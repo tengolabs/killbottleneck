@@ -394,8 +394,10 @@ mode, including the background color; only the backdrop artwork is left out.
 The project dashboard PDF and the "My day" image deliberately stay light so
 they can be sent to anyone.
 
-Community skins: <https://github.com/tengolabs/killbottleneck-skins> (CC0 — skins are
-free data; submissions welcome).
+Community skins and the **open source skin editor**:
+<https://github.com/tengolabs/killbottleneck-skins> — skins are free data (CC0), the
+editor is MIT. Try the editor right in your browser, nothing to install:
+<https://tengolabs.github.io/killbottleneck-skins/>.
 
 ## Notifications
 
@@ -596,12 +598,15 @@ anything. `FLOWMAP_*` variables in your `.env` keep working, there is no need to
 killBottleneck isn't "open source" in the strict (OSI) sense — and we say so plainly. It's
 **fair-code**: the source is public, you can download it, run it, modify it and use it, and
 for the vast majority of people it delivers the same benefits as classic open source.
+The parts that *can* be classic **open source, are**: the
+[skin editor](https://tengolabs.github.io/killbottleneck-skins/) (MIT) and the whole
+[skin gallery](https://github.com/tengolabs/killbottleneck-skins) including its validator (CC0).
 
 **You get the whole of killBottleneck — every feature, including team collaboration and the AI
 features.** No stripped-down "free version", nothing locked behind a paywall. You can even
 **power the AI yourself, for free** — with your own model (Ollama) on your machine, or your
-own API key. Our paid AI and hosting are offered only as **a convenience for those who have
-nowhere to run them** — it's convenience, not a condition.
+own API key. Our hosted cloud (AI included) is offered only as **a convenience for those who have
+nowhere to run killBottleneck** — it's convenience, not a condition.
 
 **What you may do with killBottleneck — free and with no catch:**
 - Run it yourself on your own computer or server — **your data stays with you**.

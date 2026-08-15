@@ -382,8 +382,10 @@ je věrný obrazovce** — snímá se v aktivním skinu i světlém/tmavém rež
 barvy pozadí, jen malůvka v něm není. Dashboard projektu do PDF a obrázek
 „Můj den" zůstávají záměrně vždy světlé, aby se daly poslat komukoli.
 
-Hotové skiny od komunity: <https://github.com/tengolabs/killbottleneck-skins> (CC0 —
-skiny jsou volná data, posílat vlastní je vítáno).
+Hotové skiny od komunity a **open source editor skinů**:
+<https://github.com/tengolabs/killbottleneck-skins> — skiny jsou volná data (CC0),
+editor je MIT. Editor si vyzkoušíte rovnou v prohlížeči, bez instalace:
+<https://tengolabs.github.io/killbottleneck-skins/>.
 
 ## Notifikace
 
@@ -579,13 +581,16 @@ Proměnné `FLOWMAP_*` ve vašem `.env` fungují dál, přepisovat je nemusíte.
 
 killBottleneck není „open source" v přísném (OSI) smyslu — a říkáme to na rovinu. Je **fair-code**:
 kód je veřejný, můžeš si ho stáhnout, provozovat, upravit i používat, a pro drtivou většinu
-lidí přináší stejné výhody jako klasický open source.
+lidí přináší stejné výhody jako klasický open source. Části, které klasický
+**open source být mohou, jsou**: [editor skinů](https://tengolabs.github.io/killbottleneck-skins/)
+(MIT) a celá [galerie skinů](https://github.com/tengolabs/killbottleneck-skins) včetně
+validátoru (CC0).
 
 **Dostáváš celý killBottleneck — všechny funkce, včetně týmové spolupráce i AI funkcí.** Žádná
 ořezaná „free verze", nic zamčené za paywallem. AI funkce si navíc můžeš **pohánět sám a
-zdarma** — vlastním modelem (Ollama) na svém počítači nebo vlastním API klíčem. Naši placenou
-AI a hosting nabízíme jen jako **výpomoc pro ty, kdo je nemají kde provozovat** — je to
-pohodlí, ne podmínka.
+zdarma** — vlastním modelem (Ollama) na svém počítači nebo vlastním API klíčem. Náš hostovaný
+cloud (AI v ceně) nabízíme jen jako **výpomoc pro ty, kdo killBottleneck nemají kde
+provozovat** — je to pohodlí, ne podmínka.
 
 **Co s killBottleneckem smíš — zdarma a bez háčků:**
 - Provozovat si ho sám na svém počítači či serveru — **data zůstávají u tebe**.
