@@ -409,11 +409,11 @@ below before you jump several versions.
 
 ## v0.17 — 2026-08-06
 
-- Registration funnel, trial version, and buying a plan in a few clicks.
+- A release focused on our hosted cloud (sign-up and plans); nothing changes for self-host.
 
 ## v0.16.1 — 2026-08-05
 
-- Fixes from the second review round. *(First public alpha drop.)*
+- Fixes from the second review round.
 
 ## v0.16 — 2026-08-05
 
