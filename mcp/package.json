@@ -1,0 +1,23 @@
+{
+  "name": "killbottleneck-mcp",
+  "version": "0.1.0",
+  "_comment_private": "Balíček je pod Sustainable Use License, ne pod běžnou open-source licencí — npm registry takový režim nečeká. private:true je pojistka proti nechtěnému `npm publish`; instalaci z repa (npm install) nijak nebrání.",
+  "private": true,
+  "description": "MCP server for killBottleneck — connect your AI assistant (Claude Desktop, Claude Code, …) to your killBottleneck instance and build goal maps conversationally.",
+  "type": "module",
+  "bin": {
+    "killbottleneck-mcp": "index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.24.0"
+  },
+  "license": "SEE LICENSE IN ../LICENSE"
+}

@@ -1,0 +1,136 @@
+/* ⚠️ Fonty se servírují Z VLASTNÍ INSTANCE, ne z fonts.googleapis.com. Sáhnout
+   sem po Google odkazu znamená posílat IP každého uživatele Googlu — což je
+   v přímém rozporu s vlastním slibem „data neopouštějí firmu" i s DPA, a rozbije
+   to instalace bez internetu. Soubory jsou v public/fonts (viz fonts.css). */
+@import './fonts.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 32% 17%;
+    --foreground: 45 40% 88%;
+    --card: 222 28% 21%;
+    --card-foreground: 45 40% 88%;
+    --popover: 222 28% 21%;
+    --popover-foreground: 45 40% 88%;
+    --primary: 45 85% 55%;
+    --primary-foreground: 222 45% 10%;
+    --secondary: 222 24% 26%;
+    --secondary-foreground: 45 40% 88%;
+    --muted: 222 24% 26%;
+    --muted-foreground: 220 15% 68%;
+    --accent: 45 45% 26%;
+    --accent-foreground: 45 80% 78%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 20% 32%;
+    --input: 222 20% 32%;
+    --ring: 45 85% 55%;
+    --chart-1: 45 85% 55%;
+    --chart-2: 200 70% 60%;
+    --chart-3: 340 60% 60%;
+    --chart-4: 160 50% 50%;
+    --chart-5: 270 50% 65%;
+    --radius: 0.5rem;
+    --font-heading: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-body: Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, Menlo, Consolas, monospace;
+    --sidebar-background: 222 34% 15%;
+    --sidebar-foreground: 45 35% 84%;
+    --sidebar-primary: 45 85% 55%;
+    --sidebar-primary-foreground: 222 45% 10%;
+    --sidebar-accent: 222 24% 24%;
+    --sidebar-accent-foreground: 45 40% 88%;
+    --sidebar-border: 222 20% 28%;
+    --sidebar-ring: 45 85% 55%;
+    /* Plátno mapy — hrany schválně NEjedou z --primary (v dark je bílá) */
+    --canvas-edge: 45 80% 52%;
+    --canvas-dots: 222 20% 28%;
+    --canvas-node: 220 20% 58%;
+  }
+
+  .dark {
+    /* zesvětleno z téměř černé (4 %) na měkkou tmavě šedomodrou — „až moc dark" feedback */
+    --background: 224 45% 7%;
+    --foreground: 45 40% 90%;
+    --card: 224 38% 11%;
+    --card-foreground: 45 40% 90%;
+    --popover: 224 38% 11%;
+    --popover-foreground: 45 40% 90%;
+    --primary: 45 90% 58%;
+    --primary-foreground: 224 50% 8%;
+    --secondary: 224 30% 16%;
+    --secondary-foreground: 45 40% 90%;
+    --muted: 224 30% 16%;
+    --muted-foreground: 220 15% 62%;
+    --accent: 45 55% 17%;
+    --accent-foreground: 45 85% 78%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 224 25% 22%;
+    --input: 224 25% 22%;
+    --ring: 45 90% 58%;
+    --chart-1: 45 90% 58%;
+    --chart-2: 200 70% 62%;
+    --chart-3: 340 60% 62%;
+    --chart-4: 160 50% 52%;
+    --chart-5: 270 50% 68%;
+    --sidebar-background: 224 45% 7%;
+    --sidebar-foreground: 45 40% 90%;
+    --sidebar-primary: 45 90% 58%;
+    --sidebar-primary-foreground: 224 50% 8%;
+    --sidebar-accent: 224 30% 16%;
+    --sidebar-accent-foreground: 45 40% 90%;
+    --sidebar-border: 224 25% 22%;
+    --sidebar-ring: 45 90% 58%;
+    --canvas-edge: 45 85% 52%;
+    --canvas-dots: 224 22% 18%; /* tečky pozadí — světlé #e2e8f0 by v tmavém svítily */
+    --canvas-node: 220 20% 52%;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+}
+/* Křížky pro odpojení hran musí být nad uzly (uzly mají zIndex 10),
+   jinak je uzel překryje a nejdou kliknout. */
+.react-flow__edgelabel-renderer {
+  z-index: 11 !important;
+}
+
+/* Ovládání ReactFlow plátna VŽDY z tokenů — dřív jen `.dark`, jenže skiny
+   tmavé i ve světlém režimu (Půlnoc, Terminál, Rubín) pak měly ve světlém
+   neviditelný bílý panel (Richardův screenshot 31. 7.). Tokeny se s režimem
+   přepnou samy, žádné dark-scopování není potřeba. */
+.react-flow__controls {
+  box-shadow: 0 0 2px 1px rgb(0 0 0 / 0.25);
+}
+.react-flow__controls button {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+.react-flow__controls button:hover {
+  background: hsl(var(--secondary));
+}
+.react-flow__controls button svg {
+  fill: currentColor;
+}
+.react-flow__minimap-mask {
+  fill: hsl(var(--background) / 0.6);
+}
+.react-flow__attribution {
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}

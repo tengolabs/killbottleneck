@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔐 Security vulnerability
+    url: https://github.com/tengolabs/killbottleneck/security/policy
+    about: Please do NOT open a public issue. Report privately — see SECURITY.md.
+  - name: 📖 Documentation
+    url: https://killbottleneck.com/guide/what-it-is
+    about: Installation, configuration, HTTPS, backup and the full feature guide.
+  - name: 💬 Question about using killBottleneck
+    url: https://github.com/tengolabs/killbottleneck/discussions
+    about: For "how do I…" questions, use Discussions rather than an issue.

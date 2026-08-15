@@ -1,0 +1,171 @@
+{
+  "status": {
+    "todo": "Založeno",
+    "inProgress": "Probíhá",
+    "done": "Hotovo"
+  },
+  "category": {
+    "osobni": "Osobní život",
+    "prace": "Práce",
+    "byznys": "Byznys",
+    "skola": "Škola",
+    "zdravi": "Zdraví",
+    "finance": "Finance",
+    "cestovani": "Cestování",
+    "koniky": "Koníčky",
+    "kvalita": "Kvalita a procesy",
+    "strategie": "Strategie a produktivita",
+    "procesy": "Firemní procesy"
+  },
+  "color": {
+    "blue": "Modrá",
+    "cyan": "Tyrkysová",
+    "green": "Zelená",
+    "lime": "Limetková",
+    "yellow": "Žlutá",
+    "orange": "Oranžová",
+    "red": "Červená",
+    "pink": "Růžová",
+    "purple": "Fialová",
+    "slate": "Břidlicová"
+  },
+  "weekdayAcc": {
+    "1": "pondělí",
+    "2": "úterý",
+    "3": "středu",
+    "4": "čtvrtek",
+    "5": "pátek",
+    "6": "sobotu",
+    "7": "neděli"
+  },
+  "autoCreate": {
+    "weekly": "každé {{weekday}}",
+    "monthlyLast": "poslední den v měsíci",
+    "monthlyDay": "{{day}}. den v měsíci"
+  },
+  "datePicker": {
+    "placeholder": "Vybrat termín…",
+    "format": "d. M. yyyy"
+  },
+  "nodeDeleted": "(uzel smazán)",
+  "actions": {
+    "save": "Uložit",
+    "cancel": "Zrušit",
+    "delete": "Smazat",
+    "edit": "Upravit",
+    "create": "Vytvořit",
+    "add": "Přidat",
+    "close": "Zavřít"
+  },
+  "rowActions": {
+    "done": "Hotovo",
+    "doneNote": "Označeno jako hotové",
+    "plan": "Naplánovat, kdy to řešit",
+    "planHeading": "Kdy to chci řešit",
+    "planKeepsDeadline": "Termín se tím nemění — ten se upravuje v detailu.",
+    "when": {
+      "today": "Dnes",
+      "tomorrow": "Zítra",
+      "nextWeek": "Příští týden"
+    },
+    "planned": {
+      "today": "Naplánováno na dnes",
+      "tomorrow": "Naplánováno na zítra",
+      "later": "Naplánováno"
+    },
+    "plannedNote": {
+      "today": "Naplánováno na dnes",
+      "tomorrow": "Naplánováno na zítra",
+      "nextWeek": "Naplánováno na příští týden"
+    },
+    "unplan": "Zrušit plán",
+    "unplannedNote": "Plán zrušen",
+    "plannedBadge": "Plán",
+    "failed": "Akce se nepovedla",
+    "undo": "Vrátit",
+    "focus": "Nejdůležitější úkol dne",
+    "focusHeading": "Nejdůležitější na…",
+    "focusClear": "Zrušit označení",
+    "focusNote": {
+      "today": "Označeno jako nejdůležitější na dnešek",
+      "tomorrow": "Označeno jako nejdůležitější na zítřek"
+    },
+    "focusCleared": "Označení nejdůležitějšího zrušeno"
+  },
+  "labels": {
+    "project": "Projekt",
+    "client": "Klient",
+    "note": "Poznámka"
+  },
+  "time": {
+    "hoursShort": "{{count}} h",
+    "minutesShort": "{{count}} min"
+  },
+  "misc": {
+    "untitled": "(bez názvu)",
+    "saveFailed": "Uložení se nepovedlo",
+    "statusChangeFailed": "Změna stavu se nepovedla",
+    "timerToggleFailed": "Stopky se nepodařilo přepnout",
+    "tryAgainPlease": "Zkuste to prosím znovu.",
+    "noProject": "Bez projektu",
+    "noClient": "Bez klienta"
+  },
+  "export": {
+    "csvFilename": "killbottleneck-ukoly",
+    "reportFilename": "killbottleneck-report",
+    "mapFilename": "mapa-cilu",
+    "colProject": "Projekt",
+    "colNode": "Uzel",
+    "colTask": "Úkol",
+    "colParentTask": "Nadřazený úkol",
+    "colStatus": "Stav",
+    "colAssignee": "Přiřazeno",
+    "colDeadline": "Termín",
+    "colCreatedBy": "Zadal",
+    "reportTitle": "Report úkolů",
+    "generated": "Vygenerováno {{date}} z killBottleneck.",
+    "projectHeading": "Projekt: {{title}}",
+    "unknownProject": "(neznámý)",
+    "tasksWithoutNode": "Úkoly bez uzlu:",
+    "looseTasks": "Volné úkoly (bez projektu)",
+    "overdueHeading": "⚠️ Po termínu ({{count}})",
+    "deadlineNote": "termín {{date}}",
+    "inProgressNote": "probíhá"
+  },
+  "skins": {
+    "indigo": "Indigo",
+    "contrast": "Vysoký kontrast",
+    "terminal": "Terminál",
+    "sepia": "Papír",
+    "ocean": "Oceán",
+    "les": "Les",
+    "pulnoc": "Půlnoc",
+    "svestka": "Švestka",
+    "broskev": "Broskev",
+    "grafit": "Grafit",
+    "rubin": "Rubín"
+  },
+  "skinDesc": {
+    "indigo": "Výchozí vzhled aplikace.",
+    "contrast": "Maximální čitelnost — čistá bílá/černá, ostré hrany, systémové fonty.",
+    "terminal": "Zelená na tmavé, mono fonty, ostré rohy — tmavý duch v obou režimech.",
+    "sepia": "Teplé papírové tóny se serifovými nadpisy — klidné čtení.",
+    "ocean": "Chladná modrá — klid a soustředění.",
+    "les": "Zelená příroda — teplé světlo mezi stromy.",
+    "pulnoc": "Noční modř se zlatými akcenty — tmavá v obou režimech.",
+    "svestka": "Sytá fialová — hravá, ale ne křiklavá.",
+    "broskev": "Teplá broskvová — měkké rohy, přátelský tón.",
+    "grafit": "Černobílý minimalismus — žádné barvy, jen obsah.",
+    "rubin": "Červená na černé — šetří noční vidění (hvězdárny, staré palubovky)."
+  },
+  "trial": {
+    "remaining_one": "Zkušební verze — zbývá poslední den",
+    "remaining_few": "Zkušební verze — zbývají {{count}} dny",
+    "remaining_other": "Zkušební verze — zbývá {{count}} dní",
+    "expired": "Zkušební doba skončila — data jsou v bezpečí, zápis je pozastavený",
+    "cta": "Vybrat tarif"
+  },
+  "links": {
+    "inDescription": "Odkazy v popisu:"
+  }
+}

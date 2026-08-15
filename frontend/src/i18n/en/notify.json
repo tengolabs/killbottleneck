@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Notifications",
+    "subtitle": "Everything that concerns you, in one place.",
+    "empty": "No notifications yet.",
+    "emptyUnread": "Nothing unread.",
+    "markAllRead": "Mark all as read",
+    "showAll": "Show all",
+    "back": "Back",
+    "unreadCount_one": "{{count}} unread",
+    "unreadCount_few": "{{count}} unread",
+    "unreadCount_many": "{{count}} unread",
+    "unreadCount_other": "{{count}} unread",
+    "pageOf": "Page {{page}} of {{total}}",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "filter": {
+    "all": "All",
+    "unread": "Unread",
+    "allTypes": "All types"
+  },
+  "type": {
+    "task_assigned": "Task assigned",
+    "task_comment": "Task comment",
+    "node_assigned": "Goal assigned",
+    "node_unblocked": "Goal is ready",
+    "map_created": "New project",
+    "timer_autostop": "Timer stopped",
+    "node_comment": "Goal comment",
+    "map_shared": "Project shared",
+    "ai_request": "AI agent request",
+    "deadline": "Upcoming due date",
+    "agent_done": "Automation finished",
+    "agent_failed": "Automation failed",
+    "automation_ready": "Automation is ready",
+    "deadline_request": "Due date change request",
+    "deadline_request_resolved": "Due date request resolved",
+    "user_joined": "New member signed in",
+    "rule_notice": "Rule message",
+    "rule_broken": "Broken rule"
+  },
+  "prefs": {
+    "title": "Notification settings",
+    "description": "Choose what you want to hear about. Applies to your account only.",
+    "colType": "Type",
+    "colInApp": "In app",
+    "colEmail": "E-mail",
+    "emailDisabled": "E-mail is not configured on this server yet. Once your administrator enables sending, you can choose it here.",
+    "saved": "Settings saved.",
+    "saveFailed": "Could not save the settings.",
+    "emailModeTitle": "Emails overall",
+    "emailModeDesc": "One rule above the toggles below — what may reach you by e-mail.",
+    "emailModeInstant": "Instantly",
+    "emailModeInstantDesc": "Every checked event is e-mailed right away.",
+    "emailModeDigest": "Daily digest",
+    "emailModeDigestDesc": "No individual e-mails; one digest arrives once a day.",
+    "emailModeNone": "Nothing",
+    "emailModeNoneDesc": "Nothing is e-mailed. Notifications stay in the app.",
+    "emailModeOverridden": "Controlled by the e-mail mode above"
+  },
+  "native": {
+    "newUnread_one": "{{count}} new notification",
+    "newUnread_few": "{{count}} new notifications",
+    "newUnread_other": "{{count}} new notifications"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "billing": {
+    "heading": "Fakturační údaje",
+    "hint": "Pro zkušební verzi nejsou potřeba — vyplňte je před objednávkou členství. Objeví se na fakturách.",
+    "billingCompany": "Název firmy / jméno *",
+    "billingIco": "IČO",
+    "billingDic": "DIČ",
+    "billingStreet": "Ulice a číslo *",
+    "billingCity": "Město *",
+    "billingZip": "PSČ *",
+    "billingEmail": "E-mail pro faktury",
+    "saveButton": "Uložit fakturační údaje",
+    "savedButton": "Uloženo"
+  },
+  "membership": {
+    "heading": "Členství a platba",
+    "hint": "Vyberte tarif a způsob platby.",
+    "hintTrial": "Zkušební verze běží do {{date}}. Vyberte tarif a způsob platby — data i adresa zůstanou beze změny.",
+    "plan": {
+      "cloud-lite-year": "Cloud Lite — roční",
+      "cloud-lite-quarter": "Cloud Lite — čtvrtletní",
+      "privat-standard-month": "Privát Standard",
+      "privat-business-month": "Privát Business"
+    },
+    "planHint": {
+      "cloud-lite-year": "sdílený server, 2 uživatelé, AI v ceně",
+      "cloud-lite-quarter": "sdílený server, 2 uživatelé, AI v ceně",
+      "privat-standard-month": "vlastní server, bez limitu uživatelů",
+      "privat-business-month": "vlastní server, priorita podpory"
+    },
+    "period": {
+      "year": "rok",
+      "quarter": "3 měsíce",
+      "month": "měsíc"
+    },
+    "payByCard": "Zaplatit kartou",
+    "cardUnavailable": "Platba kartou se připravuje — zatím prosím převodem (roční) nebo přes support@killbottleneck.com.",
+    "orderByTransfer": "Objednat převodem (faktura)",
+    "transferYearlyOnly": "Platba převodem je jen u ročního členství.",
+    "billingFirst": "Nejdřív vyplňte a uložte fakturační údaje výš.",
+    "orderReceived": "Objednávku jsme přijali.",
+    "orderReceivedHint": "Na e-mail vám pošleme fakturu na {{amount}} Kč — po jejím zaplacení členství aktivujeme. Data i adresa zůstávají."
+  },
+  "account": {
+    "heading": "Můj účet",
+    "fullName": "Jméno a příjmení",
+    "displayName": "Zobrazované jméno",
+    "displayNamePlaceholder": "např. přezdívka",
+    "displayNameHint": "Pod tímhle jménem vás vidí ostatní v uzlech a seznamech. Prázdné = celé jméno, případně e-mail.",
+    "saveNames": "Uložit",
+    "savedNames": "Uloženo.",
+    "saveFailed": "Uložení se nepovedlo.",
+    "passwordHeading": "Změna hesla",
+    "oldPassword": "Současné heslo",
+    "newPassword": "Nové heslo",
+    "newPassword2": "Nové heslo znovu",
+    "changePassword": "Změnit heslo",
+    "passwordMismatch": "Nová hesla se neshodují.",
+    "passwordChanged": "Heslo změněno — přihlaste se prosím znovu.",
+    "passwordFailed": "Změna hesla se nepovedla.",
+    "passwordRelogin": "Po změně hesla vás aplikace odhlásí — je to schválně, staré přihlášení přestává platit všude."
+  }
+}

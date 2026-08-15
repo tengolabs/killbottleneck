@@ -1,0 +1,65 @@
+name: 🐛 Bug report
+description: Something does not work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The single most useful thing you can give us is
+        **how to reproduce it** — that is usually the difference between a fix this week
+        and a fix never.
+
+        ⚠️ Found a security problem? Do **not** file it here. See [SECURITY.md](../blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a map
+        2. Click …
+        3. …
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: killBottleneck version
+      description: Bottom of the "About" dialog, or `docker compose exec app printenv KB_VERSION`.
+      placeholder: "v0.20.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Self-hosted (Docker on my own server)
+        - Hosted (killbottleneck.com)
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: Browser / device
+      placeholder: "Firefox 141 on Windows 11 / Chrome on Android 15"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: |
+        `docker compose logs --tail 100 app`, or the browser console.
+        **Please remove any tokens, e-mail addresses and customer names first.**
+      render: shell

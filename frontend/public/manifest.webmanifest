@@ -1,0 +1,29 @@
+{
+  "name": "killBottleneck",
+  "short_name": "killBottleneck",
+  "description": "A living map of your work — and a simple list of what to do today.",
+  "start_url": "/lite",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121F32",
+  "theme_color": "#1C2067",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

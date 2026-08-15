@@ -1,0 +1,6 @@
+node_modules/
+dist/
+pb_data/
+.env
+docker-compose.override.yml
+server/pb_public/

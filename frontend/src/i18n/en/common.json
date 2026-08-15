@@ -1,0 +1,171 @@
+{
+  "status": {
+    "todo": "To do",
+    "inProgress": "In progress",
+    "done": "Done"
+  },
+  "category": {
+    "osobni": "Personal life",
+    "prace": "Work",
+    "byznys": "Business",
+    "skola": "School",
+    "zdravi": "Health",
+    "finance": "Finance",
+    "cestovani": "Travel",
+    "koniky": "Hobbies",
+    "kvalita": "Quality & processes",
+    "strategie": "Strategy & productivity",
+    "procesy": "Company processes"
+  },
+  "color": {
+    "blue": "Blue",
+    "cyan": "Turquoise",
+    "green": "Green",
+    "lime": "Lime",
+    "yellow": "Yellow",
+    "orange": "Orange",
+    "red": "Red",
+    "pink": "Pink",
+    "purple": "Purple",
+    "slate": "Slate"
+  },
+  "weekdayAcc": {
+    "1": "Monday",
+    "2": "Tuesday",
+    "3": "Wednesday",
+    "4": "Thursday",
+    "5": "Friday",
+    "6": "Saturday",
+    "7": "Sunday"
+  },
+  "autoCreate": {
+    "weekly": "every {{weekday}}",
+    "monthlyLast": "last day of the month",
+    "monthlyDay": "day {{day}} of the month"
+  },
+  "datePicker": {
+    "placeholder": "Pick a date…",
+    "format": "d MMM yyyy"
+  },
+  "nodeDeleted": "(node deleted)",
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "add": "Add",
+    "close": "Close"
+  },
+  "rowActions": {
+    "done": "Done",
+    "doneNote": "Marked as done",
+    "plan": "Plan when to do it",
+    "planHeading": "When I want to do it",
+    "planKeepsDeadline": "This does not change the due date — edit that in the detail.",
+    "when": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "nextWeek": "Next week"
+    },
+    "planned": {
+      "today": "Planned for today",
+      "tomorrow": "Planned for tomorrow",
+      "later": "Planned"
+    },
+    "plannedNote": {
+      "today": "Planned for today",
+      "tomorrow": "Planned for tomorrow",
+      "nextWeek": "Planned for next week"
+    },
+    "unplan": "Clear the plan",
+    "unplannedNote": "Plan cleared",
+    "plannedBadge": "Planned",
+    "failed": "Action failed",
+    "undo": "Undo",
+    "focus": "Most important task of the day",
+    "focusHeading": "Most important for…",
+    "focusClear": "Remove the mark",
+    "focusNote": {
+      "today": "Marked as most important for today",
+      "tomorrow": "Marked as most important for tomorrow"
+    },
+    "focusCleared": "Most-important mark removed"
+  },
+  "labels": {
+    "project": "Project",
+    "client": "Client",
+    "note": "Note"
+  },
+  "time": {
+    "hoursShort": "{{count}} h",
+    "minutesShort": "{{count}} min"
+  },
+  "misc": {
+    "untitled": "(untitled)",
+    "saveFailed": "Saving failed",
+    "statusChangeFailed": "Status change failed",
+    "timerToggleFailed": "Couldn't toggle the timer",
+    "tryAgainPlease": "Please try again.",
+    "noProject": "No project",
+    "noClient": "No client"
+  },
+  "export": {
+    "csvFilename": "killbottleneck-tasks",
+    "reportFilename": "killbottleneck-report",
+    "mapFilename": "goal-map",
+    "colProject": "Project",
+    "colNode": "Node",
+    "colTask": "Task",
+    "colParentTask": "Parent task",
+    "colStatus": "Status",
+    "colAssignee": "Assignee",
+    "colDeadline": "Deadline",
+    "colCreatedBy": "Created by",
+    "reportTitle": "Task report",
+    "generated": "Generated {{date}} from killBottleneck.",
+    "projectHeading": "Project: {{title}}",
+    "unknownProject": "(unknown)",
+    "tasksWithoutNode": "Tasks without a node:",
+    "looseTasks": "Loose tasks (no project)",
+    "overdueHeading": "⚠️ Overdue ({{count}})",
+    "deadlineNote": "due {{date}}",
+    "inProgressNote": "in progress"
+  },
+  "skins": {
+    "indigo": "Indigo",
+    "contrast": "High contrast",
+    "terminal": "Terminal",
+    "sepia": "Paper",
+    "ocean": "Ocean",
+    "les": "Forest",
+    "pulnoc": "Midnight",
+    "svestka": "Plum",
+    "broskev": "Peach",
+    "grafit": "Graphite",
+    "rubin": "Ruby"
+  },
+  "skinDesc": {
+    "indigo": "The default look.",
+    "contrast": "Maximum readability — pure black and white, sharp corners, system fonts.",
+    "terminal": "Green on dark, mono fonts, sharp corners — dark spirit in both modes.",
+    "sepia": "Warm paper tones with serif headings — calm reading.",
+    "ocean": "Cool blue — calm and focus.",
+    "les": "Green nature — warm light between the trees.",
+    "pulnoc": "Deep night blue with golden accents — dark in both modes.",
+    "svestka": "Rich purple — playful, not loud.",
+    "broskev": "Warm peach — soft corners, friendly tone.",
+    "grafit": "Black-and-white minimalism — no colors, just content.",
+    "rubin": "Red on black — preserves night vision (observatories, old dashboards)."
+  },
+  "trial": {
+    "remaining_one": "Trial — one day left",
+    "remaining_other": "Trial — {{count}} days left",
+    "expired": "The trial has ended — your data is safe, writing is paused",
+    "cta": "Choose a plan",
+    "remaining_few": "Trial — {{count}} days left"
+  },
+  "links": {
+    "inDescription": "Links in the description:"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "nav": {
+    "today": "Today",
+    "delegated": "Assigned",
+    "notifications": "Inbox"
+  },
+  "today": {
+    "title": "What I need to do today",
+    "empty": "Nothing for today. Enjoy it.",
+    "emptyHint": "Anything new will show up here.",
+    "overdue": "Overdue",
+    "dueToday": "Today",
+    "tomorrow": "Tomorrow",
+    "week": "Within a week",
+    "blocking": "People are waiting on you",
+    "stuck": "Not moving",
+    "later": "Later",
+    "noDate": "No due date",
+    "doneToday": "done: {{count}}",
+    "idea": "idea",
+    "doneList": "Done today"
+  },
+  "delegated": {
+    "title": "What I assigned",
+    "empty": "Nobody owes you anything.",
+    "emptyHint": "Work you assign to others shows up here.",
+    "assignee": "with {{email}}"
+  },
+  "notifications": {
+    "title": "Inbox",
+    "empty": "No new messages.",
+    "markAll": "Mark all as read"
+  },
+  "add": {
+    "button": "New task",
+    "title": "New task",
+    "name": "What needs doing",
+    "deadline": "Due date (optional)",
+    "project": "Project",
+    "noProject": "Create a project in the full version first.",
+    "save": "Add",
+    "failed": "Couldn't add the task",
+    "toBuffer": "No project (to the idea inbox)",
+    "asTask": "Creates a goal in the project map — assigned to you.",
+    "asIdea": "Saved as your idea in the inbox — file it into a project later."
+  },
+  "switch": {
+    "toFull": "Switch to the full version",
+    "toLite": "Simplified view",
+    "hint": "Maps, sharing and settings live in the full version."
+  },
+  "loadFailed": "Couldn't load your data.",
+  "retry": "Try again",
+  "offline": "You're offline — showing the last loaded state.",
+  "error": {
+    "actionFailed": "The action could not be completed"
+  },
+  "truncated": "This overview is truncated — you have more work than fits here. Open the full version.",
+  "skins": {
+    "label": "Appearance",
+    "custom": "Custom",
+    "toLight": "Switch to light mode",
+    "toDark": "Switch to dark mode",
+    "hint": "You can change the look any time — try it right here.",
+    "hintClose": "Dismiss hint"
+  },
+  "focusBadge": {
+    "today": "most important today",
+    "tomorrow": "most important tomorrow"
+  },
+  "homeLink": "Back to today's list"
+}

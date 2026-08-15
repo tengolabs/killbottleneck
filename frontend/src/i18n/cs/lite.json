@@ -1,0 +1,72 @@
+{
+  "nav": {
+    "today": "Dnes",
+    "delegated": "Zadal jsem",
+    "notifications": "Zprávy"
+  },
+  "today": {
+    "title": "Co mám dnes dělat",
+    "empty": "Na dnešek nic nemáte. Užijte si to.",
+    "emptyHint": "Co přibude, uvidíte tady.",
+    "overdue": "Po termínu",
+    "dueToday": "Dnes",
+    "tomorrow": "Zítra",
+    "week": "Do týdne",
+    "blocking": "Čeká se na vás",
+    "stuck": "Tohle se nehýbe",
+    "later": "Později",
+    "noDate": "Bez termínu",
+    "doneToday": "hotovo: {{count}}",
+    "idea": "nápad",
+    "doneList": "Hotovo dnes"
+  },
+  "delegated": {
+    "title": "Co jsem zadal",
+    "empty": "Nikomu nic nečeká.",
+    "emptyHint": "Až někomu něco zadáte, budete to hlídat tady.",
+    "assignee": "řeší {{email}}"
+  },
+  "notifications": {
+    "title": "Zprávy",
+    "empty": "Žádné nové zprávy.",
+    "markAll": "Označit vše jako přečtené"
+  },
+  "add": {
+    "button": "Nový úkol",
+    "title": "Nový úkol",
+    "name": "Co je potřeba udělat",
+    "deadline": "Termín (nepovinný)",
+    "project": "Projekt",
+    "noProject": "Nejdřív si založte projekt v plné verzi.",
+    "save": "Přidat",
+    "failed": "Úkol se nepodařilo přidat",
+    "toBuffer": "Bez projektu (do zásobníku nápadů)",
+    "asTask": "Vznikne cíl v mapě projektu — přiřazený vám.",
+    "asIdea": "Uloží se jako váš nápad do zásobníku — do projektu ho zařadíte později."
+  },
+  "switch": {
+    "toFull": "Přepnout na plnou verzi",
+    "toLite": "Zjednodušené zobrazení",
+    "hint": "Mapy, sdílení a nastavení najdete v plné verzi."
+  },
+  "loadFailed": "Nepodařilo se načíst data.",
+  "retry": "Zkusit znovu",
+  "offline": "Jste offline — vidíte poslední načtený stav.",
+  "error": {
+    "actionFailed": "Akci se nepodařilo provést"
+  },
+  "truncated": "Přehled je zkrácený — máš víc práce, než se sem vejde. Otevři plnou verzi.",
+  "skins": {
+    "label": "Vzhled",
+    "custom": "Vlastní",
+    "toLight": "Přepnout na světlý režim",
+    "toDark": "Přepnout na tmavý režim",
+    "hint": "Vzhled si můžete kdykoli změnit — zkuste to hned tady.",
+    "hintClose": "Zavřít nápovědu"
+  },
+  "focusBadge": {
+    "today": "nejdůležitější dnes",
+    "tomorrow": "nejdůležitější zítra"
+  },
+  "homeLink": "Zpět na dnešní seznam"
+}

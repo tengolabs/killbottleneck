@@ -1,0 +1,36 @@
+name: 💡 Idea or wish
+description: Something that would make your work easier.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are genuinely welcome — they are the main way the product moves.
+
+        Before you write: killBottleneck deliberately says **no** to a lot, so that it does not
+        slowly turn into every other bloated task tracker. Every new feature has to pass the
+        anti-bloat rule in [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) — no mandatory new
+        field, no permanent new item in the main navigation. A "no" here is about the product's
+        shape, not about your idea being bad.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you actually trying to do?
+      description: >
+        Describe the situation, not the solution. "I need to see which goals slipped this week"
+        tells us more than "add a filter dropdown" — there may be a better answer than the one
+        you had in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you handle it today?
+      description: Workaround, another tool, on paper, or not at all.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you had in mind (optional)

@@ -1,0 +1,97 @@
+{
+  "header": {
+    "defaultTitle": "killBottleneck",
+    "userMenu": "User menu",
+    "homeLink": "Back to home"
+  },
+  "menu": {
+    "inviteTeam": "Invite to team",
+    "orgAdmin": "Organization settings",
+    "workedTime": "Worked time",
+    "clients": "Clients",
+    "apiKeys": "API keys",
+    "about": "About",
+    "logout": "Sign out",
+    "aiAgents": "AI agent registry",
+    "appearance": "Appearance",
+    "docs": "Documentation",
+    "myAccount": "My account",
+    "orgStructure": "Org structure"
+  },
+  "nav": {
+    "projects": "Projects",
+    "tasks": "Tasks",
+    "templates": "Templates",
+    "myMap": "My map"
+  },
+  "notFound": {
+    "title": "Page Not Found",
+    "descBefore": "The page",
+    "descAfter": "could not be found in this application.",
+    "goHome": "Go Home"
+  },
+  "about": {
+    "title": "About killBottleneck",
+    "description": "killBottleneck is a fair-code tool for goal maps, projects and tasks. For an ordinary user or company it works like open source — no strings: download it, run it, modify it, use it commercially. You just may not resell it as a hosted service.",
+    "docsTitle": "Documentation",
+    "docsDesc": "illustrated tutorials, features and setup",
+    "youtubeTitle": "YouTube channel",
+    "youtubeDesc": "tutorials, news and AI experiments from the authors",
+    "discordTitle": "Discord community",
+    "discordDesc": "questions, ideas, deployment help",
+    "versionLine": "Version {{version}}",
+    "updateAvailable": "Version {{version}} is available",
+    "updateCurrent": "You have {{version}} — click for release notes",
+    "supportHosted": "Enjoying killBottleneck? Support the project by telling others about it."
+  },
+  "theme": {
+    "toLight": "Switch to light mode",
+    "toDark": "Switch to dark mode"
+  },
+  "ownerSelect": {
+    "none": "Nobody",
+    "hasAccess": "Has access to the map",
+    "others": "Other team members (will share the map)",
+    "confirmShare": "{{email}} doesn't have access to this map.\n\nShare it with them with edit rights and assign them?"
+  },
+  "skins": {
+    "title": "Appearance",
+    "description": "Pick a skin or import your own. A skin applies to both light and dark mode and is saved to your account.",
+    "custom": "Custom",
+    "importBtn": "Import skin",
+    "importFile": "From file…",
+    "importCancel": "Cancel",
+    "importApply": "Apply",
+    "importPlaceholder": "Paste skin JSON (kb-skin format)…",
+    "importInvalid": "Skin import failed",
+    "importNotJson": "Input is not valid JSON.",
+    "importWarnings": "Part of the skin is unknown to this version and was skipped",
+    "exportBtn": "Export",
+    "gallery": "Skin gallery",
+    "previewMode": "Preview in mode",
+    "modeLight": "Light",
+    "modeDark": "Dark"
+  },
+  "externalContacts": {
+    "title": "External contacts",
+    "description": "People outside the system — accountants, suppliers. They have no account, receive no notifications and know nothing about this; it is purely your internal deadline tracking.",
+    "newContact": "New contact",
+    "namePlaceholder": "e.g. Accountant — Ms. Smith",
+    "emailLabel": "E-mail (for your records only)",
+    "emailPlaceholder": "e-mail (optional)",
+    "emailHint": "The e-mail is just a note for you — the system never sends anything to it.",
+    "noteLabel": "Note",
+    "notePlaceholder": "note (optional)",
+    "privateLabel": "Private contact",
+    "privateHint": "Only you can see it. On a shared map others see just “External contact” without the name.",
+    "privateBadge": "Private — visible only to you",
+    "empty": "No contacts yet.",
+    "deleteConfirm": "Delete contact “{{name}}”? Existing assignments stay and show “External contact” instead of the name.",
+    "saveFailed": "Failed to save the contact.",
+    "deleteFailed": "Failed to delete the contact.",
+    "unknown": "External contact",
+    "group": "External contacts",
+    "addNew": "+ New external contact…",
+    "manage": "Manage contacts…"
+  }
+}

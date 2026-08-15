@@ -1,0 +1,103 @@
+# TRANSITION (rename to killBottleneck): variables are named KB_*, but anyone
+# still holding old FLOWMAP_* names in .env must keep working — hence the
+# ${KB_X:-${FLOWMAP_X:-default}} form: new name wins, then old, then the default.
+#
+# The server understands the old name on its own too (helpers.js:env), but only
+# for variables that actually reach the container — and compose only lets through
+# what is listed here. So the two layers serve different users: this one handles
+# `docker compose` with an old .env, the one in the server handles
+# `docker run -e FLOWMAP_…`.
+# (It looks like the same thing handled twice. It isn't. Don't remove either
+# without verifying both.)
+services:
+  killbottleneck:
+    build:
+      context: .
+      args:
+        # Instance version. Without it the value stays "dev" and the update check
+        # is not offered — exactly what we want for work in progress. Real number:
+        #   ./nasadit-staging.sh  (razítko + build + kontrola verze — NEpouštět compose ručně)
+        KB_VERSION: ${KB_VERSION:-v0.33-beta}
+    container_name: killbottleneck
+    ports:
+      - "${KB_PORT:-${FLOWMAP_PORT:-8090}}:8090"
+    volumes:
+      - ./pb_data:/app/pb_data
+    environment:
+      # Instance time zone: the recurring-template cron creates projects in the
+      # client's LOCAL time (both weekday and hour). Default UTC = no change; a
+      # client in another zone sets e.g. Europe/Prague. Requires tzdata in the
+      # image (see Dockerfile).
+      TZ: ${TZ:-UTC}
+      # Hour of automatic creation (0–23, local TZ), default 5.
+      KB_AUTO_HOUR: ${KB_AUTO_HOUR:-${FLOWMAP_AUTO_HOUR:-5}}
+      # Update check. The signed-in user's BROWSER asks the GitHub API; the
+      # instance itself sends nothing anywhere (no telemetry). 0 = turn off.
+      KB_UPDATE_CHECK: ${KB_UPDATE_CHECK:-1}
+      # Where releases are read from (forks/tests only; empty = official repo).
+      KB_UPDATE_REPO: ${KB_UPDATE_REPO:-}
+      # Public address of the instance — ONLY for automations (AI agent / cron on
+      # a goal). killBottleneck sends it to the agent as callback_url to report back
+      # to when it finishes. Without it the "Application URL" from the PocketBase
+      # settings is used, which after installation is http://localhost:8090 — an n8n
+      # running elsewhere would then call itself.
+      KB_PUBLIC_URL: ${KB_PUBLIC_URL:-${FLOWMAP_PUBLIC_URL:-}}
+      # How many minutes an automation may run before the watchdog fails it.
+      KB_AGENT_TIMEOUT_MIN: ${KB_AGENT_TIMEOUT_MIN:-${FLOWMAP_AGENT_TIMEOUT_MIN:-90}}
+      # Allow the agent webhook into a PRIVATE network (self-host where n8n runs
+      # on the same LAN). Disabled by default — otherwise the server could be used
+      # to scan the internal network.
+      KB_ALLOW_PRIVATE_WEBHOOKS: ${KB_ALLOW_PRIVATE_WEBHOOKS:-${FLOWMAP_ALLOW_PRIVATE_WEBHOOKS:-}}
+      # Hosted instance (at a provider, next to other customers): stops the
+      # administrator pointing the AI service into a private network. On your own
+      # server leave this empty — a local Ollama is the normal setup there.
+      KB_HOSTED: ${KB_HOSTED:-${FLOWMAP_HOSTED:-}}
+      # Cap on uploaded attachments across the whole instance, in MB. Empty = no
+      # limit, 0 = uploading disabled (attachments as links only).
+      KB_FILES_MB: ${KB_FILES_MB:-${FLOWMAP_FILES_MB:-}}
+      # Backwards compatibility: an instance where e-mails already arrive keeps
+      # them by setting this to 1, even after per-user notification preferences.
+      KB_NOTIFY_EMAIL_DEFAULT: ${KB_NOTIFY_EMAIL_DEFAULT:-${FLOWMAP_NOTIFY_EMAIL_DEFAULT:-}}
+      # Hour of deadline notices (0–23, local TZ), default 7.
+      KB_DEADLINE_HOUR: ${KB_DEADLINE_HOUR:-${FLOWMAP_DEADLINE_HOUR:-7}}
+      # Hour of the daily e-mail digest (0–23, local TZ), default 8.
+      KB_NOTIFY_DIGEST_HOUR: ${KB_NOTIFY_DIGEST_HOUR:-${FLOWMAP_NOTIFY_DIGEST_HOUR:-8}}
+      # Notification budget per recipient per day — a runaway automation must not
+      # bury someone. Above the in-app cap the rows collapse into one growing
+      # summary; above the e-mail cap the e-mails are dropped. No "unlimited".
+      KB_NOTIFY_DAILY_CAP: ${KB_NOTIFY_DAILY_CAP:-${FLOWMAP_NOTIFY_DAILY_CAP:-50}}
+      KB_NOTIFY_EMAIL_DAILY_CAP: ${KB_NOTIFY_EMAIL_DAILY_CAP:-${FLOWMAP_NOTIFY_EMAIL_DAILY_CAP:-10}}
+      # Minutes over which notices for the same recipient are merged into one.
+      KB_NOTIFY_COALESCE_MIN: ${KB_NOTIFY_COALESCE_MIN:-${FLOWMAP_NOTIFY_COALESCE_MIN:-10}}
+      # Create the sample map for every new user? 0 = start with an empty account.
+      KB_UVODNI_MAPA: ${KB_UVODNI_MAPA:-${FLOWMAP_UVODNI_MAPA:-1}}
+      # AI switch: none = no AI | api = remote AI service (URL + token) | ollama = your own local model | custom = your own endpoint
+      KB_AI_PROVIDER: ${KB_AI_PROVIDER:-${FLOWMAP_AI_PROVIDER:-none}}
+      KB_AI_URL: ${KB_AI_URL:-${FLOWMAP_AI_URL:-}}
+      KB_AI_TOKEN: ${KB_AI_TOKEN:-${FLOWMAP_AI_TOKEN:-}}
+      KB_AI_MODEL: ${KB_AI_MODEL:-${FLOWMAP_AI_MODEL:-}}
+      KB_AI_TRANSCRIBE_URL: ${KB_AI_TRANSCRIBE_URL:-${FLOWMAP_AI_TRANSCRIBE_URL:-}}
+      # Daily AI summaries (dashboard on /tasks): hour of morning generation
+      # (0–23, local TZ, default 6) plus an optional dedicated model JUST for
+      # summaries — when KB_SUMMARY_PROVIDER is set, summaries bypass the general
+      # AI config (a smaller/faster model suits short formatted text).
+      KB_SUMMARY_HOUR: ${KB_SUMMARY_HOUR:-${FLOWMAP_SUMMARY_HOUR:-6}}
+      # Morning generation only for accounts signed in within the last N days
+      # (0 = everyone); others get theirs when they open the app.
+      KB_SUMMARY_ACTIVE_DAYS: ${KB_SUMMARY_ACTIVE_DAYS:-${FLOWMAP_SUMMARY_ACTIVE_DAYS:-14}}
+      KB_SUMMARY_PROVIDER: ${KB_SUMMARY_PROVIDER:-${FLOWMAP_SUMMARY_PROVIDER:-}}
+      KB_SUMMARY_URL: ${KB_SUMMARY_URL:-${FLOWMAP_SUMMARY_URL:-}}
+      KB_SUMMARY_MODEL: ${KB_SUMMARY_MODEL:-${FLOWMAP_SUMMARY_MODEL:-}}
+      KB_SUMMARY_TOKEN: ${KB_SUMMARY_TOKEN:-${FLOWMAP_SUMMARY_TOKEN:-}}
+      # Instance registration key: when set, every self-registration requires it
+      # (hosted instances have a public domain). Empty = registration without a key.
+      KB_SETUP_CODE: ${KB_SETUP_CODE:-${FLOWMAP_SETUP_CODE:-}}
+      # Sign in with Google (optional): your own OAuth client from the Google Cloud
+      # Console. When empty, the "Sign in with Google" button is not shown.
+      KB_GOOGLE_CLIENT_ID: ${KB_GOOGLE_CLIENT_ID:-${FLOWMAP_GOOGLE_CLIENT_ID:-}}
+      KB_GOOGLE_CLIENT_SECRET: ${KB_GOOGLE_CLIENT_SECRET:-${FLOWMAP_GOOGLE_CLIENT_SECRET:-}}
+      KB_GOOGLE_PICKER_API_KEY: ${KB_GOOGLE_PICKER_API_KEY:-}
+    restart: unless-stopped
+
+# Wiring to other services (reverse proxy, AI gateway on the same machine…)
+# goes into docker-compose.override.yml — see README.

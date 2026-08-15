@@ -1,0 +1,97 @@
+{
+  "header": {
+    "defaultTitle": "killBottleneck",
+    "userMenu": "Uživatelské menu",
+    "homeLink": "Zpět na úvodní stránku"
+  },
+  "menu": {
+    "inviteTeam": "Pozvat do týmu",
+    "orgAdmin": "Správa organizace",
+    "workedTime": "Odpracovaný čas",
+    "clients": "Klienti",
+    "apiKeys": "API klíče",
+    "about": "O aplikaci",
+    "logout": "Odhlásit se",
+    "aiAgents": "Registr AI agentů",
+    "appearance": "Vzhled",
+    "docs": "Dokumentace",
+    "myAccount": "Můj účet",
+    "orgStructure": "Organizační struktura"
+  },
+  "nav": {
+    "projects": "Projekty",
+    "tasks": "Úkoly",
+    "templates": "Šablony",
+    "myMap": "Moje mapa"
+  },
+  "notFound": {
+    "title": "Stránka nenalezena",
+    "descBefore": "Stránku",
+    "descAfter": "se v této aplikaci nepodařilo najít.",
+    "goHome": "Zpět na úvod"
+  },
+  "about": {
+    "title": "O aplikaci killBottleneck",
+    "description": "killBottleneck je fair-code nástroj pro mapy cílů, projekty a úkoly. Pro běžného uživatele i firmu je to jako open source — bez omezení: stáhnete, spustíte, upravíte, používáte i komerčně. Nesmí se jen přeprodávat jako hostovaná služba.",
+    "docsTitle": "Dokumentace",
+    "docsDesc": "návody s obrázky, funkce i nastavení",
+    "youtubeTitle": "YouTube kanál",
+    "youtubeDesc": "návody, novinky a AI experimenty od autorů",
+    "discordTitle": "Komunita na Discordu",
+    "discordDesc": "otázky, nápady, pomoc s nasazením",
+    "versionLine": "Verze {{version}}",
+    "updateAvailable": "Je dostupná verze {{version}}",
+    "updateCurrent": "Máte {{version}} — klikněte pro poznámky k vydání",
+    "supportHosted": "Líbí se vám killBottleneck? Podpořte vývoj tím, že o něm řeknete dál."
+  },
+  "theme": {
+    "toLight": "Přepnout na světlý režim",
+    "toDark": "Přepnout na tmavý režim"
+  },
+  "ownerSelect": {
+    "none": "Nikdo",
+    "hasAccess": "Má přístup k mapě",
+    "others": "Ostatní členové týmu (nasdílí mapu)",
+    "confirmShare": "{{email}} nemá přístup k této mapě.\n\nNasdílet mu mapu s právem upravovat a přiřadit ho?"
+  },
+  "skins": {
+    "title": "Vzhled aplikace",
+    "description": "Vyber skin, nebo si naimportuj vlastní. Skin platí pro světlý i tmavý režim a uloží se k účtu.",
+    "custom": "Vlastní",
+    "importBtn": "Importovat skin",
+    "importFile": "Ze souboru…",
+    "importCancel": "Zrušit",
+    "importApply": "Použít",
+    "importPlaceholder": "Vlož JSON skinu (formát kb-skin)…",
+    "importInvalid": "Skin se nepodařilo importovat",
+    "importNotJson": "Vstup není platný JSON.",
+    "importWarnings": "Část skinu tahle verze nezná a přeskočila ji",
+    "exportBtn": "Exportovat",
+    "gallery": "Galerie skinů",
+    "previewMode": "Náhled v režimu",
+    "modeLight": "Světlý",
+    "modeDark": "Tmavý"
+  },
+  "externalContacts": {
+    "title": "Externí kontakty",
+    "description": "Lidé mimo systém — účetní, dodavatelé. Nemají účet, nechodí jim žádná upozornění a o ničem nevědí; je to čistě vaše interní evidence termínů.",
+    "newContact": "Nový kontakt",
+    "namePlaceholder": "např. Účetní — p. Nováková",
+    "emailLabel": "E-mail (jen pro evidenci)",
+    "emailPlaceholder": "e-mail (nepovinné)",
+    "emailHint": "E-mail je jen poznámka pro vás — systém na něj nikdy nic nepošle.",
+    "noteLabel": "Poznámka",
+    "notePlaceholder": "poznámka (nepovinné)",
+    "privateLabel": "Privátní kontakt",
+    "privateHint": "Uvidíte ho jen vy. Na sdílené mapě ostatní uvidí jen „Externí kontakt“ bez jména.",
+    "privateBadge": "Privátní — vidíte jen vy",
+    "empty": "Zatím žádné kontakty.",
+    "deleteConfirm": "Smazat kontakt „{{name}}“? Už zadané úkoly zůstanou, místo jména se u nich ukáže „Externí kontakt“.",
+    "saveFailed": "Kontakt se nepodařilo uložit.",
+    "deleteFailed": "Kontakt se nepodařilo smazat.",
+    "unknown": "Externí kontakt",
+    "group": "Externí kontakty",
+    "addNew": "+ Nový externí kontakt…",
+    "manage": "Spravovat kontakty…"
+  }
+}

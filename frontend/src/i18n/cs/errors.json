@@ -1,0 +1,8 @@
+{
+  "auth": {
+    "notLoggedIn": "Nepřihlášen",
+    "refreshFailed": "Ověření přihlášení selhalo",
+    "invalidCredentials": "Neplatný email nebo heslo",
+    "googleFailed": "Přihlášení přes Google se nezdařilo"
+  }
+}

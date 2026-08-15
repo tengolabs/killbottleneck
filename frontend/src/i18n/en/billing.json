@@ -1,0 +1,63 @@
+{
+  "billing": {
+    "heading": "Billing details",
+    "hint": "Not needed for the trial — fill them in before ordering a plan. They appear on invoices.",
+    "billingCompany": "Company / name *",
+    "billingIco": "Company ID (ICO)",
+    "billingDic": "VAT ID (DIC)",
+    "billingStreet": "Street and number *",
+    "billingCity": "City *",
+    "billingZip": "ZIP *",
+    "billingEmail": "Invoicing e-mail",
+    "saveButton": "Save billing details",
+    "savedButton": "Saved"
+  },
+  "membership": {
+    "heading": "Plan & payment",
+    "hint": "Choose a plan and payment method.",
+    "hintTrial": "Your trial runs until {{date}}. Choose a plan and payment method — your data and address stay unchanged.",
+    "plan": {
+      "cloud-lite-year": "Cloud Lite — yearly",
+      "cloud-lite-quarter": "Cloud Lite — quarterly",
+      "privat-standard-month": "Private Standard",
+      "privat-business-month": "Private Business"
+    },
+    "planHint": {
+      "cloud-lite-year": "shared server, 2 users, AI included",
+      "cloud-lite-quarter": "shared server, 2 users, AI included",
+      "privat-standard-month": "your own server, unlimited users",
+      "privat-business-month": "your own server, priority support"
+    },
+    "period": {
+      "year": "year",
+      "quarter": "3 months",
+      "month": "month"
+    },
+    "payByCard": "Pay by card",
+    "cardUnavailable": "Card payment is coming soon — please use bank transfer (yearly) or contact support@killbottleneck.com.",
+    "orderByTransfer": "Order via bank transfer (invoice)",
+    "transferYearlyOnly": "Bank transfer is only available for the yearly plan.",
+    "billingFirst": "Please fill in and save the billing details above first.",
+    "orderReceived": "Order received.",
+    "orderReceivedHint": "We will e-mail you an invoice for {{amount}} CZK — your plan activates once it is paid. Your data and address stay unchanged."
+  },
+  "account": {
+    "heading": "My account",
+    "fullName": "Full name",
+    "displayName": "Display name",
+    "displayNamePlaceholder": "e.g. a nickname",
+    "displayNameHint": "This is how others see you on nodes and in lists. Empty = full name, or e-mail.",
+    "saveNames": "Save",
+    "savedNames": "Saved.",
+    "saveFailed": "Saving failed.",
+    "passwordHeading": "Change password",
+    "oldPassword": "Current password",
+    "newPassword": "New password",
+    "newPassword2": "Repeat new password",
+    "changePassword": "Change password",
+    "passwordMismatch": "The new passwords do not match.",
+    "passwordChanged": "Password changed — please sign in again.",
+    "passwordFailed": "Password change failed.",
+    "passwordRelogin": "After changing the password you will be signed out — the old session stops working everywhere on purpose."
+  }
+}

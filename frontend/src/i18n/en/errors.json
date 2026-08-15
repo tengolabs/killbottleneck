@@ -1,0 +1,8 @@
+{
+  "auth": {
+    "notLoggedIn": "Not signed in",
+    "refreshFailed": "Sign-in verification failed",
+    "invalidCredentials": "Invalid email or password",
+    "googleFailed": "Google sign-in failed"
+  }
+}

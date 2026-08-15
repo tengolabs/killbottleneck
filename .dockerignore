@@ -1,0 +1,10 @@
+# build kontext bez lokálních závislostí a dat: frontend/node_modules instaluje
+# uvnitř image `npm ci` (deterministické), mcp/ běží u klienta (do image nejde vůbec),
+# pb_data je runtime volume.
+frontend/node_modules
+mcp/node_modules
+pb_data
+# marketingový web + docs (110 MB médií) — do image aplikace nepatří
+docs
+# Capacitor obal (Android projekt + APK buildy) — do image aplikace nepatří
+mobile

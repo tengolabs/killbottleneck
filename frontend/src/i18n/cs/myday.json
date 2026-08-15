@@ -1,0 +1,76 @@
+{
+  "myMap": {
+    "title": "Moje mapa",
+    "link": "Moje mapa",
+    "rootLabel": "Já",
+    "tabMine": "Mám udělat",
+    "tabDelegated": "Zadal jsem",
+    "groupFlat": "Dle termínu",
+    "groupPeople": "Dle lidí",
+    "groupProjects": "Dle projektů"
+  },
+  "panel": {
+    "title": "Můj den",
+    "nameDay": "svátek má",
+    "untitled": "Bez názvu",
+    "summaryFailed": "Povzbuzení se nepodařilo vygenerovat",
+    "thinking": "Přemýšlím…",
+    "noSummaryYet": "Ranní povzbuzení se generuje automaticky — nebo klikněte na ⟳.",
+    "refreshTitle": "Přegenerovat povzbuzení",
+    "expand": "Rozbalit",
+    "collapse": "Sbalit",
+    "showAllTitle": "Zobrazit všechny moje úkoly",
+    "filterTitle": "Vyfiltrovat: {{label}}",
+    "doneCount": "{{count}} hotovo",
+    "blocks": "blokuje: {{node}}",
+    "blocksTitle": "Na dokončení čeká uzel „{{node}}\"",
+    "delegatedTo": "zadal jsem: {{email}}",
+    "more": "+ dalších {{count}} …",
+    "allMyTasks": "všechny moje úkoly →",
+    "ideaBadge": "nápad",
+    "loadFailed": "Přehled se nepodařilo načíst.",
+    "retry": "Zkusit znovu",
+    "focusBadge": {
+      "today": "nejdůležitější dnes",
+      "tomorrow": "nejdůležitější zítra"
+    }
+  },
+  "sections": {
+    "overdue": "Po termínu",
+    "today": "Dnes",
+    "tomorrow": "Zítra",
+    "week": "Do týdne",
+    "blocking": "Blokuje ostatní",
+    "delegated": "Zadal jsem (čekám na druhé)",
+    "stuck": "Tohle se nehýbe",
+    "open": "Otevřené"
+  },
+  "export": {
+    "buttonTitle": "Uložit přehled jako obrázek (PNG pro mobil)",
+    "button": "Uložit obrázek",
+    "downloadPng": "Stáhnout PNG",
+    "downloadAnon": "Stáhnout anonymně (bez názvů)",
+    "anonTitle": "Názvy úkolů a projektů začerněné — vhodné na sociální sítě",
+    "share": "Sdílet…",
+    "shareAnon": "Sdílet anonymně…",
+    "failed": "Export obrázku se nepovedl",
+    "fileName": "killbottleneck-muj-den",
+    "fileAnonSuffix": "-anonym",
+    "shareTitle": "Můj den — killBottleneck",
+    "blocksBadge": "blokuje!",
+    "more": "+ dalších {{count}}",
+    "footer": "Vygenerováno z killBottleneck"
+  },
+  "proverbs": [
+    "Nejdřív velké kameny.",
+    "Sněz tu žábu — nejhorší úkol jako první.",
+    "Bez práce nejsou koláče.",
+    "Kdo chce, hledá způsoby; kdo nechce, hledá důvody.",
+    "I cesta dlouhá tisíc mil začíná prvním krokem.",
+    "Hotovo je lepší než dokonalé.",
+    "Co můžeš udělat dnes, neodkládej na zítřek.",
+    "Malé krůčky každý den porazí velké plány jednou za čas.",
+    "Pomalu jedeš, dál dojedeš.",
+    "Těžko na cvičišti, lehko na bojišti."
+  ]
+}

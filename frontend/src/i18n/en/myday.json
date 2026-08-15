@@ -1,0 +1,76 @@
+{
+  "myMap": {
+    "title": "My map",
+    "link": "My map",
+    "rootLabel": "Me",
+    "tabMine": "To do",
+    "tabDelegated": "Delegated",
+    "groupFlat": "By deadline",
+    "groupPeople": "By person",
+    "groupProjects": "By project"
+  },
+  "panel": {
+    "title": "My day",
+    "nameDay": "name day of",
+    "untitled": "Untitled",
+    "summaryFailed": "Couldn't generate the encouragement",
+    "thinking": "Thinking…",
+    "noSummaryYet": "Your morning encouragement is generated automatically — or click ⟳.",
+    "refreshTitle": "Regenerate the encouragement",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "showAllTitle": "Show all my tasks",
+    "filterTitle": "Filter: {{label}}",
+    "doneCount": "{{count}} done",
+    "blocks": "blocks: {{node}}",
+    "blocksTitle": "Node \"{{node}}\" is waiting for this to be finished",
+    "delegatedTo": "delegated to: {{email}}",
+    "more": "+ {{count}} more …",
+    "allMyTasks": "all my tasks →",
+    "ideaBadge": "idea",
+    "loadFailed": "Couldn't load your overview.",
+    "retry": "Try again",
+    "focusBadge": {
+      "today": "most important today",
+      "tomorrow": "most important tomorrow"
+    }
+  },
+  "sections": {
+    "overdue": "Overdue",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "week": "Within a week",
+    "blocking": "Blocking others",
+    "delegated": "Delegated (waiting on others)",
+    "stuck": "Not moving",
+    "open": "Open"
+  },
+  "export": {
+    "buttonTitle": "Save this overview as an image (PNG for mobile)",
+    "button": "Save image",
+    "downloadPng": "Download PNG",
+    "downloadAnon": "Download anonymously (no names)",
+    "anonTitle": "Task and project names redacted — safe for social media",
+    "share": "Share…",
+    "shareAnon": "Share anonymously…",
+    "failed": "Image export failed",
+    "fileName": "killbottleneck-my-day",
+    "fileAnonSuffix": "-anonymous",
+    "shareTitle": "My day — killBottleneck",
+    "blocksBadge": "blocking!",
+    "more": "+ {{count}} more",
+    "footer": "Generated from killBottleneck"
+  },
+  "proverbs": [
+    "Big rocks first.",
+    "Eat the frog — hardest task first.",
+    "No pain, no gain.",
+    "Where there's a will, there's a way.",
+    "A journey of a thousand miles begins with a single step.",
+    "Done is better than perfect.",
+    "Never put off till tomorrow what you can do today.",
+    "Small steps every day beat big plans once in a while.",
+    "Slow and steady wins the race.",
+    "Hard on the training ground, easy on the battlefield."
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Notifikace",
+    "subtitle": "Vše, co se vás týká, na jednom místě.",
+    "empty": "Zatím žádné notifikace.",
+    "emptyUnread": "Nemáte nic nepřečteného.",
+    "markAllRead": "Označit vše přečtené",
+    "showAll": "Zobrazit vše",
+    "back": "Zpět",
+    "unreadCount_one": "{{count}} nepřečtená",
+    "unreadCount_few": "{{count}} nepřečtené",
+    "unreadCount_many": "{{count}} nepřečtené",
+    "unreadCount_other": "{{count}} nepřečtených",
+    "pageOf": "Strana {{page}} z {{total}}",
+    "prev": "Předchozí",
+    "next": "Další"
+  },
+  "filter": {
+    "all": "Vše",
+    "unread": "Nepřečtené",
+    "allTypes": "Všechny typy"
+  },
+  "type": {
+    "task_assigned": "Přiřazený úkol",
+    "task_comment": "Komentář u úkolu",
+    "node_assigned": "Přiřazený cíl",
+    "node_unblocked": "Cíl je na řadě",
+    "map_created": "Nový projekt",
+    "timer_autostop": "Zastavené stopky",
+    "node_comment": "Komentář u cíle",
+    "map_shared": "Nasdílený projekt",
+    "ai_request": "Požadavek pro AI agenta",
+    "deadline": "Blížící se termín",
+    "agent_done": "Automatizace doběhla",
+    "agent_failed": "Automatizace selhala",
+    "automation_ready": "Automatizace je hotová",
+    "deadline_request": "Žádost o změnu termínu",
+    "deadline_request_resolved": "Vyřízená žádost o termín",
+    "user_joined": "Nový člen se přihlásil",
+    "rule_notice": "Zpráva z pravidla",
+    "rule_broken": "Rozbité pravidlo"
+  },
+  "prefs": {
+    "title": "Nastavení notifikací",
+    "description": "Vyberte, o čem chcete vědět. Změna platí jen pro váš účet.",
+    "colType": "Typ",
+    "colInApp": "V aplikaci",
+    "colEmail": "E-mailem",
+    "emailDisabled": "E-mail zatím není na tomto serveru nastavený. Až správce zapne odesílání, půjde ho tady zvolit.",
+    "saved": "Nastavení uloženo.",
+    "saveFailed": "Nastavení se nepodařilo uložit.",
+    "emailModeTitle": "E-maily celkově",
+    "emailModeDesc": "Jedno pravidlo nad zaškrtáváním níže — co smí chodit e-mailem.",
+    "emailModeInstant": "Hned",
+    "emailModeInstantDesc": "Každá zaškrtnutá událost přijde e-mailem hned.",
+    "emailModeDigest": "Denní souhrn",
+    "emailModeDigestDesc": "Jednotlivé e-maily nechodí; jednou denně přijde jeden souhrn.",
+    "emailModeNone": "Nic",
+    "emailModeNoneDesc": "E-mailem nechodí nic. Notifikace zůstávají v aplikaci.",
+    "emailModeOverridden": "Řídí se režimem e-mailů výše"
+  },
+  "native": {
+    "newUnread_one": "{{count}} nové upozornění",
+    "newUnread_few": "{{count}} nová upozornění",
+    "newUnread_other": "{{count}} nových upozornění"
+  }
+}
