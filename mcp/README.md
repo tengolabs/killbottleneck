@@ -36,16 +36,23 @@ zobrazí jen jednou; klíč jde kdykoli rotovat nebo zrušit a lze mu nastavit e
 claude mcp add killbottleneck \
   -e KB_URL=http://192.168.1.10:8090 \
   -e KB_API_KEY=kb_user_... \
-  -- node /absolutni/cesta/mcp/index.js
+  -- npx -y killbottleneck-mcp
 ```
+
+**Docker** (bez Node.js na stroji):
+```bash
+docker build -t killbottleneck-mcp ./mcp     # z kořene repozitáře
+docker run -i --rm -e KB_URL=https://firma.killbottleneck.com -e KB_API_KEY=kb_user_... killbottleneck-mcp
+```
+`-i` je povinné — MCP mluví po standardním vstupu a výstupu.
 
 **Claude Desktop** — do `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "killbottleneck": {
-      "command": "node",
-      "args": ["/absolutni/cesta/mcp/index.js"],
+      "command": "npx",
+      "args": ["-y", "killbottleneck-mcp"],
       "env": {
         "KB_URL": "http://192.168.1.10:8090",
         "KB_API_KEY": "kb_user_..."

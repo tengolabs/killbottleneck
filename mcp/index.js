@@ -18,13 +18,24 @@ import { z } from 'zod';
 // pořád staré FLOWMAP_* — konfigurace se lidem nepřepíše sama.
 const URL_BASE = (process.env.KB_URL || process.env.FLOWMAP_URL || '').replace(/\/+$/, '');
 const API_KEY = process.env.KB_API_KEY || process.env.FLOWMAP_API_KEY || '';
-if (!URL_BASE || !/^https?:\/\//.test(URL_BASE)) {
-  console.error('killbottleneck-mcp: missing/invalid KB_URL (e.g. http://localhost:8090)');
-  process.exit(1);
-}
-if (!/^(?:kb|fm)_user_[A-Za-z0-9]+$/.test(API_KEY)) {   // PŘECHOD: staré fm_user_ klíče dál platí
-  console.error('killbottleneck-mcp: missing/invalid KB_API_KEY (kb_user_…) — create one in the app under "API keys"');
-  process.exit(1);
+
+// Konfigurace se NEkontroluje ukončením procesu (Richard 16. 8. 2026). Server bez
+// KB_URL/KB_API_KEY normálně naběhne a nabídne seznam nástrojů — teprve VOLÁNÍ
+// nástroje řekne, co chybí. Dva důvody: (a) klient (Claude Desktop) ukazoval
+// server, který se hned ukončil, jako rozbitý, místo aby řekl co doplnit;
+// (b) katalogy MCP serverů si server spouštějí bez konfigurace a ptají se ho na
+// nástroje — okamžitý exit = neprojde kontrolou.
+const CHYBI_KONFIG = [
+  (!URL_BASE || !/^https?:\/\//.test(URL_BASE))
+    ? 'KB_URL is missing or invalid (e.g. http://localhost:8090 or https://company.killbottleneck.com)'
+    : null,
+  // PŘECHOD: staré fm_user_ klíče dál platí
+  !/^(?:kb|fm)_user_[A-Za-z0-9]+$/.test(API_KEY)
+    ? 'KB_API_KEY is missing or invalid (kb_user_…) — create one in the app under "API keys"'
+    : null,
+].filter(Boolean);
+if (CHYBI_KONFIG.length) {
+  console.error('killbottleneck-mcp: not configured yet — ' + CHYBI_KONFIG.join('; '));
 }
 
 const enc = encodeURIComponent; // id v cestě VŽDY encodovat (LLM může poslat cokoli)
@@ -34,6 +45,11 @@ const enc = encodeURIComponent; // id v cestě VŽDY encodovat (LLM může posla
 const lastUpdated = new Map();
 
 async function call(method, path, body) {
+  // Nenakonfigurovaný server nástroje NABÍZÍ, ale při volání poctivě řekne, co chybí
+  // (místo dřívějšího tichého pádu procesu při startu).
+  if (CHYBI_KONFIG.length) {
+    throw new Error('killbottleneck-mcp is not configured: ' + CHYBI_KONFIG.join('; '));
+  }
   let res;
   try {
     res = await fetch(URL_BASE + path, {
@@ -444,8 +460,9 @@ server.registerTool('update_task', {
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
-// startup ping (nefatální): překlep v adrese ať je vidět hned, ne až u prvního nástroje
-try {
+// startup ping (nefatální): překlep v adrese ať je vidět hned, ne až u prvního nástroje.
+// Bez konfigurace se neptáme nikam — není kam.
+if (!CHYBI_KONFIG.length) try {
   const ping = await fetch(`${URL_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
   console.error(ping.ok
     ? `killbottleneck-mcp: connected, killBottleneck instance at ${URL_BASE} is healthy`

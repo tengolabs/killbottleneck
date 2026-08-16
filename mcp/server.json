@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.killbottleneck/killbottleneck",
+  "description": "Goal and process maps for humans and AI agents on your own server.",
+  "repository": {
+    "url": "https://github.com/tengolabs/killbottleneck",
+    "source": "github"
+  },
+  "version": "0.34.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "killbottleneck-mcp",
+      "version": "0.34.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "KB_URL",
+          "description": "Address of your killBottleneck instance, e.g. https://company.killbottleneck.com or http://192.168.1.10:8090",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "KB_API_KEY",
+          "description": "API key issued in the app (user menu -> API keys). Use a read-write scope for editing.",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

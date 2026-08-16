@@ -141,7 +141,10 @@ only the address differs.
 1. In the app: user menu → **API keys** → a new key with the **Read and write** scope
    (**Read only** is enough for read access). The token is shown only once. Recommended: give
    the key an expiry and revoke it once you stop using it.
-2. In the `mcp/` directory run `npm install` (once).
+2. Nothing to install — the server is on npm as
+   [`killbottleneck-mcp`](https://www.npmjs.com/package/killbottleneck-mcp), so `npx` fetches
+   it on first use. (Prefer running it from this repository? `cd mcp && npm install` and use
+   `node /absolute/path/mcp/index.js` instead of the `npx` command below.)
 3. Register it with your assistant:
 
    **Claude Code:**
@@ -149,7 +152,7 @@ only the address differs.
    claude mcp add killbottleneck \
      -e KB_URL=http://SERVER-IP:8090 \
      -e KB_API_KEY=kb_user_... \
-     -- node /path/to/killbottleneck/mcp/index.js
+     -- npx -y killbottleneck-mcp
    ```
 
    **Claude Desktop** (`claude_desktop_config.json` → `mcpServers`):
@@ -157,8 +160,8 @@ only the address differs.
    {
      "mcpServers": {
        "killbottleneck": {
-         "command": "node",
-         "args": ["/path/to/killbottleneck/mcp/index.js"],
+         "command": "npx",
+         "args": ["-y", "killbottleneck-mcp"],
          "env": {
            "KB_URL": "http://SERVER-IP:8090",
            "KB_API_KEY": "kb_user_..."

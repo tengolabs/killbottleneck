@@ -135,7 +135,10 @@ instanci, liší se jen adresa.
 1. V aplikaci: uživatelské menu → **API klíče** → nový klíč se scope
    **Čtení i zápis** (pro jen-čtecí přístup stačí **Jen čtení**). Token se ukáže
    jen jednou. Doporučení: nastavte klíči expiraci a nepoužívaný klíč zrušte.
-2. V adresáři `mcp/` spusťte `npm install` (jednorázově).
+2. Nic se neinstaluje — server je na npm jako
+   [`killbottleneck-mcp`](https://www.npmjs.com/package/killbottleneck-mcp), takže `npx` si ho
+   při prvním použití stáhne sám. (Chcete ho raději pouštět z tohoto repozitáře?
+   `cd mcp && npm install` a místo `npx` níže použijte `node /absolutni/cesta/mcp/index.js`.)
 3. Registrace u asistenta:
 
    **Claude Code:**
@@ -143,7 +146,7 @@ instanci, liší se jen adresa.
    claude mcp add killbottleneck \
      -e KB_URL=http://IP-serveru:8090 \
      -e KB_API_KEY=kb_user_... \
-     -- node /cesta/k/killbottlenecku/mcp/index.js
+     -- npx -y killbottleneck-mcp
    ```
 
    **Claude Desktop** (`claude_desktop_config.json` → `mcpServers`):
@@ -151,8 +154,8 @@ instanci, liší se jen adresa.
    {
      "mcpServers": {
        "killbottleneck": {
-         "command": "node",
-         "args": ["/cesta/k/killbottlenecku/mcp/index.js"],
+         "command": "npx",
+         "args": ["-y", "killbottleneck-mcp"],
          "env": {
            "KB_URL": "http://IP-serveru:8090",
            "KB_API_KEY": "kb_user_..."
