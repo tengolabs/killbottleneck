@@ -618,7 +618,7 @@ Chceš killBottleneck hostovat jako službu, prodávat pod svou značkou nebo p�
 
 *The English wording of this section is in [README.md](./README.md#license--fair-code).*
 
-Postavil **Richard Pobrislo** ([Ctrl+Alt+AI](https://www.youtube.com/@ctrlaltaicz)) — jeden člověk, proto ty kanály podpory níž vypadají, jak vypadají.
+Postavil **Richard Pobříslo** ([LinkedIn](https://www.linkedin.com/in/richard-pobislo), [Ctrl+Alt+AI](https://www.youtube.com/@ctrlaltaicz)) — jeden člověk, proto ty kanály podpory níž vypadají, jak vypadají.
 
 Kód je **ze 100 % napsaný AI** — modely Claude Fable 5, Claude Opus 5 a Claude Opus 4.8 — pod lidským vedením. Každé vydání projde automatickou regresí a ručním klik-testem; v poznámkách k vydání stojí, co bylo ověřeno a co vědomě ne.
 

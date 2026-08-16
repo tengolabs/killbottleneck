@@ -634,7 +634,7 @@ Want to host killBottleneck as a service, ship it under your own brand, or resel
 
 *Česká verze této sekce je v [README.cs.md](./README.cs.md#licence--fair-code).*
 
-Built by **Richard Pobrislo** ([Ctrl+Alt+AI](https://www.youtube.com/@ctrlaltaicz)) — one person, which is why the support channels below are what they are.
+Built by **Richard Pobrislo** ([LinkedIn](https://www.linkedin.com/in/richard-pobislo), [Ctrl+Alt+AI](https://www.youtube.com/@ctrlaltaicz)) — one person, which is why the support channels below are what they are.
 
 The code is **written 100% by AI** — Claude Fable 5, Claude Opus 5 and Claude Opus 4.8 — under human direction. Every release goes through an automated regression suite and a manual click-through before it ships; the release notes list what was verified and what deliberately wasn't.
 
