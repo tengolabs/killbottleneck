@@ -53,12 +53,33 @@ ok(isNewer('v1.0-rc1', 'v1.0') === false, 'rc není novinka pro finálku');
 ok(isNewer('v0.33', 'v0.33-3-g1234abc') === false, 'build za tagem nehlásí vlastní tag');
 ok(jeVydanaVerze('v0.33-beta') === true, 'beta build se hlídá (dozví se o finálce)');
 
+console.log('— dotaz na GitHub nesmí končit 404 v konzoli');
+// Repo s jediným PŘEDBĚŽNÝM vydáním: /releases/latest vrací 404 (prohlížeč to
+// zapíše jako chybu a self-hoster vidí „rozbitou" aplikaci) — proto se ptáme na
+// SEZNAM vydání a předběžná odfiltrujeme sami. Mutace: vrácení /releases/latest
+// tenhle řádek rozsvítí.
+const hook = fs.readFileSync(path.join(__dirname, '../frontend/src/hooks/useVersionCheck.js'), 'utf8');
+const compose = fs.readFileSync(path.join(__dirname, '../docker-compose.yml'), 'utf8');
+// jen v kódu volání, ne v komentáři (ten endpoint komentář zmiňuje schválně)
+const volani = (hook.match(/fetch\(`[^`]+`/g) || []).join(' ');
+ok(!/releases\/latest/.test(volani), 'neptáme se na /releases/latest (dělal 404 u beta repa)');
+ok(/releases\?per_page=/.test(hook), 'ptáme se na seznam vydání');
+ok(/prerelease/.test(hook) && /draft/.test(hook), 'předběžná a rozpracovaná vydání se filtrují');
+
 console.log('— které buildy se vůbec hlídají');
 ok(jeVydanaVerze('v0.11') === true, 'vydaná verze se hlídá');
 ok(jeVydanaVerze('dev') === false, 'vývojový build se nehlídá');
 ok(jeVydanaVerze('') === false, 'prázdná verze se nehlídá');
 // Bez tohohle by rozdělaná práce věčně hlásila "jste zastaralí".
 ok(jeVydanaVerze('v0.11-1-g0c1f61e-dirty') === false, 'nezacommitovaný build se nehlídá');
+
+console.log('— dobrovolný přepínač na beta aktualizace');
+ok(/update_prerelease/.test(hook), 'hook respektuje update_prerelease z configu');
+ok(/UPDATE_PRERELEASE/.test(fs.readFileSync(path.join(__dirname, '../server/pb_hooks/main.pb.js'), 'utf8')),
+  'server posílá update_prerelease v configu');
+ok(/KB_UPDATE_PRERELEASE/.test(fs.readFileSync(path.join(__dirname, '../.env.example'), 'utf8')),
+  '.env.example přepínač popisuje (jinak by o něm self-hoster nevěděl)');
+ok(/KB_UPDATE_PRERELEASE/.test(compose), 'compose přepínač předává do kontejneru');
 
 console.log('— server rozhoduje, komu kontrolu nabídnout');
 const server = fs.readFileSync(path.join(__dirname, '../server/pb_hooks/main.pb.js'), 'utf8');
@@ -67,7 +88,6 @@ ok(/env\("HOSTED"\) !== "1"/.test(radek), 'hostovaná instance kontrolu NEdostan
 ok(/UPDATE_CHECK/.test(radek), 'self-hoster si ji může vypnout (KB_UPDATE_CHECK=0)');
 ok(/update_repo:/.test(server), 'config vrací, odkud se vydání čtou');
 
-const compose = fs.readFileSync(path.join(__dirname, '../docker-compose.yml'), 'utf8');
 ok(/KB_VERSION:/.test(compose), 'compose razítkuje verzi do buildu');
 ok(/KB_UPDATE_CHECK:/.test(compose), 'compose umí kontrolu vypnout');
 const docker = fs.readFileSync(path.join(__dirname, '../Dockerfile'), 'utf8');

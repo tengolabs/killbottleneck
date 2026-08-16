@@ -68,11 +68,20 @@ export default function useVersionCheck() {
           // rozbitá cache není důvod nic nehlásit — prostě se zeptáme znovu
         }
 
-        return fetch(`https://api.github.com/repos/${c.update_repo}/releases/latest`, {
+        // ⚠️ Ptáme se na SEZNAM vydání, ne na /releases/latest. Ten endpoint u repa,
+        // které má zatím jen předběžná vydání, vrací 404 — a prohlížeč takový
+        // požadavek zapíše do konzole jako červenou chybu. Self-hoster pak vidí
+        // „rozbitou" aplikaci, i když šlo o správné chování (nic nenabídnout).
+        // Seznam vrací 200 a předběžná/rozpracovaná vydání si odfiltrujeme sami.
+        return fetch(`https://api.github.com/repos/${c.update_repo}/releases?per_page=10`, {
           headers: { Accept: 'application/vnd.github+json' },
         })
           .then((r) => (r.ok ? r.json() : null))
-          .then((rel) => {
+          .then((seznam) => {
+            // KB_UPDATE_PRERELEASE=1: kdo je na betě, chce vědět i o další betě.
+            const rel = Array.isArray(seznam)
+              ? seznam.find((x) => x && !x.draft && (c.update_prerelease || !x.prerelease))
+              : null;
             if (!rel) return null;
             const zaznam = {
               at: Date.now(),

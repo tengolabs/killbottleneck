@@ -17,7 +17,7 @@ services:
         # Instance version. Without it the value stays "dev" and the update check
         # is not offered — exactly what we want for work in progress. Real number:
         #   ./nasadit-staging.sh  (razítko + build + kontrola verze — NEpouštět compose ručně)
-        KB_VERSION: ${KB_VERSION:-v0.33-beta}
+        KB_VERSION: ${KB_VERSION:-v0.33.1-beta}
     container_name: killbottleneck
     ports:
       - "${KB_PORT:-${FLOWMAP_PORT:-8090}}:8090"
@@ -36,6 +36,8 @@ services:
       KB_UPDATE_CHECK: ${KB_UPDATE_CHECK:-1}
       # Where releases are read from (forks/tests only; empty = official repo).
       KB_UPDATE_REPO: ${KB_UPDATE_REPO:-}
+      # 1 = offer pre-releases too (for people running a beta); default 0.
+      KB_UPDATE_PRERELEASE: ${KB_UPDATE_PRERELEASE:-0}
       # Public address of the instance — ONLY for automations (AI agent / cron on
       # a goal). killBottleneck sends it to the agent as callback_url to report back
       # to when it finishes. Without it the "Application URL" from the PocketBase

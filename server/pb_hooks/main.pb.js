@@ -1767,6 +1767,9 @@ kbRoute("GET", "/config", (e) => {
     // instance nikam neodesílá nic o sobě, žádná telemetrie.
     update_check: env("HOSTED") !== "1" && String(env("UPDATE_CHECK") || "1").trim() !== "0",
     update_repo: env("UPDATE_REPO") || "tengolabs/killbottleneck",
+    // Kdo jede na bete, chce vedet i o dalsi bete. Vychozi chovani se NEMENI:
+    // bez tohohle prepinace se predbezna vydani nikomu nenabizeji.
+    update_prerelease: String(env("UPDATE_PRERELEASE") || "0").trim() === "1",
     // Hostovaná instance: AI konfiguruje provozovatel (.env z tenant-add), ne
     // zákazník — frontend podle toho schová sekci AI ve správě organizace
     // (Richard 6. 8. 2026: „v cloud verzi je AI nadefinované, nezobrazovat").
