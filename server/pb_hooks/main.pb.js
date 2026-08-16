@@ -3702,8 +3702,12 @@ kbRoute("GET", "/v1/tasks", (e) => {
   const q = e.requestInfo().query || {};
   let filter = "(owner = {:u} || map.owner = {:u} || assignee_email = {:em})";
   const params = { u: a.user.id, em: a.user.getString("email") };
-  if (q.map) {
-    const map = v1OwnedMap($app, String(q.map), a.user.id);
+  // Přijímáme `map` i `map_id`: nástroje (MCP, payload úkolu) používají map_id
+  // a dřív se takový dotaz TIŠE nefiltroval — volající si myslel, že má úkoly
+  // jedné mapy, a dostal všechny svoje. (Nález 16. 8. při práci přes API.)
+  const mapaQ = q.map || q.map_id;
+  if (mapaQ) {
+    const map = v1OwnedMap($app, String(mapaQ), a.user.id);
     if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
     filter += " && map = {:m}";
     params.m = map.id;
@@ -4213,7 +4217,13 @@ kbRoute("POST", "/v1/tasks", (e) => {
   rec.set("description", String(info.description || ""));
   rec.set("status", status);
   rec.set("deadline", deadline);
-  rec.set("assignee_email", String(info.assignee_email || ""));
+  // Výchozí řešitel = majitel API klíče (Richard 16. 8. 2026). Člověk v dialogu
+  // vidí seznam a „nikoho" volí vědomě; agent pole prostě vynechá — a vznikl by
+  // úkol, který nikomu nesvítí v „Mém dni". Kdo chce úkol bez řešitele, pošle
+  // assignee_email: "" (prázdný řetězec se respektuje).
+  rec.set("assignee_email", info.assignee_email === undefined
+    ? a.user.getString("email")
+    : String(info.assignee_email || ""));
   rec.set("map", map.id);
   rec.set("node_id", nodeId); // povinný a ověřený výš (existuje, není vrchol)
   rec.set("owner", a.user.id);

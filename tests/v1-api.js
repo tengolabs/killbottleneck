@@ -205,6 +205,31 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     r = await api('GET', `/api/flowmap/v1/tasks?map=${mapId}&status=todo`, { bearer: aRW });
     expect(r.status === 200 && r.json.tasks.length === 1 && r.json.tasks[0].id === taskId,
       `list_tasks s filtry (${r.json.tasks && r.json.tasks.length})`);
+    // filtr smí přijít i jako `map_id` — tak se jmenuje v MCP i v payloadu úkolu.
+    // Dřív se neznámý parametr TIŠE ignoroval a volající dostal VŠECHNY svoje
+    // úkoly v domnění, že má jednu mapu (nález 16. 8. při práci přes API).
+    r = await api('GET', `/api/flowmap/v1/tasks?map_id=${mapId}&status=todo`, { bearer: aRW });
+    expect(r.status === 200 && r.json.tasks.length === 1 && r.json.tasks[0].id === taskId,
+      `list_tasks filtruje i podle map_id (${r.json.tasks && r.json.tasks.length})`);
+    r = await api('GET', '/api/flowmap/v1/tasks?map_id=neexistujici', { bearer: aRW });
+    expect(r.status === 404, `map_id na cizí/neexistující mapu → 404, ne tichý výpis všeho (${r.status})`);
+
+    // Výchozí řešitel = majitel klíče (Richard 16. 8.): agent pole vynechá a úkol
+    // by jinak nikomu nesvítil v „Mém dni". Prázdný řetězec = vědomě nikdo.
+    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW,
+      body: { title: 'Bez řešitele', map: mapId, node_id: taskNode } });
+    const bezResitele = r.json.id;
+    r = await api('GET', `/api/flowmap/v1/tasks?map=${mapId}`, { bearer: aRW });
+    const vytvoreny = (r.json.tasks || []).find((x) => x.id === bezResitele);
+    expect(vytvoreny && vytvoreny.assignee_email === 'a@x.cz',
+      `úkol bez uvedeného řešitele dostal majitele klíče (${vytvoreny && vytvoreny.assignee_email})`);
+    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW,
+      body: { title: 'Vědomě nikoho', map: mapId, node_id: taskNode, assignee_email: '' } });
+    const nikoho = r.json.id;
+    r = await api('GET', `/api/flowmap/v1/tasks?map=${mapId}`, { bearer: aRW });
+    const prazdny = (r.json.tasks || []).find((x) => x.id === nikoho);
+    expect(prazdny && prazdny.assignee_email === '',
+      `prázdný assignee_email se RESPEKTUJE jako „nikdo" (${prazdny && JSON.stringify(prazdny.assignee_email)})`);
     r = await api('POST', `/api/flowmap/v1/tasks/${taskId}`, { bearer: aRW, body: { status: 'done' } });
     expect(r.status === 200 && r.json.status === 'done', `update task status (${r.status})`);
     // parita s UI: přiřazený (assignee) úkol smí upravit i přes API…

@@ -153,6 +153,38 @@ const findNode = (m, id) => (m.nodes || []).find((n) => n.id === id);
     await api('PATCH', `/api/collections/automation_rules/records/${r3.id}`, { token: ST, body: { enabled: false } });
     nodes = m.nodes;
 
+    console.log('== create_subnodes: totéž pravidlo vystřelí i PODRUHÉ ==');
+    // Regrese: id podstromu se skládala jen z rule.id + pořadí akce, takže druhá
+    // karta (druhá reklamace, druhý kus) narazila na "Duplicitní id uzlu",
+    // pravidlo se označilo za rozbité a akce fungovala právě jednou za život.
+    m = await freshMap(A, map.id);
+    r = await patchMap(A, map, m.nodes.concat([node('P', { title: 'Kontejner', status: 'todo' })]),
+      m.edges.concat([{ id: 'eP', source: 'root', target: 'P' }]));
+    expect(r.status === 200, `kontejner P založen (${r.status})`);
+    const rs = await mkRule({
+      name: 'Nová karta → rozbal kroky', trigger: { type: 'node_created' },
+      conditions: [{ field: 'parent', op: 'eq', value: 'P' }],
+      actions: [{ type: 'create_subnodes', parent: 'trigger_node', items: [{ title: 'Krok 1' }, { title: 'Krok 2' }] }],
+    });
+    for (const karta of ['c1', 'c2', 'c3']) {
+      m = await freshMap(A, map.id);
+      await patchMap(A, map, m.nodes.concat([node(karta, { title: `Karta ${karta}`, status: 'todo' })]),
+        m.edges.concat([{ id: `e-${karta}`, source: 'P', target: karta }]));
+    }
+    m = await freshMap(A, map.id);
+    const kroku = (id) => (m.edges || []).filter((e) => e.source === id).length;
+    expect(kroku('c1') === 2 && kroku('c2') === 2 && kroku('c3') === 2,
+      `kroky dostaly VŠECHNY tři karty, ne jen první (${kroku('c1')}/${kroku('c2')}/${kroku('c3')})`);
+    rr = await runs(`rule = "${rs.id}"`);
+    expect(rr.length === 3 && rr.every((x) => x.status === 'ok'),
+      `všechny tři běhy ok, žádné "Duplicitní id uzlu" (${rr.map((x) => x.status).join(',') || 'nic'})`);
+    const vsechnaId = (m.nodes || []).map((n) => n.id);
+    expect(new Set(vsechnaId).size === vsechnaId.length, 'v mapě nejsou duplicitní id uzlů');
+    expect(kroku('c1') === 2 && (m.edges || []).filter((e) => e.source === (m.edges.find((x) => x.source === 'c1') || {}).target).length === 0,
+      'pravidlo nespustilo samo sebe nad kroky, které právě založilo');
+    await api('PATCH', `/api/collections/automation_rules/records/${rs.id}`, { token: ST, body: { enabled: false } });
+    nodes = m.nodes;
+
     console.log('== smyčka dvou pravidel → pojistka hloubky, server nezamrzne ==');
     const la = await mkRule({
       name: 'Smyčka A', node_id: 'L', trigger: { type: 'node_status_changed', status: 'in_progress' },

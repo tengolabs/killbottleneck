@@ -3716,8 +3716,15 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       const parent = nodes.find((n) => n && n.id === parentId);
       if (!parent) throw new Error("create_subnodes: parent node not found");
       // prefix nese rule.id i pořadí akce — dvě create_subnodes v témže běhu
-      // (nebo dvě pravidla) by jinak vygenerovaly stejná node id (kolize)
-      const conv = treeItemsToNodes(a.items, "r" + rule.id + "-" + (subCounter++), null);
+      // (nebo dvě pravidla) by jinak vygenerovaly stejná node id (kolize).
+      // ⚠️ A protože TOTÉŽ pravidlo vystřelí i podruhé (druhá reklamace, druhá
+      // karta), musí být prefix unikátní i MEZI BĚHY. Bez toho druhý běh spadne
+      // na "Duplicitní id uzlu" a pravidlo se navíc označí za rozbité — takže
+      // akce fungovala právě jednou za život pravidla.
+      let subPrefix = "r" + rule.id + "-" + subCounter++;
+      const obsazeno = (p) => nodes.some((n) => n && String(n.id).indexOf("node-" + p + "-") === 0);
+      for (let bump = 1; obsazeno(subPrefix); bump++) subPrefix = "r" + rule.id + "-" + (subCounter - 1) + "-" + bump;
+      const conv = treeItemsToNodes(a.items, subPrefix, null);
       if (conv.error) throw new Error("create_subnodes: " + conv.error);
       if (conv.count > 50) throw new Error("create_subnodes: too many nodes (max 50)");
       for (const n of conv.nodes) nodes.push(n);

@@ -160,7 +160,11 @@ const FIXTURES = [
     // ani superuserem) → uživatel si založí VLASTNÍ kopii kanban šablony
     // (ai_nodes + rules ze seedu) s auto-zakládáním — pokrývá i uživatelské
     // šablony s pravidly, ne jen seedové
-    const dow = ((new Date().getDay() + 6) % 7) + 1;
+    // ⚠️ Den v týdnu MUSÍ být ten kontejnerový, ne hostitelský. Cron uvnitř
+    // kontejnera jede v UTC, hostitel v Europe/Prague — mezi půlnocí a druhou
+    // ranní se rozcházejí o celý den a sada padala na „založila 0 projektů".
+    // Stejný důvod i řešení jako v rules-engine.js (`docker exec … date`).
+    const dow = Number(execSync(`docker exec ${NAME} date +%u`).toString().trim());
     let r = await api('POST', '/api/collections/templates/records', { token: A, body: {
       title: 'Můj 8D kanban', description: '', category: 'kvalita', icon: 'ClipboardList',
       goal: tpl8d.goal, node_type: tpl8d.node_type, ai_nodes: tpl8d.ai_nodes, rules: tpl8d.rules,

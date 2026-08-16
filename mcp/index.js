@@ -187,7 +187,7 @@ server.registerTool('create_map', {
 });
 
 server.registerTool('add_nodes', {
-  description: 'Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.',
+  description: 'Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). A node IS a unit of work: give it an owner (the accountable person) and a deadline when it is a commitment — that makes it a task. Prefer this over add_task for anything that is work rather than a checklist detail. NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.',
   inputSchema: {
     map_id: z.string(),
     parent_id: z.string().optional().describe('Existing node id to attach under; omit for apex'),
@@ -425,7 +425,7 @@ server.registerTool('list_tasks', {
 });
 
 server.registerTool('add_task', {
-  description: 'Create a task attached to a specific node (map_id and node_id are required — tasks always belong to a project AND a concrete node; the apex node does not accept tasks). Optionally set deadline (YYYY-MM-DD) and assignee e-mail (the assignee gets a notification).',
+  description: 'Create a SUBTASK — a detail inside an existing goal (checklist item, one concrete step of it). ⚠️ This is NOT how you record work: in killBottleneck the work itself is a NODE — add a node with add_nodes and give it an owner (and a deadline if it is a commitment); a node with a deadline IS the task. Reach for add_task only when a goal already exists and you are breaking it into smaller items. map_id and node_id are required (never the apex). Optional deadline (YYYY-MM-DD) and assignee e-mail; when you omit the assignee, the owner of the API key gets it.',
   inputSchema: {
     title: z.string(),
     map_id: z.string(),
