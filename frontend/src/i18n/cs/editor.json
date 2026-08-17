@@ -136,6 +136,7 @@
     "jsonExported": "Schéma staženo jako JSON",
     "jsonExportFailed": "Export JSON se nepovedl",
     "mapMergedStatus": "Automatizace mezitím dokončila cíl — mapa je aktuální.",
+    "mapMergedRule": "Pravidlo mezitím upravilo mapu — máte to nejnovější.",
     "alignLocked": "Zamčeno: {{styl}}",
     "alignLockedDesc": "Platí i na mobilu. Do uložených map se nezapisuje.",
     "alignUnlocked": "Zámek vypnutý",

@@ -136,6 +136,7 @@
     "jsonExported": "Schema downloaded as JSON",
     "jsonExportFailed": "JSON export failed",
     "mapMergedStatus": "An automation completed a goal in the meantime — the map is up to date.",
+    "mapMergedRule": "A rule updated the map in the meantime — you have the latest version.",
     "alignLocked": "Locked: {{styl}}",
     "alignLockedDesc": "Applies on your phone too. Saved maps are not modified.",
     "alignUnlocked": "Style lock off",
