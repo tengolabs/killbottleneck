@@ -81,6 +81,10 @@ const sekce = (prompt, nadpis) => {
 
     await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW } });
     const AT = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@e2e.local', password: PW } })).json.token;
+    // SLOVNÍK 17. 8. 2026: položky sází superuser (uživatelský create = 403)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST2 = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const uidA = ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent("email='a@e2e.local'")}`, { token: ST2 })).json.items || [])[0].id;
 
     const DNES = den(0), PRISTE = den(7), PROPADLY = den(-3);
     const mapa = (await api('POST', '/api/collections/goalmaps/records', { token: AT, body: {
@@ -91,7 +95,7 @@ const sekce = (prompt, nadpis) => {
         { id: 'n1', type: 'goalNode', position: { x: 0, y: 300 }, data: { title: 'Zázemí', status: 'todo' } },
       ], edges: [{ id: 'e1', source: 'apex', target: 'n1' }],
     } })).json;
-    const mkTask = (body) => api('POST', '/api/collections/tasks/records', { token: AT, body: { map: mapa.id, node_id: 'n1', assignee_email: 'a@e2e.local', status: 'todo', ...body } });
+    const mkTask = (body) => api('POST', '/api/collections/tasks/records', { token: ST2, body: { map: mapa.id, node_id: 'n1', assignee_email: 'a@e2e.local', status: 'todo', owner: uidA, owner_email: 'a@e2e.local', ...body } });
     await mkTask({ title: 'ODLOZENY-NA-TYDEN', deadline: DNES, planned_on: PRISTE });
     await mkTask({ title: 'OPRAVDU-DNESNI', deadline: DNES });
     await mkTask({ title: 'PROPADLY-ODLOZENY', deadline: PROPADLY, planned_on: PRISTE });

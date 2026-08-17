@@ -57,6 +57,11 @@ async function main() {
     const admin = await prihlas('sef@firma.cz');
     const manazer = await prihlas('vedouci@firma.cz');
     const clen = await prihlas('clen@firma.cz');
+    // SLOVNÍK 17. 8. 2026: položky nejde založit uživatelem — zbytky sází superuser
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const clenId = ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent("email='clen@firma.cz'")}`, { token: ST })).json.items || [])[0].id;
+    const suTask = (body) => api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: clenId, owner_email: 'clen@firma.cz', ...body } });
 
     console.log('== člen má soukromou mapu s úkolem ==');
     // úkol musí mít konkrétní ne-vrcholový uzel (13. 8.) — mapy dostávají apex + krok
@@ -66,9 +71,8 @@ async function main() {
     ], edges: [{ id: 'e1', source: 'apex', target: 'krok' }] });
     const mapa = (await api('POST', '/api/collections/goalmaps/records', {
       token: clen, body: { title: 'Moje soukromá', ...uzly('Moje soukromá') } })).json;
-    const ukol = (await api('POST', '/api/collections/tasks/records', {
-      token: clen, body: { title: 'TAJNY-UKOL', map: mapa.id, node_id: 'krok', status: 'todo' } })).json;
-    expect(!!ukol?.id, 'úkol vznikl');
+    const ukol = (await suTask({ title: 'TAJNY-UKOL', map: mapa.id, node_id: 'krok', status: 'todo' })).json;
+    expect(!!ukol?.id, 'zbytková položka vznikla (superuser — uživatelský create je zakázán)');
 
     console.log('== nevidí ho ani admin, ani manažer ==');
     for (const [kdo, tok] of [['admin', admin], ['manažer', manazer]]) {
@@ -92,8 +96,7 @@ async function main() {
       token: clen, body: { title: 'Týmová', ...uzly('Týmová') } })).json;
     await api('POST', '/api/kb/share', {
       token: clen, body: { action: 'set_team_access', mapId: tymova.id, access: 'read' } });
-    await api('POST', '/api/collections/tasks/records', {
-      token: clen, body: { title: 'TYMOVY-UKOL', map: tymova.id, node_id: 'krok', status: 'todo' } });
+    await suTask({ title: 'TYMOVY-UKOL', map: tymova.id, node_id: 'krok', status: 'todo' });
     for (const [kdo, tok] of [['admin', admin], ['manažer', manazer]]) {
       const nazvy = ((await api('GET', '/api/collections/tasks/records?perPage=100', { token: tok })).json?.items || [])
         .map((u) => u.title);
@@ -105,8 +108,7 @@ async function main() {
       token: clen, body: { title: 'Sdílená s šéfem', ...uzly('Sdílená s šéfem') } })).json;
     await api('POST', '/api/kb/share', {
       token: clen, body: { action: 'share', mapId: sdilena.id, email: 'sef@firma.cz', canEdit: false } });
-    await api('POST', '/api/collections/tasks/records', {
-      token: clen, body: { title: 'SDILENY-UKOL', map: sdilena.id, node_id: 'krok', status: 'todo' } });
+    await suTask({ title: 'SDILENY-UKOL', map: sdilena.id, node_id: 'krok', status: 'todo' });
     const nazvyA = ((await api('GET', '/api/collections/tasks/records?perPage=100', { token: admin })).json?.items || [])
       .map((u) => u.title);
     expect(nazvyA.includes('SDILENY-UKOL'), `komu je mapa nasdílená, ten úkol vidí (${nazvyA.join(', ')})`);

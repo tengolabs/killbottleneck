@@ -99,15 +99,18 @@ const titles = (list) => (list || []).map((i) => i.title);
     expect(JSON.stringify(znovu.json.counts) === JSON.stringify(r.json.counts),
       'druhé otevření ukáže totéž, ne prázdno');
 
-    console.log('== úkoly (exekuce) jsou v souhrnu taky ==');
+    console.log('== zbytkové položky: dokončení je v souhrnu vidět ==');
+    // SLOVNÍK 17. 8. 2026: create je zakázán (položku sází superuser); vytvoření
+    // se do „přírůstků" už neloguje (v reálu nenastane), ale odbavení zbytku ano.
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
     const ukol = (await api('POST', '/api/collections/tasks/records', {
-      token: me.token, body: { title: 'Poslat nabídku', status: 'todo', map: mapa.id, node_id: 'n2', assignee_email: me.email },
+      token: ST, body: { title: 'Poslat nabídku', status: 'todo', map: mapa.id, node_id: 'n2', assignee_email: me.email, owner: me.id, owner_email: me.email },
     })).json;
     await api('PATCH', `/api/collections/tasks/records/${ukol.id}`, { token: me.token, body: { status: 'done' } });
     r = await api('GET', `/api/flowmap/map-changes?map=${mapa.id}&range=7`, { token: me.token });
-    expect(titles(r.json.groups.added).includes('Poslat nabídku'), 'nový úkol je mezi přírůstky');
     expect((r.json.groups.done || []).some((i) => i.kind === 'task' && i.title === 'Poslat nabídku'),
-      'dokončený úkol je mezi hotovými a je označen jako úkol');
+      'dokončená zbytková položka je mezi hotovými a je označena jako úkol');
 
     console.log('== smazaný uzel zůstane v historii čitelný ==');
     await api('PATCH', `/api/collections/goalmaps/records/${mapa.id}`, {

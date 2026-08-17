@@ -98,7 +98,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
 
     console.log('== úkoly a přílohy na org mapu nepatří ==');
     r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Úkol na pozici', status: 'todo', map: orgId, node_id: 'pos1' } });
-    expect(r.status === 400, `úkol na org mapě se odmítne (${r.status})`);
+    expect(r.status === 400 || r.status === 403, `položka se odmítne všude — create je zakázaný (${r.status})`);
     r = await api('POST', '/api/collections/node_files/records', { token: A, body: { map: orgId, node_id: 'pos1', name: 'odkaz', url: 'https://example.com' } });
     expect(r.status === 400, `příloha na org mapě se odmítne (${r.status})`);
 

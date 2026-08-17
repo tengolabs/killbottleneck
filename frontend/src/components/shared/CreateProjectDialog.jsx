@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FolderPlus, Loader2, FileText, Sparkles, Users, Calendar, Lock, Building2, LayoutGrid, Hash, AlarmClock, ListChecks, Briefcase, Zap } from 'lucide-react';
+import { FolderPlus, Loader2, FileText, Sparkles, Users, Calendar, Lock, Building2, LayoutGrid, Hash, AlarmClock, Briefcase, Zap } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -195,11 +195,6 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
                             {tpl.auto_create && (
                               <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
                                 <AlarmClock className="w-3 h-3" /> {tr('templates.autoCreates', { label: autoCreateLabel(tpl) })}
-                              </p>
-                            )}
-                            {(tpl.task_seeds || []).length > 0 && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <ListChecks className="w-3 h-3" /> {tr('createProject.withTasks', { count: tpl.task_seeds.length })}
                               </p>
                             )}
                             {rulesNsReady && (tpl.rules || []).length > 0 && (

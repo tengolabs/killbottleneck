@@ -37,6 +37,8 @@ import StickyNoteNode from '@/components/goal-map/StickyNoteNode';
 import PersonalRootNode from '@/components/goal-map/PersonalRootNode';
 import DeletableEdge from '@/components/goal-map/DeletableEdge';
 import NodeEditDialog from '@/components/shared/NodeEditDialog';
+import RecurrenceSwitch from '@/components/node-dialog/sections/RecurrenceSwitch';
+import { recurrenceOf } from '@/lib/recurrenceRule';
 import RulesDialog from '@/components/rules/RulesDialog';
 import NodeRulesPanel from '@/components/rules/NodeRulesPanel';
 import UnblockRulesHint from '@/components/rules/UnblockRulesHint';
@@ -70,7 +72,7 @@ import NodeTasksDialog from '@/components/tasks/NodeTasksDialog';
 import SaveTemplateDialog from '@/components/shared/SaveTemplateDialog';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { ALIGN_STYLES, ALIGN_OPTS, KLIC_ZAMEK, zamcenyStyl, platnyStyl, stylNoveMapy } from '@/lib/alignStyles';
-import { createTasksFromSeeds, createRulesFromTemplate } from '@/lib/createProject';
+import { createRulesFromTemplate } from '@/lib/createProject';
 import { computeWaitingSet, findBlockingForOwner } from '@/lib/waitStatus';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { KLIC_CITELNOST, nactiStupen, dalsiStupen } from '@/lib/citelnost';
@@ -455,7 +457,7 @@ function EditorContent({ mapId, personalMap = false }) {
   const canonicalPosRef = useRef(new Map()); // svislé (kanonické) pozice — vodorovné view je NEpřepisuje
   const alignMapKeyRef = useRef(null); // klíč stylu TÉTO mapy — čte i AI přelayout, který nemá závislosti
   const templateSeriesRef = useRef(null); // id číslované šablony z náhledu (state maže replaceState)
-  const templateSeedsRef = useRef(null); // {task_seeds, idMap, rules} z náhledu šablony — úkoly a pravidla se založí až s mapou
+  const templateSeedsRef = useRef(null); // {idMap, rules} z náhledu šablony — pravidla se založí až s mapou
   const saveTimer = useRef(null);
   const historyRef = useRef([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -693,13 +695,12 @@ function EditorContent({ mapId, personalMap = false }) {
 
           // konverze sjednocena v lib/templateConvert (vč. procesních metadat)
           const { nodes: tplNodes, edges: tplEdges, idMap: tplIdMap } = templateToMap(tpl, { startDate: new Date() });
-          // úkoly šablony („včetně úkolů") i vestavěná pravidla se založí až
-          // při skutečném uložení mapy — název pravidla dle jazyka UI
+          // vestavěná pravidla šablony se založí až při skutečném uložení
+          // mapy — název pravidla dle jazyka UI (task_seeds zrušeny 17. 8.)
           const tplRules = templateForLang(tpl).rules;
           templateSeedsRef.current =
-            (Array.isArray(tpl.task_seeds) && tpl.task_seeds.length > 0) ||
             (Array.isArray(tplRules) && tplRules.length > 0)
-              ? { task_seeds: tpl.task_seeds || [], idMap: tplIdMap, rules: tplRules || [] }
+              ? { idMap: tplIdMap, rules: tplRules }
               : null;
           setNodes(tplNodes);
           setEdges(tplEdges);
@@ -1290,15 +1291,11 @@ function EditorContent({ mapId, personalMap = false }) {
       setTitle(newMap.title || '');
       baseUpdated.current = newMap.updated_date;
       templateSeriesRef.current = null;
-      // úkoly a pravidla ze šablony — až teď, když mapa existuje; ref se nuluje
+      // pravidla ze šablony — až teď, když mapa existuje; ref se nuluje
       // PŘED zakládáním (ochrana proti dvojímu založení)
       if (templateSeedsRef.current) {
-        const { task_seeds, idMap, rules } = templateSeedsRef.current;
+        const { idMap, rules } = templateSeedsRef.current;
         templateSeedsRef.current = null;
-        try {
-          await createTasksFromSeeds(task_seeds, idMap, new Date(), newMap.id);
-          setTaskStatsVersion((v) => v + 1);
-        } catch (e2) { console.error('úkoly ze šablony', e2); }
         try {
           await createRulesFromTemplate(rules, idMap, newMap.id);
         } catch (e2) { console.error('pravidla ze šablony', e2); }
@@ -1731,6 +1728,16 @@ function EditorContent({ mapId, personalMap = false }) {
     rulesApi.list(activeMapId).then(setMapRules).catch(() => setMapRules([]));
   }, [activeMapId, canEdit, isPublicView]);
   const ruleNodes = useMemo(() => new Set(mapRules.filter((r) => r.node_id).map((r) => r.node_id)), [mapRules]);
+  // 🔁 uzly s čistým opakovacím pravidlem (v0.35) — badge na kartě cíle
+  const recurrenceNodes = useMemo(() => {
+    const out = new Set();
+    for (const r of mapRules) {
+      if (!r?.node_id) continue;
+      const st = recurrenceOf(mapRules, r.node_id);
+      if (st && !st.custom) out.add(r.node_id);
+    }
+    return out;
+  }, [mapRules]);
   // KANBAN REŽIM: mapa má zapnutá pravidla posunu. Tlačítko Zarovnat se mění
   // na indikátor „Kanban" (Richard 15. 8.): na kanban desce styly zarovnání
   // nemají co přeskládat (sloupce mají děti), cyklení názvů naprázdno matlo —
@@ -2397,6 +2404,7 @@ function EditorContent({ mapId, personalMap = false }) {
       waitingSet,
       runningAgentNodes,
       ruleNodes,
+      recurrenceNodes,
       onShowNodeTasks: user && activeMapId && !isPublicView ? setTaskNodeId : undefined,
       activeMapId, // pro hodinky na uzlu (start měření s map_id)
       direction, // směr stromu → konektory uzlů nahoře/dole vs vlevo/vpravo
@@ -2404,7 +2412,7 @@ function EditorContent({ mapId, personalMap = false }) {
       citelnost, // stupeň velikosti písma v uzlu (tlačítko Čitelnost)
       orgMap: mapKind === 'org', // organizační struktura: uzel = pozice/funkce (jiná karta)
     }),
-    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, direction, personalMap, citelnost, mapKind]
+    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind]
   );
 
   if (loading) {
@@ -3179,6 +3187,15 @@ function EditorContent({ mapId, personalMap = false }) {
         extraExecutorContent={canEdit && editNode && editNode.type !== 'apexNode' ? (
           <NodeRulesPanel rules={mapRules} nodeId={editNode.id} onOpenRules={openRulesFromNode} />
         ) : undefined}
+        extraAssignmentContent={canEdit && user && activeMapId && !isPublicView && mapKind !== 'org' && editNode && editNode.type !== 'apexNode' ? (
+          <RecurrenceSwitch
+            mapId={activeMapId}
+            nodeId={editNode.id}
+            nodeTitle={editNode.data?.title || ''}
+            rules={mapRules}
+            onRulesChanged={setMapRules}
+          />
+        ) : undefined}
         extraBehaviorContent={canEdit && editNode && editNode.type !== 'apexNode' ? (
           <UnblockRulesHint rules={mapRules} nodeId={editNode.id} onOpenRules={openRulesFromNode} />
         ) : undefined}
@@ -3204,7 +3221,6 @@ function EditorContent({ mapId, personalMap = false }) {
           map={{ id: activeMapId, title, nodes }}
           nodeId={taskNodeId}
           canEdit={canEdit}
-          emailOptions={ownerOptions}
           members={members}
           onClose={() => setTaskNodeId(null)}
           onChanged={() => setTaskStatsVersion((v) => v + 1)}
@@ -3215,7 +3231,6 @@ function EditorContent({ mapId, personalMap = false }) {
         mapTitle={title}
         nodes={nodes}
         edges={edges}
-        tasks={mapTasks}
         onClose={() => setSaveTplOpen(false)}
       />
       <SkinDialog open={skinOpen} onClose={() => setSkinOpen(false)} />

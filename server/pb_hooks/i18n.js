@@ -438,6 +438,14 @@ const STRINGS = {
     cs: "Úkol musí patřit do projektu. Rychlé poznámky patří do zásobníku nápadů.",
     en: "A task must belong to a project. Quick notes go to the idea buffer.",
   },
+  "err.taskCreateDisabled": {
+    cs: "Samostatné položky úkolů už nejde zakládat — úkol je cíl v mapě s řešitelem nebo termínem. Založte nový uzel.",
+    en: "Standalone task items can no longer be created — a task is a map goal with an assignee or deadline. Create a new node instead.",
+  },
+  "err.tasksApiRemoved": {
+    cs: "Rozhraní /v1/tasks bylo odstraněno — úkol je uzel s řešitelem nebo termínem. Používejte /v1/maps/{id}/nodes (MCP: add_nodes, update_node).",
+    en: "The /v1/tasks endpoints were removed — a task is a node with an assignee or deadline. Use /v1/maps/{id}/nodes (MCP: add_nodes, update_node).",
+  },
   "err.taskNeedsNode": {
     cs: "Úkol musí patřit ke konkrétnímu cíli v mapě. Vyberte cíl, nebo pro tu práci nejdřív cíl založte.",
     en: "A task must belong to a specific goal in the map. Pick a goal, or create one for this work first.",

@@ -52,9 +52,15 @@ const api = async (method, p, { token, body } = {}) => {
       ],
       edges: [{ id: 'e1', source: 'root', target: 'n1' }],
     } })).json;
+    // SLOVNÍK 17. 8. 2026: položky-úkoly už nevznikají — 35 notifikací nasype
+    // superuser přímo do kolekce (sada testuje zvoneček/stránkování, ne zdroj)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST0 = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const prijemceId = ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent("email='prijemce@e2e.cz'")}`, { token: ST0 })).json.items || [])[0].id;
     for (let i = 0; i < 35; i++) {
-      await api('POST', '/api/collections/tasks/records', { token: A, body: {
-        title: `Úkol ${i + 1}`, status: 'todo', assignee_email: 'prijemce@e2e.cz', map: map.id, node_id: 'n1',
+      await api('POST', '/api/collections/notifications/records', { token: ST0, body: {
+        user: prijemceId, type: 'task_assigned', text: `admin@e2e.cz vám přiřadil práci: Úkol ${i + 1}`,
+        map: map.id, count: 1, read: false, dedup_key: '',
       } });
     }
     const B = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'prijemce@e2e.cz', password: PW } })).json.token;

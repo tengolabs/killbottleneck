@@ -117,7 +117,6 @@
     "goalHint": "A map will be created with this goal at the top. Then add goals and sub-goals on the canvas, or write them as a list in Tasks.",
     "clientLabel": "Client (optional)",
     "clientHint": "Time tracked on the project is then counted for this client too.",
-    "withTasks": "Includes {{count}} tasks",
     "autoName": "The project will be named automatically: \"{{title}}\".",
     "processTemplate": "Process template",
     "startDateLabel": "Start date (deadlines will be calculated)",

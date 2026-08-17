@@ -12,6 +12,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 
 // PŘECHOD po přejmenování na killBottleneck: nové proměnné jsou KB_*, ale kdo má
 // server zaregistrovaný ve svém klientovi (Claude Code, Claude Desktop), má tam
@@ -147,7 +148,15 @@ const treeItem = z.lazy(() => z.object({
   children: z.array(treeItem).optional(),
 }));
 
-const server = new McpServer({ name: 'killbottleneck', version: '0.1.0' });
+// ⚠️ Verzi hlásit z package.json, ne natvrdo. Klienti i katalogy (Glama, registr
+// MCP) ukazují právě tuhle hodnotu — natvrdo psaná „0.1.0" tvrdila lidem, že jde
+// o první nástřel, zatímco na npm ležela 0.34.x. Selhání čtení nesmí shodit server,
+// proto záloha na 0.
+const VERZE = await readFile(new URL('./package.json', import.meta.url), 'utf8')
+  .then((t) => JSON.parse(t).version)
+  .catch(() => '0.0.0');
+
+const server = new McpServer({ name: 'killbottleneck', version: VERZE });
 
 server.registerTool('list_maps', {
   description: 'List goal maps in the killBottleneck account (id, title, node count, last update). Use archived=true to list archived maps instead.',
@@ -187,7 +196,7 @@ server.registerTool('create_map', {
 });
 
 server.registerTool('add_nodes', {
-  description: 'Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). A node IS a unit of work: give it an owner (the accountable person) and a deadline when it is a commitment — that makes it a task. Prefer this over add_task for anything that is work rather than a checklist detail. NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.',
+  description: 'Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). A node is a goal; a node with an assignee (owner) OR a deadline IS a task — that is the only kind of task in killBottleneck (there is no separate task record; new work = new node). NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.',
   inputSchema: {
     map_id: z.string(),
     parent_id: z.string().optional().describe('Existing node id to attach under; omit for apex'),
@@ -258,6 +267,7 @@ const ruleAction = z.object({
   owner: z.string().optional().describe('set_owner only: e-mail of an instance member (empty string clears), or a dynamic target resolved when the rule runs: "deputy_of_node_owner", "position:<nodeId>" (holder of an org-structure position), "deputy_of_position:<nodeId>". An unresolvable target is logged as a skipped action'),
   date: z.string().optional().describe('set_deadline only: YYYY-MM-DD (alternative to relative_days)'),
   relative_days: z.number().int().optional().describe('set_deadline only: today + N days (0-3650)'),
+  advance: z.enum(['daily', 'weekly', 'monthly']).optional().describe('set_deadline only: advance the node\'s CURRENT deadline by one interval — daily|weekly|monthly. Keeps the rhythm anchored to the original deadline (every Monday stays a Monday; the 31st stays the 31st, clamped in shorter months); past occurrences are skipped to the nearest future one. Use for recurring goals (\"repeat weekly\" = on done → set_status todo + set_deadline advance).'),
   parent: z.string().optional().describe('create_subnodes only: node id to attach under, or "trigger_node" (default)'),
   items: z.array(treeItem).optional().describe('create_subnodes only: subtree template, same shape as add_nodes items, max 50 nodes'),
   to: z.string().optional().describe('notify: "node_owner", "deputy_of_node_owner", "position:<nodeId>", "deputy_of_position:<nodeId>" (resolved at run time), "map_owner" or an e-mail. move_node (kanban): id of the new parent node the trigger node moves under — appended at the end of the new siblings row; moving the apex, a vanished target or a move creating a cycle is logged as a skipped action'),
@@ -401,60 +411,6 @@ server.registerTool('get_org_structure', {
     if (!r.positions.length) return text('The org structure has no positions yet.');
     return text(DATA_FENCE + '\n\n' + r.positions.map((p) =>
       `• ${p.title || '(untitled)'} [${p.position_kind}] (id: ${p.node_id}) — holder: ${p.holder || 'vacant'}${p.deputy ? `, deputy: ${p.deputy}` : ''}`).join('\n'));
-  } catch (e) { return errText(e.message); }
-});
-
-server.registerTool('list_tasks', {
-  description: 'List tasks (id, title, status, deadline, map, assignee). Optional filters: map_id, status.',
-  inputSchema: {
-    map_id: z.string().optional(),
-    status: z.enum(['todo', 'in_progress', 'done']).optional(),
-  },
-}, async ({ map_id, status }) => {
-  try {
-    const q = new URLSearchParams();
-    if (map_id) q.set('map', map_id);
-    if (status) q.set('status', status);
-    const qs = q.toString();
-    const r = await call('GET', `/api/kb/v1/tasks${qs ? '?' + qs : ''}`);
-    if (!r.tasks.length) return text('No tasks.');
-    return text(DATA_FENCE + '\n\n' + r.tasks.map((t) =>
-      `• ${STATUS_MARK[t.status] || '[ ]'} ${t.title} (id: ${t.id}${t.deadline ? `, deadline: ${t.deadline}` : ''}${t.assignee_email ? `, @${t.assignee_email}` : ''}, map: ${t.map})`
-    ).join('\n'));
-  } catch (e) { return errText(e.message); }
-});
-
-server.registerTool('add_task', {
-  description: 'Create a SUBTASK — a detail inside an existing goal (checklist item, one concrete step of it). ⚠️ This is NOT how you record work: in killBottleneck the work itself is a NODE — add a node with add_nodes and give it an owner (and a deadline if it is a commitment); a node with a deadline IS the task. Reach for add_task only when a goal already exists and you are breaking it into smaller items. map_id and node_id are required (never the apex). Optional deadline (YYYY-MM-DD) and assignee e-mail; when you omit the assignee, the owner of the API key gets it.',
-  inputSchema: {
-    title: z.string(),
-    map_id: z.string(),
-    node_id: z.string(),
-    deadline: z.string().optional(),
-    description: z.string().optional(),
-    assignee_email: z.string().optional(),
-  },
-}, async ({ title, map_id, node_id, deadline, description, assignee_email }) => {
-  try {
-    const r = await call('POST', '/api/kb/v1/tasks', { title, map: map_id, node_id, deadline, description, assignee_email });
-    return text(`Task created: ${r.title} (id: ${r.id}${r.deadline ? `, deadline ${r.deadline}` : ''})`);
-  } catch (e) { return errText(e.message); }
-});
-
-server.registerTool('update_task', {
-  description: 'Update a task: title, status (todo/in_progress/done), deadline (YYYY-MM-DD), description, assignee_email. Completing a recurring task automatically creates its next occurrence.',
-  inputSchema: {
-    task_id: z.string(),
-    title: z.string().optional(),
-    status: z.enum(['todo', 'in_progress', 'done']).optional(),
-    deadline: z.string().optional(),
-    description: z.string().optional(),
-    assignee_email: z.string().optional(),
-  },
-}, async ({ task_id, ...fields }) => {
-  try {
-    const r = await call('POST', `/api/kb/v1/tasks/${enc(task_id)}`, fields);
-    return text(`Task updated: ${r.title} — status ${r.status}${r.deadline ? `, deadline ${r.deadline}` : ''}`);
   } catch (e) { return errText(e.message); }
 });
 

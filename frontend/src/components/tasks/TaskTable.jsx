@@ -414,7 +414,7 @@ function QuickAddNodeRow({ onAdd }) {
   );
 }
 
-function TaskRow({ task, sub, subCount, expanded, onToggle, nodeLabel, onEdit, onCycle, onDelete, canDelete = true, onAddSub, onAssign, onOpenTaskMap, onStashTask, onRowAction, members = [], commentCount }) {
+function TaskRow({ task, sub, subCount, expanded, onToggle, nodeLabel, onEdit, onCycle, onDelete, canDelete = true, onAssign, onOpenTaskMap, onStashTask, onRowAction, members = [], commentCount }) {
   const { t } = useTranslation('tasks');
   const isDone = task.status === 'done';
   const planned = planState(task.planned_on);
@@ -499,12 +499,6 @@ function TaskRow({ task, sub, subCount, expanded, onToggle, nodeLabel, onEdit, o
               <Inbox className="w-3.5 h-3.5" />
             </Button>
           )}
-          {!sub && (
-            <Button variant="ghost" size="icon" className="h-7 w-7" title={t('taskTable.addSubtask')}
-              onClick={(e) => { e.stopPropagation(); onAddSub(task); }}>
-              <Plus className="w-3.5 h-3.5" />
-            </Button>
-          )}
           <Button variant="ghost" size="icon" className="h-7 w-7" title={t('common:actions.edit')}
             onClick={(e) => { e.stopPropagation(); onEdit(task); }}>
             <Pencil className="w-3.5 h-3.5" />
@@ -578,7 +572,7 @@ function BufferRow({ item, onEdit, onDelete, onConvert }) {
 // tasks = úkoly nejvyšší úrovně (už profiltrované), byParent = všechny podúkoly,
 // nodeTrees = { mapId: [kořeny stromu uzlů] } — osnova projektu (editovatelná),
 // bufferItems = nápady ze zásobníku (editovatelné, sekce na konci)
-export default function TaskTable({ tasks, byParent, maps, members = [], nodeTrees = {}, bufferItems = [], meEmail, onEditAppearance, onSetProjectIcon, onEditProject, onSetNodeIcon, onEdit, onCycle, onDelete, onAddSub, onAssign, onOpenNode, onOpenTaskMap, onEditNodeItem, onCycleNodeItem, onAssignNodeItem, onAddChildNode, onQuickAddNode, onEditBuffer, onDeleteBuffer, onConvertBuffer, onStashTask, onStashNodeItem, onRowAction, commentCounts = {} }) {
+export default function TaskTable({ tasks, byParent, maps, members = [], nodeTrees = {}, bufferItems = [], meEmail, onEditAppearance, onSetProjectIcon, onEditProject, onSetNodeIcon, onEdit, onCycle, onDelete, onAssign, onOpenNode, onOpenTaskMap, onEditNodeItem, onCycleNodeItem, onAssignNodeItem, onAddChildNode, onQuickAddNode, onEditBuffer, onDeleteBuffer, onConvertBuffer, onStashTask, onStashNodeItem, onRowAction, commentCounts = {} }) {
   const { t } = useTranslation('tasks');
   const canEditMap = (m) => !!m && (m.created_by === meEmail || (m.shared_with_edit || []).includes(meEmail) || m.team_access === 'edit');
   const [expanded, setExpanded] = useState(() => new Set());
@@ -814,7 +808,6 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                     onCycle={(changed) => onCycle(changed, cycleStatus(changed.status))}
                     onDelete={onDelete}
                     canDelete={task.created_by === meEmail || mapById[task.map_id]?.created_by === meEmail}
-                    onAddSub={onAddSub}
                     onAssign={onAssign}
                     onOpenTaskMap={onOpenTaskMap}
                     onStashTask={onStashTask}
@@ -832,7 +825,6 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                       onCycle={(changed) => onCycle(changed, cycleStatus(changed.status))}
                       onDelete={onDelete}
                       canDelete={s.created_by === meEmail || mapById[s.map_id]?.created_by === meEmail}
-                      onAddSub={onAddSub}
                       onAssign={onAssign}
                     onOpenTaskMap={onOpenTaskMap}
                       onRowAction={onRowAction}

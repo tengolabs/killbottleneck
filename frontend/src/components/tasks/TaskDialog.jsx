@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Calendar, X as XIcon, Inbox, RotateCw, Timer } from 'lucide-react';
+import { Calendar, X as XIcon, Inbox, Timer } from 'lucide-react';
 import { STATUSES } from '@/lib/statusMeta';
 import DatePicker from '@/components/DatePicker';
 import { useTimer } from '@/lib/TimerContext';
@@ -48,7 +48,6 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
   const [status, setStatus] = useState('todo');
   const [deadline, setDeadline] = useState('');
   const [assignee, setAssignee] = useState('');
-  const [recurrence, setRecurrence] = useState('');
   const [mapId, setMapId] = useState('');
   const [nodeId, setNodeId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -69,7 +68,6 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
     setDescription(task?.description ?? defaults?.description ?? '');
     setStatus(task?.status || 'todo');
     setDeadline(task?.deadline ?? defaults?.deadline ?? '');
-    setRecurrence(task?.recurrence || '');
     setAssignee(a);
     setCustomAssignee(!!a && members.length > 0 && !members.some((m) => m.email === a));
     setMapId(task?.map_id ?? defaults?.map_id ?? '');
@@ -109,7 +107,7 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
       if (!isSubtask) {
         data.map_id = mapId;
         data.node_id = mapId ? nodeId : '';
-        data.recurrence = recurrence;
+        // opakování zaniklo se slovníkem 17. 8. 2026 — pole se už nenabízí ani neposílá
       }
       if (!task && defaults?.parent_id) data.parent_id = defaults.parent_id;
       await onSave(data, task?.id);
@@ -254,30 +252,6 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
               )}
             </div>
           </div>
-
-          {!isSubtask && (
-            <div className="space-y-1.5">
-              <Label htmlFor="task-recurrence" className="flex items-center gap-1.5">
-                <RotateCw className="w-3.5 h-3.5" /> {t('taskDialog.labelRecurrence')}
-              </Label>
-              <Select value={recurrence || NONE} onValueChange={(v) => setRecurrence(v === NONE ? '' : v)}>
-                <SelectTrigger id="task-recurrence">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>{t('taskDialog.recurrenceNone')}</SelectItem>
-                  <SelectItem value="daily">{t('taskDialog.recurrenceDaily')}</SelectItem>
-                  <SelectItem value="weekly">{t('taskDialog.recurrenceWeekly')}</SelectItem>
-                  <SelectItem value="monthly">{t('taskDialog.recurrenceMonthly')}</SelectItem>
-                </SelectContent>
-              </Select>
-              {recurrence && (
-                <p className="text-xs text-muted-foreground">
-                  {t('taskDialog.recurrenceHint')}
-                </p>
-              )}
-            </div>
-          )}
 
           {!isSubtask && (
             <div className="grid grid-cols-2 gap-3">

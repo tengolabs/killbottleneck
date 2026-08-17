@@ -374,21 +374,43 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
               <div className="space-y-2">
               {targetSelect(a, i)}
               <div className="flex flex-wrap items-center gap-2">
-                <select className={`${selectCls} w-auto`} value={a.relative_days !== undefined ? 'relative' : 'date'}
-                  onChange={(e) => setAct(i, e.target.value === 'relative' ? { relative_days: 7, date: undefined } : { date: '', relative_days: undefined })}>
+                {/* Tři režimy: interval (opakování — v0.35), +N dní, pevné datum.
+                    ⚠️ Při přepnutí VŽDY explicitně nulovat ostatní pole — server
+                    bere advance přednostně a „viselé" advance by tiše vyhrálo
+                    nad tím, co uživatel vidí (nález panelu 17. 8.). */}
+                <select className={`${selectCls} w-auto`}
+                  value={a.advance !== undefined ? 'advance' : (a.relative_days !== undefined ? 'relative' : 'date')}
+                  onChange={(e) => setAct(i, e.target.value === 'advance'
+                    ? { advance: 'weekly', relative_days: undefined, date: undefined }
+                    : (e.target.value === 'relative'
+                      ? { relative_days: 7, date: undefined, advance: undefined }
+                      : { date: '', relative_days: undefined, advance: undefined }))}>
+                  <option value="advance">{t('rules.dlAdvance')}</option>
                   <option value="relative">{t('rules.dlRelative')}</option>
                   <option value="date">{t('rules.dlFixed')}</option>
                 </select>
-                {a.relative_days !== undefined
+                {a.advance !== undefined
                   ? (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-muted-foreground">+</span>
-                      <Input type="number" min={0} max={3650} className="w-24" value={a.relative_days}
-                        onChange={(e) => setAct(i, { relative_days: Math.max(0, Math.min(3650, parseInt(e.target.value, 10) || 0)) })} />
-                      <span className="text-sm text-muted-foreground">{t('rules.days')}</span>
+                      <select className={`${selectCls} w-auto`} value={a.advance}
+                        onChange={(e) => setAct(i, { advance: e.target.value })}>
+                        <option value="daily">{t('rules.dlAdvanceDaily')}</option>
+                        <option value="weekly">{t('rules.dlAdvanceWeekly')}</option>
+                        <option value="monthly">{t('rules.dlAdvanceMonthly')}</option>
+                      </select>
+                      <span className="text-xs text-muted-foreground">{t('rules.dlAdvanceHint')}</span>
                     </div>
                   )
-                  : <DatePicker value={a.date || ''} onChange={(v) => setAct(i, { date: v })} className="h-9 w-40" />}
+                  : a.relative_days !== undefined
+                    ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm text-muted-foreground">+</span>
+                        <Input type="number" min={0} max={3650} className="w-24" value={a.relative_days}
+                          onChange={(e) => setAct(i, { relative_days: Math.max(0, Math.min(3650, parseInt(e.target.value, 10) || 0)) })} />
+                        <span className="text-sm text-muted-foreground">{t('rules.days')}</span>
+                      </div>
+                    )
+                    : <DatePicker value={a.date || ''} onChange={(v) => setAct(i, { date: v })} className="h-9 w-40" />}
               </div>
               </div>
             )}

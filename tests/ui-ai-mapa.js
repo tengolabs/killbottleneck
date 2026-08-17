@@ -218,8 +218,13 @@ const clickText = async (page, text, sel = 'button, [role="menuitem"], span, a')
     console.log('— Odznak úkolů uzlu (mobil, tmavý režim) —');
     const uzelSUkolem = deti2[0] || apex2;
     if (!uzelSUkolem) throw new Error('mapa nemá žádný uzel — část 3 nemá na čem testovat');
+    // SLOVNÍK 17. 8. 2026: DETEKTOR — zbytkovou položku sází superuser; badge
+    // 0/1 a dialog ji musí ukázat a nespadnout (uživatelský create je 403)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const uidMe = ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent("email='admin@example.com'")}`, { token: ST })).json.items || [])[0];
     await api('POST', '/api/collections/tasks/records', {
-      token, body: { title: 'UKOL-NA-UZLU', status: 'todo', map: aiMapa.id, node_id: uzelSUkolem.id },
+      token: ST, body: { title: 'UKOL-NA-UZLU', status: 'todo', map: aiMapa.id, node_id: uzelSUkolem.id, owner: uidMe && uidMe.id, owner_email: uidMe && uidMe.email },
     });
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
     await page.goto(`${BASE}/map/${aiMapa.id}`, { waitUntil: 'networkidle2' });

@@ -166,10 +166,10 @@ instanci, liší se jen adresa.
    ```
 
 Nástroje: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`,
-`delete_node`, `list_tasks`, `add_task`, `update_task`.
+`delete_node` (plus nástroje pravidel). Cíl s řešitelem nebo termínem JE úkol —
+žádné samostatné úkolové záznamy neexistují.
 
-**Bezpečnost:** klíč zpřístupní mapy a úkoly svého majitele + úkoly, které mu
-někdo přiřadil (stejně jako v aplikaci); sdílené a týmové MAPY přes klíč nejdou
+**Bezpečnost:** klíč zpřístupní mapy svého majitele (stejně jako v aplikaci); sdílené a týmové MAPY přes klíč nejdou
 (zatím záměrně) a nikdy administrace, nastavení AI ani uživatelé. Zápis umí
 přidat/upravit/smazat uzly a úkoly; **celou mapu přes API smazat nejde** a vrchol
 mapy taky ne. Limity: 120 čtení + 30 zápisů za minutu na klíč, max 200 uzlů na
@@ -186,7 +186,7 @@ Jestli za automatizací stojí AI agent nebo naplánovaný cron, řešit nemusí
 ten, kdo ji staví.
 
 Důležité: **zodpovědná osoba u cíle zůstává vždy člověk.** I u automatizovaného kroku
-je to garant, kterému chodí notifikace a komu se cíl počítá do „Můj den". Automatizace
+je to řešitel, kterému chodí notifikace a komu se cíl počítá do „Můj den". Automatizace
 práci udělá, odpovědnost za ni má člověk.
 
 U automatizovaného kroku se zapisuje **jaká automatizace ho dělá** — je to evidence
@@ -264,7 +264,7 @@ Běžící automatizace se nespustí podruhé, dokud neohlásí výsledek nebo n
   "map_id": "…", "map_title": "…",
   "node_id": "…", "node_title": "…",
   "description": "…", "deadline": "2026-08-01",
-  "owner": "garant@firma.cz", "triggered_by": "kdo@firma.cz"
+  "owner": "resitel@firma.cz", "triggered_by": "kdo@firma.cz"
 }
 ```
 
@@ -281,7 +281,7 @@ vidí i přílohy přidané až za běhu. Po ohlášení výsledku token propad�
 druhé volání se stejným tokenem už neprojde.
 
 Po `done` se cíl **splní** a tím se rozjede zbytek procesu: navazující cíl se
-odblokuje a jeho garant dostane notifikaci „můžete začít". Pokud je i navazující
+odblokuje a jeho řešitel dostane notifikaci „můžete začít". Pokud je i navazující
 cíl automatizovaný, spustí se rovnou on — kroky se tak řetězí samy.
 
 **Nastavte adresu, na kterou se má agent ozvat.** `callback_url` v payloadu skládá
@@ -327,7 +327,7 @@ Co který stav znamená:
 | hotovo / selhalo | agent ohlásil výsledek, nebo běh vypršel |
 
 Běh, který se neozve do `KB_AGENT_TIMEOUT_MIN` (default 90) minut, hlídač
-označí za selhaný a dá vědět garantovi i správcům AI agentů — cíl tedy nikdy
+označí za selhaný a dá vědět řešiteli i správcům AI agentů — cíl tedy nikdy
 nezůstane viset potichu.
 
 Nejčastější příčiny selhání: agent není v registru nebo je vypnutý; nemá vyplněný
@@ -343,7 +343,7 @@ nebo **bez jmen**. Import je v nabídce u tlačítka „Nový projekt".
 
 Co soubor obsahuje: název, popis, celou strukturu cílů (včetně stavů, termínů,
 vykonavatele a přání o automatizaci) a navázané úkoly. Volba „bez jmen" vyprázdní
-garanty i řešitele — názvy automatizací zůstávají, je to popis procesu.
+řešitele — názvy automatizací zůstávají, je to popis procesu.
 
 **Přechod z Asany nebo Trella:** stejný import bere i **export projektu z Asany
 (CSV)** a **export boardu z Trella (JSON)**. Sekce/listy se stanou větvemi mapy,

@@ -7,9 +7,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Inbox, Trash2, ExternalLink, LayoutGrid, CalendarClock, Bot, Paperclip, ListTodo, Users } from 'lucide-react';
-import TaskDialog from '@/components/tasks/TaskDialog';
-import { base44 } from '@/api/base44Client';
-import { useToast } from '@/components/ui/use-toast';
 import { useNodeEditState } from './useNodeEditState';
 import BasicsSection from './sections/BasicsSection';
 import OrgSection from './sections/OrgSection';
@@ -28,9 +25,8 @@ import TasksCommentsSection from './sections/TasksCommentsSection';
 //
 // extraExecutorContent: sem editor mapy vloží pravidla uzlu (RuleBuilder, M7) —
 // kategorie Automatizace tím roste bez zásahu do tohohle souboru.
-export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAccess, members = [], onShareAdd, onStash, onDelete, onOpenMap, map, emailOptions = [], onTasksChanged, onContactsChanged, extraExecutorContent, extraBehaviorContent, orgMap }) {
+export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAccess, members = [], onShareAdd, onStash, onDelete, onOpenMap, map, emailOptions = [], onTasksChanged, onContactsChanged, extraExecutorContent, extraBehaviorContent, extraAssignmentContent, orgMap }) {
   const { t } = useTranslation('editor');
-  const { toast } = useToast();
   const s = useNodeEditState({ node, mapId, onSave, mapAccess, orgMap });
   const orgNode = !!orgMap && !s.isApex;
   const [cat, setCat] = useState('basics');
@@ -100,7 +96,11 @@ export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAc
               {active === 'org' && <OrgSection s={s} members={members} />}
               {active === 'basics' && <BasicsSection s={s} withColor={!s.isApex} />}
               {active === 'assignment' && (
-                <AssignmentSection s={s} mapAccess={mapAccess} members={members} onShareAdd={onShareAdd} onContactsChanged={onContactsChanged} />
+                <>
+                  <AssignmentSection s={s} mapAccess={mapAccess} members={members} onShareAdd={onShareAdd} onContactsChanged={onContactsChanged} />
+                  {/* Opakování (v0.35): přepínač spravující opakovací pravidlo — jen editor mapy */}
+                  {!s.isApex && extraAssignmentContent}
+                </>
               )}
               {active === 'executor' && !s.isApex && (
                 <>
@@ -155,27 +155,6 @@ export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAc
             {t('common:actions.save')}
           </Button>
         </div>
-        {map && (
-          <TaskDialog
-            open={s.taskOpen}
-            task={null}
-            defaults={{ map_id: map.id, node_id: node?.id }}
-            maps={[map]}
-            emailOptions={emailOptions}
-            members={members}
-            onSave={async (data) => {
-              try {
-                await base44.entities.Task.create(data);
-                onTasksChanged?.();
-                toast({ title: t('nodeDialog.taskCreated'), description: data.recurrence ? t('nodeDialog.taskCreatedDesc') : undefined });
-              } catch (e) {
-                toast({ title: t('tasks:nodeTasksDialog.createFailed'), variant: 'destructive' });
-                throw e;
-              }
-            }}
-            onClose={() => s.setTaskOpen(false)}
-          />
-        )}
       </DialogContent>
     </Dialog>
   );

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MembersContext, labelForEmail } from '@/lib/memberLabel';
 import { isExternalOwner } from '@/lib/externalContacts';
 import { Handle, Position } from '@xyflow/react';
-import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw } from 'lucide-react';
 import { useGoalMap } from './GoalMapContext';
 import { useTimer } from '@/lib/TimerContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -28,7 +28,7 @@ const aiMenuItems = [
 
 function GoalNode({ id, data, selected }) {
   const { t } = useTranslation('editor');
-  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, activeMapId, direction, compactNode, citelnost, orgMap } = useGoalMap();
+  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap } = useGoalMap();
   // směr stromu: 'horizontal' = strom doprava (mobil) → konektory vlevo/vpravo, jinak nahoře/dole
   const isH = direction === 'horizontal';
   // velikost písma v uzlu (tlačítko Čitelnost v liště) — šířka karty se NEMĚNÍ,
@@ -303,6 +303,17 @@ function GoalNode({ id, data, selected }) {
           )}
           {/* blesk = na uzel míří automatizační pravidlo (když X → udělej Y);
               detail v okně uzlu (kategorie Automatizace) a v přehledu na liště */}
+          {/* 🔁 = cíl se opakuje: po Hotovo se sám vrátí s termínem posunutým
+              v rytmu původního termínu (v0.35; spravuje přepínač v Zadání) */}
+          {recurrenceNodes?.has(id) && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+              title={t('editor:node.recurrenceBadgeHint')}
+              data-testid="node-recurrence-badge"
+            >
+              <RotateCw className="w-2.5 h-2.5 shrink-0" />
+            </span>
+          )}
           {ruleNodes?.has(id) && (
             <span
               className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"

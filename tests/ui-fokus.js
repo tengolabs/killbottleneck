@@ -77,6 +77,7 @@ const badgeInfo = (page) => page.evaluate(() => {
     await sleep(1500);
 
     const today = new Date().toLocaleDateString('en-CA');
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     await page.evaluate(async (today) => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
@@ -92,7 +93,10 @@ const badgeInfo = (page) => page.evaluate(() => {
           edges: [{ id: 'e1', source: 'apex', target: 'krok' }],
         }),
       })).json();
-      const mk = (b) => fetch('/api/collections/tasks/records', { method: 'POST', headers: H, body: JSON.stringify({ map: m.id, node_id: 'krok', ...b }) });
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
+      const mk = (b) => fetch('/api/collections/tasks/records', { method: 'POST', headers: HS, body: JSON.stringify({ map: m.id, node_id: 'krok', owner: myId, owner_email: 'fokus@e2e.cz', ...b }) });
       await mk({ title: 'FOKUS-A', status: 'todo', assignee_email: 'fokus@e2e.cz', deadline: today });
       await mk({ title: 'FOKUS-B', status: 'todo', assignee_email: 'fokus@e2e.cz', deadline: today });
     }, today);

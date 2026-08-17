@@ -53,7 +53,6 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
     setDlReqBusy(false);
   };
 
-  const [taskOpen, setTaskOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('todo');
@@ -277,7 +276,7 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
     origDeadline, taskAssigner, canManageTask, canEditDeadline,
     dlReqOpen, setDlReqOpen, dlReqDate, setDlReqDate, dlReqNote, setDlReqNote,
     dlReqBusy, dlWanted, dlNote, dlBy, dlAction,
-    taskOpen, setTaskOpen,
+
     title, setTitle, description, setDescription, status, setStatus,
     color, setColor, isApex, apexText, setApexText,
     deadline, setDeadline, owner, setOwner,

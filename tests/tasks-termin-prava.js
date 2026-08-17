@@ -48,6 +48,11 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
 
     await reg(ZADAVATEL); await reg(RESITEL); await reg(KOLEGA); await reg(TYMAK);
     const Z = await login(ZADAVATEL), R = await login(RESITEL), K = await login(KOLEGA), T = await login(TYMAK);
+    // SLOVNÍK 17. 8. 2026: položky nejde založit uživatelem — zbytky sází superuser
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const uid = async (email) => ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent(`email='${email}'`)}`, { token: ST })).json.items || [])[0].id;
+    const suTask = (body, email) => uid(email).then((id) => api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: id, owner_email: email, ...body } }));
 
     // mapa se DVĚMA sdílenými s právem editace (multi-match past) — vlastník = zadavatel
     const mapa = await api('POST', '/api/collections/goalmaps/records', {
@@ -67,11 +72,14 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     const mapId = mapa.json?.id;
     expect(mapa.status === 200 && !!mapId, `mapa založena (${mapa.status})`);
 
-    const ukol = await api('POST', '/api/collections/tasks/records', {
+    // create uživatelem je pryč — ověřit 403 a zbytek založit superuserem
+    let rC = await api('POST', '/api/collections/tasks/records', {
       token: Z, body: { title: 'Zadaný úkol', status: 'todo', map: mapId, node_id: 'n1', assignee_email: RESITEL, deadline: TERMIN },
     });
+    expect(rC.status === 400 || rC.status === 403, `založení položky uživatelem neprojde (${rC.status})`);
+    const ukol = await suTask({ title: 'Zadaný úkol', status: 'todo', map: mapId, node_id: 'n1', assignee_email: RESITEL, deadline: TERMIN }, ZADAVATEL);
     const taskId = ukol.json?.id;
-    expect(ukol.status === 200 && !!taskId, `zadavatel založil úkol s termínem (${ukol.status})`);
+    expect(ukol.status === 200 && !!taskId, `zbytková položka s termínem založena superuserem (${ukol.status})`);
 
     console.log('== řešitel/editor NESMÍ změnit ani smazat existující termín ==');
     let r = await api('PATCH', `/api/collections/tasks/records/${taskId}`, { token: R, body: { deadline: '2026-12-31' } });
@@ -89,33 +97,26 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     expect(r.status === 200, `řešitel smí označit hotovo (${r.status})`);
     r = await api('PATCH', `/api/collections/tasks/records/${taskId}`, { token: Z, body: { deadline: '2026-08-20' } });
     expect(r.status === 200, `zadavatel termín změní (${r.status})`);
-    const bezTerminu = await api('POST', '/api/collections/tasks/records', {
-      token: Z, body: { title: 'Bez termínu', status: 'todo', map: mapId, node_id: 'n1', assignee_email: RESITEL },
-    });
+    const bezTerminu = await suTask({ title: 'Bez termínu', status: 'todo', map: mapId, node_id: 'n1', assignee_email: RESITEL }, ZADAVATEL);
     r = await api('PATCH', `/api/collections/tasks/records/${bezTerminu.json.id}`, { token: R, body: { deadline: '2026-09-01' } });
     expect(r.status === 200, `první nastavení termínu řešitelem projde (${r.status})`);
 
-    console.log('== v1 API: stejné pravidlo (hooky se u $app.save nespouští) ==');
+    console.log('== v1 API: /v1/tasks odstraněno (410) ==');
     const rKey = (await api('POST', '/api/flowmap/api-keys', { token: R, body: { label: 'rw', scope: 'read_write' } })).json.token;
-    const zKey = (await api('POST', '/api/flowmap/api-keys', { token: Z, body: { label: 'rw', scope: 'read_write' } })).json.token;
     r = await api('POST', `/api/flowmap/v1/tasks/${taskId}`, { bearer: rKey, body: { deadline: '2026-12-31' } });
-    expect(r.status === 400, `v1: řešitel změnu termínu neprosadí (${r.status})`);
-    r = await api('POST', `/api/flowmap/v1/tasks/${taskId}`, { bearer: rKey, body: { status: 'todo' } });
-    expect(r.status === 200, `v1: řešitel smí měnit status (${r.status})`);
-    r = await api('POST', `/api/flowmap/v1/tasks/${taskId}`, { bearer: zKey, body: { deadline: '2026-08-25' } });
-    expect(r.status === 200, `v1: zadavatel termín změní (${r.status})`);
+    expect(r.status === 410, `v1: úkolové rozhraní vrací 410 (${r.status})`);
 
-    console.log('== regrese createRule: 2+ sdílených + team_access ==');
+    console.log('== zákaz create platí pro každého (edit-share i team_access) ==');
     r = await api('POST', '/api/collections/tasks/records', {
       token: K, body: { title: 'Úkol od kolegy', status: 'todo', map: mapId, node_id: 'n1' },
     });
-    expect(r.status === 200, `edit-share založí úkol i na mapě se 2 sdílenými (${r.status})`);
+    expect(r.status === 400 || r.status === 403, `ani edit-share položku nezaloží (${r.status})`);
     r = await api('PATCH', `/api/collections/goalmaps/records/${mapId}`, { token: Z, body: { team_access: 'edit' } });
     expect(r.status === 200, `vlastník zapnul team_access=edit (${r.status})`);
     r = await api('POST', '/api/collections/tasks/records', {
       token: T, body: { title: 'Úkol od týmáka', status: 'todo', map: mapId, node_id: 'n1' },
     });
-    expect(r.status === 200, `člen týmu (team_access=edit) založí úkol (${r.status})`);
+    expect(r.status === 400 || r.status === 403, `ani člen týmu (team_access=edit) položku nezaloží (${r.status})`);
 
     console.log('== mazání: řešitel ne, zadavatel ano + stopa v záznamníku ==');
     r = await api('DELETE', `/api/collections/tasks/records/${taskId}`, { token: R });

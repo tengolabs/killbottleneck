@@ -51,6 +51,10 @@ const titlesIn = (list) => (list || []).map((i) => i.title);
 
     const me = await register('admin@e2e.cz');
     const kolega = await register('kolega@e2e.cz');
+    // SLOVNÍK 17. 8. 2026: položky-úkoly nejde založit uživatelem (403) — zbytková
+    // data pro tenhle test zakládá superuser s explicitním owner/owner_email.
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST = (await api('/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
     const today = day(0);
 
     // moje mapa: uzel přiřazený mně (s termínem dnes) + uzel delegovaný kolegovi
@@ -71,7 +75,7 @@ const titlesIn = (list) => (list || []).map((i) => i.title);
     })).json;
 
     // výchozí node_id = neutrální n0; konkrétní test si ho může přebít (viz n1 níž)
-    const mkTask = (body, token) => api('/api/collections/tasks/records', { token: token || me.token, body: { map: mapa.id, node_id: 'n0', ...body } });
+    const mkTask = (body, zadal) => api('/api/collections/tasks/records', { token: ST, body: { map: mapa.id, node_id: 'n0', owner: (zadal || me).id, owner_email: (zadal || me).email, ...body } });
     await mkTask({ title: 'UKOL-PO-TERMINU', status: 'todo', assignee_email: me.email, deadline: day(-4) });
     await mkTask({ title: 'UKOL-PRISTI-TYDEN', status: 'todo', assignee_email: me.email, deadline: day(4) });
     await mkTask({ title: 'UKOL-HOTOVY', status: 'done', assignee_email: me.email, deadline: today });
@@ -298,7 +302,7 @@ const titlesIn = (list) => (list || []).map((i) => i.title);
       body: { title: 'ARCHIV-PROJEKT', nodes: [{ id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Archiv', title: 'Archiv', status: 'todo' } }, { id: 'arch1', type: 'goalNode', position: { x: 0, y: 120 }, data: { title: 'Archivní krok', status: 'todo' } }], edges: [{ id: 'e-arch1', source: 'apex', target: 'arch1' }] },
     })).json;
     const archUkol = (await api('/api/collections/tasks/records', {
-      token: me.token, body: { map: archMapa.id, node_id: 'arch1', title: 'UKOL-V-ARCHIVU', status: 'todo', assignee_email: me.email, deadline: today },
+      token: ST, body: { map: archMapa.id, node_id: 'arch1', title: 'UKOL-V-ARCHIVU', status: 'todo', assignee_email: me.email, deadline: today, owner: me.id, owner_email: me.email },
     })).json;
     await api(`/api/collections/tasks/records/${archUkol.id}`, { token: me.token, method: 'PATCH', body: { status: 'done' } });
     await api(`/api/collections/tasks/records/${archUkol.id}`, { token: me.token, method: 'PATCH', body: { status: 'todo' } });
@@ -316,7 +320,7 @@ const titlesIn = (list) => (list || []).map((i) => i.title);
       body: { title: 'SEFUV-PROJEKT', nodes: [{ id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Šéf', title: 'Šéf', status: 'todo' } }, { id: 's1', type: 'goalNode', position: { x: 0, y: 120 }, data: { title: 'Šéfův krok', status: 'todo' } }], edges: [{ id: 'e-s1', source: 'apex', target: 's1' }] },
     })).json;
     const zadany = (await api('/api/collections/tasks/records', {
-      token: kolega.token, body: { map: sefovaMapa.id, node_id: 's1', title: 'UKOL-OD-SEFA', status: 'todo', assignee_email: me.email, deadline: today },
+      token: ST, body: { map: sefovaMapa.id, node_id: 's1', title: 'UKOL-OD-SEFA', status: 'todo', assignee_email: me.email, deadline: today, owner: kolega.id, owner_email: kolega.email },
     })).json;
     await api(`/api/collections/tasks/records/${zadany.id}`, { token: me.token, method: 'PATCH', body: { status: 'done' } });
     r = await api(myDayUrl(today), { token: me.token });

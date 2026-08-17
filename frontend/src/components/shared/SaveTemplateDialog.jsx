@@ -18,11 +18,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { LayoutGrid, Loader2, Building2, Lock, Hash, ListChecks, AlarmClock } from 'lucide-react';
+import { LayoutGrid, Loader2, Building2, Lock, Hash, AlarmClock } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { mapToTemplateNodes, tasksToSeeds } from '@/lib/templateConvert';
+import { mapToTemplateNodes } from '@/lib/templateConvert';
 import { categoryLabels } from '@/lib/templateCategories';
 
 // labely dnů přes common:weekdayAcc.* (4. pád)
@@ -32,8 +32,7 @@ const NEW = '__new__';
 
 // Uložení aktuální mapy jako šablony organizace. Termíny uzlů se převedou
 // na „dny od startu" (počítáno ode dneška) — šablona je tak opakovatelná.
-// tasks = úkoly mapy (volitelné) — volba „uložit včetně úkolů".
-export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, tasks = [], onClose }) {
+export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClose }) {
   const { t } = useTranslation('editor');
   const { user } = useAuth();
   const { toast } = useToast();
@@ -43,7 +42,6 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, tasks
   const [target, setTarget] = useState(NEW); // NEW = nová šablona, jinak id vlastní k přepsání
   const [visibility, setVisibility] = useState('org');
   const [numbering, setNumbering] = useState(false);
-  const [withTasks, setWithTasks] = useState(false);
   const [autoCreate, setAutoCreate] = useState(''); // '' | weekly | monthly
   const [autoDay, setAutoDay] = useState(1);
   const [myTemplates, setMyTemplates] = useState([]);
@@ -86,7 +84,8 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, tasks
         // {nazev} = název šablony (nebo vlastní název při zakládání), {rok}-{n} =
         // řada s rokem — „Nabídka 2026-1"; nový rok začne novou řadu od 1
         number_format: numbering ? '{nazev} {rok}-{n}' : '',
-        task_seeds: withTasks ? tasksToSeeds(tasks, nodeIdMap) : [],
+        // task_seeds zrušeny 17. 8. 2026 (slovník): řešitel + lhůta žijí na uzlech
+        task_seeds: [],
         auto_create: autoCreate,
         auto_day: autoCreate ? autoDay : 0,
       };
@@ -144,7 +143,6 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, tasks
                   setTarget(v);
                   if (v === NEW) {
                     setNumbering(false);
-                    setWithTasks(false);
                     setAutoCreate('');
                     setAutoDay(1);
                   } else {
@@ -152,7 +150,6 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, tasks
                     if (tpl) {
                       setVisibility(tpl.visibility === 'personal' ? 'personal' : 'org');
                       setNumbering(!!tpl.number_format);
-                      setWithTasks((tpl.task_seeds || []).length > 0 && tasks.length > 0);
                       setAutoCreate(tpl.auto_create || '');
                       setAutoDay(tpl.auto_day || 1);
                     }
@@ -221,23 +218,6 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, tasks
             )}
           </div>
 
-          {tasks.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setWithTasks((v) => !v)}
-              className={`w-full flex items-center gap-2 rounded-lg border-2 p-2.5 text-sm text-left transition-all ${
-                withTasks ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'
-              }`}
-            >
-              <ListChecks className="w-4 h-4 text-primary shrink-0" />
-              <span>
-                <span className="font-medium block">{t('saveTemplate.withTasksLabel', { count: tasks.length })}</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {t('saveTemplate.withTasksDesc')}
-                </span>
-              </span>
-            </button>
-          )}
 
           <div className="space-y-1.5">
             <Label>{t('saveTemplate.autoLabel')}</Label>

@@ -31,9 +31,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       page.click('button[type="submit"]'),
     ]);
     await sleep(1500);
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     await page.evaluate(async () => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
       const mResp = await fetch('/api/collections/goalmaps/records', { method: 'POST', headers: H, body: JSON.stringify({
         title: 'Panel mapa',
         nodes: [
@@ -44,7 +48,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       }) });
       const mid = (await mResp.json()).id;
       // úkol vždy patří do projektu (server volné úkoly odmítá)
-      await fetch('/api/collections/tasks/records', { method: 'POST', headers: H, body: JSON.stringify({ title: 'UKOL-XYZ', status: 'todo', assignee_email: 'admin@e2e.cz', map: mid }) });
+      await fetch('/api/collections/tasks/records', { method: 'POST', headers: HS, body: JSON.stringify({ title: 'UKOL-XYZ', status: 'todo', assignee_email: 'admin@e2e.cz', map: mid, node_id: 'n1', owner: myId, owner_email: 'admin@e2e.cz' }) });
     });
 
     console.log('== /tasks: levý zásobník ==');

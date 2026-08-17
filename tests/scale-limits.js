@@ -66,12 +66,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ]);
     await sleep(1500);
 
-    console.log(`== nasypání dat: ${MAPS} map × ${NODES_PER_MAP} uzlů = ${MAPS * NODES_PER_MAP} uzlů, ${TASKS} úkolů ==`);
+    console.log(`== nasypání dat: ${MAPS} map × ${NODES_PER_MAP} uzlů = ${MAPS * NODES_PER_MAP} uzlů, ${TASKS} zbytkových položek ==`);
+    // SLOVNÍK 17. 8. 2026: položky nejde založit uživatelem — dávky sází superuser
+    // (zátěž tabulky zbytkovými řádky se pořád měří, jen se sází povolenou cestou)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     const seedStart = Date.now();
     const seed = await page.evaluate(async (MAPS, NODES_PER_MAP, TASKS) => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
       const me = 'admin@e2e.cz';
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = auth.record && auth.record.id;
       const day = (offset) => {
         const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + offset);
         return d.toLocaleDateString('en-CA');
@@ -105,8 +113,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         for (let k = 0; k < BATCH && i + k < TASKS; k++) {
           const idx = i + k;
           chunk.push(fetch('/api/collections/tasks/records', {
-            method: 'POST', headers: H,
+            method: 'POST', headers: HS,
             body: JSON.stringify({
+              owner: myId, owner_email: me,
               title: `Úkol ${idx}`,
               status: idx % 4 === 0 ? 'done' : 'todo',
               assignee_email: me,

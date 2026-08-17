@@ -48,6 +48,8 @@ const pragueDate = (offset = 0) => {
     const A = await login('a@example.com');
     const B = await login('b@example.com');
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: SU.email, password: SU.pw } })).json.token;
+    // SLOVNÍK 17. 8. 2026: položky sází superuser (uživatelský create = 403)
+    const uidA = ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent("email='a@example.com'")}`, { token: ST })).json.items || [])[0].id;
 
     const OLD = pragueDate(-3), TODAY = pragueDate(0), TOM = pragueDate(1), FAR = pragueDate(10);
 
@@ -68,11 +70,11 @@ const pragueDate = (offset = 0) => {
     } })).json;
 
     // úkol po termínu patří do stejného kbelíku jako prošlý uzel → jedna zpráva
-    await api('POST', '/api/collections/tasks/records', { token: A, body: {
+    await api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: uidA, owner_email: 'a@example.com',
       title: 'Prošlý úkol', status: 'todo', deadline: OLD, assignee_email: 'b@example.com', map: map.id, node_id: 'tn',
     } });
     // hotový úkol se nepočítá
-    await api('POST', '/api/collections/tasks/records', { token: A, body: {
+    await api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: uidA, owner_email: 'a@example.com',
       title: 'Hotový úkol', status: 'done', deadline: OLD, assignee_email: 'b@example.com', map: map.id, node_id: 'tn',
     } });
 
@@ -133,10 +135,10 @@ const pragueDate = (offset = 0) => {
       edges: [{ id: 'ec', source: 'r', target: 'cu' }, { id: 'ed', source: 'r', target: 'du' }, { id: 'et', source: 'r', target: 'tu' }],
     } })).json;
     for (const [email, planned] of [['c@example.com', PRISTE], ['d@example.com', '']]) {
-      await api('POST', '/api/collections/tasks/records', { token: A, body: {
+      await api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: uidA, owner_email: 'a@example.com',
         title: 'Zítřejší úkol', status: 'todo', deadline: TOM, assignee_email: email, map: mapCD.id, node_id: 'tu', planned_on: planned,
       } });
-      await api('POST', '/api/collections/tasks/records', { token: A, body: {
+      await api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: uidA, owner_email: 'a@example.com',
         title: 'Propadlý úkol', status: 'todo', deadline: OLD, assignee_email: email, map: mapCD.id, node_id: 'tu', planned_on: planned,
       } });
     }
@@ -159,7 +161,7 @@ const pragueDate = (offset = 0) => {
     // nastavit (nejpozději nejbližší pondělí), přes API/MCP ano.
     await reg('e@example.com');
     const E = await login('e@example.com');
-    await api('POST', '/api/collections/tasks/records', { token: A, body: {
+    await api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: uidA, owner_email: 'a@example.com',
       title: 'Zítřejší s plánem na měsíc', status: 'todo', deadline: TOM,
       assignee_email: 'e@example.com', map: mapCD.id, node_id: 'tu', planned_on: pragueDate(30),
     } });

@@ -156,6 +156,11 @@
       "skipped_few": "{{count}} pravidla jsme přeskočili — na této mapě nešla založit.",
       "skipped_many": "{{count}} pravidla jsme přeskočili — na této mapě nešla založit.",
       "skipped_other": "{{count}} pravidel jsme přeskočili — na této mapě nešla založit."
-    }
+    },
+    "dlAdvance": "Posunout o interval",
+    "dlAdvanceDaily": "denně",
+    "dlAdvanceWeekly": "týdně",
+    "dlAdvanceMonthly": "měsíčně",
+    "dlAdvanceHint": "od původního termínu cíle (rytmus drží; bez termínu ode dneška)"
   }
 }

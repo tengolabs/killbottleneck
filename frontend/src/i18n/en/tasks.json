@@ -94,7 +94,6 @@
     "collapseSubtasks": "Collapse subtasks",
     "recurringTitle": "Recurring task",
     "editTaskTitle": "Edit task",
-    "addSubtask": "Add subtask",
     "ideaBadge": "idea",
     "convertToTask": "Convert to task",
     "deleteFromBuffer": "Delete from stash",
@@ -130,12 +129,6 @@
     "nobody": "Nobody",
     "customEmail": "Other e-mail…",
     "pickFromTeam": "Pick from team members",
-    "labelRecurrence": "Recurrence",
-    "recurrenceNone": "Don't repeat",
-    "recurrenceDaily": "Daily",
-    "recurrenceWeekly": "Weekly",
-    "recurrenceMonthly": "Monthly",
-    "recurrenceHint": "After you mark it \"Done\", the next occurrence is created automatically with a shifted deadline.",
     "labelMap": "Map",
     "noMap": "No map",
     "labelNode": "Map node",
@@ -154,21 +147,10 @@
   "nodeTasksDialog": {
     "title": "Tasks: {{node}}",
     "nodeFallback": "node",
-    "createFailed": "Couldn't create the task",
-    "aiNoSuggestions": "AI returned no suggestions",
-    "tryAgain": "Try again.",
-    "aiSuggested": "Tasks suggested",
-    "aiSuggestedDesc": "AI added {{taskCount}} tasks — edit or delete whatever doesn't fit.",
-    "aiError": "AI error",
     "confirmDeleteTask": "Really delete the task \"{{title}}\"?",
     "empty": "This node has no tasks yet.",
-    "statusCycle": "{{status}} — click to change",
     "subtasksCount": "subtasks {{done}}/{{total}}",
-    "quickAddPlaceholder": "Quickly add a task…",
-    "addTask": "Add task",
-    "aiSuggestTitle": "Suggest tasks with AI",
-    "newTaskDetailed": "New task with details…",
-    "openInTasks": "Open in task overview"
+    "legacyNotice": "These items can no longer be created — a task is a goal with an assignee or deadline. Anything shown here is leftover data: delete it."
   },
   "inviteDialog": {
     "title": "Invite to team",
@@ -301,5 +283,17 @@
     "addTitle": "Add comment",
     "taskDiscussionHeading": "Task discussion ({{count}})",
     "forTask": "on task: {{title}}"
+  },
+  "newNode": {
+    "title": "New task",
+    "mapLabel": "Project",
+    "parentLabel": "Parent goal",
+    "parentApex": "Main goal (top)",
+    "titleLabel": "Title",
+    "titlePlaceholder": "What needs to be done…",
+    "create": "Create",
+    "hint": "A new goal is created in the map — set the assignee and deadline in the next step.",
+    "noMaps": "Create a project first.",
+    "createFailed": "Couldn't create the node"
   }
 }

@@ -172,7 +172,7 @@
     },
     "customColor": "Vlastní barva",
     "clearColor": "Zrušit barvu",
-    "ownerLabel": "Zodpovědná osoba",
+    "ownerLabel": "Řešitel",
     "assignedBy": "Zadal: {{email}}",
     "dlRequestButton": "Navrhnout jiný termín",
     "dlRequestSend": "Odeslat žádost",
@@ -194,15 +194,11 @@
     "descriptionPlaceholder": "Popište cíl podrobněji...",
     "waitSwitch": "Čekat na podřízené",
     "waitSwitchDesc": "Dokud nejsou hotové všechny cíle pod tímto uzlem, uzel čeká (⏳) — např. na cenu materiálu.",
-    "taskBox": "Úkol k tomuto uzlu",
-    "taskBoxDesc": "Úkol s termínem a opakováním (denně/týdně/měsíčně) — po dokončení se sám založí znovu.",
-    "taskCreated": "Úkol vytvořen",
-    "taskCreatedDesc": "Po dokončení se založí další výskyt.",
     "stashTitle": "Přesunout uzel z mapy do osobního zásobníku",
     "deleteTitle": "Smazat uzel z mapy",
     "openMapTitle": "Přiblížit na uzel v mapě",
     "executorLabel": "Kdo to vykoná",
-    "executorHint": "Zodpovědná osoba zůstává člověk — i u automatizace je to garant, kterému chodí notifikace.",
+    "executorHint": "Řešitel zůstává člověk — i u automatizace je to on, komu chodí notifikace.",
     "executor": {
       "human": "Člověk",
       "automation": "Automatizace"
@@ -280,8 +276,6 @@
     "numberingLabel": "Číslovat projekty z této šablony",
     "numberingDesc": "za název se přidá další číslo v řadě",
     "numberingHint": "Projekty se pojmenují samy: „{{name}} {{year}}-1\", „{{name}} {{year}}-2\"… Nový rok začne novou řadu od 1. Vlastní název při zakládání číslo dostane také.",
-    "withTasksLabel": "Uložit včetně úkolů ({{count}})",
-    "withTasksDesc": "úkoly mapy vč. podúkolů, opakování a přiřazení; termíny se převedou na „dny od startu\". Nezaškrtnuto = čistá šablona (jen struktura cílů).",
     "autoLabel": "Zakládat automaticky",
     "autoOff": "Ne",
     "autoWeekly": "Každý týden",
@@ -425,7 +419,8 @@
     "orgDeputy": "zástupce",
     "orgAddSub": "Podřízená pozice",
     "orgBadge": "Organizace",
-    "orgNewPosition": "Nová pozice"
+    "orgNewPosition": "Nová pozice",
+    "recurrenceBadgeHint": "Cíl se opakuje — po dokončení se sám vrátí s posunutým termínem"
   },
   "aiChat": {
     "undoTitle": "Vrátit poslední AI změnu",
@@ -519,5 +514,20 @@
     "from_trello": "Rozpoznán export z Trella —",
     "foreignTooBig": "Soubor má {{count}} položek — import zvládne nejvýš {{max}}. Rozdělte projekt na menší části.",
     "fileTooLarge": "Soubor je větší než 5 MB — to import nezvládne."
+  },
+  "recurrence": {
+    "label": "Opakování",
+    "none": "Neopakuje se",
+    "daily": "Denně",
+    "weekly": "Týdně",
+    "monthly": "Měsíčně",
+    "hint": "Po dokončení se cíl sám vrátí na Založeno a termín se posune v rytmu původního termínu — každé pondělí je každé pondělí. Pod kapotou je to obyčejné pravidlo, uvidíte ho v Pravidlech mapy.",
+    "customHint": "Opakování tohoto cíle řídí ručně upravené pravidlo — spravujte ho v Pravidlech mapy, přepínač na něj nesahá.",
+    "ruleName": {
+      "daily": "Opakování (denně): {{title}}",
+      "weekly": "Opakování (týdně): {{title}}",
+      "monthly": "Opakování (měsíčně): {{title}}"
+    },
+    "saveFailed": "Opakování se nepodařilo uložit"
   }
 }

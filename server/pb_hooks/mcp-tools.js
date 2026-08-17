@@ -57,6 +57,7 @@ const RULE_ACTION = {
     owner: { type: "string", description: "set_owner only: e-mail of an instance member (empty string clears), or a dynamic target resolved when the rule runs: \"deputy_of_node_owner\", \"position:<nodeId>\" (holder of an org-structure position), \"deputy_of_position:<nodeId>\". An unresolvable target is logged as a skipped action" },
     date: { type: "string", description: "set_deadline only: YYYY-MM-DD (alternative to relative_days)" },
     relative_days: { type: "integer", description: "set_deadline only: today + N days (0-3650)" },
+    advance: { type: "string", enum: ["daily", "weekly", "monthly"], description: "set_deadline only: advance the node's CURRENT deadline by one interval — daily|weekly|monthly. Keeps the rhythm anchored to the original deadline (every Monday stays a Monday; the 31st stays the 31st, clamped in shorter months); past occurrences are skipped to the nearest future one. Use for recurring goals (\"repeat weekly\" = on done → set_status todo + set_deadline advance)." },
     parent: { type: "string", description: "create_subnodes only: node id to attach under, or \"trigger_node\" (default)" },
     items: { type: "array", items: { $ref: "#/$defs/treeItem" }, description: "create_subnodes only: subtree template, same shape as add_nodes items, max 50 nodes" },
     to: { type: "string", description: "notify: \"node_owner\", \"deputy_of_node_owner\", \"position:<nodeId>\", \"deputy_of_position:<nodeId>\" (resolved at run time), \"map_owner\" or an e-mail. move_node (kanban): id of the new parent node the trigger node moves under — appended at the end of the new siblings row; moving the apex, a vanished target or a move creating a cycle is logged as a skipped action" },
@@ -95,7 +96,7 @@ const TOOLS = [
   },
   {
     name: "add_nodes",
-    description: "Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.",
+    description: "Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). A node is a goal; a node with an assignee (owner) OR a deadline IS a task — that is the only kind of task in killBottleneck (there is no separate task record; new work = new node). NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.",
     inputSchema: {
       type: "object",
       $defs: { treeItem: TREE_ITEM },
@@ -217,50 +218,6 @@ const TOOLS = [
     name: "get_org_structure",
     description: "Read the organization structure (the org map): positions and functions with node ids, holders and deputies. Use the node ids as dynamic rule targets \"position:<nodeId>\" / \"deputy_of_position:<nodeId>\". Read-only — holders and deputies are appointed by an admin in the app.",
     inputSchema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "list_tasks",
-    description: "List tasks (id, title, status, deadline, map, assignee). Optional filters: map_id, status.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        map_id: { type: "string" },
-        status: { type: "string", enum: ["todo", "in_progress", "done"] },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "add_task",
-    description: "Create a task attached to a specific node (map_id and node_id are required — tasks always belong to a project AND a concrete node; the apex node does not accept tasks). Optionally set deadline (YYYY-MM-DD) and assignee e-mail (the assignee gets a notification).",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        map_id: { type: "string" },
-        node_id: { type: "string" },
-        deadline: { type: "string" },
-        description: { type: "string" },
-        assignee_email: { type: "string" },
-      },
-      required: ["title", "map_id", "node_id"],
-    },
-  },
-  {
-    name: "update_task",
-    description: "Update a task: title, status (todo/in_progress/done), deadline (YYYY-MM-DD), description, assignee_email. Completing a recurring task automatically creates its next occurrence.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        task_id: { type: "string" },
-        title: { type: "string" },
-        status: { type: "string", enum: ["todo", "in_progress", "done"] },
-        deadline: { type: "string" },
-        description: { type: "string" },
-        assignee_email: { type: "string" },
-      },
-      required: ["task_id"],
-    },
   },
 ];
 
@@ -446,28 +403,6 @@ const EXEC = {
     if (!r.positions.length) return text("The org structure has no positions yet.");
     return text(DATA_FENCE + "\n\n" + r.positions.map((p) =>
       `• ${p.title || "(untitled)"} [${p.position_kind}] (id: ${p.node_id}) — holder: ${p.holder || "vacant"}${p.deputy ? `, deputy: ${p.deputy}` : ""}`).join("\n"));
-  },
-  list_tasks: (auth, a) => {
-    const q = [];
-    if (a.map_id) q.push("map=" + enc(a.map_id));
-    if (a.status) q.push("status=" + enc(a.status));
-    const r = vcall(auth, "GET", `/api/kb/v1/tasks${q.length ? "?" + q.join("&") : ""}`);
-    if (!r.tasks.length) return text("No tasks.");
-    return text(DATA_FENCE + "\n\n" + r.tasks.map((t) =>
-      `• ${STATUS_MARK[t.status] || "[ ]"} ${t.title} (id: ${t.id}${t.deadline ? `, deadline: ${t.deadline}` : ""}${t.assignee_email ? `, @${t.assignee_email}` : ""}, map: ${t.map})`
-    ).join("\n"));
-  },
-  add_task: (auth, a) => {
-    const r = vcall(auth, "POST", "/api/kb/v1/tasks", { title: a.title, map: a.map_id, node_id: a.node_id, deadline: a.deadline, description: a.description, assignee_email: a.assignee_email });
-    return text(`Task created: ${r.title} (id: ${r.id}${r.deadline ? `, deadline ${r.deadline}` : ""})`);
-  },
-  update_task: (auth, a) => {
-    const fields = {};
-    for (const k of ["title", "status", "deadline", "description", "assignee_email"]) {
-      if (a[k] !== undefined) fields[k] = a[k];
-    }
-    const r = vcall(auth, "POST", `/api/kb/v1/tasks/${enc(a.task_id)}`, fields);
-    return text(`Task updated: ${r.title} — status ${r.status}${r.deadline ? `, deadline ${r.deadline}` : ""}`);
   },
 };
 

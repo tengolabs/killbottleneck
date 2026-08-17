@@ -721,55 +721,24 @@ onRecordUpdateRequest((e) => {
   e.next();
 }, "templates");
 
-// tasks: owner z přihlášení; podúkoly max 1 úroveň a dědí mapu/uzel rodiče
+// tasks: vytváření ZAKÁZÁNO (slovník, Richard 17. 8. 2026): úkol = uzel
+// s řešitelem nebo termínem, nová práce = nový uzel. Kolekce zůstává jen ke
+// čtení a mazání zbytků — badge v UI je detektor chyby, ne funkce. Superuser
+// projde (testovací fixtury detektoru, admin zásah), nastaví si pole sám.
 onRecordCreateRequest((e) => {
-  const { notify, logTaskChange, assertTaskNode } = require(`${__hooks}/helpers.js`);
-  const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const L = userLang(e.auth);
-  e.record.set("owner", e.auth.id);
-  e.record.set("owner_email", e.auth.email());
-  const parentId = e.record.getString("parent");
-  if (parentId) {
-    const parent = e.app.findRecordById("tasks", parentId);
-    if (parent.getString("parent")) {
-      throw new BadRequestError(t(L, "err.subtaskNoChildren"));
-    }
-    e.record.set("map", parent.getString("map"));
-    e.record.set("node_id", parent.getString("node_id"));
-  } else if (!e.record.getString("map")) {
-    // Model „uzel = pravda": úkol vždy patří do projektu. Rychlé poznámky
-    // bez projektu = zásobník nápadů (buffer_nodes), ne volný úkol.
-    throw new BadRequestError(t(L, "err.taskNeedsProject"));
+  if (!e.hasSuperuserAuth()) {
+    const { t, userLang } = require(`${__hooks}/i18n.js`);
+    throw new ForbiddenError(t(userLang(e.auth), "err.taskCreateDisabled"));
   }
-  // …a vždy taky KONKRÉTNÍ UZEL. Vrchol se plní splněním všech uzlů, úkoly
-  // na něm nemají co dělat — „na vrchol jde věšet jen uzly" (Richard 13. 8.).
-  const chybaUzlu = assertTaskNode(e.app, e.record);
-  if (chybaUzlu) throw new BadRequestError(t(L, chybaUzlu));
   e.next();
-  // A3: nový úkol projektu patří do záznamníku změn (souhrn ukazuje obě vrstvy —
-  // uzly jako záměr a úkoly jako exekuci)
-  try { logTaskChange(e.app, e.record, null, e.auth.email()); } catch (err) { /* historie je bonus */ }
-  const assignee = e.record.getString("assignee_email");
-  if (assignee) {
-    notify(e.app, {
-      email: assignee,
-      actorEmail: e.auth.email(),
-      type: "task_assigned",
-      taskId: e.record.id,
-      mapId: e.record.getString("map") || null,
-      textKey: "notify.taskAssigned",
-      params: { actor: e.auth.email(), title: e.record.getString("title") },
-    });
-  }
 }, "tasks");
 
 onRecordUpdateRequest((e) => {
-  const { notify, spawnNextRecurrence, logTaskChange, assertTaskNode, taskDeadlineDenied, userOwnsTaskMap } = require(`${__hooks}/helpers.js`);
+  const { notify, logTaskChange, assertTaskNode, taskDeadlineDenied, userOwnsTaskMap } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const orig = e.record.original();
   const prevAssignee = orig.getString("assignee_email");
-  const prevStatus = orig.getString("status");
   e.record.set("owner", orig.getString("owner")); // owner pole neměnná
   e.record.set("owner_email", orig.getString("owner_email"));
   // Termín úkolu = dohoda se zadavatelem — existující termín smí změnit/smazat
@@ -818,9 +787,8 @@ onRecordUpdateRequest((e) => {
     });
   }
 
-  // C2 opakující se úkol: nový výskyt při dokončení — sdílená logika s v1 API
-  // (helpers.spawnNextRecurrence); autosave/re-save hotového nic nedubluje.
-  spawnNextRecurrence(e.app, prevStatus, e.record, e.auth ? e.auth.email() : "");
+  // Opakování zrušeno se zákazem vytváření (17. 8. 2026) — dokončení
+  // opakujícího zbytku už NESMÍ plodit další výskyt (spawnNextRecurrence pryč).
 }, "tasks");
 
 // Smazání úkolu do záznamníku změn — deleteRule pouští jen zadavatele a
@@ -2976,47 +2944,11 @@ kbRoute("POST", "/map-import", (e) => {
     rulesSkipped += res.skipped;
   }
 
-  // úkoly ve dvou vlnách: nejdřív hlavní (kvůli přemapování parent), pak podúkoly
-  const taskCol = $app.findCollectionByNameOrId("tasks");
-  const taskIdMap = {};
-  let imported = 0;
-  let tasksSkipped = 0; // úkoly bez konkrétního uzlu / na vrcholu (staré zálohy)
-  const importApex = apexNodeId(rec);
-  const saveTask = (tk, parentId) => {
-    const title = String((tk && tk.title) || "").trim().slice(0, 200);
-    if (!title) return;
-    const rows = new Record(taskCol);
-    rows.set("title", title);
-    rows.set("description", String(tk.description || "").slice(0, 4000));
-    rows.set("status", ["todo", "in_progress", "done"].includes(tk.status) ? tk.status : "todo");
-    rows.set("deadline", /^\d{4}-\d{2}-\d{2}$/.test(String(tk.deadline || "")) ? String(tk.deadline) : "");
-    rows.set("recurrence", ["daily", "weekly", "monthly"].includes(tk.recurrence) ? tk.recurrence : "");
-    const em = String(tk.assignee_email || "").trim();
-    if (em && !known[em]) dropped++;
-    rows.set("assignee_email", em && known[em] ? em : "");
-    rows.set("map", rec.id);
-    // Úkol patří na KONKRÉTNÍ uzel (13. 8.): úkol ze zálohy bez uzlu nebo na
-    // vrcholu (staré exporty) se PŘESKOČÍ a poctivě spočítá — import nesmí
-    // zakládat úkoly, které by dnes nešly vytvořit. $app.save hooky obchází.
-    const importNode = idMap[String(tk.node_id || "")] || "";
-    if (!importNode || importNode === importApex) { tasksSkipped++; return; }
-    rows.set("node_id", importNode);
-    rows.set("sort_order", Number(tk.sort_order) || 0);
-    if (parentId) rows.set("parent", parentId);
-    rows.set("owner", e.auth.id);
-    rows.set("owner_email", e.auth.email());
-    try {
-      $app.save(rows);
-      if (tk.id) taskIdMap[String(tk.id)] = rows.id;
-      imported++;
-    } catch (err) { /* jeden vadný úkol nesmí shodit celý import */ }
-  };
-  for (const tk of srcTasks) if (!tk || !tk.parent_id) saveTask(tk, "");
-  for (const tk of srcTasks) {
-    if (!tk || !tk.parent_id) continue;
-    const parentId = taskIdMap[String(tk.parent_id)];
-    if (parentId) saveTask(tk, parentId); // podúkol osiřelého rodiče se zahodí
-  }
+  // Položky-úkoly se NEIMPORTUJÍ (slovník 17. 8. 2026): úkol = uzel s řešitelem
+  // nebo termínem a import nesmí zakládat, co by dnes nešlo vytvořit. Úkoly ze
+  // starých záloh se poctivě spočítají jako přeskočené — data v záloze zůstávají.
+  const imported = 0;
+  const tasksSkipped = srcTasks.filter((tk) => tk && String((tk.title || "")).trim()).length;
 
   // Přání o automatizaci z importované mapy musí dojít správcům AI — jinak by
   // zůstala jen jako odznak na uzlu a nikdo by o nich nevěděl.
@@ -3693,41 +3625,29 @@ kbRoute("GET", "/v1/maps/{id}", (e) => {
   });
 });
 
-// úkoly: moje (zadal jsem / na mých mapách / přiřazené mně) + filtry map/status
+// /v1/tasks ODSTRANĚNO (slovník, Richard 17. 8. 2026): úkol = uzel s řešitelem
+// nebo termínem — práce se čte a zapisuje přes /v1/maps/{id}/nodes. Samostatná
+// kolekce úkolů byla duplicitní tabulka a zanikla; 410 říká integrátorům proč.
+// ⚠️ routerAdd handlery PB serializuje do čistého VM — closure přes proměnnou
+// se ztratí, tělo musí být soběstačné. Proto dva handlery, ne factory.
+// Scope drží původní sémantiku rout: POST chtěl read_write → read-only klíč
+// na POST dál dostane 403, ne 410.
 kbRoute("GET", "/v1/tasks", (e) => {
-  const { apiKeyAuth, v1OwnedMap } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  const q = e.requestInfo().query || {};
-  let filter = "(owner = {:u} || map.owner = {:u} || assignee_email = {:em})";
-  const params = { u: a.user.id, em: a.user.getString("email") };
-  // Přijímáme `map` i `map_id`: nástroje (MCP, payload úkolu) používají map_id
-  // a dřív se takový dotaz TIŠE nefiltroval — volající si myslel, že má úkoly
-  // jedné mapy, a dostal všechny svoje. (Nález 16. 8. při práci přes API.)
-  const mapaQ = q.map || q.map_id;
-  if (mapaQ) {
-    const map = v1OwnedMap($app, String(mapaQ), a.user.id);
-    if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
-    filter += " && map = {:m}";
-    params.m = map.id;
-  }
-  if (q.status) {
-    if (!["todo", "in_progress", "done"].includes(String(q.status))) {
-      return e.json(400, { error: t(a.lang, "err.badStatus") });
-    }
-    filter += " && status = {:s}";
-    params.s = String(q.status);
-  }
-  const rows = $app.findRecordsByFilter("tasks", filter, "-updated", 500, 0, params);
-  return e.json(200, { tasks: rows.map((r) => ({
-    id: r.id, title: r.getString("title"), status: r.getString("status"),
-    deadline: r.getString("deadline"), description: r.getString("description"),
-    map: r.getString("map"), node_id: r.getString("node_id"),
-    assignee_email: r.getString("assignee_email"), owner_email: r.getString("owner_email"),
-    parent: r.getString("parent"), updated: r.getString("updated"),
-  })) });
+  return e.json(410, { error: t(a.lang, "err.tasksApiRemoved") });
 });
+const tasksGonePost = (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  return e.json(410, { error: t(a.lang, "err.tasksApiRemoved") });
+};
+kbRoute("POST", "/v1/tasks", tasksGonePost);
+kbRoute("POST", "/v1/tasks/{id}", tasksGonePost);
 
 // založení mapy ze stromu: {title, tree:[{title, description?, deadline?, owner?,
 // status?, wait_for_children?, children?}], description?, apex_text?}
@@ -4179,150 +4099,3 @@ kbRoute("POST", "/v1/rule-templates/{id}/delete", (e) => {
   return e.json(200, { success: true });
 });
 
-// založení úkolu: {title, map, node_id, deadline?, description?, assignee_email?}
-// — mapa i KONKRÉTNÍ uzel POVINNÉ; mapa musí patřit majiteli klíče
-// (model „projekt → uzel → úkol"; vrchol úkoly nepřijímá — Richard 13. 8.)
-kbRoute("POST", "/v1/tasks", (e) => {
-  const { apiKeyAuth, v1OwnedMap, notify, jsonVal, apexNodeId, logTaskChange } = require(`${__hooks}/helpers.js`);
-  const { t } = require(`${__hooks}/i18n.js`);
-  const a = apiKeyAuth($app, e, "read_write");
-  if (a.error) return e.json(a.status, { error: a.error });
-  const info = e.requestInfo().body || {};
-  if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  const title = String(info.title || "").trim().slice(0, 200);
-  if (!title) return e.json(400, { error: t(a.lang, "err.titleRequired") });
-  const map = v1OwnedMap($app, info.map, a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
-  // zrcadlo assertTaskNode (request hook se u $app.save nespustí): org struktura
-  // popisuje kdo je kdo, ne práci — ani API klíč na ni úkol nezaloží (panel 15. 8.)
-  if (map.getString("kind") === "org") return e.json(400, { error: t(a.lang, "err.taskOnOrgMap") });
-  const nodeId = String(info.node_id || "");
-  if (!nodeId) return e.json(400, { error: t(a.lang, "err.taskNeedsNode") });
-  const cilovyUzel = jsonVal(map, "nodes", []).find((n) => n && n.id === nodeId);
-  if (!cilovyUzel) {
-    return e.json(404, { error: t(a.lang, "err.nodeNotFound") });
-  }
-  if (cilovyUzel.type === "note") return e.json(400, { error: t(a.lang, "err.taskNeedsNode") }); // poznámka není cíl
-  if (nodeId === apexNodeId(map)) return e.json(400, { error: t(a.lang, "err.taskNotOnApex") });
-  const deadline = String(info.deadline || "");
-  if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
-    return e.json(400, { error: t(a.lang, "err.badDate") });
-  }
-  const status = info.status === undefined ? "todo" : String(info.status);
-  if (!["todo", "in_progress", "done"].includes(status)) {
-    return e.json(400, { error: t(a.lang, "err.badStatus") });
-  }
-  const rec = new Record($app.findCollectionByNameOrId("tasks"));
-  rec.set("title", title);
-  rec.set("description", String(info.description || ""));
-  rec.set("status", status);
-  rec.set("deadline", deadline);
-  // Výchozí řešitel = majitel API klíče (Richard 16. 8. 2026). Člověk v dialogu
-  // vidí seznam a „nikoho" volí vědomě; agent pole prostě vynechá — a vznikl by
-  // úkol, který nikomu nesvítí v „Mém dni". Kdo chce úkol bez řešitele, pošle
-  // assignee_email: "" (prázdný řetězec se respektuje).
-  rec.set("assignee_email", info.assignee_email === undefined
-    ? a.user.getString("email")
-    : String(info.assignee_email || ""));
-  rec.set("map", map.id);
-  rec.set("node_id", nodeId); // povinný a ověřený výš (existuje, není vrchol)
-  rec.set("owner", a.user.id);
-  rec.set("owner_email", a.user.getString("email"));
-  $app.save(rec);
-  // zrcadlo tasks create hooku: bez tohohle by „Co se změnilo" a „Hotovo dnes"
-  // zamlčely veškerou práci odvedenou přes API/MCP/agenty
-  try { logTaskChange($app, rec, null, a.user.getString("email")); } catch (err) { /* historie je bonus */ }
-  const assignee = rec.getString("assignee_email");
-  if (assignee) {
-    // zrcadlo tasks create hooku (request hook se u $app.save nespustí)
-    notify($app, {
-      email: assignee,
-      actorEmail: a.user.getString("email"),
-      type: "task_assigned",
-      taskId: rec.id,
-      mapId: rec.getString("map") || null,
-      textKey: "notify.taskAssigned",
-      params: { actor: a.user.getString("email"), title: rec.getString("title") },
-    });
-  }
-  return e.json(200, { id: rec.id, title: title, status: status, deadline: deadline,
-    map: map.id, node_id: nodeId, updated: rec.getString("updated") });
-});
-
-// úprava úkolu: allowlist {title, status, deadline, description, assignee_email};
-// dokončení opakovaného úkolu založí další výskyt (sdílené s UI hookem)
-kbRoute("POST", "/v1/tasks/{id}", (e) => {
-  const { apiKeyAuth, notify, spawnNextRecurrence, logTaskChange } = require(`${__hooks}/helpers.js`);
-  const { t } = require(`${__hooks}/i18n.js`);
-  const a = apiKeyAuth($app, e, "read_write");
-  if (a.error) return e.json(a.status, { error: a.error });
-  const info = e.requestInfo().body || {};
-  if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  let rec;
-  try {
-    rec = $app.findRecordById("tasks", e.request.pathValue("id"));
-  } catch (err) {
-    return e.json(404, { error: t(a.lang, "err.taskNotFound") });
-  }
-  // autorizace: můj úkol (zadal jsem), úkol na mé mapě, NEBO úkol mně přiřazený —
-  // parita s UI (tasks updateRule pouští i assignee, Asana chování; GET /v1/tasks
-  // přiřazené úkoly vrací, takže je klíč musí umět i odškrtnout). 404 neprozrazuje existenci.
-  let onOwnMap = false;
-  const taskMapId = rec.getString("map");
-  if (taskMapId) {
-    try {
-      onOwnMap = $app.findRecordById("goalmaps", taskMapId).getString("owner") === a.user.id;
-    } catch (err) { /* mapa nedohledatelná */ }
-  }
-  const isAssignee = rec.getString("assignee_email") === a.user.getString("email");
-  if (rec.getString("owner") !== a.user.id && !onOwnMap && !isAssignee) {
-    return e.json(404, { error: t(a.lang, "err.taskNotFound") });
-  }
-  if (info.status !== undefined && !["todo", "in_progress", "done"].includes(String(info.status))) {
-    return e.json(400, { error: t(a.lang, "err.badStatus") });
-  }
-  if (info.deadline !== undefined && String(info.deadline || "") !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(String(info.deadline))) {
-    return e.json(400, { error: t(a.lang, "err.badDate") });
-  }
-  // termín = dohoda se zadavatelem: pouhý řešitel existující termín přes API
-  // nezmění (parita s tasks update hookem; $app.save request hooky nespouští)
-  const { taskDeadlineDenied } = require(`${__hooks}/helpers.js`);
-  if (info.deadline !== undefined
-    && taskDeadlineDenied(rec.getString("deadline"), String(info.deadline || ""), rec.getString("owner") === a.user.id || onOwnMap)) {
-    return e.json(400, { error: t(a.lang, "err.taskDeadlineOwnerOnly", { title: rec.getString("title") }) });
-  }
-  const prevStatus = rec.getString("status");
-  const prevAssignee = rec.getString("assignee_email");
-  // snímek pro záznamník — po rec.set() už je původní hodnota pryč.
-  // Stačí objekt s getString: logTaskChange nic jiného z `orig` nečte.
-  const snap = { status: prevStatus, deadline: rec.getString("deadline"),
-    assignee_email: prevAssignee, title: rec.getString("title") };
-  const origLike = { getString: (k) => snap[k] || "" };
-  if (info.title !== undefined) {
-    const title = String(info.title || "").trim().slice(0, 200);
-    if (!title) return e.json(400, { error: t(a.lang, "err.titleRequired") });
-    rec.set("title", title);
-  }
-  if (info.status !== undefined) rec.set("status", String(info.status));
-  if (info.deadline !== undefined) rec.set("deadline", String(info.deadline || ""));
-  if (info.description !== undefined) rec.set("description", String(info.description || ""));
-  if (info.assignee_email !== undefined) rec.set("assignee_email", String(info.assignee_email || ""));
-  $app.save(rec);
-  try { logTaskChange($app, rec, origLike, a.user.getString("email")); } catch (err) { /* historie je bonus */ }
-  const assignee = rec.getString("assignee_email");
-  if (assignee && assignee !== prevAssignee) {
-    // zrcadlo tasks update hooku
-    notify($app, {
-      email: assignee,
-      actorEmail: a.user.getString("email"),
-      type: "task_assigned",
-      taskId: rec.id,
-      mapId: rec.getString("map") || null,
-      textKey: "notify.taskAssigned",
-      params: { actor: a.user.getString("email"), title: rec.getString("title") },
-    });
-  }
-  spawnNextRecurrence($app, prevStatus, rec, a.user.getString("email"));
-  return e.json(200, { id: rec.id, title: rec.getString("title"), status: rec.getString("status"),
-    deadline: rec.getString("deadline"), updated: rec.getString("updated") });
-});

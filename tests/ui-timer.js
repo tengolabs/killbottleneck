@@ -58,11 +58,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         }),
       });
       const mid = (await r.json()).id;
-      // úkol vždy patří do projektu A na konkrétní uzel (server jinak odmítá 400)
-      await fetch('/api/collections/tasks/records', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: auth.token },
-        body: JSON.stringify({ title: 'UKOL-TIMER', status: 'todo', assignee_email: 'admin@e2e.cz', map: mid, node_id: 'n1' }),
-      });
+      // položky-úkoly zanikly (slovník 17. 8. 2026) — čas se měří na uzlech,
+      // žádný seed položky tu není potřeba
       return mid;
     });
 

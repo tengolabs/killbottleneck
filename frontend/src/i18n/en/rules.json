@@ -156,6 +156,11 @@
       "skipped_few": "{{count}} rules were skipped — they could not be created on this map.",
       "skipped_many": "{{count}} rules were skipped — they could not be created on this map.",
       "skipped_other": "{{count}} rules were skipped — they could not be created on this map."
-    }
+    },
+    "dlAdvance": "Advance by interval",
+    "dlAdvanceDaily": "daily",
+    "dlAdvanceWeekly": "weekly",
+    "dlAdvanceMonthly": "monthly",
+    "dlAdvanceHint": "from the goal's original deadline (rhythm holds; from today when unset)"
   }
 }

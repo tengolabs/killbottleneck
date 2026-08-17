@@ -1,7 +1,7 @@
 import i18next from 'i18next';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
-import { templateToMap, templateForLang, seedsToTasks } from '@/lib/templateConvert';
+import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { remapRuleIds } from '@/lib/ruleRemap';
 import { rulesApi } from '@/components/rules/rulesApi';
 
@@ -48,11 +48,8 @@ export async function createProjectFromTemplate(tpl, titleOverride, startDate, {
     if (apex) apex.data = { ...apex.data, icon: emoji };
   }
   const me = pb.authStore.record?.email;
-  const seeds = Array.isArray(tpl.task_seeds) ? tpl.task_seeds : [];
   const owners = [...new Set(
-    nodes.map((n) => n.data?.owner)
-      .concat(seeds.map((s) => s.assignee_email)) // i lidi z úkolů šablony
-      .filter((o) => o && o !== me)
+    nodes.map((n) => n.data?.owner).filter((o) => o && o !== me)
   )];
   const map = await base44.entities.GoalMap.create({
     title,
@@ -67,7 +64,6 @@ export async function createProjectFromTemplate(tpl, titleOverride, startDate, {
     // název složí server (goalmaps create hook), vrácený záznam už je má
     ...(tpl.number_format && tpl.id ? { series: tpl.id } : {}),
   });
-  await createTasksFromSeeds(seeds, idMap, startDate, map.id);
   // vestavěná pravidla šablony (kanban varianty) — název dle jazyka UI,
   // odkazy na uzly se přemapují přes idMap a založí normální cestou /rules/save
   await createRulesFromTemplate(templateForLang(tpl).rules, idMap, map.id);
@@ -76,8 +72,7 @@ export async function createProjectFromTemplate(tpl, titleOverride, startDate, {
 
 // Pravidla ze šablony s vestavěnými pravidly: sekvenčně přes /rules/save
 // (server validuje a hlídá strop 50/mapa; autor = přihlášený). Selhání
-// jednoho pravidla (ani všech) NESMÍ shodit založení projektu — mapa už
-// existuje; vzor createTasksFromSeeds.
+// jednoho pravidla (ani všech) NESMÍ shodit založení projektu — mapa už existuje.
 export async function createRulesFromTemplate(rules, idMap, mapId) {
   const list = Array.isArray(rules) ? rules : [];
   let count = 0;
@@ -92,26 +87,3 @@ export async function createRulesFromTemplate(rules, idMap, mapId) {
   return count;
 }
 
-// Úkoly ze šablony „včetně úkolů": sekvenčně (podúkoly potřebují id rodiče).
-// Selhání jednoho úkolu nesmí shodit založení projektu — mapa už existuje.
-export async function createTasksFromSeeds(seeds, idMap, startDate, mapId) {
-  const payloads = seedsToTasks(seeds, idMap, startDate);
-  if (payloads.length === 0) return 0;
-  const created = {};
-  let count = 0;
-  for (const p of payloads) {
-    try {
-      if (p.parentSeedId && !created[p.parentSeedId]) continue;
-      const task = await base44.entities.Task.create({
-        ...p.data,
-        map_id: mapId,
-        ...(p.parentSeedId ? { parent_id: created[p.parentSeedId] } : {}),
-      });
-      created[p.seedId] = task.id;
-      count++;
-    } catch (e) {
-      console.error('task seed failed', e);
-    }
-  }
-  return count;
-}

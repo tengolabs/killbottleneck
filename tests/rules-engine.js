@@ -153,6 +153,121 @@ const findNode = (m, id) => (m.nodes || []).find((n) => n.id === id);
     await api('PATCH', `/api/collections/automation_rules/records/${r3.id}`, { token: ST, body: { enabled: false } });
     nodes = m.nodes;
 
+    console.log('== opakování (v0.35): done → todo + advance drží rytmus ==');
+    // Rytmus od PŮVODNÍHO termínu (Richard: „každé pondělí je každé pondělí"):
+    // včerejší weekly termín → další výskyt za 6 dní (stejný den v týdnu),
+    // NE dnes+7. Data VŽDY z kontejneru (past UTC×hostitel, vzor výše).
+    m = await freshMap(A, map.id);
+    r = await patchMap(A, map, m.nodes.concat([
+      node('R', { title: 'Týdenní report', status: 'todo', deadline: plusDny(-1) }),
+      node('RD', { title: 'Denní úklid', status: 'todo', deadline: dnes }),
+    ]), m.edges.concat([{ id: 'eR', source: 'root', target: 'R' }, { id: 'eRD', source: 'root', target: 'RD' }]));
+    expect(r.status === 200, `uzly R a RD založeny (${r.status})`);
+    // validace přes OSTROU routu /rules/save (tudy jde přepínač v UI)
+    r = await api('POST', '/api/kb/rules/save', { token: A, body: {
+      map: map.id, name: 'Opakování (týdně): Týdenní report', node_id: 'R',
+      trigger: { type: 'node_status_changed', status: 'done' }, conditions: [],
+      actions: [{ type: 'set_status', status: 'todo' }, { type: 'set_deadline', advance: 'weekly' }],
+    } });
+    expect(r.status === 200 && r.json.rule && r.json.rule.id, `rules/save přijal advance: weekly (${r.status})`);
+    const rOpak = r.json.rule;
+    r = await api('POST', '/api/kb/rules/save', { token: A, body: {
+      map: map.id, name: 'Vadné opakování', node_id: 'R',
+      trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'set_deadline', advance: 'yearly' }],
+    } });
+    expect(r.status === 400, `advance mimo daily|weekly|monthly server odmítne (${r.status})`);
+    // pravidlo běží právy AUTORA (created_by) — bez něj termínová stráž
+    // („termín mění jen zadavatel/vlastník") advance právem zablokuje
+    const rDen = await mkRule({
+      name: 'Opakování (denně): Denní úklid', node_id: 'RD', created_by: 'a@example.com',
+      trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'set_status', status: 'todo' }, { type: 'set_deadline', advance: 'daily' }],
+    });
+    m = await freshMap(A, map.id);
+    let nn = m.nodes.map((n) => (n.id === 'R' ? node('R', Object.assign({}, n.data, { status: 'done' })) : n));
+    nn = nn.map((n) => (n.id === 'RD' ? node('RD', Object.assign({}, n.data, { status: 'done' })) : n));
+    await patchMap(A, map, nn, m.edges);
+    m = await freshMap(A, map.id);
+    expect(findNode(m, 'R').data.status === 'todo', 'dokončený opakovaný cíl se vrátil na todo');
+    expect(findNode(m, 'R').data.deadline === plusDny(6),
+      `weekly rytmus drží: včerejšek + 7 = za 6 dní, NE dnes+7 (${findNode(m, 'R').data.deadline} vs ${plusDny(6)})`);
+    expect(findNode(m, 'RD').data.status === 'todo' && findNode(m, 'RD').data.deadline === plusDny(1),
+      `denní s termínem DNES → zítra; přesně tvar, který padá jen o půlnoci (${findNode(m, 'RD').data.deadline})`);
+    rr = await runs(`rule = "${rOpak.id}"`);
+    expect(rr.length === 1 && rr[0].status === 'ok', `návrat na todo NEspustil pravidlo znovu — žádná smyčka (${rr.length})`);
+    // druhé kolo: dokončit znovu → termín zase +7 od NOVÉHO termínu
+    m = await freshMap(A, map.id);
+    await patchMap(A, map, m.nodes.map((n) => (n.id === 'R' ? node('R', Object.assign({}, n.data, { status: 'done' })) : n)), m.edges);
+    m = await freshMap(A, map.id);
+    expect(findNode(m, 'R').data.deadline === plusDny(13),
+      `druhé dokončení posunulo o další týden (${findNode(m, 'R').data.deadline} vs ${plusDny(13)})`);
+    // měsíční clamp: 31. 1. příštího roku → 28./29. 2. (kotva dne drží, únor clampuje)
+    const rokPristi = Number(dnes.slice(0, 4)) + 1;
+    const unorPosledni = new Date(Date.UTC(rokPristi, 2, 0)).getUTCDate();
+    m = await freshMap(A, map.id);
+    r = await patchMap(A, map, m.nodes.concat([node('RM', { title: 'Měsíční uzávěrka', status: 'todo', deadline: `${rokPristi}-01-31` })]),
+      m.edges.concat([{ id: 'eRM', source: 'root', target: 'RM' }]));
+    const rMes = await mkRule({
+      name: 'Opakování (měsíčně): Uzávěrka', node_id: 'RM', created_by: 'a@example.com',
+      trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'set_status', status: 'todo' }, { type: 'set_deadline', advance: 'monthly' }],
+    });
+    m = await freshMap(A, map.id);
+    await patchMap(A, map, m.nodes.map((n) => (n.id === 'RM' ? node('RM', Object.assign({}, n.data, { status: 'done' })) : n)), m.edges);
+    m = await freshMap(A, map.id);
+    expect(findNode(m, 'RM').data.deadline === `${rokPristi}-02-${String(unorPosledni).padStart(2, '0')}`,
+      `měsíčně 31.1.→konec února, clamp bez přetečení (${findNode(m, 'RM').data.deadline})`);
+    for (const rid of [rOpak.id, rDen.id, rMes.id]) {
+      await api('PATCH', `/api/collections/automation_rules/records/${rid}`, { token: ST, body: { enabled: false } });
+    }
+    nodes = m.nodes;
+
+    console.log('== uzel narozený rovnou Hotovo JE změna stavu (cloud nález 17. 8.) ==');
+    // Rychlé ruce + latence cloudu: „přidat podcíl → hned Hotovo" se slije do
+    // JEDNOHO autosave. Uzel je pak v diffu nový a dřív se počítal jen jako
+    // node_created → kanban mlčel bez záznamu. Zrození s todo změna NENÍ.
+    const rBorn = await mkRule({
+      name: 'Narozen hotový', created_by: 'a@example.com',
+      trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'notify', to: 'map_owner', message: 'narozen hotový' }],
+    });
+    m = await freshMap(A, map.id);
+    r = await patchMap(A, map, m.nodes.concat([
+      node('BD', { title: 'Bleskový úkol', status: 'done' }),
+      node('BT', { title: 'Obyčejný nový', status: 'todo' }),
+    ]), m.edges.concat([
+      { id: 'eBD', source: 'root', target: 'BD' },
+      { id: 'eBT', source: 'root', target: 'BT' },
+    ]));
+    expect(r.status === 200, `jeden PATCH s uzlem narozeným done prošel (${r.status})`);
+    rr = await runs(`rule = "${rBorn.id}"`);
+    expect(rr.length === 1 && rr[0].status === 'ok' && rr[0].node_id === 'BD',
+      `pravidlo vystřelilo PRÁVĚ pro narozeného hotového, ne pro todo (${rr.length}: ${rr.map((x) => x.node_id).join(',')})`);
+    await api('PATCH', `/api/collections/automation_rules/records/${rBorn.id}`, { token: ST, body: { enabled: false } });
+    nodes = (await freshMap(A, map.id)).nodes;
+
+    console.log('== salva narozených hotových: strop 10/uložení drží (Richard: nechat) ==');
+    // Rozhodnutí 17. 8.: vložená/duplikovaná větev hotových uzlů pravidla
+    // SPOUŠTÍ (konzistentní s „narozen hotový"), lavinu drží strop 10 na
+    // uložení a zbytek je PŘIZNANĚ skipped — nic nemlčí.
+    const rSalva = await mkRule({
+      name: 'Salva hotových', created_by: 'a@example.com',
+      trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'notify', to: 'map_owner', message: 'hotový v salvě' }],
+    });
+    m = await freshMap(A, map.id);
+    const salva = Array.from({ length: 12 }, (_, i) => node(`S${i}`, { title: `Salva ${i}`, status: 'done' }));
+    const salvaEdges = salva.map((n, i) => ({ id: `eS${i}`, source: 'root', target: n.id }));
+    r = await patchMap(A, map, m.nodes.concat(salva), m.edges.concat(salvaEdges));
+    expect(r.status === 200, `12 hotových uzlů v jednom PATCHi prošlo (${r.status})`);
+    rr = await runs(`rule = "${rSalva.id}"`);
+    const okS = rr.filter((x) => x.status === 'ok').length;
+    const skipS = rr.filter((x) => x.status === 'skipped').length;
+    expect(okS === 10 && skipS === 2, `strop: 10 ok + 2 přiznaně skipped (${okS}/${skipS})`);
+    await api('PATCH', `/api/collections/automation_rules/records/${rSalva.id}`, { token: ST, body: { enabled: false } });
+    nodes = (await freshMap(A, map.id)).nodes;
+
     console.log('== create_subnodes: totéž pravidlo vystřelí i PODRUHÉ ==');
     // Regrese: id podstromu se skládala jen z rule.id + pořadí akce, takže druhá
     // karta (druhá reklamace, druhý kus) narazila na "Duplicitní id uzlu",

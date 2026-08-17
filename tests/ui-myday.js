@@ -70,6 +70,7 @@ const clickButtonWithText = async (page, text) => {
     ]);
     await sleep(1500);
     const todayIso = new Date().toLocaleDateString('en-CA');
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     await page.evaluate(async (todayIso) => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
@@ -87,9 +88,12 @@ const clickButtonWithText = async (page, text) => {
           edges: [{ id: 'e1', source: 'node-1', target: 'krok' }],
         }),
       })).json();
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
       const mk = (body) => fetch('/api/collections/tasks/records', {
-        method: 'POST', headers: H,
-        body: JSON.stringify({ map: m.id, node_id: 'krok', assignee_email: 'admin@e2e.cz', ...body }),
+        method: 'POST', headers: HS,
+        body: JSON.stringify({ map: m.id, node_id: 'krok', assignee_email: 'admin@e2e.cz', owner: myId, owner_email: 'admin@e2e.cz', ...body }),
       });
       await mk({ title: 'PRESLY-UKOL-XYZ', status: 'todo', deadline: '2026-07-01' });
       await mk({ title: 'DNESNI-UKOL-XYZ', status: 'todo', deadline: todayIso });

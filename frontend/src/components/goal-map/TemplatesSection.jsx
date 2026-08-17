@@ -71,7 +71,6 @@ export default function TemplatesSection() {
           node_type: template.node_type || '',
           goal: template.goal || template.title,
           number_format: template.number_format || '',
-          task_seeds: template.task_seeds || [],
           // vestavěná pravidla (kanban šablony) — bez nich by mapa z galerie
           // vznikla NĚMÁ (Richardův nález 15. 8.: „nic to nedělá")
           rules: template.rules || [],

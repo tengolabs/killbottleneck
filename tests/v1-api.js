@@ -5,7 +5,7 @@
 // v1 API pro MCP/integrace (autentizace API klíčem): scope vynucení, izolace
 // uživatelů (cizí = 404), create_map → get_map roundtrip, add_nodes + konflikt 409
 // + řetězení updated, update_node (vč. odblokování → notifikace), delete_node
-// podstromu (apex zakázán), tasks CRUD (+ rekurence přes v1), normalizace vstupu,
+// podstromu (apex zakázán), odstraněné /v1/tasks (410 + zákaz create), normalizace vstupu,
 // rate-limit 429, body 413, žádná eskalace klíčem. Čerstvý kontejner na :20502.
 const { execSync } = require('child_process');
 const BASE = 'http://127.0.0.1:20502';
@@ -181,86 +181,27 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     expect(lg1.data.title === longTitle && lg1.data.status === 'stary-stav' && lg1.data.deadline === '31.12.',
       'nedotčený legacy uzel zůstal beze změny (title/status/deadline)');
 
-    console.log('== tasks ==');
-    // node_id je POVINNÉ (13. 8. 2026: úkol vždy na konkrétním uzlu).
-    // child1 padl s podstromem výš — pro úkoly se založí čerstvý uzel.
-    r = await api('GET', `/api/flowmap/v1/maps/${mapId}`, { bearer: aRW });
-    r = await api('POST', `/api/flowmap/v1/maps/${mapId}/nodes`, { bearer: aRW,
-      body: { items: [{ title: 'Uzel pro úkoly' }], base_updated: r.json.updated } });
-    const taskNode = (r.json.added_ids || [])[0];
-    expect(r.status === 200 && !!taskNode, `uzel pro úkoly založen (${r.status})`);
-    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW,
-      body: { title: 'Bez uzlu', map: mapId } });
-    expect(r.status === 400, `task bez node_id → 400 (${r.status})`);
-    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW,
-      body: { title: 'Zavolat klientovi', map: mapId, node_id: taskNode, deadline: '2026-08-20', assignee_email: 'b@x.cz' } });
-    expect(r.status === 200 && r.json.id, `create task (${r.status})`);
-    const taskId = r.json.id;
-    r = await api('GET', '/api/collections/notifications/records', { token: B });
-    expect((r.json.items || []).some((n) => n.type === 'task_assigned'), 'assignee dostal notifikaci jako z UI');
-    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: bRW, body: { title: 'hack', map: mapId, node_id: child1.id } });
-    expect(r.status === 404, `task na cizí mapu 404 (${r.status})`);
-    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW, body: { title: 'x', map: mapId, node_id: 'ghost' } });
-    expect(r.status === 404, `task na neexistující uzel 404 (${r.status})`);
-    r = await api('GET', `/api/flowmap/v1/tasks?map=${mapId}&status=todo`, { bearer: aRW });
-    expect(r.status === 200 && r.json.tasks.length === 1 && r.json.tasks[0].id === taskId,
-      `list_tasks s filtry (${r.json.tasks && r.json.tasks.length})`);
-    // filtr smí přijít i jako `map_id` — tak se jmenuje v MCP i v payloadu úkolu.
-    // Dřív se neznámý parametr TIŠE ignoroval a volající dostal VŠECHNY svoje
-    // úkoly v domnění, že má jednu mapu (nález 16. 8. při práci přes API).
-    r = await api('GET', `/api/flowmap/v1/tasks?map_id=${mapId}&status=todo`, { bearer: aRW });
-    expect(r.status === 200 && r.json.tasks.length === 1 && r.json.tasks[0].id === taskId,
-      `list_tasks filtruje i podle map_id (${r.json.tasks && r.json.tasks.length})`);
-    r = await api('GET', '/api/flowmap/v1/tasks?map_id=neexistujici', { bearer: aRW });
-    expect(r.status === 404, `map_id na cizí/neexistující mapu → 404, ne tichý výpis všeho (${r.status})`);
-
-    // Výchozí řešitel = majitel klíče (Richard 16. 8.): agent pole vynechá a úkol
-    // by jinak nikomu nesvítil v „Mém dni". Prázdný řetězec = vědomě nikdo.
-    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW,
-      body: { title: 'Bez řešitele', map: mapId, node_id: taskNode } });
-    const bezResitele = r.json.id;
+    console.log('== tasks: rozhraní odstraněno (slovník 17. 8. 2026) ==');
+    // Úkol = uzel s řešitelem nebo termínem. Samostatné položky zanikly:
+    // v1 rozhraní vrací 410 s vysvětlením a PB kolekce tasks nejde plnit
+    // uživatelem (create hook 403) — jediná cesta k práci je /nodes.
     r = await api('GET', `/api/flowmap/v1/tasks?map=${mapId}`, { bearer: aRW });
-    const vytvoreny = (r.json.tasks || []).find((x) => x.id === bezResitele);
-    expect(vytvoreny && vytvoreny.assignee_email === 'a@x.cz',
-      `úkol bez uvedeného řešitele dostal majitele klíče (${vytvoreny && vytvoreny.assignee_email})`);
+    expect(r.status === 410 && /node|uzel/i.test(r.json.error || ''),
+      `GET /v1/tasks → 410 s vysvětlením (${r.status})`);
     r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW,
-      body: { title: 'Vědomě nikoho', map: mapId, node_id: taskNode, assignee_email: '' } });
-    const nikoho = r.json.id;
-    r = await api('GET', `/api/flowmap/v1/tasks?map=${mapId}`, { bearer: aRW });
-    const prazdny = (r.json.tasks || []).find((x) => x.id === nikoho);
-    expect(prazdny && prazdny.assignee_email === '',
-      `prázdný assignee_email se RESPEKTUJE jako „nikdo" (${prazdny && JSON.stringify(prazdny.assignee_email)})`);
-    r = await api('POST', `/api/flowmap/v1/tasks/${taskId}`, { bearer: aRW, body: { status: 'done' } });
-    expect(r.status === 200 && r.json.status === 'done', `update task status (${r.status})`);
-    // parita s UI: přiřazený (assignee) úkol smí upravit i přes API…
-    r = await api('POST', `/api/flowmap/v1/tasks/${taskId}`, { bearer: bRW, body: { status: 'in_progress' } });
-    expect(r.status === 200, `assignee smí upravit delegovaný úkol — parita s UI (${r.status})`);
-    await api('POST', `/api/flowmap/v1/tasks/${taskId}`, { bearer: aRW, body: { status: 'done' } });
-    // …ale úkol bez vztahu (není můj, není na mé mapě, nejsem assignee) zůstává 404
-    r = await api('POST', '/api/flowmap/v1/tasks', { bearer: aRW, body: { title: 'Interní úkol', map: mapId } });
-    const privateTaskId = r.json.id;
-    r = await api('POST', `/api/flowmap/v1/tasks/${privateTaskId}`, { bearer: bRW, body: { status: 'todo' } });
-    expect(r.status === 404, `úkol bez vztahu ke klíči 404 (${r.status})`);
-    // rekurence: dokončení přes v1 založí další výskyt (sdílená logika s UI hookem)
-    // ⚠️ Termín se POČÍTÁ, nepíše natvrdo. Dřív tu bylo pevné datum a očekávaný
-    // posun o týden — jenže `advanceDate` u termínu v MINULOSTI počítá ode DNEŠKA,
-    // takže sada začala padat sama od sebe, jakmile to datum zestárlo. Bereme
-    // proto termín v budoucnu a stejným pravidlem dopočítáme, co má vzniknout.
-    const denUtc = (posun) => {
-      const n = new Date();
-      const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + posun));
-      return d.toISOString().slice(0, 10);
-    };
-    const terminZaklad = denUtc(3);       // v budoucnu → základ posunu je on sám
-    const terminPristi = denUtc(3 + 7);   // weekly
+      body: { title: 'Zavolat klientovi', map: mapId, node_id: 'x' } });
+    expect(r.status === 410, `POST /v1/tasks → 410 (${r.status})`);
+    r = await api('POST', '/api/flowmap/v1/tasks/nejake-id', { bearer: aRW, body: { status: 'done' } });
+    expect(r.status === 410, `POST /v1/tasks/{id} → 410 (${r.status})`);
+    // 410 chodí i bez platného klíče? Ne — autentizace se drží (401 bez klíče),
+    // ať odstraněná cesta neprozrazuje nic anonymům.
+    r = await api('GET', '/api/flowmap/v1/tasks');
+    expect(r.status === 401, `GET /v1/tasks bez klíče → 401, ne 410 (${r.status})`);
+    // PB kolekce: uživatelské založení položky je zakázané (superuser = fixtury)
     r = await api('POST', '/api/collections/tasks/records', { token: A,
-      body: { title: 'Týdenní report', map: mapId, node_id: taskNode, status: 'todo', recurrence: 'weekly', deadline: terminZaklad } });
-    const recTaskId = r.json.id;
-    r = await api('POST', `/api/flowmap/v1/tasks/${recTaskId}`, { bearer: aRW, body: { status: 'done' } });
-    expect(r.status === 200, `dokončení opakovaného úkolu (${r.status})`);
-    r = await api('GET', `/api/flowmap/v1/tasks?map=${mapId}&status=todo`, { bearer: aRW });
-    const spawned = r.json.tasks.find((t2) => t2.title === 'Týdenní report' && t2.deadline === terminPristi);
-    expect(!!spawned, `rekurence založila další výskyt s posunutým termínem (${terminZaklad} → ${terminPristi})`);
+      body: { title: 'Pokus o položku', map: mapId, status: 'todo' } });
+    // dvě vrstvy zákazu: createRule=null (400 z pravidel) + hook (403) — obě znamenají NE
+    expect(r.status === 400 || r.status === 403, `create v kolekci tasks jako uživatel neprojde (${r.status})`);
 
     console.log('== limity a eskalace ==');
     r = await api('POST', '/api/flowmap/v1/maps', { bearer: aRW,

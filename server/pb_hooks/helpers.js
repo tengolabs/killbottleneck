@@ -591,6 +591,43 @@ function aiConfig(app) {
 // rec = "daily" | "weekly" | "monthly". Počítá v UTC, ať přechod přes půlnoc/DST neposune den.
 // Základ posunu = max(termín, dnes) — prošlý úkol dokončený se zpožděním založí další
 // výskyt v budoucnu, ne znovu prošlý (rozhodnutí Richarda 2026-07-19).
+// Opakování na cílech (v0.35, Richard 17. 8. 2026): „opakuje se od původního
+// termínu — každé pondělí je každé pondělí." Další termín = termín + interval;
+// prošlé výskyty se přeskočí po intervalech k nejbližšímu BUDOUCÍMU — den
+// v týdnu (a den v měsíci, vč. 31. s clampem jen v kratších měsících) drží.
+// Tím se liší od advanceDate níže, která základ posouvala na dnešek a pozdní
+// odbavení rytmus lámalo. Bez termínu se rytmus zakládá ode dneška.
+// „Dnes" = serverový den v UTC (kontejner) — viz past UTC×hostitel.
+function dalsiTermin(base, rec) {
+  const n = new Date();
+  const today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+  let anchor = base && /^\d{4}-\d{2}-\d{2}$/.test(base) ? new Date(base + "T00:00:00Z") : new Date(today);
+  // tvarem validní nesmysl („2026-02-31" → Invalid Date) nebo prehistorická
+  // kotva (monthly strop 1200 iterací by vrátil "" a termín tiše smazal)
+  // → rytmus se poctivě založí ode dneška, nikdy se nic nemaže potichu
+  if (isNaN(anchor.getTime()) || anchor.getUTCFullYear() < 1990) anchor = new Date(today);
+  const p2 = (x) => (x < 10 ? "0" + x : "" + x);
+  const fmt = (d) => d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate());
+  if (rec === "daily" || rec === "weekly") {
+    const krokMs = (rec === "daily" ? 1 : 7) * 86400000;
+    let k = 1;
+    if (anchor.getTime() <= today) k = Math.floor((today - anchor.getTime()) / krokMs) + 1;
+    return fmt(new Date(anchor.getTime() + k * krokMs));
+  }
+  if (rec === "monthly") {
+    const den = anchor.getUTCDate(); // kotva dne v měsíci: 31. zůstává 31.
+    let y = anchor.getUTCFullYear(), m = anchor.getUTCMonth();
+    for (let i = 0; i < 1200; i++) {
+      m += 1; if (m > 11) { m -= 12; y += 1; }
+      const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      const d = new Date(Date.UTC(y, m, Math.min(den, last)));
+      if (d.getTime() > today) return fmt(d);
+    }
+    return "";
+  }
+  return base || "";
+}
+
 function advanceDate(base, rec) {
   const n = new Date();
   const today = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()));
@@ -1743,45 +1780,6 @@ function userOwnsTaskMap(app, taskRecord, userId) {
 // termínem. Jen hlavní úkoly (ne podúkoly); archivovaná mapa už neplodí další
 // výskyty (archiv = hotovo, Richard 2026-07-20). Sdílí tasks update hook i v1 API
 // routy (zápis přes $app.save request hook nespustí) — JEDNA logika pro UI i API.
-function spawnNextRecurrence(app, prevStatus, record, actorEmail) {
-  try {
-    const rec = record.getString("recurrence");
-    if (!rec || prevStatus === "done" || record.getString("status") !== "done" || record.getString("parent")) return;
-    let mapArchived = false;
-    const recMapId = record.getString("map");
-    if (recMapId) {
-      try {
-        mapArchived = app.findRecordById("goalmaps", recMapId).getBool("archived");
-      } catch (err) { /* mapa nedohledatelná → chovej se jako dosud */ }
-    }
-    if (mapArchived) return;
-    const col = app.findCollectionByNameOrId("tasks");
-    const next = new Record(col);
-    next.set("title", record.getString("title"));
-    next.set("description", record.getString("description"));
-    next.set("status", "todo");
-    next.set("recurrence", rec);
-    next.set("deadline", advanceDate(record.getString("deadline"), rec));
-    next.set("assignee_email", record.getString("assignee_email"));
-    next.set("map", record.getString("map"));
-    next.set("node_id", record.getString("node_id"));
-    next.set("owner", record.getString("owner"));
-    next.set("owner_email", record.getString("owner_email"));
-    app.save(next);
-    const na = next.getString("assignee_email");
-    if (na) {
-      notify(app, {
-        email: na,
-        actorEmail: actorEmail || "",
-        type: "task_assigned",
-        taskId: next.id,
-        mapId: next.getString("map") || null,
-        textKey: "notify.taskRecurring",
-        params: { title: next.getString("title"), deadline: next.getString("deadline") },
-      });
-    }
-  } catch (err) { /* vytvoření dalšího výskytu nesmí shodit uložení úkolu */ }
-}
 
 // Přidělení čísla řady mapě (record) ze šablony (tpl). Atomický inkrement čítače
 // s ročním rolloverem v JEDNOM statementu: jiný rok → čítač začne znovu (vrátí 2,
@@ -2180,46 +2178,6 @@ function templateToMapServer(tplObj, startDate, layoutOpts) {
   };
 }
 
-// založí úkoly mapy ze seeds šablony (top-level dřív, podúkoly s vazbou parent)
-// Úkol patří na KONKRÉTNÍ uzel (13. 8.): seed bez uzlu nebo mířící na vrchol
-// se PŘESKOČÍ ($app.save obchází hooky, pravidlo se musí držet tady) — radši
-// šablona bez pár úkolů než úkoly, které pravidlo porušují. Podúkol dědí uzel
-// rodiče, stejně jako create hook.
-function createTasksFromSeeds(app, seeds, idMap, startDate, mapRecord, ownerId, ownerEmail) {
-  const list = Array.isArray(seeds) ? seeds : [];
-  if (list.length === 0) return 0;
-  const col = app.findCollectionByNameOrId("tasks");
-  const created = {};
-  const createdNode = {};
-  const apex = apexNodeId(mapRecord);
-  const ordered = list.filter((s) => !s.parent).concat(list.filter((s) => s.parent));
-  let count = 0;
-  for (const s of ordered) {
-    if (s.parent && !created[s.parent]) continue; // podúkol bez rodiče v seeds
-    let nodeId = (s.node && idMap[s.node]) || "";
-    if (s.parent) nodeId = createdNode[s.parent] || nodeId;
-    if (!nodeId || nodeId === apex) continue; // bez konkrétního uzlu se nezakládá
-    const r = new Record(col);
-    r.set("title", s.title || "Úkol");
-    r.set("description", s.description || "");
-    r.set("status", "todo");
-    const hasOffset = s.deadline_offset_days !== null && s.deadline_offset_days !== undefined && s.deadline_offset_days !== "" && isFinite(Number(s.deadline_offset_days));
-    r.set("deadline", hasOffset ? addDaysStr(startDate, Number(s.deadline_offset_days)) : "");
-    r.set("recurrence", s.recurrence || "");
-    r.set("assignee_email", s.assignee_email || "");
-    r.set("map", mapRecord.id);
-    r.set("node_id", nodeId);
-    r.set("owner", ownerId);
-    r.set("owner_email", ownerEmail);
-    if (s.parent) r.set("parent", created[s.parent]);
-    app.save(r);
-    created[s.id] = r.id;
-    createdNode[s.id] = nodeId;
-    count++;
-  }
-  return count;
-}
-
 // Přemapování šablonového/přeneseného pravidla na reálná id uzlů přes idMap
 // (d1 → node-<ts>-d1). Zrcadlo: frontend/src/lib/ruleRemap.js:remapRuleIds —
 // FE lib a hooks kód nesdílí (vzor templateToMap/templateToMapServer), shodu
@@ -2248,7 +2206,7 @@ function remapRuleIdsServer(rule, idMap) {
 
 // Založí pravidla ze seznamu (šablona mapy / import) na ULOŽENOU mapu — mimo
 // request hooky, proto validace explicitně tady (kolekce automation_rules je
-// zamčená a app.save stráže obchází; stejný princip jako createTasksFromSeeds).
+// zamčená a app.save stráže obchází).
 // Položky se šablonovými id se čekají UŽ PŘEMAPOVANÉ přes remapRuleIdsServer.
 // Nevalidní/spadlé pravidlo = PŘIZNANÝ skip v čítači, nikdy pád celé mapy.
 // Vrací { created, skipped }.
@@ -2296,15 +2254,11 @@ function instantiateTemplate(app, tpl, startDate) {
   const tplRules = jsonVal(tpl, "rules", []);
   const jeKanban = Array.isArray(tplRules) && tplRules.length > 0;
   const conv = templateToMapServer(tplObj, startDate, jeKanban ? {} : undefined);
-  const seeds = jsonVal(tpl, "task_seeds", []);
-  // auto-share: owneri uzlů + assignee úkolů (bez vlastníka) — stejné jako ruční založení
+  // auto-share: owneri uzlů (bez vlastníka) — task_seeds zanikly 17. 8. 2026
   const emails = {};
   for (const n of conv.nodes) {
     const o = (n.data || {}).owner;
     if (o && o !== ownerEmail) emails[o] = true;
-  }
-  for (const s of (Array.isArray(seeds) ? seeds : [])) {
-    if (s.assignee_email && s.assignee_email !== ownerEmail) emails[s.assignee_email] = true;
   }
   const shared = Object.keys(emails);
   const col = app.findCollectionByNameOrId("goalmaps");
@@ -2328,7 +2282,8 @@ function instantiateTemplate(app, tpl, startDate) {
   }
   app.save(rec);
   syncShares(app, rec);
-  createTasksFromSeeds(app, seeds, conv.idMap, startDate || new Date(), rec, ownerId, ownerEmail);
+  // task_seeds se od 17. 8. 2026 NEROZBALUJÍ (slovník: úkol = uzel s řešitelem
+  // nebo termínem; řešitele a lhůty nesou uzly šablony samy)
   // vestavěná pravidla šablony: remap přes idMap → validace → založení; autor =
   // vlastník šablony (pravidlo poběží jeho právy, konzistentně s vlastnictvím mapy)
   if (jeKanban) {
@@ -3632,7 +3587,10 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       if (rt.skip) { skips.push({ type: a.type, reason: rt.skip }); continue; }
       const tn = rt.node;
       let date = "";
-      if (a.relative_days !== undefined) {
+      if (a.advance !== undefined) {
+        // opakování: další výskyt od PŮVODNÍHO termínu cíle (rytmus), viz dalsiTermin
+        date = dalsiTermin(String((tn.data || {}).deadline || ""), String(a.advance));
+      } else if (a.relative_days !== undefined) {
         const days = Math.trunc(Number(a.relative_days));
         if (!Number.isFinite(days) || days < 0 || days > 3650) throw new Error("set_deadline: invalid relative_days");
         date = addDaysStr(new Date(), days);
@@ -3849,8 +3807,17 @@ function runAutomationRules(app, origNodes, origEdges, record, actorEmail, opts)
         if (trig.type === "node_created") {
           if (origById[n.id] || n.type === "apexNode") continue;
         } else if (trig.type === "node_status_changed") {
-          if (!origById[n.id]) continue; // nový uzel je node_created, ne změna stavu
-          if ((prevStatus[n.id] || "") === (d.status || "")) continue;
+          // Uzel NAROZENÝ rovnou s ne-výchozím stavem JE změna stavu (nález
+          // Richarda 17. 8. na cloudu: rychlé „přidat podcíl → hned Hotovo" se
+          // slilo do jednoho autosave a kanban mlčel — latence dávku drží déle,
+          // takže na hostované verzi to byla otázka vteřin). Zrození s „todo"
+          // změna není (výchozí stav) — to je čisté node_created.
+          if (!origById[n.id]) {
+            if (n.type === "apexNode") continue;
+            if (!d.status || d.status === "todo") continue;
+          } else {
+            if ((prevStatus[n.id] || "") === (d.status || "")) continue;
+          }
           const want = String(trig.status || "");
           if (want && want !== String(d.status || "")) continue;
         } else { // node_unblocked — přesně diff z triggerReadyAgents
@@ -3947,7 +3914,7 @@ function runScheduledRules(app, opts) {
       if (trig.type !== "schedule" && trig.type !== "deadline_approaching") continue;
       let map = null;
       try { map = app.findRecordById("goalmaps", rule.getString("map")); } catch (err) { continue; }
-      if (map.getBool("archived")) continue; // archivovaná mapa neplodí (vzor spawnNextRecurrence)
+      if (map.getBool("archived")) continue; // archivovaná mapa neplodí
       const nodes = jsonVal(map, "nodes", []);
       const edgesMapy = jsonVal(map, "edges", []); // pro podmínku `parent`
       const scope = rule.getString("node_id");
@@ -4208,12 +4175,19 @@ function validateRuleInput(app, map, body) {
       if (ownerRefErr) return { error: ownerRefErr };
       actions.push(Object.assign({ type: a.type, owner: owner }, target ? { target: target } : {}));
     } else if (a.type === "set_deadline") {
-      if (a.relative_days !== undefined) {
+      if (a.advance !== undefined) {
+        // opakování: posun stávajícího termínu cíle o interval, rytmus drží.
+        // Kombinace s date/relative_days se ODMÍTÁ — exekuce bere advance
+        // přednostně a tichá přednost by lhala o tom, co pravidlo dělá.
+        if (a.relative_days !== undefined || a.date !== undefined) return { error: "set_deadline: advance cannot be combined with date or relative_days" };
+        if (!["daily", "weekly", "monthly"].includes(a.advance)) return { error: "set_deadline.advance must be daily|weekly|monthly" };
+        actions.push(Object.assign({ type: a.type, advance: a.advance }, target ? { target: target } : {}));
+      } else if (a.relative_days !== undefined) {
         if (!Number.isInteger(a.relative_days) || a.relative_days < 0 || a.relative_days > 3650) return { error: "set_deadline.relative_days must be an integer 0-3650" };
         actions.push(Object.assign({ type: a.type, relative_days: a.relative_days }, target ? { target: target } : {}));
       } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(a.date || ""))) {
         actions.push(Object.assign({ type: a.type, date: String(a.date) }, target ? { target: target } : {}));
-      } else return { error: "set_deadline needs date YYYY-MM-DD or relative_days" };
+      } else return { error: "set_deadline needs date YYYY-MM-DD, relative_days, or advance daily|weekly|monthly" };
     } else if (a.type === "move_node") {
       // KANBAN POSUN (Richard 14. 8.): přesune TRIGGER uzel pod jiného rodiče
       // (`to` = id uzlu mapy). Šablona konkrétní id mít nemůže (viz target).
@@ -5406,7 +5380,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
   return out;
 }
 
-module.exports = { env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, spawnNextRecurrence, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+module.exports = { env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

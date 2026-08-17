@@ -105,14 +105,16 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `add_nodes` | přidání podstromu pod uzel (⚠️ přepočítá layout celé mapy) |
 | `update_node` | název/stav/popis/termín/osoba/čekání-na-podstrom jednoho uzlu |
 | `delete_node` | smaže uzel VČETNĚ podstromu (vrchol nejde; celé mapy přes API nejdou) |
-| `list_tasks` | úkoly s filtry mapa/stav |
-| `add_task` | nový úkol v projektu (vždy patří do mapy) |
-| `update_task` | úprava úkolu; dokončení opakovaného úkolu založí další výskyt |
+
+**Úkol = uzel s řešitelem (`owner`) nebo termínem** — žádný samostatný úkolový
+záznam neexistuje. Novou práci zakládejte přes `add_nodes`, odbavujte přes
+`update_node` → `status: done`. (Dřívější nástroje `list_tasks`/`add_task`/
+`update_task` byly ve v0.34 odstraněny; serverové rozhraní `/v1/tasks` vrací 410.)
 
 ## Chování a limity
 
-- Klíč vidí **mapy a úkoly svého majitele + úkoly jemu přiřazené** (parita
-  s aplikací) — žádnou administraci, nastavení AI, uživatele ani sdílené/týmové mapy.
+- Klíč vidí **mapy svého majitele** (parita s aplikací) — žádnou administraci,
+  nastavení AI, uživatele ani sdílené/týmové mapy.
 - Výstupy nástrojů jsou anglicky (LLM jim rozumí vždy); chybové hlášky serveru
   chodí v jazyce vlastníka klíče.
 - Rate-limit na klíč: 120 čtení + 30 zápisů za minutu; max 200 uzlů na volání;
@@ -124,8 +126,8 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
   řeší za vás: při zápisu do mapy, kterou ještě nečetl, si ji sám načte; když ji
   mezitím změní někdo v editoru, dostane konflikt a vrátí aktuální strom, aby
   asistent úpravu zopakoval nad čerstvou verzí.
-- Notifikace (přiřazení úkolu, odblokování čekajícího uzlu, opakované úkoly)
-  fungují stejně jako z aplikace.
+- Notifikace (přiřazení úkolu-uzlu, odblokování čekajícího uzlu) fungují stejně
+  jako z aplikace.
 
 ## Licence
 

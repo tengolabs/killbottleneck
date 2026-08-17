@@ -43,6 +43,11 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
 
     await reg(VLASTNIK); await reg(WORKER); await reg(CTENAR); await reg(EDITOR);
     const V = await login(VLASTNIK), W = await login(WORKER), R = await login(CTENAR), E = await login(EDITOR);
+    // SLOVNÍK 17. 8. 2026: položky sází superuser (uživatelský create = 403)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const vId = ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent(`email='${VLASTNIK}'`)}`, { token: ST })).json.items || [])[0].id;
+    const suTask = (body) => api('POST', '/api/collections/tasks/records', { token: ST, body: { owner: vId, owner_email: VLASTNIK, ...body } });
 
     const mapa = await api('POST', '/api/collections/goalmaps/records', {
       token: V,
@@ -94,10 +99,8 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     expect(r.status === 200, `editor přes routu smí kterýkoli uzel (${r.status})`);
 
     console.log('== řešitel úkolu na uzlu smí jeho stav taky ==');
-    r = await api('POST', '/api/collections/tasks/records', {
-      token: V, body: { title: 'Podúkol pro spolupracovníka', status: 'todo', map: mapId, node_id: 'n2', assignee_email: WORKER },
-    });
-    expect(r.status === 200, `vlastník zadal úkol na cizím uzlu (${r.status})`);
+    r = await suTask({ title: 'Podúkol pro spolupracovníka', status: 'todo', map: mapId, node_id: 'n2', assignee_email: WORKER });
+    expect(r.status === 200, `zbytková položka na uzlu založena superuserem (${r.status})`);
     r = await api('POST', '/api/kb/node-status', { token: W, body: { mapId, nodeId: 'n2', status: 'done' } });
     expect(r.status === 200, `s úkolem na uzlu už spolupracovník stav změní (${r.status})`);
 
@@ -106,9 +109,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
       token: W, body: { goalmap: mapId, node_id: 'n1', text: 'Hotovo, mrkněte.' },
     });
     expect(r.status === 200, `spolupracovník komentuje (${r.status})`);
-    const task = await api('POST', '/api/collections/tasks/records', {
-      token: V, body: { title: 'Task pro workera', status: 'todo', map: mapId, node_id: 'n1', assignee_email: WORKER },
-    });
+    const task = await suTask({ title: 'Task pro workera', status: 'todo', map: mapId, node_id: 'n1', assignee_email: WORKER });
     r = await api('PATCH', `/api/collections/tasks/records/${task.json.id}`, { token: W, body: { status: 'done' } });
     expect(r.status === 200, `svůj úkolový záznam odškrtne (${r.status})`);
 

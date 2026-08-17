@@ -126,9 +126,12 @@ const pragueDate = (offset = 0) => {
     } })).json;
     expect(!!mapa?.id, 'mapa s externím garantem uzlu vznikla');
     // ⚠️ tady se láme riziko TLD .invalid: email pole úkolu musí pseudo-adresu vzít
-    const ukol = (await api('POST', '/api/collections/tasks/records', { token: A, body: {
+    // SLOVNÍK 17. 8. 2026: položku sází superuser (uživatelský create = 403)
+    const uidA3 = ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent("email='anna@example.com'")}`, { token: ST })).json.items || [])[0].id;
+    const ukol = (await api('POST', '/api/collections/tasks/records', { token: ST, body: {
       title: 'Zpracovat DPH', status: 'todo', deadline: OLD,
       assignee_email: pseudo(ucetni.id), map: mapa.id, node_id: 'n2',
+      owner: uidA3, owner_email: 'anna@example.com',
     } })).json;
     expect(!!ukol?.id, `tasks.assignee_email přijal pseudo-adresu ${pseudo(ucetni.id)}`);
 
@@ -188,7 +191,8 @@ const pragueDate = (offset = 0) => {
     expect(ownersImp['Můj kontakt'] === pseudo(ucetni.id), 'viditelný kontakt import ZACHOVAL');
     expect(ownersImp['Cizí privátní'] === '' && ownersImp['Neznámé id'] === '', 'cizí privátní i neznámé id import vyprázdnil');
     const impUkoly = (await api('GET', `/api/collections/tasks/records?filter=${encodeURIComponent(`map = "${imp.json.id}"`)}`, { token: A })).json?.items || [];
-    expect(impUkoly.length === 1 && impUkoly[0].assignee_email === pseudo(ucetni.id), 'úkol z importu nese externího řešitele');
+    expect(impUkoly.length === 0 && imp.json?.tasks_skipped >= 1,
+      `import položky NEzakládá (slovník 17. 8.) a poctivě je počítá jako přeskočené (${impUkoly.length}/${imp.json?.tasks_skipped})`);
 
     console.log('== přejmenování kontaktu se promítne, smazání nechá čitelný fallback ==');
     await api('PATCH', `/api/collections/external_contacts/records/${ucetni.id}`, { token: A, body: { name: 'Nová účetní s.r.o.' } });

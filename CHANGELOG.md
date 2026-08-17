@@ -9,6 +9,67 @@ below before you jump several versions.
 
 ---
 
+## v0.35-beta — 2026-08-17
+
+**Recurrence is back — on goals, powered by rules**
+
+v0.34 removed task items and with them recurrence; this release brings recurrence
+back the systemic way: as a property of goals, built on the automation rule engine.
+
+- **A goal can repeat** — daily, weekly or monthly. Set it with the new
+  **Recurrence** switch in the goal detail (Assignment category). When the goal
+  is marked Done it returns to To do by itself and the deadline advances.
+- **The rhythm is anchored to the original deadline**: every Monday stays
+  a Monday, the 31st stays the 31st (clamped to the last day in shorter months),
+  and missed occurrences skip to the nearest future one — a late completion
+  never hides how late you were, and never breaks the rhythm.
+- **No new machinery**: the switch manages an ordinary automation rule
+  (`on Done → set_status todo + set_deadline advance`) visible in the map's
+  Rules. Hand-edit it and the switch honestly steps aside. Recurring goals
+  carry a 🔁 badge; templates and the API/MCP (`create_rule` with the new
+  `set_deadline.advance: daily|weekly|monthly`) transfer recurrence for free.
+- **Fix: a node born straight into Done now fires status-change rules.** On
+  hosted instances, a quick "add subgoal → mark Done" could land in a single
+  save; the node was new in the diff, the kanban move rule stayed silent and
+  the card never left its column. Rules now treat a node born with a
+  non-default status as a status change (born as To do is not one). This also
+  applies when you paste or import a whole branch of finished nodes — each
+  fires the rule, with the existing cap of 10 rule executions per save
+  (anything beyond is openly logged as skipped).
+
+## v0.34-beta — 2026-08-17
+
+**One vocabulary: a task is a goal with an assignee or a deadline**
+
+Words used to disagree across the app — the same box in the map was a "goal" in the
+editor, a "task" in the table and a "node" in the API, while a second, separate kind of
+"task" lived inside nodes. That second kind is now gone.
+
+- **A task is a node (goal) with an assignee or a deadline.** New work = a new goal.
+  Nothing exists outside a map — quick thoughts go to the idea stash.
+- **Standalone task items were removed.** They can no longer be created anywhere — app,
+  API or MCP. A migration deletes existing items and their comments; **time tracked on an
+  item is preserved** (re-attached to the item's node). The orange badge remains only as
+  a leftover-data detector: if you ever see it, something snuck in that shouldn't exist —
+  open it and delete the leftovers.
+- **"New task" on the Tasks page now creates a goal** — under the project's main goal or
+  under a goal you pick — and immediately opens its detail to set the assignee and deadline.
+- **⚠️ Breaking (beta): the `/v1/tasks` endpoints return 410 Gone** and the MCP tools
+  `list_tasks`/`add_task`/`update_task` were removed. Use `/v1/maps/{id}/nodes`
+  (MCP `add_nodes`, `update_node`) — a node with an assignee or deadline IS the task.
+- Map import no longer creates task items (they are counted in `tasks_skipped`); templates
+  no longer carry `task_seeds` — assignees and relative deadlines live on the template's
+  nodes and keep working.
+- **Removed with the items** (deliberately): task recurrence (a future feature will
+  revisit repetition on goals), item subtasks and item comment threads.
+- Wording unified in Czech UI and docs: the responsible person is **"řešitel"**
+  everywhere ("garant" is gone); the person who assigned the task remains **"zadavatel"**.
+
+**Upgrade notes.** If an integration of yours calls `/v1/tasks*` or the removed MCP task
+tools, switch it to nodes: create work with `add_nodes` (set `owner` and/or `deadline`),
+complete it with `update_node` → `status: done`. The migration deletes all task items and
+their comments irreversibly — export anything you want to keep before upgrading.
+
 ## v0.33-beta — 2026-08-15
 
 **First public release — the self-host beta**

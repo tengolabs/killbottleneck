@@ -117,7 +117,6 @@
     "goalHint": "Vznikne mapa s tímto cílem jako vrcholem. Cíle a podcíle pak přidáte na plátně, nebo je napíšete jako seznam v Úkolech.",
     "clientLabel": "Klient (volitelně)",
     "clientHint": "Měřený čas na projektu se pak počítá i tomuto klientovi.",
-    "withTasks": "Včetně {{count}} úkolů",
     "autoName": "Projekt se pojmenuje automaticky: „{{title}}\".",
     "processTemplate": "Procesní šablona",
     "startDateLabel": "Datum startu (termíny se dopočítají)",

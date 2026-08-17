@@ -27,14 +27,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       page.click('button[type="submit"]'),
     ]);
     await sleep(1500);
+    // SLOVNÍK 17. 8. 2026: položky sází superuser (uživatelský create = 403)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     await page.evaluate(async () => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
       await fetch('/api/collections/buffer_nodes/records', { method: 'POST', headers: H, body: JSON.stringify({ title: 'NAPAD-XYZ', owner: auth.record?.id || auth.model?.id }) });
       // úkol vždy patří do projektu A na konkrétní NE-vrcholový uzel
       // (neutrální uzel bez garanta/termínu, ať do seznamů nic nepřidá)
       const m = await (await fetch('/api/collections/goalmaps/records', { method: 'POST', headers: H, body: JSON.stringify({ title: 'Buffer mapa', nodes: [{ id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Buffer mapa', title: 'Buffer mapa', status: 'todo' } }, { id: 'n1', type: 'goalNode', position: { x: 0, y: 120 }, data: { title: 'Zázemí úkolů', status: 'todo' } }], edges: [{ id: 'e-n1', source: 'apex', target: 'n1' }] }) })).json();
-      await fetch('/api/collections/tasks/records', { method: 'POST', headers: H, body: JSON.stringify({ title: 'UKOL-PO-TERMINU', status: 'todo', deadline: '2026-07-01', assignee_email: 'admin@e2e.cz', map: m.id, node_id: 'n1' }) });
+      await fetch('/api/collections/tasks/records', { method: 'POST', headers: HS, body: JSON.stringify({ title: 'UKOL-PO-TERMINU', status: 'todo', deadline: '2026-07-01', assignee_email: 'admin@e2e.cz', map: m.id, node_id: 'n1', owner: myId, owner_email: 'admin@e2e.cz' }) });
     });
 
     await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle2' });

@@ -24,12 +24,6 @@ export function useTasks(user, { mapId } = {}) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const add = useCallback(async (data) => {
-    const item = await base44.entities.Task.create({ status: 'todo', ...data });
-    setItems((prev) => [item, ...prev]);
-    return item;
-  }, []);
-
   const update = useCallback(async (id, patch) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     try {
@@ -63,5 +57,5 @@ export function useTasks(user, { mapId } = {}) {
     return m;
   }, [items]);
 
-  return { items, loading, add, update, remove, refresh, byParent };
+  return { items, loading, update, remove, refresh, byParent };
 }

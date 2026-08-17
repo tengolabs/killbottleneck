@@ -63,12 +63,17 @@ const rozbalDen = async (p) => {
     // dedup: úkol na existujícím uzlu n1 (fold) + úkol s osiřelým node_id (počítá se sám).
     // Osiřelost se vyrábí legálně: úkol vznikne na uzlu 'docasny', pak se uzel
     // (i s hranou) PATCHem mapy smaže — ponechané node_id osiří (vzor api-rls.js).
+    // SLOVNÍK 17. 8. 2026: zbytkové položky sází superuser (create = 403)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     await page.evaluate(async (mapId) => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
       const mk = (body) => fetch('/api/collections/tasks/records', {
-        method: 'POST', headers: H,
-        body: JSON.stringify({ ...body, assignee_email: 'admin@e2e.cz', status: 'todo', deadline: '2026-07-01' }),
+        method: 'POST', headers: HS,
+        body: JSON.stringify({ ...body, assignee_email: 'admin@e2e.cz', status: 'todo', deadline: '2026-07-01', owner: myId, owner_email: 'admin@e2e.cz' }),
       });
       await mk({ title: 'FOLDNUTY-UKOL-XYZ', map: mapId, node_id: 'n1' });
       await mk({ title: 'OSIRELY-UKOL-XYZ', map: mapId, node_id: 'docasny' });

@@ -119,10 +119,10 @@ const login = async (email, pw = PW) => {
     expect(r.status === 200, `team_access=edit: člen edituje (${r.status})`);
     await api('POST', '/api/flowmap/share', { token: A, body: { action: 'set_team_access', mapId: m2.id, access: '' } });
 
-    console.log('== tasks ==');
-    // MODEL: projekt → uzel → úkol, nic nestojí samo (Richard 27. 7. 2026,
-    // ZPŘÍSNĚNO 13. 8. 2026: „na vrchol jde věšet jen uzly"). Úkol bez
-    // KONKRÉTNÍHO uzlu server odmítá, vrchol úkoly nepřijímá.
+    console.log('== tasks (položky zanikly — zákaz create + RLS nad zbytky) ==');
+    // SLOVNÍK 17. 8. 2026: úkol = uzel s řešitelem nebo termínem; položky-úkoly
+    // nejde založit ŽÁDNOU uživatelskou cestou (create hook 403). Kolekce žije
+    // jen jako detektor zbytků — RLS čtení/úprav/mazání nad nimi musí dál držet.
     const m3 = (await api('POST', '/api/collections/goalmaps/records', { token: A, body: { title: 'Soukromá s úkoly',
       nodes: [
         { id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Soukromá s úkoly', title: 'Soukromá s úkoly', status: 'todo' } },
@@ -131,28 +131,32 @@ const login = async (email, pw = PW) => {
         { id: 'pozn1', type: 'note', position: { x: 600, y: 300 }, data: { title: 'Lísteček' } },
       ],
       edges: [{ id: 'e1', source: 'apex', target: 'n1' }, { id: 'e2', source: 'apex', target: 'n2' }] } })).json;
-    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Úkol bez uzlu', status: 'todo', map: m3.id } });
-    expect(r.status === 400, `úkol bez uzlu server odmítne (${r.status})`);
-    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Úkol na vrchol', status: 'todo', map: m3.id, node_id: 'apex' } });
-    expect(r.status === 400, `úkol na vrcholu server odmítne (${r.status})`);
-    const t1 = (await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Úkol na kroku', status: 'todo', map: m3.id, node_id: 'n1' } })).json;
-    expect(t1.node_id === 'n1', `úkol s konkrétním uzlem projde (${t1.node_id})`);
-    // úkol nejde ani DODATEČNĚ odpojit nebo přesunout na vrchol
+    // create je zakázaný VŽDY — i s platným uzlem, i vlastníkovi mapy
+    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Úkol na kroku', status: 'todo', map: m3.id, node_id: 'n1' } });
+    // createRule=null → 400 z datové vrstvy; hook by dal 403 — obě vrstvy znamenají NE
+    expect(r.status === 400 || r.status === 403, `create položky jako uživatel neprojde i s platným uzlem (${r.status})`);
+    r = await api('POST', '/api/collections/tasks/records', { token: B, body: { title: 'B na cizí mapě', status: 'todo', map: m3.id, node_id: 'n1' } });
+    // na cizí mapě padne dřív createRule kolekce (400) — hook 403 je pro povolené;
+    // podstatné je, že create neprojde NIKDY a nic neprozradí
+    expect(r.status === 400 || r.status === 403, `create položky na cizí mapě neprojde (${r.status})`);
+
+    // zbytková data zakládá superuser (jediná povolená cesta — fixtury/admin)
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
+    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const uid = async (email) => ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent(`email='${email}'`)}`, { token: ST })).json.items || [])[0].id;
+    const uidA = await uid('a@example.com');
+    const suTask = async (body) => (await api('POST', '/api/collections/tasks/records', { token: ST, body })).json;
+    const t1 = await suTask({ title: 'Úkol na kroku', status: 'todo', map: m3.id, node_id: 'n1', owner: uidA, owner_email: 'a@example.com' });
+    expect(!!t1.id && t1.node_id === 'n1', `zbytková položka založena superuserem (${t1.id})`);
+    // úprava zbytku nesmí model rozbít: odpojení, vrchol ani vymyšlený uzel neprojdou
     r = await api('PATCH', `/api/collections/tasks/records/${t1.id}`, { token: A, body: { node_id: '' } });
-    expect(r.status === 400, `odpojení úkolu od uzlu server odmítne (${r.status})`);
+    expect(r.status === 400, `odpojení položky od uzlu server odmítne (${r.status})`);
     r = await api('PATCH', `/api/collections/tasks/records/${t1.id}`, { token: A, body: { node_id: 'apex' } });
-    expect(r.status === 400, `přesun úkolu na vrchol server odmítne (${r.status})`);
-    // uzel musí EXISTOVAT a nesmí to být poznámka (nález panelu 13. 8.:
-    // vymyšlené node_id dřív prošlo → úkol neviditelný v mapě)
-    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Na vymyšleném', status: 'todo', map: m3.id, node_id: 'neexistuje-123' } });
-    expect(r.status === 400, `úkol na vymyšleném uzlu server odmítne (${r.status})`);
+    expect(r.status === 400, `přesun položky na vrchol server odmítne (${r.status})`);
     r = await api('PATCH', `/api/collections/tasks/records/${t1.id}`, { token: A, body: { node_id: 'neexistuje-123' } });
     expect(r.status === 400, `přesun na vymyšlený uzel server odmítne (${r.status})`);
-    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Na poznámce', status: 'todo', map: m3.id, node_id: 'pozn1' } });
-    expect(r.status === 400, `úkol na poznámce server odmítne (${r.status})`);
-    // OSIŘELÝ uzel: po smazání uzlu se úkol dál smí odbavit (ponechání
-    // původního node_id), ale nový úkol na smazaný uzel už nevznikne
-    const tOs = (await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Osiřelý', status: 'todo', map: m3.id, node_id: 'n2' } })).json;
+    // OSIŘELÝ zbytek: po smazání uzlu jde dál odbavit (ponechání původního node_id)
+    const tOs = await suTask({ title: 'Osiřelý', status: 'todo', map: m3.id, node_id: 'n2', owner: uidA, owner_email: 'a@example.com' });
     const m3stav = (await api('GET', `/api/collections/goalmaps/records/${m3.id}`, { token: A })).json;
     r = await api('PATCH', `/api/collections/goalmaps/records/${m3.id}`, { token: A, body: {
       nodes: m3stav.nodes.filter((n) => n.id !== 'n2'),
@@ -160,38 +164,28 @@ const login = async (email, pw = PW) => {
       base_updated: m3stav.updated } });
     expect(r.status === 200, `uzel n2 smazán z mapy (${r.status})`);
     r = await api('PATCH', `/api/collections/tasks/records/${tOs.id}`, { token: A, body: { status: 'done' } });
-    expect(r.status === 200, `osiřelý úkol jde dál odbavit (${r.status})`);
-    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Na smazaném', status: 'todo', map: m3.id, node_id: 'n2' } });
-    expect(r.status === 400, `nový úkol na smazaném uzlu nevznikne (${r.status})`);
-    // ⚠️ Projekt ÚPLNĚ bez uzlů (jde založit jen přes API): úkol tam nejde
-    // založit vůbec — není konkrétní uzel, na který by patřil.
-    const prazdna = (await api('POST', '/api/collections/goalmaps/records', { token: A, body: { title: 'Bez uzlů', nodes: [], edges: [] } })).json;
-    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'V prázdné', status: 'todo', map: prazdna.id } });
-    expect(r.status === 400, `v projektu bez jediného uzlu úkol nevznikne (${r.status})`);
+    expect(r.status === 200, `osiřelá položka jde dál odbavit (${r.status})`);
     r = await api('GET', `/api/collections/tasks/records/${t1.id}`, { token: B });
-    expect(r.status === 404, `úkol na cizí soukromé mapě B nevidí (${r.status})`);
-    const t2 = (await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Pro B', status: 'todo', map: m3.id, node_id: 'n1', assignee_email: 'b@example.com' } })).json;
+    expect(r.status === 404, `položku na cizí soukromé mapě B nevidí (${r.status})`);
+    const t2 = await suTask({ title: 'Pro B', status: 'todo', map: m3.id, node_id: 'n1', assignee_email: 'b@example.com', owner: uidA, owner_email: 'a@example.com' });
     r = await api('GET', `/api/collections/tasks/records/${t2.id}`, { token: B });
     const ru = await api('PATCH', `/api/collections/tasks/records/${t2.id}`, { token: B, body: { status: 'done' } });
-    expect(r.status === 200 && ru.status === 200, `assignee úkol vidí a mění stav (${r.status}/${ru.status})`);
+    expect(r.status === 200 && ru.status === 200, `assignee položku vidí a mění stav (${r.status}/${ru.status})`);
     r = await api('DELETE', `/api/collections/tasks/records/${t2.id}`, { token: B });
-    expect(r.status === 404, `assignee úkol NEsmaže (${r.status})`);
-    r = await api('POST', '/api/collections/tasks/records', { token: B, body: { title: 'B na cizí mapě', status: 'todo', map: m3.id, node_id: 'n1' } });
-    expect(r.status === 400, `úkol na cizí mapě bez edit práva nejde založit (${r.status})`);
-    // model „uzel = pravda": úkol bez projektu server odmítne (rychlé poznámky = zásobník)
-    r = await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Bez projektu', status: 'todo' } });
-    expect(r.status === 400, `úkol bez projektu server odmítne (${r.status})`);
+    expect(r.status === 404, `assignee položku NEsmaže (${r.status})`);
+    r = await api('DELETE', `/api/collections/tasks/records/${t1.id}`, { token: A });
+    expect(r.status === 204, `zadavatel zbytek smaže — jediná cesta k úklidu (${r.status})`);
 
     // is_public mapa ≠ veřejné úkoly (migrace 009)
-    const tp = (await api('POST', '/api/collections/tasks/records', { token: A, body: { title: 'Na veřejné mapě', status: 'todo', map: m1.id, node_id: 'pub1' } })).json;
+    const tp = await suTask({ title: 'Na veřejné mapě', status: 'todo', map: m1.id, node_id: 'pub1', owner: uidA, owner_email: 'a@example.com' });
     r = await api('GET', `/api/collections/tasks/records/${tp.id}`);
-    expect(r.status === 404, `guest úkol veřejné mapy nevidí (${r.status})`);
+    expect(r.status === 404, `guest položku veřejné mapy nevidí (${r.status})`);
 
     console.log('== role manažer (vedení vidí SPOLEČNOU práci, ne cizí soukromou) ==');
     const inv = await api('POST', '/api/flowmap/invite', { token: A, body: { email: 'd@example.com', role: 'manager' } });
     expect(inv.status === 200 && !!inv.json.temp_password, 'admin pozve manažera (temp heslo bez SMTP)');
     const D = await login('d@example.com', inv.json.temp_password);
-    r = await api('GET', `/api/collections/tasks/records/${t1.id}`, { token: D });
+    r = await api('GET', `/api/collections/tasks/records/${tOs.id}`, { token: D });
     // ⚠️ ZMĚNA 6. 8. 2026 (Richard): „privátní je privátní a to je extrémně
     // důležité, ty nikdy nesmí být vidět. Týmové ano." Do té doby tu stálo
     // opačné tvrzení — vedení vidělo úkoly i na cizích SOUKROMÝCH mapách,
@@ -202,7 +196,7 @@ const login = async (email, pw = PW) => {
       { id: 'bx', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Soukromá B', title: 'Soukromá B', status: 'todo' } },
       { id: 'b1', type: 'goalNode', position: { x: 0, y: 300 }, data: { title: 'Krok B', status: 'todo' } },
     ], edges: [{ id: 'eb1', source: 'bx', target: 'b1' }] } })).json;
-    const st = (await api('POST', '/api/collections/tasks/records', { token: B, body: { title: 'Samostatný B', status: 'todo', map: mB.id, node_id: 'b1' } })).json;
+    const st = await suTask({ title: 'Samostatný B', status: 'todo', map: mB.id, node_id: 'b1', owner: await uid('b@example.com'), owner_email: 'b@example.com' });
     r = await api('GET', `/api/collections/tasks/records/${st.id}`, { token: D });
     const rc2 = await api('GET', `/api/collections/tasks/records/${st.id}`, { token: C });
     expect(r.status === 404 && rc2.status === 404,

@@ -26,6 +26,7 @@ const clickText = async (page, text, sel = 'button, a') => {
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     execSync(`docker run -d --name ${NAME} -p 20515:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    // SLOVNÍK 17. 8. 2026: položky sází superuser (uživatelský create = 403)
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
@@ -58,6 +59,7 @@ const clickText = async (page, text, sel = 'button, a') => {
     await sleep(1500);
 
     const today = new Date().toLocaleDateString('en-CA');
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     await page.evaluate(async (today) => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
@@ -74,7 +76,10 @@ const clickText = async (page, text, sel = 'button, a') => {
           edges: [{ id: 'e-n1', source: 'apex', target: 'n1' }],
         }),
       })).json();
-      const mk = (b) => fetch('/api/collections/tasks/records', { method: 'POST', headers: H, body: JSON.stringify({ map: m.id, node_id: 'n1', ...b }) });
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
+      const mk = (b) => fetch('/api/collections/tasks/records', { method: 'POST', headers: HS, body: JSON.stringify({ map: m.id, node_id: 'n1', owner: myId, owner_email: 'admin@e2e.cz', ...b }) });
       await mk({ title: 'LITE-DNES', status: 'todo', assignee_email: 'admin@e2e.cz', deadline: today });
       await mk({ title: 'LITE-PO-TERMINU', status: 'todo', assignee_email: 'admin@e2e.cz', deadline: '2026-07-01' });
       await mk({ title: 'LITE-ZADANY', status: 'todo', assignee_email: 'kolega@e2e.cz', deadline: today });
@@ -299,7 +304,10 @@ const clickText = async (page, text, sel = 'button, a') => {
       const map = maps.items[0];
       const day = (o) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + o); return d.toLocaleDateString('en-CA'); };
       // node_id: 'n1' = neutrální uzel založený na začátku sady v mapě PROJEKT-LITE
-      const mk = (b) => fetch('/api/collections/tasks/records', { method: 'POST', headers: H, body: JSON.stringify({ map: map.id, node_id: 'n1', assignee_email: 'admin@e2e.cz', status: 'todo', ...b }) });
+      const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
+      const mk = (b) => fetch('/api/collections/tasks/records', { method: 'POST', headers: HS, body: JSON.stringify({ map: map.id, node_id: 'n1', assignee_email: 'admin@e2e.cz', status: 'todo', owner: myId, owner_email: 'admin@e2e.cz', ...b }) });
       await mk({ title: 'LITE-DO-TYDNE', deadline: day(5) });
       await mk({ title: 'LITE-POZDEJI', deadline: day(20) });
       await mk({ title: 'LITE-BEZ-TERMINU' });

@@ -8,9 +8,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Inbox, Trash2, ExternalLink } from 'lucide-react';
-import TaskDialog from '@/components/tasks/TaskDialog';
-import { base44 } from '@/api/base44Client';
-import { useToast } from '@/components/ui/use-toast';
 import { useNodeEditState } from './useNodeEditState';
 import BasicsSection from './sections/BasicsSection';
 import AssignmentSection from './sections/AssignmentSection';
@@ -33,7 +30,6 @@ import ColorPicker from './sections/ColorPicker';
 // dialog nabídne založení úkolu k uzlu (vč. opakování) stejným formulářem jako tabulka úkolů.
 export default function NodeEditDialogCompact({ node, mapId, onSave, onClose, mapAccess, members = [], onShareAdd, onStash, onDelete, onOpenMap, map, emailOptions = [], onTasksChanged, onContactsChanged }) {
   const { t } = useTranslation('editor');
-  const { toast } = useToast();
   const s = useNodeEditState({ node, mapId, onSave, mapAccess });
 
   return (
@@ -93,27 +89,6 @@ export default function NodeEditDialogCompact({ node, mapId, onSave, onClose, ma
             {t('common:actions.save')}
           </Button>
         </DialogFooter>
-        {map && (
-          <TaskDialog
-            open={s.taskOpen}
-            task={null}
-            defaults={{ map_id: map.id, node_id: node?.id }}
-            maps={[map]}
-            emailOptions={emailOptions}
-            members={members}
-            onSave={async (data) => {
-              try {
-                await base44.entities.Task.create(data);
-                onTasksChanged?.();
-                toast({ title: t('nodeDialog.taskCreated'), description: data.recurrence ? t('nodeDialog.taskCreatedDesc') : undefined });
-              } catch (e) {
-                toast({ title: t('tasks:nodeTasksDialog.createFailed'), variant: 'destructive' });
-                throw e;
-              }
-            }}
-            onClose={() => s.setTaskOpen(false)}
-          />
-        )}
       </DialogContent>
     </Dialog>
   );

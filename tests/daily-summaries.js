@@ -75,6 +75,8 @@ const api = async (method, path, { token, body } = {}) => {
 
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert ${SU.email} ${SU.pw}`, { stdio: 'ignore' });
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: SU.email, password: SU.pw } })).json.token;
+    // SLOVNÍK 17. 8. 2026: položky sází superuser (uživatelský create = 403)
+    const uidOf = async (email) => ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent(`email='${email}'`)}`, { token: ST })).json.items || [])[0].id;
     // A = aktivní s prací; B = aktivní bez práce; C = má práci, ale NEpřihlášený
     // (filtr FLOWMAP_SUMMARY_ACTIVE_DAYS ho z ranní dávky vynechá)
     await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW } });
@@ -91,7 +93,7 @@ const api = async (method, path, { token, body } = {}) => {
     // úkol navíc musí viset na KONKRÉTNÍM uzlu (ne vrcholu) — neutrální uzel bez
     // garanta a termínu, aby nepřidal žádnou „práci" navíc do sumářů
     const mapC = (await api('POST', '/api/collections/goalmaps/records', { token: CT, body: { title: 'C projekt', nodes: [{ id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'C projekt', title: 'C projekt', status: 'todo' } }, { id: 'c1', type: 'goalNode', position: { x: 0, y: 120 }, data: { title: 'Provoz', status: 'todo' } }], edges: [{ id: 'e-c1', source: 'apex', target: 'c1' }] } })).json;
-    await api('POST', '/api/collections/tasks/records', { token: CT, body: { title: 'Úkol neaktivního C', status: 'todo', deadline: '2026-07-01', assignee_email: 'c@e2e.local', map: mapC.id, node_id: 'c1' } });
+    await api('POST', '/api/collections/tasks/records', { token: ST, body: { title: 'Úkol neaktivního C', status: 'todo', deadline: '2026-07-01', assignee_email: 'c@e2e.local', map: mapC.id, node_id: 'c1', owner: await uidOf('c@e2e.local'), owner_email: 'c@e2e.local' } });
 
     console.log('== e2e: provider none ==');
     const r0 = await api('POST', '/api/flowmap/run-daily-summaries', { token: ST });
@@ -111,8 +113,9 @@ const api = async (method, path, { token, body } = {}) => {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
     // digest počítá jako panel Můj den: jen PŘIŘAZENÉ úkoly (assignee_email)
     const mapA = (await api('POST', '/api/collections/goalmaps/records', { token: AT, body: { title: 'Administrativa', nodes: [{ id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Administrativa', title: 'Administrativa', status: 'todo' } }, { id: 'a1', type: 'goalNode', position: { x: 0, y: 120 }, data: { title: 'Agenda', status: 'todo' } }], edges: [{ id: 'e-a1', source: 'apex', target: 'a1' }] } })).json;
-    await api('POST', '/api/collections/tasks/records', { token: AT, body: { title: 'Zaplatit fakturu Novák', status: 'todo', deadline: '2026-07-01', assignee_email: 'a@e2e.local', map: mapA.id, node_id: 'a1' } });
-    await api('POST', '/api/collections/tasks/records', { token: AT, body: { title: 'Připravit podklady pro schůzku', status: 'in_progress', deadline: today, assignee_email: 'a@e2e.local', map: mapA.id, node_id: 'a1' } });
+    const uidA2 = await uidOf('a@e2e.local');
+    await api('POST', '/api/collections/tasks/records', { token: ST, body: { title: 'Zaplatit fakturu Novák', status: 'todo', deadline: '2026-07-01', assignee_email: 'a@e2e.local', map: mapA.id, node_id: 'a1', owner: uidA2, owner_email: 'a@e2e.local' } });
+    await api('POST', '/api/collections/tasks/records', { token: ST, body: { title: 'Připravit podklady pro schůzku', status: 'in_progress', deadline: today, assignee_email: 'a@e2e.local', map: mapA.id, node_id: 'a1', owner: uidA2, owner_email: 'a@e2e.local' } });
     await api('POST', '/api/collections/goalmaps/records', { token: AT, body: {
       title: 'Zdravý životní styl',
       nodes: [

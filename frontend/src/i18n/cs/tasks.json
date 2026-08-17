@@ -94,7 +94,6 @@
     "collapseSubtasks": "Sbalit podúkoly",
     "recurringTitle": "Opakující se úkol",
     "editTaskTitle": "Upravit úkol",
-    "addSubtask": "Přidat podúkol",
     "ideaBadge": "nápad",
     "convertToTask": "Převést na úkol",
     "deleteFromBuffer": "Smazat ze zásobníku",
@@ -130,12 +129,6 @@
     "nobody": "Nikdo",
     "customEmail": "Jiný e-mail…",
     "pickFromTeam": "Vybrat ze členů týmu",
-    "labelRecurrence": "Opakování",
-    "recurrenceNone": "Neopakovat",
-    "recurrenceDaily": "Denně",
-    "recurrenceWeekly": "Týdně",
-    "recurrenceMonthly": "Měsíčně",
-    "recurrenceHint": "Po označení „Hotovo\" se automaticky vytvoří další výskyt s posunutým termínem.",
     "labelMap": "Mapa",
     "noMap": "Bez mapy",
     "labelNode": "Uzel mapy",
@@ -154,21 +147,10 @@
   "nodeTasksDialog": {
     "title": "Úkoly: {{node}}",
     "nodeFallback": "uzel",
-    "createFailed": "Úkol se nepodařilo vytvořit",
-    "aiNoSuggestions": "AI nevrátila návrhy",
-    "tryAgain": "Zkuste to znovu.",
-    "aiSuggested": "Úkoly navrženy",
-    "aiSuggestedDesc": "AI přidala {{taskCount}} úkolů — upravte nebo smažte, co nesedí.",
-    "aiError": "Chyba AI",
     "confirmDeleteTask": "Opravdu chcete smazat úkol „{{title}}\"?",
     "empty": "K tomuto uzlu zatím nejsou žádné úkoly.",
-    "statusCycle": "{{status}} — klikněte pro změnu",
     "subtasksCount": "podúkoly {{done}}/{{total}}",
-    "quickAddPlaceholder": "Rychle přidat úkol…",
-    "addTask": "Přidat úkol",
-    "aiSuggestTitle": "Navrhnout úkoly pomocí AI",
-    "newTaskDetailed": "Nový úkol s detaily…",
-    "openInTasks": "Otevřít v přehledu úkolů"
+    "legacyNotice": "Tyhle položky už nejde vytvářet — úkol je cíl s řešitelem nebo termínem. Co tu vidíte, je pozůstatek: smažte ho."
   },
   "inviteDialog": {
     "title": "Pozvat do týmu",
@@ -301,5 +283,17 @@
     "addTitle": "Přidat komentář",
     "taskDiscussionHeading": "Diskuse z úkolů ({{count}})",
     "forTask": "k úkolu: {{title}}"
+  },
+  "newNode": {
+    "title": "Nový úkol",
+    "mapLabel": "Projekt",
+    "parentLabel": "Nadřazený cíl",
+    "parentApex": "Hlavní cíl (vrchol)",
+    "titleLabel": "Název",
+    "titlePlaceholder": "Co je potřeba udělat…",
+    "create": "Vytvořit",
+    "hint": "Vznikne nový cíl v mapě — řešitele a termín nastavíte hned v dalším kroku.",
+    "noMaps": "Nejdřív si založte projekt.",
+    "createFailed": "Uzel se nepodařilo vytvořit"
   }
 }

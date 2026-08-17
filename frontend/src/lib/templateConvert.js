@@ -142,50 +142,7 @@ export function mapToTemplateNodes(nodes, edges) {
   return { ai_nodes: aiNodes, nodeIdMap: shortId };
 }
 
-// úkoly mapy → task_seeds šablony (vč. podúkolů; termíny jako ofsety, opakování
-// a přiřazení 1:1). node se překládá přes nodeIdMap z mapToTemplateNodes.
-export function tasksToSeeds(tasks, nodeIdMap) {
-  const list = tasks || [];
-  const shortId = {};
-  list.forEach((t, i) => { shortId[t.id] = `t${i + 1}`; });
-  return list.map((t) => ({
-    id: shortId[t.id],
-    parent: t.parent_id && shortId[t.parent_id] ? shortId[t.parent_id] : null,
-    node: t.node_id && nodeIdMap[t.node_id] ? nodeIdMap[t.node_id] : '',
-    title: t.title || 'Úkol',
-    description: t.description || '',
-    deadline_offset_days: deadlineOffset(t.deadline),
-    recurrence: t.recurrence || '',
-    assignee_email: t.assignee_email || '',
-  }));
-}
 
-// task_seeds šablony → payloady pro Task.create (v pořadí: nejdřív hlavní úkoly,
-// pak podúkoly — volající po založení rodiče doplní parent_id z vráceného mapování).
-// Seed bez namapovaného uzlu se PŘESKOČÍ (podúkol uzel zdědí přes parent_id na
-// serveru): úkol patří na konkrétní cíl a server by ho stejně odmítl
-// (err.taskNeedsNode, 13. 8. 2026).
-export function seedsToTasks(seeds, idMap, startDate) {
-  const start = startDate || new Date();
-  const list = Array.isArray(seeds) ? seeds : [];
-  const ordered = list.filter((s) => !s.parent).concat(list.filter((s) => s.parent))
-    .filter((s) => s.parent || (s.node && idMap?.[s.node]));
-  return ordered.map((s) => ({
-    seedId: s.id,
-    parentSeedId: s.parent || null,
-    data: {
-      title: s.title || 'Úkol',
-      description: s.description || '',
-      status: 'todo',
-      deadline: s.deadline_offset_days !== null && s.deadline_offset_days !== undefined && s.deadline_offset_days !== ''
-        ? addDays(start, Number(s.deadline_offset_days))
-        : '',
-      recurrence: s.recurrence || '',
-      assignee_email: s.assignee_email || '',
-      node_id: (s.node && idMap?.[s.node]) || '',
-    },
-  }));
-}
 
 // má šablona procesní metadata? (řídí zobrazení data startu a náhledu přiřazení)
 export function isProcessTemplate(tpl) {

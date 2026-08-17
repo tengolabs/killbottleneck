@@ -1,6 +1,6 @@
 // MCP e2e: čerstvý kontejner (:20503) → uživatel + read_write API klíč přes REST →
 // spawn product/mcp/index.js (stdio) → ruční JSON-RPC dialog (initialize, tools/list,
-// create_map → get_map → add_nodes → update_node → add_task → list_tasks → delete_node)
+// create_map → get_map → add_nodes → update_node → delete_node; task nástroje NEEXISTUJÍ)
 // — celý řetěz MCP → v1 API → PocketBase naostro, bez SDK klienta v testu.
 // Předpoklad: v product/mcp proběhl `npm install`.
 const { execSync, spawn } = require('child_process');
@@ -75,8 +75,11 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const tools = await rpc('tools/list', {});
     const names = (tools.result.tools || []).map((t) => t.name).sort();
-    expect(names.length === 18 && names.includes('create_map') && names.includes('create_rule') && names.includes('get_org_structure'),
-      `tools/list → 18 nástrojů (${names.join(', ')})`);
+    expect(names.length === 15 && names.includes('create_map') && names.includes('create_rule') && names.includes('get_org_structure'),
+      `tools/list → 15 nástrojů (${names.join(', ')})`);
+    // Slovník 17. 8. 2026: úkol = uzel s řešitelem nebo termínem — task nástroje zanikly
+    expect(!names.includes('add_task') && !names.includes('list_tasks') && !names.includes('update_task'),
+      'task nástroje (add/list/update_task) NEEXISTUJÍ');
 
     console.log('== create_map → get_map ==');
     let r = await callTool('create_map', {
@@ -111,15 +114,10 @@ let mcp = null;
     r = await callTool('delete_node', { map_id: mapId, node_id: fazeB });
     expect(!r.isError && /Deleted 2 node/.test(r.text), 'delete_node smaže uzel + podstrom');
 
-    console.log('== tasks ==');
-    // node_id je od 13. 8. 2026 povinné — úkol vždy patří na konkrétní uzel
-    r = await callTool('add_task', { title: 'Poslat pozvánky', map_id: mapId, node_id: krokA1, deadline: '2026-08-05' });
-    expect(!r.isError && /Task created/.test(r.text), 'add_task');
-    const taskId = (r.text.match(/\(id: ([a-z0-9]{15})/i) || [])[1];
-    r = await callTool('list_tasks', { map_id: mapId, status: 'todo' });
-    expect(!r.isError && /Poslat pozvánky/.test(r.text), 'list_tasks úkol vidí');
-    r = await callTool('update_task', { task_id: taskId, status: 'done' });
-    expect(!r.isError && /status done/.test(r.text), 'update_task → done');
+    console.log('== tasks: nástroje odstraněny ==');
+    // volání odstraněného nástroje = slušná chyba, ne pád serveru
+    r = await callTool('add_task', { title: 'Poslat pozvánky', map_id: mapId, node_id: krokA1 });
+    expect(r.isError, `volání add_task = chyba, server běží dál („${(r.text || '').slice(0, 40)}…")`);
 
     console.log('== automatizační pravidla přes MCP ==');
     // agent si pravidlo ZALOŽÍ sám (opěra „MCP first" — tohle nemá Asana ani Monday)
@@ -130,6 +128,28 @@ let mcp = null;
     });
     expect(!r.isError && /Rule created/.test(r.text), 'create_rule');
     const ruleId = (r.text.match(/\(id: ([a-z0-9]{15})/i) || [])[1];
+    // v0.35: opakování na cílech — agent zakládá opakovací pravidlo přes advance
+    r = await callTool('create_rule', {
+      map_id: mapId, name: 'Opakování (týdně): Krok A1', node_id: krokA1,
+      trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'set_status', status: 'todo' }, { type: 'set_deadline', advance: 'weekly' }],
+    });
+    expect(!r.isError && /Rule created/.test(r.text), 'create_rule s set_deadline advance: weekly');
+    r = await callTool('create_rule', {
+      map_id: mapId, name: 'Vadné opakování', node_id: krokA1,
+      trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'set_deadline', advance: 'yearly' }],
+    });
+    expect(r.isError && /advance/.test(r.text), `advance mimo výčet = srozumitelná chyba („${(r.text || '').slice(0, 60)}…")`);
+    // úklid: opakovací pravidlo smazat hned — pozdější část sady počítá pravidla mapy
+    r = await callTool('list_rules', { map_id: mapId });
+    const opakId = ((r.text || '').match(/Opakování \(týdně\)[^(]*\(id: ([a-z0-9]{15})/i) || [])[1];
+    expect(!!opakId, `opakovací pravidlo má id v list_rules (${opakId || 'nenalezeno'})`);
+    if (opakId) {
+      r = await callTool('delete_rule', { map_id: mapId, rule_id: opakId });
+      expect(!r.isError, 'delete_rule opakovací pravidlo uklidil');
+    }
+
     r = await callTool('list_rules', { map_id: mapId });
     expect(!r.isError && /Nový uzel → ohlásit/.test(r.text) && /enabled/.test(r.text), 'list_rules pravidlo vidí');
     r = await callTool('add_nodes', { map_id: mapId, items: [{ title: 'Spouštěcí uzel' }] });

@@ -87,8 +87,8 @@ const EDGES = [
     // a nikdo@jinde.cz (neexistuje)
     let r = await api('POST', '/api/flowmap/map-import', { token: B, body: full });
     expect(r.status === 200, `import prošel (${r.status})`);
-    expect(r.json.nodes_imported === 3 && r.json.tasks_imported === 1,
-      `naimportováno 3 uzly a 1 úkol (${r.json.nodes_imported}/${r.json.tasks_imported})`);
+    expect(r.json.nodes_imported === 3 && r.json.tasks_imported === 0 && r.json.tasks_skipped === 1,
+      `3 uzly; položky-úkoly se NEIMPORTUJÍ (slovník 17. 8.) a poctivě se počítají (${r.json.nodes_imported}/${r.json.tasks_imported}/${r.json.tasks_skipped})`);
     expect(r.json.assignments_dropped === 1,
       `neznámý e-mail zahozen a započítán (${r.json.assignments_dropped})`);
 
@@ -108,9 +108,7 @@ const EDGES = [
       'známý garant zachován');
 
     const tasks = (await api('GET', '/api/collections/tasks/records', { token: B })).json;
-    const nodeIds = imported.nodes.map((n) => n.id);
-    expect(tasks.totalItems === 1 && nodeIds.includes(tasks.items[0].node_id),
-      'úkol visí na přemapovaném uzlu');
+    expect(tasks.totalItems === 0, `žádná položka-úkol z importu nevznikla (${tasks.totalItems})`);
 
     // import nesmí vyrobit ANI JEDNU notifikaci (jinak by podvržený soubor spamoval)
     const nA = (await api('GET', '/api/collections/notifications/records?perPage=1', { token: A })).json;

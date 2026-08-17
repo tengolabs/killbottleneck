@@ -10,7 +10,7 @@ import TimeLogPanel from '@/components/time/TimeLogPanel';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskCalendar from '@/components/tasks/TaskCalendar';
 import TaskDialog from '@/components/tasks/TaskDialog';
-import CommentThread from '@/components/shared/CommentThread';
+import NewNodeDialog from '@/components/tasks/NewNodeDialog';
 import BufferPanel, { useBufferNodes, BufferEditDialog } from '@/components/goal-map/BufferPanel';
 import NodeEditDialog from '@/components/shared/NodeEditDialog';
 import NewMapActions from '@/components/shared/NewMapActions';
@@ -75,8 +75,8 @@ export default function Tasks() {
   const [deadlineFilter, setDeadlineFilter] = useState(ALL);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [newNodeOpen, setNewNodeOpen] = useState(false);
   const [editTask, setEditTask] = useState(null);
-  const [dialogDefaults, setDialogDefaults] = useState(null);
   const buffer = useBufferNodes(user);
   const [editBufferItem, setEditBufferItem] = useState(null);
   // nápad čekající na převod na úkol (dialog otevřen, smaže se po založení)
@@ -206,7 +206,6 @@ export default function Tasks() {
     const found = items.find((i) => i.id === taskId);
     if (found) {
       setEditTask(found);
-      setDialogDefaults(null);
       setDialogOpen(true);
       searchParams.delete('task');
       setSearchParams(searchParams, { replace: true });
@@ -694,31 +693,39 @@ export default function Tasks() {
     }
   };
 
-  const openCreate = () => {
-    setEditTask(null);
-    setDialogDefaults(mapFilter !== ALL && mapFilter !== NONE ? { map_id: mapFilter, node_id: nodeFilter } : null);
-    setDialogOpen(true);
+  // „Nový úkol" zakládá UZEL (rozhodnutí Richarda 17. 8. 2026) — pod hlavní
+  // cíl, nebo pod vybraný uzel; řešitel/termín hned v dalším kroku (dialog uzlu).
+  const openCreate = () => setNewNodeOpen(true);
+
+  const handleCreateNode = async (mapId, parentId, title) => {
+    try {
+      const newId = await addNodeToMap(mapId, parentId, title);
+      setEditNodeItem({
+        id: `node-item-${mapId}-${newId}`,
+        isNode: true,
+        title,
+        status: 'todo',
+        deadline: '',
+        assignee_email: '',
+        map_id: mapId,
+        node_id: newId,
+      });
+    } catch (e) {
+      toast({ title: t('newNode.createFailed'), description: e?.message, variant: 'destructive' });
+      throw e;
+    }
   };
 
+  // editace zbylé položky (detektor chyby) — TaskDialog už jen upravuje, nic nezakládá
   const openEdit = (task) => {
     setEditTask(task);
-    setDialogDefaults(null);
-    setDialogOpen(true);
-  };
-
-  const openAddSub = (parent) => {
-    setEditTask(null);
-    setDialogDefaults({ parent_id: parent.id });
     setDialogOpen(true);
   };
 
   const handleSave = async (data, taskId) => {
     try {
-      if (taskId) {
-        await tasksApi.update(taskId, data);
-      } else {
-        await tasksApi.add(data);
-      }
+      if (!taskId) throw new Error(t('common:misc.saveFailed'));
+      await tasksApi.update(taskId, data);
     } catch (e) {
       toast({ title: t('common:misc.saveFailed'), description: e?.message || t('common:misc.tryAgainPlease'), variant: 'destructive' });
       throw e;
@@ -1009,7 +1016,6 @@ export default function Tasks() {
             onEdit={openEdit}
             onCycle={handleCycle}
             onDelete={handleDelete}
-            onAddSub={openAddSub}
             onAssign={(task, email) => tasksApi.update(task.id, { assignee_email: email }).catch(() => toast({ title: t('tasksPage.assignFailed'), variant: 'destructive' }))}
             onOpenNode={openNodeInMap}
             onOpenTaskMap={(task) => navigate(`/map/${task.map_id}${task.node_id ? `?node=${task.node_id}` : ''}`)}
@@ -1033,19 +1039,27 @@ export default function Tasks() {
         )}
       </div>
 
+      <NewNodeDialog
+        open={newNodeOpen}
+        maps={activeMaps}
+        defaultMapId={mapFilter !== ALL && mapFilter !== NONE ? mapFilter : ''}
+        defaultParentId={nodeFilter || ''}
+        onCreate={handleCreateNode}
+        onClose={() => setNewNodeOpen(false)}
+      />
+      {/* editor ZBYTKOVÝCH položek (detektor): bez komentářů — nové by po
+          smazání položky osiřely (migrace 1787240000 vlákna mazala jako
+          „bez kontextu") */}
       <TaskDialog
         open={dialogOpen}
         task={editTask}
-        defaults={dialogDefaults}
         maps={activeMaps}
         emailOptions={emailOptions}
         members={members}
         onSave={handleSave}
         onStash={handleStashTask}
         onClose={() => setDialogOpen(false)}
-      >
-        {editTask && <CommentThread entity="TaskComment" filter={{ task_id: editTask.id }} />}
-      </TaskDialog>
+      />
       <BufferEditDialog item={editBufferItem} onSave={buffer.update} onClose={() => setEditBufferItem(null)} />
 
       {/* Nápad → uzel pod hlavním cílem vybraného projektu (model: žádné volné úkoly) */}

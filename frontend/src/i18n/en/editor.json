@@ -172,7 +172,7 @@
     },
     "customColor": "Custom color",
     "clearColor": "Clear color",
-    "ownerLabel": "Responsible person",
+    "ownerLabel": "Assignee",
     "assignedBy": "Assigned by: {{email}}",
     "dlRequestButton": "Propose a different due date",
     "dlRequestSend": "Send request",
@@ -194,15 +194,11 @@
     "descriptionPlaceholder": "Describe the goal in more detail...",
     "waitSwitch": "Wait for children",
     "waitSwitchDesc": "Until every goal under this node is done, the node waits (⏳) — e.g. for a material price.",
-    "taskBox": "Task for this node",
-    "taskBoxDesc": "A task with a deadline and recurrence (daily/weekly/monthly) — after completion it re-creates itself.",
-    "taskCreated": "Task created",
-    "taskCreatedDesc": "The next occurrence will be created after completion.",
     "stashTitle": "Move the node from the map to your personal stash",
     "deleteTitle": "Delete the node from the map",
     "openMapTitle": "Zoom to the node in the map",
     "executorLabel": "Who performs this",
-    "executorHint": "The accountable person stays human — even for an automation they are the owner who gets notified.",
+    "executorHint": "The assignee stays human — even for an automation it is the assignee who gets notified.",
     "executor": {
       "human": "Person",
       "automation": "Automation"
@@ -280,8 +276,6 @@
     "numberingLabel": "Number projects from this template",
     "numberingDesc": "the next number in the series is appended to the name",
     "numberingHint": "Projects name themselves: \"{{name}} {{year}}-1\", \"{{name}} {{year}}-2\"… A new year starts a new series from 1. A custom name given at creation gets a number too.",
-    "withTasksLabel": "Save including tasks ({{count}})",
-    "withTasksDesc": "the map's tasks incl. subtasks, recurrence and assignees; deadlines are converted to \"days from start\". Unchecked = clean template (goal structure only).",
     "autoLabel": "Create automatically",
     "autoOff": "No",
     "autoWeekly": "Every week",
@@ -425,7 +419,8 @@
     "orgDeputy": "deputy",
     "orgAddSub": "Add subordinate",
     "orgBadge": "Organization",
-    "orgNewPosition": "New position"
+    "orgNewPosition": "New position",
+    "recurrenceBadgeHint": "This goal repeats — when completed it returns with the deadline advanced"
   },
   "aiChat": {
     "undoTitle": "Undo the last AI change",
@@ -519,5 +514,20 @@
     "from_trello": "Recognized a Trello export —",
     "foreignTooBig": "The file has {{count}} items — import handles at most {{max}}. Split the project into smaller parts.",
     "fileTooLarge": "The file is larger than 5 MB — import cannot handle that."
+  },
+  "recurrence": {
+    "label": "Recurrence",
+    "none": "Does not repeat",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "hint": "When completed, the goal returns to To do by itself and the deadline advances in the rhythm of the original one — every Monday stays a Monday. Under the hood it is an ordinary rule; you will see it in the map's Rules.",
+    "customHint": "This goal's recurrence is driven by a manually edited rule — manage it in the map's Rules; the switch will not touch it.",
+    "ruleName": {
+      "daily": "Recurrence (daily): {{title}}",
+      "weekly": "Recurrence (weekly): {{title}}",
+      "monthly": "Recurrence (monthly): {{title}}"
+    },
+    "saveFailed": "Couldn't save the recurrence"
   }
 }

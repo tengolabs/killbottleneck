@@ -36,6 +36,7 @@ const clickButtonExact = async (page, text) => {
     await sleep(1500);
     // mapa s uzlem přiřazeným kolegovi + delegované úkoly (jeden na TOM uzlu =
     // fold, jeden volně v projektu = vlastní položka) + můj vlastní uzel
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     const mapId = await page.evaluate(async () => {
       const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
       const H = { 'Content-Type': 'application/json', Authorization: auth.token };
@@ -54,8 +55,11 @@ const clickButtonExact = async (page, text) => {
           edges: [{ id: 'e1', source: 'apex', target: 'n1', type: 'deletable' }, { id: 'e2', source: 'apex', target: 'n2', type: 'deletable' }, { id: 'e3', source: 'apex', target: 'krok', type: 'deletable' }],
         }),
       })).json();
-      const mk = (body) => fetch('/api/collections/tasks/records', {
-        method: 'POST', headers: H, body: JSON.stringify({ status: 'todo', map: m.id, ...body }),
+            const su = await (await fetch('/api/collections/_superusers/auth-with-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'su@e2e.local', password: 'supersu12345' }) })).json();
+      const HS = { 'Content-Type': 'application/json', Authorization: su.token };
+      const myId = (auth.record || auth.model || {}).id;
+const mk = (body) => fetch('/api/collections/tasks/records', {
+        method: 'POST', headers: HS, body: JSON.stringify({ status: 'todo', map: m.id, owner: myId, owner_email: (auth.record || auth.model || {}).email, ...body }),
       });
       await mk({ title: 'FOLD-DELEG-UKOL', assignee_email: 'kolega@e2e.cz', node_id: 'n1', deadline: '2026-07-02' });
       await mk({ title: 'DELEG-UKOL-XYZ', assignee_email: 'jiny@e2e.cz', node_id: 'krok', deadline: '2026-07-28' });
