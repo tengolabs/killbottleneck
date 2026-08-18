@@ -7,7 +7,7 @@
     "login": "Log in",
     "archivedProject": "This project is archived",
     "restore": "Restore",
-    "templatePreview": "Template preview — not saved",
+    "templatePreview": "Template preview — nothing is saved",
     "useTemplate": "Use template",
     "publicMap": "Publicly shared map — view only, changes are not saved",
     "mapChanged": "Someone else has changed this map in the meantime."
@@ -111,6 +111,7 @@
     "mapNotSavedDesc": "Save the map first (add some content).",
     "mapSaved": "Map saved",
     "mapSavedDesc": "The template has been saved to your maps.",
+    "mapFromTemplateDesc": "Created from the clean template — anything you tried in the preview is not carried over.",
     "error": "Error",
     "saveMapFailed": "The map could not be saved.",
     "archived": "Project archived",

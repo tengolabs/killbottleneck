@@ -147,6 +147,10 @@
     "templateBadge_few": "vč. {{count}} pravidel automatizace",
     "templateBadge_many": "vč. {{count}} pravidel automatizace",
     "templateBadge_other": "vč. {{count}} pravidel automatizace",
+    "templateRulesFailed_one": "Projekt vznikl, ale {{count}} pravidlo automatizace se nepodařilo založit — doplňte ho v Pravidlech mapy.",
+    "templateRulesFailed_few": "Projekt vznikl, ale {{count}} pravidla automatizace se nepodařilo založit — doplňte je v Pravidlech mapy.",
+    "templateRulesFailed_many": "Projekt vznikl, ale {{count}} pravidla automatizace se nepodařilo založit — doplňte je v Pravidlech mapy.",
+    "templateRulesFailed_other": "Projekt vznikl, ale {{count}} pravidel automatizace se nepodařilo založit — doplňte je v Pravidlech mapy.",
     "importSummary": {
       "imported_one": "Naimportováno {{count}} pravidlo automatizace",
       "imported_few": "Naimportována {{count}} pravidla automatizace",

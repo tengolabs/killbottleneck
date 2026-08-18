@@ -147,6 +147,10 @@
     "templateBadge_few": "includes {{count}} automation rules",
     "templateBadge_many": "includes {{count}} automation rules",
     "templateBadge_other": "includes {{count}} automation rules",
+    "templateRulesFailed_one": "The project was created, but {{count}} automation rule could not be set up — add it in the map's Rules.",
+    "templateRulesFailed_few": "The project was created, but {{count}} automation rules could not be set up — add them in the map's Rules.",
+    "templateRulesFailed_many": "The project was created, but {{count}} automation rules could not be set up — add them in the map's Rules.",
+    "templateRulesFailed_other": "The project was created, but {{count}} automation rules could not be set up — add them in the map's Rules.",
     "importSummary": {
       "imported_one": "{{count}} automation rule imported",
       "imported_few": "{{count}} automation rules imported",

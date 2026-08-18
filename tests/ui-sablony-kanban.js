@@ -184,6 +184,185 @@ const api = async (method, path, { token, body } = {}) => {
       .map((n) => Math.round(n.position.y)))];
     ok(sloupceY.length === 1, `sloupce D1–D8 jsou v jedné řadě (${sloupceY.length} úrovní y)`);
 
+    console.log('== náhled šablony je DEMO: co v něm nakliknu, se do projektu NEPŘENESE ==');
+    // Richardova cesta 17. 8.: v náhledu si přepnul kartu na Hotovo, aby vyzkoušel
+    // kanban. Mapa ale ještě neexistovala, takže se karta narodila hotová a žádné
+    // pravidlo ji nikdy neposunulo (0 běhů). Projekt proto vzniká VŽDY z čisté
+    // šablony — jen název si uživatel ponechá.
+    await page.goto(`${BASE}/?view=templates`, { waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => (b.textContent || '').trim() === 'Kanban'), { timeout: 45000 });
+    await page.evaluate(() => {
+      const chip = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === 'Kanban');
+      chip && chip.click();
+    });
+    await sleep(600);
+    await page.evaluate(() => {
+      const card = [...document.querySelectorAll('div')].find((d) => d.className.includes('rounded-xl') && (d.textContent || '').includes('8D report — kanban'));
+      const b = card && [...card.querySelectorAll('button')].find((x) => /Otevřít šablonu/.test(x.textContent || ''));
+      b && b.click();
+    });
+    await page.waitForSelector('.react-flow__node', { timeout: 45000 });
+    await sleep(1500);
+    ok(/neukládá se/.test(await page.evaluate(() => document.body.innerText)),
+      'lišta náhledu říká, že se NEUKLÁDÁ (ne „neuloženo")');
+    // v náhledu přepnout kartu D1 na Hotovo — přesně to, co vadu vyrábělo
+    const cyklusNahled = async () => page.evaluate(() => {
+      const uzel = [...document.querySelectorAll('.react-flow__node')].find((n) => (n.textContent || '').includes('D1 – Sestavení týmu'));
+      const b = uzel && uzel.querySelector('button');
+      if (b) b.click();
+      return !!b;
+    });
+    ok(await cyklusNahled(), 'v náhledu jde klikat (demo se nezamyká — záměr)');
+    await sleep(700); await cyklusNahled(); await sleep(900);
+    // POZITIVNÍ tvrzení: karta v náhledu OPRAVDU stojí na Hotovo. Bez něj by
+    // „projekt vznikl čistý" dokazovala jen mutace na starém obrazu — kdyby se
+    // někdy rozbilo samotné přepínání stavu, sada by zezelenala z nesprávného
+    // důvodu (nic se nepřeplo → nic se nepřeneslo).
+    const stavD1Nahled = await page.evaluate(() => {
+      const uzel = [...document.querySelectorAll('.react-flow__node')].find((n) => (n.textContent || '').includes('D1 – Sestavení týmu'));
+      return uzel ? (uzel.querySelector('button')?.textContent || '').trim() : '(uzel nenalezen)';
+    });
+    ok(/Hotovo/.test(stavD1Nahled), `v náhledu je karta D1 přepnutá na Hotovo (${stavD1Nahled})`);
+    // ...a přejmenovat, protože NÁZEV je jediné, co si uživatel ponechá
+    await page.evaluate(() => {
+      const i = [...document.querySelectorAll('input')].find((x) => (x.value || '').includes('8D report'));
+      if (i) {
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(i, 'Reklamace 12');
+        i.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    await sleep(600);
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /Použít šablonu/.test(x.textContent || ''));
+      b && b.click();
+    });
+    await page.waitForFunction(() => ![...document.querySelectorAll('button')].some((b) => /Použít šablonu/.test(b.textContent || '')), { timeout: 45000 });
+    await sleep(3000);
+    const vsechny = (await api('GET', '/api/collections/goalmaps/records?perPage=50&sort=-created', { token: SEF })).json.items || [];
+    // hledat PODLE NÁZVU, ne vsechny[0]: při selhání zakládání by „nejnovější
+    // mapa" byla cizí záznam a test by spadl na TypeError místo čitelného ❌
+    const novy = vsechny.find((m) => m.title === 'Reklamace 12');
+    ok(!!novy, `název z náhledu si uživatel ponechal — projekt „Reklamace 12" existuje (${novy ? 'ano' : 'nejnovější je ' + ((vsechny[0] || {}).title || '—')})`);
+    if (!novy) throw new Error('projekt z náhledu nevznikl — další tvrzení nemají co měřit');
+    const hotoveVNovem = (novy.nodes || []).filter((n) => (n.data || {}).status === 'done');
+    ok(hotoveVNovem.length === 0,
+      `projekt vznikl ČISTÝ — žádná karta se nenarodila hotová (${hotoveVNovem.map((n) => n.data.title).join(', ') || 'žádná'})`);
+    ok((novy.nodes || []).length === (zGalerie.nodes || []).length,
+      `stejná struktura jako vzorová šablona (${(novy.nodes || []).length} vs ${(zGalerie.nodes || []).length} uzlů)`);
+    const rulesNovy = (await api('GET', `/api/kb/rules?map=${novy.id}`, { token: SEF })).json.rules || [];
+    ok(rulesNovy.length === 7, `a pravidla se založila (${rulesNovy.length})`);
+    // A teď to hlavní: v PROJEKTU už kanban jede. ⚠️ Karta se musí přidat POD
+    // sloupec — pravidlo má podmínku `parent = D1`, takže přepnutí samotného
+    // sloupce nic nespustí (na tohle jsem si sám naběhl: falešně rudý test).
+    const d1Novy = (novy.nodes || []).find((n) => /D1 – Sestavení týmu/.test((n.data || {}).title || ''));
+    const sKartou = {
+      nodes: [...novy.nodes, { id: 'karta-e2e', type: 'goalNode', position: { x: d1Novy.position.x, y: d1Novy.position.y + 200 },
+        data: { title: 'Reklamace v projektu', status: 'todo' } }],
+      edges: [...novy.edges, { id: 'e-karta-e2e', source: d1Novy.id, target: 'karta-e2e' }],
+    };
+    await api('PATCH', `/api/collections/goalmaps/records/${novy.id}`, { token: SEF, body: sKartou });
+    await sleep(800);
+    const cerstva = (await api('GET', `/api/collections/goalmaps/records/${novy.id}`, { token: SEF })).json;
+    await api('PATCH', `/api/collections/goalmaps/records/${novy.id}`, { token: SEF, body: {
+      nodes: cerstva.nodes.map((n) => (n.id === 'karta-e2e' ? { ...n, data: { ...n.data, status: 'done' } } : n)),
+      edges: cerstva.edges, base_updated: cerstva.updated,
+    } });
+    await sleep(2000);
+    const poPosunu = (await api('GET', `/api/collections/goalmaps/records/${novy.id}`, { token: SEF })).json;
+    const rodicKarty = (poPosunu.edges || []).find((e) => e.target === 'karta-e2e');
+    const d2Novy = (poPosunu.nodes || []).find((n) => /D2 – Popis problému/.test((n.data || {}).title || ''));
+    ok(rodicKarty && d2Novy && rodicKarty.source === d2Novy.id,
+      'v projektu už kanban jede — karta pod D1 po Hotovo odjela do D2');
+
+    console.log('== projekt z náhledu se NASDÍLÍ lidem přiřazeným v šabloně (parita s dialogem) ==');
+    // Richard 17. 8.: obě cesty šablona→projekt mají sdílet stejně. Cesta z náhledu
+    // dřív shared_with neposílala vůbec — přiřazený kolega se k projektu nedostal
+    // a nepřišla mu notifikace. Vlastní šablona s přiřazenou osobou je na to
+    // jediná poctivá zkouška: systémové kanbanové šablony osoby NEMAJÍ.
+    await api('POST', '/api/collections/users/records', { body: { email: 'kolega@example.com', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/templates/records', { token: SEF, body: {
+      title: 'Nábor s kolegou', node_type: 'mise', visibility: 'personal',
+      ai_nodes: [
+        { id: 'k1', title: 'Nábor', parentId: null },
+        { id: 'k2', title: 'Pohovory', parentId: 'k1', owner: 'kolega@example.com' },
+      ],
+    } });
+    await page.goto(`${BASE}/?view=templates`, { waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => document.body.innerText.includes('Nábor s kolegou'), { timeout: 45000 });
+    await page.evaluate(() => {
+      const card = [...document.querySelectorAll('div')].find((d) => d.className.includes('rounded-xl') && (d.textContent || '').includes('Nábor s kolegou'));
+      const b = card && [...card.querySelectorAll('button')].find((x) => /Otevřít šablonu/.test(x.textContent || ''));
+      b && b.click();
+    });
+    await page.waitForSelector('.react-flow__node', { timeout: 45000 });
+    await sleep(1500);
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /Použít šablonu/.test(x.textContent || ''));
+      b && b.click();
+    });
+    await page.waitForFunction(() => ![...document.querySelectorAll('button')].some((b) => /Použít šablonu/.test(b.textContent || '')), { timeout: 45000 });
+    await sleep(2500);
+    const poNaboru = (await api('GET', '/api/collections/goalmaps/records?perPage=50&sort=-created', { token: SEF })).json.items || [];
+    const nabor = poNaboru.find((m) => m.title === 'Nábor s kolegou');
+    ok(!!nabor, `projekt z vlastní šablony vznikl (${nabor ? 'ano' : 'ne'})`);
+    ok(nabor && (nabor.shared_with_edit || []).includes('kolega@example.com'),
+      `přiřazený kolega má na projekt edit (${JSON.stringify((nabor || {}).shared_with_edit || [])})`);
+    ok(nabor && (nabor.shared_with || []).includes('kolega@example.com'),
+      `a je i ve sdílení (${JSON.stringify((nabor || {}).shared_with || [])})`);
+
+    console.log('== nezaložená pravidla se PŘIZNAJÍ (projekt bez pravidel = mrtvý kanban) ==');
+    // Šablona se dvěma pravidly, z toho jedno míří na neexistující uzel → server
+    // ho odmítne. Projekt vznikne (mapa už existuje, to je záměr), ale hláška to
+    // NESMÍ zamlčet. ⚠️ Text žije v líném ns `rules` a UVNITŘ objektu `rules`
+    // (klíč je tedy `rules:rules.templateRulesFailed`) — obojí jsem si při psaní
+    // spletl a v toastu se ukázal holý klíč. Proto se to tady čte z obrazovky.
+    await api('POST', '/api/collections/templates/records', { token: SEF, body: {
+      title: 'Vadná pravidla', node_type: 'mise', visibility: 'personal',
+      ai_nodes: [
+        { id: 'a1', title: 'Kořen', parentId: null },
+        { id: 'a2', title: 'Krok 1', parentId: 'a1' },
+        { id: 'a3', title: 'Krok 2', parentId: 'a1' },
+      ],
+      rules: [
+        { id: 'r1', name: 'Platné: Krok 1 → Krok 2', trigger: { type: 'node_status_changed', status: 'done' },
+          conditions: [{ field: 'parent', op: 'eq', value: 'a1' }], actions: [{ type: 'move_node', to: 'a3' }] },
+        { id: 'r2', name: 'Vadné: cíl neexistuje', trigger: { type: 'node_status_changed', status: 'done' },
+          conditions: [], actions: [{ type: 'move_node', to: 'uzel-ktery-neexistuje' }] },
+      ],
+    } });
+    await page.goto(`${BASE}/?view=templates`, { waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => document.body.innerText.includes('Vadná pravidla'), { timeout: 45000 });
+    await page.evaluate(() => {
+      const card = [...document.querySelectorAll('div')].find((d) => d.className.includes('rounded-xl') && (d.textContent || '').includes('Vadná pravidla'));
+      const b = card && [...card.querySelectorAll('button')].find((x) => /Otevřít šablonu/.test(x.textContent || ''));
+      b && b.click();
+    });
+    await page.waitForSelector('.react-flow__node', { timeout: 45000 });
+    await sleep(1500);
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /Použít šablonu/.test(x.textContent || ''));
+      b && b.click();
+    });
+    await page.waitForFunction(() => ![...document.querySelectorAll('button')].some((b) => /Použít šablonu/.test(b.textContent || '')), { timeout: 45000 });
+    await sleep(2500);
+    // Odmítnuté pravidlo je ZÁMĚR téhle scény, takže server vrátí 400 a prohlížeč
+    // si ho zapíše do konzole. Odebrat je z `errs` ADRESNĚ (jen 400) a rovnou
+    // ověřit, že tam opravdu byly — paušální umlčení konzole by zakrylo i cizí
+    // chyby a ze závěrečného tvrzení by udělalo vždy-zelené.
+    const ctyristovky = errs.filter((e) => /400/.test(e));
+    ok(ctyristovky.length > 0, `server vadné pravidlo ODMÍTL (${ctyristovky.length}× 400, čekáno)`);
+    for (const e of ctyristovky) errs.splice(errs.indexOf(e), 1);
+    const toastVadne = await page.evaluate(() => document.body.innerText.replace(/\n/g, ' | '));
+    ok(/nepodařilo založit/.test(toastVadne),
+      `hláška přiznala nezaložené pravidlo (${(toastVadne.match(/Projekt vznikl[^|]*/) || ['— nic takového v textu'])[0].trim().slice(0, 90)})`);
+    ok(!/templateRulesFailed/.test(toastVadne), 'a je to PŘELOŽENÝ text, ne holý klíč');
+    const mapyVadne = (await api('GET', '/api/collections/goalmaps/records?perPage=50&sort=-created', { token: SEF })).json.items || [];
+    const vadnyProjekt = mapyVadne.find((m) => m.title === 'Vadná pravidla');
+    const pravidlaVadne = vadnyProjekt ? ((await api('GET', `/api/kb/rules?map=${vadnyProjekt.id}`, { token: SEF })).json.rules || []) : [];
+    ok(!!vadnyProjekt && pravidlaVadne.length === 1,
+      `projekt přesto vznikl a platné pravidlo se založilo (${pravidlaVadne.length} ze 2)`);
+
     console.log('== export/import PROKLIKEM: soubor z REÁLNÉ buildMapExport → dialog Importovat → souhrn s počty ==');
     // export skládá skutečná FE funkce (jako tlačítko v editoru), soubor se
     // nahraje přes dialog; navíc 1 vadné pravidlo → musí se ukázat i jantarová

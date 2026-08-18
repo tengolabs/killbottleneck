@@ -61,7 +61,8 @@ import { buildMapExport, downloadJson, exportFilename } from '@/lib/mapPortable'
 import { useMapDirection } from '@/lib/useMapDirection';
 import GoalMapContext from '@/components/goal-map/GoalMapContext';
 import { useToast } from '@/components/ui/use-toast';
-import { useLazyNs } from '@/i18n/lazyNs';
+import i18next from 'i18next';
+import { useLazyNs, ensureNs } from '@/i18n/lazyNs';
 import { ToastAction } from '@/components/ui/toast';
 import { captureAndSave } from '@/lib/mapExport';
 import { getPublicMap } from '@/functions/getPublicMap';
@@ -73,7 +74,7 @@ import NodeTasksDialog from '@/components/tasks/NodeTasksDialog';
 import SaveTemplateDialog from '@/components/shared/SaveTemplateDialog';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { ALIGN_STYLES, ALIGN_OPTS, KLIC_ZAMEK, zamcenyStyl, platnyStyl, stylNoveMapy } from '@/lib/alignStyles';
-import { createRulesFromTemplate } from '@/lib/createProject';
+import { createRulesFromTemplate, ownersFromNodes } from '@/lib/createProject';
 import { computeWaitingSet, findBlockingForOwner } from '@/lib/waitStatus';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { KLIC_CITELNOST, nactiStupen, dalsiStupen } from '@/lib/citelnost';
@@ -489,6 +490,8 @@ function EditorContent({ mapId, personalMap = false }) {
   const canonicalPosRef = useRef(new Map()); // svislé (kanonické) pozice — vodorovné view je NEpřepisuje
   const alignMapKeyRef = useRef(null); // klíč stylu TÉTO mapy — čte i AI přelayout, který nemá závislosti
   const templateSeriesRef = useRef(null); // id číslované šablony z náhledu (state maže replaceState)
+  // VZOROVÁ (needitovaná) podoba šablony — projekt vzniká z ní, ne z rozklikaného náhledu
+  const sablonaCistaRef = useRef(null);
   const templateSeedsRef = useRef(null); // {idMap, rules} z náhledu šablony — pravidla se založí až s mapou
   const saveTimer = useRef(null);
   const historyRef = useRef([]);
@@ -691,6 +694,16 @@ function EditorContent({ mapId, personalMap = false }) {
 
   // Load map
   useEffect(() => {
+    // ⚠️ Úklid stavu PŘEDCHOZÍ mapy. Route `/map/:id` nemá `key`, takže přechod
+    // z náhledu šablony (nebo z veřejné mapy) na skutečnou mapu komponentu
+    // NEPŘEMOUNTUJE — příznaky by přežily. A `isTemplatePreview`/`isPublicView`
+    // vypínají autosave, takže by se nad reálnou mapou tiše ztrácely úpravy.
+    // Příznaky si zapíná až ta větev, které patří.
+    setIsTemplatePreview(false);
+    setIsPublicView(false);
+    sablonaCistaRef.current = null;
+    templateSeedsRef.current = null;
+    templateSeriesRef.current = null;
     (async () => {
       // „Moje mapa" — read-only agregace mých uzlů napříč projekty (žádné ukládání)
       if (personalMap) {
@@ -734,6 +747,18 @@ function EditorContent({ mapId, personalMap = false }) {
             (Array.isArray(tplRules) && tplRules.length > 0)
               ? { idMap: tplIdMap, rules: tplRules }
               : null;
+          // ⚠️ ČISTÁ podoba šablony se odkládá stranou. Náhled je DEMO, ve kterém
+          // se dá klidně klikat (Richard 17. 8.: „funguje to jako takové demo,
+          // kde nejde nic pokazit a nic se neuloží") — a „Použít šablonu" proto
+          // zakládá projekt VŽDY z téhle vzorové podoby, ne z toho, co si v
+          // náhledu kdo rozklikal. Bez toho se stalo tohle: uživatel si v
+          // náhledu přepnul kartu na Hotovo, aby vyzkoušel kanban, a projekt pak
+          // vznikl s kartou, která se narodila hotová — pravidla ještě
+          // neexistovala, takže ji nikdy nic neposunulo.
+          // structuredClone = pojistka: bez ní by odložená šablona sdílela objekty
+          // s plátnem a jediná in-place mutace uzlu v editoru by „čistou" podobu
+          // tiše ušpinila. Dnes editor nemutuje, ale nic to nehlídá.
+          sablonaCistaRef.current = structuredClone({ nodes: tplNodes, edges: tplEdges, title: tpl.title || '' });
           setNodes(tplNodes);
           setEdges(tplEdges);
           // Mapa vzniká ve stylu podle zámku (jinak kompaktně) — ať to ví
@@ -1386,41 +1411,101 @@ function EditorContent({ mapId, personalMap = false }) {
     }
     setSavingTemplate(true);
     try {
-      const { cleanNodes, cleanEdges } = cleanMapData();
+      // Projekt vzniká z VZOROVÉ šablony, ne z rozklikaného náhledu (viz komentář
+      // u načtení náhledu). Kdo si v demu něco naklikal, o to přijde — záměr.
+      const vzor = sablonaCistaRef.current;
+      const { cleanNodes, cleanEdges } = vzor
+        ? cleanMap(vzor.nodes, vzor.edges)
+        : cleanMapData();
+      // NÁZEV je výjimka: přejmenování z náhledu si uživatel ponechá (Richard
+      // 17. 8.: „všiml jsem si, že když nechám název šablony, měl jsem 2 stejné
+      // se stejným názvem, to je docela na nic"). Obsah čistý, jméno vlastní.
+      const nazev = title.trim() || (vzor ? vzor.title : '').trim() || t('defaults.newMapTitle');
+      // Přiřazení lidé se projektu nasdílí stejně jako u cesty „Nový projekt →
+      // Ze šablony" (Richard 17. 8.: cesty sjednotit) — server pak rozešle
+      // notifikace node_assigned. Vlastníci se berou z ČISTÉ šablony, ne
+      // z plátna: co si kdo naklikal v náhledu, se nepřenáší ani tady.
+      const owners = ownersFromNodes(cleanNodes);
       const newMap = await base44.entities.GoalMap.create({
-        title: title.trim() || t('defaults.newMapTitle'),
+        title: nazev,
         description: '',
         nodes: cleanNodes,
         edges: cleanEdges,
+        shared_with: owners,
+        shared_with_edit: owners,
         ...(templateSeriesRef.current ? { series: templateSeriesRef.current } : {}),
       });
       setIsTemplatePreview(false);
       setActiveMapId(newMap.id);
       setIsMapOwner(true);
+      // ⚠️ Plátno přepnout na vzorovou podobu. Bez toho by na obrazovce zůstaly
+      // rozklikané změny z náhledu a nejbližší autosave by je poslal do právě
+      // založeného projektu — tedy přesně to, čemu se tahle změna vyhýbá.
+      // SLÉVAT, ne vyměnit vše — velkoplošná výměna objektů bere uzlům measured
+      // a plátno umí přestat kreslit hrany (viz komentář u nasadNaPlatno).
+      if (vzor) {
+        let vzorNodes = vzor.nodes;
+        // Na úzkém displeji je plátno překlopené doprava, ale efekt směru se po
+        // výměně obsahu znovu nespustí (deps [direction, loading]) — vzor nese
+        // kanonické SVISLÉ pozice, takže si je sem překlopíme sami.
+        // POCTIVĚ: měřeno na 700 px se rozhození projektu NEPODAŘILO vyvolat ani
+        // na obrazu PŘED opravou (náhled i projekt vyšly stejně) — tohle je tedy
+        // pojistka konzistence s appliedDirRef, ne oprava pozorované vady.
+        if (directionRef.current === 'horizontal') {
+          canonicalPosRef.current = new Map(vzorNodes.filter((n) => n.type !== 'note').map((n) => [n.id, { ...n.position }]));
+          const hpos = layoutTree(vzorNodes, vzor.edges, 'horizontal', ALIGN_OPTS[alignStyleRef.current] || {});
+          vzorNodes = vzorNodes.map((n) => (hpos[n.id] ? { ...n, position: hpos[n.id] } : n));
+        }
+        nasadNaPlatno(vzorNodes, vzor.edges);   // název zůstává uživatelův
+      }
+      sablonaCistaRef.current = null;
       // u číslované série server přepsal název a záznam je novější — srovnat,
       // jinak by první autosave poslal starý title (a starou verzi → 409)
       skipNextSave.current = true;
       setTitle(newMap.title || '');
+      // Barva zvolená v náhledu se do projektu nesmí propašovat: create() ji
+      // neposílá, ale stav `color` by ji poslal prvním autosavem — a hláška
+      // přitom slibuje, že se z náhledu nepřenáší nic než název.
+      setColor('');
       zapamatujServer(newMap);
       templateSeriesRef.current = null;
       // pravidla ze šablony — až teď, když mapa existuje; ref se nuluje
       // PŘED zakládáním (ochrana proti dvojímu založení)
+      let pravidlaChybi = 0;
       if (templateSeedsRef.current) {
         const { idMap, rules } = templateSeedsRef.current;
         templateSeedsRef.current = null;
         try {
-          await createRulesFromTemplate(rules, idMap, newMap.id);
-        } catch (e2) { console.error('pravidla ze šablony', e2); }
+          const { zalozeno, celkem } = await createRulesFromTemplate(rules, idMap, newMap.id);
+          pravidlaChybi = celkem - zalozeno;
+        } catch (e2) {
+          console.error('pravidla ze šablony', e2);
+          pravidlaChybi = rules.length;
+        }
       }
       window.history.replaceState(null, '', `/map/${newMap.id}`);
-      toast({ title: t('toasts.mapSaved'), description: t('toasts.mapSavedDesc') });
+      // Přiznat, že se rozklikaný náhled nepřenáší — jinak by to bylo tiché
+      // zahození lidské práce, i když jen z dema.
+      // A hlavně: projekt bez pravidel = mrtvý kanban. Mlčet o tom nejde,
+      // i když samotné založení projektu proběhlo.
+      if (pravidlaChybi > 0) {
+        // Text žije v líném ns `rules` (mimo jazykový balík) — lite má rozpočet
+        // 490 kB a je PŘESNĚ na prahu; texty pravidel do něj nepatří.
+        // ⚠️ Překládat přes i18next.t, NE přes `t` z useTranslation('editor'):
+        // to je navázané na svoje ns a na dodatečně přidaný balík nedosáhne —
+        // v toastu se pak ukáže holý klíč (naměřeno, ne odhad).
+        await ensureNs('rules');
+        toast({ title: t('toasts.mapSaved'), description: i18next.t('rules:rules.templateRulesFailed', { count: pravidlaChybi }) });
+      } else {
+        toast({ title: t('toasts.mapSaved'), description: t(vzor ? 'toasts.mapFromTemplateDesc' : 'toasts.mapSavedDesc') });
+      }
     } catch (e) {
       console.error(e);
       toast({ title: t('toasts.error'), description: t('toasts.saveMapFailed'), variant: 'destructive' });
     } finally {
       setSavingTemplate(false);
     }
-  }, [nodes, edges, title, toast, user, navigate]);
+  }, [nodes, edges, title, toast, user, navigate, nasadNaPlatno]);
 
   // Archivace (jen vlastník; server hlídá totéž). Update jde přes stejný
   // konfliktní mechanismus jako autosave (base_updated → 409).

@@ -7,7 +7,7 @@
     "login": "Přihlásit se",
     "archivedProject": "Projekt je v archivu",
     "restore": "Obnovit",
-    "templatePreview": "Náhled šablony — neuloženo",
+    "templatePreview": "Náhled šablony — neukládá se",
     "useTemplate": "Použít šablonu",
     "publicMap": "Veřejně sdílená mapa — jen k nahlédnutí, změny se neukládají",
     "mapChanged": "Mapu mezitím změnil někdo jiný."
@@ -111,6 +111,7 @@
     "mapNotSavedDesc": "Nejdřív mapu uložte (přidejte obsah).",
     "mapSaved": "Mapa uložena",
     "mapSavedDesc": "Šablona byla uložena do vašich map.",
+    "mapFromTemplateDesc": "Vznikl z čisté šablony — co jste zkoušeli v náhledu, se nepřenáší.",
     "error": "Chyba",
     "saveMapFailed": "Mapu se nepodařilo uložit.",
     "archived": "Projekt archivován",

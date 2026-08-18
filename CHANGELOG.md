@@ -9,6 +9,33 @@ below before you jump several versions.
 
 ---
 
+## v0.35.3-beta — 2026-08-18
+
+**The template preview is a demo — and your project is born clean**
+
+Opening a template drops you into a preview where nothing is saved. People naturally
+try things there — flip a card to Done to see the kanban move. The project was then
+created from *that* clicked-around state: the card was born finished, no rule had
+existed yet to move it, and the board looked dead on arrival.
+
+- **A project from the preview is always created from the clean template.** Click
+  around all you like; none of it carries over. The one exception is the **name** —
+  rename the template in the preview and your project keeps that name (two projects
+  with the same title help nobody).
+- **The preview bar says so plainly**: "Template preview — nothing is saved". The
+  preview deliberately stays unlocked; a demo you cannot touch teaches nothing.
+- **Fix (silent data loss): leaving the preview for a real map switched off saving.**
+  Going straight from the preview to another map (avatar menu → Organizational
+  structure) kept the preview flag alive, because the route does not remount the
+  editor. Everything you then did on that real map was discarded without a word, and
+  a stray "Use template" button hung over someone else's map. Both are gone, and a
+  new test suite reproduces the loss on the old build.
+- **A project created from the preview now shares like the dialog does**: people
+  assigned to nodes in the template get edit access and their assignment
+  notification. Previously only the "New project → From template" path did that.
+- **If a template's automation rules fail to be created, you are told.** The project
+  used to be reported as fully created while its kanban was dead.
+
 ## v0.35.2-beta — 2026-08-18
 
 **An invitation that no longer looks like spam**
@@ -113,6 +140,46 @@ editor, a "task" in the table and a "node" in the API, while a second, separate 
 tools, switch it to nodes: create work with `add_nodes` (set `owner` and/or `deadline`),
 complete it with `update_node` → `status: done`. The migration deletes all task items and
 their comments irreversibly — export anything you want to keep before upgrading.
+
+## v0.33.2-beta — 2026-08-17
+
+**"Create subgoals" works every time, and two ways to feed the map from a spreadsheet**
+
+- **Fix: the automation action "Create subgoals" only ever worked on the first run.**
+  The second card (second complaint, second part) failed with a duplicate-id error,
+  the run was marked failed and the rule itself looked broken — the most appealing
+  piece of automation handled one case and then quietly gave up. Each run now gets
+  its own node id prefix.
+- **New guide — Google Sheets integration**: every new row in the sheet creates a goal
+  in the map and unfolds the whole procedure under it (worked through on the 8D
+  report). Ready-made Apps Script you configure by filling in three lines, status
+  written back to the sheet, and honest limits at the end.
+- **New guide — n8n integration** as a separate route: two ready workflows to download
+  (`.json`), import, fill in four lines. Unlike Apps Script it also reaches an
+  instance inside a company network, because it calls outward.
+- Both guides cover the two shapes a map can take — the classic tree and the kanban
+  board where a complaint travels as a card through columns D1–D8.
+- Installation docs now hold your hand outside Linux too: step by step for Windows
+  (Docker Desktop, PowerShell), Linux and macOS, including what actually trips people
+  up (a sleeping computer is a sleeping instance, access from a phone, the firewall).
+
+## v0.33.1-beta — 2026-08-16
+
+**Small things the first real installation turned up**
+
+- **The version check no longer logs a 404** in the browser console. It asked GitHub
+  for the "latest release", which returns 404 for a project that only has a beta —
+  the behaviour was right (nothing was offered) but it looked like a broken app. It
+  now reads the list of releases and filters pre-releases itself.
+- **New switch `KB_UPDATE_PRERELEASE=1`**: if you run a beta, you can opt in to being
+  told about the next beta. The default does not change — without it, pre-releases
+  are never offered to anyone.
+- **The MCP server runs in Docker** (`mcp/Dockerfile`) and no longer exits when it is
+  not configured: it starts, offers its tools, and only a tool call tells you what is
+  missing. Clients like Claude Desktop no longer show it as broken.
+- **The MCP server is on npm as `killbottleneck-mcp`** — `npx -y killbottleneck-mcp`
+  is enough, no need to clone the repository. It is also listed in the official MCP
+  server registry as `com.killbottleneck/killbottleneck`.
 
 ## v0.33-beta — 2026-08-15
 

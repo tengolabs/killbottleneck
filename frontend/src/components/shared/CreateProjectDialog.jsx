@@ -28,7 +28,9 @@ import DatePicker from '@/components/DatePicker';
 import DynamicIcon from '@/components/goal-map/DynamicIcon';
 import EmojiPicker from '@/components/shared/EmojiPicker';
 import ProjectColorPicker from '@/components/shared/ProjectColorPicker';
-import { useLazyNs } from '@/i18n/lazyNs';
+import i18next from 'i18next';
+import { useLazyNs, ensureNs } from '@/i18n/lazyNs';
+import { useToast } from '@/components/ui/use-toast';
 
 // Jednotné zakládání projektu (Home i Úkoly): Prázdný / Ze šablony,
 // volitelně odbočka na sjednocený AI dialog (onOpenAi — dialog vlastní volající).
@@ -39,6 +41,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
   // odznak „vč. N pravidel" u šablon s pravidly — text v lazy ns rules
   // (lite drží rozpočet); řádka je bonus, dialog na ns nečeká
   const rulesNsReady = useLazyNs('rules');
+  const { toast } = useToast();
   const ai = useAiModes();
   const { user } = useAuth();
   const [tab, setTab] = useState('empty');
@@ -81,9 +84,21 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
     if (!canCreate || creating) return;
     setCreating(true);
     try {
+      // Projekt bez pravidel = mrtvý kanban. Selhání zakládání pravidel projekt
+      // neshodí (mapa už existuje), ale mlčet se o něm nesmí.
+      let pravidlaChybi = 0;
       const map = tab === 'empty'
         ? await createEmptyProject(name.trim(), { emoji, color, client: clientId })
-        : await createProjectFromTemplate(selectedTpl, name, startDate ? new Date(startDate + 'T00:00:00') : undefined, { emoji, color, client: clientId });
+        : await createProjectFromTemplate(selectedTpl, name, startDate ? new Date(startDate + 'T00:00:00') : undefined, {
+          emoji, color, client: clientId,
+          onRulesResult: ({ zalozeno, celkem }) => { pravidlaChybi = celkem - zalozeno; },
+        });
+      if (pravidlaChybi > 0) {
+        // text je v ns `rules` (líný, mimo lite rozpočet); dialog ho už načítá
+        // kvůli odznaku „vč. N pravidel", ale jistota nic nestojí
+        await ensureNs('rules');
+        toast({ title: tr('editor:toasts.mapSaved'), description: i18next.t('rules:rules.templateRulesFailed', { count: pravidlaChybi }) });
+      }
       onCreated(map);
       onClose();
     } finally {
