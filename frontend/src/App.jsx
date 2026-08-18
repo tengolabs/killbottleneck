@@ -7,6 +7,7 @@ import { TimerProvider } from '@/lib/TimerContext';
 import { useTranslation } from 'react-i18next';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
+import DocumentTitle from '@/components/shared/DocumentTitle';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { shouldUseLite } from '@/lib/liteMode';
 // Přihlašovací stránky zůstávají v hlavním balíku — jsou to první obrazovky,
@@ -115,6 +116,7 @@ function App() {
       <TimerProvider>
         <Router key={i18n.language}>
           <ScrollToTop />
+          <DocumentTitle />
           <AuthenticatedApp />
         </Router>
         <Toaster />

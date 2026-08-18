@@ -5,6 +5,7 @@ import { saveMode, MODE_LITE } from '@/lib/liteMode';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
+import OrgLogo from '@/components/shared/OrgLogo';
 import { useAuth } from '@/lib/AuthContext';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/shared/NotificationBell';
@@ -61,26 +62,7 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
             aria-label={t('header.homeLink')}
             className="flex items-center shrink-0 rounded-md outline-none hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {org?.logo_url ? (
-              <img src={org.logo_url} alt="" className="w-8 h-8 rounded-lg object-contain bg-card border" />
-            ) : (
-              /* ⚠️ Značka killBottlenecku, ne obecný terč. Do 6. 8. 2026 tu byla
-                 ikona „Target" v barevném čtverečku — vypadala jako logo, takže si
-                 jí nikdo nevšiml, ale s naší značkou neměla nic společného.
-                 Objevilo se to na snímcích v dokumentaci („všude staré logo").
-                 Vlastní logo organizace má přednost (větev výš). */
-              /* ⚠️ Kolečko s hadem má natvrdo TMAVÉ pozadí, takže ve světlém
-                 režimu působilo jako tmavý flek (Richard 6. 8. 2026: „ve světlém
-                 režimu by bylo lepší světlé logo"). Světlá varianta kolečka
-                 neexistuje, proto tu jde plná sestava ve dvou verzích — stejně
-                 jako v liště mapy. */
-              <span className="flex items-center" aria-hidden="true">
-                <img src="/znak-tmavy.webp" alt="" width="525" height="320"
-                     className="hidden dark:block h-7 w-auto" />
-                <img src="/znak-svetly.webp" alt="" width="493" height="320"
-                     className="dark:hidden h-7 w-auto" />
-              </span>
-            )}
+            <OrgLogo org={org} />
           </button>
           <h1 className="font-heading text-lg font-bold tracking-tight truncate hidden sm:block">
             {/* Dokud si organizace nenastaví vlastní název, stojí tu značka

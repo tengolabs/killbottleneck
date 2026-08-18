@@ -13,8 +13,8 @@ export default [
       "src/Layout.jsx",
     ],
     ignores: ["src/lib/**/*", "src/components/ui/**/*"],
-    ...pluginJs.configs.recommended,
-    ...pluginReact.configs.flat.recommended,
+    // Pravidla doporučených sad se vtahují DOLE v `rules` — spready na téhle
+    // úrovni by stejně přebil klíč `rules` níž a konfig by říkal dvě věci naráz.
     languageOptions: {
       globals: globals.browser,
       parserOptions: {
@@ -36,6 +36,11 @@ export default [
       "unused-imports": pluginUnusedImports,
     },
     rules: {
+      // ⚠️ `rules` přepisuje celý blok ze spreadů výše — pravidla doporučených
+      // sad je nutné vtáhnout ručně, jinak z nich neběží ANI JEDNO (mj. no-undef,
+      // které by chytlo `setWithTasks` po smazání stavu → černá obrazovka).
+      ...pluginJs.configs.recommended.rules,
+      ...pluginReact.configs.flat.recommended.rules,
       "no-unused-vars": "off",
       "react/jsx-uses-vars": "error",
       "react/jsx-uses-react": "error",

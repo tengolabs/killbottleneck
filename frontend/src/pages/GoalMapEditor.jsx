@@ -17,6 +17,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { base44 } from '@/api/base44Client';
+import OrgLogo from '@/components/shared/OrgLogo';
 import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -404,6 +405,7 @@ function EditorContent({ mapId, personalMap = false }) {
   const [miniMapOpen, setMiniMapOpen] = useState(() => nactiKlic('kb-minimap-open') !== '0');
   const [skinOpen, setSkinOpen] = useState(false);   // dialog Vzhled i z editoru
   const [saveTplOpen, setSaveTplOpen] = useState(false);
+  const [nazevEditace, setNazevEditace] = useState(false);
   const ai = useAiModes();
   const [advisorOpen, setAdvisorOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -420,6 +422,21 @@ function EditorContent({ mapId, personalMap = false }) {
   const [delegatedGrouping, setDelegatedGrouping] = useState(() => nactiKlic('kb-delegated-grouping') || 'flat');
   const [sharedCount, setSharedCount] = useState(0);
   const [isPublicView, setIsPublicView] = useState(false);  // veřejně sdílená mapa ≠ demo
+  // Logo organizace i v liště mapy (Richard 18. 8. 2026: „v organizaci DUVE jsem
+  // změnil logo, ale v mapě se nezměnilo"). Vlastní logo má přednost, značka
+  // killBottlenecku zůstává instancím, které si žádné nenahrály.
+  //
+  // ⚠️ JEN PŘIHLÁŠENÉMU ČLENOVI. Dřív tu stálo, že „na veřejné mapě vrátí
+  // org.get() prázdno" — NENÍ TO PRAVDA: `org_settings` má listRule "" (vědomě,
+  // od 15. 7. 2026: jedna firma = jedna instance), takže je čte i nepřihlášený
+  // a /map/:id není za ProtectedRoute. Anonymní návštěvník sdílené mapy by tedy
+  // viděl logo zákazníka — a veřejná mapa je jediná akviziční plocha produktu.
+  // Stejné pravidlo drží i DocumentTitle. (Nález panelu /checkup 18. 8. 2026.)
+  const [org, setOrg] = useState(null);
+  useEffect(() => {
+    if (!user || isPublicView) { setOrg(null); return; }
+    base44.org.get().then(setOrg).catch(() => {});
+  }, [user, isPublicView]);
   const [activeMapId, setActiveMapId] = useState(null);
   const [isTemplatePreview, setIsTemplatePreview] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -517,6 +534,13 @@ function EditorContent({ mapId, personalMap = false }) {
       return !v;
     });
   }, []);
+
+  // Posun levé lišty ikon i proužku s názvem, když je vysunutý zásobník (288 px)
+  // nebo časovač (320 px). Oba naráz otevřené BÝT NEMOHOU — přepínače se navzájem
+  // zavírají (toggleBuffer/toggleTimeLog výš) a i úvodní stav z prohlížeče dává
+  // přednost zásobníku, takže se šířky nikdy nesčítají. Dřív ten výraz stál
+  // v souboru třikrát a rozejít se mohl kdykoliv.
+  const railLeft = bufferOpen ? 288 : timeLogOpen ? 320 : 0;
 
   const pushHistory = useCallback(() => {
     historyRef.current.push({ nodes, edges });
@@ -2692,10 +2716,12 @@ function EditorContent({ mapId, personalMap = false }) {
         </div>
       )}
       <header className="min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
-        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:flex-1">
-          {/* NAŠE značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
-              U názvu projektu být nesmí — tam si zákazník dává svoje vlastní
-              logo a dvě loga vedle sebe by si konkurovala.
+        <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
+          {/* Značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
+              U názvu projektu být nesmí — dvě loga vedle sebe by si konkurovala,
+              proto tady stojí BUĎ logo firmy, NEBO naše, nikdy obojí.
+              18. 8. 2026: přednost dostalo logo organizace (stejně jako
+              v hlavičce plné verze) — kdo si ho nahraje, čeká ho všude.
               Na mobilu jen kolečko s hadem, jinak by v úzké liště nezbylo
               místo na název. */}
           {/* Logo = zkratka na úvod (klik odkudkoli vede na Home, Richard 7. 8. 2026).
@@ -2707,16 +2733,7 @@ function EditorContent({ mapId, personalMap = false }) {
             aria-label={t('toolbar.homeLink')}
             className="flex items-center shrink-0 rounded-md outline-none hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span className="flex items-center" aria-hidden="true">
-              <img src="/znak-ikona.webp" alt="" width="512" height="512"
-                   className="sm:hidden h-5 w-5 rounded-sm" />
-              <span className="hidden sm:flex items-center">
-                <img src="/znak-tmavy.webp" alt="" width="525" height="320"
-                     className="hidden dark:block h-5 w-auto" />
-                <img src="/znak-svetly.webp" alt="" width="493" height="320"
-                     className="dark:hidden h-5 w-auto" />
-              </span>
-            </span>
+            <OrgLogo org={org} compact />
           </button>
           <Button
             variant="ghost"
@@ -2731,13 +2748,9 @@ function EditorContent({ mapId, personalMap = false }) {
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            readOnly={!canEdit}
-            className="bg-transparent text-sm font-heading font-semibold outline-none flex-1 min-w-0"
-            placeholder={t('toolbar.titlePlaceholder')}
-          />
+          {/* Název projektu se 18. 8. 2026 přestěhoval z lišty POD ni (Richard:
+              „název mapy je málo viditelný a když je dlouhý, schová se").
+              V liště se tísnil mezi ikonami a přebytek ořízl doprostřed slova. */}
         </div>
         <div className="flex items-center gap-1.5 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
           {/* Vyhledávání a filtr Moje úkoly se přestěhovaly do LEVÉ lišty pod
@@ -3126,6 +3139,48 @@ function EditorContent({ mapId, personalMap = false }) {
             position={`absolute inset-x-0 bottom-0 ${miniMapOpen && !narrow && !personalMap ? 'pr-56' : ''}`}
           />
         )}
+        {/* NÁZEV PROJEKTU — volný pruh nad levou lištou ikon (ta začíná na top-16).
+            Vlastní řádek unese i dlouhý název, na který se v liště nedostávalo.
+            Odsazení zleva kopíruje lištu ikon, ať název neschová vysunutý
+            zásobník ani časovač. Nad dashboardem ne — ten si název píše sám. */}
+        {!dashboardOpen && (
+          <div
+            style={{ left: railLeft + 8 }}
+            className="absolute top-2 z-30 max-w-[min(80vw,60rem)]"
+          >
+            {/* ⚠️ V KLIDU JE TO TEXT, NE POLE. Široké průhledné `input` přes plátno
+                vypadalo stejně, ale polykalo myš: v pruhu 960 × 38 px nešlo chytit
+                uzel ani táhnout plátnem, a nic to neprozrazovalo (nález panelu
+                /checkup 18. 8. 2026, změřeno — tažení nepohnulo plátnem vůbec).
+                Tlačítko se smrskne na šířku textu, takže mrtvá zóna je přesně
+                velikost názvu — a tam klik stejně patří, otevírá přejmenování. */}
+            {nazevEditace && canEdit ? (
+              <input
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => setNazevEditace(false)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
+                aria-label={t('toolbar.titlePlaceholder')}
+                placeholder={t('toolbar.titlePlaceholder')}
+                className="w-[min(80vw,60rem)] max-w-full bg-card rounded-lg px-2 py-1 outline-none
+                  font-heading text-lg sm:text-xl font-bold tracking-tight border border-input"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => canEdit && setNazevEditace(true)}
+                title={title}
+                className={`block max-w-full truncate rounded-lg px-2 py-1 text-left
+                  font-heading text-lg sm:text-xl font-bold tracking-tight
+                  border border-transparent transition-colors
+                  ${canEdit ? 'hover:bg-card/80 hover:border-border' : 'cursor-default'}`}
+              >
+                {title || t('toolbar.titlePlaceholder')}
+              </button>
+            )}
+          </div>
+        )}
         {dashboardOpen ? (
           <ProgressDashboard nodes={nodes} edges={edges} tasks={mapTasks} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} />
         ) : (
@@ -3283,7 +3338,6 @@ function EditorContent({ mapId, personalMap = false }) {
             z horní lišty pryč, „je to jen filtr"). Aktivní stav je vidět na
             ikoně, panely lištu odsouvají stejně jako ouška. */}
         {!dashboardOpen && (() => {
-          const railLeft = bufferOpen ? 288 : timeLogOpen ? 320 : 0;
           const railCls = railLeft ? '' : 'border-l-0';
           return (
             <>
@@ -3343,7 +3397,7 @@ function EditorContent({ mapId, personalMap = false }) {
             schované, takže lišta sedí u kraje. */}
         <button
           onClick={() => setDashboardOpen((v) => !v)}
-          style={{ left: dashboardOpen ? 0 : (bufferOpen ? 288 : timeLogOpen ? 320 : 0) }}
+          style={{ left: dashboardOpen ? 0 : railLeft }}
           title={t('toolbar.dashboardTitle')}
           className={`absolute top-64 z-30 flex items-center rounded-r-lg border px-2 py-2.5 shadow-md transition-all ${dashboardOpen ? 'bg-primary text-primary-foreground border-l-0' : `bg-card text-muted-foreground hover:bg-secondary ${(bufferOpen || timeLogOpen) ? '' : 'border-l-0'}`}`}
         >

@@ -296,6 +296,9 @@ async function clearOfflineData() {
   } catch (err) { /* offline cache je bonus, přihlášení kvůli ní padnout nesmí */ }
 }
 
+// Rozpracovaný/hotový slib s údaji organizace — viz komentář u org.get().
+let orgCache = null;
+
 export const base44 = {
   entities: {
     GoalMap: entityApi('GoalMap'),
@@ -525,16 +528,30 @@ export const base44 = {
 
   // nastavení organizace — jeden záznam (název + logo), zapisuje admin
   org: {
+    // Název a logo organizace čte na jedné obrazovce až šest nezávislých míst
+    // (Home, Tasks, AppHeader, UserAdmin, DocumentTitle, editor mapy). Dotaz se
+    // proto drží — sdílí se ROZPRACOVANÝ slib, takže souběžná volání při startu
+    // spadnou do jednoho requestu. Vedlejší přínos: nemůže se stát, že jedno
+    // místo ukazuje staré logo a druhé nové.
+    // ⚠️ Zapomíná se při zápisu (save níž) a při odhlášení (`forget`) — jinak by
+    // po odhlášení zůstal název firmy viset dalšímu člověku u stejného počítače.
     async get() {
-      try {
-        const res = await pb.collection('org_settings').getList(1, 1);
-        const r = res.items[0];
-        if (!r) return null;
-        return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '' };
-      } catch {
-        return null;
+      if (!orgCache) {
+        orgCache = (async () => {
+          try {
+            const res = await pb.collection('org_settings').getList(1, 1);
+            const r = res.items[0];
+            if (!r) return null;
+            return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '' };
+          } catch {
+            orgCache = null;   // chybu si nedržet, ať to příště zkusí znovu
+            return null;
+          }
+        })();
       }
+      return orgCache;
     },
+    forget() { orgCache = null; },
     async save({ id, name, logoFile, removeLogo }) {
       const form = new FormData();
       form.append('name', name || '');
@@ -543,6 +560,7 @@ export const base44 = {
       const r = id
         ? await pb.collection('org_settings').update(id, form)
         : await pb.collection('org_settings').create(form);
+      orgCache = null;   // po přejmenování/výměně loga musí ostatní místa číst znovu
       return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '' };
     },
   },

@@ -17,7 +17,7 @@ services:
         # Instance version. Without it the value stays "dev" and the update check
         # is not offered — exactly what we want for work in progress. Real number:
         #   ./nasadit-staging.sh  (razítko + build + kontrola verze — NEpouštět compose ručně)
-        KB_VERSION: ${KB_VERSION:-v0.36-beta}
+        KB_VERSION: ${KB_VERSION:-v0.37-beta}
     container_name: killbottleneck
     ports:
       - "${KB_PORT:-${FLOWMAP_PORT:-8090}}:8090"

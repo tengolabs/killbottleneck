@@ -102,7 +102,8 @@
     "orgAuthorTitle": "Organization template — author {{author}}",
     "orgFallback": "organization",
     "system": "Ready-made templates",
-    "allCategories": "All"
+    "allCategories": "All",
+    "noneInCategory": "No template in this category yet."
   },
   "createProject": {
     "title": "New project",

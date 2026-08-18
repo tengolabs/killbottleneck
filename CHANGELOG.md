@@ -9,6 +9,39 @@ below before you jump several versions.
 
 ---
 
+## v0.37-beta — 2026-08-18
+
+**Your organization everywhere you look — and the project name finally has room**
+
+- **The project name moved out of the map toolbar and onto its own line** above the
+  canvas, in larger type. Squeezed between the icons, a longer name was cut off
+  mid-word. Click it to rename, Enter confirms. In its resting state it is text, not
+  an input: the old transparent field spanned the canvas and swallowed the mouse, so
+  a strip 960 px wide could neither grab a node nor pan the map.
+- **The map toolbar now shows your organization's logo**, the same as the app header
+  does. Until you upload one, the killBottleneck mark stands there — one or the
+  other, never both. **Anonymous visitors of a publicly shared map always see the
+  killBottleneck mark**, not your logo: a public map is your calling card outward,
+  not an internal screen.
+- **The browser window title starts with your organization**: "Acme killBottleneck".
+  With several windows open you can tell yours apart in the taskbar at a glance.
+- **Project cards show the main goal** — the text of the apex node — under the project
+  name. The name tends to be shorthand ("FMEA — kanban") while the main goal is the
+  sentence that says what it is about. When the two match, the line is left out.
+- **The simplified view shows the name day** in its header, the way the My day panel
+  in the full app always has (Czech version, on days that have one).
+- **Fix: "Save as template" crashed the screen.** In the cloud beta, Export → Save as
+  template turned the whole screen black: the dialog called a state setter that an
+  earlier change had removed. Our linter stayed silent about it, because the ESLint
+  config pulled the recommended rule sets in a place where the `rules` key below
+  overwrote them — so not a single recommended rule was running, `no-undef` included.
+  Both are fixed, and a browser test now clicks the whole path.
+- **Security: SVG is no longer an accepted logo format** (PNG, JPG and WebP are).
+  Uploaded files are served from the same origin as the app; an SVG opened directly
+  in the address bar can run script and reach the login token. Only administrators
+  can upload a logo, so this is a trap for the administrator, not a way in for a
+  regular user. Logos already uploaded keep working.
+
 ## v0.36-beta — 2026-08-18
 
 **A structure manager: HR draws the org chart without being an administrator**

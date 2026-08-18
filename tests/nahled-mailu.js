@@ -105,10 +105,10 @@ const predmetZ = (raw) => {
       smtp: { enabled: true, host: 'host.docker.internal', port: SMTP_PORT, tls: false },
     } });
 
-    await api('POST', '/api/collections/users/records', { body: { email: 'richard.pobrislo@gmail.com', password: PW, passwordConfirm: PW, language: 'cs' } });
-    const prihl = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'richard.pobrislo@gmail.com', password: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'sefka@firma.cz', password: PW, passwordConfirm: PW, language: 'cs' } });
+    const prihl = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'sefka@firma.cz', password: PW } });
     const UT = prihl.json.token;
-    await api('PATCH', `/api/collections/users/records/${prihl.json.record.id}`, { token: UT, body: { full_name: 'Richard Pobříslo' } });
+    await api('PATCH', `/api/collections/users/records/${prihl.json.record.id}`, { token: UT, body: { full_name: 'Jana Nováková' } });
 
     maily.length = 0;
     await api('POST', '/api/kb/invite', { token: UT, body: { email: 'kolega@firma.cz', role: 'user' } });

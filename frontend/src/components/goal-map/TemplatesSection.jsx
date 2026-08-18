@@ -35,17 +35,26 @@ export default function TemplatesSection() {
     })();
   }, []);
 
-  // „Moje šablony" = VŠE, co jsem vytvořil (osobní i firemní) — autor svou šablonu
-  // hledá u sebe, ne podle viditelnosti; org sekce = firemní šablony ostatních
-  const personal = templates.filter((t) => t.owner && t.owner === user?.id);
-  const orgTemplates = templates.filter((t) => t.owner && t.owner !== user?.id && t.visibility !== 'personal');
+  // ⭐ SKUPINA = KDO ŠABLONU VIDÍ, ne kdo ji vytvořil (Richard 18. 8. 2026:
+  // „firemní šablony přesunout do sekce Šablony organizace a v Mých nechat jen
+  // osobní"). Do té doby stálo v „Mých" všechno, co jsem vytvořil — včetně
+  // firemních — pod nadpisem „Osobní šablony — vidíte je jen vy" a se zámkem
+  // „osobní" na kartě. To u firemní šablony nebyla nepřesnost, ale nepravda.
+  // Vlastní firemní šablona je tedy nově DOLE mezi firemními; mazat ji smím
+  // pořád (canDelete jede podle vlastníka, ne podle sekce).
+  const personal = templates.filter((t) => t.owner && t.owner === user?.id && t.visibility === 'personal');
+  const orgTemplates = templates.filter((t) => t.owner && t.visibility !== 'personal');
   const system = templates.filter((t) => !t.owner);
 
+  // Filtr kategorií platí na VŠECHNY tři skupiny. Do 18. 8. 2026 filtroval jen
+  // připravené šablony, takže kategorie zvolená při ukládání se nikde neprojevila
+  // (Richard: „když vyberu kategorii, stejně se to do ní nedá").
   const categories = ['all', ...Object.keys(categoryLabels)];
-  const filteredSystem =
-    activeCategory === 'all'
-      ? system
-      : system.filter((t) => t.category === activeCategory);
+  const vKategorii = (list) =>
+    activeCategory === 'all' ? list : list.filter((t) => t.category === activeCategory);
+  const filteredPersonal = vKategorii(personal);
+  const filteredOrg = vKategorii(orgTemplates);
+  const filteredSystem = vKategorii(system);
 
   const canDelete = (t) => !!t.owner && (t.owner === user?.id || user?.role === 'admin');
 
@@ -152,11 +161,28 @@ export default function TemplatesSection() {
     );
   }
 
-  const hasOwnGroups = personal.length > 0 || orgTemplates.length > 0;
+  const hasOwnGroups = filteredPersonal.length > 0 || filteredOrg.length > 0;
 
   return (
     <div className="space-y-10">
-      {personal.length > 0 && (
+      {/* Filtr kategorií řídí celou stránku, proto stojí nad všemi skupinami. */}
+      <div className="flex flex-wrap gap-2">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              activeCategory === cat
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-accent'
+            }`}
+          >
+            {cat === 'all' ? tr('templates.allCategories') : getCategoryLabel(cat)}
+          </button>
+        ))}
+      </div>
+
+      {filteredPersonal.length > 0 && (
         <div>
           <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-2">
             <Lock className="w-4 h-4" />
@@ -164,7 +190,7 @@ export default function TemplatesSection() {
           </h2>
           <p className="text-xs text-muted-foreground mb-4">{tr('templates.mineDesc')}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {personal.map((t) => (
+            {filteredPersonal.map((t) => (
               <TemplateCard
                 key={t.id}
                 t={t}
@@ -179,7 +205,7 @@ export default function TemplatesSection() {
         </div>
       )}
 
-      {orgTemplates.length > 0 && (
+      {filteredOrg.length > 0 && (
         <div>
           <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-2">
             <Building2 className="w-4 h-4" />
@@ -187,7 +213,7 @@ export default function TemplatesSection() {
           </h2>
           <p className="text-xs text-muted-foreground mb-4">{tr('templates.orgDesc')}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {orgTemplates.map((t) => (
+            {filteredOrg.map((t) => (
               <TemplateCard
                 key={t.id}
                 t={t}
@@ -202,34 +228,27 @@ export default function TemplatesSection() {
         </div>
       )}
 
-      <div>
-        {hasOwnGroups && (
-          <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
-            <LayoutGrid className="w-4 h-4" />
-            {tr('templates.system')}
-          </h2>
-        )}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                activeCategory === cat
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-accent'
-              }`}
-            >
-              {cat === 'all' ? tr('templates.allCategories') : getCategoryLabel(cat)}
-            </button>
-          ))}
+      {filteredSystem.length > 0 && (
+        <div>
+          {hasOwnGroups && (
+            <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
+              <LayoutGrid className="w-4 h-4" />
+              {tr('templates.system')}
+            </h2>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredSystem.map((t) => (
+              <TemplateCard key={t.id} t={t} />
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredSystem.map((t) => (
-            <TemplateCard key={t.id} t={t} />
-          ))}
-        </div>
-      </div>
+      )}
+
+      {/* Prázdná kategorie se musí ozvat. Bez téhle věty vypadá odfiltrovaná
+          stránka jako rozbitá galerie. */}
+      {filteredPersonal.length + filteredOrg.length + filteredSystem.length === 0 && (
+        <p className="text-sm text-muted-foreground py-10 text-center">{tr('templates.noneInCategory')}</p>
+      )}
     </div>
   );
 }

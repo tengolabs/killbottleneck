@@ -312,10 +312,15 @@ export default function UserAdmin() {
               )}
               <div>
                 <Label htmlFor="org-logo" className="text-xs text-muted-foreground">{t('userAdmin.logoLabel')}</Label>
+                {/* SVG tu bylo do 18. 8. 2026; server ho od migrace
+                    1787270000_org_logo_bez_svg odmítá (skript uvnitř SVG
+                    otevřeného v adresním řádku sahá na token). Nabízet ho
+                    k výběru by adminovi vyrobilo nepochopitelnou chybu
+                    z PocketBase až po odeslání. */}
                 <Input
                   id="org-logo"
                   type="file"
-                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  accept="image/png,image/jpeg,image/webp"
                   className="mt-1 h-9 w-56"
                   onChange={(e) => setOrgLogoFile(e.target.files?.[0] || null)}
                 />

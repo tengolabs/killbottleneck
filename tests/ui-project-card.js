@@ -67,6 +67,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
           edges: [{ id: 'e1', source: 'apex', target: 'n1' }],
         }),
       });
+      // druhý projekt: název je zkratka, hlavní cíl je věta — přesně případ,
+      // kvůli kterému se hlavní cíl na kartu přidával (18. 8. 2026)
+      await fetch('/api/collections/goalmaps/records', {
+        method: 'POST', headers: H,
+        body: JSON.stringify({
+          title: 'FMEA — kanban',
+          nodes: [
+            { id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Snížit počet reklamací z výroby na polovinu', title: 'Snížit počet reklamací z výroby', status: 'todo' } },
+            { id: 'n1', type: 'goalNode', position: { x: 0, y: 300 }, data: { title: 'Sběr dat', status: 'todo' } },
+          ],
+          edges: [{ id: 'e1', source: 'apex', target: 'n1' }],
+        }),
+      });
     });
 
     // vrátit se na plnou titulku (na užším okně by naskočil lite režim)
@@ -87,6 +100,34 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const box = card.getBoundingClientRect();
       return { btns, cardTop: box.y, cardBottom: box.y + box.height, cardMid: box.y + box.height / 2 };
     }, 'PROJEKT-KARTA');
+
+    console.log('== pod názvem projektu je vidět hlavní cíl (vrcholový uzel) ==');
+    // Richard 18. 8. 2026: „v moje projekty by uživatelé chtěli vidět pod
+    // názvem projektu název hlavního uzlu." Karta ho bere z apexText.
+    const textKarty = (title) => page.evaluate((tt) => {
+      const els = [...document.querySelectorAll('div')]
+        .filter((e) => (e.innerText || '').includes(tt) && e.className.includes('rounded-xl'));
+      const card = els[els.length - 1];
+      return card ? (card.innerText || '') : '';
+    }, title);
+    const kartaFmea = await textKarty('FMEA — kanban');
+    expect(/Snížit počet reklamací z výroby na polovinu/.test(kartaFmea),
+      `karta ukazuje hlavní cíl pod názvem („${kartaFmea.split('\n').slice(0, 3).join(' / ')}")`);
+    // ⚠️ Pořadí NEporovnávat holým indexOf — chybějící text dá −1, které je
+    // menší než cokoliv, a kontrola svítí zeleně i když řádek vůbec není
+    // (chyceno mutací 18. 8. 2026). Proto se napřed trvá na tom, že tam je.
+    const poradi = (a, b) => {
+      const ia = kartaFmea.indexOf(a), ib = kartaFmea.indexOf(b);
+      return ia >= 0 && ib >= 0 && ia < ib;
+    };
+    expect(poradi('FMEA — kanban', 'Snížit počet reklamací'),
+      'hlavní cíl je POD názvem projektu, ne nad ním');
+    expect(poradi('Snížit počet reklamací', ' cílů'),
+      'hlavní cíl stojí nad řádkem s počtem cílů');
+    // shoda názvů = řádek se neopakuje (dvakrát totéž pod sebou je šum)
+    const kartaStejna = await textKarty('PROJEKT-KARTA');
+    expect((kartaStejna.match(/PROJEKT-KARTA/g) || []).length === 1,
+      `když se hlavní cíl rovná názvu, řádek se NEZDVOJUJE (výskytů: ${(kartaStejna.match(/PROJEKT-KARTA/g) || []).length})`);
 
     console.log('== akce jsou vidět BEZ najetí myší (tablet/telefon hover nemá) ==');
     const visible = await page.evaluate((title) => {

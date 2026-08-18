@@ -223,15 +223,30 @@ const api = async (method, path, { token, body } = {}) => {
       return uzel ? (uzel.querySelector('button')?.textContent || '').trim() : '(uzel nenalezen)';
     });
     ok(/Hotovo/.test(stavD1Nahled), `v náhledu je karta D1 přepnutá na Hotovo (${stavD1Nahled})`);
-    // ...a přejmenovat, protože NÁZEV je jediné, co si uživatel ponechá
-    await page.evaluate(() => {
-      const i = [...document.querySelectorAll('input')].find((x) => (x.value || '').includes('8D report'));
-      if (i) {
-        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        setter.call(i, 'Reklamace 12');
-        i.dispatchEvent(new Event('input', { bubbles: true }));
-      }
+    // ...a přejmenovat, protože NÁZEV je jediné, co si uživatel ponechá.
+    //
+    // ⚠️ Od 18. 8. 2026 je název v klidu TEXT a pole se otevře až klikem (dřív to
+    // bylo široké průhledné pole přes plátno, které polykalo myš). Sada proto
+    // dělá SKUTEČNÉ gesto — klikne a píše. Původní syntetický zápis do `input`
+    // by dnes tiše neudělal nic (pole neexistuje) a navíc obcházel `readOnly`,
+    // takže by prošel i tehdy, kdyby přejmenování člověku vůbec nešlo.
+    const otevrenoKPrejmenovani = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => (x.textContent || '').includes('8D report'));
+      if (!b) return false;
+      b.click();
+      return true;
     });
+    ok(otevrenoKPrejmenovani, 'klik na název v náhledu otevřel přejmenování');
+    await sleep(500);
+    const lzePsat = await page.evaluate(() => {
+      const i = [...document.querySelectorAll('input')].find((x) => (x.value || '').includes('8D report'));
+      if (!i || i.readOnly) return false;
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(i, 'Reklamace 12');
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    });
+    ok(lzePsat, 'název v náhledu jde doopravdy přepsat (pole není jen na oko)');
     await sleep(600);
     await page.evaluate(() => {
       const b = [...document.querySelectorAll('button')].find((x) => /Použít šablonu/.test(x.textContent || ''));

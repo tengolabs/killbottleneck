@@ -69,3 +69,15 @@ export function projectName(map) {
   const t = map?.title || '';
   return setTitleEmoji(t, '') || t;
 }
+
+// Text vrcholového uzlu = HLAVNÍ CÍL projektu. V mapě ho člověk vidí ve špičce,
+// na kartě projektu chyběl (Richard 18. 8. 2026). Název projektu bývá zkratka
+// („FMEA — kanban"), kdežto hlavní cíl je věta, která říká, o co doopravdy jde.
+// ⚠️ Pořadí polí je tu SCHVÁLNĚ OPAČNÉ než jinde v appce (Tasks, TimeLogPanel,
+// NodeTasksDialog a spol. berou `title || apexText`). Důvod: `title` je jen
+// 60znaková USEKNUTÁ kopie (useNodeEditState.js ukládá obojí), a na kartě
+// projektu chceme celou větu. Nesjednocovat zpátky.
+export function apexTitle(map) {
+  const d = apexNode(map)?.data || {};
+  return String(d.apexText || d.title || '').trim();
+}

@@ -1,80 +1,32 @@
-// Český občanský kalendář jmen — „dnes má svátek…" v hlavičce panelu Můj den
-// a v exportním obrázku. Statická data, žádné API. Klíč 'měsíc-den' (bez nul).
-// Dny bez jmeniny (státní svátky apod.) mají prázdný řetězec → řádek se nezobrazí.
-export const NAME_DAYS = {
-  '1-1': '', '1-2': 'Karina', '1-3': 'Radmila', '1-4': 'Diana', '1-5': 'Dalimil',
-  '1-6': '', '1-7': 'Vilma', '1-8': 'Čestmír', '1-9': 'Vladan', '1-10': 'Břetislav',
-  '1-11': 'Bohdana', '1-12': 'Pravoslav', '1-13': 'Edita', '1-14': 'Radovan', '1-15': 'Alice',
-  '1-16': 'Ctirad', '1-17': 'Drahoslav', '1-18': 'Vladislav', '1-19': 'Doubravka', '1-20': 'Ilona',
-  '1-21': 'Běla', '1-22': 'Slavomír', '1-23': 'Zdeněk', '1-24': 'Milena', '1-25': 'Miloš',
-  '1-26': 'Zora', '1-27': 'Ingrid', '1-28': 'Otýlie', '1-29': 'Zdislava', '1-30': 'Robin', '1-31': 'Marika',
-  '2-1': 'Hynek', '2-2': 'Nela', '2-3': 'Blažej', '2-4': 'Jarmila', '2-5': 'Dobromila',
-  '2-6': 'Vanda', '2-7': 'Veronika', '2-8': 'Milada', '2-9': 'Apolena', '2-10': 'Mojmír',
-  '2-11': 'Božena', '2-12': 'Slavěna', '2-13': 'Věnceslav', '2-14': 'Valentýn', '2-15': 'Jiřina',
-  '2-16': 'Ljuba', '2-17': 'Miloslava', '2-18': 'Gizela', '2-19': 'Patrik', '2-20': 'Oldřich',
-  '2-21': 'Lenka', '2-22': 'Petr', '2-23': 'Svatopluk', '2-24': 'Matěj', '2-25': 'Liliana',
-  '2-26': 'Dorota', '2-27': 'Alexandr', '2-28': 'Lumír', '2-29': 'Horymír',
-  '3-1': 'Bedřich', '3-2': 'Anežka', '3-3': 'Kamil', '3-4': 'Stela', '3-5': 'Kazimír',
-  '3-6': 'Miroslav', '3-7': 'Tomáš', '3-8': 'Gabriela', '3-9': 'Františka', '3-10': 'Viktorie',
-  '3-11': 'Anděla', '3-12': 'Řehoř', '3-13': 'Růžena', '3-14': 'Rút a Matylda', '3-15': 'Ida',
-  '3-16': 'Elena a Herbert', '3-17': 'Vlastimil', '3-18': 'Eduard', '3-19': 'Josef', '3-20': 'Světlana',
-  '3-21': 'Radek', '3-22': 'Leona', '3-23': 'Ivona', '3-24': 'Gabriel', '3-25': 'Marián',
-  '3-26': 'Emanuel', '3-27': 'Dita', '3-28': 'Soňa', '3-29': 'Taťána', '3-30': 'Arnošt', '3-31': 'Kvido',
-  '4-1': 'Hugo', '4-2': 'Erika', '4-3': 'Richard', '4-4': 'Ivana', '4-5': 'Miroslava',
-  '4-6': 'Vendula', '4-7': 'Heřman a Hermína', '4-8': 'Ema', '4-9': 'Dušan', '4-10': 'Darja',
-  '4-11': 'Izabela', '4-12': 'Julius', '4-13': 'Aleš', '4-14': 'Vincenc', '4-15': 'Anastázie',
-  '4-16': 'Irena', '4-17': 'Rudolf', '4-18': 'Valérie', '4-19': 'Rostislav', '4-20': 'Marcela',
-  '4-21': 'Alexandra', '4-22': 'Evženie', '4-23': 'Vojtěch', '4-24': 'Jiří', '4-25': 'Marek',
-  '4-26': 'Oto', '4-27': 'Jaroslav', '4-28': 'Vlastislav', '4-29': 'Robert', '4-30': 'Blahoslav',
-  '5-1': '', '5-2': 'Zikmund', '5-3': 'Alexej', '5-4': 'Květoslav', '5-5': 'Klaudie',
-  '5-6': 'Radoslav', '5-7': 'Stanislav', '5-8': '', '5-9': 'Ctibor', '5-10': 'Blažena',
-  '5-11': 'Svatava', '5-12': 'Pankrác', '5-13': 'Servác', '5-14': 'Bonifác', '5-15': 'Žofie',
-  '5-16': 'Přemysl', '5-17': 'Aneta', '5-18': 'Nataša', '5-19': 'Ivo', '5-20': 'Zbyšek',
-  '5-21': 'Monika', '5-22': 'Emil', '5-23': 'Vladimír', '5-24': 'Jana', '5-25': 'Viola',
-  '5-26': 'Filip', '5-27': 'Valdemar', '5-28': 'Vilém', '5-29': 'Maxim', '5-30': 'Ferdinand', '5-31': 'Kamila',
-  '6-1': 'Laura', '6-2': 'Jarmil', '6-3': 'Tamara', '6-4': 'Dalibor', '6-5': 'Dobroslav',
-  '6-6': 'Norbert', '6-7': 'Iveta a Slavoj', '6-8': 'Medard', '6-9': 'Stanislava', '6-10': 'Gita',
-  '6-11': 'Bruno', '6-12': 'Antonie', '6-13': 'Antonín', '6-14': 'Roland', '6-15': 'Vít',
-  '6-16': 'Zbyněk', '6-17': 'Adolf', '6-18': 'Milan', '6-19': 'Leoš', '6-20': 'Květa',
-  '6-21': 'Alois', '6-22': 'Pavla', '6-23': 'Zdeňka', '6-24': 'Jan', '6-25': 'Ivan',
-  '6-26': 'Adriana', '6-27': 'Ladislav', '6-28': 'Lubomír', '6-29': 'Petr a Pavel', '6-30': 'Šárka',
-  '7-1': 'Jaroslava', '7-2': 'Patricie', '7-3': 'Radomír', '7-4': 'Prokop', '7-5': 'Cyril a Metoděj',
-  '7-6': '', '7-7': 'Bohuslava', '7-8': 'Nora', '7-9': 'Drahoslava', '7-10': 'Libuše a Amálie',
-  '7-11': 'Olga', '7-12': 'Bořek', '7-13': 'Markéta', '7-14': 'Karolína', '7-15': 'Jindřich',
-  '7-16': 'Luboš', '7-17': 'Martina', '7-18': 'Drahomíra', '7-19': 'Čeněk', '7-20': 'Ilja',
-  '7-21': 'Vítězslav', '7-22': 'Magdaléna', '7-23': 'Libor', '7-24': 'Kristýna', '7-25': 'Jakub',
-  '7-26': 'Anna', '7-27': 'Věroslav', '7-28': 'Viktor', '7-29': 'Marta', '7-30': 'Bořivoj', '7-31': 'Ignác',
-  '8-1': 'Oskar', '8-2': 'Gustav', '8-3': 'Miluše', '8-4': 'Dominik', '8-5': 'Kristián',
-  '8-6': 'Oldřiška', '8-7': 'Lada', '8-8': 'Soběslav', '8-9': 'Roman', '8-10': 'Vavřinec',
-  '8-11': 'Zuzana', '8-12': 'Klára', '8-13': 'Alena', '8-14': 'Alan', '8-15': 'Hana',
-  '8-16': 'Jáchym', '8-17': 'Petra', '8-18': 'Helena', '8-19': 'Ludvík', '8-20': 'Bernard',
-  '8-21': 'Johana', '8-22': 'Bohuslav', '8-23': 'Sandra', '8-24': 'Bartoloměj', '8-25': 'Radim',
-  '8-26': 'Luděk', '8-27': 'Otakar', '8-28': 'Augustýn', '8-29': 'Evelína', '8-30': 'Vladěna', '8-31': 'Pavlína',
-  '9-1': 'Linda a Samuel', '9-2': 'Adéla', '9-3': 'Bronislav', '9-4': 'Jindřiška', '9-5': 'Boris',
-  '9-6': 'Boleslav', '9-7': 'Regína', '9-8': 'Mariana', '9-9': 'Daniela', '9-10': 'Irma',
-  '9-11': 'Denisa', '9-12': 'Marie', '9-13': 'Lubor', '9-14': 'Radka', '9-15': 'Jolana',
-  '9-16': 'Ludmila', '9-17': 'Naděžda', '9-18': 'Kryštof', '9-19': 'Zita', '9-20': 'Oleg',
-  '9-21': 'Matouš', '9-22': 'Darina', '9-23': 'Berta', '9-24': 'Jaromír', '9-25': 'Zlata',
-  '9-26': 'Andrea', '9-27': 'Jonáš', '9-28': 'Václav', '9-29': 'Michal', '9-30': 'Jeroným',
-  '10-1': 'Igor', '10-2': 'Olívie a Oliver', '10-3': 'Bohumil', '10-4': 'František', '10-5': 'Eliška',
-  '10-6': 'Hanuš', '10-7': 'Justýna', '10-8': 'Věra', '10-9': 'Štefan a Sára', '10-10': 'Marina',
-  '10-11': 'Andrej', '10-12': 'Marcel', '10-13': 'Renáta', '10-14': 'Agáta', '10-15': 'Tereza',
-  '10-16': 'Havel', '10-17': 'Hedvika', '10-18': 'Lukáš', '10-19': 'Michaela', '10-20': 'Vendelín',
-  '10-21': 'Brigita', '10-22': 'Sabina', '10-23': 'Teodor', '10-24': 'Nina', '10-25': 'Beáta',
-  '10-26': 'Erik', '10-27': 'Šarlota a Zoe', '10-28': '', '10-29': 'Silvie', '10-30': 'Tadeáš', '10-31': 'Štěpánka',
-  '11-1': 'Felix', '11-2': '', '11-3': 'Hubert', '11-4': 'Karel', '11-5': 'Miriam',
-  '11-6': 'Liběna', '11-7': 'Saskie', '11-8': 'Bohumír', '11-9': 'Bohdan', '11-10': 'Evžen',
-  '11-11': 'Martin', '11-12': 'Benedikt', '11-13': 'Tibor', '11-14': 'Sáva', '11-15': 'Leopold',
-  '11-16': 'Otmar', '11-17': 'Mahulena', '11-18': 'Romana', '11-19': 'Alžběta', '11-20': 'Nikola',
-  '11-21': 'Albert', '11-22': 'Cecílie', '11-23': 'Klement', '11-24': 'Emílie', '11-25': 'Kateřina',
-  '11-26': 'Artur', '11-27': 'Xenie', '11-28': 'René', '11-29': 'Zina', '11-30': 'Ondřej',
-  '12-1': 'Iva', '12-2': 'Blanka', '12-3': 'Svatoslav', '12-4': 'Barbora', '12-5': 'Jitka',
-  '12-6': 'Mikuláš', '12-7': 'Ambrož a Benjamín', '12-8': 'Květoslava', '12-9': 'Vratislav', '12-10': 'Julie',
-  '12-11': 'Dana', '12-12': 'Simona', '12-13': 'Lucie', '12-14': 'Lýdie', '12-15': 'Radana',
-  '12-16': 'Albína', '12-17': 'Daniel', '12-18': 'Miloslav', '12-19': 'Ester', '12-20': 'Dagmar',
-  '12-21': 'Natálie', '12-22': 'Šimon', '12-23': 'Vlasta', '12-24': 'Adam a Eva', '12-25': '',
-  '12-26': 'Štěpán', '12-27': 'Žaneta', '12-28': 'Bohumila', '12-29': 'Judita', '12-30': 'David', '12-31': 'Silvestr',
-};
+// Český občanský kalendář jmen — „dnes má svátek…" v hlavičce panelu Můj den,
+// v lite režimu a v exportním obrázku. Statická data, žádné API.
+//
+// ⚠️ FORMÁT: dvanáct řádků po měsících, jména oddělená čárkou, pořadí = dny
+// v měsíci (únor má 29 kvůli přestupnému roku). Prázdné místo mezi čárkami =
+// den bez jmeniny (státní svátky apod.) → řádek se nezobrazí.
+//
+// Proč takhle a ne čitelné klíče '1-15': ty zabíraly v balíku 3 kB navíc a lite
+// režim jede PŘESNĚ na stropu rozpočtu (product/tests/lite-bundle.js). Rozepsanou
+// podobu hlídá product/tests/name-days.js — 366 klíčů, žádná díra, spot-checky.
+// Jméno NESMÍ obsahovat čárku (generátor to kontroloval; „Adam a Eva" je v pořádku).
+const MESICE = [
+  ',Karina,Radmila,Diana,Dalimil,,Vilma,Čestmír,Vladan,Břetislav,Bohdana,Pravoslav,Edita,Radovan,Alice,Ctirad,Drahoslav,Vladislav,Doubravka,Ilona,Běla,Slavomír,Zdeněk,Milena,Miloš,Zora,Ingrid,Otýlie,Zdislava,Robin,Marika',
+  'Hynek,Nela,Blažej,Jarmila,Dobromila,Vanda,Veronika,Milada,Apolena,Mojmír,Božena,Slavěna,Věnceslav,Valentýn,Jiřina,Ljuba,Miloslava,Gizela,Patrik,Oldřich,Lenka,Petr,Svatopluk,Matěj,Liliana,Dorota,Alexandr,Lumír,Horymír',
+  'Bedřich,Anežka,Kamil,Stela,Kazimír,Miroslav,Tomáš,Gabriela,Františka,Viktorie,Anděla,Řehoř,Růžena,Rút a Matylda,Ida,Elena a Herbert,Vlastimil,Eduard,Josef,Světlana,Radek,Leona,Ivona,Gabriel,Marián,Emanuel,Dita,Soňa,Taťána,Arnošt,Kvido',
+  'Hugo,Erika,Richard,Ivana,Miroslava,Vendula,Heřman a Hermína,Ema,Dušan,Darja,Izabela,Julius,Aleš,Vincenc,Anastázie,Irena,Rudolf,Valérie,Rostislav,Marcela,Alexandra,Evženie,Vojtěch,Jiří,Marek,Oto,Jaroslav,Vlastislav,Robert,Blahoslav',
+  ',Zikmund,Alexej,Květoslav,Klaudie,Radoslav,Stanislav,,Ctibor,Blažena,Svatava,Pankrác,Servác,Bonifác,Žofie,Přemysl,Aneta,Nataša,Ivo,Zbyšek,Monika,Emil,Vladimír,Jana,Viola,Filip,Valdemar,Vilém,Maxim,Ferdinand,Kamila',
+  'Laura,Jarmil,Tamara,Dalibor,Dobroslav,Norbert,Iveta a Slavoj,Medard,Stanislava,Gita,Bruno,Antonie,Antonín,Roland,Vít,Zbyněk,Adolf,Milan,Leoš,Květa,Alois,Pavla,Zdeňka,Jan,Ivan,Adriana,Ladislav,Lubomír,Petr a Pavel,Šárka',
+  'Jaroslava,Patricie,Radomír,Prokop,Cyril a Metoděj,,Bohuslava,Nora,Drahoslava,Libuše a Amálie,Olga,Bořek,Markéta,Karolína,Jindřich,Luboš,Martina,Drahomíra,Čeněk,Ilja,Vítězslav,Magdaléna,Libor,Kristýna,Jakub,Anna,Věroslav,Viktor,Marta,Bořivoj,Ignác',
+  'Oskar,Gustav,Miluše,Dominik,Kristián,Oldřiška,Lada,Soběslav,Roman,Vavřinec,Zuzana,Klára,Alena,Alan,Hana,Jáchym,Petra,Helena,Ludvík,Bernard,Johana,Bohuslav,Sandra,Bartoloměj,Radim,Luděk,Otakar,Augustýn,Evelína,Vladěna,Pavlína',
+  'Linda a Samuel,Adéla,Bronislav,Jindřiška,Boris,Boleslav,Regína,Mariana,Daniela,Irma,Denisa,Marie,Lubor,Radka,Jolana,Ludmila,Naděžda,Kryštof,Zita,Oleg,Matouš,Darina,Berta,Jaromír,Zlata,Andrea,Jonáš,Václav,Michal,Jeroným',
+  'Igor,Olívie a Oliver,Bohumil,František,Eliška,Hanuš,Justýna,Věra,Štefan a Sára,Marina,Andrej,Marcel,Renáta,Agáta,Tereza,Havel,Hedvika,Lukáš,Michaela,Vendelín,Brigita,Sabina,Teodor,Nina,Beáta,Erik,Šarlota a Zoe,,Silvie,Tadeáš,Štěpánka',
+  'Felix,,Hubert,Karel,Miriam,Liběna,Saskie,Bohumír,Bohdan,Evžen,Martin,Benedikt,Tibor,Sáva,Leopold,Otmar,Mahulena,Romana,Alžběta,Nikola,Albert,Cecílie,Klement,Emílie,Kateřina,Artur,Xenie,René,Zina,Ondřej',
+  'Iva,Blanka,Svatoslav,Barbora,Jitka,Mikuláš,Ambrož a Benjamín,Květoslava,Vratislav,Julie,Dana,Simona,Lucie,Lýdie,Radana,Albína,Daniel,Miloslav,Ester,Dagmar,Natálie,Šimon,Vlasta,Adam a Eva,,Štěpán,Žaneta,Bohumila,Judita,David,Silvestr',
+];
+
+export const NAME_DAYS = Object.fromEntries(
+  MESICE.flatMap((mesic, i) => mesic.split(',').map((jmeno, d) => [`${i + 1}-${d + 1}`, jmeno])),
+);
 
 export function todayNameDay(d = new Date()) {
   return NAME_DAYS[`${d.getMonth() + 1}-${d.getDate()}`] || '';

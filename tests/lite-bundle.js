@@ -23,13 +23,20 @@ const SRC = path.join(__dirname, '../frontend/src');
 // vypisují taky, ale samotný PocketBase nekomprimuje — viz poznámka
 // v server/pb_hooks/main.pb.js.) Po dietě 4. 8. 2026 ~453 kB, strop drží
 // úsporu zamčenou: s původními 560 by balík mohl tiše vyrůst zpátky o 100+ kB
+// a test by mlčel. Rezerva je na růst lite režimu, ne na přilepení knihoven
+// plné verze — samotný ReactFlow má 670 kB.
 // 11. 8. 2026: 480 → 490. Vlna externích kontaktů + tří stylů zarovnání přidala
 // ~3 kB ČISTĚ i18n textů do sdíleného jazykového balíku (žádná knihovna —
 // všechny kontroly těžkých závislostí výše drží; naměřeno 483). Strop záměrně
 // jen o 10 kB, ať tlak na dietu zůstává.
-// a test by mlčel. Rezerva je na růst lite režimu, ne na přilepení knihoven
-// plné verze — samotný ReactFlow má 670 kB.
-const MAX_KB = Number(process.env.LITE_MAX_KB || 490);
+// 18. 8. 2026: 490 → 495. Svátek v hlavičce lite (Richard: „v režimu lite se
+// nezobrazuje svátek") přinesl do balíku český jmenný kalendář. Cena se nejdřív
+// osekala: data se přepsala z klíčů '1-15' na dvanáct řádků po měsících, což
+// ušetřilo ~3 kB — plná appka díky tomu ZHUBLA 898 → 895 kB. Zbylé +3 kB jsou
+// holá data kalendáře, levněji to nejde bez druhé kopie na serveru (= drift).
+// Naměřeno 494 (opakovaně, stabilně) → do stropu zbývá 1 kB, ne 5. Jedna delší
+// věta v hlavním jazykovém balíku sadu zase shodí; nové texty patří do lazy ns.
+const MAX_KB = Number(process.env.LITE_MAX_KB || 495);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.

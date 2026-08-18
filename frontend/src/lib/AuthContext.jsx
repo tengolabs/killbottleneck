@@ -26,6 +26,9 @@ export const AuthProvider = ({ children }) => {
   const checkUserAuth = async () => {
     setIsLoadingAuth(true);
     setAuthError(null);
+    // Kdo se právě přihlásil, musí dostat čerstvé údaje organizace — držená
+    // odpověď mohla vzniknout ještě bez přihlášení, tedy prázdná.
+    base44.org.forget();
     if (!pb.authStore.isValid) {
       setUser(null);
       setIsAuthenticated(false);
@@ -79,6 +82,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = (shouldRedirect = true) => {
+    // Údaje organizace se drží v paměti klienta (base44.org.get). Bez zapomenutí
+    // by po odhlášení viděl název a logo firmy i další člověk u téhož počítače.
+    base44.org.forget();
     setUser(null);
     setIsAuthenticated(false);
     if (shouldRedirect) {

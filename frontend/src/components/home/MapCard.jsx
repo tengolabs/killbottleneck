@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { projectIcon, projectName } from '@/lib/projectColors';
+import { Target } from 'lucide-react';
+import { projectIcon, projectName, apexTitle } from '@/lib/projectColors';
 import { fmtDateShort } from '@/lib/locale';
 
 // Jedna karta projektu na titulní straně.
@@ -16,6 +17,13 @@ export default function MapCard({ map, icon: Icon, iconWrapClass = 'bg-primary/1
   const { t } = useTranslation('home');
   const color = map.color || '';
   const emoji = projectIcon(map);
+  const nazev = projectName(map) || t('misc.untitled');
+  // Hlavní cíl (text vrcholového uzlu) pod názvem projektu — Richard 18. 8. 2026:
+  // „uživatelé by chtěli vidět pod názvem projektu název hlavního uzlu."
+  // Když se shoduje s názvem projektu (typicky projekt ze šablony), řádek se
+  // NEUKAZUJE — dvakrát totéž pod sebou je šum, ne informace.
+  const hlavniCil = apexTitle(map);
+  const stejne = hlavniCil.toLocaleLowerCase() === nazev.toLocaleLowerCase();
   return (
     <div
       onClick={onClick}
@@ -35,8 +43,16 @@ export default function MapCard({ map, icon: Icon, iconWrapClass = 'bg-primary/1
         {badges}
       </div>
       <h3 className="font-heading font-semibold text-base mb-1 line-clamp-1">
-        {projectName(map) || t('misc.untitled')}
+        {nazev}
       </h3>
+      {hlavniCil && !stejne && (
+        /* `line-clamp` patří až na vnitřní <span> — na <p> ho přebije `flex`
+           (Tailwind emituje display AŽ ZA lineClamp), takže by byl mrtvý. */
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground mb-1.5" title={hlavniCil}>
+          <Target className="w-3.5 h-3.5 shrink-0 mt-px opacity-70" aria-hidden="true" />
+          <span className="line-clamp-2">{hlavniCil}</span>
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">{meta}</p>
       {map.updated_date && (
         <p className="text-xs text-muted-foreground/70 mt-2">

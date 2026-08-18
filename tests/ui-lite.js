@@ -389,6 +389,63 @@ const clickText = async (page, text, sel = 'button, a') => {
     await sleep(2500);
     expect(page.url().endsWith('/lite'), `jedním klikem zpět v lite režimu (${page.url().replace(BASE, '')})`);
 
+    console.log('== v hlavičce je svátek (Richard 18. 8. 2026) ==');
+    // ⚠️ Nesmí to být natvrdo „Helena" — sada by fungovala jeden den v roce.
+    // Očekávaná hodnota se bere ze stejného kalendáře jako appka a dny BEZ
+    // jmeniny (1. 1., 1. 5., …) se kontrolují obráceně: tam řádek být nesmí.
+    const { todayNameDay } = await import('file://' + require('path').resolve(__dirname, '../frontend/src/lib/nameDays.js'));
+    const dnesniSvatek = todayNameDay();
+    // ⚠️ Texty níž jsou natvrdo česky, ale jazyk určuje navigator.language
+    // prohlížeče — pod anglickým prostředím by sada falešně červenala.
+    await page.evaluateOnNewDocument(() => localStorage.setItem('kb-lang', 'cs'));
+    await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
+    await sleep(2000);
+    const hlavicka = await page.evaluate(() => (document.querySelector('header')?.innerText || ''));
+    if (dnesniSvatek) {
+      expect(hlavicka.includes(`svátek má ${dnesniSvatek}`),
+        `hlavička lite ukazuje „svátek má ${dnesniSvatek}" („${hlavicka.split('\n').pop()}")`);
+    } else {
+      expect(!/svátek má/.test(hlavicka),
+        `dnes jmeniny nejsou, hlavička o svátku mlčí („${hlavicka.split('\n').pop()}")`);
+    }
+    // ⚠️ Ve dnech BEZ jmenin (1. 1., 1. 5., … ~11 dní v roce) by výše proběhla jen
+    // záporná větev a sada by v ten den prošla i appce, která svátek nezobrazí
+    // NIKDY. Proto se kladná strana ověří vždy — s podvrženým datem, kdy jmeniny
+    // jistě jsou. (Nález panelu /checkup 18. 8. 2026.)
+    const PEVNE = new Date(2026, 6, 21);   // 21. 7. = Vítězslav, viz name-days.js
+    const ocekavany = todayNameDay(PEVNE);
+    await page.evaluateOnNewDocument((ms) => {
+      const Puvodni = Date;
+      // eslint-disable-next-line no-global-assign
+      Date = class extends Puvodni {
+        constructor(...a) { super(...(a.length ? a : [ms])); }
+        static now() { return ms; }
+      };
+    }, PEVNE.getTime());
+    await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
+    await sleep(2000);
+    const hlavickaPevna = await page.evaluate(() => (document.querySelector('header')?.innerText || ''));
+    expect(hlavickaPevna.includes(`svátek má ${ocekavany}`),
+      `s podvrženým 21. 7. hlavička hlásí „svátek má ${ocekavany}" („${hlavickaPevna.split('\n').pop()}")`);
+
+    console.log('== logo v liště je zkratka domů (klik nesmí spadnout) ==');
+    // Logo volalo `navigate`, které v LiteList vůbec neexistovalo (hák seděl
+    // ve vnitřní komponentě Row, kde se nepoužíval) → klik = ReferenceError.
+    // Strom to NESHODÍ (chyba letí z handleru, ne z renderu), takže navenek se
+    // jen „nic nestane" — o to hůř se to všimne. Chytá to kontrola konzole
+    // na konci sady; ověřeno mutací 18. 8. 2026 (vrácení vady = 1 ❌).
+    await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
+    await sleep(2000);
+    const logo = await page.$('header button[aria-label="Zpět na dnešní seznam"]');
+    expect(!!logo, 'logo v lite hlavičce je klikací zkratka');
+    if (logo) {
+      await logo.click();
+      await sleep(1500);
+      const zije = await page.evaluate(() => (document.body.innerText || '').trim().length);
+      expect(zije > 50, `po kliku na logo seznam dál stojí (${zije} znaků)`);
+      expect(page.url().includes('/lite'), `logo drží v lite režimu (${page.url().replace(BASE, '')})`);
+    }
+
     console.log('== stará adresa /light dál funguje ==');
     // režim se přejmenoval z „light" na „lite"; kdo si starou adresu uložil
     // na plochu telefonu, nesmí zůstat na chybové stránce

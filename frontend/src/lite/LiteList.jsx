@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Calendar, CheckSquare, Target, Lightbulb, Send, TriangleAlert, Flame, CalendarClock, Clock, Pause, Inbox, Sunrise, CalendarCheck, CalendarDays, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-react';
 import TaskRowActions from '@/components/shared/TaskRowActions';
 import { getDeadlineStatus, formatDeadline } from '@/lib/nodeMeta';
+import { todayNameDay } from '@/lib/nameDays';
 import { planState } from '@/lib/taskActions';
 import { intlLocale } from '@/lib/locale';
 import { focusStateOf, sortFocusFirst } from '@/lib/focus';
@@ -46,7 +47,6 @@ const shortEmail = (email) => String(email || '').split('@')[0] || email;
 
 function Row({ item, onChanged, onFailed }) {
   const { t } = useTranslation('lite');
-  const navigate = useNavigate();
   const { t: tc } = useTranslation('common');
   const { user } = useAuth();
   const focusState = focusStateOf(user, item);
@@ -115,6 +115,7 @@ function Row({ item, onChanged, onFailed }) {
 
 export default function LiteList({ kind, day, failed, onReload, onChanged, onFailed }) {
   const { t, i18n } = useTranslation('lite');
+  const navigate = useNavigate();
   // Hotová práce se ze seznamu schovává schválně — ale úplně zmizet nesmí.
   // Richard 27. 7. 2026: „ať si v hlavě potvrdím, že to mám a někde to nevisí,
   // například důležitý úkol pro šéfa." Sbalené, ať to nezabírá místo.
@@ -150,8 +151,14 @@ export default function LiteList({ kind, day, failed, onReload, onChanged, onFai
           </span>
         </button>
         <h1 className="font-heading text-xl font-bold">{t(kind === 'today' ? 'today.title' : 'delegated.title')}</h1>
+        {/* Svátek chyběl jen v lite (Richard 18. 8. 2026) — v plné verzi ho
+            hlavička „Můj den" má odjakživa. Stejná podmínka i pořadí jako tam:
+            jen čeština (kalendář je český) a jen když ten den jmeniny jsou.
+            Popisek se půjčuje z namespace myday, ať ta věta žije na jednom
+            místě; myday je v hlavním jazykovém balíku, takže lite nic nestojí. */}
         <p className="text-xs text-muted-foreground mt-0.5">
           {new Date().toLocaleDateString(intlLocale(i18n.language), { weekday: 'long', day: 'numeric', month: 'long' })}
+          {i18n.language === 'cs' && todayNameDay() ? ` · ${t('myday:panel.nameDay')} ${todayNameDay()}` : ''}
           {kind === 'today' && day?.counts ? ` · ${t('today.doneToday', { count: day.counts.done })}` : ''}
         </p>
       </header>

@@ -55,7 +55,6 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
     setTarget(NEW);
     setVisibility('org');
     setNumbering(false);
-    setWithTasks(false);
     setAutoCreate('');
     setAutoDay(1);
     setSaving(false);
