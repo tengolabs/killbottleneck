@@ -1343,6 +1343,36 @@ function aiManagerEmails(app) {
   }
 }
 
+// Smí tenhle přihlášený EDITOVAT organizační strukturu? Admin vždy, plus každý
+// se zapnutým `is_org_manager` (typicky personalista, který kreslí strom pozic,
+// ale nemá být administrátorem instance — Richard 17. 8. 2026).
+// ⚠️ SMAZAT org mapu tohle NEOPRAVŇUJE: mazání struktury celé firmy zůstává
+// adminovi (goalmaps delete hook). Editace ≠ zrušení.
+function smiEditovatOrgStrukturu(auth) {
+  if (!auth) return false;
+  return auth.getString("role") === "admin" || auth.getBool("is_org_manager") === true;
+}
+
+// E-maily všech, kdo mají mít edit na org mapě. Fallback stejný jako u AI:
+// když příznak nemá NIKDO, zastávají to administrátoři („když nebude nikdo
+// přiřazen, musí to někdo být jako teď"). Používá se při dorovnávání sdílení
+// org mapy — bez toho by se správce ke strukturu nedostal přes RLS, i když ho
+// routy pouštějí.
+function orgManagerEmails(app) {
+  try {
+    const admini = app.findRecordsByFilter("users", "role = 'admin'", "email", 200, 0)
+      .map((u) => u.getString("email"))
+      .filter(Boolean);
+    const vyslovni = app.findRecordsByFilter("users", "is_org_manager = true", "email", 200, 0)
+      .map((u) => u.getString("email"))
+      .filter(Boolean);
+    // admini strukturu kreslili vždycky a nesmí o ni přijít jmenováním správce
+    return [...new Set(admini.concat(vyslovni))];
+  } catch (err) {
+    return [];
+  }
+}
+
 // Uživatel u uzlu zaškrtl „tady by se hodila automatizace" → notifikace SPRÁVCŮM
 // AI AGENTŮ. Není to příkaz agentovi, ale PŘÁNÍ: správce se podívá, rozhodne se
 // a případně automatizaci postaví. Volitelná poznámka mu dá kontext.
@@ -1694,6 +1724,16 @@ function v1SaveMapData(app, map, nodes, edges, lang, relayout, actorEmail, opts)
   // MUSÍ předat isOwner=false + actorEmail, jinak by stráže mlčely.
   const origNodes = jsonVal(map, "nodes", []); // parse JEDNOU (pole má až 5 MB)
   const origEdges = jsonVal(map, "edges", []); // pro diff automatizačních pravidel (node_unblocked)
+  // ⚠️ v1 API (a MCP) má org strukturu POUZE KE ČTENÍ — závazné rozhodnutí
+  // z v0.30: „klíč nesmí eskalovat, jmenování jen v aplikaci". Bez téhle
+  // brány stačilo být vlastníkem org mapy a přes API klíč se do ní dalo
+  // zapisovat i po odebrání práv (ověřeno živě panelem 17. 8.).
+  // Struktura se mění výhradně routami /api/kb/org-structure/* a editorem,
+  // kde stráž kontroluje čerstvá práva z databáze.
+  if (map.getString("kind") === "org" && (opts || {}).orgAllowed !== true) {
+    const i18nOrg = require(`${__hooks}/i18n.js`);
+    return { status: 403, error: i18nOrg.t(lang, "err.orgApiReadOnly") };
+  }
   // org mapa: změněné holder/deputy validovat i tady — /assign nesmí být
   // jediná brána (nález panelu 15. 8.)
   if (map.getString("kind") === "org") {
@@ -2390,8 +2430,21 @@ function zalozOrgMapu(app, user, lang) {
   rec.set("description", "");
   rec.set("nodes", [apex]);
   rec.set("edges", []);
-  rec.set("owner", user.id);
-  rec.set("owner_email", user.getString("email"));
+  // ⚠️ VLASTNÍKEM ORG MAPY JE VŽDY ADMIN, i když ji zakládá správce struktury.
+  // Vlastnictví je v tomhle systému silnější než role: vlastník smí mapu
+  // archivovat, zveřejnit, rozdat i zapisovat do ní přes v1 API klíč — a to
+  // všechno mu zůstane i poté, co mu příznak správce odeberou. Navíc `owner`
+  // má cascadeDelete, takže smazáním účtu personalisty by zmizela struktura
+  // celé firmy. (Vše ověřeno živě 17. 8. panelem /checkup.)
+  // Zakladatel se dostane k editaci přes sdílení (dorovnává ho /org-map
+  // a users hook), ne přes vlastnictví.
+  let majitel = user;
+  try {
+    const admini = app.findRecordsByFilter("users", "role = 'admin'", "created", 1, 0);
+    if (admini.length) majitel = admini[0];
+  } catch (err) { /* bez adminů zůstane zakladatel — instance bez admina neexistuje */ }
+  rec.set("owner", majitel.id);
+  rec.set("owner_email", majitel.getString("email"));
   rec.set("is_public", false);
   rec.set("team_access", "read"); // strukturu vidí celá organizace
   rec.set("kind", "org");
@@ -2502,7 +2555,7 @@ function addOrgPosition(app, map, parentId, title, actorEmail, lang) {
   nodes.push({ id: id, type: "goalNode", position: { x: (parent.position || {}).x || 0, y: ((parent.position || {}).y || 0) + 200 },
     data: { title: cleanTitle, status: "todo", positionKind: "position" } });
   edges.push({ id: "edge-" + id, source: parent.id, target: id });
-  const saved = v1SaveMapData(app, map, nodes, edges, lang, true, actorEmail, { isOwner: true });
+  const saved = v1SaveMapData(app, map, nodes, edges, lang, true, actorEmail, { isOwner: true, orgAllowed: true });
   if (saved.error) return { error: saved.error, status: saved.status || 400 };
   return { row: orgStructureRows(map).find((r) => r.node_id === id) };
 }
@@ -2525,7 +2578,7 @@ function removeOrgPosition(app, map, nodeId, actorEmail, lang) {
   const pryc = [nodeId].concat(noteDeti);
   const zbyleNodes = nodes.filter((n) => !(n && pryc.includes(n.id)));
   const zbyleEdges = edges.filter((ed) => !(ed && (pryc.includes(ed.source) || pryc.includes(ed.target))));
-  const saved = v1SaveMapData(app, map, zbyleNodes, zbyleEdges, lang, true, actorEmail, { isOwner: true });
+  const saved = v1SaveMapData(app, map, zbyleNodes, zbyleEdges, lang, true, actorEmail, { isOwner: true, orgAllowed: true });
   if (saved.error) return { error: saved.error, status: saved.status || 400 };
   return { ok: true };
 }
@@ -2562,7 +2615,7 @@ function setPositionAssignment(app, map, nodeId, patch, actorEmail, lang) {
     d.title = title;
   }
   node.data = d;
-  const saved = v1SaveMapData(app, map, nodes, edges, lang, false, actorEmail, { isOwner: true });
+  const saved = v1SaveMapData(app, map, nodes, edges, lang, false, actorEmail, { isOwner: true, orgAllowed: true });
   if (saved.error) return { error: saved.error, status: saved.status || 400 };
   return { row: orgStructureRows(map).find((r) => r.node_id === nodeId) };
 }
@@ -5380,7 +5433,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
   return out;
 }
 
-module.exports = { env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+module.exports = { env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

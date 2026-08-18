@@ -174,6 +174,9 @@ onRecordCreateRequest((e) => {
   if (!byAdmin) {
     // správcovství AI agentů se nedá získat self-registrací (uděluje ho admin)
     e.record.set("is_ai_manager", false);
+    // totéž pro správce organizační struktury — jinak by si právo kreslit strom
+    // pozic celé firmy udělil kdokoli při registraci
+    e.record.set("is_org_manager", false);
     // zástupce také nastavuje jen admin (vzor is_ai_manager)
     e.record.set("deputy", "");
   } else if (e.record.getString("deputy")) {
@@ -212,10 +215,17 @@ onRecordCreateRequest((e) => {
 onRecordUpdateRequest((e) => {
   const { NOTIFY_TYPES, NOTIFY_ALWAYS } = require(`${__hooks}/helpers.js`);
   const byAdmin = e.hasSuperuserAuth() || (e.auth && e.auth.getString("role") === "admin");
+  // ⚠️ Zástupce zapisuje správce struktury VÝHRADNĚ routou /member-deputy.
+  // Tady žádná výjimka být nesmí: `users.updateRule` pouští ne-adminovi jen
+  // JEHO VLASTNÍ účet, takže by výjimka nedovolila zapsat zástupce kolegům
+  // (na to je ta routa), ale dovolila by správci nastavit zástupce SÁM SOBĚ —
+  // přesně to, co komentář níž zakazuje. (Nález panelu 17. 8.)
   if (!byAdmin) {
     e.record.set("role", e.record.original().getString("role"));
     // stejný vzor jako role: správcovství AI agentů si nikdo nenastaví sám
     e.record.set("is_ai_manager", e.record.original().getBool("is_ai_manager"));
+    // ani správcovství organizační struktury
+    e.record.set("is_org_manager", e.record.original().getBool("is_org_manager"));
     // zástupce určuje admin — člen si ho nevybírá (ani sobě, ani jiným)
     e.record.set("deputy", e.record.original().getString("deputy"));
   } else {
@@ -270,28 +280,63 @@ onRecordUpdateRequest((e) => {
   sanitizeUserFocus(e.record);
   e.next();
 
-  // DEGRADACE ADMINA: odebrat mu edit sdílení org mapy. /org-map edit adminům
-  // jen PŘIDÁVÁ — bez tohohle úklidu by si bývalý admin podržel kreslení
-  // struktury přes map_shares (obrana do hloubky ke stráži role v goalmaps
-  // update hooku; nález panelu 15. 8.).
+  // SDÍLENÍ ORG MAPY podle práv. Kdo smí strukturu editovat (admin NEBO správce
+  // struktury), musí na mapu dosáhnout i přes RLS — routy samy nestačí, editor
+  // by mu ji ukázal jen ke čtení. A kdo právo ZTRATÍ (degradace admina nebo
+  // vypnutí příznaku), musí o edit přijít: /org-map ho totiž jen PŘIDÁVÁ, takže
+  // bez tohohle úklidu by si bývalý správce kreslení struktury podržel přes
+  // map_shares (obrana do hloubky ke stráži v goalmaps update hooku;
+  // nález panelu 15. 8., rozšířeno o správce struktury 17. 8.).
   try {
-    const origRole = e.record.original().getString("role");
-    if (origRole === "admin" && e.record.getString("role") !== "admin") {
-      const { findOrgMapAnyState, jsonList, syncShares } = require(`${__hooks}/helpers.js`);
+    const { findOrgMapAnyState, jsonList, syncShares } = require(`${__hooks}/helpers.js`);
+    const smiTeď = e.record.getString("role") === "admin" || e.record.getBool("is_org_manager") === true;
+    const smělDřív = e.record.original().getString("role") === "admin" || e.record.original().getBool("is_org_manager") === true;
+    if (smiTeď !== smělDřív) {
       const om = findOrgMapAnyState(e.app);
-      if (om && om.getString("owner_email") !== e.record.getString("email")) {
-        const em = e.record.getString("email");
+      const em = e.record.getString("email");
+      // vlastníka mapy neřešíme — ten má práva z vlastnictví, ne ze sdílení
+      if (om && em && om.getString("owner_email") !== em) {
         const edit = jsonList(om, "shared_with_edit");
-        if (edit.includes(em)) {
-          om.set("shared_with_edit", edit.filter((x) => x !== em));
-          om.set("shared_with", jsonList(om, "shared_with").filter((x) => x !== em));
+        const videt = jsonList(om, "shared_with");
+        if (smiTeď && !edit.includes(em)) {
+          om.set("shared_with_edit", edit.concat([em]));
+          om.set("shared_with", videt.includes(em) ? videt : videt.concat([em]));
           e.app.save(om);
           syncShares(e.app, om); // JSON je zrcadlo — autorizaci drží map_shares
+        } else if (!smiTeď && edit.includes(em)) {
+          om.set("shared_with_edit", edit.filter((x) => x !== em));
+          om.set("shared_with", videt.filter((x) => x !== em));
+          e.app.save(om);
+          syncShares(e.app, om);
         }
       }
     }
   } catch (err) {
-    try { e.app.logger().warn("users: úklid org sdílení po degradaci selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    try { e.app.logger().warn("users: srovnání org sdílení selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+
+  // JMENOVÁNÍ SPRÁVCEM STRUKTURY se člověk musí dozvědět (Richard 17. 8.:
+  // „čekal bych, že dostane notifikaci na zvonek"). Bez toho dostane tiše
+  // pravomoc, o které neví, a nikdo mu neřekne, kde ji má použít — proto text
+  // rovnou navádí pod panáčka. Posílá se JEN při zapnutí příznaku, ne při
+  // každém uložení účtu, a záměrně mimo blok sdílení výš: přijít musí i tehdy,
+  // když org mapa ještě neexistuje.
+  try {
+    const { notify } = require(`${__hooks}/helpers.js`);
+    if (e.record.getBool("is_org_manager") === true && e.record.original().getBool("is_org_manager") !== true) {
+      notify(e.app, {
+        email: e.record.getString("email"),
+        actorEmail: e.auth ? e.auth.getString("email") : "",
+        type: "org_notice",
+        textKey: "notify.orgManagerGranted",
+        // ⚠️ BEZ dedupKey: index je UNIQUE (user, dedup_key) natrvalo, takže
+        // s pevným klíčem by druhé jmenování (po odebrání a vrácení příznaku)
+        // proběhlo TIŠE — přesně to, čemu má oznámení bránit.
+
+      });
+    }
+  } catch (err) {
+    try { e.app.logger().warn("users: oznámení o jmenování správcem struktury selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
 }, "users");
 
@@ -324,16 +369,19 @@ onRecordAfterDeleteSuccess((e) => {
         if ((n.data || {}).deputy === em) { n.data = Object.assign({}, n.data, { deputy: "" }); changed = true; }
       }
       if (changed) {
-        const saved = v1SaveMapData(e.app, om, nodes, jsonVal(om, "edges", []), null, false, "", { isOwner: true });
+        const saved = v1SaveMapData(e.app, om, nodes, jsonVal(om, "edges", []), null, false, "", { isOwner: true, orgAllowed: true });
         if (!saved.error && uvolnene.length) {
           try {
-            const admins = e.app.findRecordsByFilter("users", "role = 'admin'", "", 200, 0);
-            for (const adm of admins) {
+            // Uvolněné pozice hlásíme adminům I SPRÁVCŮM STRUKTURY — „jmenujte
+            // nové obsazení" je přesně jejich práce, takže by se personalista
+            // o díře ve struktuře jinak nedozvěděl (nález panelu 17. 8.).
+            const { orgManagerEmails } = require(`${__hooks}/helpers.js`);
+            for (const komu of orgManagerEmails(e.app)) {
               notify(e.app, {
-                email: adm.getString("email"), actorEmail: "", type: "org_notice", mapId: om.id,
+                email: komu, actorEmail: "", type: "org_notice", mapId: om.id,
                 textKey: "notify.orgVacated",
                 params: { member: em, positions: uvolnene.join(", ").slice(0, 200) },
-                dedupKey: "orgvac:" + em + ":" + adm.getString("email"),
+                dedupKey: "orgvac:" + em + ":" + komu,
               });
             }
           } catch (err) { /* oznámení je bonus, úklid už proběhl */ }
@@ -342,6 +390,27 @@ onRecordAfterDeleteSuccess((e) => {
     }
   } catch (err) {
     try { e.app.logger().warn("users delete: úklid zastupování selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+
+  // Smazaný člověk musí zmizet i ze SDÍLENÍ org mapy. Bez toho po něm zůstane
+  // e-mail v `shared_with_edit` i v `map_shares` — a jakmile se tatáž adresa
+  // znovu zaregistruje, přístup ke struktuře jí ožije (nález panelu 17. 8.).
+  try {
+    const { findOrgMapAnyState, jsonList, syncShares } = require(`${__hooks}/helpers.js`);
+    const em2 = e.record.getString("email");
+    const om2 = findOrgMapAnyState(e.app);
+    if (om2 && em2) {
+      const edit = jsonList(om2, "shared_with_edit");
+      const videt = jsonList(om2, "shared_with");
+      if (edit.includes(em2) || videt.includes(em2)) {
+        om2.set("shared_with_edit", edit.filter((x) => x !== em2));
+        om2.set("shared_with", videt.filter((x) => x !== em2));
+        e.app.save(om2);
+        syncShares(e.app, om2);
+      }
+    }
+  } catch (err) {
+    try { e.app.logger().warn("users delete: úklid org sdílení selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
   e.next();
 }, "users");
@@ -470,11 +539,25 @@ onRecordUpdateRequest((e) => {
   // typ mapy (org struktura) drží server — běžná mapa se nesmí „prohlásit" za org
   e.record.set("kind", orig.get("kind"));
   if (orig.getString("kind") === "org") {
-    // org strukturu edituje JEN admin — edit sdílení (map_shares) tu nestačí:
-    // degradovaný admin by si ho jinak podržel a dál řídil, komu pravidla
-    // přiřazují práci (nález panelu 15. 8.)
-    if (!e.hasSuperuserAuth() && (!e.auth || e.auth.getString("role") !== "admin")) {
-      throw new BadRequestError(t(L, "err.orgAdminOnly"));
+    // org strukturu edituje JEN admin nebo správce struktury — edit sdílení
+    // (map_shares) tu nestačí: degradovaný admin by si ho jinak podržel a dál
+    // řídil, komu pravidla přiřazují práci (nález panelu 15. 8.)
+    const { smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
+    const jeAdmin = e.hasSuperuserAuth() || (e.auth && e.auth.getString("role") === "admin");
+    if (!e.hasSuperuserAuth() && !smiEditovatOrgStrukturu(e.auth)) {
+      throw new BadRequestError(t(L, "err.orgManagerOnly"));
+    }
+    // ⚠️ SPRÁVA mapy (ne obsah) zůstává adminovi, i kdyby byl správce struktury
+    // jejím vlastníkem. ARCHIVACE má prakticky stejný účinek jako smazání —
+    // findOrgMap archivovanou mapu nevrací, takže zmizí tabulka i cíle pravidel
+    // — a admin by ji nevrátil, protože tahle pole smí měnit jen vlastník.
+    // Ověřeno živě 17. 8.: správce strukturu archivoval a admin ji neodarchivoval.
+    // Zákaz mazání (delete hook) by bez tohohle šel obejít archivací.
+    if (!jeAdmin) {
+      for (const f of ["archived", "archived_at", "is_public", "team_access", "owner", "owner_email",
+        "shared_with", "shared_with_edit", "shared_with_work"]) {
+        e.record.set(f, orig.get(f));
+      }
     }
     // změněné holder/deputy validovat i na přímém PATCHi — /assign není jediná brána
     const { orgAssignmentInvalid } = require(`${__hooks}/helpers.js`);
@@ -1913,6 +1996,13 @@ kbRoute("POST", "/share", (e) => {
   if (map.getString("owner") !== e.auth.id) {
     return e.json(403, { error: t(L, "err.onlyOwnerCanShare") });
   }
+  // ⚠️ ORG MAPA se tudy nesdílí ani nezveřejňuje — ani vlastníkem. Sdílení
+  // struktury srovnává výhradně /org-map a users hook podle práv; ruční zásah
+  // by je rozešel. A `toggle_public` by z organigramu firmy udělal veřejnou
+  // stránku (nález panelu 17. 8.: vlastník ho zveřejnil i po odebrání příznaku).
+  if (map.getString("kind") === "org" && e.auth.getString("role") !== "admin") {
+    return e.json(403, { error: t(L, "err.orgAdminOnly") });
+  }
   const sharedWith = jsonList(map, "shared_with");
   const sharedWithEdit = jsonList(map, "shared_with_edit");
   const sharedWithWork = jsonList(map, "shared_with_work");
@@ -2508,8 +2598,11 @@ kbRoute("POST", "/ai-test", (e) => {
 kbRoute("POST", "/invite", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
+  // Zve admin, manažer — a nově i správce struktury: je to personální práce
+  // a bez ní by musel o každý nový účet žádat admina (Richard 17. 8.).
+  const { smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
   const myRole = e.auth.getString("role");
-  if (myRole !== "admin" && myRole !== "manager") {
+  if (myRole !== "admin" && myRole !== "manager" && !smiEditovatOrgStrukturu(e.auth)) {
     return e.json(403, { error: t(L, "err.inviteAdminManagerOnly") });
   }
   const info = e.requestInfo().body || {};
@@ -2521,9 +2614,14 @@ kbRoute("POST", "/invite", (e) => {
     const { isExternalOwner } = require(`${__hooks}/helpers.js`);
     if (isExternalOwner(email)) return e.json(400, { error: t(L, "err.extEmailReserved") });
   }
-  // manažer smí zvát jen členy; roli manager/admin uděluje admin
+  // ⚠️ Vyšší roli než člen smí udělit VÝHRADNĚ admin. Dřív se degradace vázala
+  // na jméno role („manager"), takže kdokoli další, kdo směl zvát, si mohl
+  // pozvánkou založit administrátorský účet — a na instanci bez SMTP dostal
+  // heslo rovnou v odpovědi. Vyrobil to správce struktury (role `user`),
+  // ověřeno živě 17. 8. Podmínka proto NESMÍ vyjmenovávat role, které srazit;
+  // musí vyjmenovat tu jedinou, která smí povyšovat.
   let role = ["admin", "manager", "user"].includes(info.role) ? info.role : "user";
-  if (myRole === "manager") role = "user";
+  if (myRole !== "admin") role = "user";
   try {
     $app.findFirstRecordByFilter("users", "email = {:email}", { email: email });
     return e.json(400, { error: t(L, "err.userAlreadyExists") });
@@ -2589,7 +2687,11 @@ kbRoute("POST", "/invite", (e) => {
 kbRoute("POST", "/reset-user-password", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") {
+  // Reset hesla dělá admin a správce struktury (personální agenda). Hranice
+  // níž ZŮSTÁVAJÍ: ne sobě a ne adminovi — jinak by si správce struktury
+  // přepsáním admina převzal celou instanci.
+  const { smiEditovatOrgStrukturu: smiReset } = require(`${__hooks}/helpers.js`);
+  if (!smiReset(e.auth)) {
     return e.json(403, { error: t(L, "err.resetPasswordAdminOnly") });
   }
   const info = e.requestInfo().body || {};
@@ -2612,6 +2714,15 @@ kbRoute("POST", "/reset-user-password", (e) => {
   // ANI JINÉMU ADMINOVI (Richard 11. 8.): dva rovnocenní správci by si mohli
   // navzájem převzít účet a vystrnadit se z instance. Role je hranice, ne řád.
   if (rec.getString("role") === "admin") {
+    return e.json(403, { error: t(L, "err.resetPasswordNotAdmin") });
+  }
+  // ⚠️ A NE-ADMIN nesmí sáhnout ani na účet, který nese JAKÝKOLI správcovský
+  // příznak nebo vyšší roli. Hranice z 11. 8. počítala jen s rolemi; vedle nich
+  // ale mezitím vyrostly příznaky se skutečnou mocí (registr AI agentů, org
+  // struktura). Přepsáním hesla by si správce struktury převzal účet správce AI
+  // i manažera — a s ním jeho pravomoci (nález panelu 17. 8.).
+  if (e.auth.getString("role") !== "admin"
+      && (rec.getString("role") !== "user" || rec.getBool("is_ai_manager") || rec.getBool("is_org_manager"))) {
     return e.json(403, { error: t(L, "err.resetPasswordNotAdmin") });
   }
 
@@ -2660,6 +2771,9 @@ kbRoute("GET", "/members", (e) => {
     name: u.getString("name"),
     role: u.getString("role"),
     is_ai_manager: u.getBool("is_ai_manager"),
+    // správce struktury je stejně veřejný jako správce AI — Správa uživatelů
+    // podle něj kreslí přepínač a org struktura podle něj pouští editaci
+    is_org_manager: u.getBool("is_org_manager"),
     // zástupce (e-mail) je v týmu veřejná informace — kreslí ho org struktura
     // i tabulka zastupování a RuleBuilder podle něj radí; nastavuje jen admin
     deputy: u.getString("deputy"),
@@ -2674,14 +2788,16 @@ kbRoute("GET", "/members", (e) => {
 // nevznikne). Jen admin. Při každém volání se adminům dorovná edit sdílení —
 // strukturu kreslí VŠICHNI admini, ne jen ten, kdo ji založil.
 kbRoute("POST", "/org-map", (e) => {
-  const { zalozOrgMapu, syncShares, jsonList, mapToDto } = require(`${__hooks}/helpers.js`);
+  const { zalozOrgMapu, syncShares, jsonList, mapToDto, smiEditovatOrgStrukturu, orgManagerEmails } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") return e.json(403, { error: t(L, "err.orgAdminOnly") });
+  if (!smiEditovatOrgStrukturu(e.auth)) return e.json(403, { error: t(L, "err.orgManagerOnly") });
   const map = zalozOrgMapu($app, e.auth, L);
   try {
-    const admins = $app.findRecordsByFilter("users", "role = 'admin'", "", 200, 0)
-      .map((u) => u.getString("email"))
+    // edit dostanou VŠICHNI, kdo smějí strukturu editovat — admini i jmenovaní
+    // správci struktury. Routy je sice pouštějí, ale bez sdílení by na mapu
+    // nedosáhli přes RLS a editor by jim ji ukázal jen ke čtení.
+    const admins = orgManagerEmails($app)
       .filter((em) => em && em !== map.getString("owner_email"));
     const sharedWith = jsonList(map, "shared_with");
     const sharedEdit = jsonList(map, "shared_with_edit");
@@ -2711,10 +2827,10 @@ kbRoute("GET", "/org-structure", (e) => {
 // Zápis jde přes v1SaveMapData (historie změn, kanonizace) do TÉŽE mapy,
 // kterou kreslí editor — žádná druhá evidence.
 kbRoute("POST", "/org-structure/assign", (e) => {
-  const { findOrgMap, setPositionAssignment } = require(`${__hooks}/helpers.js`);
+  const { findOrgMap, setPositionAssignment, smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") return e.json(403, { error: t(L, "err.orgAdminOnly") });
+  if (!smiEditovatOrgStrukturu(e.auth)) return e.json(403, { error: t(L, "err.orgManagerOnly") });
   const map = findOrgMap($app);
   if (!map) return e.json(404, { error: t(L, "err.orgMapMissing") });
   const info = e.requestInfo().body || {};
@@ -2731,10 +2847,10 @@ kbRoute("POST", "/org-structure/assign", (e) => {
 // Založení pozice PŘÍMO Z TABULKY zastupování — bez vstupu do mapy (jen admin).
 // {parent_node_id?: id pozice | prázdno = pod vrchol, title?}
 kbRoute("POST", "/org-structure/add", (e) => {
-  const { findOrgMap, addOrgPosition } = require(`${__hooks}/helpers.js`);
+  const { findOrgMap, addOrgPosition, smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") return e.json(403, { error: t(L, "err.orgAdminOnly") });
+  if (!smiEditovatOrgStrukturu(e.auth)) return e.json(403, { error: t(L, "err.orgManagerOnly") });
   const map = findOrgMap($app);
   if (!map) return e.json(404, { error: t(L, "err.orgMapMissing") });
   const info = e.requestInfo().body || {};
@@ -2743,13 +2859,54 @@ kbRoute("POST", "/org-structure/add", (e) => {
   return e.json(200, { position: res.row });
 }, $apis.requireAuth());
 
+// Zápis ZÁSTUPCE člena — úzká routa pro admina i správce struktury.
+// Proč routa a ne přímý PATCH users: kolekce users pouští zápis do CIZÍHO účtu
+// jen adminovi (updateRule). Rozšířit to pravidlo na správce struktury by mu
+// otevřelo VŠECHNA pole cizího účtu včetně e-mailu — a s právem měnit hesla
+// je změna cizího e-mailu rovnou převzetí identity. Tahle routa proto umí
+// jedinou věc: nastavit `deputy`, se stejnou validací jako admin (Richard
+// 17. 8.: „mohla by dávat zástupce, to patří k personální").
+kbRoute("POST", "/member-deputy", (e) => {
+  const { smiEditovatOrgStrukturu, deputyValueError } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (!smiEditovatOrgStrukturu(e.auth)) return e.json(403, { error: t(L, "err.orgManagerOnly") });
+  const info = e.requestInfo().body || {};
+  const id = typeof info.id === "string" ? info.id : "";
+  const deputy = typeof info.deputy === "string" ? info.deputy.trim() : "";
+  let rec;
+  try {
+    rec = $app.findRecordById("users", id);
+  } catch (err) {
+    return e.json(404, { error: t(L, "err.userNotFound") });
+  }
+  // ⚠️ Cíl nesmí být PRIVILEGOVANÝ účet. `users.deputy` je osobní fallback
+  // dynamického cíle „zástupce zodpovědné osoby", takže zápisem k adminovi by
+  // se správce struktury udělal jeho zástupcem a přesměroval si na sebe
+  // přiřazení práce i notifikace z jeho map (ověřeno živě 17. 8.).
+  // SÁM SOBĚ ho ale nastavit SMÍ: je to jeho vlastní zastupování, nikomu tím
+  // nic nebere a spravovat zastupování je přesně jeho práce (Richardův
+  // klik-test 18. 8.: „nemohu sobě dát zástupce"). Manažeři jsou taky v pořádku
+  // — manažer dnes nemá žádné rozšířené právo kromě zvaní lidí.
+  const jeSam = rec.id === e.auth.id;
+  if (e.auth.getString("role") !== "admin" && !jeSam
+      && (rec.getString("role") === "admin" || rec.getBool("is_ai_manager") || rec.getBool("is_org_manager"))) {
+    return e.json(403, { error: t(L, "err.deputyPrivilegedTarget") });
+  }
+  const bad = deputyValueError($app, rec.getString("email"), deputy, L);
+  if (bad) return e.json(400, { error: bad });
+  rec.set("deputy", deputy);
+  $app.save(rec);
+  return e.json(200, { deputy: rec.getString("deputy") });
+}, $apis.requireAuth());
+
 // Odebrání pozice z tabulky (jen admin). Pozice s podřízenými se odmítá —
 // kaskádu ať admin udělá vědomě v mapě, ne omylem jedním klikem v tabulce.
 kbRoute("POST", "/org-structure/remove", (e) => {
-  const { findOrgMap, removeOrgPosition } = require(`${__hooks}/helpers.js`);
+  const { findOrgMap, removeOrgPosition, smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") return e.json(403, { error: t(L, "err.orgAdminOnly") });
+  if (!smiEditovatOrgStrukturu(e.auth)) return e.json(403, { error: t(L, "err.orgManagerOnly") });
   const map = findOrgMap($app);
   if (!map) return e.json(404, { error: t(L, "err.orgMapMissing") });
   const res = removeOrgPosition($app, map, String((e.requestInfo().body || {}).node_id || ""), e.auth.email(), L);

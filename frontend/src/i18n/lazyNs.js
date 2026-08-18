@@ -12,6 +12,14 @@ const LOADERS = {
     cs: () => import('./cs/billing.json'),
     en: () => import('./en/billing.json'),
   },
+  // texty stránky Správa organizace — vidí je jen admin a správce struktury,
+  // v lite nemají co dělat. ⚠️ Lite má rozpočet 490 kB a je PŘESNĚ na prahu:
+  // pár delších vět v hlavním jazykovém balíku ho shodilo už dvakrát
+  // (18. 8. 2026). Nové texty správcovské stránky patří sem, ne do auth.json.
+  admin: {
+    cs: () => import('./cs/admin.json'),
+    en: () => import('./en/admin.json'),
+  },
   // texty automatizačních pravidel — jen v plném editoru mapy (builder, přehled,
   // šablony), lite je nemá kde použít; mimo jazykový balík kvůli lite dietě
   // (přetáhly by lite přes rozpočet, lite-bundle.js 14. 8. 2026)

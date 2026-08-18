@@ -52,15 +52,38 @@ export default function UserMenu({ onInvited }) {
   const [timeOpen, setTimeOpen] = useState(false);
 
   // Organizační struktura pod panáčkem — vidí ji KAŽDÝ člen (Richard 15. 8.);
-  // ne-admin dostane mapu jen pro čtení (edit mají jen admini). Položka se
-  // ukazuje, jen když struktura existuje — jinak by vedla do prázdna.
+  // kdo ji nesmí měnit, dostane mapu jen pro čtení.
+  // Položka se ukazuje, když struktura EXISTUJE (jinak by vedla do prázdna) —
+  // NEBO když ji ten člověk smí založit. Bez té druhé půlky neměl jmenovaný
+  // správce struktury kde začít: tabulka je ve Správě uživatelů, kam se jako
+  // ne-admin nedostane, takže mu nezbyla ŽÁDNÁ cesta (Richard 17. 8.:
+  // „kde má Jana začít upravovat?").
+  const smiSpravovatStrukturu = user?.role === 'admin' || !!user?.is_org_manager;
   const [orgMapId, setOrgMapId] = useState('');
+  const [zakladamStrukturu, setZakladamStrukturu] = useState(false);
   useEffect(() => {
     if (!user) return;
     pb.send('/api/kb/org-structure', { method: 'GET' })
       .then((res) => setOrgMapId(res.exists ? res.map_id : ''))
       .catch(() => setOrgMapId(''));
   }, [user]);
+
+  // Otevřít strukturu; když ještě nevznikla, založí ji (routa je idempotentní —
+  // druhá org mapa nikdy nevznikne, i kdyby dva lidé klikli naráz).
+  const otevriStrukturu = async () => {
+    if (orgMapId) { navigate(`/map/${orgMapId}`); return; }
+    if (zakladamStrukturu) return;
+    setZakladamStrukturu(true);
+    try {
+      const res = await pb.send('/api/kb/org-map', { method: 'POST' });
+      const id = res?.map?.id;
+      if (id) { setOrgMapId(id); navigate(`/map/${id}`); }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setZakladamStrukturu(false);
+    }
+  };
 
   return (
     <>
@@ -90,12 +113,14 @@ export default function UserMenu({ onInvited }) {
           <DropdownMenuItem onClick={() => setSkinOpen(true)} data-skin-menu-item>
             <Palette className="w-4 h-4 mr-2" /> {t('menu.appearance')}
           </DropdownMenuItem>
-          {orgMapId && (
-            <DropdownMenuItem onClick={() => navigate(`/map/${orgMapId}`)} data-testid="menu-org-structure">
+          {(orgMapId || smiSpravovatStrukturu) && (
+            <DropdownMenuItem onClick={otevriStrukturu} data-testid="menu-org-structure">
               <Network className="w-4 h-4 mr-2" /> {t('menu.orgStructure')}
             </DropdownMenuItem>
           )}
-          {user?.role === 'admin' && (
+          {/* Správu organizace otevře i správce struktury — uvidí v ní ale jen
+              seznam lidí a organizační strukturu (Richard 17. 8.). */}
+          {(user?.role === 'admin' || smiSpravovatStrukturu) && (
             <DropdownMenuItem onClick={() => navigate('/admin/users')}>
               <Shield className="w-4 h-4 mr-2" /> {t('menu.orgAdmin')}
             </DropdownMenuItem>

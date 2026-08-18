@@ -9,6 +9,38 @@ below before you jump several versions.
 
 ---
 
+## v0.36-beta — 2026-08-18
+
+**A structure manager: HR draws the org chart without being an administrator**
+
+Drawing the company's org structure required the administrator role — which also
+grants power over accounts, roles and instance settings. Handing that to an HR
+person to let them maintain a position tree was far too much.
+
+- **New flag: Structure manager**, granted per person in Organization settings,
+  independent of the role (the same pattern as the AI manager). The holder draws
+  the structure, appoints people to positions and sets deputies — and, because that
+  is the same job, may invite new people (always as members) and reset their
+  passwords.
+- **What they deliberately cannot do**: change roles, grant any manager flag, delete
+  or archive the structure, publish it or share it out, or write to it through an API
+  key. Passwords of administrators and of other flag holders are off limits — a
+  password reset is an account takeover, and the boundary now covers flags, not just
+  roles.
+- **They see only what they need**: Organization settings show them the list of
+  people and the structure, nothing else — no billing, membership, AI or instance
+  appearance, and no login history or map counts.
+- **Nobody appointed? The administrator covers it**, exactly as before. Withdrawing
+  the flag takes every right away at once, including access to the structure map.
+- Being appointed **arrives as a notification**, pointing to where the structure lives.
+  Vacated positions after someone leaves are now reported to structure managers too,
+  not only to administrators.
+- **Fix: the Manager role description was a lie.** It promised "sees and manages all
+  tasks" — a rule removed back on 6 August. A manager's only remaining privilege is
+  inviting new people into the organization; the Member description was understated
+  in the same way (members create projects and invite colleagues just fine). Texts in
+  the app and the documentation now say what the code does.
+
 ## v0.35.3-beta — 2026-08-18
 
 **The template preview is a demo — and your project is born clean**

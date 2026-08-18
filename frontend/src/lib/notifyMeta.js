@@ -68,6 +68,11 @@ export const notifyTarget = (n) => {
     n.type === 'automation_ready' || n.type?.startsWith('deadline_request') ||
     n.type?.startsWith('rule_'); // pravidla jsou vždy vázaná na mapu (příp. uzel)
   if (nodeBound && n.map_id) return `/map/${n.map_id}${n.node_id ? `?node=${n.node_id}` : ''}`;
+  // Organizační struktura: buď rovnou mapa (uvolněné pozice po odchodu člena),
+  // nebo Správa organizace — tam žije tabulka struktury i seznam lidí.
+  // ⚠️ Bez tohohle spadl klik na oznámení „jste správcem struktury" do TABULKY
+  // ÚKOLŮ (výchozí větev níž) — Richardův nález 17. 8.
+  if (n.type === 'org_notice') return n.map_id ? `/map/${n.map_id}` : '/admin/users';
   if (n.type === 'deadline') {
     if (n.task_id) return `/tasks?task=${n.task_id}`;
     if (n.map_id) return `/map/${n.map_id}${n.node_id ? `?node=${n.node_id}` : ''}`;

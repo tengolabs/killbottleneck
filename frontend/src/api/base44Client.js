@@ -82,6 +82,7 @@ const toDto = (name, r) => {
         role: r.role,
         language: r.language || '',
         is_ai_manager: !!r.is_ai_manager,
+        is_org_manager: !!r.is_org_manager,
         deputy: r.deputy || '',
         notify_prefs: r.notify_prefs || {},
         notify_email_mode: r.notify_email_mode || '',

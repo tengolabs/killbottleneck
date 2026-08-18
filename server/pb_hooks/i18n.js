@@ -238,6 +238,10 @@ const STRINGS = {
     cs: "Pravidlo „{rule}\" v projektu „{project}\" selhalo: {reason}. Opravte ho, nebo ho vypněte.",
     en: "Rule \"{rule}\" in project \"{project}\" failed: {reason}. Fix it or disable it.",
   },
+  "notify.orgManagerGranted": {
+    cs: "Jste nově správcem organizační struktury — můžete kreslit strom pozic, jmenovat do nich lidi a zastupování. Otevřete Správu organizace pod panáčkem.",
+    en: "You are now the structure manager — you can draw the tree of positions, appoint people to them and set deputies. Open Organization settings under your avatar.",
+  },
   "notify.orgVacated": {
     cs: "Člen {member} byl odebrán — uvolnily se pozice: {positions}. Jmenujte nové obsazení ve Správě organizace.",
     en: "Member {member} was removed — these positions are now vacant: {positions}. Appoint new holders in Organization settings.",
@@ -823,6 +827,18 @@ const STRINGS = {
   "err.orgAdminOnly": {
     cs: "Organizační strukturu spravuje administrátor.",
     en: "Only an administrator manages the org structure.",
+  },
+  "err.deputyPrivilegedTarget": {
+    cs: "Zástupce administrátora nebo jiného správce nastavuje jen administrátor.",
+    en: "Only an administrator can set the deputy of an administrator or another manager.",
+  },
+  "err.orgApiReadOnly": {
+    cs: "Organizační strukturu API jen čte — měnit ji lze v aplikaci.",
+    en: "The API can only read the org structure — change it in the app.",
+  },
+  "err.orgManagerOnly": {
+    cs: "Organizační strukturu smí měnit administrátor nebo správce struktury.",
+    en: "Only an administrator or the structure manager can change the org structure.",
   },
   "err.orgMapMissing": {
     cs: "Organizační struktura zatím neexistuje — založí ji administrátor ve Správě organizace.",

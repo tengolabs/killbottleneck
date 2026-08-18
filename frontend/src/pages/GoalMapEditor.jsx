@@ -3218,6 +3218,9 @@ function EditorContent({ mapId, personalMap = false }) {
               <MiniMap
                 nodeColor={(node) => statusConfig[node.data?.status]?.color || 'hsl(var(--canvas-node))'}
                 className="!bg-card !border"
+                /* o 30 % menší než výchozí 200×150 (Richard 18. 8.) — na plátně
+                   zabírala víc místa, než kolik reálně pomůže */
+                style={{ width: 140, height: 105 }}
                 pannable
                 zoomable
               />

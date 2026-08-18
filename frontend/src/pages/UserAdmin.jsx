@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '@/lib/clipboard';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
+import { useLazyNs } from '@/i18n/lazyNs';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,15 @@ export default function UserAdmin() {
   ];
   const roleLabel = (r) => ROLES.find((x) => x.value === r)?.label || t('userAdmin.roleUser');
   const { user: currentUser } = useAuth();
+  // Na stránku smí admin — a nově i SPRÁVCE STRUKTURY, ovšem jen na dvě okna:
+  // seznam lidí a organizační strukturu (Richard 17. 8.: „dal bych jí přístup
+  // do správy organizace, ale měla by tam jen tyhle 2 okna"). Fakturace,
+  // členství, AI ani vzhled instance mu nepatří. Páky na ROLE a SPRÁVCOVSTVÍ
+  // nevidí vůbec — jinak by si mohl povýšit sebe. Server to vynucuje zvlášť,
+  // tohle je jen ovládání.
+  const jenStruktura = currentUser?.role !== 'admin' && !!currentUser?.is_org_manager;
+  // texty správcovské stránky žijí v líném balíku `admin` (mimo lite rozpočet)
+  const adminNsReady = useLazyNs('admin');
   const [users, setUsers] = useState([]);
   const [loginLogs, setLoginLogs] = useState({});
   const [mapCounts, setMapCounts] = useState({});
@@ -76,10 +86,31 @@ export default function UserAdmin() {
         setOrg(o);
         setOrgName(o?.name || '');
       }).catch(() => {});
+    } else if (currentUser?.is_org_manager) {
+      loadMembers();
     } else {
       setLoading(false);
     }
   }, [currentUser]);
+
+  // Seznam lidí pro SPRÁVCE STRUKTURY. Kolekci users číst nesmí (listRule je
+  // adminská) a je to tak správně: přihlašovací historie ani počty map celé
+  // firmy do personální agendy nepatří. Bere proto bezpečnou podmnožinu
+  // z /members — a sloupce, které se z ní naplnit nedají, se mu neukazují.
+  const loadMembers = async () => {
+    try {
+      const res = await pb.send('/api/kb/members', { method: 'GET' });
+      setUsers((res.members || []).map((m) => ({
+        id: m.id, email: m.email, full_name: m.full_name || m.name || '',
+        role: m.role, deputy: m.deputy || '',
+        is_ai_manager: m.is_ai_manager, is_org_manager: m.is_org_manager,
+      })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOrgSave = async () => {
     setOrgSaving(true);
@@ -179,6 +210,18 @@ export default function UserAdmin() {
     }
   };
 
+  // Správce organizační struktury — stejný vzor jako správce AI (příznak kolmý
+  // na roli). Smí kreslit strom pozic i jmenovat lidi; SMAZAT org mapu ale ne,
+  // to zůstává adminovi (Richard 17. 8. 2026).
+  const handleOrgManagerChange = async (userId, value) => {
+    try {
+      await base44.entities.User.update(userId, { is_org_manager: value });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_org_manager: value } : u)));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Obnova hesla rukou správce (jediná cesta na instanci bez pošty).
   // Se SMTP se chová jako pozvánka: server pošle standardní reset a heslo
   // NEVRACÍ. Bez SMTP vrátí dočasné heslo, které správce člověku předá —
@@ -199,12 +242,19 @@ export default function UserAdmin() {
   // Zástupce člena — OSOBNÍ fallback dynamického cíle „zástupce zodpovědné
   // osoby" v pravidlech (přesnější je zástupce per pozice v org. struktuře).
   // Server pouští zápis jen adminovi a hlídá člen + ne-sebe.
+  // Zástupce jde přes vlastní routu — kolekce users pouští zápis do cizího účtu
+  // jen adminovi, a rozšiřovat to pravidlo na správce struktury by mu otevřelo
+  // i cizí e-mail (= převzetí identity, když navíc smí měnit hesla).
   const handleDeputyChange = async (userId, deputy) => {
     try {
-      await base44.entities.User.update(userId, { deputy });
+      await pb.send('/api/kb/member-deputy', { method: 'POST', body: { id: userId, deputy } });
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, deputy } : u)));
     } catch (e) {
-      window.alert(e?.response?.message || e?.message || t('userAdmin.deputyFailed'));
+      // ⚠️ Naše routy vracejí důvod v poli `error`; `message` je obecný text
+      // PocketBase („Something went wrong…"). Když se čte jen `message`,
+      // uživatel dostane „něco se pokazilo" místo věty, proč to nešlo
+      // (Richardův klik-test 18. 8.).
+      window.alert(e?.response?.error || e?.response?.message || e?.message || t('userAdmin.deputyFailed'));
     }
   };
 
@@ -218,7 +268,10 @@ export default function UserAdmin() {
     }
   };
 
-  if (currentUser?.role !== 'admin') {
+  // dokud se líný balík textů nenačte, nekreslit — bliknutí holých klíčů
+  // („admin:userAdmin.orgManager") je horší než snímek čekání
+  if (!adminNsReady) return null;
+  if (currentUser?.role !== 'admin' && !currentUser?.is_org_manager) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <Shield className="w-12 h-12 text-muted-foreground" />
@@ -241,6 +294,7 @@ export default function UserAdmin() {
           <h1 className="font-heading text-2xl font-bold">{t('userAdmin.title')}</h1>
         </div>
 
+        {!jenStruktura && (
         <div className="rounded-xl border bg-card p-4 mb-6">
           <h2 className="font-heading text-sm font-semibold flex items-center gap-2 mb-3">
             <Building2 className="w-4 h-4 text-primary" /> {t('userAdmin.orgHeading')}
@@ -283,6 +337,7 @@ export default function UserAdmin() {
           </div>
           <p className="text-xs text-muted-foreground mt-2">{t('userAdmin.orgSaveHint')}</p>
         </div>
+        )}
 
         <div className="flex justify-end mb-4">
           <Button onClick={() => setInviteOpen(true)}>
@@ -290,9 +345,15 @@ export default function UserAdmin() {
           </Button>
         </div>
 
-        {!loading && users.length > 0 && !users.some((u) => u.is_ai_manager) && (
+        {!jenStruktura && !loading && users.length > 0 && !users.some((u) => u.is_ai_manager) && (
           <p className="text-sm text-muted-foreground mb-3">
             {t('userAdmin.aiManagerAutoBanner')}
+          </p>
+        )}
+
+        {!jenStruktura && !loading && users.length > 0 && !users.some((u) => u.is_org_manager) && (
+          <p className="text-sm text-muted-foreground mb-3">
+            {t('admin:userAdmin.orgManagerAutoBanner')}
           </p>
         )}
 
@@ -305,16 +366,17 @@ export default function UserAdmin() {
           // nevejde a bez rolování byly sloupce za okrajem nedosažitelné
           // (Richard 6. 8. 2026 večer, šlo to jen otočením na šířku).
           <div className="rounded-xl border bg-card overflow-x-auto">
-            <table className="w-full min-w-[840px]">
+            <table className="w-full min-w-[960px]">
               <thead className="bg-secondary/50 border-b">
                 <tr>
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colUser')}</th>
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.role')}</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3" title={t('userAdmin.aiManagerHint')}>{t('userAdmin.aiManager')}</th>
+                  {!jenStruktura && <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3" title={t('userAdmin.aiManagerHint')}>{t('userAdmin.aiManager')}</th>}
+                  {!jenStruktura && <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3" title={t('admin:userAdmin.orgManagerHint')}>{t('admin:userAdmin.orgManager')}</th>}
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3" title={t('userAdmin.deputyHint')}>{t('userAdmin.colDeputy')}</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colLastLogin')}</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colMaps')}</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colCreated')}</th>
+                  {!jenStruktura && <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colLastLogin')}</th>}
+                  {!jenStruktura && <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colMaps')}</th>}
+                  {!jenStruktura && <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colCreated')}</th>}
                   <th className="text-right text-sm font-medium text-muted-foreground px-4 py-3">{t('userAdmin.colActions')}</th>
                 </tr>
               </thead>
@@ -333,6 +395,10 @@ export default function UserAdmin() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
+                      {jenStruktura ? (
+                        // role je pro správce struktury jen údaj — měnit ji smí admin
+                        <span className="text-sm px-2 py-1">{roleLabel(u.role)}</span>
+                      ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button className="inline-flex items-center gap-1 text-sm px-2 py-1 rounded-md hover:bg-secondary">
@@ -351,7 +417,9 @@ export default function UserAdmin() {
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      )}
                     </td>
+                    {!jenStruktura && (
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Switch
@@ -369,6 +437,26 @@ export default function UserAdmin() {
                         )}
                       </div>
                     </td>
+                    )}
+                    {!jenStruktura && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!!u.is_org_manager}
+                          onCheckedChange={(v) => handleOrgManagerChange(u.id, v)}
+                          aria-label={t('admin:userAdmin.orgManager')}
+                        />
+                        {u.role === 'admin' && !users.some((x) => x.is_org_manager) && (
+                          <span
+                            className="text-xs text-muted-foreground"
+                            title={t('admin:userAdmin.orgManagerAutoHint')}
+                          >
+                            {t('admin:userAdmin.orgManagerAuto')}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    )}
                     <td className="px-4 py-3">
                       {/* zástupce = jiný člen; sebe server odmítá, tak se ani nenabízí */}
                       <DropdownMenu>
@@ -392,6 +480,7 @@ export default function UserAdmin() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
+                    {!jenStruktura && (
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {loginLogs[u.id] || u.last_login ? (
                         <span className="inline-flex items-center gap-1.5">
@@ -408,15 +497,20 @@ export default function UserAdmin() {
                         </span>
                       )}
                     </td>
+                    )}
+                    {!jenStruktura && (
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-1.5 text-sm">
                         <MapIcon className="w-3.5 h-3.5 text-muted-foreground" />
                         {mapCounts[u.id] || 0}
                       </span>
                     </td>
+                    )}
+                    {!jenStruktura && (
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {u.created_date ? fmtDateShort(u.created_date) : '—'}
                     </td>
+                    )}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {/* Obnova hesla rukou správce. Na instanci BEZ pošty je to jediná
                           cesta — „Zapomněli jste heslo?" se tam nenabízí, protože by
@@ -433,7 +527,7 @@ export default function UserAdmin() {
                           <KeyRound className="w-4 h-4" />
                         </button>
                       )}
-                      {u.id !== currentUser?.id && (
+                      {!jenStruktura && u.id !== currentUser?.id && (
                         <button
                           onClick={() => handleDelete(u.id)}
                           className="text-muted-foreground hover:text-destructive transition-colors"
@@ -454,12 +548,12 @@ export default function UserAdmin() {
 
         {/* fakturační údaje hned pod uživateli (Richard 8. 8. 2026); košík
             členství jen na hostované instanci — self-host nic nekupuje tady */}
-        <BillingSection onChange={setBillingComplete} />
-        <MembershipSection billingComplete={billingComplete} />
+        {!jenStruktura && <BillingSection onChange={setBillingComplete} />}
+        {!jenStruktura && <MembershipSection billingComplete={billingComplete} />}
 
-        {hosted === false && <AiSettingsSection />}
+        {!jenStruktura && hosted === false && <AiSettingsSection />}
 
-        <InstanceSkinSection />
+        {!jenStruktura && <InstanceSkinSection />}
       </div>
 
       <Dialog open={inviteOpen} onOpenChange={(v) => { if (!v) closeInvite(); }}>
@@ -499,6 +593,11 @@ export default function UserAdmin() {
                   autoFocus
                 />
               </div>
+              {/* Výběr role je jen pro admina. Správce struktury zve VŽDY členy —
+                  server mu vyšší roli stejně srazí, ale nabízet tlačítko
+                  „Administrátor" znamená slibovat něco, co se nestane (a dřív
+                  to dokonce fungovalo — bezpečnostní nález panelu 17. 8.). */}
+              {!jenStruktura && (
               <div className="space-y-2">
                 <Label>{t('userAdmin.role')}</Label>
                 <div className="flex gap-2">
@@ -521,6 +620,7 @@ export default function UserAdmin() {
                   {ROLES.find((r) => r.value === inviteRole)?.hint}
                 </p>
               </div>
+              )}
             </div>
           )}
 

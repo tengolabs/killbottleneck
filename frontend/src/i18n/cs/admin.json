@@ -1,0 +1,9 @@
+{
+  "userAdmin": {
+    "orgManager": "Správce struktury",
+    "orgManagerHint": "Smí kreslit organizační strukturu a jmenovat lidi do pozic — typicky personalista. Nezávislé na roli; strukturu SMAZAT může dál jen administrátor.",
+    "orgManagerAuto": "automaticky",
+    "orgManagerAutoHint": "Nikdo není výslovný správce organizační struktury, proto to automaticky zastává administrátor. Přepínačem to můžete svěřit konkrétnímu člověku.",
+    "orgManagerAutoBanner": "Organizační strukturu teď spravuje administrátor — dokud přepínačem neurčíte konkrétního člověka."
+  }
+}

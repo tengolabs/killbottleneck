@@ -1,0 +1,9 @@
+{
+  "userAdmin": {
+    "orgManager": "Structure manager",
+    "orgManagerHint": "May draw the organizational structure and appoint people to positions — typically an HR person. Independent of the role; only an administrator can still DELETE the structure.",
+    "orgManagerAuto": "automatic",
+    "orgManagerAutoHint": "Nobody is an explicit structure manager, so the administrator covers it automatically. Use the switch to hand it to a specific person.",
+    "orgManagerAutoBanner": "The administrator currently manages the org structure — until you appoint a specific person with the switch."
+  }
+}
