@@ -58,11 +58,43 @@ function odkazuj(s) {
 }
 
 /**
+ * Šedá kartička POD tlačítkem — „kam se vrátit, až zavřete prohlížeč".
+ *
+ * Proč rámeček a proč až pod tlačítkem (Richard 17. 8. 2026, mění umístění
+ * z 8. 8.): tyhle údaje nepotřebuje člověk TEĎ, ale za týden, až zavře okno
+ * a nebude vědět, jak zpátky. Vevnitř běžného textu nad tlačítkem je nikdo
+ * nečetl jako kartičku k uschování a zároveň odváděly pozornost od jediné
+ * akce, kterou má příjemce udělat hned (nastavit heslo).
+ *
+ * @param {object} k { ikona, nadpis, radky: [{label, hodnota}], poznamka }
+ */
+function karticka(k) {
+  if (!k || !((k.radky && k.radky.length) || k.poznamka)) return "";
+  const radky = (k.radky || []).map((r) =>
+    `<tr>
+      <td style="padding:0 12px 6px 0;font-size:13px;line-height:1.5;color:${BARVA_SEDA};white-space:nowrap;vertical-align:top;">${esc(r.label)}</td>
+      <td style="padding:0 0 6px;font-size:14px;line-height:1.5;color:${BARVA_TEXT};font-weight:600;word-break:break-word;">${odkazuj(esc(r.hodnota))}</td>
+    </tr>`
+  ).join("");
+  const poznamka = k.poznamka
+    ? `<p style="margin:${radky ? "12px" : "0"} 0 0;font-size:13px;line-height:1.6;color:${BARVA_SEDA};">${odkazuj(esc(k.poznamka))}</p>`
+    : "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
+    <tr><td style="padding:16px 18px;">
+      ${k.nadpis ? `<p style="margin:0 0 12px;font-size:14px;font-weight:700;color:${BARVA_TEXT};">${esc((k.ikona ? k.ikona + " " : "") + k.nadpis)}</p>` : ""}
+      ${radky ? `<table role="presentation" cellpadding="0" cellspacing="0">${radky}</table>` : ""}
+      ${poznamka}
+    </td></tr>
+  </table>`;
+}
+
+/**
  * Složí HTML mail v jednotném vzhledu.
  * @param {object} o
  *   nadpis     – velký nadpis nad textem
  *   odstavce   – pole odstavců (prostý text, escapuje se; adresy se samy prokliknou)
  *   tlacitko   – { text, url } volitelně
+ *   karta      – šedá kartička POD tlačítkem (viz karticka())
  *   odstavcePo – odstavce POD tlačítkem (kam se vrátit, až odkaz vyprší)
  *   paticka    – pole řádků do patičky (prostý text)
  *   znacka     – název produktu v hlavičce (default killBottleneck)
@@ -74,6 +106,7 @@ function mailHtml(o) {
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BARVA_TEXT};">${odkazuj(esc(t))}</p>`;
   const odstavce = (o.odstavce || []).map(odstavec).join("");
   const odstavcePo = (o.odstavcePo || []).map(odstavec).join("");
+  const karta = karticka(o.karta);
 
   let tlacitko = "";
   if (o.tlacitko && o.tlacitko.url) {
@@ -108,6 +141,7 @@ function mailHtml(o) {
         <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:${BARVA_TEXT};">${esc(o.nadpis || "")}</h1>
         ${odstavce}
         ${tlacitko}
+        ${karta}
         ${odstavcePo}
       </td></tr>
       <tr><td style="padding:18px 28px;background:#fafafa;border-top:1px solid #e5e7eb;">
@@ -124,6 +158,12 @@ function mailText(o) {
   const casti = [o.nadpis || "", ""];
   for (const t of (o.odstavce || [])) casti.push(t, "");
   if (o.tlacitko && o.tlacitko.url) casti.push(o.tlacitko.text + ": " + o.tlacitko.url, "");
+  if (o.karta) {
+    if (o.karta.nadpis) casti.push((o.karta.ikona ? o.karta.ikona + " " : "") + o.karta.nadpis);
+    for (const r of (o.karta.radky || [])) casti.push(r.label + " " + r.hodnota);
+    if (o.karta.poznamka) casti.push("", o.karta.poznamka);
+    casti.push("");
+  }
   for (const t of (o.odstavcePo || [])) casti.push(t, "");
   for (const t of (o.paticka || [])) casti.push(String(t).replace(/<[^>]+>/g, ""));
   return casti.join("\n");
@@ -131,12 +171,17 @@ function mailText(o) {
 
 /**
  * Patička: adresa instance + odkaz na web + kam psát + proč mail přišel.
- * `t` je i18n funkce, `base` adresa instance (volitelně).
+ * `t` je i18n funkce, `base` adresa instance (volitelně), `odpovedNa` adresa,
+ * které dorazí odpověď (pozvánka má Reply-To na zvoucího).
  *
  * Adresa instance je v patičce ZÁMĚRNĚ i u mailů, které ji mají v těle: patička
  * je jediné místo, které vypadá stejně ve všech zprávách, takže se v ní dá hledat.
+ *
+ * ⚠️ Poslední řádek se řídí Reply-To: u pozvánky odpověď DORAZÍ (zvoucímu), takže
+ * by věta „na tuto adresu neodpovídejte" lhala a rozbila přesně tu důvěru, kvůli
+ * které se Reply-To přidávalo.
  */
-function patickaRadky(t, lang, base) {
+function patickaRadky(t, lang, base, odpovedNa) {
   const radky = [];
   if (base) {
     radky.push(
@@ -146,7 +191,9 @@ function patickaRadky(t, lang, base) {
   radky.push(
     `<a href="${WEB}" style="color:${BARVA_HLAVNI};text-decoration:none;">${WEB.replace("https://", "")}</a>`,
     esc(t(lang, "mail.footerSupport")),
-    esc(t(lang, "mail.footerNoReply")),
+    odpovedNa
+      ? esc(t(lang, "mail.footerReplyGoesTo", { email: odpovedNa }))
+      : esc(t(lang, "mail.footerNoReply")),
   );
   return radky;
 }
@@ -224,18 +271,27 @@ function prepisSystemovyMail(e, klice) {
     // volitelný úvodní odstavec s parametry (např. KDO posílá pozvánku)
     if (klice.uvod) odstavce.push(text(klice.uvod));
     odstavce.push(text(klice.body));
-    // kam se bude přihlašovat (jméno organizace + adresa) — patří NAD tlačítko,
-    // ať to přečte i ten, kdo hned klikne
-    if (klice.adresa) odstavce.push(text(klice.adresa));
     if (kod) odstavce.push(kod);
     if (klice.ignore) odstavce.push(text(klice.ignore));
 
     const podklad = {
       nadpis: text(klice.heading),
       odstavce: odstavce,
-      paticka: patickaRadky(t, lang, info.base),
+      paticka: patickaRadky(t, lang, info.base, klice.replyTo),
       domov: info.base || WEB,
     };
+    // „kam se vrátit" jde do šedé kartičky POD tlačítko (Richard 17. 8. 2026):
+    // nad tlačítkem to odvádělo od jediné akce, kterou má příjemce udělat hned.
+    if (klice.karta) {
+      podklad.karta = {
+        ikona: klice.karta.ikona || "",
+        nadpis: klice.karta.nadpis ? text(klice.karta.nadpis) : "",
+        radky: (klice.karta.radky || [])
+          .filter((r) => r && r.hodnota)
+          .map((r) => ({ label: text(r.label), hodnota: r.hodnota })),
+        poznamka: klice.karta.poznamka ? text(klice.karta.poznamka) : "",
+      };
+    }
     if (cilovyOdkaz) {
       podklad.tlacitko = { text: text(klice.button), url: cilovyOdkaz };
       podklad.tlacitkoNahrada = t(lang, "mail.linkFallback");
@@ -245,6 +301,10 @@ function prepisSystemovyMail(e, klice) {
     e.message.subject = text(klice.subject);
     e.message.html = mailHtml(podklad);
     e.message.text = mailText(podklad);
+    // Odpověď na pozvánku má dorazit ZVOUCÍMU, ne do prázdna (Richard 17. 8. 2026):
+    // kdo pozvánce nevěří, klikne „Odpovědět" a zeptá se člověka, kterého zná.
+    // Odesílatel zůstává noreply@ — měnit From by rozbilo SPF/DKIM domény.
+    if (klice.replyTo) e.message.headers = { "Reply-To": klice.replyTo };
   } catch (err) {
     // přepis je vylepšení, ne podmínka — při chybě odejde původní zpráva
     try { e.app.logger().warn("systémový mail: přepis selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }

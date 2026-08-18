@@ -9,6 +9,50 @@ below before you jump several versions.
 
 ---
 
+## v0.35.2-beta — 2026-08-18
+
+**An invitation that no longer looks like spam**
+
+Invited colleagues could not tell the mail was sent by a person they know, so some
+reported it as spam. And once they were inside, closed the browser and came back a
+week later, they had no idea what their organization was called or where to log in.
+
+- **The subject line now starts with the address of whoever invited you** —
+  `richard@example.com invites you to killBottleneck — organization tengo`.
+- **You can reply to an invitation.** It carries a `Reply-To` back to the inviter,
+  so anyone unsure can hit Reply and ask a person instead of a no-reply mailbox.
+  The footer says so instead of "do not reply".
+- **"How to get back" moved into a card below the button.** Organization, sign-in
+  address and the e-mail you sign in with used to sit in a paragraph above the
+  button, where nobody read them as something to keep — and they competed with the
+  one thing you are meant to do right away: set a password.
+- **New welcome mail after your first sign-in.** It arrives once the account
+  actually works and holds nothing but the way back: the address of your
+  organization and a nudge to bookmark it (Ctrl+D / ⌘+D). Only invited users get
+  it, and only once — guarded by a stored flag, not by guessing whether this is a
+  first login.
+
+## v0.35.1-beta — 2026-08-17
+
+**The kanban board stops crying wolf**
+
+Marking a card Done moved it on the server, but the editor treated the rule's own
+work as somebody else's change and showed the amber "someone else changed this map"
+bar. The board looked broken while it was working perfectly.
+
+- **An automation's change now merges into your unsaved work silently.** The card
+  slides to its new column in front of you and your half-typed edits stay exactly
+  where they were. Nothing interrupts you.
+- **The bar still appears where it belongs**: when two people genuinely touch the
+  same goal, and when the change did not come from a rule. Your own work is never
+  silently discarded — when the editor cannot be sure, it asks.
+- Why it only bit hosted users: the old code adopted the server's version only if
+  you had typed nothing since the save left. Locally the answer comes back before
+  anyone can type; over a real network you are almost always mid-sentence. Same
+  code, different latency — which is why the new test suite runs against a live
+  instance as well as a simulated slow link.
+- MCP server listing in the Glama catalog (`glama.json` in the repository root).
+
 ## v0.35-beta — 2026-08-17
 
 **Recurrence is back — on goals, powered by rules**

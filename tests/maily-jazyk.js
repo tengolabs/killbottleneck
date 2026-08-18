@@ -83,6 +83,30 @@ const dekoduj = (s) => {
   return out;
 };
 
+// Předmět z RAW zprávy. ⚠️ Nestačí na něj pustit dekoduj(): dlouhý český předmět
+// se skládá přes VÍC encoded-words (=?utf-8?B?…?=) a hranice mezi nimi padne
+// doprostřed vícebajtového znaku — dekódování po kusech z „vás" udělá „v?s".
+// Kusy se proto musí spojit PO BAJTECH a teprve celek číst jako UTF-8; bílé
+// znaky mezi sousedními encoded-words se podle RFC 2047 zahazují.
+const predmetZ = (raw) => {
+  const m = raw.match(/^Subject:[ \t]*(.*(?:\r?\n[ \t].*)*)/mi);
+  if (!m) return '';
+  const radek = m[1].replace(/\r?\n[ \t]+/g, '').replace(/\?=\s+=\?/g, '?==?');
+  const kusy = [];
+  const re = /=\?[Uu][Tt][Ff]-8\?([BbQq])\?([^?]*)\?=/g;
+  let konec = 0, mm;
+  while ((mm = re.exec(radek))) {
+    if (mm.index > konec) kusy.push(Buffer.from(radek.slice(konec, mm.index), 'utf8'));
+    kusy.push(mm[1].toLowerCase() === 'b'
+      ? Buffer.from(mm[2], 'base64')
+      : Buffer.from(mm[2].replace(/_/g, ' ')
+          .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))), 'binary'));
+    konec = mm.index + mm[0].length;
+  }
+  if (konec < radek.length) kusy.push(Buffer.from(radek.slice(konec), 'utf8'));
+  return Buffer.concat(kusy).toString('utf8').trim();
+};
+
 (async () => {
   const server = jimka();
   try {
@@ -142,23 +166,41 @@ const dekoduj = (s) => {
     expect(inv.status === 200 && inv.json && inv.json.invited_via_email === true,
       `pozvánka odešla e-mailem (${inv.status})`);
     await sleep(2500);
-    const poz = dekoduj(maily.join('\n---\n'));
+    const pozRaw = maily.join('\n---\n');
+    const poz = dekoduj(pozRaw);
     expect(maily.length === 1, `pozvánka vyrobila 1 zprávu (${maily.length})`);
-    expect(/Pozvánka do killBottlenecku|pozval/.test(poz), 'zpráva zve, nepředstírá reset');
+    expect(/Pozvánka do killBottlenecku|pozval|vás zve/.test(poz), 'zpráva zve, nepředstírá reset');
     expect(/Do týmu vás zve/.test(poz), 'říká, KDO zve (úvodní věta)');
     expect(/Jana Zvoucí \(cesky@example\.com\)/.test(poz), '…se jménem I e-mailem zvoucího');
     expect(!/Obnovení hesla|Někdo \(nejspíš vy\)/.test(poz), 'nestraší „někdo žádal o obnovení hesla"');
     expect(/\/reset-password\?token=[A-Za-z0-9._-]+/.test(poz), 'nese odkaz pro nastavení hesla s tokenem');
+    // Richard 17. 8. 2026: pozvánku lidé hlásili jako spam, protože v předmětu
+    // nebylo vidět, že zve KONKRÉTNÍ ČLOVĚK. Adresa zvoucího proto stojí na
+    // ZAČÁTKU předmětu — jinak ji ve výpisu schránky nikdo neuvidí.
+    const predmet = predmetZ(pozRaw);
+    expect(/^cesky@example\.com vás zve do killBottlenecku/.test(predmet),
+      `předmět začíná adresou zvoucího (${predmet.slice(0, 70)})`);
+    // Kdo pozvánce nevěří, klikne „Odpovědět" — a má se dostat k člověku, ne do prázdna.
+    expect(/^Reply-To:\s*cesky@example\.com\s*$/mi.test(pozRaw), 'zpráva nese Reply-To na zvoucího');
+    expect(/Odpověď na tuto zprávu dorazí na cesky@example\.com/.test(poz),
+      '…a patička to říká místo „neodpovídejte"');
     // Nález z ostrého provozu 8. 8. 2026: pozvaná kolegyně vypadla z aplikace a
     // zpátky netrefila — mail uměl JEN znovu nastavit heslo. Self-host instance
     // (tahle) jméno organizace nemá, ale TRVALOU adresu k přihlášení mít musí.
-    expect(new RegExp(`Vaše adresa pro přihlášení je ${BASE.replace(/[.]/g, '\\.')}`).test(poz),
-      'říká trvalou adresu pro přihlášení');
-    expect(new RegExp(`${BASE.replace(/[.]/g, '\\.')}/login`).test(poz), 'nese odkaz na přihlašovací stránku');
-    expect(/uložte si ji do záložek/i.test(poz), 'radí uložit adresu do záložek');
+    expect(/Kam se vrátit, až zavřete prohlížeč/.test(poz), 'má kartičku „kam se vrátit"');
+    expect(new RegExp(`Adresa pro přihlášení:[\\s\\S]{0,200}${BASE.replace(/[.]/g, '\\.')}`).test(poz),
+      'kartička nese trvalou adresu pro přihlášení');
+    expect(/Přihlašujete se e-mailem:[\s\S]{0,200}pozvany@example\.com/.test(poz),
+      'kartička říká, KTEROU adresou se přihlašuje');
+    expect(/Uložte si adresu do záložek/i.test(poz), 'radí uložit adresu do záložek');
     expect(/Zapomenuté heslo/.test(poz), 'říká, co dělat, až jednorázový odkaz vyprší');
-    expect(!/organizace tengo|Jméno vaší organizace/.test(poz),
+    expect(!/organizace tengo|Organizace:/.test(poz),
       'self-host instance si NEvymýšlí jméno organizace');
+    // Richard 17. 8. 2026 (mění umístění z 8. 8.): kartička patří POD tlačítko —
+    // nad ním odváděla od jediné akce, kterou má příjemce udělat hned.
+    const iTlacitko = poz.indexOf('/reset-password?token=');
+    const iKarta = poz.indexOf('Kam se vrátit');
+    expect(iTlacitko >= 0 && iKarta > iTlacitko, `kartička je až ZA tlačítkem (${iTlacitko} < ${iKarta})`);
 
     console.log('== hostovaná instance: pozvánka řekne JMÉNO ORGANIZACE ==');
     // Richard 8. 8. 2026: jméno organizace se bere VŽDY ze subdomény, protože
@@ -174,14 +216,56 @@ const dekoduj = (s) => {
     const inv2 = await api('POST', '/api/kb/invite', { token: UT, body: { email: 'pozvany2@example.com', role: 'user' } });
     expect(inv2.status === 200, `druhá pozvánka odešla (${inv2.status})`);
     await sleep(2500);
-    const hos = dekoduj(maily.join('\n---\n'));
+    const hosRaw = maily.join('\n---\n');
+    const hos = dekoduj(hosRaw);
+    const predmet2 = predmetZ(hosRaw);
+    expect(/^cesky@example\.com vás zve do killBottlenecku — organizace tengo$/.test(predmet2),
+      `předmět = zvoucí + organizace (${predmet2})`);
     expect(/organizace tengo/.test(hos), 'předmět i nadpis jmenují organizaci');
-    expect(/Jméno vaší organizace je „tengo“/.test(hos), 'pojmenuje to slovo, které se zadává při přihlášení');
-    expect(/https:\/\/tengo\.killbottleneck\.com\/login/.test(hos), 'nese odkaz na přihlášení do své instance');
+    expect(/Organizace:[\s\S]{0,200}tengo/.test(hos), 'kartička pojmenuje slovo, které se zadává při přihlášení');
+    expect(/https:\/\/tengo\.killbottleneck\.com/.test(hos), 'nese adresu své instance');
     expect(/killbottleneck\.com[\s\S]{0,120}Přihlásit se[\s\S]{0,160}zadejte „tengo“/.test(hos),
       'popisuje i cestu přes rozcestník na killbottleneck.com');
     // appka ještě není venku (Richard 8. 8.) — mail ji nesmí slibovat
     expect(!/mobilní aplikac|mobilní appc|Google Play/i.test(hos), 'neslibuje mobilní aplikaci, dokud není venku');
+
+    console.log('== uvítací mail po PRVNÍM VSTUPU pozvaného ==');
+    // Richard 17. 8. 2026: pozvaný si nastaví heslo, projde aplikací, zavře
+    // prohlížeč — a druhý den neví adresu ani jméno organizace. Uvítací mail
+    // přijde až ve chvíli, kdy účet FUNGUJE, a jeho jediný obsah je cesta zpátky.
+    const tok = (hos.match(/\/reset-password\?token=([A-Za-z0-9._-]+)/) || [])[1];
+    expect(!!tok, `z pozvánky jde vytáhnout token (${tok ? tok.slice(0, 12) + '…' : 'CHYBÍ'})`);
+    const potvrz = await api('POST', '/api/collections/users/confirm-password-reset',
+      { body: { token: tok, password: PW, passwordConfirm: PW } });
+    expect(potvrz.status === 204 || potvrz.status === 200, `pozvaný si nastavil heslo (${potvrz.status})`);
+    const prihlPozvany = await api('POST', '/api/collections/users/auth-with-password',
+      { body: { identity: 'pozvany2@example.com', password: PW } });
+    expect(!!(prihlPozvany.json && prihlPozvany.json.token), 'pozvaný se přihlásil novým heslem');
+    maily.length = 0;
+    const vstup = await api('POST', '/api/collections/loginlogs/records',
+      { token: prihlPozvany.json.token, body: {} });
+    expect(vstup.status === 200, `první vstup zaznamenán (${vstup.status})`);
+    await sleep(2500);
+    const uvitRaw = maily.join('\n---\n');
+    const uvit = dekoduj(uvitRaw);
+    expect(maily.length === 1, `první vstup vyrobil právě 1 zprávu (${maily.length})`);
+    expect(/Vítejte v killBottlenecku/.test(uvit), 'uvítací mail vítá, nezve podruhé');
+    expect(predmetZ(uvitRaw) === 'Vítejte v killBottlenecku — organizace tengo',
+      `předmět jmenuje organizaci (${predmetZ(uvitRaw)})`);
+    expect(/Uložte si to do oblíbených/.test(uvit), 'má kartičku s radou uložit stránku');
+    expect(/Ctrl\+D/.test(uvit) && /⌘\+D/.test(uvit), '…a říká, ČÍM se to udělá (hvězdička v prohlížeči)');
+    expect(/https:\/\/tengo\.killbottleneck\.com/.test(uvit), 'nese adresu organizace');
+    expect(/Přihlašujete se e-mailem:[\s\S]{0,200}pozvany2@example\.com/.test(uvit),
+      'připomene, kterou adresou se přihlašuje');
+    expect(!/reset-password\?token=/.test(uvit), 'uvítací mail NEsvádí zpátky do nastavení hesla');
+    // ⚠️ Bez tvrdé závory by mail chodil při KAŽDÉM přihlášení: „je to poprvé?"
+    // se souběhem s frontendovým PATCHem rozbíjí (ostrý provoz 9. 8. 2026).
+    maily.length = 0;
+    const vstup2 = await api('POST', '/api/collections/loginlogs/records',
+      { token: prihlPozvany.json.token, body: {} });
+    expect(vstup2.status === 200, `druhý vstup zaznamenán (${vstup2.status})`);
+    await sleep(2500);
+    expect(maily.length === 0, `druhý vstup už NEposlal nic (${maily.length})`);
 
     console.log('== jednotný vzhled a použitelnost ==');
     expect(/killbottleneck\.com/.test(cz), 'patička odkazuje na web');
@@ -211,7 +295,7 @@ const dekoduj = (s) => {
       'adresa instance je i v patičce (jediné místo stejné ve všech mailech)');
     const bezLoga = cz.replace(/<img[^>]+mail-znak\.jpg[^>]*>/g, '');
     expect(!/<img[^>]+src="https?:/.test(bezLoga), 'kromě loga žádné jiné externí obrázky');
-    expect(/Content-Type: text\/plain/i.test(maily.join('')), 'zpráva nese i textovou verzi');
+    expect(/Content-Type: text\/plain/i.test(pozRaw), 'zpráva nese i textovou verzi');
 
   } finally {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);

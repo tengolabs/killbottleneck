@@ -78,6 +78,12 @@ const STRINGS = {
     cs: "Tato zpráva je odesílána automaticky — na tuto adresu neodpovídejte.",
     en: "This message was sent automatically — please do not reply to this address.",
   },
+  // pozvánka má Reply-To na zvoucího, takže odpověď NĚKAM dorazí — patička
+  // to musí říct, jinak si s hlavičkou odporuje
+  "mail.footerReplyGoesTo": {
+    cs: "Odpověď na tuto zprávu dorazí na {email}.",
+    en: "A reply to this message goes to {email}.",
+  },
   "mail.footerInstance": {
     cs: "Vaše přihlašovací adresa:",
     en: "Your sign-in address:",
@@ -119,6 +125,18 @@ const STRINGS = {
   // a neříkal ani JMÉNO ORGANIZACE, ani adresu; uměl jen znovu nastavit heslo.
   // Proto pozvánka jméno organizace pojmenovává (je to slovo, které se zadává
   // v rozcestníku na killbottleneck.com) a nese trvalý odkaz na přihlášení.
+  // Předmět začíná ADRESOU ZVOUCÍHO (Richard 17. 8. 2026): pozvánka od
+  // „killBottleneck <noreply@…>" vypadá ve schránce jako reklama a lidé ji
+  // hlásili jako spam. Jméno zvoucího se do předmětu NEDÁVÁ — je dlouhé a
+  // v mobilním Gmailu by uřízlo zbytek; zůstává v prvním odstavci těla.
+  "sysmail.inviteSubjectFromOrg": {
+    cs: "{inviter} vás zve do killBottlenecku — organizace {org}",
+    en: "{inviter} invites you to killBottleneck — organization {org}",
+  },
+  "sysmail.inviteSubjectFrom": {
+    cs: "{inviter} vás zve do killBottlenecku",
+    en: "{inviter} invites you to killBottleneck",
+  },
   "sysmail.inviteSubjectOrg": {
     cs: "Pozvánka do killBottlenecku — organizace {org}",
     en: "Invitation to killBottleneck — organization {org}",
@@ -127,26 +145,56 @@ const STRINGS = {
     cs: "Byli jste pozváni do killBottlenecku organizace {org}",
     en: "You were invited to the {org} killBottleneck",
   },
-  "sysmail.inviteAddressOrg": {
-    cs: "Jméno vaší organizace je „{org}“ a vaše adresa pro přihlášení je {url} — uložte si ji do záložek. Přihlašujete se e-mailem, na který přišla tato zpráva, a heslem, které si teď nastavíte.",
-    en: "Your organization name is “{org}” and your sign-in address is {url} — save it to your bookmarks. You sign in with the e-mail this message was sent to and the password you are about to set.",
+  // Popisky šedé kartičky pod tlačítkem (mailTemplate.js → karticka). Údaje,
+  // které dřív visely v odstavci nad tlačítkem — člověk je nepotřebuje TEĎ,
+  // ale za týden, až zavře okno a nebude vědět, jak zpátky.
+  "sysmail.boxTitle": {
+    cs: "Kam se vrátit, až zavřete prohlížeč",
+    en: "How to get back after you close the browser",
   },
-  "sysmail.inviteAddress": {
-    cs: "Vaše adresa pro přihlášení je {url} — uložte si ji do záložek. Přihlašujete se e-mailem, na který přišla tato zpráva, a heslem, které si teď nastavíte.",
-    en: "Your sign-in address is {url} — save it to your bookmarks. You sign in with the e-mail this message was sent to and the password you are about to set.",
-  },
+  "sysmail.boxOrg": { cs: "Organizace:", en: "Organization:" },
+  "sysmail.boxUrl": { cs: "Adresa pro přihlášení:", en: "Sign-in address:" },
+  "sysmail.boxLogin": { cs: "Přihlašujete se e-mailem:", en: "You sign in with:" },
   "sysmail.inviteReturnOrg": {
-    cs: "Až se budete chtít vrátit: otevřete {login}. Na killbottleneck.com vás k přihlášení dovede tlačítko „Přihlásit se“ — zeptá se na jméno organizace, zadejte „{org}“. Pokud odkaz na nastavení hesla mezitím vypršel, použijte na přihlašovací stránce „Zapomenuté heslo“.",
-    en: "When you want to come back: open {login}. On killbottleneck.com the “Log in” button takes you there — it asks for your organization name, enter “{org}”. If the password link above has expired in the meantime, use “Forgot password” on the sign-in page.",
+    cs: "Uložte si adresu do záložek. Na killbottleneck.com vás k přihlášení dovede tlačítko „Přihlásit se“ — zeptá se na jméno organizace, zadejte „{org}“. Pokud odkaz na nastavení hesla mezitím vypršel, použijte na přihlašovací stránce „Zapomenuté heslo“.",
+    en: "Save the address to your bookmarks. On killbottleneck.com the “Log in” button takes you there — it asks for your organization name, enter “{org}”. If the password link above has expired in the meantime, use “Forgot password” on the sign-in page.",
   },
   "sysmail.inviteReturn": {
-    cs: "Až se budete chtít vrátit: otevřete {login}. Pokud odkaz na nastavení hesla mezitím vypršel, použijte na přihlašovací stránce „Zapomenuté heslo“.",
-    en: "When you want to come back: open {login}. If the password link above has expired in the meantime, use “Forgot password” on the sign-in page.",
+    cs: "Uložte si adresu do záložek. Pokud odkaz na nastavení hesla mezitím vypršel, použijte na přihlašovací stránce „Zapomenuté heslo“.",
+    en: "Save the address to your bookmarks. If the password link above has expired in the meantime, use “Forgot password” on the sign-in page.",
   },
   "sysmail.inviteButton": { cs: "Nastavit heslo a začít", en: "Set a password and start" },
   "sysmail.inviteIgnore": {
     cs: "Pokud pozvánku nečekáte, můžete tento e-mail v klidu ignorovat — bez nastavení hesla se nic nestane.",
     en: "If you were not expecting this invitation, feel free to ignore this e-mail — nothing happens until a password is set.",
+  },
+  // ── uvítací mail po PRVNÍM VSTUPU pozvaného ──────────────────────
+  // Nález z ostrého provozu: pozvaný si nastavil heslo, prošel aplikací, zavřel
+  // prohlížeč — a druhý den nevěděl ani jméno organizace, ani adresu. Pozvánkový
+  // mail už mezitím vypadal jako „něco s heslem" a nikdo ho nehledal. Tohle je
+  // zpráva, kterou si má nechat: přijde ve chvíli, kdy už účet FUNGUJE.
+  "sysmail.welcomeSubjectOrg": {
+    cs: "Vítejte v killBottlenecku — organizace {org}",
+    en: "Welcome to killBottleneck — organization {org}",
+  },
+  "sysmail.welcomeSubject": { cs: "Vítejte v killBottlenecku", en: "Welcome to killBottleneck" },
+  "sysmail.welcomeHeading": { cs: "Vítejte v killBottlenecku", en: "Welcome to killBottleneck" },
+  "sysmail.welcomeBody": {
+    cs: "Účet je hotový a jste uvnitř — heslo máte nastavené a nic dalšího vyplňovat nemusíte. Tuhle zprávu si nechte ve schránce: je v ní cesta zpátky, až prohlížeč zavřete.",
+    en: "Your account is ready and you are in — the password is set and there is nothing else to fill in. Keep this message: it holds the way back once you close the browser.",
+  },
+  "sysmail.welcomeButton": { cs: "Otevřít killBottleneck", en: "Open killBottleneck" },
+  "sysmail.welcomeBoxTitle": {
+    cs: "Uložte si to do oblíbených",
+    en: "Save it to your bookmarks",
+  },
+  "sysmail.welcomeBoxNote": {
+    cs: "Otevřete adresu výš a stiskněte Ctrl+D (na Macu ⌘+D) — je to ta hvězdička v adresním řádku prohlížeče. Příště se tam dostanete jedním kliknutím.",
+    en: "Open the address above and press Ctrl+D (⌘+D on a Mac) — the star icon in the browser address bar. Next time you get there in one click.",
+  },
+  "sysmail.welcomeBoxNoteOrg": {
+    cs: "Otevřete adresu výš a stiskněte Ctrl+D (na Macu ⌘+D) — je to ta hvězdička v adresním řádku prohlížeče. Kdybyste adresu ztratili, na killbottleneck.com klikněte „Přihlásit se“ a zadejte jméno organizace „{org}“.",
+    en: "Open the address above and press Ctrl+D (⌘+D on a Mac) — the star icon in the browser address bar. If you lose the address, click “Log in” on killbottleneck.com and enter the organization name “{org}”.",
   },
   "sysmail.resetSubject": { cs: "Obnovení hesla", en: "Password reset" },
   "sysmail.resetHeading": { cs: "Nastavení nového hesla", en: "Set a new password" },

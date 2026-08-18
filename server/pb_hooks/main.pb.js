@@ -34,8 +34,9 @@ onMailerRecordPasswordResetSend((e) => {
   // příjemce neví, jestli jí věřit. invited_by nese e-mail zvoucího; jméno
   // dohledáme, ale mail nesmí spadnout, když zvoucí mezitím zmizel.
   let uvod = null;
+  let zvouciEmail = "";
   if (pozvankaCeka) {
-    const zvouciEmail = e.record.getString("invited_by");
+    zvouciEmail = e.record.getString("invited_by");
     let kdo = zvouciEmail;
     try {
       const zvouci = e.app.findFirstRecordByData("users", "email", zvouciEmail);
@@ -52,17 +53,32 @@ onMailerRecordPasswordResetSend((e) => {
   let klicePozvanky = null;
   if (pozvankaCeka) {
     const info = instanceInfo(e.app, "");
-    const p = { org: info.org, url: info.base, login: info.base ? info.base + "/login" : "" };
+    const p = { org: info.org, url: info.base, login: info.base ? info.base + "/login" : "", inviter: zvouciEmail };
+    // Předmět začíná ADRESOU ZVOUCÍHO (Richard 17. 8. 2026) — lidé pozvánku od
+    // neznámého odesílatele hlásili jako spam. Bez značky invited_by (nemělo by
+    // u pozvánky nastat) spadneme na starý neosobní předmět, ať mail odejde vždy.
+    const zPredmet = zvouciEmail
+      ? (info.org ? "sysmail.inviteSubjectFromOrg" : "sysmail.inviteSubjectFrom")
+      : (info.org ? "sysmail.inviteSubjectOrg" : "sysmail.inviteSubject");
     klicePozvanky = {
-      subject: info.org ? { key: "sysmail.inviteSubjectOrg", params: p } : "sysmail.inviteSubject",
+      subject: { key: zPredmet, params: p },
       heading: info.org ? { key: "sysmail.inviteHeadingOrg", params: p } : "sysmail.inviteHeading",
       body: "sysmail.inviteBody", button: "sysmail.inviteButton", ignore: "sysmail.inviteIgnore",
       cesta: "/reset-password", uvod: uvod,
+      replyTo: zvouciEmail,
     };
     // bez známé adresy instance nemá smysl slibovat návrat — raději nic než lež
     if (info.base) {
-      klicePozvanky.adresa = { key: info.org ? "sysmail.inviteAddressOrg" : "sysmail.inviteAddress", params: p };
-      klicePozvanky.navrat = { key: info.org ? "sysmail.inviteReturnOrg" : "sysmail.inviteReturn", params: p };
+      klicePozvanky.karta = {
+        ikona: "📌",
+        nadpis: "sysmail.boxTitle",
+        radky: [
+          { label: "sysmail.boxOrg", hodnota: info.org },
+          { label: "sysmail.boxUrl", hodnota: info.base },
+          { label: "sysmail.boxLogin", hodnota: e.record.getString("email") },
+        ],
+        poznamka: { key: info.org ? "sysmail.inviteReturnOrg" : "sysmail.inviteReturn", params: p },
+      };
     }
   }
   prepisSystemovyMail(e, pozvankaCeka ? klicePozvanky : {
@@ -676,6 +692,26 @@ onRecordCreateRequest((e) => {
         params: { user: e.auth.email() },
         dedupKey: "joined:" + e.auth.email(),
       });
+    }
+    // UVÍTACÍ MAIL pozvanému — až teď, když už účet funguje (Richard 17. 8. 2026).
+    // Nese jméno organizace, adresu a radu uložit si ji hvězdičkou; pozvánkový
+    // mail tuhle roli neutáhne, protože ve schránce vypadá jako „něco s heslem".
+    // Samoregistrovaný uživatel ho NEDOSTÁVÁ (zakladatel zkušebky už má cloudový
+    // „Vaše instance je připravená" a dva uvítací maily by si konkurovaly).
+    //
+    // ⚠️ Závorou je pole `welcome_sent`, NE `prvniPrihlaseni`: to je jen levná
+    // zkratka a prokazatelně selhává (viz souběh s PATCHem výš — 3 ze 3 pozvaných
+    // dostali zprávu o vstupu dvakrát). Příznak se zapisuje PŘED odesláním, ať
+    // selhaná pošta nepustí druhý pokus při dalším přihlášení.
+    if (zvouci && !u.getBool("welcome_sent") && e.app.settings().smtp.enabled) {
+      try {
+        u.set("welcome_sent", true);
+        e.app.save(u);
+        const { posliUvitaciMail } = require(`${__hooks}/uvitaciMail.js`);
+        posliUvitaciMail(e.app, u);
+      } catch (err) {
+        try { e.app.logger().warn("uvitaci mail: odeslání selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+      }
     }
   } catch (err) {
     try { e.app.logger().warn("loginlogs: zápis last_login selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
