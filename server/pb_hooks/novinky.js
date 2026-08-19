@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.39-beta": {
+    cs: [
+      "Každý cíl má Životopis — kdo kdy co udělal, včetně času.",
+      "Zásah automatizačního pravidla se přizná jako pravidlo, ne jako člověk.",
+      "Označené cíle jde upravit najednou — stav, řešitel, termín, ikona i barva.",
+      "Čáry v mapě nesou stav: zelená a stojí = hotovo, červená a rychlejší = po termínu.",
+      "V okně cíle je u Příloh a Komentářů vidět počet, takže je nemusíte hledat.",
+    ],
+    en: [
+      "Every goal now has a History — who did what and when, down to the time.",
+      "An automation rule shows up as a rule, not as the person who wrote it.",
+      "A selection can be edited in one go — status, owner, deadline, icon, colour.",
+      "Lines carry state: green and still means done, red and faster means overdue.",
+      "Attachments and Comments show a count, so you no longer hunt for them.",
+    ],
+  },
   "v0.38.1-beta": {
     cs: [
       "Hlášení chyb odchází anonymně — bez vaší adresy a názvu firmy.",
