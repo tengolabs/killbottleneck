@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.38.1-beta": {
+    cs: [
+      "Hlášení chyb odchází anonymně — bez vaší adresy a názvu firmy.",
+      "Chcete odpověď? Zaškrtnete si to a teprve tím adresu přiložíte.",
+      "Odeslaná hlášení se po 30 dnech sama mažou.",
+    ],
+    en: [
+      "Bug reports are sent anonymously — without your address or company name.",
+      "Want a reply? Tick the box and only then is your address attached.",
+      "Sent reports delete themselves after 30 days.",
+    ],
+  },
   "v0.38-beta": {
     cs: [
       "Popis cíle umí formátování — tučné, odrážky, nadpisy i odkazy.",

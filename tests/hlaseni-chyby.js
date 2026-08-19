@@ -17,6 +17,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const NAME = 'kb-e2e-hlaseni';
 const PW = 'testheslo123';
 const SU = { email: 'su@example.com', pw: 'superheslo123' };
+const SU2 = SU;
 const CIL = 'podpora@example.com';
 
 let pass = 0, fail = 0;
@@ -129,7 +130,13 @@ const ucet = async (email) => {
     ok(maily.length === 1, `odešla právě jedna zpráva (${maily.length})`);
     const m = dekoduj(maily[0] || '');
     ok(/podpora@example\.com/.test(m), 'míří na adresu z KB_REPORT_TO');
-    ok(/Reply-To:\s*uzivatel@example\.com/i.test(m), 'Reply-To je adresa hlásícího (jde odpovědět)');
+    // ⚠️ Bez zaškrtnutí „chci odpověď" NESMÍ z instance odejít adresa ani název
+    // firmy — Richardovo rozhodnutí 19. 8. 2026. Na opravu programu je nepotřebujeme
+    // a bez nich to nejsou osobní údaje.
+    ok(!/uzivatel@example\.com/.test(m), 'BEZ souhlasu neodešla adresa pisatele');
+    ok(!/Reply-To/i.test(m), 'a ani Reply-To');
+    ok(!/127\.0\.0\.1:20534|instance/i.test((m.match(/^Subject:.*$/m) || [''])[0]),
+      'předmět neprozrazuje instanci ani firmu');
     ok(/noreply@killbottleneck\.com/.test(m), 'From zůstává noreply (kvůli SPF/DKIM)');
     ok(/Tlačítko Uložit nic nedělá/.test(m), 'text uživatele je ve zprávě');
     // ⚠️ HTML a TEXTOVOU část je nutné posuzovat ZVLÁŠŤ. V HTML musí být
@@ -142,9 +149,17 @@ const ucet = async (email) => {
     // Escapovat se smí JEDNOU. Dvojí escapování dorazí jako „&amp;lt;b&amp;gt;" — a hlášení
     // chyby je přesně ten obsah, kde úryvky kódu a ampersandy chodí (panel 19. 8.).
     ok(!/&amp;(lt|gt|amp|quot);/.test(htmlCast), 'escapuje se jen jednou, ne dvakrát');
-    ok(/uzivatel@example\.com/.test(m), 'je vidět, kdo hlásil');
     ok(/v0\.38-test/.test(m), 'je vidět verze instance');
     ok(/\/map\/abc/.test(m), 'je vidět, na které stránce to bylo');
+
+    console.log('== se zaškrtnutím „chci odpověď" adresa odejde ==');
+    maily.length = 0;
+    await api('POST', '/api/kb/report', { token, body: {
+      kind: 'chyba', text: 'Tohle je hlášení, na které chci odpověď.', reply: true } });
+    await sleep(1500);
+    const mo = dekoduj(maily[0] || '');
+    ok(/Reply-To:\s*uzivatel@example\.com/i.test(mo), 'Reply-To je adresa pisatele');
+    ok(/uzivatel@example\.com/.test(mo), 'a je vidět, kdo psal');
 
     console.log('== nápad má vlastní předmět ==');
     maily.length = 0;
@@ -191,6 +206,54 @@ const ucet = async (email) => {
       if (r.status === 429) limit++;
     }
     ok(limit > 0, `po pěti hlášeních za hodinu přijde 429 (${limit}× odmítnuto)`);
+
+    console.log('== úklid: hlášení se nedrží navěky ==');
+    // Zásady soukromí slibují tři roky; bez téhle úlohy by tam ležela navždy
+    // a slib by byl prázdný (panel 19. 8. 2026).
+    const crony2 = await api('GET', '/api/crons', { token: (await api('POST',
+      '/api/collections/_superusers/auth-with-password',
+      { body: { identity: SU2.email, password: SU2.pw } })).json.token });
+    const stToken = (await api('POST', '/api/collections/_superusers/auth-with-password',
+      { body: { identity: SU2.email, password: SU2.pw } })).json.token;
+    const uklid = (crony2.json || []).find((c) => c.id === 'prune_reports');
+    ok(!!uklid, `úklidová úloha prune_reports existuje (${uklid ? uklid.expression : 'CHYBÍ'})`);
+
+    // ⚠️ „Cron existuje" nedokazuje, že něco maže. Datum se přepíše PŘÍMO
+    // V DATABÁZI (přes API to nejde, `created` je autodate), pak se úloha
+    // spustí: starý záznam musí zmizet, čerstvý zůstat. Bez druhé půlky by
+    // prošel i dotaz, který smaže všechno.
+    // Richard 19. 8. 2026 zkrátil dobu ze tří let na 30 dnů.
+    await api('POST', '/api/kb/report', { token, body: { kind: 'napad', text: 'cerstvy zaznam musi zustat' } });
+    await sleep(800);
+    execSync(`docker stop ${NAME}`, { stdio: 'ignore' });
+    const tmp = `/tmp/kb-ret-${process.pid}.db`;
+    execSync(`docker cp ${NAME}:/app/pb_data/data.db ${tmp}`, { stdio: 'ignore' });
+    // starý = všechno kromě posledního; python3 je na stroji, sqlite3 binárka ne
+    const skript = `/tmp/kb-ret-${process.pid}.py`;
+    require('fs').writeFileSync(skript, [
+      'import sqlite3, sys',
+      "c = sqlite3.connect(sys.argv[1])",
+      "ids = [r[0] for r in c.execute('SELECT id FROM reports ORDER BY created').fetchall()][:-1]",
+      "for i in ids: c.execute(\"UPDATE reports SET created='2020-01-01 00:00:00.000Z' WHERE id=?\", (i,))",
+      'c.commit(); c.close()',
+    ].join('\n'));
+    execSync(`python3 ${skript} ${tmp}`, { stdio: 'ignore' });
+    execSync(`rm -f ${skript}`, { stdio: 'ignore' });
+    execSync(`docker cp ${tmp} ${NAME}:/app/pb_data/data.db`, { stdio: 'ignore' });
+    execSync(`rm -f ${tmp}`, { stdio: 'ignore' });
+    execSync(`docker start ${NAME}`, { stdio: 'ignore' });
+    await pockej();
+    const st2 = (await api('POST', '/api/collections/_superusers/auth-with-password',
+      { body: { identity: SU2.email, password: SU2.pw } })).json.token;
+    const predUklidem = (await api('GET', '/api/collections/reports/records?perPage=200', { token: st2 })).json;
+    ok(predUklidem.totalItems >= 2, `je co uklízet (${predUklidem.totalItems} záznamů, z toho staré)`);
+    await api('POST', '/api/crons/prune_reports', { token: st2 });
+    await sleep(1500);
+    const poUklidu = (await api('GET', '/api/collections/reports/records?perPage=200', { token: st2 })).json;
+    ok(poUklidu.totalItems === 1, `úklid smazal STARÉ (${predUklidem.totalItems} → ${poUklidu.totalItems})`);
+    const zbyl = (poUklidu.items || [])[0];
+    ok(zbyl && !zbyl.created.startsWith('2020'),
+      `a čerstvý záznam NECHAL — dotaz nemaže všechno (zbyl z ${zbyl ? zbyl.created.slice(0, 10) : '—'})`);
 
     console.log('== stará cesta /api/flowmap/report ==');
     const t2 = await ucet('druhy@example.com');

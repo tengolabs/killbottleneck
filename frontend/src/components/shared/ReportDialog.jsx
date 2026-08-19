@@ -37,6 +37,11 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
   const [odesilam, setOdesilam] = useState(false);
   const [hotovo, setHotovo] = useState(false);
   const [chyba, setChyba] = useState('');
+  // ⚠️ Ve výchozím stavu se adresa NEPOSÍLÁ. Richard 19. 8. 2026: „nepotřebujeme
+  // vědět, jaký uživatel a jaká firma — stejně neopravujeme zákaznické účty,
+  // ale program pro všechny." Bez adresy to nejsou osobní údaje. Kdo chce
+  // odpověď, řekne si o ni sám.
+  const [chciOdpoved, setChciOdpoved] = useState(false);
   const [historie, setHistorie] = useState(null);   // null = ještě nenačteno
 
   // Vlastní hlášení — ať člověk nehlásí podruhé totéž. RLS pustí jen jeho
@@ -49,7 +54,7 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
   };
   useEffect(() => { if (open) nactiHistorii(); }, [open]);
 
-  const reset = () => { setDruh('chyba'); setText(''); setHotovo(false); setChyba(''); setOdesilam(false); };
+  const reset = () => { setDruh('chyba'); setText(''); setHotovo(false); setChyba(''); setOdesilam(false); setChciOdpoved(false); };
   const zavri = () => { reset(); onClose(); };
 
   const odesli = async () => {
@@ -62,6 +67,7 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
         text: text.trim(),
         page: window.location.pathname,
         browser: navigator.userAgent,
+        reply: chciOdpoved,   // jen tohle rozhodne, jestli se přiloží adresa
       });
       setHotovo(true);
       nactiHistorii();
@@ -127,16 +133,31 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
               />
             </div>
 
+            {/* Chci odpověď = jediná cesta, jak z aplikace odejde adresa. */}
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={chciOdpoved}
+                onChange={(e) => setChciOdpoved(e.target.checked)}
+                data-report-odpoved
+                className="mt-0.5"
+              />
+              <span>
+                {t('report.chciOdpoved')}
+                {userEmail && <span className="text-muted-foreground"> ({userEmail})</span>}
+              </span>
+            </label>
+
             {/* co odejde spolu se zprávou — žádné tiché sbírání údajů */}
             <div className="rounded-md border bg-muted/30 px-2.5 py-2 space-y-0.5">
               <p className="text-[11px] font-medium text-muted-foreground">{t('report.coOdejde')}</p>
               <ul className="text-[11px] text-muted-foreground space-y-0.5">
-                {userEmail && <li>· {userEmail}</li>}
-                <li>· {window.location.host}{version ? ` (${version})` : ''}</li>
+                <li>· {t('report.coOdejdeVerze')}{version ? `: ${version}` : ''}</li>
                 <li>· {t('report.coOdejdeStranka')}: {nazevStranky(window.location.pathname, t)}</li>
-                {/* prohlížeč se posílá taky — když se to nevypíše, je slib „vidíte,
-                    co odejde" jen půlpravda (nález panelu 19. 8. 2026) */}
                 <li className="truncate" title={navigator.userAgent}>· {t('report.coOdejdeProhlizec')}</li>
+                <li className={chciOdpoved ? 'text-foreground' : ''}>
+                  · {chciOdpoved ? `${t('report.coOdejdeAdresa')}: ${userEmail || ''}` : t('report.bezAdresy')}
+                </li>
               </ul>
             </div>
 

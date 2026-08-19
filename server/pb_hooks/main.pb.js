@@ -1291,6 +1291,18 @@ cronAdd("prune_notifications", "40 3 * * *", () => {
   } catch (err) { /* úklid nesmí nikdy shodit server */ }
 });
 
+// Hlášení chyb a nápadů: 30 dnů. Richard 19. 8. 2026: „chybu odstraníme hned
+// a nedává smysl to držet dlouho." Sedí to k tomu, že hlášení je anonymní a
+// slouží k opravě programu, ne k vedení spisu o zákazníkovi. Do v0.38-beta
+// byla `reports` jediná kolekce v aplikaci bez úklidu.
+// ⚠️ Doba je uvedená i v zásadách soukromí (docs/…/soukromi.md, čl. 3) a
+// v dokumentaci funkce — při změně upravit obojí, jinak si budou odporovat.
+cronAdd("prune_reports", "20 3 * * *", () => {
+  try {
+    $app.db().newQuery("DELETE FROM reports WHERE created < datetime('now','-30 days')").execute();
+  } catch (err) { /* úklid nesmí nikdy shodit server */ }
+});
+
 // Záznamník změn je jediná kolekce, která roste sama s každým uložením mapy —
 // bez úklidu by po letech provozu nabobtnala donekonečna. 400 dní = rok
 // s rezervou; rozhraní nabízí okna 7 / 30 dní / vše, takže „vše" nově znamená
@@ -2761,6 +2773,12 @@ kbRoute("POST", "/report", (e) => {
   store.set(rlKey, historie);
 
   const inst = instanceInfo($app, "");
+  // ⚠️ ADRESA ODCHÁZÍ JEN NA VÝSLOVNÉ PŘÁNÍ. Richard 19. 8. 2026: „nepotřebujeme
+  // vědět, jaký uživatel a jaká firma — stejně neopravujeme zákaznické účty, ale
+  // program pro všechny." Bez adresy a bez názvu instance to nejsou osobní údaje,
+  // takže z toho neplyne ani povinnost v zásadách soukromí. Kdo chce odpověď,
+  // zaškrtne si to v dialogu; teprve pak se přiloží e-mail a Reply-To.
+  const chceOdpoved = info.reply === true;
   const odesilatel = e.auth.getString("email");
   const podklad = {
     nadpis: t(L, druh === "napad" ? "report.headingIdea" : "report.headingBug"),
@@ -2772,8 +2790,8 @@ kbRoute("POST", "/report", (e) => {
       ikona: druh === "napad" ? "💡" : "🐛",
       nadpis: t(L, "report.boxTitle"),
       radky: [
-        { label: t(L, "report.boxFrom"), hodnota: odesilatel },
-        { label: t(L, "report.boxInstance"), hodnota: inst.base || inst.host },
+        // adresa jen se souhlasem; název instance NIKDY — identifikoval by firmu
+        { label: t(L, "report.boxFrom"), hodnota: chceOdpoved ? odesilatel : "" },
         { label: t(L, "report.boxVersion"), hodnota: env("VERSION") || "" },
         { label: t(L, "report.boxPage"), hodnota: stranka },
         { label: t(L, "report.boxBrowser"), hodnota: prohlizec },
@@ -2794,6 +2812,8 @@ kbRoute("POST", "/report", (e) => {
     zaznam.set("browser", prohlizec);
     zaznam.set("version", env("VERSION") || "");
     zaznam.set("owner", e.auth.id);
+    // ⚠️ Tohle NEODCHÁZÍ z instance — drží jen seznam „co jsem už nahlásil"
+    // pro samotného pisatele (RLS: vidí jen svoje).
     zaznam.set("owner_email", odesilatel);
     zaznam.set("sent", false);
     $app.save(zaznam);
@@ -2806,12 +2826,12 @@ kbRoute("POST", "/report", (e) => {
   const zprava = new MailerMessage({
     from: { address: $app.settings().meta.senderAddress, name: $app.settings().meta.senderName },
     to: [{ address: komu }],
-    subject: t(L, druh === "napad" ? "report.subjectIdea" : "report.subjectBug", { org: inst.org || inst.host }),
+    subject: t(L, druh === "napad" ? "report.subjectIdea" : "report.subjectBug", { verze: env("VERSION") || "?" }),
     html: mailHtml(podklad),
     text: mailText(podklad),
   });
-  // odpověď má chodit tomu, kdo hlásil, ne na noreply@
-  if (odesilatel) zprava.headers = { "Reply-To": odesilatel };
+  // Reply-To jen když člověk o odpověď stojí — jinak by adresa odešla i tak
+  if (chceOdpoved && odesilatel) zprava.headers = { "Reply-To": odesilatel };
 
   try {
     $app.newMailClient().send(zprava);

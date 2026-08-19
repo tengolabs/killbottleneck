@@ -406,10 +406,10 @@ export const base44 = {
   // Hlášení chyby nebo nápadu provozovateli. Server routu vůbec nemá, když
   // není nastavené KB_REPORT_TO — proto se tlačítko ukazuje jen podle
   // `report_enabled` z /api/kb/config.
-  async reportIssue({ kind, text, page, browser }) {
+  async reportIssue({ kind, text, page, browser, reply }) {
     return await pb.send('/api/kb/report', {
       method: 'POST',
-      body: { kind, text, page, browser },
+      body: { kind, text, page, browser, reply: !!reply },
     });
   },
 

@@ -9,6 +9,22 @@ below before you jump several versions.
 
 ---
 
+## v0.38.1-beta — 2026-08-19
+
+**Bug reports without your address or your company name**
+
+- **Bug reports are sent anonymously.** Your text, the app version, the page you were
+  on and your browser go out — your e-mail address and the instance address do not.
+  Bugs get fixed in the program for everyone, not on individual accounts.
+- **Want a reply? Tick the box.** Only then is your address attached and put into
+  `Reply-To`. Without the tick it goes nowhere.
+- **Sent reports delete themselves after 30 days.** Until now `reports` was the only
+  collection in the app with no clean-up at all.
+- Added a guide to bug reporting (Czech and English), documented `KB_REPORT_TO` in the
+  environment reference, and lined the privacy policy up with what actually happens.
+
+---
+
 ## v0.38-beta — 2026-08-19
 
 **Describe a process, not just name it — and tell us when something breaks**

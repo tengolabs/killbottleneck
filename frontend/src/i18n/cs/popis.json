@@ -46,6 +46,10 @@
       "lite": "Zjednodušený režim",
       "jina": "Jiná stránka"
     },
-    "coOdejdeProhlizec": "prohlížeč a operační systém"
+    "coOdejdeProhlizec": "prohlížeč a operační systém",
+    "chciOdpoved": "Chci odpověď — přiložit moji e-mailovou adresu",
+    "coOdejdeVerze": "verze aplikace",
+    "coOdejdeAdresa": "vaše adresa",
+    "bezAdresy": "vaše adresa ani název firmy NE"
   }
 }

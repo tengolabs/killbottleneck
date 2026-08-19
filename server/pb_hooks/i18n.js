@@ -664,12 +664,12 @@ const STRINGS = {
     en: "Improvement idea for killBottleneck",
   },
   "report.subjectBug": {
-    cs: "Chyba: hlášení z instance {org}",
-    en: "Bug: report from instance {org}",
+    cs: "Chyba: hlášení z killBottlenecku {verze}",
+    en: "Bug: report from killBottleneck {verze}",
   },
   "report.subjectIdea": {
-    cs: "Nápad: podnět z instance {org}",
-    en: "Idea: suggestion from instance {org}",
+    cs: "Nápad: podnět ke killBottlenecku {verze}",
+    en: "Idea: suggestion for killBottleneck {verze}",
   },
   "report.boxTitle": {
     cs: "Odkud hlášení přišlo",

@@ -46,6 +46,10 @@
       "lite": "Lite mode",
       "jina": "Another page"
     },
-    "coOdejdeProhlizec": "browser and operating system"
+    "coOdejdeProhlizec": "browser and operating system",
+    "chciOdpoved": "I want a reply — include my e-mail address",
+    "coOdejdeVerze": "app version",
+    "coOdejdeAdresa": "your address",
+    "bezAdresy": "NOT your address or company name"
   }
 }

@@ -118,6 +118,8 @@ const polozkyMenu = async (page) => {
         text: d.innerText,
         druhy: [...d.querySelectorAll('[data-report-druh]')].map((x) => x.getAttribute('data-report-druh')),
         maPole: !!d.querySelector('#report-text'),
+        maOdpoved: !!d.querySelector('[data-report-odpoved]'),
+        odpovedVypnuta: d.querySelector('[data-report-odpoved]') ? !d.querySelector('[data-report-odpoved]').checked : false,
         odeslatVypnuto: !!d.querySelector('[data-report-odeslat]')?.disabled,
       };
     });
@@ -128,9 +130,14 @@ const polozkyMenu = async (page) => {
     ok(dialog.odeslatVypnuto, 'Odeslat je zašedlé, dokud není co poslat');
 
     console.log('== před odesláním je vidět, co odejde ==');
-    ok(/b@example\.com/.test(dialog.text), 'v dialogu je vidět adresa hlásícího');
-    ok(/v0\.38-test/.test(dialog.text), 'v dialogu je vidět verze instance');
-    ok(/127\.0\.0\.1|localhost/.test(dialog.text), 'v dialogu je vidět, o kterou instanci jde');
+    // ⚠️ Adresa ani instance se od 19. 8. 2026 NEODESÍLAJÍ (Richard: „nepotřebujeme
+    // vědět, jaký uživatel a jaká firma"). Dialog to musí říct nahlas a nabídnout
+    // zaškrtnutí pro ty, kdo o odpověď stojí.
+    ok(/v0\.38-test/.test(dialog.text), 'v dialogu je vidět verze aplikace');
+    ok(!/127\.0\.0\.1:|localhost:/.test(dialog.text), 'adresa instance se NEUVÁDÍ');
+    ok(/adresa ani název firmy NE/i.test(dialog.text), 'a je řečeno, že adresa neodejde');
+    ok(dialog.maOdpoved, 'je tam zaškrtnutí „Chci odpověď"');
+    ok(dialog.odpovedVypnuta, 'a je ve výchozím stavu VYPNUTÉ');
 
     await page.type('#report-text', 'Tlačítko Uložit v mapě nereaguje.');
     await sleep(400);
