@@ -1,0 +1,42 @@
+{
+  "historie": {
+    "nadpis": "Životopis",
+    "popis": "Co se s tímhle cílem dělo — odshora od nejnovějšího.",
+    "prazdno": "Zatím se tu nic nestalo. Jakmile někdo změní stav, termín, řešitele nebo přidá komentář, objeví se to tady.",
+    "nacitam": "Načítám…",
+    "chyba": "Životopis se nepodařilo načíst.",
+    "oriznuto": "Starší události se sem už nevešly.",
+    "kdo": {
+      "system": "systém",
+      "pravidlo": "pravidlo",
+      "agent": "agent"
+    },
+    "udalost": {
+      "created": "Cíl založen",
+      "deleted": "Cíl smazán",
+      "status": "Stav: {{z}} → {{na}}",
+      "statusNovy": "Stav nastaven na {{na}}",
+      "deadline": "Termín: {{z}} → {{na}}",
+      "deadlineNovy": "Termín nastaven na {{na}}",
+      "deadlineZrusen": "Termín zrušen",
+      "owner": "Řešitel: {{z}} → {{na}}",
+      "ownerNovy": "Řešitel nastaven na {{na}}",
+      "ownerZrusen": "Řešitel odebrán",
+      "title": "Přejmenováno: {{z}} → {{na}}",
+      "parent": "Přesunuto: {{z}} → {{na}}",
+      "description": "Změněno zadání",
+      "icon": "Změněna ikona",
+      "color": "Změněna barva",
+      "executor": "Změněn vykonavatel",
+      "waiting": "Změněno čekání na podřízené",
+      "komentar": "Přidán komentář",
+      "priloha": "Přidána příloha {{nazev}}",
+      "odkaz": "Přidán odkaz {{nazev}}",
+      "pravidloOk": "Pravidlo „{{nazev}}\" zasáhlo",
+      "pravidloFailed": "Pravidlo „{{nazev}}\" selhalo",
+      "pravidloSkipped": "Pravidlo „{{nazev}}\" přeskočeno",
+      "neznama": "Změna"
+    },
+    "prazdnaHodnota": "—"
+  }
+}

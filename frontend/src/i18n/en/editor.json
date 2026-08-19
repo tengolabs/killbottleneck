@@ -100,6 +100,7 @@
     "selected_few": "{{count}} nodes selected",
     "selected_many": "{{count}} nodes selected",
     "selected_other": "{{count}} nodes selected",
+    "editSelection": "Edit selected",
     "deleteSelection": "Delete selection"
   },
   "empty": {
@@ -153,7 +154,8 @@
       "files": "Attachments",
       "tasks": "Tasks & comments",
       "behavior": "Behavior",
-      "org": "Position"
+      "org": "Position",
+      "history": "History"
     },
     "iconLabel": "Node icon (optional)",
     "iconDesc": "Shown in the map and in the table instead of the default icon.",

@@ -148,7 +148,11 @@ const openSkinDialog = async (page) => {
       const probe = document.createElement('span');
       document.body.appendChild(probe);
       const resolve = (v) => { probe.style.color = v; return getComputedStyle(probe).color; };
-      const edge = document.querySelector('.react-flow__edge-path');
+      // ⚠️ Jen NEUTRÁLNÍ hrana jede z --canvas-edge. Od 19. 8. 2026 má hrana do
+      // hotového cíle --canvas-edge-done a do propadlého --canvas-edge-late, takže
+      // „první hrana v DOM" by tuhle kontrolu shodila, jakmile by testovací mapa
+      // měla první cíl hotový nebo po termínu.
+      const edge = document.querySelector('[data-stav-hrany="normal"] .react-flow__edge-path');
       const dot = document.querySelector('.react-flow__background circle');
       const out = {
         edge: edge ? getComputedStyle(edge).stroke : null,

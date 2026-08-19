@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Inbox, Trash2, ExternalLink, LayoutGrid, CalendarClock, Bot, Paperclip, ListTodo, Users } from 'lucide-react';
+import { Inbox, Trash2, ExternalLink, LayoutGrid, CalendarClock, Bot, Paperclip, ListTodo, Users, History } from 'lucide-react';
 import { useNodeEditState } from './useNodeEditState';
 import BasicsSection from './sections/BasicsSection';
 import OrgSection from './sections/OrgSection';
@@ -15,6 +15,7 @@ import ExecutorSection from './sections/ExecutorSection';
 import FilesSection from './sections/FilesSection';
 import BehaviorSection from './sections/BehaviorSection';
 import TasksCommentsSection from './sections/TasksCommentsSection';
+import HistorySection from './sections/HistorySection';
 
 // VELKÉ okno uzlu pro EDITORY mapy (rozhodnutí Richarda 14. 8. 2026): skoro
 // celoobrazovkový dialog, vlevo svislé menu kategorií (vzor menu pod panáčkem
@@ -48,13 +49,18 @@ export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAc
         : [
           { id: 'basics', icon: LayoutGrid },
           { id: 'assignment', icon: CalendarClock },
-          { id: 'tasks', icon: ListTodo },
+          { id: 'tasks', icon: ListTodo, badge: s.commentCount || 0 },
         ])
       : [
         { id: 'basics', icon: LayoutGrid },
         { id: 'assignment', icon: CalendarClock },
         { id: 'files', icon: Paperclip, badge: s.files.length || 0 },
-        { id: 'tasks', icon: ListTodo },
+        { id: 'tasks', icon: ListTodo, badge: s.commentCount || 0 },
+        // Životopis (jen ke ČTENÍ) je PŘED Automatizací, ne na konci: „Automatizace
+        // bude poslední" je Richardovo rozhodnutí z 15. 8. a nová kategorie ho
+        // přebíjet nesmí. Levé menu kategorií není hlavní navigace → anti-bloat
+        // pravidlo #2 platí dál; tohle je kontextová cesta k věci před sebou.
+        { id: 'history', icon: History },
         // „Vykonavatel a automatizace" + „Chování" sloučeno do JEDNÉ kategorie
         // Automatizace, POSLEDNÍ v menu (Richard 15. 8.: „nelíbí se mi název
         // vykonavatel… nechápu to chování; Automatizace bude poslední pod
@@ -114,6 +120,7 @@ export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAc
               )}
               {active === 'files' && !s.isApex && <FilesSection s={s} mapId={mapId} />}
               {active === 'tasks' && <TasksCommentsSection s={s} map={map} mapId={mapId} />}
+              {active === 'history' && <HistorySection mapId={mapId} nodeId={s.node?.id} />}
             </div>
           </main>
         </div>

@@ -34,6 +34,19 @@ const LOADERS = {
     cs: () => import('./cs/popis.json'),
     en: () => import('./en/popis.json'),
   },
+  // hromadná úprava označených cílů — jen v plném editoru mapy (lite plátno
+  // vůbec nemá, ReactFlow se do něj neveze), takže do editor.json nepatří:
+  // ten jde do lite celý a rezerva do stropu je ~1 kB (lite-bundle.js).
+  hromadne: {
+    cs: () => import('./cs/hromadne.json'),
+    en: () => import('./en/hromadne.json'),
+  },
+  // životopis cíle (kdo kdy co změnil) — otevírá se až v okně cíle, ze stejného
+  // důvodu jako hromadné akce mimo jazykový balík
+  historie: {
+    cs: () => import('./cs/historie.json'),
+    en: () => import('./en/historie.json'),
+  },
 };
 const nactene = new Set();
 

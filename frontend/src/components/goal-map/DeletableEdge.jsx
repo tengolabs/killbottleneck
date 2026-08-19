@@ -48,8 +48,16 @@ export default function DeletableEdge({
       selected={selected}
       style={{
         ...style,
-        strokeWidth: selected ? 3.5 : 2,
-        stroke: selected ? 'hsl(0 84% 60%)' : style?.stroke,
+        // Vybranou hranu dělá TLOUŠŤKA, ne barva. Červená odpadla (od 19. 8. 2026
+        // znamená „cíl je po termínu"), a barva zvýraznění ze vzhledu taky ne:
+        // `--ring` je ve 12 z 22 variant vestavěných skinů BAJT ZA BAJT stejná
+        // jako `--canvas-edge` (Oceán, Švestka, Broskev, Grafit, Vysoký kontrast…),
+        // takže by výběr nebylo poznat. Vlastní token skinu Richard zamítl:
+        // „na čáru nemáš co klikat, to je zbytečná funkce, ale tloušťka stačí"
+        // — výběr uzlu je důležitější a nemá cenu kvůli tomuhle přidávat
+        // 22 hodnot do všech vzhledů (anti-bloat: žádné rozhodnutí navíc).
+        strokeWidth: selected ? 5 : 2,
+        stroke: style?.stroke,
       }}
     />
   );

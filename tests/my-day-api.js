@@ -154,6 +154,36 @@ const titlesIn = (list) => (list || []).map((i) => i.title);
     const dvakrat = (uzel.json.sections.doneToday || []).map(klic).filter((k) => otevrene.includes(k));
     expect(dvakrat.length === 0, `žádná položka není zároveň hotová i otevřená (${dvakrat})`);
 
+    console.log('== sekce „nehýbe se" u CÍLŮ vůbec funguje ==');
+    // ⚠️ Tuhle sekci u cílů do 19. 8. 2026 netestoval NIKDO — a přitom se opírá
+    // o záznamník změn, do kterého tou vlnou přibyly nové druhy řádků. Tohle
+    // hlídá, že dotaz po zúžení na skutečný pohyb pořád VRACÍ data: kdyby měl
+    // chybný filtr, nevrátil by nic a sekce by tiše zmizela (uzel bez razítka
+    // se za zaseknutý NEPOVAŽUJE, takže by prázdno vypadalo jako pořádek).
+    //
+    // Stáří se simuluje POSUNEM „dneška" do budoucnosti (práh je today − 14 dní);
+    // razítko `created` je autodate a PATCH ho neprojde.
+    // ⚠️ POCTIVĚ: že kosmetická změna cíl ze zaseknutých NEVYHODÍ, se takhle
+    // ověřit NEDÁ — s dneškem v budoucnosti je za prahem i ta kosmetická změna,
+    // takže by tvrzení prošlo i s rozbitým filtrem. Tu půlku opravy hlídá
+    // map-changes.js, kde je měřitelná.
+    const budoucnost = new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10);
+    const zaseknutyUzel = { id: 'zasek', type: 'goalNode', position: { x: 900, y: 300 },
+      data: { title: 'UZEL-ZASEKNUTY', status: 'todo', owner: me.email, deadline: '', description: '' } };
+    const mZ = (await api(`/api/collections/goalmaps/records/${mapa.id}`, { token: ST })).json;
+    await api(`/api/collections/goalmaps/records/${mapa.id}`, { token: ST, method: 'PATCH',
+      body: { nodes: (mZ.nodes || []).concat([zaseknutyUzel]), edges: mZ.edges } });
+    await sleep(400);
+
+    const dz = (await api(myDayUrl(budoucnost), { token: me.token })).json;
+    expect(titlesIn(dz.sections.stuck).includes('UZEL-ZASEKNUTY'),
+      `cíl bez pohybu je v „nehýbe se" (${titlesIn(dz.sections.stuck)})`);
+    // kotva: s DNEŠNÍM dneškem tam být nesmí — jinak by tvrzení výš prošlo
+    // i tehdy, kdyby se do sekce sypalo všechno
+    const dnesni = (await api(myDayUrl(today), { token: me.token })).json;
+    expect(!titlesIn(dnesni.sections.stuck).includes('UZEL-ZASEKNUTY'),
+      `čerstvý cíl v „nehýbe se" NENÍ (${titlesIn(dnesni.sections.stuck)})`);
+
     console.log('== dedup uzel + úkol ==');
     const vsechny = [].concat(d.sections.overdue, d.sections.today, d.sections.week, d.sections.blocking);
     expect(!titlesIn(vsechny).includes('UKOL-NA-MEM-UZLU'),

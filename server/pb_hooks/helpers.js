@@ -1260,11 +1260,24 @@ function assertTaskNode(app, record, origNodeId) {
 // a souhrn by byl nečitelný.
 // Zápis je „bonus": když selže, uložení mapy tím padnout NESMÍ.
 const TRACKED_NODE_FIELDS = ["status", "deadline", "owner", "title"];
+// Pole, u kterých se do historie zapisuje jen TO, ŽE se změnila — ne obsah.
+// Zadání je formátovaný text; nacpat ho do from/to (max 500 znaků) by z historie
+// udělalo druhou, useknutou kopii dat. Životopis odpovídá „kdo kdy sáhl na co",
+// ne „jak to tehdy znělo". Klíč vlevo = pole uzlu, vpravo = hodnota do `field`
+// (musí být ve výčtu SELECTu, viz migrace 1787300000).
+const TRACKED_NODE_FLAGS = {
+  description: "description",
+  icon: "icon",
+  color: "color",
+  executorKind: "executor",
+  executorName: "executor",
+  waitForChildren: "waiting",
+};
 
 // origEdges/newEdges jsou volitelné — bez nich se změna rodiče jen nezaloguje
 // (kanban posun pravidlem by jinak byl v historii neviditelný: mění hranu
 // a pozici, tedy nic, co záznamník sledoval).
-function logMapChanges(app, mapId, origNodes, newNodes, actorEmail, origEdges, newEdges) {
+function logMapChanges(app, mapId, origNodes, newNodes, actorEmail, origEdges, newEdges, via) {
   if (!mapId) return;
   let col;
   try { col = app.findCollectionByNameOrId("map_changes"); } catch (err) { return; }
@@ -1304,6 +1317,19 @@ function logMapChanges(app, mapId, origNodes, newNodes, actorEmail, origEdges, n
       if (a === b) continue;
       rows.push({ kind: "node", item_id: n.id, title: titleOf(d), field: f, from: a.slice(0, 500), to: b.slice(0, 500) });
     }
+    // Pole bez obsahu v historii (zadání, ikona, barva, vykonavatel, čekání).
+    // executorKind i executorName spadají pod jedno `executor` — přepnutí
+    // vykonavatele mění obě naráz a dva řádky o jedné akci by jen šuměly.
+    const flagsSeen = {};
+    for (const f in TRACKED_NODE_FLAGS) {
+      const a = String(before[f] === undefined ? "" : before[f]);
+      const b = String(d[f] === undefined ? "" : d[f]);
+      if (a === b) continue;
+      const znacka = TRACKED_NODE_FLAGS[f];
+      if (flagsSeen[znacka]) continue;
+      flagsSeen[znacka] = true;
+      rows.push({ kind: "node", item_id: n.id, title: titleOf(d), field: znacka, from: "", to: "" });
+    }
     if (origEdges && newEdges && prevParent[n.id] && newParent[n.id] && prevParent[n.id] !== newParent[n.id]) {
       rows.push({
         kind: "node", item_id: n.id, title: titleOf(d), field: "parent",
@@ -1329,6 +1355,9 @@ function logMapChanges(app, mapId, origNodes, newNodes, actorEmail, origEdges, n
       rec.set("from", r.from);
       rec.set("to", r.to);
       rec.set("actor_email", actorEmail || "");
+      // kdo to udělal doopravdy: prázdné = člověk, "rule:<id>" / "agent:<jméno>"
+      // jinak by historie tvrdila, že zásah pravidla udělal jeho autor
+      rec.set("via", via || "");
       app.save(rec);
     } catch (err) { /* jeden nezapsaný řádek historie nesmí shodit uložení mapy */ }
   }
@@ -1862,7 +1891,9 @@ function v1SaveMapData(app, map, nodes, edges, lang, relayout, actorEmail, opts)
   map.set("edges", norm.edges);
   app.save(map);
   try {
-    logMapChanges(app, map.id, origNodes, finalNodes, actorEmail || "", origEdges, norm.edges);
+    // opts.via protéká z volajícího: zásah pravidla se do historie musí přiznat
+    // jako pravidlo, ne jako jeho autor (viz executeRuleActions)
+    logMapChanges(app, map.id, origNodes, finalNodes, actorEmail || "", origEdges, norm.edges, (opts && opts.via) || "");
   } catch (err) { /* historie je bonus, uložení mapy kvůli ní padnout nesmí */ }
   // žádosti o termín: nová žádost → zadavateli; vyřízená → žadateli.
   // Notifikace až PO úspěšném zápisu a nikdy nesmí shodit uložení.
@@ -3876,7 +3907,10 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
   }
 
   if (changed) {
-    const saved = v1SaveMapData(app, map, nodes, edges, null, relayout, authorActor, { isOwner: authorIsOwner, rulesDepth: depth + 1, rulesBudget: budget });
+    // via: v životopisu cíle se zásah PŘIZNÁ jako pravidlo. actorEmail zůstává
+    // autor pravidla (autorizace i notifikace na něm stojí), ale historie by
+    // bez tohohle tvrdila, že u cíle klikal člověk.
+    const saved = v1SaveMapData(app, map, nodes, edges, null, relayout, authorActor, { isOwner: authorIsOwner, rulesDepth: depth + 1, rulesBudget: budget, via: "rule:" + rule.id });
     if (saved.error) throw new Error("save failed: " + saved.error);
   }
   return { done: done, skips: skips, agentRunId: agentRunId };
@@ -5143,8 +5177,15 @@ function buildMyDay(app, userId, email, opts) {
       // řazeno od nejnovějšího → první výskyt item_id JE poslední pohyb.
       // Strop je vědomý: u velmi činné mapy může starší uzel vypadnout z okna
       // a projeví se jako „nevím" (tedy NEzaseknutý) — bezpečný směr chyby.
+      // ⚠️ Jen SKUTEČNÝ POHYB, ne kosmetika. Od 19. 8. 2026 padají do záznamníku
+      // i změny zadání, ikony, barvy, vykonavatele a čekání — bez tohohle filtru
+      // by přebarvení karty znamenalo „cíl se hýbe" a vyřadilo ho ze sekce
+      // „Nehýbe se". Tím by se sekce tiše vyprázdnila právě u lidí, kteří si
+      // mapu rádi uklízejí, a přesně to má A4 odhalovat.
       const rows = app.findRecordsByFilter("map_changes",
-        "kind = 'node' && (" + parts.join(" || ") + ")", "-created", 3000, 0, params);
+        "kind = 'node' && (field = 'status' || field = 'deadline' || field = 'owner'"
+        + " || field = 'title' || field = 'created' || field = 'parent')"
+        + " && (" + parts.join(" || ") + ")", "-created", 3000, 0, params);
       for (const r of rows) {
         const key = r.getString("map") + ":" + r.getString("item_id");
         if (nodeMoved[key] === undefined) nodeMoved[key] = r.getString("created");

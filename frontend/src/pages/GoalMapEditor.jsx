@@ -21,7 +21,7 @@ import OrgLogo from '@/components/shared/OrgLogo';
 import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, Target, Trash2, Download, Search, X, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, Filter, BarChart3, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, Lock, Unlock, Sun, Moon, FileJson, ChevronDown, Map as MapIcon, Palette, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3 } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Check, Target, Trash2, Download, Search, X, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, Filter, BarChart3, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, Lock, Unlock, Sun, Moon, FileJson, ChevronDown, Map as MapIcon, Palette, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3, SlidersHorizontal } from 'lucide-react';
 import ShareDialog from '@/components/goal-map/ShareDialog';
 import {
   DropdownMenu,
@@ -72,7 +72,9 @@ import { useAiModes } from '@/hooks/useAiEnabled';
 import { effectiveTheme, setTheme } from '@/lib/theme';
 import NotificationBell from '@/components/shared/NotificationBell';
 import { statusConfig, cycleStatus } from '@/lib/statusMeta';
+import { getDeadlineStatus } from '@/lib/nodeMeta';
 import NodeTasksDialog from '@/components/tasks/NodeTasksDialog';
+import BulkEditDialog from '@/components/goal-map/BulkEditDialog';
 import SaveTemplateDialog from '@/components/shared/SaveTemplateDialog';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { ALIGN_STYLES, ALIGN_OPTS, KLIC_ZAMEK, zamcenyStyl, platnyStyl, stylNoveMapy } from '@/lib/alignStyles';
@@ -404,6 +406,7 @@ function EditorContent({ mapId, personalMap = false }) {
   const [exporting, setExporting] = useState(false);
   // minimapa jde schovat — překrývá malůvku skinu a na malých mapách zavazí
   const [miniMapOpen, setMiniMapOpen] = useState(() => nactiKlic('kb-minimap-open') !== '0');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [skinOpen, setSkinOpen] = useState(false);   // dialog Vzhled i z editoru
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [nazevEditace, setNazevEditace] = useState(false);
@@ -684,7 +687,35 @@ function EditorContent({ mapId, personalMap = false }) {
       // je posílá zvlášť a děti by tiše osiřely — nález checkupu 2. 8.)
       .map((n) => ({ ...n, zIndex: n.type === 'note' ? 0 : (n.zIndex ?? 10), ...(isApexNodeShared(n) ? { deletable: false } : {}) }));
     const visibleIds = new Set(vNodes.map((n) => n.id));
-    const vEdges = edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target));
+    // Stav hrany se ODVOZUJE za běhu z CÍLOVÉHO uzlu — hrana vede *do* něj a nic
+    // jiného o ní nevypovídá. Ukládat se nesmí: cleanMap zapisuje u hrany jen
+    // id/source/target, takže uložený stav by se rozešel s realitou hned, jak
+    // někdo přepne stav uzlu jinde (mobil, pravidlo, API).
+    const dataById = {};
+    for (const n of vNodes) dataById[n.id] = n.data || {};
+    const vEdges = edges
+      .filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target))
+      .map((e) => {
+        const d = dataById[e.target] || {};
+        // getDeadlineStatus vrací u hotového vždy 'normal', takže přednost
+        // „zelená před červenou" vyjde bez dalšího větvení
+        const stav = d.status === 'done'
+          ? 'done'
+          : (getDeadlineStatus(d.deadline, d.status) === 'overdue' ? 'late' : 'normal');
+        const barva = stav === 'done' ? 'var(--canvas-edge-done)'
+          : stav === 'late' ? 'var(--canvas-edge-late)'
+          : 'var(--canvas-edge)';
+        return {
+          ...e,
+          // hotové se přestane hýbat (práce doběhla), propadlé zrychlí (index.css)
+          animated: stav !== 'done',
+          className: stav === 'late' ? 'kb-hrana-late' : undefined,
+          // ⚠️ xyflow slučuje s defaultEdgeOptions MĚLCE — vlastní style nahradí
+          // celý výchozí objekt, takže strokeWidth tu musí být taky
+          style: { stroke: `hsl(${barva})`, strokeWidth: 2 },
+          domAttributes: { 'data-stav-hrany': stav },
+        };
+      });
 
     return { visibleNodes: vNodes, visibleEdges: vEdges, hiddenCounts: counts };
   }, [nodes, edges, childrenMap]);
@@ -2380,6 +2411,74 @@ function EditorContent({ mapId, personalMap = false }) {
 
   const selectedNodeCount = nodes.filter((n) => n.selected).length;
 
+  // Hromadná úprava označených cílů. Stejný merge do `data` jako handleSaveNode,
+  // jen přes celý výběr — mapa je jeden JSON blob, takže autosave pošle JEDEN
+  // PATCH a žádný dávkový endpoint není potřeba.
+  //
+  // ⚠️ Termín se u cizího zadání PŘESKAKUJE. Server (deadlineChangeDenied)
+  // odmítne CELÝ PATCH mapy kvůli jedinému uzlu, na který uživatel nemá právo —
+  // uživateli by se autosave tiše zasekl a nevěděl by proč. Předfiltr je tady,
+  // ne v dialogu, a počet přeskočených se hlásí nahlas.
+  const smiMenitTermin = useCallback(
+    (n) => {
+      if (!n?.data?.deadline) return true;          // první nastavení je volné
+      if (isMapOwner) return true;
+      const zadavatel = n.data.assignedBy || effectiveMapAccess.ownerEmail || '';
+      return !!user?.email && user.email === zadavatel;
+    },
+    [isMapOwner, effectiveMapAccess.ownerEmail, user?.email]
+  );
+  // Poznámky (lístky) NEJSOU cíle: server u nich cizí pole při normalizaci zahodí,
+  // ale barvu si drží pod vlastním klíčem — hromadné přebarvení by jim ji tiše
+  // sebralo (StickyNoteNode hledá hodnotu ve svém výčtu a jinak spadne na výchozí).
+  // Vrchol se vylučuje taky: ten se hromadně needituje ani nemaže.
+  const jeUpravitelny = (n) => n.selected && !isApexNodeShared(n) && n.type !== 'note';
+  const selectedEditable = nodes.filter(jeUpravitelny);
+  const selectedDeadlineOk = selectedEditable.filter(smiMenitTermin).length;
+
+  const handleBulkApply = useCallback((zmeny) => {
+    const cile = nodes.filter(jeUpravitelny);
+    if (cile.length === 0) return;
+    const meniTermin = Object.prototype.hasOwnProperty.call(zmeny, 'deadline');
+    // „Termín je termín" (rozhodnutí 27. 7. 2026) — hromadná změna termínu se
+    // potvrzuje, u ostatních polí stačí Zpět
+    if (meniTermin && !window.confirm(i18next.t('hromadne:hromadne.potvrdit', { count: cile.length }))) return;
+
+    const ids = new Set(cile.map((n) => n.id));
+    let zmeneno = 0;
+    let preskoceno = 0;
+    const dalsi = nodes.map((n) => {
+      if (!ids.has(n.id)) return n;
+      const patch = { ...zmeny };
+      if (meniTermin && !smiMenitTermin(n)) { delete patch.deadline; preskoceno += 1; }
+      // beze změny → uzel nechat NETKNUTÝ, ať autosave ani záznamník nedostanou
+      // práci zadarmo (a undo krok nevznikne z ničeho)
+      const jineHodnoty = Object.keys(patch).some((k) => (n.data?.[k] || '') !== (patch[k] || ''));
+      if (!jineHodnoty) return n;
+      zmeneno += 1;
+      return { ...n, data: { ...n.data, ...patch } };
+    });
+
+    if (zmeneno === 0) {
+      // rozlišit „hodnoty už tam byly" od „nesměl jsem na to sáhnout" — druhé
+      // je odmítnutí a tvářit se u něj, že se nic nezměnilo, je zavádějící
+      toast(preskoceno > 0
+        ? { title: i18next.t('hromadne:hromadne.terminCizi', { pocet: preskoceno, celkem: cile.length }) }
+        : { title: i18next.t('hromadne:hromadne.nicSeNezmenilo') });
+      setBulkOpen(false);
+      return;
+    }
+    pushHistory();
+    setNodes(dalsi);
+    setBulkOpen(false);
+    toast({
+      title: i18next.t('hromadne:hromadne.hotovo', { count: zmeneno }),
+      description: preskoceno > 0
+        ? i18next.t('hromadne:hromadne.terminCizi', { pocet: preskoceno, celkem: cile.length })
+        : i18next.t('hromadne:hromadne.hotovoZpet'),
+    });
+  }, [nodes, setNodes, pushHistory, toast, smiMenitTermin]);
+
   const handleExport = async (format) => {
     setExporting(true);
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -3318,6 +3417,20 @@ function EditorContent({ mapId, personalMap = false }) {
               <span className="text-sm font-medium text-muted-foreground">
                 {t('selection.selected', { count: selectedNodeCount })}
               </span>
+              {/* Když ve výběru není žádný SKUTEČNÝ cíl (jen vrchol nebo poznámky),
+                  tlačítko se nenabízí — jinak se otevře „Upravit 0 cílů" a klik
+                  na Použít mlčky neudělá nic. */}
+              {selectedEditable.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkOpen(true)}
+                data-bulk-open
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                {t('selection.editSelection')}
+              </Button>
+              )}
               <Button
                 variant="destructive"
                 size="sm"
@@ -3327,6 +3440,19 @@ function EditorContent({ mapId, personalMap = false }) {
                 {t('selection.deleteSelection')}
               </Button>
             </div>
+          )}
+          {canEdit && bulkOpen && (
+            <BulkEditDialog
+              open={bulkOpen}
+              onOpenChange={setBulkOpen}
+              pocet={selectedEditable.length}
+              pocetSmiTermin={selectedDeadlineOk}
+              mapAccess={effectiveMapAccess}
+              members={members}
+              onShareAdd={handleShareAdd}
+              onContactsChanged={reloadMembers}
+              onApply={handleBulkApply}
+            />
           )}
         </MembersContext.Provider>
         </GoalMapContext.Provider>

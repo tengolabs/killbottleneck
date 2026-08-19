@@ -48,6 +48,12 @@
     --sidebar-ring: 45 85% 55%;
     /* Plátno mapy — hrany schválně NEjedou z --primary (v dark je bílá) */
     --canvas-edge: 45 80% 52%;
+    /* Stav CÍLOVÉHO uzlu hrany: hotovo / po termínu. Jsou to tokeny skinu,
+       ne pevné barvy — v Lese je neutrální čára zelená a v Terminálu žlutá,
+       takže natvrdo zapsaná zelená a červená by v půlce vzhledů byly cizí
+       prvek (rozhodnutí Richarda 19. 8. 2026). Co skin nedefinuje, padá sem. */
+    --canvas-edge-done: 142 60% 40%;
+    --canvas-edge-late: 0 78% 52%;
     --canvas-dots: 222 20% 28%;
     --canvas-node: 220 20% 58%;
   }
@@ -87,6 +93,8 @@
     --sidebar-border: 224 25% 22%;
     --sidebar-ring: 45 90% 58%;
     --canvas-edge: 45 85% 52%;
+    --canvas-edge-done: 142 55% 48%;
+    --canvas-edge-late: 0 80% 62%;
     --canvas-dots: 224 22% 18%; /* tečky pozadí — světlé #e2e8f0 by v tmavém svítily */
     --canvas-node: 220 20% 52%;
   }
@@ -103,6 +111,29 @@
     @apply bg-background text-foreground font-body;
   }
 }
+/* Hrana do cíle PO TERMÍNU běží rychleji. Knihovna má v `.react-flow__edge.animated
+   path` ZKRATKU `animation: dashdraw 0.5s ...`, a ta při shodné specifičnosti
+   přepíše i samotné animation-duration. Style.css xyflow se navíc importuje až
+   v GoalMapEditor.jsx, tedy PO tomhle souboru → v pořadí by vyhrála knihovna.
+   Proto se sem přidává třetí třída (0,4,0 > 0,2,1) místo !important.
+   ⚠️ Ověřeno měřením: se selektorem o stejné specifičnosti zůstalo 0,5 s.
+   Hrana do HOTOVÉHO cíle se nehýbe vůbec — to řeší `animated: false`
+   v GoalMapEditor, ne CSS. */
+.react-flow__edge.animated.kb-hrana-late .react-flow__edge-path {
+  animation-duration: 0.2s;
+}
+
+/* Kdo si vypnul pohyb v systému, ať ho nedostane ani na plátně — rychle
+   blikající čára je přesně ten podnět, kvůli kterému si lidi tuhle volbu
+   zapínají. Barva stavu zůstává, mizí jen pohyb. Cílíme třídou (0,3,0), ne
+   `path` (0,2,1), ze stejného důvodu jako výš — a NE na
+   .react-flow__edge-interaction, tu knihovna nechává schválně bez animace. */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge.animated .react-flow__edge-path {
+    animation: none;
+  }
+}
+
 /* Křížky pro odpojení hran musí být nad uzly (uzly mají zIndex 10),
    jinak je uzel překryje a nejdou kliknout. */
 .react-flow__edgelabel-renderer {

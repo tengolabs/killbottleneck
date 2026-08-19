@@ -6,7 +6,14 @@ import NodeTaskComments from '@/components/shared/NodeTaskComments';
 export default function TasksCommentsSection({ s, mapId }) {
   return (
     <>
-      <CommentThread entity="Comment" filter={{ goalmap_id: mapId, node_id: s.node?.id }} />
+      {/* onCountChange drží odznak u kategorie v souladu i po přidání či smazání
+          komentáře; prvotní počet načítá useNodeEditState, aby odznak byl vidět
+          hned po otevření okna, ne až po vstupu do téhle kategorie */}
+      <CommentThread
+        entity="Comment"
+        filter={{ goalmap_id: mapId, node_id: s.node?.id }}
+        onCountChange={s.setCommentCount}
+      />
       <NodeTaskComments mapId={mapId} nodeId={s.node?.id} />
     </>
   );

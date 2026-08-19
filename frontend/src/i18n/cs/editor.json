@@ -100,6 +100,7 @@
     "selected_few": "Vybráno {{count}} uzly",
     "selected_many": "Vybráno {{count}} uzlů",
     "selected_other": "Vybráno {{count}} uzlů",
+    "editSelection": "Upravit vybrané",
     "deleteSelection": "Smazat výběr"
   },
   "empty": {
@@ -153,7 +154,8 @@
       "files": "Přílohy",
       "tasks": "Úkoly a komentáře",
       "behavior": "Chování",
-      "org": "Pozice"
+      "org": "Pozice",
+      "history": "Životopis"
     },
     "iconLabel": "Ikona uzlu (volitelně)",
     "iconDesc": "Zobrazí se v mapě i v tabulce místo výchozí ikony.",

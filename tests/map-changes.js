@@ -94,6 +94,30 @@ const titles = (list) => (list || []).map((i) => i.title);
     r = await api('GET', `/api/flowmap/map-changes?map=${mapa.id}&range=7`, { token: me.token });
     expect(JSON.stringify(r.json.counts) === pred, `po samotném přesunu uzlů žádný nový záznam (${pred} → ${JSON.stringify(r.json.counts)})`);
 
+    console.log('== JÁDRO: kosmetika do souhrnu NEPATŘÍ a neujídá z okna ==');
+    // Od 19. 8. 2026 zapisuje záznamník i změnu zadání, ikony, barvy, vykonavatele
+    // a čekání. Do souhrnu na dashboardu se hlásit NESMÍ — je o POHYBU práce.
+    // A hlavně: musí se odfiltrovat UŽ V DOTAZU. Kdyby se natáhly a zahodily až
+    // v JS, ujídaly by ze stropu 500 řádků a na činné mapě by z okna vytlačily
+    // SKUTEČNÉ události — report by pak tiše mlčel o práci, která proběhla.
+    const predKosmetikou = (await api('GET', `/api/kb/map-changes?map=${mapa.id}&range=all`, { token: me.token })).json;
+    const mK = (await api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: me.token })).json;
+    for (const n of mK.nodes) if (n.id === 'n1') {
+      n.data.color = '#8b5cf6'; n.data.icon = '🎨'; n.data.description = 'Jine zadani';
+    }
+    await api('PATCH', `/api/collections/goalmaps/records/${mapa.id}`, { token: me.token, body: { nodes: mK.nodes, edges: mK.edges } });
+    await sleep(400);
+    const poKosmetice = (await api('GET', `/api/kb/map-changes?map=${mapa.id}&range=all`, { token: me.token })).json;
+    expect(JSON.stringify(poKosmetice.counts) === JSON.stringify(predKosmetikou.counts),
+      `barva, ikona ani zadání souhrn nezmění (${JSON.stringify(predKosmetikou.counts)} → ${JSON.stringify(poKosmetice.counts)})`);
+    // protikontrola: řádky VZNIKLY, jen se do souhrnu nehlásí — bez ní by
+    // tvrzení výš prošlo i tehdy, kdyby se kosmetika vůbec nezaznamenávala.
+    // Čte se přes životopis cíle, který na týž záznamník kouká bez filtru pohybu.
+    const zivot = (await api('GET', `/api/kb/node-history?map=${mapa.id}&node=n1`, { token: me.token })).json;
+    const pole = (zivot.items || []).filter((i) => i.kind === 'change').map((i) => i.field);
+    expect(pole.includes('color') && pole.includes('icon') && pole.includes('description'),
+      `v záznamníku ty řádky ale JSOU (${[...new Set(pole)].join(',')})`);
+
     console.log('== okno se neposouvá tím, že se podíváš ==');
     const znovu = await api('GET', `/api/flowmap/map-changes?map=${mapa.id}&range=7`, { token: me.token });
     expect(JSON.stringify(znovu.json.counts) === JSON.stringify(r.json.counts),

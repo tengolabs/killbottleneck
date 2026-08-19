@@ -1586,7 +1586,14 @@ kbRoute("GET", "/map-changes", (e) => {
   const days = range === "all" ? 0 : (range === "30" ? 30 : 7);
   let rows = [];
   const params = { m: mapId };
-  let filter = "map = {:m}";
+  // ⚠️ Filtrovat POLE UŽ V DOTAZU, ne až v JS níž. Od 19. 8. 2026 zapisuje
+  // záznamník i změny zadání, ikony, barvy, vykonavatele a čekání — ty se sem
+  // nehlásí (souhrn je o POHYBU práce, ne o kosmetice). Kdyby se natáhly a
+  // zahodily až v JS, ujídaly by ze stropu 500 řádků a na činné mapě by
+  // z okna vytlačily SKUTEČNÉ události. Report by pak tiše mlčel o práci,
+  // která proběhla.
+  let filter = "map = {:m} && (field = 'status' || field = 'deadline' || field = 'owner'"
+    + " || field = 'created' || field = 'deleted' || field = 'parent')";
   let since = "";
   if (days > 0) {
     const { pbDateString } = require(`${__hooks}/helpers.js`);
@@ -1637,6 +1644,135 @@ kbRoute("GET", "/map-changes", (e) => {
       removed: groups.removed.length,
     },
     groups: groups,
+  });
+}, $apis.requireAuth());
+
+// ŽIVOTOPIS JEDNOHO CÍLE — „kdo kdy co s tímhle udělal" (Richard 19. 8. 2026).
+//
+// Liší se od /map-changes záměrně: ten je REPORT NA PORADU za celý projekt
+// (skupiny, okno 7/30 dní, bez časů). Tohle je LOG jednoho cíle — jeden řádek
+// = jedna událost, s časem, odshora dolů.
+//
+// Komentáře a přílohy se sem berou PŘÍMO z jejich kolekcí, ne ze záznamníku.
+// Zápis do map_changes by ukázal historii až od nasazení téhle verze; čtení ji
+// ukáže zpětně u všech existujících map, a nevzniká druhý zdroj pravdy.
+// ⚠️ Daň za to: smazaný komentář nebo příloha zmizí i z historie, na rozdíl od
+// smazaného cíle (ten má v záznamníku řádek "deleted"). Přiznáno v dokumentaci.
+kbRoute("GET", "/node-history", (e) => {
+  const { userSeesMap, jsonVal } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const q = e.request.url.query();
+  const mapId = String(q.get("map") || "");
+  const nodeId = String(q.get("node") || "");
+  if (!mapId || !nodeId) return e.json(400, { error: t(L, "err.mapNotFound") });
+
+  let map;
+  try {
+    map = e.app.findFirstRecordByFilter("goalmaps", "id = {:id}", { id: mapId });
+  } catch (err) {
+    return e.json(404, { error: t(L, "err.mapNotFound") });
+  }
+  // ⚠️ includePublic ZÁMĚRNĚ vypnuté — stejně jako u /map-changes. Veřejný odkaz
+  // na mapu ukazuje AKTUÁLNÍ STAV, ne kdo co kdy měnil, jaké názvy tam byly dřív
+  // a co vlastník smazal. (Nález panelu 27. 7. 2026: endpoint historie tehdy
+  // vydával data i cizímu účtu u veřejné mapy.)
+  if (!userSeesMap(e.app, map, e.auth.id, e.auth.email())) {
+    return e.json(404, { error: t(L, "err.mapNotFound") });
+  }
+
+  const STROP = 300;
+  const polozky = [];
+  const params = { m: mapId, n: nodeId };
+  // Ořez se PŘIZNÁVÁ. Kdyby se hlídalo jen `polozky.length > STROP`, pak by
+  // 300 změn a žádný komentář vyšlo jako „nic se neuseklo", ačkoli starší
+  // změny dotaz vůbec nevrátil. Tiché zkrácení čte člověk jako úplný seznam.
+  let useknuto = false;
+
+  try {
+    const rows = e.app.findRecordsByFilter("map_changes",
+      "map = {:m} && item_id = {:n} && kind = 'node'", "-created", STROP, 0, params);
+    if (rows.length >= STROP) useknuto = true;
+    for (const r of rows) {
+      polozky.push({
+        kind: "change",
+        field: r.getString("field"),
+        from: r.getString("from"),
+        to: r.getString("to"),
+        actor: r.getString("actor_email"),
+        via: r.getString("via"),
+        when: r.getString("created"),
+      });
+    }
+  } catch (err) { /* prázdná historie není chyba */ }
+
+  try {
+    const rows = e.app.findRecordsByFilter("comments",
+      "goalmap = {:m} && node_id = {:n}", "-created", 100, 0, params);
+    if (rows.length >= 100) useknuto = true;
+    for (const r of rows) {
+      // ⚠️ ŽÁDNÝ text komentáře, ani náhled (Richard 19. 8. 2026). Životopis
+      // říká JEN „kdo kdy sáhl na co" — text patří do kategorie Úkoly
+      // a komentáře, kam ho autor psal. Náhled by ho vynesl na jiné místo UI
+      // (a do jiné odpovědi API) všem, kdo mapu vidí. Neposílá se vůbec, ne
+      // že by se jen neukazoval — co neodejde ze serveru, nemůže uniknout.
+      polozky.push({
+        kind: "comment",
+        actor: r.getString("author_email"),
+        when: r.getString("created"),
+      });
+    }
+  } catch (err) { /* kolekce může chybět na staré instanci */ }
+
+  try {
+    const rows = e.app.findRecordsByFilter("node_files",
+      "map = {:m} && node_id = {:n}", "-created", 100, 0, params);
+    if (rows.length >= 100) useknuto = true;
+    for (const r of rows) {
+      polozky.push({
+        kind: "attachment",
+        name: r.getString("name"),
+        isLink: !!r.getString("url"),
+        actor: r.getString("owner_email"),
+        when: r.getString("created"),
+      });
+    }
+  } catch (err) { /* přílohy mohou být na instanci vypnuté */ }
+
+  try {
+    const rows = e.app.findRecordsByFilter("rule_runs",
+      "map = {:m} && node_id = {:n}", "-created", 100, 0, params);
+    if (rows.length >= 100) useknuto = true;
+    for (const r of rows) {
+      polozky.push({
+        kind: "rule",
+        name: r.getString("rule_name"),
+        status: r.getString("status"),
+        when: r.getString("created"),
+      });
+    }
+  } catch (err) { /* pravidla nemusí být použitá */ }
+
+  // jedna časová osa: nejnovější nahoře
+  polozky.sort((a, b) => (a.when < b.when ? 1 : (a.when > b.when ? -1 : 0)));
+  const oriznuto = useknuto || polozky.length > STROP;
+  const vysledek = oriznuto ? polozky.slice(0, STROP) : polozky;
+
+  // Uzel může být mezitím smazaný — název pak vezmeme z posledního řádku
+  // záznamníku (ten si ho pamatuje k okamžiku změny).
+  let nazev = "";
+  try {
+    const node = jsonVal(map, "nodes", []).find((n) => n && n.id === nodeId);
+    nazev = node ? String((node.data || {}).title || (node.data || {}).apexText || "") : "";
+  } catch (err) { /* název je bonus */ }
+
+  e.response.header().set("Cache-Control", "private, no-store");
+  e.response.header().add("Vary", "Authorization");
+  return e.json(200, {
+    node: nodeId,
+    title: nazev,
+    truncated: oriznuto,
+    items: vysledek,
   });
 }, $apis.requireAuth());
 

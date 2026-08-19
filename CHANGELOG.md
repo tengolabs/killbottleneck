@@ -9,6 +9,49 @@ below before you jump several versions.
 
 ---
 
+## v0.39-beta — 2026-08-19
+
+**See what happened to a goal, edit a whole selection at once, and read the map from the lines**
+
+- **Every goal now has a History.** A category in the goal dialog lists what happened to
+  it — one row per event, **with the date and the time**, newest first: status, deadline,
+  owner and name changes, moves under a different parent, changes to the brief, icon,
+  colour and performer, plus comments and attachments added and automation rules that
+  fired. **A rule shows up as a rule**, not as the person who once wrote it; until now the
+  recorder stored the rule author's address, so the log claimed a human had clicked.
+  Comments and attachments are read from where they live, so the history is complete
+  **retroactively** — you get it for goals you created months ago.
+  The history says *that* the brief or a comment changed, never *what* it said: it is a
+  record of movement, not a second copy of your data. It does not leave a publicly shared
+  map, it reaches 400 days back, and moving a card on the canvas is not recorded (tidying
+  the map would bury everything that matters).
+- **A selection can be edited in one go, not just deleted.** Shift-drag several goals and
+  set status, owner, deadline, icon or colour for all of them. Every field has its own
+  switch, so only what you switch on is changed — "set the owner" never wipes a deadline —
+  and a switched-on field left empty **clears** the value, which is how you strip an owner
+  or a deadline in bulk. A deadline somebody else set is skipped and the dialog says so up
+  front; without that the server would refuse the whole save and nothing would happen.
+  Undo reverts the lot.
+- **The connector lines now carry the state of the goal they point to.** Green and still
+  means done; red and moving faster means past the deadline; everything else looks exactly
+  as before. A done goal with a missed deadline still counts as done. The two new colours
+  are **part of the skin**, so they suit every theme — in Ruby, where the lines are red
+  anyway, "past the deadline" shows up as flame orange. With animations switched off
+  system-wide you get the colours without the motion.
+- **The goal dialog shows where things are.** "Attachments" and "Tasks & comments" carry a
+  count, so a comment you can see on the card is no longer something you have to hunt for.
+- Selecting a line makes it thicker rather than recolouring it — the colour now means the
+  state of the goal, and two different things in one colour could not be told apart.
+
+**Upgrade notes**
+
+- One migration adds the new event types and a field recording *what* made the change.
+  Nothing is rewritten and no existing history is touched.
+- Skins keep working unchanged. A skin without the two new colours is still valid and
+  falls back to the built-in green and red, token by token.
+
+---
+
 ## v0.38.1-beta — 2026-08-19
 
 **Bug reports without your address or your company name**

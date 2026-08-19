@@ -1,0 +1,42 @@
+{
+  "historie": {
+    "nadpis": "History",
+    "popis": "What happened to this goal — newest first.",
+    "prazdno": "Nothing has happened yet. Once someone changes the status, deadline or owner, or adds a comment, it shows up here.",
+    "nacitam": "Loading…",
+    "chyba": "The history could not be loaded.",
+    "oriznuto": "Older events did not fit here.",
+    "kdo": {
+      "system": "system",
+      "pravidlo": "rule",
+      "agent": "agent"
+    },
+    "udalost": {
+      "created": "Goal created",
+      "deleted": "Goal deleted",
+      "status": "Status: {{z}} → {{na}}",
+      "statusNovy": "Status set to {{na}}",
+      "deadline": "Deadline: {{z}} → {{na}}",
+      "deadlineNovy": "Deadline set to {{na}}",
+      "deadlineZrusen": "Deadline removed",
+      "owner": "Owner: {{z}} → {{na}}",
+      "ownerNovy": "Owner set to {{na}}",
+      "ownerZrusen": "Owner removed",
+      "title": "Renamed: {{z}} → {{na}}",
+      "parent": "Moved: {{z}} → {{na}}",
+      "description": "Brief changed",
+      "icon": "Icon changed",
+      "color": "Colour changed",
+      "executor": "Executor changed",
+      "waiting": "Waiting for sub-goals changed",
+      "komentar": "Comment added",
+      "priloha": "Attachment {{nazev}} added",
+      "odkaz": "Link {{nazev}} added",
+      "pravidloOk": "Rule \"{{nazev}}\" ran",
+      "pravidloFailed": "Rule \"{{nazev}}\" failed",
+      "pravidloSkipped": "Rule \"{{nazev}}\" skipped",
+      "neznama": "Change"
+    },
+    "prazdnaHodnota": "—"
+  }
+}

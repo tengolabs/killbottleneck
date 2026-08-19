@@ -15,7 +15,8 @@ const SKIN_MAX_BYTES = 8192;
 const KNOWN_SKIN_IDS = ['indigo', 'contrast', 'terminal', 'sepia',
   'ocean', 'les', 'pulnoc', 'svestka', 'broskev', 'grafit', 'rubin', 'custom'];
 
-// 1:1 s index.css :root/.dark (32 barev) + 3 canvas tokeny plátna mapy.
+// 1:1 s index.css :root/.dark (32 barev) + 5 canvas tokenů plátna mapy
+// (neutrální hrana + hrana do hotového + hrana po termínu, tečky, uzel).
 const SKIN_COLOR_TOKENS = [
   'background', 'foreground', 'card', 'card-foreground', 'popover', 'popover-foreground',
   'primary', 'primary-foreground', 'secondary', 'secondary-foreground',
@@ -24,7 +25,7 @@ const SKIN_COLOR_TOKENS = [
   'chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5',
   'sidebar-background', 'sidebar-foreground', 'sidebar-primary', 'sidebar-primary-foreground',
   'sidebar-accent', 'sidebar-accent-foreground', 'sidebar-border', 'sidebar-ring',
-  'canvas-edge', 'canvas-dots', 'canvas-node',
+  'canvas-edge', 'canvas-edge-done', 'canvas-edge-late', 'canvas-dots', 'canvas-node',
 ];
 const SKIN_FONT_TOKENS = ['font-heading', 'font-body', 'font-display', 'font-mono'];
 // Dekorativní malůvka v pozadí LITE režimu. Skin říká jen JMÉNO z výčtu —

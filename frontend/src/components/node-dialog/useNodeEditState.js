@@ -75,6 +75,7 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
   const [aiAgents, setAiAgents] = useState([]);
   const [agentsLoaded, setAgentsLoaded] = useState(false); // ať hláška „neznámý agent" nebliká, než dorazí registr
   const [files, setFiles] = useState([]);
+  const [commentCount, setCommentCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -148,6 +149,20 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
     base44.nodeFiles.list(mapId, node.id).then(setFiles).catch(() => setFiles([]));
   };
   useEffect(loadFiles, [node?.id, mapId]);
+
+  // Počet komentářů pro ODZNAK u kategorie. Načítá se při otevření okna, ne až
+  // při otevření té kategorie: na kartě je komentář vidět, takže v okně se po
+  // něm nesmí hledat proklikáváním všech kategorií (Richard 19. 8. 2026).
+  // CommentThread pak počet přepisuje přes onCountChange, aby odznak seděl
+  // i po přidání nebo smazání komentáře, dokud je okno otevřené.
+  useEffect(() => {
+    if (!node?.id || !mapId) { setCommentCount(0); return; }
+    let zivy = true;
+    base44.entities.Comment.filter({ goalmap_id: mapId, node_id: node.id }, 'created_date', 100)
+      .then((r) => { if (zivy) setCommentCount((r || []).length); })
+      .catch(() => { if (zivy) setCommentCount(0); });   // odznak je bonus, okno kvůli němu padnout nesmí
+    return () => { zivy = false; };
+  }, [node?.id, mapId]);
 
   const handleUpload = async (file) => {
     if (!file || uploading) return;
@@ -286,6 +301,7 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
     positionKind, setPositionKind, holder, setHolder, deputy, setDeputy,
     aiAgents, agentsLoaded,
     files, uploading, fileInputRef, linkOpen, setLinkOpen,
+    commentCount, setCommentCount,
     linkUrl, setLinkUrl, linkName, setLinkName, savingLink, setSavingLink,
     uploadsEnabled, pickerCfg, lastRun, loadFiles,
     handleUpload, handleDownload, handleRemoveFile, handleAddLink, handleSave,

@@ -36,7 +36,17 @@ const SRC = path.join(__dirname, '../frontend/src');
 // holá data kalendáře, levněji to nejde bez druhé kopie na serveru (= drift).
 // Naměřeno 494 (opakovaně, stabilně) → do stropu zbývá 1 kB, ne 5. Jedna delší
 // věta v hlavním jazykovém balíku sadu zase shodí; nové texty patří do lazy ns.
-const MAX_KB = Number(process.env.LITE_MAX_KB || 495);
+// 19. 8. 2026: 495 → 500. Barva čar podle stavu cíle (hotovo / po termínu) přidala
+// do KAŽDÉHO z 11 vestavěných skinů dva tokeny × light/dark = 44 položek,
+// tj. +1,6 kB HOLÝCH DAT v skins.js (naměřeno 496). Texty funkce se do lite
+// nedostaly vůbec — hromadné akce i životopis mají vlastní lazy namespace
+// (hromadne, historie), protože plátno mapy v lite není. Cena je čistě za skiny.
+// ⚠️ Zvažováno a ZAMÍTNUTO: definovat tokeny jen u skinů, kde generická zelená
+// a červená nesedí (Terminál, Les, Rubín, Vysoký kontrast, Broskev, Grafit),
+// a zbytek nechat spadnout na index.css. Ušetřilo by to ~0,7 kB, tedy pořád
+// přes strop — a rozbilo by to jednotnost („skin buď barvy má, nebo ne").
+// Strop opět jen +5 kB, ať tlak na dietu zůstává.
+const MAX_KB = Number(process.env.LITE_MAX_KB || 500);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.

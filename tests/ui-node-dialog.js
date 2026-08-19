@@ -46,6 +46,13 @@ const api = async (method, path, { token, body } = {}) => {
     await api('POST', '/api/kb/share', { token: SEF, body: { action: 'share', mapId: mapa.json.id, email: 'delnik@example.com', permission: 'work' } });
     // registr agentů — kategorie Automatizace z něj nabízí VIDITELNÝ výběr
     await api('POST', '/api/flowmap/ai-agents/save', { token: SEF, body: { name: 'Zapisovatel', enabled: true, secret: 'x'.repeat(20), webhook_url: 'http://host.docker.internal:1/nikam' } });
+    // komentář a dvě přílohy → odznaky u kategorií musí ukázat POČTY hned po
+    // otevření okna (Richard 19. 8. 2026: „na uzlu vidím komentář, ale otevřu
+    // editaci a nevidím ho a musím proklikat vše")
+    await api('POST', '/api/collections/comments/records', { token: SEF, body: { goalmap: mapa.json.id, node_id: 'n1', text: 'Poznamka k prvnimu kroku' } });
+    for (const nazev of ['Nabidka.pdf', 'Pudorys.pdf']) {
+      await api('POST', '/api/collections/node_files/records', { token: SEF, body: { map: mapa.json.id, node_id: 'n1', url: 'https://example.com/' + nazev, name: nazev, size: 0 } });
+    }
 
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
     const page = await browser.newPage();
@@ -76,9 +83,19 @@ const api = async (method, path, { token, body } = {}) => {
     const kategorie = await page.evaluate(() =>
       [...document.querySelectorAll('[role="dialog"] [data-cat]')].map((b) => b.dataset.cat));
     // 15. 8.: Chování sloučeno do Automatizace (executor) a ta je POSLEDNÍ
-    // pod Úkoly (rozhodnutí Richarda) → 5 kategorií v tomhle pořadí
-    ok(kategorie.join(',') === 'basics,assignment,files,tasks,executor',
-      `velké okno má 5 kategorií, Automatizace poslední (${kategorie.join(',') || 'ŽÁDNÉ'})`);
+    // pod Úkoly (rozhodnutí Richarda). 19. 8. přibyl Životopis — vklínil se
+    // PŘED Automatizaci právě proto, aby to rozhodnutí platilo dál.
+    ok(kategorie.join(',') === 'basics,assignment,files,tasks,history,executor',
+      `velké okno má 6 kategorií, Automatizace pořád poslední (${kategorie.join(',') || 'ŽÁDNÉ'})`);
+
+    // ⚠️ Odznaky se čtou z TEXTU tlačítka, ne z počtu prvků — prázdný odznak
+    // se nevykresluje vůbec, takže „je tam nula" a „odznak chybí" by jinak
+    // vypadaly stejně a kontrola by nedokazovala nic.
+    const odznaky = await page.evaluate(() => Object.fromEntries(
+      [...document.querySelectorAll('[role="dialog"] [data-cat]')].map((b) => [b.dataset.cat, (b.innerText || '').replace(/\s+/g, ' ').trim()])));
+    ok(/\b1$/.test(odznaky.tasks || ''), `u „Úkoly a komentáře" je počet komentářů (${odznaky.tasks})`);
+    ok(/\b2$/.test(odznaky.files || ''), `u „Přílohy" je počet příloh (${odznaky.files})`);
+    ok(!/\d$/.test(odznaky.basics || ''), `kategorie bez obsahu odznak NEMÁ (${odznaky.basics})`);
     if (!kategorie.length) throw new Error('velké okno se neotevřelo — dál by se měřilo prázdno');
     ok(await page.evaluate(() => !!document.querySelector('[role="dialog"] input#title')),
       'kategorie Základ ukazuje pole názvu');
