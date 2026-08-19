@@ -1,0 +1,51 @@
+{
+  "popis": {
+    "tucne": "Tučné",
+    "kurziva": "Kurzíva",
+    "skrtnute": "Přeškrtnuté",
+    "nadpis1": "Nadpis / zvětšit označené",
+    "nadpis2": "Podnadpis / mírně zvětšit",
+    "odrazka": "Odrážky",
+    "cislovana": "Číslovaný seznam",
+    "odkaz": "Vložit odkaz",
+    "zPriloh": "Z příloh tohoto uzlu",
+    "vlastniOdkaz": "Vlastní adresa",
+    "popisekPlaceholder": "Jak se má odkaz jmenovat (např. evidence)",
+    "vlozit": "Vložit odkaz",
+    "nahled": "Zamčeno",
+    "psat": "Editovat",
+    "vybratIkonu": "Vybrat ikonu"
+  },
+  "report": {
+    "titulek": "Nahlásit chybu nebo nápad",
+    "uvod": "Napište nám, co nefunguje nebo co by se dalo zlepšit. Zpráva jde přímo našemu týmu.",
+    "druhChyba": "Chyba",
+    "druhNapad": "Nápad",
+    "popisChyba": "Co se stalo?",
+    "popisNapad": "Co navrhujete?",
+    "placeholderChyba": "Co jste dělali, co jste čekali a co se místo toho stalo.",
+    "placeholderNapad": "Co by vám usnadnilo práci.",
+    "coOdejde": "Spolu se zprávou odejde:",
+    "coOdejdeStranka": "stránka",
+    "odeslat": "Odeslat",
+    "zrusit": "Zrušit",
+    "zavrit": "Zavřít",
+    "odeslano": "Děkujeme, zpráva odešla. Když bude potřeba, ozveme se na vaši adresu.",
+    "chybaObecna": "Zprávu se nepodařilo odeslat.",
+    "uzMate": "Už jste nahlásili",
+    "zadneHlaseni": "Zatím jste nic neposlali.",
+    "neodeslano": "neodešlo",
+    "stranky": {
+      "/": "Přehled projektů",
+      "/tasks": "Úkoly",
+      "/my-map": "Moje mapa",
+      "/archive": "Archiv",
+      "/notifications": "Oznámení",
+      "/admin/users": "Správa organizace",
+      "mapa": "Mapa cílů",
+      "lite": "Zjednodušený režim",
+      "jina": "Jiná stránka"
+    },
+    "coOdejdeProhlizec": "prohlížeč a operační systém"
+  }
+}

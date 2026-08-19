@@ -20,6 +20,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useNodeEditState } from './useNodeEditState';
 import FilesSection from './sections/FilesSection';
+import FormatovanyPopis from '@/components/shared/FormatovanyPopis';
+import OdkazyVPopisu from '@/components/shared/OdkazyVPopisu';
 
 // ZJEDNODUŠENÉ okno uzlu pro SPOLUPRACOVNÍKA (sdílení „work") — Richard 14. 8.
 // 2026: běžný uživatel nemá dostat přeplněný editor. Zadání jen ČTE (název,
@@ -65,8 +67,11 @@ export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, 
         </DialogHeader>
         <div className="space-y-4 py-2 flex-1 min-h-0 overflow-y-auto pr-1">
           {s.description && (
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{s.description}</p>
+            <FormatovanyPopis text={s.description} className="text-sm text-muted-foreground" />
           )}
+          {/* Holé adresy napsané v textu; pojmenované odkazy jsou už klikací
+              přímo v textu, takže se pod ním neopakují (nález panelu 19. 8. 2026). */}
+          <OdkazyVPopisu text={s.description} jenHole />
           <div className="space-y-2">
             <Label>{t('tasks:taskDialog.labelStatus')}</Label>
             <div className="flex gap-2">

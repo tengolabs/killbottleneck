@@ -7,7 +7,7 @@
 import {
   KeyRound,
   MessageSquare, UserPlus, Target, PlayCircle, Timer,
-  Share2, Bot, CalendarClock, CheckCircle2, AlertTriangle, Zap,
+  Share2, Bot, CalendarClock, CheckCircle2, AlertTriangle, Zap, Sparkles,
 } from 'lucide-react';
 
 export const NOTIFY_TYPES = [
@@ -31,6 +31,9 @@ export const NOTIFY_TYPES = [
 ];
 
 const META = {
+  // Oznámení o nové verzi. ZÁMĚRNĚ není v NOTIFY_TYPES: chodí jednou za vydání
+  // a nastavovat se nemá co. E-mailem nechodí nikdy (helpers.js).
+  new_version: { icon: Sparkles, className: 'text-primary' },
   task_assigned: { icon: UserPlus, className: 'text-primary' },
   task_comment: { icon: MessageSquare, className: 'text-primary' },
   node_assigned: { icon: Target, className: 'text-primary' },

@@ -15,6 +15,7 @@ import {
 import { X, Plus, Trash2, Inbox, GripVertical, ArrowRight, Loader2, Pencil, Calendar, X as XIcon, Network } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import { intlLocale } from '@/lib/locale';
+import { popisJakoText } from '@/lib/popisFormat';
 
 export const BUFFER_DRAG_MIME = 'application/kb-buffer';
 
@@ -252,7 +253,7 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium break-words">{item.title}</p>
               {item.description && (
-                <p className="text-xs text-muted-foreground break-words line-clamp-2 mt-0.5">{item.description}</p>
+                <p className="text-xs text-muted-foreground break-words line-clamp-2 mt-0.5">{popisJakoText(item.description)}</p>
               )}
               {item.deadline && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium mt-1 px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">

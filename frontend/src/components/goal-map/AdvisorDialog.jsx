@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertTriangle, Check, X, Sparkles, ArrowRight, ArrowLeft, Info } from 'lucide-react';
 import { advisor } from '@/functions/advisor';
+import { popisJakoText } from '@/lib/popisFormat';
 
 // value = interní enum posílaný na server (kontrakt s ollama.js SCOPE_COUNTS)
 // — NEPŘEKLÁDAT; labelKey → editor:advisor.scopes.* / editor:node.goalType.*
@@ -57,7 +58,7 @@ function PreviewNode({ node, depth = 0 }) {
       ) : (
         <div className="border-l-2 border-border pl-3">
           <p className="text-sm font-medium">{node.title}</p>
-          {node.description && <p className="text-xs text-muted-foreground line-clamp-2">{node.description}</p>}
+          {node.description && <p className="text-xs text-muted-foreground line-clamp-2">{popisJakoText(node.description)}</p>}
         </div>
       )}
       {node.children?.map((child) => <PreviewNode key={child.id} node={child} depth={depth + 1} />)}

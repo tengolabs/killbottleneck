@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import OdkazyVPopisu from '@/components/shared/OdkazyVPopisu';
+import PopisEditor from '@/components/shared/PopisEditor';
 import EmojiPicker from '@/components/shared/EmojiPicker';
 import { STATUSES as statuses } from '@/lib/statusMeta';
 import ColorPicker from './ColorPicker';
@@ -48,12 +49,13 @@ export default function BasicsSection({ s, withColor }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">{t('tasks:taskDialog.labelDescription')}</Label>
-            <Textarea
+            <PopisEditor
               id="description"
               value={s.description}
-              onChange={(e) => s.setDescription(e.target.value)}
+              onChange={s.setDescription}
               placeholder={t('nodeDialog.descriptionPlaceholder')}
-              rows={3}
+              rows={6}
+              prilohy={s.files}
             />
             <OdkazyVPopisu text={s.description} />
           </div>

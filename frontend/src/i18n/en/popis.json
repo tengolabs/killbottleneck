@@ -1,0 +1,51 @@
+{
+  "popis": {
+    "tucne": "Bold",
+    "kurziva": "Italic",
+    "skrtnute": "Strikethrough",
+    "nadpis1": "Heading / enlarge selection",
+    "nadpis2": "Subheading / slightly enlarge",
+    "odrazka": "Bulleted list",
+    "cislovana": "Numbered list",
+    "odkaz": "Insert link",
+    "zPriloh": "From this goal's attachments",
+    "vlastniOdkaz": "Custom address",
+    "popisekPlaceholder": "What the link should be called (e.g. records)",
+    "vlozit": "Insert link",
+    "nahled": "Locked",
+    "psat": "Edit",
+    "vybratIkonu": "Choose icon"
+  },
+  "report": {
+    "titulek": "Report a bug or idea",
+    "uvod": "Tell us what is broken or what could be better. The message goes straight to our team.",
+    "druhChyba": "Bug",
+    "druhNapad": "Idea",
+    "popisChyba": "What happened?",
+    "popisNapad": "What do you suggest?",
+    "placeholderChyba": "What you did, what you expected and what happened instead.",
+    "placeholderNapad": "What would make your work easier.",
+    "coOdejde": "Sent along with your message:",
+    "coOdejdeStranka": "page",
+    "odeslat": "Send",
+    "zrusit": "Cancel",
+    "zavrit": "Close",
+    "odeslano": "Thank you, the message was sent. We will reply to your address if needed.",
+    "chybaObecna": "The message could not be sent.",
+    "uzMate": "You already reported",
+    "zadneHlaseni": "You have not sent anything yet.",
+    "neodeslano": "not sent",
+    "stranky": {
+      "/": "Projects overview",
+      "/tasks": "Tasks",
+      "/my-map": "My map",
+      "/archive": "Archive",
+      "/notifications": "Notifications",
+      "/admin/users": "Organization admin",
+      "mapa": "Goal map",
+      "lite": "Lite mode",
+      "jina": "Another page"
+    },
+    "coOdejdeProhlizec": "browser and operating system"
+  }
+}

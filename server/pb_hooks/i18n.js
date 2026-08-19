@@ -629,6 +629,57 @@ const STRINGS = {
     cs: "Objednávku převodem tu nejde odeslat — napište nám na support@killbottleneck.com.",
     en: "Transfer orders are not available here — please contact support@killbottleneck.com.",
   },
+  // oznámení o nové verzi (do zvonečku, nikdy mailem)
+  "notify.newVersion": {
+    cs: "Aplikace byla aktualizována na verzi {verze}.",
+    en: "The app has been updated to version {verze}.",
+  },
+  "notify.newVersionBody": {
+    cs: "Nová verze {verze} — co přibylo:\n{body}",
+    en: "New version {verze} — what's new:\n{body}",
+  },
+  // hlášení chyb a nápadů (routa /report)
+  "err.reportUnavailable": {
+    cs: "Na této instanci není nastavené odesílání pošty, hlášení tudy poslat nejde.",
+    en: "This instance has no outgoing e-mail set up, so reports cannot be sent from here.",
+  },
+  "err.reportRateLimited": {
+    cs: "Hlášení jste právě poslali několikrát po sobě. Zkuste to prosím za hodinu.",
+    en: "You have sent several reports in a row. Please try again in an hour.",
+  },
+  "err.reportEmpty": {
+    cs: "Napište prosím, co se stalo nebo co navrhujete.",
+    en: "Please describe what happened or what you suggest.",
+  },
+  "err.reportSendFailed": {
+    cs: "Hlášení se nepodařilo odeslat, zkuste to prosím za chvíli.",
+    en: "The report could not be sent, please try again shortly.",
+  },
+  "report.headingBug": {
+    cs: "Hlášení chyby z killBottlenecku",
+    en: "Bug report from killBottleneck",
+  },
+  "report.headingIdea": {
+    cs: "Nápad na zlepšení killBottlenecku",
+    en: "Improvement idea for killBottleneck",
+  },
+  "report.subjectBug": {
+    cs: "Chyba: hlášení z instance {org}",
+    en: "Bug: report from instance {org}",
+  },
+  "report.subjectIdea": {
+    cs: "Nápad: podnět z instance {org}",
+    en: "Idea: suggestion from instance {org}",
+  },
+  "report.boxTitle": {
+    cs: "Odkud hlášení přišlo",
+    en: "Where the report came from",
+  },
+  "report.boxFrom": { cs: "Od", en: "From" },
+  "report.boxInstance": { cs: "Instance", en: "Instance" },
+  "report.boxVersion": { cs: "Verze", en: "Version" },
+  "report.boxPage": { cs: "Stránka", en: "Page" },
+  "report.boxBrowser": { cs: "Prohlížeč", en: "Browser" },
   "err.orderFailed": {
     cs: "Objednávku se nepodařilo odeslat, zkuste to prosím za chvíli.",
     en: "The order could not be submitted, please try again shortly.",

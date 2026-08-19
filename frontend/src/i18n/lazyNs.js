@@ -27,6 +27,13 @@ const LOADERS = {
     cs: () => import('./cs/rules.json'),
     en: () => import('./en/rules.json'),
   },
+  // texty lišty formátování popisu — jen v editaci uzlu a úkolu, lite je nemá
+  // kde použít. ⚠️ Do editor.json patřit NEMOHOU: ten se veze do lite celý
+  // a rezerva do stropu je ~1 kB (lite-bundle.js, 18. 8. 2026).
+  popis: {
+    cs: () => import('./cs/popis.json'),
+    en: () => import('./en/popis.json'),
+  },
 };
 const nactene = new Set();
 

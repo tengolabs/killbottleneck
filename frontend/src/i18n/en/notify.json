@@ -38,7 +38,8 @@
     "deadline_request_resolved": "Due date request resolved",
     "user_joined": "New member signed in",
     "rule_notice": "Rule message",
-    "rule_broken": "Broken rule"
+    "rule_broken": "Broken rule",
+    "new_version": "New version"
   },
   "prefs": {
     "title": "Notification settings",

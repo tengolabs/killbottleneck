@@ -51,6 +51,7 @@ import AIChatPanel from '@/components/goal-map/AIChatPanel';
 import BufferPanel, { useBufferNodes, BUFFER_DRAG_MIME } from '@/components/goal-map/BufferPanel';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ProgressDashboard from '@/components/goal-map/ProgressDashboard';
+import ReportRailButton from '@/components/shared/ReportRailButton';
 import { advisor } from '@/functions/advisor';
 import { shareMap } from '@/functions/shareMap';
 import { layoutTree, findFreeChildSpot } from '@/lib/treeLayout';
@@ -450,6 +451,7 @@ function EditorContent({ mapId, personalMap = false }) {
   const [dashboardOpen, setDashboardOpen] = useState(
     () => new URLSearchParams(location.search).get('view') === 'dashboard');
   const [commentCounts, setCommentCounts] = useState({});
+  const [fileCounts, setFileCounts] = useState({});
   const [taskStats, setTaskStats] = useState({});
   const [mapTasks, setMapTasks] = useState([]);
   const [mapTaskCount, setMapTaskCount] = useState(0);
@@ -918,6 +920,19 @@ function EditorContent({ mapId, personalMap = false }) {
         setCommentCounts(counts);
       } catch (e) {
         console.error(e);
+      }
+    })();
+  }, [activeMapId, isPublicView, editNodeId]);
+
+  // Počty příloh → odznak se sponkou na kartě uzlu. Stejný spouštěč jako
+  // u komentářů (zavření detailu uzlu), ať se odznak objeví hned po přidání.
+  useEffect(() => {
+    if (!activeMapId || isPublicView) return;
+    (async () => {
+      try {
+        setFileCounts(await base44.nodeFiles.counts(activeMapId));
+      } catch (e) {
+        setFileCounts({});   // bez příloh se mapa kreslí dál, odznak je bonus
       }
     })();
   }, [activeMapId, isPublicView, editNodeId]);
@@ -2619,6 +2634,7 @@ function EditorContent({ mapId, personalMap = false }) {
       myTasksOnly,
       currentUserEmail: user?.email,
       commentCounts,
+      fileCounts,
       onStashNode: bufferEnabled && canEdit ? handleStashNode : undefined,
       onDetachNode: canEdit ? handleDetachNode : undefined,
       hasParent: (nodeId) => edges.some((e) => e.target === nodeId),
@@ -2634,7 +2650,7 @@ function EditorContent({ mapId, personalMap = false }) {
       citelnost, // stupeň velikosti písma v uzlu (tlačítko Čitelnost)
       orgMap: mapKind === 'org', // organizační struktura: uzel = pozice/funkce (jiná karta)
     }),
-    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind]
+    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, fileCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind]
   );
 
   if (loading) {
@@ -3403,6 +3419,9 @@ function EditorContent({ mapId, personalMap = false }) {
         >
           <BarChart3 className="w-4 h-4" />
         </button>
+        {/* Nahlásit chybu rovnou z mapy — pod dashboardem (Richard 18. 8. 2026).
+            Stránku si aplikace vezme sama, takže hlášení odsud nese mapu. */}
+        {user && <ReportRailButton top="top-[19rem]" leftOffset={railLeft} />}
         {canEdit && nodes.length === 0 && !dashboardOpen && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-center pointer-events-auto">

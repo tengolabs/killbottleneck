@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DIR = path.join(__dirname, '..', 'frontend', 'src', 'i18n');
-const NS = ['common', 'nav', 'auth', 'home', 'editor', 'tasks', 'myday', 'notify', 'errors', 'lite', 'billing', 'rules', 'admin'];
+const NS = ['common', 'nav', 'auth', 'home', 'editor', 'tasks', 'myday', 'notify', 'errors', 'lite', 'billing', 'rules', 'admin', 'popis'];
 const CZ = /[ěščřžýáíéůúňťďĚŠČŘŽÝÁÍÉŮÚŇŤĎ]/;
 
 let ok = 0, fail = 0;

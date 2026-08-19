@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar, X as XIcon, Inbox, Timer } from 'lucide-react';
 import { STATUSES } from '@/lib/statusMeta';
@@ -28,6 +27,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
 import OdkazyVPopisu from '@/components/shared/OdkazyVPopisu';
+import PopisEditor from '@/components/shared/PopisEditor';
 
 // hodnota „bez výběru" pro shadcn Select (neumí prázdný string jako item value)
 const NONE = '__none__';
@@ -145,12 +145,12 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
 
           <div className="space-y-1.5">
             <Label htmlFor="task-desc">{t('taskDialog.labelDescription')}</Label>
-            <Textarea
+            <PopisEditor
               id="task-desc"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
               placeholder={t('taskDialog.descPlaceholder')}
-              rows={3}
+              rows={6}
             />
             <OdkazyVPopisu text={description} />
           </div>

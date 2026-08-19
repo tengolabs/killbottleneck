@@ -17,7 +17,7 @@ services:
         # Instance version. Without it the value stays "dev" and the update check
         # is not offered — exactly what we want for work in progress. Real number:
         #   ./nasadit-staging.sh  (razítko + build + kontrola verze — NEpouštět compose ručně)
-        KB_VERSION: ${KB_VERSION:-v0.37-beta}
+        KB_VERSION: ${KB_VERSION:-v0.38-beta}
     container_name: killbottleneck
     ports:
       - "${KB_PORT:-${FLOWMAP_PORT:-8090}}:8090"
@@ -91,6 +91,11 @@ services:
       KB_SUMMARY_URL: ${KB_SUMMARY_URL:-${FLOWMAP_SUMMARY_URL:-}}
       KB_SUMMARY_MODEL: ${KB_SUMMARY_MODEL:-${FLOWMAP_SUMMARY_MODEL:-}}
       KB_SUMMARY_TOKEN: ${KB_SUMMARY_TOKEN:-${FLOWMAP_SUMMARY_TOKEN:-}}
+      # Where "Report a bug or idea" (under the person icon) sends to. EMPTY BY
+      # DEFAULT — with no address the route returns 404 and the item is not even
+      # shown, so a self-hosted instance never sends anything out on its own.
+      # Set it to your own address if you want your users' reports.
+      KB_REPORT_TO: ${KB_REPORT_TO:-}
       # Instance registration key: when set, every self-registration requires it
       # (hosted instances have a public domain). Empty = registration without a key.
       KB_SETUP_CODE: ${KB_SETUP_CODE:-${FLOWMAP_SETUP_CODE:-}}

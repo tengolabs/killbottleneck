@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Check, ChevronRight, Pencil, Trash2, Plus, Calendar, Map as MapIcon, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, Target, ExternalLink, Inbox, Network, UserPlus, RotateCw, X, Palette, Timer, CalendarCheck } from 'lucide-react';
+import { Check, ChevronRight, Pencil, Trash2, Plus, Calendar, Map as MapIcon, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, Target, ExternalLink, Inbox, Network, UserPlus, RotateCw, Palette, Timer, CalendarCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +21,8 @@ import {
 import { labelForEmail } from '@/lib/memberLabel';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import ProjectColorPicker from '@/components/shared/ProjectColorPicker';
-import { PROJECT_EMOJIS, projectIcon, projectName } from '@/lib/projectColors';
+import { projectIcon, projectName } from '@/lib/projectColors';
+import { EmojiNabidka } from '@/components/shared/EmojiPicker';
 import { statusConfig, cycleStatus } from '@/lib/statusMeta';
 import TaskRowActions from '@/components/shared/TaskRowActions';
 import { planState } from '@/lib/taskActions';
@@ -106,27 +107,7 @@ function AppearancePopover({ map, onEditAppearance, onSetProjectIcon }) {
         </div>
         <div className="space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">{t('taskTable.projectIconLabel')}</p>
-          <div className="grid grid-cols-8 gap-0.5">
-            {PROJECT_EMOJIS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => onSetProjectIcon(map, e)}
-                className={`w-7 h-7 rounded flex items-center justify-center text-lg leading-none hover:bg-secondary ${icon === e ? 'bg-primary/15 ring-1 ring-primary' : ''}`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-          {icon && (
-            <button
-              type="button"
-              onClick={() => onSetProjectIcon(map, '')}
-              className="w-full text-xs text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1 py-1"
-            >
-              <X className="w-3 h-3" /> {t('taskTable.noIcon')}
-            </button>
-          )}
+          <EmojiNabidka value={icon} onChange={(e) => onSetProjectIcon(map, e)} />
         </div>
       </PopoverContent>
     </Popover>
@@ -234,28 +215,8 @@ function NodeIconPopover({ item, onSetNodeIcon }) {
           <Palette className="w-3.5 h-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2" onClick={(e) => e.stopPropagation()}>
-        <div className="grid grid-cols-8 gap-0.5">
-          {PROJECT_EMOJIS.map((e) => (
-            <button
-              key={e}
-              type="button"
-              onClick={() => onSetNodeIcon(item, e)}
-              className={`w-7 h-7 rounded flex items-center justify-center text-lg leading-none hover:bg-secondary ${item.icon === e ? 'bg-primary/15 ring-1 ring-primary' : ''}`}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-        {item.icon && (
-          <button
-            type="button"
-            onClick={() => onSetNodeIcon(item, '')}
-            className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1 py-1"
-          >
-            <X className="w-3 h-3" /> Bez ikony
-          </button>
-        )}
+      <PopoverContent align="start" className="w-72 p-2" onClick={(e) => e.stopPropagation()}>
+        <EmojiNabidka value={item.icon} onChange={(e) => onSetNodeIcon(item, e)} />
       </PopoverContent>
     </Popover>
   );

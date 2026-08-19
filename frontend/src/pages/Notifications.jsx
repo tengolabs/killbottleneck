@@ -174,7 +174,7 @@ export default function Notifications() {
                 >
                   <span className="mt-0.5 shrink-0"><Icon className={`w-4 h-4 ${className}`} /></span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm break-words">{n.text}</span>
+                    <span className="block text-sm break-words whitespace-pre-line">{n.text}</span>
                     <span className="block text-[11px] text-muted-foreground mt-0.5">
                       {t(`type.${n.type}`)} · {formatWhen(n.created_date)}
                     </span>

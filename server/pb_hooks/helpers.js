@@ -282,11 +282,82 @@ const NOTIFY_TYPES = [
 // Typy, které uživatel NESMÍ vypnout — poplachy o vlastním účtu. Předvolby je
 // nesmí nabízet (frontend) ani potlačit (notifyChannels).
 const NOTIFY_ALWAYS = ["password_reset"];
+// Typy, které NIKDY nechodí e-mailem. Oznámení o nové verzi je informace do
+// zvonečku; e-mailem by z vydání byla hromadná pošta všem uživatelům instance.
+const NOTIFY_NIKDY_MAILEM = ["new_version"];
 
 // Uživatelské preference notifikací pro daný typ. Chybějící záznam = in-app zapnuto
 // (dnešní chování), e-mail vypnutý. FLOWMAP_NOTIFY_EMAIL_DEFAULT=1 je záchranná brzda
 // pro instance, kde už SMTP běží a e-maily chodí — bez ní by nový default tiše vypnul
 // něco, co uživatelům dnes funguje.
+/**
+ * Po aktualizaci instance oznámí VŠEM uživatelům, že je tu nová verze
+ * (Richard 18. 8. 2026: „když vydáme novou verzi, aby přišlo do zvonečku info").
+ *
+ * Spouští se při startu serveru. Že se pošle právě jednou, hlídá `dedupKey`
+ * s verzí v klíči — unikátní index v `notifications` druhý zápis odmítne,
+ * takže ani restart kontejneru nikoho nezasype podruhé. Žádné další pole
+ * s „poslední oznámenou verzí" proto není potřeba.
+ *
+ * Vývojové buildy (`dev`, `-dirty`) se neoznamují: instance se během ladění
+ * restartuje pořád dokola a zvoneček by z toho byl k nepoužití.
+ */
+function oznamNovouVerzi(app) {
+  const verze = String(env("VERSION") || "").trim();
+  if (!verze || verze === "dev" || verze.indexOf("-dirty") !== -1) return 0;
+
+  // Už oznámeno? Jeden dotaz místo procházení všech účtů. Drží to i přes
+  // restart procesu, protože se ptáme DAT, ne paměti.
+  try {
+    app.findFirstRecordByFilter("notifications", "dedup_key = {:k}", { k: "verze:" + verze });
+    return 0;
+  } catch (err) { /* nenalezeno = ještě se neoznamovalo, pokračujeme */ }
+
+  // Pár bodů česky místo odkazu na anglický changelog (Richard 18. 8. 2026).
+  // Body se plní ručně při vydání do pb_hooks/novinky.js; není-li pro verzi
+  // záznam, pošle se holé oznámení a NIC se nedomýšlí.
+  let body = null;
+  try {
+    const vsechny = require(`${__hooks}/novinky.js`);
+    body = vsechny && vsechny[verze] ? vsechny[verze] : null;
+  } catch (err) {
+    try { app.logger().warn("novinky.js se nenačetly", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+
+  let lide = [];
+  try {
+    lide = app.findAllRecords("users");
+  } catch (err) {
+    // ⚠️ Tichý catch tady stál hodinu hledání: oznámení se neposílalo a v logu
+    // nebylo NIC. Selhání se musí ozvat, i když funkce sama je jen bonus.
+    try { app.logger().warn("oznamNovouVerzi: účty se nenačetly", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    return 0;
+  }
+
+  const i18n = require(`${__hooks}/i18n.js`);
+  let n = 0;
+  for (const u of lide) {
+    const email = u.getString("email");
+    if (!email) continue;
+    try {
+      const lang = i18n.userLang(u);
+      const radky = body && body[lang] && body[lang].length ? body[lang] : null;
+      notify(app, {
+        email: email,
+        type: "new_version",
+        textKey: radky ? "notify.newVersionBody" : "notify.newVersion",
+        // odrážky skládá server, ať zvoneček dostane hotový text v jazyce příjemce
+        params: { verze: verze, body: radky ? radky.map((r) => "• " + r).join("\n") : "" },
+        dedupKey: "verze:" + verze,
+      });
+      n++;
+    } catch (err) {
+      try { app.logger().warn("oznamNovouVerzi: účet přeskočen", "email", email, "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
+  return n;
+}
+
 function notifyChannels(user, type) {
   let prefs = {};
   try {
@@ -305,6 +376,7 @@ function notifyChannels(user, type) {
   // (odemčený počítač, ukradená relace) si ho vypne dopředu a převzetí je neviditelné.
   // Nález panelu /checkup 11. 8. 2026: typ propadl do uživatelských předvoleb, takže
   // se dal potlačit PATCHem na notify_prefs. Richardovo rozhodnutí: nevypnutelné.
+  if (NOTIFY_NIKDY_MAILEM.includes(type)) return { inApp: p.in_app !== false, email: false };
   if (NOTIFY_ALWAYS.includes(type)) return { inApp: true, email: email };
   return {
     inApp: p.in_app !== false,
@@ -463,6 +535,14 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, textKey, 
       try {
         app.save(rec);
       } catch (err) {
+        // Očekávané je UNIQUE violation (posláno už dřív) — to je v pořádku
+        // a mlčí se. Cokoli jiného je vada a musí být vidět: neznámá hodnota
+        // `type` takhle tiše zahodila celé oznámení o nové verzi (18. 8. 2026)
+        // a v logu po ní nezbylo nic.
+        const zprava = String(err && err.message ? err.message : err);
+        if (!/UNIQUE|unique/i.test(zprava)) {
+          try { app.logger().warn("notify: záznam se neuložil", "type", type, "error", zprava); } catch (e2) { /* log je bonus */ }
+        }
         return;
       }
     } else {
@@ -901,6 +981,12 @@ function normalizeNodeShapes(nodes) {
     const out = canonicalNodeData(d);
     out.title = typeof out.title === "string" ? out.title.slice(0, 500) : out.title;
     out.description = typeof out.description === "string" ? out.description.slice(0, 10000) : out.description;
+    // ikona je emoji, ne text: 16 kódových jednotek pokryje i složené (rodina má 11).
+    // Bez stropu je `icon` volné pole, do kterého jde uložit megabajty (nález 18. 8. 2026).
+    // ⚠️ řezat po ZNACÍCH, ne po UTF-16 jednotkách: slice(0,16) umí rozpůlit
+    // surrogate pár a uložit půl emoji, které se vykreslí jako „�"
+    // (nález panelu 19. 8. 2026; klient limit hlídá, API a MCP ne).
+    out.icon = typeof out.icon === "string" ? Array.from(out.icon).slice(0, 16).join("") : out.icon;
     out.executorName = String(out.executorName).slice(0, 100);
     out.automationNote = String(out.automationNote).slice(0, 1000);
     return Object.assign({}, n, { data: out });
@@ -1712,6 +1798,11 @@ function notifyDeadlineRequestResolved(app, record, pending, actorEmail) {
 function v1SaveMapData(app, map, nodes, edges, lang, relayout, actorEmail, opts) {
   const norm = normalizeMapData(nodes, edges, lang);
   if (norm.error) return { status: 400, error: norm.error };
+  // ⚠️ Ořez délek MUSÍ platit i tudy. Cestou v1 (REST API, MCP, agenti) se
+  // record hook nespustí, takže se sem dřív dal uložit popis o 100 000 znacích
+  // — a ten pak šel přes PUBLIC_NODE_DATA i anonymnímu návštěvníkovi veřejné
+  // mapy. Ověřeno bezpečnostním panelem 19. 8. 2026 živým zápisem.
+  norm.nodes = normalizeNodeShapes(norm.nodes);
   const bad = validateMapData(norm.nodes, norm.edges, lang);
   if (bad) return { status: 400, error: bad };
   if (apexRemoved(jsonVal(map, "nodes", []), norm.nodes)) {
@@ -5433,7 +5524,8 @@ function formatSeriesTitle(fmt, n, baseTitle) {
   return out;
 }
 
-module.exports = { env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+module.exports = {
+  oznamNovouVerzi, env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

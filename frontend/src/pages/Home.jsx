@@ -12,6 +12,7 @@ import NewMapActions from '@/components/shared/NewMapActions';
 import { useMapCreation } from '@/hooks/useMapCreation';
 import BufferPanel, { useBufferNodes } from '@/components/goal-map/BufferPanel';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
+import ReportRailButton from '@/components/shared/ReportRailButton';
 import MyDaySection from '@/components/shared/MyDaySection';
 import MapCard from '@/components/home/MapCard';
 import { useTasks } from '@/hooks/useTasks';
@@ -164,6 +165,7 @@ export default function Home() {
       {/* převod nápadu vyžaduje výběr projektu → dokončí se v dialogu na /tasks */}
       <BufferPanel buffer={buffer} canEdit={false} onConvert={(item) => navigate(`/tasks?convert=${item.id}`)} open={bufferOpen} onToggle={toggleBuffer} fixed leftOffset={timeLogOpen ? 320 : 0} />
       {user && <TimeLogPanel fixed open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />}
+      {user && <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />}
       <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
         {view === 'templates' ? (
           <TemplatesSection />

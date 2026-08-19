@@ -38,7 +38,8 @@
     "deadline_request_resolved": "Vyřízená žádost o termín",
     "user_joined": "Nový člen se přihlásil",
     "rule_notice": "Zpráva z pravidla",
-    "rule_broken": "Rozbité pravidlo"
+    "rule_broken": "Rozbité pravidlo",
+    "new_version": "Nová verze"
   },
   "prefs": {
     "title": "Nastavení notifikací",

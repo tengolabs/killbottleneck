@@ -9,6 +9,41 @@ below before you jump several versions.
 
 ---
 
+## v0.38-beta — 2026-08-19
+
+**Describe a process, not just name it — and tell us when something breaks**
+
+- **The goal description now takes formatting.** A toolbar above the field offers
+  bold, italic, strikethrough, two heading levels, bulleted and numbered lists, and
+  links; Ctrl+B and Ctrl+I work. A Preview switch shows the result. People asked for
+  this because they document whole processes in there, and a plain box was not enough.
+  The text is stored **as markup, not HTML** — every existing description stays valid
+  and nothing is migrated.
+- **Links in the description can carry a name.** The link button offers the goal's own
+  **attachments**, so the description reads "evidence" instead of a full-width Google
+  Sheets address. You can also type any address and name it yourself.
+  On the map card the description still shows as plain text — a card is one or two
+  lines and markup would look like a defect there.
+- **Icons for goals: about 200 of them**, in categories, with search in Czech and
+  English (accents optional), and a field for any emoji from your keyboard. The ones
+  you pick most recently stay at the top under Favourites. The catalogue loads only
+  when you open the picker, so the app is not any heavier.
+- **Hover help on the map icons.** Only some of them had it: the pencil in a goal's
+  footer, "Add sub-goal", the deadline badge, the comment bubble and the sticky-note
+  colour dots now say what they do.
+- **A goal card shows how many attachments it has** — a paperclip badge next to the
+  comment bubble. Until now an attachment was only visible after opening the goal.
+- **When a new version arrives, the bell says what changed** — a few sentences in
+  your language, right in the app. No link to an English changelog.
+- **Report a bug or an idea** straight from the app — under the person icon and from
+  the left rail on the overview, in Tasks and in a map. The
+  message goes to our team and we can reply to you directly. Before you send, the
+  dialog shows exactly what travels with it: your address, the instance and the page
+  you were on. Nothing is collected quietly. **Self-hosted instances do not offer
+  this** — they have nowhere to send it and must not send anything out on their own.
+
+---
+
 ## v0.37-beta — 2026-08-18
 
 **Your organization everywhere you look — and the project name finally has room**

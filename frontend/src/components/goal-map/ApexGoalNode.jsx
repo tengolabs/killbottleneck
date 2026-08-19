@@ -202,7 +202,7 @@ function ApexGoalNode({ id, data, selected }) {
       </div>
       {commentCounts && commentCounts[id] > 0 && (
         <div className="absolute -top-2 -right-2 z-10">
-          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm">
+          <span title={t('tasks:comments.heading', { count: commentCounts[id] })} className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm">
             <MessageSquare className="w-2.5 h-2.5" />
             {commentCounts[id]}
           </span>

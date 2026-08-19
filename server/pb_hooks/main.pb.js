@@ -1168,6 +1168,36 @@ onBootstrap((e) => {
   }
 });
 
+// Po aktualizaci dát lidem vědět do zvonečku, že je tu nová verze
+// (Richard 18. 8. 2026). Běží při startu; že se pošle jednou, hlídá dedup klíč
+// s verzí, ne stav uložený někde stranou.
+onBootstrap((e) => {
+  e.next();
+  try {
+    const { oznamNovouVerzi } = require(`${__hooks}/helpers.js`);
+    const n = oznamNovouVerzi(e.app);
+    if (n > 0) e.app.logger().info("nová verze oznámena", "prijemcu", n);
+  } catch (err) {
+    // oznámení je bonus — nikdy nesmí zabránit startu serveru
+    try { $app.logger().warn("oznámení o nové verzi selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+});
+
+// ⚠️ POJISTKA k onBootstrap výše: hook se pouští DŘÍV, než doběhnou migrace.
+// Vydání, které samo přidává nový typ notifikace, tedy při prvním startu
+// neoznámí nic (naraženo 18. 8. 2026 — zachránilo to až logování v notify).
+// Cron to dožene do pěti minut; dvakrát se nic nepošle, hlídá dedup klíč
+// a rychlá zkratka v oznamNovouVerzi.
+cronAdd("nova_verze", "*/5 * * * *", () => {
+  try {
+    const { oznamNovouVerzi } = require(`${__hooks}/helpers.js`);
+    const n = oznamNovouVerzi($app);
+    if (n > 0) $app.logger().info("nová verze oznámena (cron)", "prijemcu", n);
+  } catch (err) {
+    try { $app.logger().warn("cron nova_verze selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+});
+
 // ---------- údržba ----------
 
 // Retence logů přihlášení: mažou se záznamy starší 90 dní, aby tabulka loginlogs
@@ -1659,6 +1689,11 @@ routerUse((e) => {
   // poslal, po vypršení zkušebky zhasnul a UI by přestalo dostávat aktualizace.
   if (cesta === "/api/kb/public-maps" || cesta === "/api/flowmap/public-maps"
       || cesta === "/api/realtime") return e.next();
+  // Nahlásit chybu musí jít i po vypršení zkušebky — na zamčené instanci má
+  // člověk k psaní nejvíc důvodů a odmítnout ho s 402 by bylo absurdní.
+  // ⚠️ Kotveno na CELOU cestu, jako všechny výjimky výše (sufix šlo obejít
+  // pojmenováním uzlu, nález kontrolního panelu 6. 8. 2026).
+  if (cesta === "/api/kb/report" || cesta === "/api/flowmap/report") return e.next();
   // Superuser = MY, provozovatel. Musíme umět na zamčené instanci zasáhnout
   // (záloha, oprava, ruční spuštění). Zákazník se superuserem nestane: na
   // hostované instanci Caddy zvenku zavírá /api/collections/_superusers,
@@ -1857,6 +1892,12 @@ kbRoute("GET", "/config", (e) => {
     // Kdo jede na bete, chce vedet i o dalsi bete. Vychozi chovani se NEMENI:
     // bez tohohle prepinace se predbezna vydani nikomu nenabizeji.
     update_prerelease: String(env("UPDATE_PRERELEASE") || "0").trim() === "1",
+    // Smí se z téhle instance nahlásit chyba nebo nápad provozovateli?
+    // Zapíná se JEN nastavením KB_REPORT_TO (cílová adresa) — bez ní se
+    // formulář v aplikaci vůbec nenabídne. Je to vědomé: cizí self-host nemá
+    // kam psát a nesmí nic odesílat ven bez vědomí svého provozovatele
+    // (Richard 18. 8. 2026: „jen z našich instancí"). Adresa samotná ven NEJDE.
+    report_enabled: !!(env("REPORT_TO") || "").trim() && !!$app.settings().smtp.enabled,
     // Hostovaná instance: AI konfiguruje provozovatel (.env z tenant-add), ne
     // zákazník — frontend podle toho schová sekci AI ve správě organizace
     // (Richard 6. 8. 2026: „v cloud verzi je AI nadefinované, nezobrazovat").
@@ -2670,6 +2711,119 @@ kbRoute("POST", "/invite", (e) => {
     }
   }
   return e.json(200, { success: true, email: email, role: role, temp_password: tempPassword });
+}, $apis.requireAuth());
+
+// Nahlásit chybu nebo nápad provozovateli.
+//
+// Proč vůbec: uživatelé neměli kudy dát vědět, že něco nefunguje — psali to
+// Richardovi mimo aplikaci, nebo vůbec (18. 8. 2026).
+//
+// ⚠️ ZAPÍNÁ SE JEN proměnnou KB_REPORT_TO. Bez ní routa vrací 404 a formulář
+// se v aplikaci ani nenabídne. Je to brzda uvnitř ODESÍLAJÍCÍ cesty, ne
+// v prostředí testu — přesně proto, že „vypnutí přes prostředí" nám už jednou
+// tiše nefungovalo a testy posílaly skutečné zprávy (feedback z 6. 8. 2026).
+// Zároveň to plní Richardovo zadání „jen z našich instancí": cizí self-host
+// proměnnou nemá, takže z něj nikdy nic neodejde.
+//
+// Reply-To je adresa hlásícího, ať jde odpovědět rovnou z inboxu. From zůstává
+// noreply@ — měnit ho by rozbilo SPF/DKIM (stejný důvod jako u pozvánky).
+kbRoute("POST", "/report", (e) => {
+  const { env } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { mailHtml, mailText, patickaRadky, instanceInfo, WEB } = require(`${__hooks}/mailTemplate.js`);
+  const L = userLang(e.auth);
+
+  const komu = String(env("REPORT_TO") || "").trim();
+  if (!komu) return e.json(404, { error: "Not found." });   // neprozrazovat existenci routy
+  if (!$app.settings().smtp.enabled) return e.json(503, { error: t(L, "err.reportUnavailable") });
+
+  // Rate limit na uživatele — vzor /my-summary/refresh. Hlášení chyb je
+  // dobrovolné a vzácné; pět za hodinu pokryje i upovídaného zákazníka.
+  const store = $app.store();
+  const rlKey = "report:" + e.auth.id;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const historie = (store.get(rlKey) || []).filter((x) => nowSec - x < 3600);
+  if (historie.length >= 5) return e.json(429, { error: t(L, "err.reportRateLimited") });
+
+  const info = e.requestInfo().body || {};
+  const druh = info.kind === "napad" ? "napad" : "chyba";
+  const text = String(info.text || "").trim().slice(0, 5000);
+  if (text.length < 5) return e.json(400, { error: t(L, "err.reportEmpty") });
+  // kde v aplikaci to bylo — pomůcka pro hledání, ne sledování uživatele
+  const stranka = String(info.page || "").trim().slice(0, 300);
+  const prohlizec = String(info.browser || "").trim().slice(0, 300);
+
+  // ⚠️ Pokus se počítá HNED, ne až po úspěšném odeslání. Dokud se zapisoval
+  // až na konci, mohl uživatel při rozbitém SMTP tlouct routu donekonečna —
+  // každý pokus zakládal záznam v `reports` a nové SMTP spojení. Hlídač, který
+  // při chybě pustí všechno, není hlídač (nález panelu 19. 8. 2026).
+  historie.push(nowSec);
+  store.set(rlKey, historie);
+
+  const inst = instanceInfo($app, "");
+  const odesilatel = e.auth.getString("email");
+  const podklad = {
+    nadpis: t(L, druh === "napad" ? "report.headingIdea" : "report.headingBug"),
+    // ⚠️ NEescapovat tady: mailHtml si odstavce escapuje sám (mailTemplate.js).
+    // Dvojí escapování dorazilo operátorovi jako „&amp;amp;lt;b&amp;amp;gt;" — a hlášení
+    // chyby je právě ten obsah, kde ampersandy a úryvky kódu chodí běžně.
+    odstavce: [text],
+    karta: {
+      ikona: druh === "napad" ? "💡" : "🐛",
+      nadpis: t(L, "report.boxTitle"),
+      radky: [
+        { label: t(L, "report.boxFrom"), hodnota: odesilatel },
+        { label: t(L, "report.boxInstance"), hodnota: inst.base || inst.host },
+        { label: t(L, "report.boxVersion"), hodnota: env("VERSION") || "" },
+        { label: t(L, "report.boxPage"), hodnota: stranka },
+        { label: t(L, "report.boxBrowser"), hodnota: prohlizec },
+      ].filter((r) => r.hodnota),
+    },
+    paticka: patickaRadky(t, L, inst.base),
+    domov: inst.base || WEB,
+  };
+
+  // Záznam vzniká PŘED odesláním: uživatel má v aplikaci vidět, co už nahlásil
+  // (Richard 18. 8. 2026), a když selže pošta, hlášení se aspoň neztratí.
+  let zaznam = null;
+  try {
+    zaznam = new Record($app.findCollectionByNameOrId("reports"));
+    zaznam.set("kind", druh);
+    zaznam.set("text", text);
+    zaznam.set("page", stranka);
+    zaznam.set("browser", prohlizec);
+    zaznam.set("version", env("VERSION") || "");
+    zaznam.set("owner", e.auth.id);
+    zaznam.set("owner_email", odesilatel);
+    zaznam.set("sent", false);
+    $app.save(zaznam);
+  } catch (err) {
+    // Neuložení nesmí zabránit odeslání — mail je to podstatné, seznam pomůcka.
+    try { $app.logger().warn("report: záznam se neuložil", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    zaznam = null;
+  }
+
+  const zprava = new MailerMessage({
+    from: { address: $app.settings().meta.senderAddress, name: $app.settings().meta.senderName },
+    to: [{ address: komu }],
+    subject: t(L, druh === "napad" ? "report.subjectIdea" : "report.subjectBug", { org: inst.org || inst.host }),
+    html: mailHtml(podklad),
+    text: mailText(podklad),
+  });
+  // odpověď má chodit tomu, kdo hlásil, ne na noreply@
+  if (odesilatel) zprava.headers = { "Reply-To": odesilatel };
+
+  try {
+    $app.newMailClient().send(zprava);
+  } catch (err) {
+    try { $app.logger().warn("report: odeslání selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    return e.json(502, { error: t(L, "err.reportSendFailed") });
+  }
+
+  if (zaznam) {
+    try { zaznam.set("sent", true); $app.save(zaznam); } catch (err) { /* mail už odešel, příznak je bonus */ }
+  }
+  return e.json(200, { success: true });
 }, $apis.requireAuth());
 
 // Obnova hesla RUKOU SPRÁVCE — jediná cesta na instanci bez SMTP.

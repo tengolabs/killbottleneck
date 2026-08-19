@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import PopisEditor from '@/components/shared/PopisEditor';
 import { Label } from '@/components/ui/label';
 
 // Kategorie „Pozice" v dialogu uzlu ORGANIZAČNÍ STRUKTURY (mapa kind='org'):
@@ -66,8 +66,8 @@ export default function OrgSection({ s, members = [] }) {
 
       <div className="space-y-2">
         <Label htmlFor="org-desc">{t('nodeDialog.descriptionLabel')}</Label>
-        <Textarea id="org-desc" rows={3} value={s.description} onChange={(e) => s.setDescription(e.target.value)}
-          placeholder={t('nodeDialog.org.descPlaceholder')} />
+        <PopisEditor id="org-desc" rows={6} value={s.description} onChange={s.setDescription}
+          placeholder={t('nodeDialog.org.descPlaceholder')} prilohy={s.files} />
       </div>
     </div>
   );

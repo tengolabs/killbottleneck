@@ -37,6 +37,7 @@ function StickyNoteNode({ id, data, selected }) {
                 key={c.bg}
                 onClick={(e) => { e.stopPropagation(); onUpdateNote?.(id, { color: c.bg }); }}
                 onPointerDown={(e) => e.stopPropagation()}
+                title={t('nodeDialog.colorLabel')}
                 className="w-3.5 h-3.5 rounded-full border border-black/10 hover:scale-125 transition-transform"
                 style={{ backgroundColor: c.bg }}
               />

@@ -403,6 +403,16 @@ export const base44 = {
     },
   },
 
+  // Hlášení chyby nebo nápadu provozovateli. Server routu vůbec nemá, když
+  // není nastavené KB_REPORT_TO — proto se tlačítko ukazuje jen podle
+  // `report_enabled` z /api/kb/config.
+  async reportIssue({ kind, text, page, browser }) {
+    return await pb.send('/api/kb/report', {
+      method: 'POST',
+      body: { kind, text, page, browser },
+    });
+  },
+
   users: {
     async inviteUser(email, role) {
       return await pb.send('/api/kb/invite', {
@@ -446,6 +456,17 @@ export const base44 = {
   // přílohy u uzlu mapy. Soubor je v kolekci `protected`, takže odkaz ke stažení
   // potřebuje krátkodobý token — bez něj by prohlížeč dostal 403.
   nodeFiles: {
+    // Počty příloh pro CELOU mapu — na kartě uzlu se ukazuje odznak se sponkou
+    // (Richard 18. 8. 2026: „když přidám komentář, je to vidět na uzlu, ale
+    // přílohu ne, a to je škoda"). Jeden dotaz na mapu, ne na každý uzel zvlášť.
+    async counts(mapId) {
+      // Strop mapy je 200 příloh (server, main.pb.js), takže se sem všechny vejdou.
+      // Kdyby se strop někdy zvedl, radši ať odznaky chybí, než aby tiše lhaly.
+      const vsechny = await base44.entities.NodeFile.filter({ map_id: mapId }, 'created_date', 500);
+      const out = {};
+      for (const f of vsechny || []) out[f.node_id] = (out[f.node_id] || 0) + 1;
+      return out;
+    },
     async list(mapId, nodeId) {
       return await base44.entities.NodeFile.filter({ map_id: mapId, node_id: nodeId }, 'created_date', 100);
     },

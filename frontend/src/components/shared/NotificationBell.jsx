@@ -119,7 +119,7 @@ export default function NotificationBell() {
                 >
                   <span className="mt-0.5 shrink-0"><Icon className={`w-3.5 h-3.5 ${className}`} /></span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-xs break-words">{n.text}</span>
+                    <span className="block text-xs break-words whitespace-pre-line">{n.text}</span>
                     <span className="block text-[10px] text-muted-foreground mt-0.5">{formatWhen(n.created_date)}</span>
                   </span>
                   {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />}

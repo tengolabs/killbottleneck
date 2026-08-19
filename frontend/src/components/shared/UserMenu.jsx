@@ -10,6 +10,8 @@ import ApiKeysDialog from '@/components/shared/ApiKeysDialog';
 import AiAgentsDialog from '@/components/shared/AiAgentsDialog';
 import TimeOverviewDialog from '@/components/time/TimeOverviewDialog';
 import AccountDialog from '@/components/shared/AccountDialog';
+import ReportDialog from '@/components/shared/ReportDialog';
+import { useReportConfig } from '@/hooks/useReportConfig';
 import { saveMode, MODE_LITE } from '@/lib/liteMode';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User as UserIcon, LogOut, Shield, UserPlus, Info, BookOpen, KeyRound, Clock, Languages, Bot, Smartphone, Palette, UserCog, Network } from 'lucide-react';
+import { User as UserIcon, LogOut, Shield, UserPlus, Info, BookOpen, KeyRound, Clock, Languages, Bot, Smartphone, Palette, UserCog, Network, Bug } from 'lucide-react';
 import { useLanguageSwitch } from '@/components/LanguageToggle';
 
 /**
@@ -50,6 +52,11 @@ export default function UserMenu({ onInvited }) {
   const [aiAgentsOpen, setAiAgentsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  // Hlásit chyby jde jen tam, kam je komu poslat (KB_REPORT_TO + SMTP).
+  // V cizím self-hostu se položka vůbec neukáže — nic nemá odcházet ven
+  // bez vědomí toho, kdo instanci provozuje.
+  const reportCfg = useReportConfig(!!user);
 
   // Organizační struktura pod panáčkem — vidí ji KAŽDÝ člen (Richard 15. 8.);
   // kdo ji nesmí měnit, dostane mapu jen pro čtení.
@@ -163,6 +170,11 @@ export default function UserMenu({ onInvited }) {
               <BookOpen className="w-4 h-4 mr-2" /> {t('menu.docs')}
             </a>
           </DropdownMenuItem>
+          {reportCfg.enabled && (
+            <DropdownMenuItem onClick={() => setReportOpen(true)} data-menu-report>
+              <Bug className="w-4 h-4 mr-2" /> {t('menu.report')}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => setAboutOpen(true)}>
             <Info className="w-4 h-4 mr-2" /> {t('menu.about')}
           </DropdownMenuItem>
@@ -185,6 +197,12 @@ export default function UserMenu({ onInvited }) {
       <ApiKeysDialog open={apiKeysOpen} onClose={() => setApiKeysOpen(false)} />
       <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
       <TimeOverviewDialog open={timeOpen} onClose={() => setTimeOpen(false)} />
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        userEmail={user?.email}
+        version={reportCfg.version}
+      />
     </>
   );
 }

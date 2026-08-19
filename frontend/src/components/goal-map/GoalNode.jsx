@@ -1,13 +1,14 @@
-import { memo, useContext } from 'react';
+import { memo, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MembersContext, labelForEmail } from '@/lib/memberLabel';
 import { isExternalOwner } from '@/lib/externalContacts';
 import { Handle, Position } from '@xyflow/react';
-import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip } from 'lucide-react';
 import { useGoalMap } from './GoalMapContext';
 import { useTimer } from '@/lib/TimerContext';
 import { useToast } from '@/components/ui/use-toast';
 import { getDeadlineStatus, getInitials, formatDeadline } from '@/lib/nodeMeta';
+import { popisJakoText } from '@/lib/popisFormat';
 import { statusConfig } from '@/lib/statusMeta';
 import { tridyCitelnosti } from '@/lib/citelnost';
 import {
@@ -28,12 +29,23 @@ const aiMenuItems = [
 
 function GoalNode({ id, data, selected }) {
   const { t } = useTranslation('editor');
-  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap } = useGoalMap();
+  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, fileCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap } = useGoalMap();
   // směr stromu: 'horizontal' = strom doprava (mobil) → konektory vlevo/vpravo, jinak nahoře/dole
   const isH = direction === 'horizontal';
   // velikost písma v uzlu (tlačítko Čitelnost v liště) — šířka karty se NEMĚNÍ,
   // roste jen písmo; viz lib/citelnost.js, proč zvětšovat celý uzel nemá smysl
   const cit = tridyCitelnosti(citelnost);
+  // Na kartě se popis ukazuje BEZ značek formátování: vejdou se sem jeden až dva
+  // řádky a „**důraz**" by tu vypadal jako vada. Obrázkový export navíc snímá
+  // kartu tak, jak je vykreslená. U odkazu zůstane popisek, ne dlouhá adresa —
+  // o to při psaní [evidence](…) šlo.
+  // ⚠️ Ořez vstupu: server pouští popis do 10 000 znaků a rozbor textu samých
+  // značek stojí u té délky desítky ms — krát dvě stě uzlů na plátně by to bylo
+  // znát při každém překreslení. Na kartu se stejně vejdou dva řádky.
+  const popisText = useMemo(
+    () => popisJakoText(String(data.description || '').slice(0, 2000)),
+    [data.description],
+  );
   // Měření času na uzlu — jen doplňkové, NIKDY nemění stav uzlu (rozhodnutí
   // Richarda). Funguje i v read-only mapě (měřím svůj čas, mapu neměním).
   const timer = useTimer();
@@ -128,11 +140,11 @@ function GoalNode({ id, data, selected }) {
         </div>
         {!readOnly && (
           <div className="px-3 pb-3 flex gap-2">
-            <button onClick={(e) => { e.stopPropagation(); onAddChild(id); }} className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+            <button title={t('node.orgAddSub')} onClick={(e) => { e.stopPropagation(); onAddChild(id); }} className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
               <Plus className="w-3.5 h-3.5" />
               {t('node.orgAddSub')}
             </button>
-            <button data-testid="org-node-edit" onClick={(e) => { e.stopPropagation(); onEditNode(id); }} className="inline-flex items-center justify-center text-xs font-medium px-2 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+            <button data-testid="org-node-edit" title={t('common:actions.edit')} onClick={(e) => { e.stopPropagation(); onEditNode(id); }} className="inline-flex items-center justify-center text-xs font-medium px-2 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
               <Pencil className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -255,7 +267,7 @@ function GoalNode({ id, data, selected }) {
              Celý text zůstává dostupný v bublině. */
           <p
             data-popis-skryt
-            title={data.description}
+            title={popisText}
             aria-label={t('node.descriptionHidden')}
             className={`mt-1 text-[10px] leading-none text-muted-foreground ${isDone ? 'opacity-50' : ''}`}
           >
@@ -263,7 +275,7 @@ function GoalNode({ id, data, selected }) {
           </p>
         ) : (
           <p data-popis-uzlu className={`mt-1 ${cit.popis} text-muted-foreground ${cit.popisRadky} ${isDone ? 'opacity-50' : ''}`}>
-            {data.description}
+            {popisText}
           </p>
         ))}
       </div>
@@ -271,7 +283,7 @@ function GoalNode({ id, data, selected }) {
       {(deadlineStatus || waitingSet?.has(id) || data.owner || data.blocks || isAutomated || wantsAutomation) && (
         <div className="px-3 pb-1 flex items-center gap-1.5 flex-wrap">
           {deadlineStatus && (
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${deadlineBadgeClass}`}>
+            <span title={`${t('tasks:taskDialog.labelDeadline')}: ${formatDeadline(data.deadline)}`} className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${deadlineBadgeClass}`}>
               <Calendar className="w-2.5 h-2.5" />
               {formatDeadline(data.deadline)}
             </span>
@@ -360,12 +372,26 @@ function GoalNode({ id, data, selected }) {
           )}
         </div>
       )}
-      {commentCounts && commentCounts[id] > 0 && (
-        <div className="absolute -top-2 -right-2 z-10">
-          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm">
-            <MessageSquare className="w-2.5 h-2.5" />
-            {commentCounts[id]}
-          </span>
+      {/* Komentáře a přílohy vpravo nahoře. Přílohu bylo dosud poznat jen
+          otevřením detailu (Richard 18. 8. 2026: „a to je škoda"). */}
+      {((commentCounts && commentCounts[id] > 0) || (fileCounts && fileCounts[id] > 0)) && (
+        <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1">
+          {fileCounts && fileCounts[id] > 0 && (
+            <span
+              data-odznak-prilohy
+              title={`${t('nodeDialog.files.label')}: ${fileCounts[id]}`}
+              className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm"
+            >
+              <Paperclip className="w-2.5 h-2.5" />
+              {fileCounts[id]}
+            </span>
+          )}
+          {commentCounts && commentCounts[id] > 0 && (
+            <span title={t('tasks:comments.heading', { count: commentCounts[id] })} className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm">
+              <MessageSquare className="w-2.5 h-2.5" />
+              {commentCounts[id]}
+            </span>
+          )}
         </div>
       )}
       {onShowNodeTasks && taskStats?.[id]?.total > 0 && (
@@ -396,7 +422,7 @@ function GoalNode({ id, data, selected }) {
 
       {!readOnly && (
         <div className="px-3 pb-3 flex gap-2">
-          <button onClick={(e) => { e.stopPropagation(); onAddChild(id); }} className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+          <button title={t('tasks:taskTable.addSubgoal')} onClick={(e) => { e.stopPropagation(); onAddChild(id); }} className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
             <Plus className="w-3.5 h-3.5" />
             {t('tasks:taskTable.addSubgoal')}
           </button>
@@ -423,7 +449,7 @@ function GoalNode({ id, data, selected }) {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <button onClick={(e) => { e.stopPropagation(); onEditNode(id); }} className="inline-flex items-center justify-center text-xs font-medium px-2 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+          <button title={t('common:actions.edit')} onClick={(e) => { e.stopPropagation(); onEditNode(id); }} className="inline-flex items-center justify-center text-xs font-medium px-2 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
         </div>

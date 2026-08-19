@@ -7,6 +7,7 @@ import { useTasks } from '@/hooks/useTasks';
 import TaskTable from '@/components/tasks/TaskTable';
 import MyDaySection from '@/components/shared/MyDaySection';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
+import ReportRailButton from '@/components/shared/ReportRailButton';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskCalendar from '@/components/tasks/TaskCalendar';
 import TaskDialog from '@/components/tasks/TaskDialog';
@@ -51,6 +52,23 @@ import { useToast } from '@/components/ui/use-toast';
 import { STATUSES } from '@/lib/statusMeta';
 import { getDeadlineStatus } from '@/lib/nodeMeta';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
+import { popisJakoText } from '@/lib/popisFormat';
+
+// Popis bez značek pro hledání. ⚠️ S pamětí: predikát filtru se volá pro každou
+// položku při KAŽDÉM stisku klávesy ve vyhledávání, takže rozebírat popis znovu
+// a znovu se u delších textů projeví (nález panelu 19. 8. 2026).
+const hledaciCache = new Map();
+function hledaciText(popis) {
+  const klic = popis || '';
+  if (!klic) return '';
+  let v = hledaciCache.get(klic);
+  if (v === undefined) {
+    v = popisJakoText(klic).toLowerCase();
+    if (hledaciCache.size > 2000) hledaciCache.clear();   // ať paměť neroste bez konce
+    hledaciCache.set(klic, v);
+  }
+  return v;
+}
 
 const ALL = '__all__';
 const NONE = '__none__'; // „Bez mapy" / „Nepřiřazené" (Radix Select neumí prázdný string)
@@ -268,7 +286,7 @@ export default function Tasks() {
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      if (!(it.title || '').toLowerCase().includes(q) && !(it.description || '').toLowerCase().includes(q)) return false;
+      if (!(it.title || '').toLowerCase().includes(q) && !hledaciText(it.description).includes(q)) return false;
     }
     return true;
   };
@@ -622,7 +640,7 @@ export default function Tasks() {
       }
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        if (!(b.title || '').toLowerCase().includes(q) && !(b.description || '').toLowerCase().includes(q)) return false;
+        if (!(b.title || '').toLowerCase().includes(q) && !hledaciText(b.description).includes(q)) return false;
       }
       return true;
     });
@@ -789,6 +807,7 @@ export default function Tasks() {
 
       <BufferPanel buffer={buffer} canEdit={false} onConvert={handleConvertBuffer} open={bufferOpen} onToggle={toggleBuffer} fixed leftOffset={timeLogOpen ? 320 : 0} />
       <TimeLogPanel fixed open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />
+      <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         <MyDaySection
