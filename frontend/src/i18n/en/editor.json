@@ -96,10 +96,10 @@
     "skinTitle": "Change appearance (skin)"
   },
   "selection": {
-    "selected_one": "{{count}} node selected",
-    "selected_few": "{{count}} nodes selected",
-    "selected_many": "{{count}} nodes selected",
-    "selected_other": "{{count}} nodes selected",
+    "selected_one": "{{count}} goal selected",
+    "selected_few": "{{count}} goals selected",
+    "selected_many": "{{count}} goals selected",
+    "selected_other": "{{count}} goals selected",
     "editSelection": "Edit selected",
     "deleteSelection": "Delete selection"
   },

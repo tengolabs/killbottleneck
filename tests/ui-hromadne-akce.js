@@ -135,7 +135,9 @@ const register = async (email) => {
     await sleep(700);
 
     const listaText = await page.evaluate(() => document.body.innerText);
-    ok(/Vybráno 3/.test(listaText), `lišta hlásí tři vybrané cíle (${(listaText.match(/Vybráno \d+/) || ['—'])[0]})`);
+    // ⚠️ „Vybráno 3 cíle" — v UI se uzlu říká CÍL (slovník rozhodnutý 16.–17. 8.),
+    // „uzel" je technické slovo pro kód a API. Vzor je proto na počtu, ne na slově.
+    ok(/Vybrán[oy]? 3/.test(listaText), `lišta hlásí tři vybrané cíle (${(listaText.match(/Vybrán[oy]? \d+ \S+/) || ['—'])[0]})`);
     ok(await page.$('[data-bulk-open]') !== null, 'v liště je tlačítko hromadné úpravy');
 
     await page.click('[data-bulk-open]');
@@ -207,7 +209,7 @@ const register = async (email) => {
     if (cizi) {
       await page.mouse.click(cizi.x, cizi.y);
       await sleep(700);
-      const jenJeden = /Vybráno 1/.test(await page.evaluate(() => document.body.innerText));
+      const jenJeden = /Vybrán 1|Vybráno 1/.test(await page.evaluate(() => document.body.innerText));
       ok(jenJeden, 'vybrán samotný cíl s cizím zadáním');
       if (jenJeden) {
         await page.click('[data-bulk-open]');
@@ -295,7 +297,7 @@ const register = async (email) => {
       await page.mouse.click(naPoznamku.x, naPoznamku.y);
       await sleep(700);
       const stav = await page.evaluate(() => ({
-        vybrano: /Vybráno/.test(document.body.innerText),
+        vybrano: /Vybrán/.test(document.body.innerText),
         maTlacitko: !!document.querySelector('[data-bulk-open]'),
       }));
       ok(stav.vybrano && !stav.maTlacitko,

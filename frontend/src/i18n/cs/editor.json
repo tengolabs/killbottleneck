@@ -96,10 +96,10 @@
     "skinTitle": "Změnit vzhled (skin)"
   },
   "selection": {
-    "selected_one": "Vybráno {{count}} uzel",
-    "selected_few": "Vybráno {{count}} uzly",
-    "selected_many": "Vybráno {{count}} uzlů",
-    "selected_other": "Vybráno {{count}} uzlů",
+    "selected_one": "Vybrán {{count}} cíl",
+    "selected_few": "Vybrány {{count}} cíle",
+    "selected_many": "Vybráno {{count}} cílů",
+    "selected_other": "Vybráno {{count}} cílů",
     "editSelection": "Upravit vybrané",
     "deleteSelection": "Smazat výběr"
   },
