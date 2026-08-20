@@ -116,6 +116,41 @@ const login = async (base, email) => {
     s = await api(H, 'POST', '/api/flowmap/ai-settings', { token: A, body: { provider: 'custom', url: 'https://ai.example.com/v1/advisor' } });
     expect(s.status === 200, 'veřejná adresa se uloží normálně');
 
+    console.log('-- SSRF: adresa podvržená AŽ PO uložení (TOCTOU) --');
+    // Kontrola při uložení nestačí: záznam se dá změnit i mimo /ai-settings
+    // (přímý zápis do DB, data z doby před zavedením kontroly). /advisor proto
+    // musí adresu ověřit znovu těsně před odesláním. Nejdřív OPAČNÝ SMĚR:
+    // s veřejnou adresou nesmí /advisor hlásit „privátní" (past vždy-zelených).
+    let adv = await api(H, 'POST', '/api/flowmap/advisor', { token: A, body: { mode: 'chat', message: 'ahoj', map: { nodes: [], edges: [] } } });
+    expect(!/privátní|private/i.test(JSON.stringify(adv.json || {})),
+      `veřejná adresa se v /advisor nehlásí jako privátní (${adv.status})`);
+    // Teď se uložená adresa přepíše PŘÍMO V DATABÁZI na metadata službu —
+    // stejný postup jako v hlaseni-chyby.js (python3 je na stroji, sqlite3 v image není).
+    execSync(`docker stop ${HOSTED.name}`, { stdio: 'ignore' });
+    const dbTmp = `/tmp/kb-toctou-${process.pid}.db`;
+    execSync(`docker cp ${HOSTED.name}:/app/pb_data/data.db ${dbTmp}`, { stdio: 'ignore' });
+    const pySkript = `/tmp/kb-toctou-${process.pid}.py`;
+    require('fs').writeFileSync(pySkript, [
+      'import sqlite3, sys',
+      'c = sqlite3.connect(sys.argv[1])',
+      'c.execute("UPDATE ai_settings SET url=\'http://169.254.169.254/latest\'")',
+      'c.commit(); c.close()',
+    ].join('\n'));
+    execSync(`python3 ${pySkript} ${dbTmp}`, { stdio: 'ignore' });
+    execSync(`docker cp ${dbTmp} ${HOSTED.name}:/app/pb_data/data.db`, { stdio: 'ignore' });
+    execSync(`rm -f ${pySkript} ${dbTmp}`, { stdio: 'ignore' });
+    execSync(`docker start ${HOSTED.name}`, { stdio: 'ignore' });
+    for (let i = 0; i < 40; i++) {
+      try { if ((await fetch(`${H}/api/health`)).ok) break; } catch { /* startuje */ }
+      await sleep(1000);
+    }
+    const A2 = await login(H, 'admin@example.com');
+    adv = await api(H, 'POST', '/api/flowmap/advisor', { token: A2, body: { mode: 'chat', message: 'ahoj', map: { nodes: [], edges: [] } } });
+    expect(adv.status === 503 && /privátní|private/i.test(JSON.stringify(adv.json || {})),
+      `podvržená privátní adresa se odmítne i V OKAMŽIKU VOLÁNÍ (${adv.status})`);
+    // uklidit po sobě: vrátit veřejnou adresu, ať navazující kroky sady nestaví na podvrhu
+    await api(H, 'POST', '/api/flowmap/ai-settings', { token: A2, body: { provider: 'custom', url: 'https://ai.example.com/v1/advisor' } });
+
     console.log('-- brzda na hádání aktivačního kódu --');
     let limited = 0, rejected = 0;
     for (let i = 0; i < 14; i++) {

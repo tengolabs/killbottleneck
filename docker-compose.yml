@@ -14,10 +14,12 @@ services:
     build:
       context: .
       args:
-        # Instance version. Without it the value stays "dev" and the update check
-        # is not offered — exactly what we want for work in progress. Real number:
-        #   ./nasadit-staging.sh  (razítko + build + kontrola verze — NEpouštět compose ručně)
-        KB_VERSION: ${KB_VERSION:-v0.40-beta}
+        # Instance version. Release archives ship with the real number stamped
+        # in below, so there is nothing to set here. Without it the value stays
+        # "dev" and the update check is not offered — exactly what we want for
+        # work in progress. (Dev repo only: staging deploys go through
+        # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
+        KB_VERSION: ${KB_VERSION:-v0.40.1-beta}
     container_name: killbottleneck
     ports:
       - "${KB_PORT:-${FLOWMAP_PORT:-8090}}:8090"

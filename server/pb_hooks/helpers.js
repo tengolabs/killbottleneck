@@ -5392,6 +5392,12 @@ function upsertDailySummary(app, userId, date, text, provider) {
 // co shrnovat (žádná otevřená práce). Cron NEmá auth kontext → model se volá
 // přímo (advisor.js / gateway), nikdy přes /api/flowmap/advisor.
 function generateDailySummary(app, userId, email, cfg, lang) {
+  // Stejná pojistka jako v /advisor: adresa z DB prošla kontrolou při uložení,
+  // ale cron ji čte až po čase — kdyby se mezitím změnila jinudy, hostovaná
+  // instance nesmí na privátní cíl sáhnout. Hodnoty z prostředí jsou provozovatele.
+  if (cfg.source === "db" && aiHostBlocked(cfg.url)) {
+    throw new Error("adresa AI služby míří na privátní cíl (viz nastavení AI)");
+  }
   const L = dgOf(lang);
   const digest = collectUserTaskDigest(app, userId, email, lang);
   if (digest.total === 0) return null;

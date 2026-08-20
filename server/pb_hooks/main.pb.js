@@ -2106,6 +2106,17 @@ kbRoute("POST", "/advisor", (e) => {
     return e.json(503, { error: t(L, "err.aiDisabled") });
   }
 
+  // Blokace privátních cílů se kontroluje při ULOŽENÍ adresy (/ai-settings) —
+  // jenže mezi uložením a voláním se záznam dá změnit i jinudy (přímý zápis do
+  // DB, data z doby před zavedením kontroly). Hostovaná instance proto adresu
+  // ověří znovu těsně před odesláním. Jen pro adresy z DB: hodnoty z prostředí
+  // nastavuje provozovatel a uloženou kontrolou nikdy neprošly.
+  const { aiHostBlocked } = require(`${__hooks}/helpers.js`);
+  if (cfg.source === "db" &&
+      (aiHostBlocked(cfg.url) || (cfg.transcribeUrl && aiHostBlocked(cfg.transcribeUrl)))) {
+    return e.json(503, { error: t(L, "err.aiHostPrivate") });
+  }
+
   const body = e.requestInfo().body || {};
   // jazyk uživatele → do payloadu; vlastní model (advisor.js), cloud/n8n advisor
   // i přepis zvuku (Whisper language na bráně) podle něj volí jazyk. Vždy
