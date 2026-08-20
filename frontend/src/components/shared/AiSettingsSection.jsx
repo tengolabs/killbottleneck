@@ -5,7 +5,7 @@ import { refreshAiModes } from '@/hooks/useAiEnabled';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Loader2, Check, PlugZap, Server, Cloud, Ban, Wrench } from 'lucide-react';
+import { Sparkles, Loader2, Check, PlugZap, Server, Cloud, Ban, Wrench, KeyRound } from 'lucide-react';
 
 // Nastavení AI providera z administrace (zamčená kolekce ai_settings; token
 // nikdy nechodí do prohlížeče — server vrací jen token_set). Fallback: dokud
@@ -19,6 +19,7 @@ export default function AiSettingsSection() {
   const PROVIDERS = [
     { value: 'none', label: t('aiSettings.providerNoneLabel'), icon: Ban, hint: t('aiSettings.providerNoneHint') },
     { value: 'ollama', label: t('aiSettings.providerOllamaLabel'), icon: Server, hint: t('aiSettings.providerOllamaHint') },
+    { value: 'openai', label: t('aiSettings.providerOpenaiLabel'), icon: KeyRound, hint: t('aiSettings.providerOpenaiHint') },
     { value: 'api', label: t('aiSettings.providerApiLabel'), icon: Cloud, hint: t('aiSettings.providerApiHint') },
     { value: 'custom', label: t('aiSettings.providerCustomLabel'), icon: Wrench, hint: t('aiSettings.providerCustomHint') },
   ];
@@ -28,6 +29,7 @@ export default function AiSettingsSection() {
   const [token, setToken] = useState('');
   const [tokenSet, setTokenSet] = useState(false);
   const [transcribeUrl, setTranscribeUrl] = useState('');
+  const [transcribeModel, setTranscribeModel] = useState('');
   const [source, setSource] = useState('db');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,6 +44,7 @@ export default function AiSettingsSection() {
         setUrl(d.url || '');
         setModel(d.model || '');
         setTranscribeUrl(d.transcribe_url || '');
+        setTranscribeModel(d.transcribe_model || '');
         setTokenSet(!!d.token_set);
         setSource(d.source || 'db');
       })
@@ -52,7 +55,7 @@ export default function AiSettingsSection() {
   const pickProvider = (v) => {
     setProvider(v);
     setTestResult(null);
-    if (v === 'ollama' && url === API_URL_PLACEHOLDER) setUrl('');
+    if ((v === 'ollama' || v === 'openai') && url === API_URL_PLACEHOLDER) setUrl('');
   };
 
   const handleSave = async () => {
@@ -61,7 +64,7 @@ export default function AiSettingsSection() {
     try {
       const d = await pb.send('/api/kb/ai-settings', {
         method: 'POST',
-        body: { provider, url, model, transcribe_url: transcribeUrl, token },
+        body: { provider, url, model, transcribe_url: transcribeUrl, transcribe_model: transcribeModel, token },
       });
       setTokenSet(!!d.token_set);
       setToken('');
@@ -104,7 +107,7 @@ export default function AiSettingsSection() {
         {source === 'env' && t('aiSettings.envNotice')}
       </p>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
         {PROVIDERS.map((p) => (
           <button
             key={p.value}
@@ -127,22 +130,32 @@ export default function AiSettingsSection() {
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="ai-url" className="text-xs text-muted-foreground">
-                {provider === 'ollama' ? t('aiSettings.urlLabelOllama') : provider === 'api' ? t('aiSettings.urlLabelApi') : t('aiSettings.urlLabelCustom')}
+                {provider === 'ollama' ? t('aiSettings.urlLabelOllama')
+                  : provider === 'openai' ? t('aiSettings.urlLabelOpenai')
+                  : provider === 'api' ? t('aiSettings.urlLabelApi') : t('aiSettings.urlLabelCustom')}
               </Label>
               <Input
                 id="ai-url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder={provider === 'ollama' ? 'http://192.168.1.10:11434' : API_URL_PLACEHOLDER}
+                placeholder={provider === 'ollama' ? 'http://192.168.1.10:11434'
+                  : provider === 'openai' ? 'https://openrouter.ai/api/v1' : API_URL_PLACEHOLDER}
               />
             </div>
-            {provider === 'ollama' && (
+            {(provider === 'ollama' || provider === 'openai') && (
               <div className="space-y-1">
-                <Label htmlFor="ai-model" className="text-xs text-muted-foreground">{t('aiSettings.modelLabel')}</Label>
-                <Input id="ai-model" value={model} onChange={(e) => setModel(e.target.value)} placeholder={t('aiSettings.modelPlaceholder')} />
+                <Label htmlFor="ai-model" className="text-xs text-muted-foreground">
+                  {provider === 'openai' ? t('aiSettings.modelLabelOpenai') : t('aiSettings.modelLabel')}
+                </Label>
+                <Input
+                  id="ai-model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder={provider === 'openai' ? t('aiSettings.modelPlaceholderOpenai') : t('aiSettings.modelPlaceholder')}
+                />
               </div>
             )}
-            {(provider === 'api' || provider === 'custom') && (
+            {(provider === 'api' || provider === 'custom' || provider === 'openai') && (
               <div className="space-y-1">
                 <Label htmlFor="ai-token" className="text-xs text-muted-foreground">
                   {t('aiSettings.tokenLabel')} {tokenSet && <span className="text-green-600 dark:text-green-400">{t('aiSettings.tokenSetNote')}</span>}
@@ -152,7 +165,7 @@ export default function AiSettingsSection() {
                   type="password"
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
-                  placeholder={tokenSet ? '••••••••' : 'fm_…'}
+                  placeholder={tokenSet ? '••••••••' : provider === 'openai' ? 'sk-…' : 'fm_…'}
                 />
               </div>
             )}
@@ -162,10 +175,30 @@ export default function AiSettingsSection() {
               <Trans i18nKey="aiSettings.ollamaHelp" ns="auth" components={{ b: <strong />, c: <code /> }} />
             </p>
           )}
-          {(provider === 'ollama' || provider === 'custom') && (
+          {provider === 'openai' && (
+            <p className="text-[11px] text-muted-foreground">
+              <Trans i18nKey="aiSettings.openaiHelp" ns="auth" components={{ b: <strong />, c: <code /> }} />
+            </p>
+          )}
+          {(provider === 'ollama' || provider === 'custom' || provider === 'openai') && (
             <div className="space-y-1">
-              <Label htmlFor="ai-transcribe" className="text-xs text-muted-foreground">{t('aiSettings.transcribeLabel')}</Label>
+              <Label htmlFor="ai-transcribe" className="text-xs text-muted-foreground">
+                {provider === 'openai' ? t('aiSettings.transcribeLabelOpenai') : t('aiSettings.transcribeLabel')}
+              </Label>
               <Input id="ai-transcribe" value={transcribeUrl} onChange={(e) => setTranscribeUrl(e.target.value)} placeholder="http://…" />
+            </div>
+          )}
+          {provider === 'openai' && (
+            <div className="space-y-1">
+              <Label htmlFor="ai-transcribe-model" className="text-xs text-muted-foreground">
+                {t('aiSettings.transcribeModelLabel')}
+              </Label>
+              <Input
+                id="ai-transcribe-model"
+                value={transcribeModel}
+                onChange={(e) => setTranscribeModel(e.target.value)}
+                placeholder="whisper-1"
+              />
             </div>
           )}
         </div>

@@ -9,6 +9,39 @@ below before you jump several versions.
 
 ---
 
+## v0.40-beta — 2026-08-20
+
+**Connect the app to OpenAI, OpenRouter or any other service with an API key**
+
+- **A new AI mode: `openai`.** Until now killBottleneck could only speak Ollama's dialect,
+  so an ordinary API key — OpenAI, OpenRouter, Groq, Mistral, Together, or your own vLLM,
+  LM Studio, llama.cpp or liteLLM proxy — got you nowhere. Now you enter an address, a key
+  and a model name and every AI feature works. Reported from the beta.
+  In the app it is **Administration → AI features → OpenAI-compatible**; in `.env` it is
+  `KB_AI_PROVIDER=openai`. **Test connection** tells you straight away whether the key is
+  valid and whether the model name exists.
+- **Dictation works through the same service.** No separate transcription endpoint needed;
+  the model is `whisper-1` unless you change `KB_AI_TRANSCRIBE_MODEL`. If you would rather
+  run transcription somewhere else, `KB_AI_TRANSCRIBE_URL` still wins.
+- **"OpenAI-compatible" is a family, not one interface**, so the app copes with the
+  differences: a service that does not accept a structured-JSON request is asked again, more
+  simply. A reasoning model that burns its whole budget on thinking and returns nothing now
+  **says so** instead of silently doing nothing.
+- **The contract for `custom` is finally written down** — the "your own endpoint" mode has
+  existed for a long time, but what such an endpoint must do lived only in our source code.
+  New reference page: *Custom AI endpoint*.
+- Nothing changes for existing instances: `ollama`, `api` and `custom` behave exactly as
+  before, and AI stays off by default.
+
+**Upgrade notes.** Two migrations: one adds a fifth value to the AI switch, the other adds a
+transcription-model field. Nothing is rewritten and nothing is switched on by itself.
+⚠️ **Going back to v0.39 with `provider=openai` saved turns AI off silently** — the older
+version does not know the value and answers "AI is disabled". Switch the provider back before
+downgrading. With `openai` there is now also an hourly cap of AI operations per person
+(`KB_AI_MAX_PER_HOUR`, 60 by default), because every call spends your own credit.
+
+---
+
 ## v0.39-beta — 2026-08-19
 
 **See what happened to a goal, edit a whole selection at once, and read the map from the lines**

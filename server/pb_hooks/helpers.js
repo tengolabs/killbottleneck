@@ -654,6 +654,7 @@ function aiConfig(app) {
         model: rec.getString("model"),
         token: rec.getString("token"),
         transcribeUrl: rec.getString("transcribe_url"),
+        transcribeModel: rec.getString("transcribe_model"),
       };
     }
   } catch (err) { /* kolekce/záznam nemusí existovat */ }
@@ -664,6 +665,7 @@ function aiConfig(app) {
     model: env("AI_MODEL") || "",
     token: env("AI_TOKEN") || "",
     transcribeUrl: env("AI_TRANSCRIBE_URL") || "",
+    transcribeModel: env("AI_TRANSCRIBE_MODEL") || "",
   };
 }
 
@@ -5388,7 +5390,7 @@ function upsertDailySummary(app, userId, date, text, provider) {
 
 // Vygeneruje a uloží sumář jednoho uživatele. Vrací record, nebo null když není
 // co shrnovat (žádná otevřená práce). Cron NEmá auth kontext → model se volá
-// přímo (ollama.js / gateway), nikdy přes /api/flowmap/advisor.
+// přímo (advisor.js / gateway), nikdy přes /api/flowmap/advisor.
 function generateDailySummary(app, userId, email, cfg, lang) {
   const L = dgOf(lang);
   const digest = collectUserTaskDigest(app, userId, email, lang);
@@ -5400,11 +5402,13 @@ function generateDailySummary(app, userId, email, cfg, lang) {
   const system = L.sysSummary;
   const userMsg = L.userSummary(today, digest.promptText);
   let text;
-  if (cfg.provider === "ollama") {
-    const { ollamaText } = require(`${__hooks}/ollama.js`);
+  if (cfg.provider === "ollama" || cfg.provider === "openai") {
+    const { advisorText } = require(`${__hooks}/advisor.js`);
     // num_predict kryje i reasoning tokeny thinking modelů (gpt-oss) — proto
     // víc, než by 2 věty potřebovaly
-    text = ollamaText(system, userMsg, { url: cfg.url, model: cfg.model }, { numPredict: 1000 });
+    text = advisorText(system, userMsg, {
+      provider: cfg.provider, url: cfg.url, model: cfg.model, token: cfg.token,
+    }, { numPredict: 1000, lang: (lang === "en" ? "en" : "cs") });
   } else {
     // api/custom — stejný kontrakt jako advisor routa (mode chat), serverový token;
     // jazyk odjede v payloadu (gateway/n8n si podle něj zvolí jazyk odpovědi)

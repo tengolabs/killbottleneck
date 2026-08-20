@@ -1781,7 +1781,7 @@ kbRoute("POST", "/my-summary/refresh", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const cfg = summaryAiConfig($app);
-  if (!["ollama", "api", "custom"].includes(cfg.provider)) {
+  if (!["ollama", "api", "custom", "openai"].includes(cfg.provider)) {
     return e.json(503, { error: t(L, "err.aiDisabled") });
   }
   // brzda: každé volání = LLM inference (GPU / u provider=api placená kvóta) —
@@ -1939,6 +1939,40 @@ kbRoute("GET", "/config", (e) => {
       }
       store.set("aiModesCache", { at: now, modes: modes, healthy: healthy, provider: provider });
     }
+  } else if (provider === "openai") {
+    modes = ["questions", "generate", "expand", "chat", "from_text"];
+    if (fresh) {
+      modes = cached.modes;
+      healthy = cached.healthy;
+    } else {
+      // ⚠️ Diktování NENABÍZET naslepo. „OpenAI-kompatibilní" mluví o chatu —
+      // /audio/transcriptions má OpenAI, ale OpenRouter, vLLM ani LM Studio ho
+      // běžně nemají. Mikrofon, který vždycky skončí chybou, je horší než žádný
+      // (nález panelu 20. 8. 2026). Ptáme se proto SLUŽBY: nabídne-li v seznamu
+      // modelů nějaký přepisovací, diktování zapneme. Vlastní adresa přepisu
+      // (transcribeUrl) rozhoduje vždycky a bez ptaní.
+      if (cfg.transcribeUrl) modes.push("transcribe");
+      try {
+        const { openaiBase } = require(`${__hooks}/llm.js`);
+        const res = $http.send({
+          url: openaiBase(cfg.url) + "/models",
+          method: "GET",
+          headers: { "Authorization": "Bearer " + (cfg.token || "") },
+          timeout: 5,
+        });
+        // 401/403 = špatný klíč, tedy chyba NASTAVENÍ, ne výpadek: admin má
+        // vidět chybu v nastavení, ne „AI je dočasně nedostupná" (stejné
+        // pravidlo jako u provideru api).
+        healthy = res.statusCode < 500;
+        if (!cfg.transcribeUrl && res.statusCode === 200 && res.json && Array.isArray(res.json.data)) {
+          const umiPrepis = res.json.data.some((m) => /whisper|transcribe/i.test(String((m || {}).id || "")));
+          if (umiPrepis) modes.push("transcribe");
+        }
+      } catch (err) {
+        healthy = false;
+      }
+      store.set("aiModesCache", { at: now, modes: modes, healthy: healthy, provider: provider });
+    }
   } else if (provider === "api") {
     // tarifní módy z AI služby (/v1/status), cache 60 s ať se config nezpožďuje
     if (fresh) {
@@ -2060,44 +2094,89 @@ kbRoute("GET", "/config", (e) => {
 });
 
 // AI poradce — proxy na n8n kontrakt (modes: questions/generate/expand/chat/from_text/transcribe)
-// 3 polohy: none (vypnuto) | api (killBottleneck API Richarda) | custom (vlastní endpoint zákazníka)
+// polohy: none (vypnuto) | api (killBottleneck API) | custom (vlastní endpoint)
+//         | ollama (vlastní Ollama) | openai (OpenAI-kompatibilní rozhraní)
 kbRoute("POST", "/advisor", (e) => {
   const { aiConfig } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const cfg = aiConfig($app);
   const provider = cfg.provider;
-  if (provider !== "api" && provider !== "custom" && provider !== "ollama") {
+  if (!["api", "custom", "ollama", "openai"].includes(provider)) {
     return e.json(503, { error: t(L, "err.aiDisabled") });
   }
 
   const body = e.requestInfo().body || {};
-  // jazyk uživatele → do payloadu; lokální model (ollama.js), cloud/n8n advisor
+  // jazyk uživatele → do payloadu; vlastní model (advisor.js), cloud/n8n advisor
   // i přepis zvuku (Whisper language na bráně) podle něj volí jazyk. Vždy
   // PŘEPÍŠEME serverovým userLang (∈ cs/en) — klient nesmí podvrhnout
   // libovolný lang do payloadu na gateway.
   body.lang = L;
 
-  // lokální model: killBottleneck si prompty i parsování řeší sám (pb_hooks/ollama.js)
-  if (provider === "ollama") {
+  // ⚠️ BRZDA. U provideru openai je každé volání PENÍZE ZÁKAZNÍKA (u ollamy jen
+  // vlastní GPU čas, u api hlídá kvótu brána). Bez stropu by kterýkoli člen —
+  // nebo unesený účet — vypálil kredit ve smyčce. Fixní hodinové okno ve
+  // sdíleném store, stejný levný vzor jako brzda u registrace a u sumářů.
+  // Schválně JEN pro openai: stávajícím instancím se nesmí nic změnit pod rukama.
+  if (provider === "openai") {
+    const { env } = require(`${__hooks}/helpers.js`);
+    const jePrepis = body.mode === "transcribe";
+    // přepis je dražší a nikdo ho nepotřebuje desetkrát za minutu → vlastní strop
+    const strop = parseInt(env(jePrepis ? "AI_MAX_TRANSCRIBE_PER_HOUR" : "AI_MAX_PER_HOUR"), 10);
+    const limit = strop > 0 ? strop : (jePrepis ? 20 : 60);
+    const store = $app.store();
+    const okno = Math.floor(Date.now() / 3600000);
+    const klic = "airl:" + (jePrepis ? "t:" : "c:") + e.auth.id;
+    const drive = String(store.get(klic) || "").split(":");
+    const pouzito = Number(drive[0]) === okno ? Number(drive[1]) || 0 : 0;
+    if (pouzito >= limit) {
+      return e.json(429, { error: t(L, "err.aiRateLimited", { limit: limit }), code: "ai_rate" });
+    }
+    store.set(klic, okno + ":" + (pouzito + 1));
+  }
+
+  // vlastní model (Ollama i OpenAI-kompatibilní rozhraní): killBottleneck si
+  // prompty i parsování řeší sám (pb_hooks/advisor.js), doprava je v llm.js
+  if (provider === "ollama" || provider === "openai") {
     if (body.mode === "transcribe") {
       const turl = cfg.transcribeUrl;
-      if (!turl) return e.json(503, { error: t(L, "err.transcribeNotConfigured") });
-      try {
-        const tres = $http.send({
-          url: turl, method: "POST", body: JSON.stringify(body),
-          headers: { "Content-Type": "application/json" }, timeout: 300,
-        });
-        return e.json(tres.statusCode, tres.json);
-      } catch (err) {
-        return e.json(502, { error: t(L, "err.transcribeUnavailable") });
+      // Vlastní adresa přepisu má PŘEDNOST i u openai: kdo si ji nastavil
+      // (whisper na vlastním železe), tomu se nesmí cesta změnit pod rukama.
+      if (turl) {
+        try {
+          const tres = $http.send({
+            url: turl, method: "POST", body: JSON.stringify(body),
+            headers: { "Content-Type": "application/json" }, timeout: 300,
+          });
+          return e.json(tres.statusCode, tres.json);
+        } catch (err) {
+          return e.json(502, { error: t(L, "err.transcribeUnavailable") });
+        }
       }
+      // OpenAI-kompatibilní služby přepis umí samy (multipart /audio/transcriptions),
+      // takže bez zvlášť nastavené adresy jde diktování rovnou tam.
+      if (provider === "openai") {
+        try {
+          const { llmTranscribe } = require(`${__hooks}/llm.js`);
+          return e.json(200, llmTranscribe({
+            url: cfg.url, token: cfg.token, transcribeModel: cfg.transcribeModel,
+          }, body, L));
+        } catch (err) {
+          return e.json(502, { error: t(L, "err.aiFailed", { msg: (err && err.message ? err.message : err) }) });
+        }
+      }
+      return e.json(503, { error: t(L, "err.transcribeNotConfigured") });
     }
     try {
-      const { ollamaAdvisor } = require(`${__hooks}/ollama.js`);
-      return e.json(200, ollamaAdvisor(body, { url: cfg.url, model: cfg.model }));
+      const { advisorRun } = require(`${__hooks}/advisor.js`);
+      return e.json(200, advisorRun(body, {
+        provider: provider, url: cfg.url, model: cfg.model, token: cfg.token,
+        // podrobnost cizí chyby jen adminovi — může nést i materiál klíče
+        podrobneChyby: e.auth.getString("role") === "admin",
+      }));
     } catch (err) {
-      return e.json(502, { error: t(L, "err.localModel", { msg: (err && err.message ? err.message : err) }) });
+      const klic = provider === "openai" ? "err.aiFailed" : "err.localModel";
+      return e.json(502, { error: t(L, klic, { msg: (err && err.message ? err.message : err) }) });
     }
   }
 
@@ -2540,6 +2619,7 @@ kbRoute("GET", "/ai-settings", (e) => {
     url: cfg.url,
     model: cfg.model,
     transcribe_url: cfg.transcribeUrl,
+    transcribe_model: cfg.transcribeModel,
     token_set: !!cfg.token,
     source: cfg.source,
   });
@@ -2553,7 +2633,7 @@ kbRoute("POST", "/ai-settings", (e) => {
   }
   const info = e.requestInfo().body || {};
   const provider = String(info.provider || "none").toLowerCase();
-  if (!["none", "ollama", "api", "custom"].includes(provider)) {
+  if (!["none", "ollama", "api", "custom", "openai"].includes(provider)) {
     return e.json(400, { error: t(L, "err.unknownProvider") });
   }
   // Uloženou adresu volá i cron sumářů a generování map — kdyby prošla privátní,
@@ -2576,6 +2656,7 @@ kbRoute("POST", "/ai-settings", (e) => {
   rec.set("url", String(info.url || "").trim());
   rec.set("model", String(info.model || "").trim());
   rec.set("transcribe_url", String(info.transcribe_url || "").trim());
+  rec.set("transcribe_model", String(info.transcribe_model || "").trim());
   // token: prázdný v požadavku = ponechat stávající (admin ho nemusí přepisovat)
   if (info.clear_token) {
     rec.set("token", "");
@@ -2767,6 +2848,43 @@ kbRoute("POST", "/ai-test", (e) => {
         return e.json(200, { ok: false, message: t(L, "err.ollamaModelNotFound", { model: model, list: (models.join(", ") || (L === "en" ? "none" : "žádný")) }) });
       }
       return e.json(200, { ok: true, message: model ? t(L, "err.ollamaOkModel", { model: model }) : t(L, "err.ollamaOkNoModel") });
+    }
+    if (provider === "openai") {
+      const { openaiBase } = require(`${__hooks}/llm.js`);
+      const base = openaiBase(url);
+      const res = $http.send({
+        url: base + "/models", method: "GET",
+        headers: { "Authorization": "Bearer " + token }, timeout: 8,
+      });
+      if (res.statusCode === 401 || res.statusCode === 403) {
+        return e.json(200, { ok: false, message: t(L, "err.serviceInvalidToken") });
+      }
+      // Bez názvu modelu nemá smysl hlásit úspěch ANI JEDNOU cestou — dřív
+      // fallback větev vracela zelenou s prázdným modelem (nález panelu 20. 8.)
+      if (!model) return e.json(200, { ok: false, message: t(L, "err.openaiModelMissing") });
+      // Ne každá OpenAI-kompatibilní brána seznam modelů vůbec má. Když ho
+      // nemá, není to důkaz nefunkčnosti — zeptáme se nejmenším možným
+      // dotazem na chat, protože ten produkt reálně používá.
+      if (res.statusCode !== 200 || !res.json) {
+        const zk = $http.send({
+          url: base + "/chat/completions", method: "POST",
+          body: JSON.stringify({ model: model, messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          timeout: 15,
+        });
+        if (zk.statusCode === 401 || zk.statusCode === 403) {
+          return e.json(200, { ok: false, message: t(L, "err.serviceInvalidToken") });
+        }
+        if (zk.statusCode < 200 || zk.statusCode >= 300) {
+          return e.json(200, { ok: false, message: t(L, "err.serviceHttp", { status: zk.statusCode }) });
+        }
+        return e.json(200, { ok: true, message: t(L, "err.openaiOkModel", { model: model || "?" }) });
+      }
+      const ids = (res.json.data || []).map((m) => String(m.id || ""));
+      if (ids.length && ids.indexOf(model) === -1) {
+        return e.json(200, { ok: false, message: t(L, "err.openaiModelNotFound", { model: model, count: ids.length }) });
+      }
+      return e.json(200, { ok: true, message: t(L, "err.openaiOkModel", { model: model }) });
     }
     if (provider === "api") {
       const base = url.replace(/\/v1\/advisor\/?$/, "").replace(/\/+$/, "");

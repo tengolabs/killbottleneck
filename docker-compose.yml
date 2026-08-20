@@ -17,7 +17,7 @@ services:
         # Instance version. Without it the value stays "dev" and the update check
         # is not offered — exactly what we want for work in progress. Real number:
         #   ./nasadit-staging.sh  (razítko + build + kontrola verze — NEpouštět compose ručně)
-        KB_VERSION: ${KB_VERSION:-v0.39-beta}
+        KB_VERSION: ${KB_VERSION:-v0.40-beta}
     container_name: killbottleneck
     ports:
       - "${KB_PORT:-${FLOWMAP_PORT:-8090}}:8090"
@@ -73,12 +73,19 @@ services:
       KB_NOTIFY_COALESCE_MIN: ${KB_NOTIFY_COALESCE_MIN:-${FLOWMAP_NOTIFY_COALESCE_MIN:-10}}
       # Create the sample map for every new user? 0 = start with an empty account.
       KB_UVODNI_MAPA: ${KB_UVODNI_MAPA:-${FLOWMAP_UVODNI_MAPA:-1}}
-      # AI switch: none = no AI | api = remote AI service (URL + token) | ollama = your own local model | custom = your own endpoint
+      # AI switch: none = no AI | openai = any OpenAI-compatible API (OpenAI,
+      # OpenRouter, Groq, vLLM, LM Studio...) | ollama = your own local model
+      # | api = remote AI service (URL + token) | custom = your own endpoint
       KB_AI_PROVIDER: ${KB_AI_PROVIDER:-${FLOWMAP_AI_PROVIDER:-none}}
       KB_AI_URL: ${KB_AI_URL:-${FLOWMAP_AI_URL:-}}
       KB_AI_TOKEN: ${KB_AI_TOKEN:-${FLOWMAP_AI_TOKEN:-}}
       KB_AI_MODEL: ${KB_AI_MODEL:-${FLOWMAP_AI_MODEL:-}}
       KB_AI_TRANSCRIBE_URL: ${KB_AI_TRANSCRIBE_URL:-${FLOWMAP_AI_TRANSCRIBE_URL:-}}
+      # provider=openai only: transcription model (default whisper-1)
+      KB_AI_TRANSCRIBE_MODEL: ${KB_AI_TRANSCRIBE_MODEL:-${FLOWMAP_AI_TRANSCRIBE_MODEL:-}}
+      # provider=openai only: cap of AI operations per person per hour (money!)
+      KB_AI_MAX_PER_HOUR: ${KB_AI_MAX_PER_HOUR:-${FLOWMAP_AI_MAX_PER_HOUR:-60}}
+      KB_AI_MAX_TRANSCRIBE_PER_HOUR: ${KB_AI_MAX_TRANSCRIBE_PER_HOUR:-${FLOWMAP_AI_MAX_TRANSCRIBE_PER_HOUR:-20}}
       # Daily AI summaries (dashboard on /tasks): hour of morning generation
       # (0–23, local TZ, default 6) plus an optional dedicated model JUST for
       # summaries — when KB_SUMMARY_PROVIDER is set, summaries bypass the general

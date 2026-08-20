@@ -1,41 +1,21 @@
-// Provider „ollama" — killBottleneck mluví přímo s lokálním modelem (Ollama /api/chat),
-// bez externí AI služby. Drží stejný kontrakt odpovědí jako killBottleneck AI služba:
+// Prompty a kontrakt AI poradce — killBottleneck si tady řídí, CO se modelu
+// řekne a JAK se přečte odpověď. Jak se model zavolá (Ollama vs. OpenAI-kompatibilní
+// rozhraní) řeší llm.js; tenhle soubor o dopravě nic neví, proto stačí jedna sada
+// promptů pro všechna rozhraní.
 //   questions → {questions:[..]} · generate/from_text → {nodes:[{id,title,description,parentId}]}
 //   expand → {nodes:[{title,description}]} · chat → {reply, operations:[..]}
 // Prompty jsou vlastní (jednodušší než laděná placená služba) — poctivé „basic AI zdarma".
+// (Do v0.39 se soubor jmenoval ollama.js — jméno přestalo platit, když přibyl
+// provider openai; obsah je tentýž.)
 
-let CFG = null; // nastavuje ollamaAdvisor — konfigurace z administrace má přednost před env
+let CFG = null; // nastavuje advisorRun — konfigurace z administrace má přednost před env
 
-function callOllama(body, system, user, opts) {
-  // env() umí přechod KB_* → FLOWMAP_* (viz helpers.js); moduly se v izolovaném
-  // VM nevidí navzájem, takže se načítá uvnitř funkce jako všude jinde
-  const { env } = require(`${__hooks}/helpers.js`);
-  const base = ((CFG && CFG.url) || env("AI_URL") || "http://localhost:11434").replace(/\/+$/, "");
-  const model = (CFG && CFG.model) || env("AI_MODEL") || "gpt-oss:20b";
-  const payload = {
-    model: model,
-    stream: false,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-    options: { temperature: 0.7, num_predict: (opts && opts.numPredict) || 4000 },
-  };
-  if (opts && opts.json) payload.format = "json";
-  if (opts && opts.think !== undefined) payload.think = opts.think;
-  const res = $http.send({
-    url: base + "/api/chat",
-    method: "POST",
-    body: JSON.stringify(payload),
-    headers: { "Content-Type": "application/json" },
-    timeout: 300,
-  });
-  if (res.statusCode < 200 || res.statusCode >= 300) {
-    throw new Error("Ollama vrátila HTTP " + res.statusCode + " (model " + model + ")");
-  }
-  const content = res.json && res.json.message && res.json.message.content;
-  if (!content) throw new Error(errMsg(body && body.lang === "en" ? "en" : "cs", "emptyReply"));
-  return content;
+function callModel(body, system, user, opts) {
+  const { llmChat } = require(`${__hooks}/llm.js`);
+  const o = opts || {};
+  // jazyk chybových hlášek: z požadavku, u sumářů (body = null) z opts
+  if (!o.lang) o.lang = body && body.lang === "en" ? "en" : "cs";
+  return llmChat(CFG, system, user, o);
 }
 
 function parseJson(content) {
@@ -62,7 +42,6 @@ function langOf(body) { return body && body.lang === "en" ? "en" : "cs"; }
 function projectWord(lang) { return lang === "en" ? "project" : "projekt"; }
 
 const ERR = {
-  emptyReply: { cs: "model vrátil prázdnou odpověď", en: "model returned an empty response" },
   noQuestions: { cs: "model nevrátil otázky", en: "model returned no questions" },
   noNodes: { cs: "model nevrátil uzly", en: "model returned no nodes" },
   noNode: { cs: "model nevrátil uzel", en: "model returned no node" },
@@ -172,7 +151,7 @@ const P = {
 function modeQuestions(body) {
   const lang = langOf(body); const p = P[lang];
   const goal = body.goal || "";
-  const out = parseJson(callOllama(body, p.sysCoach,
+  const out = parseJson(callModel(body, p.sysCoach,
     p.questions(goal, projectWord(lang)),
     { json: true, numPredict: 800 }
   ));
@@ -196,7 +175,7 @@ function modeGenerate(body) {
   const count = scopeCount(body.scope);
   const answers = Array.isArray(body.answers) && body.answers.filter(Boolean).length
     ? p.answersPrefix(body.answers.filter(Boolean).join(" | ")) : "";
-  const out = parseJson(callOllama(body, p.sysPlanner,
+  const out = parseJson(callModel(body, p.sysPlanner,
     p.nodesPrompt(body.goal || "", projectWord(lang), count, answers),
     { json: true }
   ));
@@ -206,7 +185,7 @@ function modeGenerate(body) {
 function modeFromText(body) {
   const lang = langOf(body); const p = P[lang];
   const count = scopeCount(body.scope);
-  const out = parseJson(callOllama(body, p.sysFromText,
+  const out = parseJson(callModel(body, p.sysFromText,
     p.fromText(String(body.text || "").slice(0, 8000),
       p.nodesPrompt(p.fromTextGoal, projectWord(lang), count, "")),
     { json: true }
@@ -219,7 +198,7 @@ function modeExpand(body) {
   const node = body.node || {};
   const action = body.action || "subgoals";
   if (action === "rewrite") {
-    const out = parseJson(callOllama(body, p.sysEditor,
+    const out = parseJson(callModel(body, p.sysEditor,
       p.rewrite(body.goal || "", node.title || "", node.description || ""),
       { json: true, numPredict: 600 }
     ));
@@ -229,7 +208,7 @@ function modeExpand(body) {
   const what = p.expandActions[action] || p.expandActions.subgoals;
   const count = Number(body.count) || 3;
   const path = Array.isArray(body.path) && body.path.length ? p.pathLabel(body.path.join(" → ")) : "";
-  const out = parseJson(callOllama(body, p.sysPlanner,
+  const out = parseJson(callModel(body, p.sysPlanner,
     p.expand(body.goal || "", path, node.title || "", node.description || p.noDesc, count, what),
     { json: true, numPredict: 1500 }
   ));
@@ -245,7 +224,7 @@ function modeChat(body) {
   const compact = (map.nodes || []).map((n) => ({
     id: n.id, title: n.title, status: n.status, parentId: n.parentId || null,
   }));
-  const out = parseJson(callOllama(body, p.sysMapAssistant,
+  const out = parseJson(callModel(body, p.sysMapAssistant,
     p.chat(JSON.stringify(compact).slice(0, 12000), String(body.message || "").slice(0, 2000)),
     { json: true }
   ));
@@ -257,12 +236,15 @@ function modeChat(body) {
 
 // Prostý textový chat bez JSON kontraktu — pro denní sumáře (cron / refresh
 // routa), kde je výstupem odstavec textu, ne struktura.
-function ollamaText(system, user, cfg, opts) {
+function advisorText(system, user, cfg, opts) {
   CFG = cfg || null;
-  return callOllama(null, system, user, { numPredict: (opts && opts.numPredict) || 700 });
+  return callModel(null, system, user, {
+    numPredict: (opts && opts.numPredict) || 700,
+    lang: opts && opts.lang === "en" ? "en" : "cs",
+  });
 }
 
-function ollamaAdvisor(body, cfg) {
+function advisorRun(body, cfg) {
   CFG = cfg || null;
   const mode = String(body.mode || "").toLowerCase();
   switch (mode) {
@@ -276,4 +258,4 @@ function ollamaAdvisor(body, cfg) {
   }
 }
 
-module.exports = { ollamaAdvisor, ollamaText };
+module.exports = { advisorRun, advisorText };

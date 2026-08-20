@@ -109,6 +109,11 @@ More in the [Simplified view guide](https://killbottleneck.com/features/lite-vie
 The AI advisor (draft a map from a goal, expand branches, chat about a map, AI project summary,
 suggest tasks from a goal, a map from text/voice) is switched on in `.env` via `KB_AI_PROVIDER`:
 
+- `openai` — **any OpenAI-compatible API**: OpenAI, OpenRouter, Groq, Mistral, Together,
+  or your own vLLM / LM Studio / llama.cpp / liteLLM proxy. Set
+  `KB_AI_URL=https://openrouter.ai/api/v1` (the base address, usually ending in `/v1`),
+  `KB_AI_TOKEN=<your API key>` and `KB_AI_MODEL=<exact model name>`. Dictation works
+  through the same service; your provider bills you for the requests.
 - `api` — a remote AI service compatible with the killBottleneck API contract: enter the
   address and token you got from your provider. No GPU of your own and no maintenance.
 - `ollama` — **your own local model**: install [Ollama](https://ollama.com), pull a model
@@ -116,7 +121,8 @@ suggest tasks from a goal, a map from text/voice) is switched on in `.env` via `
   `KB_AI_URL=http://IP:11434` + `KB_AI_MODEL=gpt-oss:20b`.
   Everything runs on your side, no data leaves your network. (Basic prompts; voice
   transcription is not included.)
-- `custom` — your own endpoint honouring the same API contract.
+- `custom` — your own endpoint honouring the same API contract
+  ([the contract is written down here](https://killbottleneck.com/reference/custom-ai-endpoint)).
 
 When AI is used, map data is sent to the endpoint you chose; with `none` (the default) nothing
 ever leaves your server.

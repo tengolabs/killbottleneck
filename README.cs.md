@@ -104,13 +104,19 @@ Víc v [návodu ke zjednodušenému zobrazení](https://killbottleneck.cz/funkce
 AI poradce (návrh mapy z cíle, rozšíření větví, chat nad mapou, AI souhrn projektu,
 návrh úkolů z uzlu, mapa z textu/hlasu) se aktivuje v `.env` — `KB_AI_PROVIDER`:
 
+- `openai` — **jakékoli OpenAI-kompatibilní API**: OpenAI, OpenRouter, Groq, Mistral,
+  Together nebo vaše vlastní vLLM / LM Studio / llama.cpp / liteLLM proxy. Nastavíte
+  `KB_AI_URL=https://openrouter.ai/api/v1` (základní adresa, obvykle končí `/v1`),
+  `KB_AI_TOKEN=<váš klíč>` a `KB_AI_MODEL=<přesný název modelu>`. Diktování jde přes
+  tutéž službu; dotazy vám účtuje váš poskytovatel.
 - `api` — vzdálená AI služba kompatibilní s killBottleneck API kontraktem: vložíte
   adresu a token od svého poskytovatele. Bez vlastního GPU a údržby.
 - `ollama` — **vlastní lokální model**: nainstalujte [Ollama](https://ollama.com),
   stáhněte model (`ollama pull gpt-oss:20b`) a nastavte
   `KB_AI_URL=http://IP:11434` + `KB_AI_MODEL=gpt-oss:20b`.
   Vše běží u vás, data neopouští síť. (Základní prompty; přepis hlasu není součástí.)
-- `custom` — vlastní endpoint se stejným API kontraktem.
+- `custom` — vlastní endpoint se stejným API kontraktem
+  ([kontrakt je sepsaný tady](https://killbottleneck.cz/reference/vlastni-ai-rozhrani)).
 
 Data map se při použití AI odesílají na zvolený endpoint; s `none` (výchozí)
 neopouští váš server nikdy nic.

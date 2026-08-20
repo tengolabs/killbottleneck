@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.40-beta": {
+    cs: [
+      "AI se dá připojit klíčem od OpenAI, OpenRouteru, Groqu a dalších.",
+      "Stačí adresa, klíč a název modelu — tlačítko Otestovat připojení hned řekne, jestli to sedí.",
+      "Diktování jde přes tutéž službu, nemusíte nastavovat nic navíc.",
+      "Když model spotřebuje limit na přemýšlení a nic nenapíše, dozvíte se to.",
+      "Vlastní AI rozhraní má konečně sepsaný kontrakt v dokumentaci.",
+    ],
+    en: [
+      "AI can now be connected with a key from OpenAI, OpenRouter, Groq and others.",
+      "An address, a key and a model name — Test connection tells you at once if it fits.",
+      "Dictation goes through the same service, with nothing extra to set up.",
+      "If a model spends its budget on thinking and writes nothing, you get told.",
+      "The custom AI endpoint contract is finally written down in the docs.",
+    ],
+  },
   "v0.39-beta": {
     cs: [
       "Každý cíl má Životopis — kdo kdy co udělal, včetně času.",

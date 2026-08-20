@@ -466,6 +466,9 @@ const STRINGS = {
     en: "The transcription service is unavailable.",
   },
   "err.localModel": { cs: "Lokální model: {msg}", en: "Local model: {msg}" },
+  // provider=openai: „lokální model" by lhalo (běží u poskytovatele), a u přepisu
+  // je to navíc služba, ne model — proto neutrální předpona
+  "err.aiFailed": { cs: "AI služba: {msg}", en: "AI service: {msg}" },
   "err.missingAiUrl": {
     cs: "Chybí konfigurace FLOWMAP_AI_URL.",
     en: "Missing FLOWMAP_AI_URL configuration.",
@@ -713,6 +716,22 @@ const STRINGS = {
   "err.ollamaOkNoModel": {
     cs: "Ollama běží. Doplňte název modelu.",
     en: "Ollama is running. Add the model name.",
+  },
+  "err.aiRateLimited": {
+    cs: "Vyčerpali jste hodinový strop AI operací ({limit}). Zkuste to za chvíli — strop chrání kredit u vašeho poskytovatele.",
+    en: "You have used up the hourly cap of AI operations ({limit}). Try again shortly — the cap protects your provider credit.",
+  },
+  "err.openaiModelMissing": {
+    cs: "Služba odpovídá a klíč platí. Doplňte název modelu (např. gpt-4o-mini nebo openai/gpt-4o-mini).",
+    en: "The service responds and the key is valid. Add the model name (e.g. gpt-4o-mini or openai/gpt-4o-mini).",
+  },
+  "err.openaiModelNotFound": {
+    cs: "Klíč platí, ale model „{model}“ není mezi {count} nabízenými. Zkontrolujte přesný název u poskytovatele.",
+    en: "The key is valid, but model “{model}” is not among the {count} offered. Check the exact name with your provider.",
+  },
+  "err.openaiOkModel": {
+    cs: "Připojeno. Model „{model}“ je k dispozici.",
+    en: "Connected. Model “{model}” is available.",
   },
   "err.serviceInvalidToken": {
     cs: "Služba běží, ale token je neplatný.",
