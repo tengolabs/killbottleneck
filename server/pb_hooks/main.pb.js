@@ -874,6 +874,20 @@ onRecordUpdateRequest((e) => {
   // panelu 27. 7. 2026. Přesun mezi projekty by chtěl vlastní routu s kontrolou
   // práv k CÍLOVÉ mapě; do té doby se prostě nepřesouvá.
   e.record.set("map", orig.getString("map"));
+  // ⚠️ BEZPEČNOST: PŘESUN NA JINÝ UZEL smí jen ZADAVATEL (owner) nebo vlastník
+  // projektu — stejný okruh jako u termínu výš. Od chvíle, kdy „právo plyne
+  // z práce" (20. 8. 2026), je `node_id` AUTORIZAČNÍ pole: /node-status podle
+  // něj pouští změnu stavu uzlu. Řešitel si tudy jinak přepsal svůj úkol na
+  // CIZÍ krok (updateRule ho pouští na všechna pole, `assertTaskNode` přesun
+  // mezi existujícími uzly povoluje) a získal právo přepnout cizí krok —
+  // změřeno panelem 20. 8. 2026, a fungovalo to i PŘED touhle vlnou (tehdy
+  // úrovni „spolupracovník"). Vrací se tiše, stejně jako `map` a `owner` výš.
+  const smiPresunout = e.hasSuperuserAuth()
+    || (e.auth && (e.auth.id === orig.getString("owner") || userOwnsTaskMap(e.app, orig, e.auth.id)));
+  if (!smiPresunout) e.record.set("node_id", orig.getString("node_id"));
+  // Řešitele taky nepředává řešitel: `assignee_email` rozhoduje o právu ke kroku
+  // a jeho změna posílá notifikaci jménem měnícího. Zadavatel a vlastník ano.
+  if (!smiPresunout) e.record.set("assignee_email", orig.getString("assignee_email"));
   // Úkol drží KONKRÉTNÍ EXISTUJÍCÍ uzel i při každé úpravě — žádné odpojení,
   // žádný vrchol, žádné výjimky pro stará data (Richard 13. 8.: „prostě to
   // nepůjde"; existující hříšníky přesouvá migrace 1786640000). Jediné, co se
@@ -2259,7 +2273,7 @@ kbRoute("POST", "/advisor", (e) => {
 // Každá mutující akce vrací `updated`, aby si editor posunul base_updated
 // a další autosave nespadl na falešný 409 (routa ukládá mimo request hook).
 kbRoute("POST", "/share", (e) => {
-  const { jsonList, syncShares, notify } = require(`${__hooks}/helpers.js`);
+  const { jsonList, jsonVal, syncShares, notify, mapShareAdminAccess } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const info = e.requestInfo().body || {};
@@ -2272,31 +2286,76 @@ kbRoute("POST", "/share", (e) => {
   } catch (err) {
     return e.json(404, { error: t(L, "err.mapNotFound") });
   }
-  if (map.getString("owner") !== e.auth.id) {
+  // Adresné sdílení spravuje vlastník NEBO jmenovaný spolusprávce („Upravovat"
+  // z map_shares, ne z team_access) — rozhodnutí Richarda 20. 8. 2026.
+  const isOwner = map.getString("owner") === e.auth.id;
+  if (!mapShareAdminAccess($app, map, e.auth)) {
     return e.json(403, { error: t(L, "err.onlyOwnerCanShare") });
   }
-  // ⚠️ ORG MAPA se tudy nesdílí ani nezveřejňuje — ani vlastníkem. Sdílení
-  // struktury srovnává výhradně /org-map a users hook podle práv; ruční zásah
-  // by je rozešel. A `toggle_public` by z organigramu firmy udělal veřejnou
-  // stránku (nález panelu 17. 8.: vlastník ho zveřejnil i po odebrání příznaku).
-  if (map.getString("kind") === "org" && e.auth.getString("role") !== "admin") {
-    return e.json(403, { error: t(L, "err.orgAdminOnly") });
+  // Plošná/veřejná expozice (týmový přístup, zveřejnění) zůstává vlastníkovi —
+  // spolusprávce spravuje jen jmenovitý seznam.
+  if (!isOwner && (action === "set_team_access" || action === "toggle_public")) {
+    return e.json(403, { error: t(L, "err.teamPublicOwnerOnly") });
+  }
+  // Řádek sdílení pro vlastníka nesmí vzniknout ani se měnit — vlastník má plný
+  // přístup mimo seznam. Dřív to hlídalo owner-only pravidlo samo sebou.
+  // ⚠️ Cílový e-mail se čte PODLE AKCE (share→email, update/unshare→memberEmail)
+  // — společné `email || memberEmail` šlo obejít přibalením nevyužitého pole
+  // (nález panelu 21. 8.).
+  let ownerEmail = "";
+  try { ownerEmail = $app.findRecordById("users", map.getString("owner")).getString("email").toLowerCase(); } catch (err) { /* bez účtu */ }
+  const targetEmail = String((action === "share" ? info.email : info.memberEmail) || "").trim().toLowerCase();
+  if (ownerEmail && targetEmail && targetEmail === ownerEmail) {
+    return e.json(400, { error: t(L, "err.cannotShareWithOwner") });
+  }
+  // ⚠️ ORG MAPA se tudy nesdílí ani nezveřejňuje — smí na ni JEN VLASTNÍK
+  // (a ten musí být admin). Sdílení struktury srovnává výhradně /org-map a
+  // users hook podle práv; ruční zásah by je rozešel. A `toggle_public` by
+  // z organigramu udělal veřejnou stránku (nález panelu 17. 8.). Vlastníkovský
+  // zámek tu MUSÍ být zvlášť: org sync dává adminům edit řádky v map_shares,
+  // takže by admin-nevlastník jinak prošel spolusprávcovským gatem
+  // (nález panelu 21. 8.).
+  if (map.getString("kind") === "org") {
+    if (!isOwner) return e.json(403, { error: t(L, "err.orgAdminOnly") });
+    if (e.auth.getString("role") !== "admin") {
+      return e.json(403, { error: t(L, "err.orgAdminOnly") });
+    }
   }
   const sharedWith = jsonList(map, "shared_with");
   const sharedWithEdit = jsonList(map, "shared_with_edit");
   const sharedWithWork = jsonList(map, "shared_with_work");
+  // Porovnání e-mailů case-insensitive: `share` zapisuje lowercase, ale org
+  // sync a /org-map berou adresy z users tak, jak jsou uložené — přesná shoda
+  // by mixed-case řádek tiše NEODEBRALA a vrátila success (nález panelu 21. 8.).
+  const eqi = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+  const maILc = (list, emailVal) => list.some((x) => eqi(x, emailVal));
   // tři úrovně: read < work (spolupracovník — jen vlastní úkoly) < edit
-  const permOf = (emailVal) => (sharedWithEdit.includes(emailVal) ? "edit" : (sharedWithWork.includes(emailVal) ? "work" : "read"));
+  const permOf = (emailVal) => (maILc(sharedWithEdit, emailVal) ? "edit" : (maILc(sharedWithWork, emailVal) ? "work" : "read"));
   const setPermLists = (emailVal, perm) => {
     map.set("shared_with_edit", perm === "edit"
-      ? sharedWithEdit.filter((x) => x !== emailVal).concat([emailVal])
-      : sharedWithEdit.filter((x) => x !== emailVal));
+      ? sharedWithEdit.filter((x) => !eqi(x, emailVal)).concat([emailVal])
+      : sharedWithEdit.filter((x) => !eqi(x, emailVal)));
     map.set("shared_with_work", perm === "work"
-      ? sharedWithWork.filter((x) => x !== emailVal).concat([emailVal])
-      : sharedWithWork.filter((x) => x !== emailVal));
+      ? sharedWithWork.filter((x) => !eqi(x, emailVal)).concat([emailVal])
+      : sharedWithWork.filter((x) => !eqi(x, emailVal)));
   };
 
   if (action === "list") {
+    // `has_work`: člen má na mapě SVOU práci (garant uzlu / řešitel legacy
+    // úkolu) — tedy i s úrovní „Číst" si svůj krok odškrtne (právo z práce,
+    // /node-status). Bez příznaku seznam říkal míň, než je pravda (Richard 20. 8.).
+    const workEmails = {};
+    jsonVal(map, "nodes", []).forEach((n) => {
+      if (!n || n.type === "note") return;
+      const g = String(((n.data || {}).owner) || "").trim().toLowerCase();
+      if (g) workEmails[g] = true;
+    });
+    try {
+      $app.findRecordsByFilter("tasks", "map = {:m}", "", 0, 0, { m: map.id }).forEach((r) => {
+        const a = r.getString("assignee_email").trim().toLowerCase();
+        if (a) workEmails[a] = true;
+      });
+    } catch (err) { /* legacy úkoly nemusí existovat */ }
     const members = sharedWith.map((emailVal) => {
       let fullName = null;
       try {
@@ -2307,9 +2366,26 @@ kbRoute("POST", "/share", (e) => {
         email: emailVal,
         full_name: fullName,
         permission: permOf(emailVal),
+        has_work: !!workEmails[String(emailVal).toLowerCase()],
       };
     });
-    return e.json(200, { members: members, is_public: map.getBool("is_public"), team_access: map.getString("team_access") });
+    // U TÝMOVÉ mapy (team_access) mají přístup i lidé BEZ řádku v seznamu —
+    // a když na mapě mají svou práci, seznam o nich mlčel (Richard 21. 8.:
+    // sekce „mají tu práci přes týmový přístup"). Jen registrovaní členové
+    // instance; externí kontakty (pseudo-e-maily) sem nepatří — nejsou tým.
+    const teamWorkers = [];
+    if (map.getString("team_access") !== "") {
+      const { isExternalOwner } = require(`${__hooks}/helpers.js`);
+      Object.keys(workEmails).forEach((w) => {
+        if (isExternalOwner(w) || (ownerEmail && w === ownerEmail) || maILc(sharedWith, w)) return;
+        try {
+          const u = $app.findFirstRecordByFilter("users", "email = {:email}", { email: w });
+          teamWorkers.push({ email: u.getString("email"), full_name: u.getString("full_name") || null });
+        } catch (err) { /* není člen instance — ručně vepsaný e-mail bez účtu */ }
+      });
+      teamWorkers.sort((a, b) => a.email.localeCompare(b.email));
+    }
+    return e.json(200, { members: members, team_workers: teamWorkers, is_public: map.getBool("is_public"), team_access: map.getString("team_access") });
   }
 
   if (action === "set_team_access") {
@@ -2333,10 +2409,53 @@ kbRoute("POST", "/share", (e) => {
     if (email === e.auth.email().toLowerCase()) {
       return e.json(400, { error: t(L, "err.cannotShareWithSelf") });
     }
-    if (sharedWith.includes(email)) {
-      return e.json(400, { error: t(L, "err.alreadyShared") });
-    }
     const perm = ["edit", "work"].includes(info.permission) ? info.permission : "read";
+    // Už nasdílený e-mail: POVÝŠIT, ne odmítnout (Richard 20. 8. 2026). Přisdílení
+    // při zadání úkolu posílá „work"; když adresát mapu už viděl KE ČTENÍ, skončilo
+    // hláškou „už je sdílena" a zadavateli nikdo neřekl, že člověk sice úkol dostal,
+    // ale nemá ho jak dokončit. Povyšuje se výhradně NAHORU (read → work → edit);
+    // snížení dál patří do dialogu sdílení („update_permission"), aby se omylem
+    // nesebrala práva editorovi, kterému někdo zadá úkol.
+    // `quiet`: přisdílení/povýšení v rámci ZADÁNÍ PRÁCE — adresátovi hned nato
+    // přijde souhrnná notifikace o přidělené práci (notifyAssignedFromNodes),
+    // druhá o sdílení by byla duplikát (Richard 21. 8.: „nesmí chodit 2
+    // notifikace"). Jen doručení — autorizace se flagem nemění.
+    const quiet = !!info.quiet;
+    const RANK = { read: 0, work: 1, edit: 2 };
+    if (maILc(sharedWith, email)) {
+      if (RANK[perm] <= RANK[permOf(email)]) {
+        return e.json(400, { error: t(L, "err.alreadyShared") });
+      }
+      setPermLists(email, perm);
+      $app.save(map);
+      syncShares($app, map);
+      let jmeno = null;
+      try {
+        jmeno = $app.findFirstRecordByFilter("users", "email = {:email}", { email: email }).getString("full_name") || null;
+      } catch (err) { /* neregistrovaný */ }
+      // Povýšení z dialogu sdílení adresáta informuje (Richard 21. 8.) —
+      // dřív mlčelo a člověk se o širším přístupu neměl jak dozvědět.
+      if (!quiet) {
+        try {
+          notify($app, {
+            email: email,
+            actorEmail: e.auth.email(),
+            type: "map_shared",
+            mapId: map.id,
+            textKey: "notify.mapShareUpgraded",
+            params: { actor: e.auth.email(), project: map.getString("title") },
+          });
+        } catch (err) {
+          try { $app.logger().warn("share: notifikace povýšení selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+        }
+      }
+      // stejný tvar `member` jako u zakládání — klient řádek jen přepíše a nesmí
+      // přitom přijít o jméno (nález panelu 20. 8. 2026)
+      return e.json(200, {
+        success: true, upgraded: true, updated: map.getString("updated"),
+        member: { email: email, full_name: jmeno, permission: perm },
+      });
+    }
     // Pozn.: Base44 posílal e-mailovou pozvánku neregistrovaným; lokální verze
     // přístup naváže na e-mail — uživatel ho získá, jakmile se s ním zaregistruje.
     map.set("shared_with", sharedWith.concat([email]));
@@ -2350,17 +2469,20 @@ kbRoute("POST", "/share", (e) => {
     } catch (err) { /* neregistrovaný */ }
     // adresát se dosud o nasdíleném projektu nedozvěděl nijak. Jen akce `share` —
     // set_team_access/update_permission jsou hromadné a jejich oznamování je šum.
-    try {
-      notify($app, {
-        email: email,
-        actorEmail: e.auth.email(),
-        type: "map_shared",
-        mapId: map.id,
-        textKey: "notify.mapShared",
-        params: { actor: e.auth.email(), project: map.getString("title") },
-      });
-    } catch (err) {
-      try { $app.logger().warn("share: notifikace sdílení selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    // `quiet` (zadání práce) mlčí — přijde souhrnná notifikace o přidělené práci.
+    if (!quiet) {
+      try {
+        notify($app, {
+          email: email,
+          actorEmail: e.auth.email(),
+          type: "map_shared",
+          mapId: map.id,
+          textKey: "notify.mapShared",
+          params: { actor: e.auth.email(), project: map.getString("title") },
+        });
+      } catch (err) {
+        try { $app.logger().warn("share: notifikace sdílení selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+      }
     }
     // `updated` vracíme, aby si editor mohl posunout base_updated a další uložení
     // mapy (owner+termín uzlu) nespadlo na 409 „mapa změněna" po tomto sdílení
@@ -2368,9 +2490,9 @@ kbRoute("POST", "/share", (e) => {
   }
 
   if (action === "update_permission") {
-    const memberEmail = info.memberEmail;
+    const memberEmail = String(info.memberEmail || "").trim().toLowerCase();
     if (!memberEmail) return e.json(400, { error: t(L, "err.emailRequired") });
-    if (!sharedWith.includes(memberEmail)) {
+    if (!maILc(sharedWith, memberEmail)) {
       return e.json(400, { error: t(L, "err.userNoAccess") });
     }
     const perm = ["edit", "work"].includes(info.permission) ? info.permission : "read";
@@ -2381,11 +2503,11 @@ kbRoute("POST", "/share", (e) => {
   }
 
   if (action === "unshare") {
-    const memberEmail = info.memberEmail;
+    const memberEmail = String(info.memberEmail || "").trim().toLowerCase();
     if (!memberEmail) return e.json(400, { error: t(L, "err.emailRequired") });
-    map.set("shared_with", sharedWith.filter((x) => x !== memberEmail));
-    map.set("shared_with_edit", sharedWithEdit.filter((x) => x !== memberEmail));
-    map.set("shared_with_work", sharedWithWork.filter((x) => x !== memberEmail));
+    map.set("shared_with", sharedWith.filter((x) => !eqi(x, memberEmail)));
+    map.set("shared_with_edit", sharedWithEdit.filter((x) => !eqi(x, memberEmail)));
+    map.set("shared_with_work", sharedWithWork.filter((x) => !eqi(x, memberEmail)));
     $app.save(map);
     syncShares($app, map);
     return e.json(200, { success: true, updated: map.getString("updated") });
@@ -2394,12 +2516,14 @@ kbRoute("POST", "/share", (e) => {
   return e.json(400, { error: t(L, "err.unknownAction") });
 }, $apis.requireAuth());
 
-// Cílená změna STAVU jednoho uzlu — jediná zapisovací cesta pro úroveň
-// „spolupracovník" (work). Záměrně NE PATCH celé mapy: work nemá edit RLS
+// Cílená změna STAVU jednoho uzlu — jediná zapisovací cesta pro každého, kdo
+// mapu needituje. Záměrně NE PATCH celé mapy: nikdo z nich nemá edit RLS
 // (edit-práva na celý JSON nodes byla zdrojem děr termínů/vrcholu) a autosave
 // read-only klienta by kolidoval s editory. Vlastník/edit smí kterýkoli uzel
-// (pohodlí z přehledů), work JEN svou práci: uzel, kde je garant (data.owner),
-// nebo má na uzlu úkol jako řešitel.
+// (pohodlí z přehledů), VŠICHNI OSTATNÍ, kdo mapu vidí (spolupracovník, čtenář,
+// týmový přístup), JEN svou práci: uzel, kde jsou garant (data.owner), nebo mají
+// na uzlu úkol jako řešitel. Kdo dostal práci, musí ji umět odškrtnout —
+// rozhodnuto Richardem 20. 8. 2026 (do té doby to uměl jen „spolupracovník").
 kbRoute("POST", "/node-status", (e) => {
   const { jsonVal, v1SaveMapData, notifyUnblockedTransitions, triggerReadyAgents } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
@@ -2423,8 +2547,21 @@ kbRoute("POST", "/node-status", (e) => {
     const row = $app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: email });
     perm = row.getString("permission");
   } catch (err) { /* nesdíleno jmenovitě */ }
-  const canEditMap = isOwner || perm === "edit" || map.getString("team_access") === "edit";
-  if (!canEditMap && perm !== "work") {
+  const teamAccess = map.getString("team_access");
+  const canEditMap = isOwner || perm === "edit" || teamAccess === "edit";
+  // ⭐ PRÁVO PLYNE Z PRÁCE (Richard 20. 8. 2026): kdo mapu VIDÍ a má na uzlu
+  // SVOU práci (garant / řešitel úkolu — kontrola `mine` níže), ten smí přepnout
+  // stav TOHO uzlu. Dřív to uměl jen „spolupracovník" (work), takže komu se mapa
+  // nasdílela KE ČTENÍ nebo ji viděl jen přes týmový přístup, dostal úkol a NEMĚL
+  // ho jak odškrtnout (403 „nemáte právo zápisu"). Doloženo reprodukcí 20. 8.:
+  // úkolový záznam odškrtnout šel, ale uzel — a tím i procento projektu — zůstal
+  // viset na „Založeno", takže práce navenek vypadala nehotově.
+  // Rozsah zápisu se NEMĚNÍ: pořád jen pole `status` jednoho uzlu touhle routou,
+  // pořád jen na vlastní práci. Kdo mapu nevidí vůbec, nemá tu co pohledávat.
+  // ⚠️ `is_public` tu ZÁMĚRNĚ NENÍ: veřejná mapa je vývěska ke čtení, ne pozvánka
+  // k zápisu pro kohokoli, komu se ve `data.owner` objeví jeho adresa.
+  const canSeeMap = canEditMap || perm !== "" || teamAccess === "read";
+  if (!canSeeMap) {
     return e.json(403, { error: t(L, "err.noWriteAccess") });
   }
   const origNodes = jsonVal(map, "nodes", []);
@@ -2489,14 +2626,29 @@ kbRoute("POST", "/deadline-requests", (e) => {
     const row = $app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: email });
     perm = row.getString("permission");
   } catch (err) { /* nesdíleno jmenovitě */ }
-  // jen úrovně se vztahem k práci: work/edit (jmenovitě), tým s editací, vlastník —
-  // čtenáři (jmenovití i org-wide) žádosti nezapisují (spam na cizí uzly z read úrovně)
+  // úrovně se vztahem k práci: work/edit (jmenovitě), tým s editací, vlastník —
+  // ti žádají kdekoli. ČTENÁŘ (jmenovitý i org-wide) navíc JEN u uzlu se SVOU
+  // prací (garant/řešitel) — právo plyne z práce (Richard 21. 8. 2026): kdo
+  // práci dostal, musí umět říct, že termín nestíhá. Cizí uzly čtenáři dál
+  // nežádají (původní spam argument platí). Veřejná mapa tudy nezapisuje.
   const hasAccess = isOwner || ["work", "edit"].includes(perm) || map.getString("team_access") === "edit";
-  if (!hasAccess) return e.json(403, { error: t(L, "err.noWriteAccess") });
+  const canSee = hasAccess || perm !== "" || map.getString("team_access") === "read";
+  if (!canSee) return e.json(403, { error: t(L, "err.noWriteAccess") });
   const origNodes = jsonVal(map, "nodes", []);
   const origEdges = jsonVal(map, "edges", []);
   const node = origNodes.find((n) => n.id === String(info.nodeId || "") && n.type !== "note");
   if (!node) return e.json(404, { error: t(L, "err.nodeNotFound") });
+  if (!hasAccess) {
+    let mine = String(((node.data || {}).owner) || "") === email;
+    if (!mine) {
+      try {
+        $app.findFirstRecordByFilter("tasks", "map = {:m} && node_id = {:n} && assignee_email = {:e}",
+          { m: map.id, n: node.id, e: email });
+        mine = true;
+      } catch (err) { /* na uzlu nemá žádný svůj úkol */ }
+    }
+    if (!mine) return e.json(403, { error: t(L, "err.deadlineRequestOwnWorkOnly") });
+  }
   const d = node.data || {};
   const assigner = d.assignedBy || map.getString("owner_email");
   const requester = d.deadlineChangeRequestedBy || "";

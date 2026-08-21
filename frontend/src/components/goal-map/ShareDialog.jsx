@@ -18,7 +18,9 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, UserPlus, Trash2, Mail, Users, Eye, Pencil, UserCheck, Globe, Copy, Check, Building2 } from 'lucide-react';
 import { serverOrigin } from '@/lib/serverUrl';
 
-export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
+// isOwner: spolusprávce (jmenované „Upravovat") spravuje jen jmenovitý seznam —
+// týmový přístup a zveřejnění vidí a mění jen vlastník (server je stejně odmítne).
+export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped }) {
   const { t } = useTranslation('editor');
   // každá mutace sdílení bumpne `updated` mapy — poslat editoru, ať si posune
   // base_updated a další autosave nespadne na falešný 409
@@ -31,6 +33,9 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
   const [newPermission, setNewPermission] = useState('read');
   const [isPublic, setIsPublic] = useState(false);
   const [teamAccess, setTeamAccess] = useState('');
+  // lidé s prací na mapě, kteří v jmenovitém seznamu nejsou (mají ji přes
+  // týmový přístup) — bez nich seznam u týmové mapy říkal míň, než je pravda
+  const [teamWorkers, setTeamWorkers] = useState([]);
   const [copied, setCopied] = useState(false);
 
   const loadMembers = useCallback(async () => {
@@ -40,6 +45,7 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
     try {
       const res = await shareMap({ action: 'list', mapId });
       setMembers(res.data.members || []);
+      setTeamWorkers(res.data.team_workers || []);
       setIsPublic(res.data.is_public || false);
       setTeamAccess(res.data.team_access || '');
     } catch (e) {
@@ -69,7 +75,14 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
         setError(res.data.error);
       } else {
         bump(res);
-        setMembers(prev => [...prev, res.data.member]);
+        // povýšení existujícího člena (server vrací `upgraded`) mění ŘÁDEK,
+        // nepřidává nový — jinak byl e-mail v seznamu dvakrát, se dvěma
+        // úrovněmi a duplicitním React key (nález panelu 20. 8. 2026)
+        setMembers(prev => (res.data.upgraded
+          ? prev.map((m) => (m.email === res.data.member.email
+            ? { ...m, permission: res.data.member.permission }
+            : m))
+          : [...prev, res.data.member]));
         setEmail('');
       }
     } catch (e) {
@@ -195,6 +208,7 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
               <button
                 type="button"
                 onClick={() => setNewPermission('read')}
+                title={t('shareDialog.permReadTitle')}
                 className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
                   newPermission === 'read' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent'
                 }`}
@@ -216,6 +230,7 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
               <button
                 type="button"
                 onClick={() => setNewPermission('edit')}
+                title={t('shareDialog.permEditTitle')}
                 className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
                   newPermission === 'edit' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent'
                 }`}
@@ -260,6 +275,15 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
                         {m.full_name && (
                           <p className="text-xs text-muted-foreground truncate">{m.email}</p>
                         )}
+                        {m.permission === 'read' && m.has_work && (
+                          <p
+                            className="text-xs text-amber-600 dark:text-amber-500 truncate"
+                            data-testid="share-has-work"
+                            title={t('shareDialog.hasWorkNoteTitle')}
+                          >
+                            {t('shareDialog.hasWorkNote')}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -290,7 +314,7 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
                           className={`flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors ${
                             m.permission === 'edit' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
                           }`}
-                          title={t('shareDialog.permEdit')}
+                          title={t('shareDialog.permEditTitle')}
                         >
                           <Pencil className="w-3 h-3" />
                         </button>
@@ -309,8 +333,33 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
                 ))}
               </div>
             )}
+            {teamWorkers.length > 0 && (
+              <div className="pt-2" data-testid="share-team-workers">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {t('shareDialog.teamWorkersHeader')}
+                </p>
+                <p className="text-xs text-muted-foreground mb-1.5">{t('shareDialog.teamWorkersDesc')}</p>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {teamWorkers.map((m) => (
+                    <div key={m.email} className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <UserCheck className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{memberLabel(m) || m.email}</p>
+                        {m.full_name && (
+                          <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                        )}
+                        <p className="text-xs text-amber-600 dark:text-amber-500 truncate">{t('shareDialog.hasWorkNote')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
+          {isOwner && (
           <div className="space-y-2 pt-2 border-t">
             <div className="p-3 rounded-lg border space-y-2">
               <div className="flex items-center justify-between">
@@ -374,6 +423,7 @@ export default function ShareDialog({ open, mapId, onClose, onMapBumped }) {
               </div>
             )}
           </div>
+          )}
         </div>
 
         <DialogFooter>

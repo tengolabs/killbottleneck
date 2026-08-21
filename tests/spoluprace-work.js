@@ -55,7 +55,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
         title: 'Spolupráce',
         nodes: [
           { id: 'apex', type: 'apexNode', position: { x: 300, y: 0 }, data: { nodeType: 'apex', apexText: 'PROJEKT', title: 'PROJEKT', status: 'todo' } },
-          { id: 'n1', type: 'goalNode', position: { x: 100, y: 380 }, data: { title: 'Můj úkol', status: 'todo', owner: WORKER } },
+          { id: 'n1', type: 'goalNode', position: { x: 100, y: 380 }, data: { title: 'Můj úkol', status: 'todo', owner: WORKER, deadline: '2026-08-30' } },
           { id: 'n2', type: 'goalNode', position: { x: 500, y: 380 }, data: { title: 'Cizí krok', status: 'todo' } },
         ],
         edges: [{ id: 'e1', source: 'apex', target: 'n1' }, { id: 'e2', source: 'apex', target: 'n2' }],
@@ -128,16 +128,64 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     await sleep(2000);
     const badge = await page.evaluate(() => document.body.innerText.includes('Spolupracovník'));
     expect(badge, 'hlavička ukazuje badge spolupracovníka');
-    // klik na stavový štítek vlastního uzlu (n1, teď done) → cykluje na todo přes routu
-    await page.evaluate(() => {
+    // Klik na stavový štítek vlastního uzlu (n1, teď done) → cykluje na todo přes routu.
+    // ⚠️ MYŠÍ na souřadnice, NE btn.click(): programový klik ignoruje pointer-events,
+    // takže projde i tehdy, když je karta pro myš průhledná (xyflow ji tak ve čtecím
+    // režimu nastavuje). Přesně na tom sada 20. 8. 2026 selhala jako hlídač —
+    // spolupracovník tlačítko VIDĚL a nemohl ho zmáčknout, a testy byly zelené.
+    const cil = await page.evaluate(() => {
       const n = [...document.querySelectorAll('.react-flow__node')].find((x) => (x.innerText || '').includes('Můj úkol'));
-      const btn = n?.querySelector('button');
-      btn?.click();
+      const btn = n.querySelector('button');
+      const r = btn.getBoundingClientRect();
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2, trefa: btn === top || btn.contains(top) };
     });
+    expect(cil.trefa, 'myš na štítek stavu trefí TLAČÍTKO, ne plátno pod kartou');
+    await page.mouse.click(cil.x, cil.y);
     await sleep(1500);
     const stav = await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token: V });
     const n1status = (stav.json?.nodes || []).find((n) => n.id === 'n1')?.data?.status;
     expect(n1status === 'todo', `klik ve UI cykloval stav přes routu (${n1status})`);
+    // ⚠️ Tahle měření MUSÍ běžet v MAPĚ. Kontrola tužek dřív stála až za odchodem
+    // na stránku Úkoly, kde žádné uzly nejsou — vracela 0 a byla zelená bez ohledu
+    // na skutečnost (nález 20. 8. 2026, tatáž rodina vad jako `btn.click()`).
+    const tuzky = await page.evaluate(() => {
+      const naKroku = (tt) => {
+        const n = [...document.querySelectorAll('.react-flow__node')].find((x) => (x.innerText || '').includes(tt));
+        return [...(n?.querySelectorAll('button') || [])].filter((b) => b.querySelector('.lucide-pencil')).length;
+      };
+      return { muj: naKroku('Můj úkol'), cizi: naKroku('Cizí krok') };
+    });
+    // Spolupracovník má detail i u CIZÍHO kroku — potřebuje si přečíst zadání
+    // a okno je jen ke čtení; stav mu tam server stejně nepustí (kontrola výš).
+    // ⚠️ ČTENÁŘ se svou prací ho má jen u svých kroků (ukol-bez-prav.js) — jiná
+    // úroveň, jiná nabídka; kdyby se to mělo sjednotit, je to rozhodnutí, ne oprava.
+    expect(tuzky.muj === 1 && tuzky.cizi === 1, `detail (tužka) má spolupracovník u obou kroků (${JSON.stringify(tuzky)})`);
+
+    // okno spolupracovníka: termín smí navrhnout, přílohy ne (chtějí EDIT práva)
+    const tuzkaXY = await page.evaluate(() => {
+      const n = [...document.querySelectorAll('.react-flow__node')].find((x) => (x.innerText || '').includes('Můj úkol'));
+      const b = [...n.querySelectorAll('button')].find((x) => x.querySelector('.lucide-pencil'));
+      const r = b.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    await page.mouse.click(tuzkaXY.x, tuzkaXY.y);
+    await sleep(3500);
+    const oknoWork = await page.evaluate(() => {
+      const dlg = document.querySelector('[role="dialog"]');
+      return dlg ? {
+        priloha: /Přidat přílohu/i.test(dlg.innerText),
+        odkaz: /Přidat odkaz/i.test(dlg.innerText),
+        termin: /Navrhnout jiný termín/i.test(dlg.innerText),
+        koment: /koment/i.test(dlg.innerText),
+      } : null;
+    });
+    expect(oknoWork && !oknoWork.priloha && !oknoWork.odkaz, `okno nenabízí přílohy ani odkazy — server je chce s EDIT právy (${JSON.stringify(oknoWork)})`);
+    expect(oknoWork && oknoWork.termin, 'žádost o jiný termín spolupracovníkovi ZŮSTÁVÁ');
+    expect(oknoWork && oknoWork.koment, 'komentáře v okně zůstávají');
+    await page.keyboard.press('Escape');
+    await sleep(800);
+
     console.log('== stránka Úkoly: odškrtnutí vlastního uzlu jde přes fallback ==');
     await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle2' });
     await sleep(2500);
@@ -154,11 +202,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     const n1po = (poKliku.json?.nodes || []).find((n) => n.id === 'n1')?.data?.status;
     expect(n1po !== 'todo', `stav se změnil i ze stránky Úkoly — fallback /node-status funguje (${n1po})`);
 
-    const tuzky = await page.evaluate(() => {
-      const n = [...document.querySelectorAll('.react-flow__node')].find((x) => (x.innerText || '').includes('Cizí krok'));
-      return [...(n?.querySelectorAll('button') || [])].filter((b) => b.querySelector('.lucide-pencil')).length;
-    });
-    expect(tuzky === 0, `mapa zůstává read-only — bez tužky na uzlech (${tuzky})`);
+
   } finally {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     if (browser) await browser.close();

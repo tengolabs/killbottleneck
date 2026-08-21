@@ -4204,6 +4204,23 @@ function mapEditAccess(app, map, auth) {
   } catch (err) { return false; }
 }
 
+// Kdo smí SPRAVOVAT SDÍLENÍ mapy = vlastník, nebo JMENOVANÝ spolusprávce
+// (řádek v map_shares s permission=edit). Rozhodnutí Richarda 20. 8. 2026:
+// „Upravovat" je spolusprávce — kdo rozdává práci, umí zařídit i přístup.
+// ⚠️ ZÁMĚRNĚ BEZ team_access: plošné týmové „edit" dostává kdokoli ve firmě,
+// a ten mapu dál sdílet NESMÍ — jinak by adresné sdílení rozdával každý.
+// Proto tu nejde použít mapEditAccess (team_access zahrnuje). Úroveň se čte
+// z map_shares (JSON zrcadla shared_with_* NEJSOU autorizace — invariant
+// migrace 1785020006).
+function mapShareAdminAccess(app, map, auth) {
+  if (!auth) return false;
+  if (map.getString("owner") === auth.id) return true;
+  try {
+    const row = app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: auth.email() });
+    return row.getString("permission") === "edit";
+  } catch (err) { return false; }
+}
+
 // Ověření reference na pozici při UKLÁDÁNÍ pravidla (anglicky — obalí to
 // err.ruleInvalid). "" = v pořádku / není to reference na pozici.
 function validatePositionRef(app, spec) {
@@ -5581,7 +5598,7 @@ module.exports = {
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,
-  mapEditAccess, validateRuleInput, ruleDto, ruleRunDto, ruleTemplateDto,
+  mapEditAccess, mapShareAdminAccess, validateRuleInput, ruleDto, ruleRunDto, ruleTemplateDto,
   remapRuleIdsServer, createRulesFromList,
   RULE_TRIGGERS, RULE_ACTIONS, RULE_CONDITION_FIELDS, RULE_CONDITION_OPS,
   MAX_RULES_PER_MAP, MAX_RULE_ACTIONS, MAX_RULE_CONDITIONS, MAX_TEMPLATES_PER_AUTHOR,

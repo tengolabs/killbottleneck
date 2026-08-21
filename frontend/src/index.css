@@ -134,6 +134,24 @@
   }
 }
 
+/* ⚠️⚠️ ČTECÍ REŽIM: tlačítka na kartě uzlu musí jít ZMÁČKNOUT MYŠÍ.
+   xyflow dává uzlu inline `pointer-events: none`, jakmile není ani vybíratelný,
+   ani přetažitelný (`elementsSelectable={canEdit}`) — celá karta je pak pro myš
+   průhledná a klik propadne na plátno. Postižený je KAŽDÝ, kdo mapu needituje:
+   spolupracovník (tužka + štítek stavu od 14. 8. 2026) i čtenář se svou prací.
+   Richard 20. 8. 2026 z ostrého provozu: „nejde to potvrdit" — tlačítko VIDĚL,
+   ale nešlo stisknout.
+   Vrací se pointer-events jen INTERAKTIVNÍM prvkům uvnitř karty, ne kartě samotné:
+   posouvání plátna tažením přes kartu tím zůstává (čtenář jinak nemá kudy mapu
+   posunout — karty zabírají většinu plochy).
+   ⚠️ Programový `.click()` v testu tenhle stav NEODHALÍ (pointer-events se ho
+   netýkají) — proto sady klikají myší na souřadnice, viz ukol-bez-prav.js. */
+.react-flow__node button,
+.react-flow__node a,
+.react-flow__node [role="button"] {
+  pointer-events: all;
+}
+
 /* Křížky pro odpojení hran musí být nad uzly (uzly mají zIndex 10),
    jinak je uzel překryje a nejdou kliknout. */
 .react-flow__edgelabel-renderer {

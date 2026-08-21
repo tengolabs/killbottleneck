@@ -31,7 +31,7 @@ export default function OwnerSelect({ value, onChange, mapAccess, members = [], 
   const team = useMemo(() => members.filter((m) => !m.external), [members]);
   const contacts = useMemo(() => members.filter((m) => m.external), [members]);
 
-  const { accessible, others } = useMemo(() => {
+  const { accessible, others, pracovni } = useMemo(() => {
     const access = new Set(
       [mapAccess?.ownerEmail, ...(mapAccess?.sharedWith || [])].filter(Boolean)
     );
@@ -39,9 +39,19 @@ export default function OwnerSelect({ value, onChange, mapAccess, members = [], 
     // stávající (i historická) hodnota musí jít zobrazit — ale pseudo-e-mail
     // externího kontaktu patří do skupiny kontaktů, ne mezi „má přístup"
     if (value && !isExternalOwner(value)) access.add(value);
+    // ⭐ „Má přístup" NESTAČÍ (Richard 20. 8. 2026): „když dám člověku úkol, musí
+    // mít šanci ho vyřešit — a nebo se tomu, kdo zadává, musí nabídnout, ať mu dá
+    // jiná práva." Kdo mapu vidí jen KE ČTENÍ (i přes týmový přístup), práci sice
+    // dokončí (server ho pustí na jeho krok), ale zadavatel o tom nemá jak vědět
+    // a v seznamu sdílení stojí „Číst". Proto se rozlišuje PRACOVNÍ úroveň —
+    // teprve u ní se dotaz nenabízí.
+    const prac = new Set(
+      [mapAccess?.ownerEmail, ...(mapAccess?.sharedWithWork || []), ...(mapAccess?.sharedWithEdit || [])].filter(Boolean)
+    );
+    if (mapAccess?.teamAccess === 'edit') for (const m of team) prac.add(m.email);
     const acc = [...access].sort();
     const oth = team.map((m) => m.email).filter((e) => !access.has(e)).sort();
-    return { accessible: acc, others: oth };
+    return { accessible: acc, others: oth, pracovni: prac };
   }, [mapAccess, team, value]);
 
   const label = (email) => {
@@ -60,11 +70,18 @@ export default function OwnerSelect({ value, onChange, mapAccess, members = [], 
     }
     if (v === NONE) return onChange('');
     if (isExternalOwner(v)) return onChange(v); // externí: bez přisdílení, nemá účet
-    if (accessible.includes(v)) return onChange(v);
+    if (pracovni.has(v)) return onChange(v);
     if (!onShareAdd) return;
-    if (!window.confirm(t('ownerSelect.confirmShare', { email: v }))) return;
+    // dvě různé situace, dvě různé otázky: „vůbec nevidí" × „vidí, ale jen čte"
+    const jenCte = accessible.includes(v);
+    if (!window.confirm(t(jenCte ? 'ownerSelect.confirmUpgrade' : 'ownerSelect.confirmShare', { email: v }))) {
+      // odmítnutí NESMÍ zahodit přiřazení: práci na svém kroku dokončí i čtenář,
+      // jen o tom zadavatel nebude mít stopu v seznamu sdílení
+      if (jenCte) onChange(v);
+      return;
+    }
     const ok = await onShareAdd(v);
-    if (ok) onChange(v);
+    if (ok || jenCte) onChange(v);
   };
 
   return (

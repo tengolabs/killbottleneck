@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.41-beta": {
+    cs: [
+      "Kdo mapu spravuje úrovní Upravovat, může ji teď i sdílet dalším lidem.",
+      "Kdo dostal práci, požádá u svého kroku o jiný termín — i s právem jen ke čtení.",
+      "Seznam sdílení přiznává, kdo má na mapě práci — včetně lidí s týmovým přístupem.",
+      "Externí kontakty jsou v mapě i v seznamech označené štítkem (externě).",
+      "Tlačítka na kartě kroku jdou ve čtecím režimu znovu zmáčknout myší.",
+    ],
+    en: [
+      "Anyone managing a map at the Edit level can now also share it with more people.",
+      "Whoever was given work can request a different due date on their own step — even with view-only access.",
+      "The sharing list admits who has work on the map — including people with team access.",
+      "External contacts are marked with an (external) badge on the map and in lists.",
+      "Buttons on step cards are clickable with the mouse again in read-only mode.",
+    ],
+  },
   "v0.40-beta": {
     cs: [
       "AI se dá připojit klíčem od OpenAI, OpenRouteru, Groqu a dalších.",

@@ -418,6 +418,10 @@ function EditorContent({ mapId, personalMap = false }) {
   const [searchOpen, setSearchOpen] = useState(false); // lupa v levé liště
   const [rfInstance, setRfInstance] = useState(null);
   const [canEdit, setCanEdit] = useState(true);
+  // Sdílení spravuje vlastník + JMENOVANÝ spolusprávce (shared_with_edit), NE
+  // plošný team_access=edit (Richard 20. 8. 2026). Zrcadlo je tu jen UI
+  // nápověda — autorizaci drží server (map_shares v routě /share).
+  const [canShare, setCanShare] = useState(false);
   const personalTargets = useRef({}); // „Moje mapa": vid uzlu → { type, mapId/nodeId/taskId }
   // „Moje mapa": záložka mine=„Mám udělat" / delegated=„Zadal jsem" (?view=delegated)
   // + seskupení záložky Zadal jsem (flat=dle termínu / people / projects)
@@ -617,7 +621,9 @@ function EditorContent({ mapId, personalMap = false }) {
       return false;
     }
     try {
-      const res = await shareMap({ action: 'share', mapId: activeMapId, email, permission: 'work' });
+      // quiet: přisdílení je součást ZADÁNÍ PRÁCE — adresát dostane souhrnnou
+      // notifikaci o přidělené práci, druhá o sdílení by byla duplikát
+      const res = await shareMap({ action: 'share', mapId: activeMapId, email, permission: 'work', quiet: true });
       if (res.data?.error) {
         toast({ title: t('tasks:tasksPage.shareFailed'), description: res.data.error, variant: 'destructive' });
         return false;
@@ -625,8 +631,14 @@ function EditorContent({ mapId, personalMap = false }) {
       // sdílení bumplo `updated` mapy → posunout základ, jinak následné uložení
       // uzlu (owner+termín) spadne na 409 a přisdílená osoba/termín se ztratí
       if (res.data?.updated) baseUpdated.current = res.data.updated;
-      setMapShare((s) => ({ ...s, sharedWith: [...(s?.sharedWith || []), email] }));
-      setSharedCount((c) => c + 1);
+      // povýšení (už nasdílený čtenář) NEPŘIDÁVÁ řádek — jen mu zvedne úroveň;
+      // bez téhle větve se člověk v seznamu i v počtu objevil dvakrát
+      setMapShare((s) => ({
+        ...s,
+        sharedWith: (s?.sharedWith || []).includes(email) ? s.sharedWith : [...(s?.sharedWith || []), email],
+        sharedWithWork: (s?.sharedWithWork || []).includes(email) ? s.sharedWithWork : [...(s?.sharedWithWork || []), email],
+      }));
+      if (!res.data?.upgraded) setSharedCount((c) => c + 1);
       toast({ title: t('tasks:tasksPage.mapShared'), description: t('tasks:tasksPage.mapSharedDesc', { email }) });
       return true;
     } catch (e) {
@@ -765,6 +777,7 @@ function EditorContent({ mapId, personalMap = false }) {
       // „Moje mapa" — read-only agregace mých uzlů napříč projekty (žádné ukládání)
       if (personalMap) {
         setCanEdit(false);
+        setCanShare(false);
         skipNextSave.current = true;
         setTitle(t('myday:myMap.title'));
         await loadPersonalMap();
@@ -784,6 +797,7 @@ function EditorContent({ mapId, personalMap = false }) {
       // New map — draft mode, or template preview
       if (mapId === 'new') {
         setCanEdit(true);
+        setCanShare(true);
         skipNextSave.current = true;
 
         // Template preview — load template structure without saving
@@ -840,8 +854,10 @@ function EditorContent({ mapId, personalMap = false }) {
           if (result && result.length > 0) {
             const m = result[0];
             const isOwner = m.created_by_id === user?.id;
-            const hasEdit = (m.shared_with_edit || []).includes(user?.email) || m.team_access === 'edit';
+            const namedEdit = (m.shared_with_edit || []).includes(user?.email);
+            const hasEdit = namedEdit || m.team_access === 'edit';
             setCanEdit(isOwner || hasEdit);
+            setCanShare(isOwner || namedEdit);
             setCanWork(!isOwner && !hasEdit && (m.shared_with_work || []).includes(user?.email));
             setIsMapOwner(isOwner);
             setArchived(!!m.archived);
@@ -854,7 +870,7 @@ function EditorContent({ mapId, personalMap = false }) {
             zapamatujServer(m);
             setSharedCount(((m.shared_with || []).concat(m.shared_with_edit || [])).filter((v, i, a) => a.indexOf(v) === i).length);
             setOwnerEmails([user?.email, ...(m.shared_with_edit || [])].filter((v, i, a) => v && a.indexOf(v) === i));
-            setMapShare({ ownerEmail: m.created_by, sharedWith: m.shared_with || [], teamAccess: m.team_access || '', sharedWithWork: m.shared_with_work || [] });
+            setMapShare({ ownerEmail: m.created_by, sharedWith: m.shared_with || [], teamAccess: m.team_access || '', sharedWithWork: m.shared_with_work || [], sharedWithEdit: m.shared_with_edit || [] });
             skipNextSave.current = true;
             setTitle(m.title || '');
             setColor(m.color || '');
@@ -875,6 +891,7 @@ function EditorContent({ mapId, personalMap = false }) {
           const map = result.data?.map;
           if (map) {
             setCanEdit(true);
+            setCanShare(false);
             // Veřejně sdílená mapa NENÍ demo — nápis „Demo režim" u cizí mapy
             // mate (Richardův nález 6. 8.). Chování zůstává stejné (nic se
             // neukládá), mění se jen to, co se návštěvníkovi říká.
@@ -1508,6 +1525,7 @@ function EditorContent({ mapId, personalMap = false }) {
       setIsTemplatePreview(false);
       setActiveMapId(newMap.id);
       setIsMapOwner(true);
+      setCanShare(true);
       // ⚠️ Plátno přepnout na vzorovou podobu. Bez toho by na obrazovce zůstaly
       // rozklikané změny z náhledu a nejbližší autosave by je poslal do právě
       // založeného projektu — tedy přesně to, čemu se tahle změna vyhýbá.
@@ -1958,6 +1976,29 @@ function EditorContent({ mapId, personalMap = false }) {
 
   // blokované „čekající" uzly (waitForChildren + nehotový podstrom)
   const waitingSet = useMemo(() => computeWaitingSet(nodes, edges), [nodes, edges]);
+  // Uzly, kde mám SVOU práci: jsem garant uzlu, nebo na něm mám úkol jako
+  // řešitel. Stejný předpis jako serverová kontrola v /node-status — podle něj
+  // dostane ČTENÁŘ mapy tlačítka u svého kroku (a jen u něj).
+  const mojePracovniUzly = useMemo(() => {
+    const email = user?.email;
+    if (!email) return new Set();
+    const set = new Set(nodes.filter((n) => n.data?.owner === email).map((n) => n.id));
+    for (const tk of mapTasks || []) {
+      if (tk.node_id && tk.assignee_email === email) set.add(tk.node_id);
+    }
+    return set;
+  }, [nodes, mapTasks, user]);
+  // Čtenář (ani vlastník, ani editor, ani spolupracovník), který v mapě přesto
+  // nějakou práci má. Veřejný náhled a demo šablony se sem nepočítají — tam se
+  // nic neukládá a uživatel nemusí být ani přihlášený.
+  // ⚠️ A NIKDY „Moje mapa": ta je dopočítaný POHLED přes všechny projekty, ne
+  // uložená mapa (`canEdit` je tam false, uzly nesou složené id `mapa::uzel`
+  // a `activeMapId` k nim nepatří). Bez téhle podmínky dostal uživatel tlačítka
+  // na svých kartách a klik skončil na 404 „mapa nebyla nalezena" — změřeno
+  // 20. 8. 2026 na 11 z 19 karet. Skok do zdrojového projektu (onNodeClick)
+  // navíc přebíjel štítek stavu, takže se ztratila i jediná funkční akce.
+  const ctenarSPraci = !!user && !!activeMapId && !personalMap && !isPublicView
+    && !canEdit && !canWork && mojePracovniUzly.size > 0;
   // uzly, nad kterými PRÁVĚ běží automatizace (pending/running běh) — jen pro
   // indikátor na uzlu; realtime na agent_runs drží stav bez reloadu
   const [runningAgentNodes, setRunningAgentNodes] = useState(new Set());
@@ -2716,13 +2757,19 @@ function EditorContent({ mapId, personalMap = false }) {
       onAddChild: canEdit ? handleAddChild : undefined,
       // spolupracovník (work) uzel od 14. 8. 2026 OTEVÍRÁ taky — dostane
       // zjednodušené okno (variant="work" níže); cyklování stavu klikem na
-      // odznak zůstává beze změny (anti-bloat: žádný klik navíc)
-      onEditNode: canEdit || canWork ? setEditNodeId : undefined,
+      // odznak zůstává beze změny (anti-bloat: žádný klik navíc).
+      // Od 20. 8. 2026 totéž ČTENÁŘ, ale JEN na uzlech se svou prací
+      // (statusCycleNodeIds níže) — kdo dostal úkol, musí ho umět odškrtnout.
+      onEditNode: canEdit || canWork || ctenarSPraci ? setEditNodeId : undefined,
       onDeleteNode: canEdit ? handleDeleteNode : undefined,
       onDeleteEdge: canEdit ? handleDeleteEdge : undefined,
       onExpandNode: canEdit && ai.has('expand') && user ? handleExpandNode : undefined,
       onToggleCollapse: handleToggleCollapse,
-      onCycleStatus: canEdit ? handleCycleStatus : (canWork ? handleCycleStatusWork : undefined),
+      onCycleStatus: canEdit ? handleCycleStatus : (canWork || ctenarSPraci ? handleCycleStatusWork : undefined),
+      // null = bez omezení (vlastník, editor, spolupracovník). Množina = ČTENÁŘ:
+      // štítek stavu i tužka jen tam, kde má svou práci. Kdo smí doopravdy,
+      // rozhoduje server (/node-status) — tohle je jen to, co má smysl nabídnout.
+      statusCycleNodeIds: canEdit || canWork ? null : mojePracovniUzly,
       onUpdateNote: canEdit ? handleUpdateNote : undefined,
       getProgress: (nodeId) => progressMap[nodeId] || 0,
       childCount: (nodeId) => hiddenCounts[nodeId] || 0,
@@ -2749,7 +2796,7 @@ function EditorContent({ mapId, personalMap = false }) {
       citelnost, // stupeň velikosti písma v uzlu (tlačítko Čitelnost)
       orgMap: mapKind === 'org', // organizační struktura: uzel = pozice/funkce (jiná karta)
     }),
-    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, fileCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind]
+    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, ctenarSPraci, mojePracovniUzly, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, fileCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind]
   );
 
   if (loading) {
@@ -2979,7 +3026,7 @@ function EditorContent({ mapId, personalMap = false }) {
           )}
           {sharedCount > 0 && (
             <button
-              onClick={() => canEdit && setShareOpen(true)}
+              onClick={() => canShare && setShareOpen(true)}
               className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary hover:bg-accent transition-colors"
               title={t('share.sharedWith', { count: sharedCount })}
             >
@@ -2997,7 +3044,7 @@ function EditorContent({ mapId, personalMap = false }) {
               <Undo2 className="w-4 h-4" /> {t('toolbar.undoShort')}
             </Button>
           )}
-          {canEdit && user && !isDraft && !isTemplatePreview && (
+          {canShare && user && !isDraft && !isTemplatePreview && (
             <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={() => setShareOpen(true)}>
               <Share2 className="w-4 h-4" /> {t('toolbar.share')}
             </Button>
@@ -3168,7 +3215,7 @@ function EditorContent({ mapId, personalMap = false }) {
                 </DropdownMenuItem>
               )}
               {/* Zarovnat má vlastní ikonu v liště na všech velikostech — v ⋮ menu by bylo dvakrát */}
-              {canEdit && user && !isDraft && !isTemplatePreview && (
+              {canShare && user && !isDraft && !isTemplatePreview && (
                 <DropdownMenuItem onClick={() => setShareOpen(true)}>
                   <Share2 className="w-4 h-4" /> {t('toolbar.share')}
                 </DropdownMenuItem>
@@ -3572,6 +3619,9 @@ function EditorContent({ mapId, personalMap = false }) {
         onSave={handleSaveNode}
         onClose={() => setEditNodeId(null)}
         mapAccess={effectiveMapAccess}
+        // žádost o jiný termín: spolupracovník kdekoli, čtenář jen u své práce
+        // (dialog se mu jinde ani neotevře — tužku má jen u svých kroků)
+        canRequestDeadline={canWork || ctenarSPraci}
         members={members}
         onShareAdd={user && activeMapId ? handleShareAdd : undefined}
         onStash={bufferEnabled && canEdit ? handleStashNode : undefined}
@@ -3638,6 +3688,7 @@ function EditorContent({ mapId, personalMap = false }) {
       <ShareDialog
         open={shareOpen}
         mapId={mapId}
+        isOwner={isMapOwner}
         onClose={() => setShareOpen(false)}
         onMapBumped={(u) => { baseUpdated.current = u; }}
       />

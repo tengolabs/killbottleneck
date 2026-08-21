@@ -53,7 +53,8 @@
     "none": "Nikdo",
     "hasAccess": "Má přístup k mapě",
     "others": "Ostatní členové týmu (nasdílí mapu)",
-    "confirmShare": "{{email}} nemá přístup k této mapě.\n\nNasdílet mu mapu s právem upravovat a přiřadit ho?"
+    "confirmShare": "{{email}} nemá přístup k této mapě.\n\nNasdílet mu ji jako spolupracovníkovi (vidí mapu, plní své úkoly) a přiřadit ho?",
+    "confirmUpgrade": "{{email}} má tuhle mapu jen ke čtení.\n\nDát mu práva spolupracovníka (vidí mapu, plní své úkoly), ať je vidět, že tu má práci? Přiřadit ho můžete i bez toho."
   },
   "skins": {
     "title": "Vzhled aplikace",
@@ -91,6 +92,8 @@
     "saveFailed": "Kontakt se nepodařilo uložit.",
     "deleteFailed": "Kontakt se nepodařilo smazat.",
     "unknown": "Externí kontakt",
+    "cardHint": "{{name}} — externí kontakt: nemá účet, nic mu nechodí. Jen vaše evidence.",
+    "cardBadge": "{{name}} (externě)",
     "group": "Externí kontakty",
     "addNew": "+ Nový externí kontakt…",
     "manage": "Spravovat kontakty…"

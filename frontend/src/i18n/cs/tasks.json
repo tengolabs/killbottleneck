@@ -62,7 +62,8 @@
     "ideaPlaceHint": "Nápad „{{title}}“ se zavěsí jako cíl pod hlavní cíl vybraného projektu.",
     "ideaPlaced": "Nápad je v projektu",
     "ideaPlacedDesc": "„{{title}}“ visí pod hlavním cílem projektu „{{project}}“.",
-    "ideaPlaceFailed": "Vložení se nepovedlo — nápad zůstal v zásobníku."
+    "ideaPlaceFailed": "Vložení se nepovedlo — nápad zůstal v zásobníku.",
+    "confirmUpgradeAssign": "{{email}} má mapu „{{title}}\" jen ke čtení.\n\nDát mu práva spolupracovníka (vidí mapu, plní své úkoly), ať je vidět, že tu má práci? Přiřadit ho můžete i bez toho."
   },
   "taskTable": {
     "timerStop": "Zastavit měření času",

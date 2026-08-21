@@ -10,10 +10,11 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core';
-import { Calendar, Map as MapIcon, ListChecks, MessageSquare, Target, CalendarCheck } from 'lucide-react';
+import { Calendar, Map as MapIcon, ListChecks, MessageSquare, Target, CalendarCheck, Handshake } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { STATUSES } from '@/lib/statusMeta';
 import { labelForEmail } from '@/lib/memberLabel';
+import { isExternalOwner } from '@/lib/externalContacts';
 import { getDeadlineStatus, formatDeadline, getInitials } from '@/lib/nodeMeta';
 import { planState } from '@/lib/taskActions';
 
@@ -28,6 +29,33 @@ const deadlineClass = (task) => {
 const orderCmp = (a, b) =>
   (a.sort_order || Number.MAX_SAFE_INTEGER) - (b.sort_order || Number.MAX_SAFE_INTEGER)
   || ((a.created_date || '') < (b.created_date || '') ? -1 : 1);
+
+// Kolečko řešitele. EXTERNÍ kontakt vypadá jinak než člen (Richard 21. 8. 2026):
+// plné kolečko budí dojem, že „na tom někdo dělá" — externímu nikdy nic nechodí.
+// Kroužek s iniciálami nestačil (klik-test) → celý štítek se jménem a „externě".
+function AssigneeDot({ email, labelOf }) {
+  const { t } = useTranslation('nav');
+  const label = labelOf ? labelOf(email) : email;
+  if (isExternalOwner(email)) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border border-dashed border-amber-600/70 bg-amber-500/15 text-amber-700 dark:text-amber-400 max-w-[9rem]"
+        title={t('externalContacts.cardHint', { name: label })}
+      >
+        <Handshake className="w-2.5 h-2.5 shrink-0" />
+        <span className="truncate">{t('externalContacts.cardBadge', { name: label })}</span>
+      </span>
+    );
+  }
+  return (
+    <span
+      className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold inline-flex items-center justify-center"
+      title={label}
+    >
+      {getInitials(label)}
+    </span>
+  );
+}
 
 function TaskCard({ task, mapTitle, subStats, commentCount, onEdit, labelOf }) {
   const { t: tt } = useTranslation('tasks');
@@ -74,14 +102,7 @@ function TaskCard({ task, mapTitle, subStats, commentCount, onEdit, labelOf }) {
               <Calendar className="w-3 h-3" /> {formatDeadline(task.deadline)}
             </span>
           ) : <span />}
-          {task.assignee_email && (
-            <span
-              className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold inline-flex items-center justify-center"
-              title={labelOf ? labelOf(task.assignee_email) : task.assignee_email}
-            >
-              {getInitials(labelOf ? labelOf(task.assignee_email) : task.assignee_email)}
-            </span>
-          )}
+          {task.assignee_email && <AssigneeDot email={task.assignee_email} labelOf={labelOf} />}
         </div>
       )}
     </div>
@@ -136,14 +157,7 @@ function NodeCard({ item, mapTitle, onOpenNode, labelOf }) {
               <Calendar className="w-3 h-3" /> {formatDeadline(item.deadline)}
             </span>
           ) : <span />}
-          {item.assignee_email && (
-            <span
-              className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold inline-flex items-center justify-center"
-              title={labelOf ? labelOf(item.assignee_email) : item.assignee_email}
-            >
-              {getInitials(labelOf ? labelOf(item.assignee_email) : item.assignee_email)}
-            </span>
-          )}
+          {item.assignee_email && <AssigneeDot email={item.assignee_email} labelOf={labelOf} />}
         </div>
       )}
     </div>

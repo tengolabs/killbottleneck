@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.40.1-beta}
+        KB_VERSION: ${KB_VERSION:-v0.41-beta}
     container_name: killbottleneck
     ports:
       - "${KB_PORT:-${FLOWMAP_PORT:-8090}}:8090"

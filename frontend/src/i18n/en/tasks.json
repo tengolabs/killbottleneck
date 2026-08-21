@@ -62,7 +62,8 @@
     "ideaPlaceHint": "The idea “{{title}}” will hang as a goal under the main goal of the chosen project.",
     "ideaPlaced": "The idea is in the project",
     "ideaPlacedDesc": "“{{title}}” now hangs under the main goal of “{{project}}”.",
-    "ideaPlaceFailed": "Insert failed — the idea stays in the stash."
+    "ideaPlaceFailed": "Insert failed — the idea stays in the stash.",
+    "confirmUpgradeAssign": "{{email}} only has read access to the map \"{{title}}\".\n\nGive them collaborator rights (view map, work on own tasks) so it shows they have work here? You can assign them either way."
   },
   "taskTable": {
     "timerStop": "Stop time tracking",

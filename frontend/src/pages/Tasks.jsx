@@ -502,7 +502,9 @@ export default function Tasks() {
   // přisdílení mapy (spolupracovník) při přiřazení člena bez přístupu — smí jen vlastník
   const shareMapWith = async (mapId, email) => {
     try {
-      const res = await shareMap({ action: 'share', mapId, email, permission: 'work' });
+      // quiet: součást zadání práce — adresát dostane notifikaci o přidělené
+      // práci, druhá o sdílení by byla duplikát (Richard 21. 8.)
+      const res = await shareMap({ action: 'share', mapId, email, permission: 'work', quiet: true });
       if (res.data?.error) {
         toast({ title: t('tasksPage.shareFailed'), description: res.data.error, variant: 'destructive' });
         return false;
@@ -516,11 +518,18 @@ export default function Tasks() {
     }
   };
 
-  const nodeHasAccess = (map, email) => {
+  // „Vidí mapu" NESTAČÍ — rozhoduje PRACOVNÍ úroveň (Richard 20. 8. 2026: kdo
+  // dostane úkol, musí ho umět vyřešit, a nebo se zadavateli musí nabídnout, ať
+  // mu dá jiná práva). Čtenář svůj krok odškrtne i tak (server ho pustí), ale
+  // zadavatel by netušil, že ten člověk má mapu jen ke čtení.
+  const nodeHasWorkAccess = (map, email) => {
     if (!email || !map) return true;
-    if (map.team_access) return true;
-    return map.created_by === email || (map.shared_with || []).includes(email);
+    if (map.team_access === 'edit') return true;
+    return map.created_by === email
+      || (map.shared_with_work || []).includes(email)
+      || (map.shared_with_edit || []).includes(email);
   };
+  const nodeIsShared = (map, email) => !!map && ((map.shared_with || []).includes(email) || !!map.team_access);
 
   const handleCycleNodeItem = (item) => {
     if (item.status === 'todo' && item.waiting) {
@@ -531,10 +540,16 @@ export default function Tasks() {
 
   const handleAssignNodeItem = async (item, email) => {
     const map = maps.find((m) => m.id === item.map_id);
-    if (email && !nodeHasAccess(map, email)) {
-      if (!window.confirm(t('tasksPage.confirmShareAssign', { email, title: map?.title }))) return;
-      const ok = await shareMapWith(item.map_id, email);
-      if (!ok) return;
+    if (email && !nodeHasWorkAccess(map, email)) {
+      const jenCte = nodeIsShared(map, email);
+      const otazka = jenCte ? 'tasksPage.confirmUpgradeAssign' : 'tasksPage.confirmShareAssign';
+      if (!window.confirm(t(otazka, { email, title: map?.title }))) {
+        // odmítnutí povýšení přiřazení NERUŠÍ — práci na svém kroku dokončí i čtenář
+        if (!jenCte) return;
+      } else {
+        const ok = await shareMapWith(item.map_id, email);
+        if (!ok && !jenCte) return;
+      }
     }
     updateMapNode(item, { owner: email }).catch(() => {});
   };

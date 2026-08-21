@@ -294,6 +294,10 @@ const STRINGS = {
     cs: "{actor} vám nasdílel projekt „{project}\"",
     en: "{actor} shared the project \"{project}\" with you",
   },
+  "notify.mapShareUpgraded": {
+    cs: "{actor} vám rozšířil přístup k projektu „{project}\"",
+    en: "{actor} expanded your access to the project \"{project}\"",
+  },
 
   // ── požadavky na automatizaci (chodí správcům AI agentů) ──
   "notify.automationWantedOne": {
@@ -514,8 +518,20 @@ const STRINGS = {
     en: "Only the assigner or project owner can change the due date of task \"{title}\".",
   },
   "err.onlyOwnerCanShare": {
-    cs: "Pouze vlastník mapy může spravovat sdílení.",
-    en: "Only the map owner can manage sharing.",
+    cs: "Sdílení smí spravovat jen vlastník mapy nebo jmenovaný spolusprávce (úroveň Upravovat).",
+    en: "Only the map owner or a named co-manager (Edit level) can manage sharing.",
+  },
+  "err.teamPublicOwnerOnly": {
+    cs: "Týmový přístup a zveřejnění mapy mění jen její vlastník.",
+    en: "Only the map owner can change team access or public visibility.",
+  },
+  "err.deadlineRequestOwnWorkOnly": {
+    cs: "O jiný termín můžete požádat jen u kroku, kde máte svou práci.",
+    en: "You can only request a different due date on a step with your own work.",
+  },
+  "err.cannotShareWithOwner": {
+    cs: "Vlastník mapy má plný přístup — nasdílet mu ji nejde.",
+    en: "The map owner already has full access — they can't be added to sharing.",
   },
   "err.emailRequired": { cs: "E-mail je povinný.", en: "E-mail is required." },
   "err.userNotFound": { cs: "Takový uživatel na instanci není.", en: "No such user on this instance." },

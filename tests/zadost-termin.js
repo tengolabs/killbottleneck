@@ -16,6 +16,7 @@ const PW = 'TajneHeslo.2026';
 const VLASTNIK = 'vlastnik@e2e.cz';
 const RESITEL = 'resitel@e2e.cz';
 const EDITOR = 'editor@e2e.cz';
+const CTENAR = 'ctenar@e2e.cz'; // sdíleno KE ČTENÍ, garant uzlu n2
 const TERMIN = '2026-08-20';
 const NAVRH = '2026-09-15';
 
@@ -47,8 +48,8 @@ const notifCount = async (token, type) => (await notifsOf(token, type)).reduce((
     execSync(`docker run -d --name ${NAME} -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 60; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch (e) { /* startuje */ } await sleep(1000); }
 
-    await reg(VLASTNIK); await reg(RESITEL); await reg(EDITOR);
-    const V = await login(VLASTNIK), W = await login(RESITEL), E = await login(EDITOR);
+    await reg(VLASTNIK); await reg(RESITEL); await reg(EDITOR); await reg(CTENAR);
+    const V = await login(VLASTNIK), W = await login(RESITEL), E = await login(EDITOR), C = await login(CTENAR);
 
     const mapa = await api('POST', '/api/collections/goalmaps/records', {
       token: V,
@@ -57,14 +58,16 @@ const notifCount = async (token, type) => (await notifsOf(token, type)).reduce((
         nodes: [
           { id: 'apex', type: 'apexNode', position: { x: 300, y: 0 }, data: { nodeType: 'apex', apexText: 'PROJEKT', title: 'PROJEKT', status: 'todo' } },
           { id: 'n1', type: 'goalNode', position: { x: 300, y: 380 }, data: { title: 'Termínovaný krok', status: 'todo', deadline: TERMIN, owner: RESITEL } },
+          { id: 'n2', type: 'goalNode', position: { x: 620, y: 380 }, data: { title: 'Krok čtenáře', status: 'todo', deadline: TERMIN, owner: CTENAR } },
         ],
-        edges: [{ id: 'e1', source: 'apex', target: 'n1' }],
+        edges: [{ id: 'e1', source: 'apex', target: 'n1' }, { id: 'e2', source: 'apex', target: 'n2' }],
       },
     });
     const mapId = mapa.json?.id;
     expect(mapa.status === 200 && !!mapId, `mapa založena (${mapa.status})`);
     await api('POST', '/api/kb/share', { token: V, body: { action: 'share', mapId, email: RESITEL, permission: 'work' } });
     await api('POST', '/api/kb/share', { token: V, body: { action: 'share', mapId, email: EDITOR, permission: 'edit' } });
+    await api('POST', '/api/kb/share', { token: V, body: { action: 'share', mapId, email: CTENAR, permission: 'read' } });
 
     const n1 = async (token) => ((await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token })).json?.nodes || []).find((n) => n.id === 'n1');
 
@@ -126,6 +129,21 @@ const notifCount = async (token, type) => (await notifsOf(token, type)).reduce((
     r = await api('POST', '/api/kb/deadline-requests', { token: W, body: { action: 'cancel', mapId, nodeId: 'n1' } });
     expect(r.status === 200, `žadatel žádost stáhne (${r.status})`);
     expect((await notifCount(W, 'deadline_request_resolved')) === 2, 'stažení negeneruje další notifikaci');
+
+    console.log('== ČTENÁŘ žádá jen u SVÉHO kroku (právo z práce, 21. 8. 2026) ==');
+    // Kdo práci dostal, musí umět říct, že termín nestíhá — i s právem jen ke
+    // čtení. Cizí uzly čtenáři dál nežádají (spam argument trvá). Mutační
+    // pojistka: na buildu před změnou vrací žádost čtenáře 403.
+    r = await api('POST', '/api/kb/deadline-requests', { token: C, body: { action: 'request', mapId, nodeId: 'n2', date: NAVRH, note: 'Nestíhám' } });
+    expect(r.status === 200, `čtenář-garant požádá o termín u SVÉHO kroku (${r.status} ${r.json?.error || ''})`);
+    let n2 = ((await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token: V })).json?.nodes || []).find((n) => n.id === 'n2');
+    expect(n2?.data?.deadlineChangeWanted === NAVRH && n2?.data?.deadlineChangeRequestedBy === CTENAR,
+      `uzel nese žádost s razítkem čtenáře (${n2?.data?.deadlineChangeRequestedBy})`);
+    expect(n2?.data?.deadline === TERMIN, 'samotný termín se čtenářovou žádostí NEZMĚNIL');
+    r = await api('POST', '/api/kb/deadline-requests', { token: C, body: { action: 'cancel', mapId, nodeId: 'n2' } });
+    expect(r.status === 200, `čtenář svou žádost stáhne (${r.status})`);
+    r = await api('POST', '/api/kb/deadline-requests', { token: C, body: { action: 'request', mapId, nodeId: 'n1', date: NAVRH } });
+    expect(r.status === 403, `u CIZÍHO kroku čtenář nežádá (${r.status})`);
 
     console.log('== public-maps neleakuje žádost ==');
     await api('PATCH', `/api/collections/goalmaps/records/${mapId}`, { token: V, body: { is_public: true } });

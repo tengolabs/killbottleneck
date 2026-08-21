@@ -53,7 +53,8 @@
     "none": "Nobody",
     "hasAccess": "Has access to the map",
     "others": "Other team members (will share the map)",
-    "confirmShare": "{{email}} doesn't have access to this map.\n\nShare it with them with edit rights and assign them?"
+    "confirmShare": "{{email}} doesn't have access to this map.\n\nShare it with them as a collaborator (view map, work on own tasks) and assign them?",
+    "confirmUpgrade": "{{email}} only has read access to this map.\n\nGive them collaborator rights (view map, work on own tasks) so it shows they have work here? You can assign them either way."
   },
   "skins": {
     "title": "Appearance",
@@ -91,6 +92,8 @@
     "saveFailed": "Failed to save the contact.",
     "deleteFailed": "Failed to delete the contact.",
     "unknown": "External contact",
+    "cardHint": "{{name}} — external contact: no account, nothing is ever sent to them. Your private note only.",
+    "cardBadge": "{{name}} (external)",
     "group": "External contacts",
     "addNew": "+ New external contact…",
     "manage": "Manage contacts…"

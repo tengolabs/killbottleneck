@@ -23,13 +23,14 @@ import FilesSection from './sections/FilesSection';
 import FormatovanyPopis from '@/components/shared/FormatovanyPopis';
 import OdkazyVPopisu from '@/components/shared/OdkazyVPopisu';
 
-// ZJEDNODUŠENÉ okno uzlu pro SPOLUPRACOVNÍKA (sdílení „work") — Richard 14. 8.
-// 2026: běžný uživatel nemá dostat přeplněný editor. Zadání jen ČTE (název,
-// popis, termín, garant), DĚLÁ v něm svoje: přepne stav (routa /node-status —
-// kdo smí, rozhoduje server: garant nebo řešitel úkolu na uzlu), požádá
-// o změnu termínu, nahraje přílohu (u automatizovaného kroku tím krok rozjede)
-// a komentuje. Mapu tenhle dialog NEUKLÁDÁ — žádné onSave.
-export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, onWorkStatusSaved }) {
+// ZJEDNODUŠENÉ okno uzlu pro SPOLUPRACOVNÍKA (sdílení „work") a ČTENÁŘE
+// s vlastní prací — Richard 14. 8. 2026: běžný uživatel nemá dostat přeplněný
+// editor. Zadání jen ČTE (název, popis, termín, garant), DĚLÁ v něm svoje:
+// přepne stav (routa /node-status — kdo smí, rozhoduje server: garant nebo
+// řešitel úkolu na uzlu), požádá o změnu termínu a komentuje. Přílohy jen
+// VIDÍ (FilesSection readOnly — nahrání by u automatizovaného kroku krok
+// spustilo, Richard 20. 8.). Mapu tenhle dialog NEUKLÁDÁ — žádné onSave.
+export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, onWorkStatusSaved, canRequestDeadline }) {
   const { t } = useTranslation('editor');
   const { toast } = useToast();
   const { user } = useAuth();
@@ -104,13 +105,16 @@ export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, 
               </span>
             )}
           </div>
-          {/* žádost o změnu termínu — jediná „zadávací" věc, kterou řešitel smí */}
-          {s.origDeadline && !s.dlWanted && !s.dlReqOpen && (
+          {/* Žádost o změnu termínu — jediná „zadávací" věc, kterou řešitel smí.
+              Od 21. 8. 2026 ji server pouští i ČTENÁŘI, ale jen u kroku s jeho
+              prací (právo z práce) — dialog se mu jinde neotevře, takže
+              canRequestDeadline={canWork || ctenarSPraci} tu sedí se serverem. */}
+          {canRequestDeadline && s.origDeadline && !s.dlWanted && !s.dlReqOpen && (
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { s.setDlReqDate(''); s.setDlReqNote(''); s.setDlReqOpen(true); }}>
               <CalendarClock className="w-3.5 h-3.5" /> {t('nodeDialog.dlRequestButton')}
             </Button>
           )}
-          {s.dlReqOpen && (
+          {canRequestDeadline && s.dlReqOpen && (
             <div className="space-y-2 rounded-lg border p-2">
               <DatePicker id="dl-request-date" value={s.dlReqDate} onChange={s.setDlReqDate} className="h-8" />
               <Input value={s.dlReqNote} onChange={(e) => s.setDlReqNote(e.target.value)} placeholder={t('nodeDialog.dlRequestNotePh')} maxLength={500} />
@@ -124,7 +128,7 @@ export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, 
               </div>
             </div>
           )}
-          {s.dlWanted && s.dlBy === user?.email && (
+          {canRequestDeadline && s.dlWanted && s.dlBy === user?.email && (
             <p className="text-xs text-muted-foreground flex items-center gap-2">
               <CalendarClock className="w-3.5 h-3.5 shrink-0" />
               {t('nodeDialog.dlRequestMine', { date: s.dlWanted })}
@@ -134,7 +138,8 @@ export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, 
               </button>
             </p>
           )}
-          <FilesSection s={s} mapId={mapId} />
+          {/* přílohy i odkazy chtějí EDIT práva → tady jen SEZNAM, bez tlačítek */}
+          <FilesSection s={s} mapId={mapId} readOnly />
           <CommentThread entity="Comment" filter={{ goalmap_id: mapId, node_id: node?.id }} />
           <NodeTaskComments mapId={mapId} nodeId={node?.id} />
         </div>

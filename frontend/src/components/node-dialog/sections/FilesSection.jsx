@@ -20,10 +20,16 @@ const DriveIcon = ({ className }) => (
 // „Přílohy": upload (jen kde je zapnutý), odkaz, Google Drive picker, seznam
 // s kopírováním/otevřením/smazáním. Nahrání u kroku s automatizací ji rovnou
 // spustí (řeší server) — hláška triggersAutomation to říká uživateli.
-export default function FilesSection({ s, mapId }) {
+// readOnly = ten, kdo mapu needituje. Přílohy i odkazy jdou do TÉŽE kolekce
+// a server na ni chce EDIT práva (nahrání u automatizovaného kroku ho spustí),
+// takže tlačítka by mu jen svítila a skončila chybou — Richard 20. 8. 2026:
+// „když uživatel nemá práva, ať nevidí to, co nemá." Seznam už přiložených
+// zůstává: číst je smí a bez nich by nevěděl, s čím má pracovat.
+export default function FilesSection({ s, mapId, readOnly }) {
   const { t } = useTranslation('editor');
   const { toast } = useToast();
   if (!mapId) return null;
+  if (readOnly && !s.files.length) return null;
   return (
     <div className="space-y-2">
       <Label className="flex items-center gap-1.5">
@@ -53,20 +59,22 @@ export default function FilesSection({ s, mapId }) {
                 title={f.url ? t('nodeDialog.files.open') : t('nodeDialog.files.download')}>
                 {f.url ? <ExternalLink className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
               </button>
-              <button onClick={() => s.handleRemoveFile(f)} className="text-muted-foreground hover:text-destructive p-1" title={t('nodeDialog.files.delete')}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {!readOnly && (
+                <button onClick={() => s.handleRemoveFile(f)} className="text-muted-foreground hover:text-destructive p-1" title={t('nodeDialog.files.delete')}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
       {/* i skrytý vstup patří pod přepínač — v hostované verzi nemá
           v DOM co dělat (a test na to spoléhá nezávisle na překladu) */}
-      {s.uploadsEnabled && (
+      {s.uploadsEnabled && !readOnly && (
         <input ref={s.fileInputRef} type="file" className="hidden" onChange={(e) => s.handleUpload(e.target.files?.[0])} />
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        {s.uploadsEnabled && (
+      <div className={`flex flex-wrap items-center gap-2 ${readOnly ? 'hidden' : ''}`}>
+        {s.uploadsEnabled && !readOnly && (
           <Button variant="outline" size="sm" className="gap-1.5" disabled={s.uploading}
             onClick={() => s.fileInputRef.current?.click()}>
             {s.uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
@@ -103,7 +111,7 @@ export default function FilesSection({ s, mapId }) {
           </Button>
         </div>
       )}
-      {!s.uploadsEnabled && (
+      {!s.uploadsEnabled && !readOnly && (
         <p className="text-xs text-muted-foreground">{t('nodeDialog.files.uploadsOff')}</p>
       )}
       {s.executorKind === 'automation' && s.executorName && (

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MembersContext, labelForEmail } from '@/lib/memberLabel';
 import { isExternalOwner } from '@/lib/externalContacts';
 import { Handle, Position } from '@xyflow/react';
-import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip, Handshake } from 'lucide-react';
 import { useGoalMap } from './GoalMapContext';
 import { useTimer } from '@/lib/TimerContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -29,7 +29,7 @@ const aiMenuItems = [
 
 function GoalNode({ id, data, selected }) {
   const { t } = useTranslation('editor');
-  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, fileCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap } = useGoalMap();
+  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, statusCycleNodeIds, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, fileCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap } = useGoalMap();
   // směr stromu: 'horizontal' = strom doprava (mobil) → konektory vlevo/vpravo, jinak nahoře/dole
   const isH = direction === 'horizontal';
   // velikost písma v uzlu (tlačítko Čitelnost v liště) — šířka karty se NEMĚNÍ,
@@ -74,6 +74,9 @@ function GoalNode({ id, data, selected }) {
   const wantsAutomation = !!data.automationWanted;
   const progress = getProgress(id);
   const isMyTask = !myTasksOnly || (data.owner && data.owner === currentUserEmail);
+  // Čtenář mapy s vlastní prací dostane akce JEN u svých kroků — množina přijde
+  // z editoru (null = bez omezení: vlastník, editor, spolupracovník).
+  const mujPracovniUzel = !statusCycleNodeIds || statusCycleNodeIds.has(id);
   const members = useContext(MembersContext);
   const ownerLabel = labelForEmail(members, data.owner);
   const deadlineStatus = getDeadlineStatus(data.deadline, data.status);
@@ -117,7 +120,7 @@ function GoalNode({ id, data, selected }) {
             </button>
           )}
         </div>
-        <div className="px-3 pb-2" onDoubleClick={() => onEditNode?.(id)}>
+        <div className="px-3 pb-2" onDoubleClick={() => { if (mujPracovniUzel) onEditNode?.(id); }}>
           <h3 data-nazev-uzlu title={data.title} className={`font-heading font-semibold ${cit.nazev} text-foreground ${cit.nazevRadky}`}>
             {data.icon && <span className="mr-1.5 leading-none">{data.icon}</span>}
             {data.title}
@@ -179,16 +182,23 @@ function GoalNode({ id, data, selected }) {
         {/* spolupracovník (work) má mapu readOnly, ale stav SVÝCH uzlů cykluje
             routou /node-status — řídí se tedy přítomností handleru, ne readOnly */}
         <button
-          onClick={(e) => { e.stopPropagation(); onCycleStatus?.(id); }}
-          disabled={!onCycleStatus}
+          onClick={(e) => { e.stopPropagation(); if (mujPracovniUzel) onCycleStatus?.(id); }}
+          disabled={!onCycleStatus || !mujPracovniUzel}
           title={t('tasks:taskTable.statusCycleTitle')}
-          className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${status.badge} ${!onCycleStatus ? 'cursor-default' : 'hover:opacity-80 cursor-pointer'}`}
+          className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${status.badge} ${!onCycleStatus || !mujPracovniUzel ? 'cursor-default' : 'hover:opacity-80 cursor-pointer'}`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
           {isDone && <Check className="w-3 h-3" />}
           {status.label}
         </button>
         <div className="flex items-center gap-1.5">
+          {/* Hodiny zůstávají i na CIZÍM kroku, i tomu, kdo mapu needituje —
+              ROZHODNUTÍ Richarda 20. 8. 2026, ne přehlédnutí. Výkaz času je
+              čistě osobní záznam (`time_entries`: vidí ho jen jeho autor, do
+              mapy ani k zadavateli nejde), takže si smím vykázat i čas strávený
+              nad cizím krokem (konzultace, revize). Neuklízet jako nekonzistenci
+              vůči štítku stavu a tužce — ty se u cizího kroku schovávají právem,
+              tohle ne. Hlídá test ukol-bez-prav.js. */}
           <button
             onClick={handleTimer}
             className={timerRunsHere ? 'text-red-500' : 'text-muted-foreground hover:text-primary transition-colors'}
@@ -198,7 +208,7 @@ function GoalNode({ id, data, selected }) {
           </button>
           {/* spolupracovník (work): viditelná cesta k detailu uzlu — akce musí
               být vidět pořád, dvojklik nikdo neobjeví (zásada z lite režimu) */}
-          {readOnly && onEditNode && (
+          {readOnly && onEditNode && mujPracovniUzel && (
             <button
               onClick={(e) => { e.stopPropagation(); onEditNode(id); }}
               className="text-muted-foreground hover:text-primary transition-colors"
@@ -248,10 +258,12 @@ function GoalNode({ id, data, selected }) {
         </div>
       </div>
 
-      {/* dvojklik se řídí PŘÍTOMNOSTÍ handleru (vzor stavového odznaku výš):
-          spolupracovník (work) má mapu readOnly, ale detail uzlu od 14. 8. 2026
-          otevírá — dostane zjednodušené okno; čtenář handler nemá vůbec */}
-      <div className="px-3 py-3" onDoubleClick={() => onEditNode?.(id)}>
+      {/* Dvojklik se řídí přítomností handleru (vzor stavového odznaku výš) A
+          `mujPracovniUzel`: spolupracovník (work) má mapu readOnly, ale detail
+          uzlu od 14. 8. 2026 otevírá — dostane zjednodušené okno. ČTENÁŘ se svou
+          prací jen u SVÝCH kroků; bez té podmínky si dvojklikem otevřel okno
+          cizího kroku s tlačítky stavu, která server odmítne (panel 20. 8. 2026). */}
+      <div className="px-3 py-3" onDoubleClick={() => { if (mujPracovniUzel) onEditNode?.(id); }}>
         {/* Bublina s CELÝM názvem: čím větší písmo, tím míň znaků se do karty
             vejde (šířka zůstává 220 px), takže dlouhý název se ořízne. Popisek
             svou bublinu měl, název ne — a ve vyšších stupních je oříznutý
@@ -292,14 +304,27 @@ function GoalNode({ id, data, selected }) {
               odznak vykonavatele (odpovědný je pořád člověk).
               Jméno místo mailu (Richard 8. 8. 2026): iniciály i bublina se berou
               ze zobrazovaného jména z adresáře členů; e-mail je jen fallback. */}
-          {data.owner && (
+          {/* EXTERNÍ garant vypadá jinak (Richard 21. 8. 2026): plné kolečko
+              budí dojem, že „na tom někdo dělá" — přitom externímu kontaktu
+              nikdy nic nechodí a o úkolu neví. Kroužek s iniciálami nestačil
+              (klik-test 21. 8. večer) → celý štítek se jménem a slovem
+              „externě", ve stejném jazyce jako štítky termínu/automatizace. */}
+          {data.owner && (isExternalOwner(data.owner) ? (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border border-dashed border-amber-600/70 bg-amber-500/15 text-amber-700 dark:text-amber-400 max-w-[11rem]"
+              title={t('nav:externalContacts.cardHint', { name: ownerLabel })}
+            >
+              <Handshake className="w-2.5 h-2.5 shrink-0" />
+              <span className="truncate">{t('nav:externalContacts.cardBadge', { name: ownerLabel })}</span>
+            </span>
+          ) : (
             <span
               className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold flex items-center justify-center shrink-0"
-              title={isExternalOwner(data.owner) ? ownerLabel : (ownerLabel === data.owner ? data.owner : `${ownerLabel} (${data.owner})`)}
+              title={ownerLabel === data.owner ? data.owner : `${ownerLabel} (${data.owner})`}
             >
               {getInitials(ownerLabel)}
             </span>
-          )}
+          ))}
           {isAutomated && (
             <span
               className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 max-w-[10rem]"
