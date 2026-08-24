@@ -144,6 +144,46 @@ const polozkyMenu = async (page) => {
     const poNapsani = await page.evaluate(() => !document.querySelector('[data-report-odeslat]')?.disabled);
     ok(poNapsani, 'po napsání textu jde Odeslat zmáčknout');
 
+    console.log('== snímek obrazovky: výběrem souboru i Ctrl+V ==');
+    // podnět z bety 21. 8. 2026 — „blbě se to popisuje, obrázek řekne víc"
+    const pngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const pngSoubor = `/tmp/kb-ui-hlaseni-${process.pid}.png`;
+    require('fs').writeFileSync(pngSoubor, Buffer.from(pngB64, 'base64'));
+    ok(await page.evaluate(() => !!document.querySelector('[data-report-priloha]')),
+      'dialog nabízí tlačítko „Přiložit snímek obrazovky"');
+    const vstup = await page.$('[data-report-priloha-input]');
+    await vstup.uploadFile(pngSoubor);
+    await sleep(1500);
+    const poVyberu = await page.evaluate(() => ({
+      nahled: !!document.querySelector('[data-report-priloha-nahled] img'),
+      vBoxu: /přiložený snímek|attached screenshot/i.test(document.querySelector('[role="dialog"]')?.innerText || ''),
+    }));
+    ok(poVyberu.nahled, 'po výběru souboru je vidět náhled snímku');
+    ok(poVyberu.vBoxu, 'a box „co odejde" snímek přiznává');
+    // odebrání: náhled zmizí a tlačítko se vrátí (jediné tlačítko v náhledu)
+    await page.click('[data-report-priloha-nahled] button');
+    await sleep(600);
+    ok(await page.evaluate(() => !document.querySelector('[data-report-priloha-nahled]') && !!document.querySelector('[data-report-priloha]')),
+      'Odebrat snímek zruší náhled a vrátí tlačítko');
+    // Ctrl+V: vložení obrázku ze schránky do textového pole (přesně cesta,
+    // kterou navrhl uživatel z bety — soubor je nouzovka, schránka hlavní)
+    const vlozeno = await page.evaluate((b64) => {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], 'schranka.png', { type: 'image/png' }));
+      const ta = document.querySelector('#report-text');
+      if (!ta) return false;
+      ta.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      return true;
+    }, pngB64);
+    ok(vlozeno, 'událost vložení ze schránky odeslána');
+    await sleep(1500);
+    ok(await page.evaluate(() => !!document.querySelector('[data-report-priloha-nahled] img')),
+      'Ctrl+V obrázku ukáže náhled snímku');
+    require('fs').unlinkSync(pngSoubor);
+
     console.log('== ikona v levé liště: přehled, úkoly i mapa ==');
     // ⚠️ Tahle sada vznikla z ostudy: tlačítko v mapě mělo `top-76`, což
     // Tailwind NEGENERUJE (škála 64 → 72 → 80). Třída se tiše zahodila,

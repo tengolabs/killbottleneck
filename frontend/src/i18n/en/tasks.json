@@ -216,7 +216,9 @@
     "recordedDescInbox": "{{minutes}} min — note also saved to the idea stash",
     "stopFailed": "Couldn't stop the timer",
     "confirmDeleteEntry": "Really delete the {{time}} entry?",
-    "confirmDeleteEntryNote": "Really delete the {{time}} entry (\"{{note}}\")?"
+    "confirmDeleteEntryNote": "Really delete the {{time}} entry (\"{{note}}\")?",
+    "startButton": "Start measuring time",
+    "startFailed": "Couldn't start the timer"
   },
   "timeSummary": {
     "heading": "Time worked",

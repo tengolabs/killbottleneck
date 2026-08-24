@@ -10,7 +10,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { intlLocale } from '@/lib/locale';
 import { useTranslation } from 'react-i18next';
-import { Timer, Square, X as XIcon, Trash2 } from 'lucide-react';
+import { Timer, Square, Play, X as XIcon, Trash2 } from 'lucide-react';
 
 const NONE = '__none__';
 const parseDate = (s) => (s ? new Date(String(s).replace(' ', 'T')) : null);
@@ -25,7 +25,7 @@ const parseDate = (s) => (s ? new Date(String(s).replace(' ', 'T')) : null);
 export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, open, onToggle, leftOffset = 0 }) {
   const { t } = useTranslation('tasks');
   const { toast } = useToast();
-  const { running, elapsed, stop } = useTimer();
+  const { running, elapsed, start, stop } = useTimer();
   const pos = fixed ? 'fixed' : 'absolute';
   const [entries, setEntries] = useState([]);
   const [maps, setMaps] = useState([]);
@@ -50,6 +50,21 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
     [nodes]
   );
   const nodeTitle = (id) => nodeOptions.find((n) => n.id === id)?.title || '';
+
+  // Start i z panelu — uživatel z bety ho tu hledal (24. 8. 2026): panel při
+  // běžícím měření nabízí Stop, tak musí umět i protějšek. Volné měření bez
+  // cíle (vzor hodin v hlavičce); k uzlu/projektu se přiřadí zpětně u záznamu.
+  const handleStart = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await start();
+    } catch (e) {
+      toast({ title: t('timeLog.startFailed'), description: e?.message, variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleStop = async () => {
     if (busy) return;
@@ -118,6 +133,14 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
         </Button>
       </div>
 
+      {!running && (
+        <div className="p-3 border-b shrink-0">
+          <Button size="sm" className="w-full h-8" onClick={handleStart} disabled={busy} data-timelog-start>
+            <Play className="w-3.5 h-3.5" /> {t('timeLog.startButton')}
+          </Button>
+        </div>
+      )}
+
       {running && (
         <div className="p-3 border-b space-y-2 shrink-0 bg-primary/5">
           <div className="flex items-center gap-2">
@@ -145,7 +168,10 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
           entries.map((e) => {
             const unassigned = !e.map_id && !e.task_id && !e.node_id;
             return (
-              <div key={e.id} className={`rounded-lg border px-2.5 py-2 space-y-1.5 ${unassigned ? 'border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20' : ''}`}>
+              // karta MUSÍ mít vlastní pozadí — bez něj splývá s panelem a název
+              // úkolu + lišta výběrů vypadají jako prosvítající cizí okno
+              // (hlášení z bety 21. 8. 2026)
+              <div key={e.id} className={`rounded-lg border px-2.5 py-2 space-y-1.5 ${unassigned ? 'border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20' : 'bg-background/50'}`}>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-muted-foreground tabular-nums shrink-0">
                     {parseDate(e.started)?.toLocaleDateString(intlLocale(), { day: 'numeric', month: 'numeric' })}

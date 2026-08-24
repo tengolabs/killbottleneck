@@ -674,6 +674,14 @@ const STRINGS = {
     cs: "Hlášení se nepodařilo odeslat, zkuste to prosím za chvíli.",
     en: "The report could not be sent, please try again shortly.",
   },
+  "err.reportImageTooBig": {
+    cs: "Přiložený obrázek je moc velký (limit {mb} MB).",
+    en: "The attached image is too large (limit {mb} MB).",
+  },
+  "err.reportImageType": {
+    cs: "Přiložit jde jen obrázek PNG, JPEG nebo WebP.",
+    en: "Only PNG, JPEG or WebP images can be attached.",
+  },
   "report.headingBug": {
     cs: "Hlášení chyby z killBottlenecku",
     en: "Bug report from killBottleneck",
@@ -698,6 +706,8 @@ const STRINGS = {
   "report.boxInstance": { cs: "Instance", en: "Instance" },
   "report.boxVersion": { cs: "Verze", en: "Version" },
   "report.boxPage": { cs: "Stránka", en: "Page" },
+  "report.boxImage": { cs: "Snímek", en: "Screenshot" },
+  "report.boxImageAttached": { cs: "v příloze", en: "attached" },
   "report.boxBrowser": { cs: "Prohlížeč", en: "Browser" },
   "err.orderFailed": {
     cs: "Objednávku se nepodařilo odeslat, zkuste to prosím za chvíli.",

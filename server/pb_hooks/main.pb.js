@@ -1313,7 +1313,15 @@ cronAdd("prune_notifications", "40 3 * * *", () => {
 // v dokumentaci funkce — při změně upravit obojí, jinak si budou odporovat.
 cronAdd("prune_reports", "20 3 * * *", () => {
   try {
-    $app.db().newQuery("DELETE FROM reports WHERE created < datetime('now','-30 days')").execute();
+    // ⚠️ Mazat PŘES ZÁZNAMY, ne surovým SQL: hlášení může nést soubor (snímek
+    // obrazovky) a DELETE FROM by ho nechal v pb_data/storage navždy — přesně
+    // ta nejcitlivější data by přežívala 30denní slib zásad soukromí
+    // (nález panelu 24. 8. 2026). $app.delete() uklidí i soubor.
+    const stare = $app.findRecordsByFilter("reports", "created < {:hranice}", "", 500, 0,
+      { hranice: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().replace("T", " ") });
+    for (const rec of stare) {
+      try { $app.delete(rec); } catch (err) { /* jeden vzdorující záznam nesmí zastavit úklid */ }
+    }
   } catch (err) { /* úklid nesmí nikdy shodit server */ }
 });
 
@@ -3173,6 +3181,15 @@ kbRoute("POST", "/report", (e) => {
   const nowSec = Math.floor(Date.now() / 1000);
   const historie = (store.get(rlKey) || []).filter((x) => nowSec - x < 3600);
   if (historie.length >= 5) return e.json(429, { error: t(L, "err.reportRateLimited") });
+  // Druhý, volnější čítač na VŠECHNY pokusy včetně odmítnutých: kvóta 5/h se
+  // schválně počítá až po validacích (odmítnutý obrázek nesmí sežrat hlášení),
+  // jenže bez tohohle stropu šlo routu mlátit ~2,7MB payloady donekonečna
+  // (nález panelu 24. 8. 2026). 20/h nikoho poctivého nebrzdí.
+  const tryKey = "report_pokusy:" + e.auth.id;
+  const pokusy = (store.get(tryKey) || []).filter((x) => nowSec - x < 3600);
+  if (pokusy.length >= 20) return e.json(429, { error: t(L, "err.reportRateLimited") });
+  pokusy.push(nowSec);
+  store.set(tryKey, pokusy);
 
   const info = e.requestInfo().body || {};
   const druh = info.kind === "napad" ? "napad" : "chyba";
@@ -3182,12 +3199,24 @@ kbRoute("POST", "/report", (e) => {
   const stranka = String(info.page || "").trim().slice(0, 300);
   const prohlizec = String(info.browser || "").trim().slice(0, 300);
 
-  // ⚠️ Pokus se počítá HNED, ne až po úspěšném odeslání. Dokud se zapisoval
-  // až na konci, mohl uživatel při rozbitém SMTP tlouct routu donekonečna —
-  // každý pokus zakládal záznam v `reports` a nové SMTP spojení. Hlídač, který
-  // při chybě pustí všechno, není hlídač (nález panelu 19. 8. 2026).
-  historie.push(nowSec);
-  store.set(rlKey, historie);
+  // Volitelný snímek obrazovky (podnět z bety 21. 8. 2026). Jen rastr a max
+  // 2 MB — dialog snímek před odesláním zmenšuje, limit je pojistka. Validace
+  // MUSÍ být před připočtením pokusu: moc velký obrázek nesmí žrát kvótu.
+  const MAX_IMG_MB = 2;
+  const imgB64 = String(info.image_base64 || "");
+  let imgExt = "";
+  if (imgB64) {
+    if (imgB64.length * 3 / 4 > MAX_IMG_MB * 1024 * 1024) {
+      return e.json(400, { error: t(L, "err.reportImageTooBig", { mb: MAX_IMG_MB }) });
+    }
+    // ze jména od klienta se bere VÝHRADNĚ přípona z bezpečné abecedy (vzor llm.js)
+    const mExt = String(info.image_name || "").toLowerCase().match(/\.(png|jpe?g|webp)$/);
+    if (!mExt) return e.json(400, { error: t(L, "err.reportImageType") });
+    imgExt = mExt[1];
+    // jen standardní base64 abeceda — garbage (i data:URI prefix) ať dostane
+    // srozumitelnou 400, ne výjimku z `base64 -d` (nález panelu 24. 8. 2026)
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(imgB64)) return e.json(400, { error: t(L, "err.reportImageType") });
+  }
 
   const inst = instanceInfo($app, "");
   // ⚠️ ADRESA ODCHÁZÍ JEN NA VÝSLOVNÉ PŘÁNÍ. Richard 19. 8. 2026: „nepotřebujeme
@@ -3212,55 +3241,115 @@ kbRoute("POST", "/report", (e) => {
         { label: t(L, "report.boxVersion"), hodnota: env("VERSION") || "" },
         { label: t(L, "report.boxPage"), hodnota: stranka },
         { label: t(L, "report.boxBrowser"), hodnota: prohlizec },
+        // žádné data: URI do HTML (Gmail je zahazuje) — snímek jde jako příloha
+        { label: t(L, "report.boxImage"), hodnota: imgB64 ? t(L, "report.boxImageAttached") : "" },
       ].filter((r) => r.hodnota),
     },
     paticka: patickaRadky(t, L, inst.base),
     domov: inst.base || WEB,
   };
 
-  // Záznam vzniká PŘED odesláním: uživatel má v aplikaci vidět, co už nahlásil
-  // (Richard 18. 8. 2026), a když selže pošta, hlášení se aspoň neztratí.
-  let zaznam = null;
+  // Snímek: base64 → binárka přes dočasný soubor (vzor llm.js — čistě JS dekód
+  // by v goja jen žral paměť). Úklid MUSÍ proběhnout i po chybě, proto finally.
+  let imgB64Path = null, imgPath = null;
   try {
-    zaznam = new Record($app.findCollectionByNameOrId("reports"));
-    zaznam.set("kind", druh);
-    zaznam.set("text", text);
-    zaznam.set("page", stranka);
-    zaznam.set("browser", prohlizec);
-    zaznam.set("version", env("VERSION") || "");
-    zaznam.set("owner", e.auth.id);
-    // ⚠️ Tohle NEODCHÁZÍ z instance — drží jen seznam „co jsem už nahlásil"
-    // pro samotného pisatele (RLS: vidí jen svoje).
-    zaznam.set("owner_email", odesilatel);
-    zaznam.set("sent", false);
-    $app.save(zaznam);
-  } catch (err) {
-    // Neuložení nesmí zabránit odeslání — mail je to podstatné, seznam pomůcka.
-    try { $app.logger().warn("report: záznam se neuložil", "error", String(err)); } catch (e2) { /* log je bonus */ }
-    zaznam = null;
-  }
+    if (imgB64) {
+      const stem = $os.tempDir() + "/kb-report-" + $security.randomString(12);
+      imgB64Path = stem + ".b64";
+      imgPath = stem + "." + imgExt;
+      $os.writeFile(imgB64Path, imgB64, 0o600);
+      // cílový soubor založit s 0600 PŘED redirektem — jinak vznikne dle umask
+      // a snímek je po dobu zpracování čitelný ostatním účtům na hostiteli
+      $os.writeFile(imgPath, "", 0o600);
+      try {
+        $os.cmd("sh", "-c", "base64 -d < '" + imgB64Path + "' > '" + imgPath + "'").run();
+      } catch (err) {
+        return e.json(400, { error: t(L, "err.reportImageType") });
+      }
+      // obsah musí být opravdu ten rastr, který tvrdí přípona — mime kontrola
+      // FileFieldu se při neuložení záznamu tiše spolkne a příloha by odešla
+      // mailem tak jako tak (nález panelu 24. 8. 2026)
+      const surove = $os.readFile(imgPath);   // dle prostředí string, nebo pole čísel
+      const bajt = (i) => (typeof surove === "string" ? surove.charCodeAt(i) & 0xff : surove[i]);
+      const sedi = (imgExt === "png" && surove.length > 8 && bajt(0) === 0x89 && bajt(1) === 0x50 && bajt(2) === 0x4e && bajt(3) === 0x47)
+        || (imgExt !== "png" && imgExt !== "webp" && surove.length > 3 && bajt(0) === 0xff && bajt(1) === 0xd8 && bajt(2) === 0xff)
+        || (imgExt === "webp" && surove.length > 12 && bajt(0) === 0x52 && bajt(1) === 0x49 && bajt(2) === 0x46 && bajt(3) === 0x46
+            && bajt(8) === 0x57 && bajt(9) === 0x45 && bajt(10) === 0x42 && bajt(11) === 0x50);
+      if (!sedi) return e.json(400, { error: t(L, "err.reportImageType") });
+    }
 
-  const zprava = new MailerMessage({
-    from: { address: $app.settings().meta.senderAddress, name: $app.settings().meta.senderName },
-    to: [{ address: komu }],
-    subject: t(L, druh === "napad" ? "report.subjectIdea" : "report.subjectBug", { verze: env("VERSION") || "?" }),
-    html: mailHtml(podklad),
-    text: mailText(podklad),
-  });
-  // Reply-To jen když člověk o odpověď stojí — jinak by adresa odešla i tak
-  if (chceOdpoved && odesilatel) zprava.headers = { "Reply-To": odesilatel };
+    // ⚠️ Pokus se počítá HNED po validacích, ne až po úspěšném odeslání. Dokud
+    // se zapisoval až na konci, mohl uživatel při rozbitém SMTP tlouct routu
+    // donekonečna — každý pokus zakládal záznam v `reports` a nové SMTP spojení.
+    // Hlídač, který při chybě pustí všechno, není hlídač (nález panelu 19. 8.).
+    // Odmítnutý obrázek (velikost/typ/obsah) kvótu neužírá — na hrubou sílu je
+    // volnější čítač report_pokusy nahoře.
+    historie.push(nowSec);
+    store.set(rlKey, historie);
 
-  try {
-    $app.newMailClient().send(zprava);
-  } catch (err) {
-    try { $app.logger().warn("report: odeslání selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
-    return e.json(502, { error: t(L, "err.reportSendFailed") });
-  }
+    // Záznam vzniká PŘED odesláním: uživatel má v aplikaci vidět, co už nahlásil
+    // (Richard 18. 8. 2026), a když selže pošta, hlášení se aspoň neztratí.
+    let zaznam = null;
+    try {
+      zaznam = new Record($app.findCollectionByNameOrId("reports"));
+      zaznam.set("kind", druh);
+      zaznam.set("text", text);
+      zaznam.set("page", stranka);
+      zaznam.set("browser", prohlizec);
+      zaznam.set("version", env("VERSION") || "");
+      zaznam.set("owner", e.auth.id);
+      // ⚠️ Tohle NEODCHÁZÍ z instance — drží jen seznam „co jsem už nahlásil"
+      // pro samotného pisatele (RLS: vidí jen svoje).
+      zaznam.set("owner_email", odesilatel);
+      zaznam.set("sent", false);
+      // snímek se ukládá i k záznamu: pisatel ho vidí v „Už jste nahlásili"
+      // a při výpadku pošty se neztratí; maže ho prune_reports s celým záznamem.
+      // ⚠️ Schválně MIMO bránu KB_FILES_MB — ta je o zákaznických datech
+      // (v cloudu vypnutá), tohle je jednorázový snímek pro operátora.
+      if (imgPath) zaznam.set("image", $filesystem.fileFromPath(imgPath));
+      $app.save(zaznam);
+    } catch (err) {
+      // Neuložení nesmí zabránit odeslání — mail je to podstatné, seznam pomůcka.
+      try { $app.logger().warn("report: záznam se neuložil", "error", String(err)); } catch (e2) { /* log je bonus */ }
+      zaznam = null;
+    }
 
-  if (zaznam) {
-    try { zaznam.set("sent", true); $app.save(zaznam); } catch (err) { /* mail už odešel, příznak je bonus */ }
+    const zprava = new MailerMessage({
+      from: { address: $app.settings().meta.senderAddress, name: $app.settings().meta.senderName },
+      to: [{ address: komu }],
+      subject: t(L, druh === "napad" ? "report.subjectIdea" : "report.subjectBug", { verze: env("VERSION") || "?" }),
+      html: mailHtml(podklad),
+      text: mailText(podklad),
+    });
+    // Reply-To jen když člověk o odpověď stojí — jinak by adresa odešla i tak
+    if (chceOdpoved && odesilatel) zprava.headers = { "Reply-To": odesilatel };
+    // Skutečná SMTP příloha — žádné URL instance do mailu (název instance NIKDY).
+    // ⚠️ attachments chce io.Reader: fileFromPath sám o sobě nestačí, čtečku
+    // vrací až .reader.open() — ověřeno testem hlaseni-chyby na živém kontejneru.
+    let ctecka = null;
+    if (imgPath) {
+      ctecka = $filesystem.fileFromPath(imgPath).reader.open();
+      zprava.attachments = { ["snimek." + imgExt]: ctecka };
+    }
+
+    try {
+      $app.newMailClient().send(zprava);
+    } catch (err) {
+      try { $app.logger().warn("report: odeslání selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+      return e.json(502, { error: t(L, "err.reportSendFailed") });
+    } finally {
+      // čtečku zavřít vždy — jinak každé hlášení se snímkem nechá viset file descriptor
+      if (ctecka) { try { ctecka.close(); } catch (err) { /* nevadí */ } }
+    }
+
+    if (zaznam) {
+      try { zaznam.set("sent", true); $app.save(zaznam); } catch (err) { /* mail už odešel, příznak je bonus */ }
+    }
+    return e.json(200, { success: true });
+  } finally {
+    if (imgB64Path) { try { $os.remove(imgB64Path); } catch (err) { /* nevadí */ } }
+    if (imgPath) { try { $os.remove(imgPath); } catch (err) { /* nevadí */ } }
   }
-  return e.json(200, { success: true });
 }, $apis.requireAuth());
 
 // Obnova hesla RUKOU SPRÁVCE — jediná cesta na instanci bez SMTP.

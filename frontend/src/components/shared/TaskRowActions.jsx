@@ -14,7 +14,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, CalendarClock, CalendarCheck, Star } from 'lucide-react';
 import { availableActions, markDone, setStatus, plan, unplan, planState, toTarget } from '@/lib/taskActions';
-import { focusStateOf, setFocus, restoreFocus } from '@/lib/focus';
+import { focusStateOf, setFocus, clearFocusOf, restoreFocus } from '@/lib/focus';
 import { useAuth } from '@/lib/AuthContext';
 
 const BTN = 'inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground ' +
@@ -138,11 +138,15 @@ export default function TaskRowActions({ item, onDone, onError, className = '', 
               {focusStateOf(user, item) && (
                 <button
                   type="button"
+                  data-focus-clear
                   className="px-3 py-1.5 text-left text-sm text-muted-foreground hover:bg-secondary border-t mt-1 pt-2"
                   onClick={(e) => {
                     stop(e);
                     setFocusOpen(false);
-                    run('focus', () => setFocus(user, patchUser, focusStateOf(user, item), null), t('rowActions.focusCleared'));
+                    // i zrušení má vrácení jedním klikem — stejný vzor jako označení dne
+                    const prevFocus = user?.focus && typeof user.focus === 'object' ? { ...user.focus } : {};
+                    run('focus', () => clearFocusOf(user, patchUser, item),
+                      t('rowActions.focusCleared'), () => restoreFocus(user, patchUser, prevFocus));
                   }}
                 >
                   {t('rowActions.focusClear')}

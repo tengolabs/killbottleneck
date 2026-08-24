@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Bug, Lightbulb, Loader2, Send, Check } from 'lucide-react';
+import { Bug, Lightbulb, Loader2, Send, Check, ImagePlus, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,35 @@ function nazevStranky(cesta, t) {
   return znamy || t('report.stranky.jina');
 }
 
+// Snímek se zmenšuje UŽ v prohlížeči (max hrana 1600 px, JPEG): 4K screenshot
+// má klidně 6 MB a limit routy jsou 2 MB — po převodu zbývá ~250 kB.
+const zmensiSnimek = (soubor) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(soubor);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const pomer = Math.min(1, 1600 / Math.max(img.width, img.height, 1));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * pomer));
+    canvas.height = Math.max(1, Math.round(img.height * pomer));
+    const ctx = canvas.getContext('2d');
+    // JPEG průhlednost neumí — bez podkladu by alfa z PNG skončila černá
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob'))), 'image/jpeg', 0.82);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+  img.src = url;
+});
+
+const doBase64 = (blob) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(String(r.result).split(',', 2)[1] || '');
+  r.onerror = () => reject(new Error('read'));
+  r.readAsDataURL(blob);
+});
+
 export default function ReportDialog({ open, onClose, userEmail, version }) {
   const { t } = useTranslation('popis');
   const nsReady = useLazyNs('popis');
@@ -43,18 +72,46 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
   // odpověď, řekne si o ni sám.
   const [chciOdpoved, setChciOdpoved] = useState(false);
   const [historie, setHistorie] = useState(null);   // null = ještě nenačteno
+  // Snímek obrazovky — podnět z bety 21. 8. 2026: „blbě se to popisuje,
+  // obrázek řekne víc." Vložit jde Ctrl+V do textu i výběrem souboru.
+  const [snimek, setSnimek] = useState(null);       // { blob, url }
+  const souborRef = useRef(null);
+
+  const odeberSnimek = () => setSnimek((s) => { if (s) URL.revokeObjectURL(s.url); return null; });
+  // revoke i při odmountování s vloženým snímkem (navigace pryč z dialogu)
+  const snimekRef = useRef(null);
+  snimekRef.current = snimek;
+  useEffect(() => () => { if (snimekRef.current) URL.revokeObjectURL(snimekRef.current.url); }, []);
+  const prijmiSoubor = async (soubor) => {
+    if (!soubor || !String(soubor.type).startsWith('image/')) return;
+    try {
+      const blob = await zmensiSnimek(soubor);
+      setSnimek((s) => { if (s) URL.revokeObjectURL(s.url); return { blob, url: URL.createObjectURL(blob) }; });
+      setChyba('');
+    } catch {
+      setChyba(t('report.prilohaChyba'));
+    }
+  };
 
   // Vlastní hlášení — ať člověk nehlásí podruhé totéž. RLS pustí jen jeho
   // vlastní záznamy, takže se čte kolekce přímo, bez další routy.
+  // Snímky jsou protected → miniatura potřebuje krátkodobý file token
+  // (vzor node_files.downloadUrl); bez tokenu se prostě neukáže.
+  const [fileToken, setFileToken] = useState('');
   const nactiHistorii = () => {
     pb.collection('reports')
       .getList(1, 5, { sort: '-created' })
-      .then((r) => setHistorie(r.items || []))
+      .then((r) => {
+        setHistorie(r.items || []);
+        if ((r.items || []).some((h) => h.image)) {
+          pb.files.getToken().then(setFileToken).catch(() => {});
+        }
+      })
       .catch(() => setHistorie([]));   // starší instance kolekci nemá — seznam se prostě neukáže
   };
   useEffect(() => { if (open) nactiHistorii(); }, [open]);
 
-  const reset = () => { setDruh('chyba'); setText(''); setHotovo(false); setChyba(''); setOdesilam(false); setChciOdpoved(false); };
+  const reset = () => { setDruh('chyba'); setText(''); setHotovo(false); setChyba(''); setOdesilam(false); setChciOdpoved(false); odeberSnimek(); };
   const zavri = () => { reset(); onClose(); };
 
   const odesli = async () => {
@@ -68,6 +125,7 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
         page: window.location.pathname,
         browser: navigator.userAgent,
         reply: chciOdpoved,   // jen tohle rozhodne, jestli se přiloží adresa
+        ...(snimek ? { image_base64: await doBase64(snimek.blob), image_name: 'snimek.jpg' } : {}),
       });
       setHotovo(true);
       nactiHistorii();
@@ -128,10 +186,38 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
                 id="report-text"
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, 5000))}
+                onPaste={(e) => {
+                  const obr = [...(e.clipboardData?.items || [])].find((i) => i.kind === 'file' && i.type.startsWith('image/'));
+                  if (obr) { e.preventDefault(); prijmiSoubor(obr.getAsFile()); }
+                }}
                 placeholder={druh === 'napad' ? t('report.placeholderNapad') : t('report.placeholderChyba')}
                 rows={6}
               />
             </div>
+
+            {snimek ? (
+              <div className="flex items-center gap-2" data-report-priloha-nahled>
+                <img src={snimek.url} alt="" className="h-14 max-w-[10rem] rounded border object-cover" />
+                <Button variant="ghost" size="sm" onClick={odeberSnimek}>
+                  <X className="w-4 h-4" /> {t('report.prilohaOdebrat')}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => souborRef.current?.click()} data-report-priloha>
+                  <ImagePlus className="w-4 h-4" /> {t('report.priloha')}
+                </Button>
+                <span className="text-[11px] text-muted-foreground">{t('report.prilohaHint')}</span>
+                <input
+                  ref={souborRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  data-report-priloha-input
+                  onChange={(e) => { prijmiSoubor(e.target.files?.[0]); e.target.value = ''; }}
+                />
+              </div>
+            )}
 
             {/* Chci odpověď = jediná cesta, jak z aplikace odejde adresa. */}
             <label className="flex items-start gap-2 text-sm cursor-pointer">
@@ -155,6 +241,7 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
                 <li>· {t('report.coOdejdeVerze')}{version ? `: ${version}` : ''}</li>
                 <li>· {t('report.coOdejdeStranka')}: {nazevStranky(window.location.pathname, t)}</li>
                 <li className="truncate" title={navigator.userAgent}>· {t('report.coOdejdeProhlizec')}</li>
+                {snimek && <li>· {t('report.coOdejdeSnimek')}</li>}
                 <li className={chciOdpoved ? 'text-foreground' : ''}>
                   · {chciOdpoved ? `${t('report.coOdejdeAdresa')}: ${userEmail || ''}` : t('report.bezAdresy')}
                 </li>
@@ -172,6 +259,10 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
                       {h.kind === 'napad'
                         ? <Lightbulb className="w-3 h-3 shrink-0 mt-0.5" aria-hidden="true" />
                         : <Bug className="w-3 h-3 shrink-0 mt-0.5" aria-hidden="true" />}
+                      {h.image && fileToken && (
+                        <img src={pb.files.getURL(h, h.image, { token: fileToken })} alt="" loading="lazy"
+                          className="w-5 h-5 rounded border object-cover shrink-0" />
+                      )}
                       <span className="truncate" title={h.text}>{h.text}</span>
                       <span className="ml-auto shrink-0 tabular-nums">
                         {new Date(h.created).toLocaleDateString()}

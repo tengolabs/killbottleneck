@@ -96,6 +96,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const panelText2 = await page.evaluate(() => document.body.innerText);
     expect(/\d{1,2}:\d{2}–\d{1,2}:\d{2}/.test(panelText2), 'záznam v panelu ukazuje od–do');
 
+    // start PŘÍMO z panelu — uživatel z bety ho tu hledal (24. 8. 2026);
+    // po zastavení výše nic neběží, takže tlačítko musí být vidět a fungovat
+    const startBtn = await page.$('[data-timelog-start]');
+    expect(!!startBtn, 'panel bez běžícího měření nabízí Spustit měření času');
+    await startBtn.click();
+    await sleep(1200);
+    const poStartu = await page.evaluate(async () => {
+      const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
+      const r = await fetch(`/api/collections/time_entries/records?filter=${encodeURIComponent("ended = ''")}`, { headers: { Authorization: auth.token } });
+      return {
+        bezi: (await r.json()).items?.length ?? -1,
+        tlacitkoPryc: !document.querySelector('[data-timelog-start]'),
+        stopJe: [...document.querySelectorAll('button')].some((b) => (b.innerText || '').trim() === 'Stop'),
+      };
+    });
+    expect(poStartu.bezi === 1, `Start v panelu spustil měření (běží ${poStartu.bezi})`);
+    expect(poStartu.tlacitkoPryc && poStartu.stopJe, 'tlačítko Start zmizelo a nabízí se Stop');
+    for (const h of await page.$$('button')) {
+      const t = await h.evaluate((el) => el.innerText || '');
+      if (t.trim() === 'Stop') { await h.click(); break; }
+    }
+    await sleep(1200);
+
     console.log('== tabulka úkolů ==');
     await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle2' });
     await sleep(1500);

@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.41.1-beta": {
+    cs: [
+      "K hlášení chyby teď přiložíte snímek obrazovky — stačí ho vložit klávesami Ctrl+V.",
+      "Hvězdička „nejdůležitější dnes/zítra“ se při přepnutí dne správně přepne a zrušení ji smaže úplně.",
+      "Měření času jde nově spustit i tlačítkem přímo v levém panelu.",
+      "Záznamy v panelu Měření času mají vlastní podklad a splývají méně s okolím.",
+    ],
+    en: [
+      "Bug reports can now carry a screenshot — just paste it with Ctrl+V.",
+      "The “top today/tomorrow” star switches correctly when you change the day, and clearing removes it everywhere.",
+      "Time tracking can now be started right from the left panel.",
+      "Entries in the time-tracking panel got their own background and blend less with their surroundings.",
+    ],
+  },
   "v0.41-beta": {
     cs: [
       "Kdo mapu spravuje úrovní Upravovat, může ji teď i sdílet dalším lidem.",

@@ -14,6 +14,7 @@ const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, con
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // klik na hvězdu v řádku s daným titulkem + volba dne v rozbalovátku
+// (when = 'today'/'tomorrow', nebo 'clear' = položka „zrušit fokus")
 async function markFocus(page, title, when) {
   const btn = await page.evaluateHandle((tt) => {
     const rows = [...document.querySelectorAll('div')].filter((el) =>
@@ -24,7 +25,7 @@ async function markFocus(page, title, when) {
   if (!btn.asElement()) return false;
   await btn.asElement().click();
   await sleep(300);
-  const opt = await page.$(`[data-focus-when="${when}"]`);
+  const opt = await page.$(when === 'clear' ? '[data-focus-clear]' : `[data-focus-when="${when}"]`);
   if (!opt) return false;
   await opt.click();
   await sleep(1200);
@@ -138,6 +139,55 @@ const badgeInfo = (page) => page.evaluate(() => {
     const whens = badges.map((b) => b.when).sort();
     expect(badges.length === 2 && whens.join(',') === 'today,tomorrow',
       `dnes i zítra vedle sebe (${JSON.stringify(badges)})`);
+
+    console.log('== STEJNÝ úkol dnes → zítra: štítek se přepne a záznam je právě jeden ==');
+    // chyba z bety 21. 8. 2026: cíl zůstal pod OBĚMA dny a štítek navždy hlásil „dnes"
+    expect(await markFocus(page, 'FOKUS-A', 'tomorrow'), 'hvězda → Zítra u FOKUS-A (byl Dnes)');
+    badges = await badgeInfo(page);
+    expect(badges.length === 1 && badges[0].when === 'tomorrow' && badges[0].text.includes('FOKUS-A'),
+      `FOKUS-A má jediný badge a je „zítra" (${JSON.stringify(badges)})`);
+    const poPrepnuti = await page.evaluate(async () => {
+      const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
+      const r = await (await fetch(`/api/collections/users/records/${auth.record?.id || auth.model?.id}`,
+        { headers: { Authorization: auth.token } })).json();
+      return r.focus;
+    });
+    expect(poPrepnuti && Object.keys(poPrepnuti).length === 1,
+      `na účtu je právě JEDEN záznam fokusu (${JSON.stringify(poPrepnuti)})`);
+    expect(await markFocus(page, 'FOKUS-A', 'today'), 'a zpět: Zítra → Dnes');
+    badges = await badgeInfo(page);
+    expect(badges.length === 1 && badges[0].when === 'today',
+      `po návratu jediný badge „dnes" (${JSON.stringify(badges)})`);
+
+    console.log('== zrušení maže cíl z OBOU dnů (špinavá data starších účtů) ==');
+    const tomorrowKey = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-CA'); })();
+    await page.evaluate(async (today, tomorrowKey) => {
+      const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
+      const H = { 'Content-Type': 'application/json', Authorization: auth.token };
+      const id = auth.record?.id || auth.model?.id;
+      const me = await (await fetch(`/api/collections/users/records/${id}`, { headers: H })).json();
+      const entry = (me.focus || {})[today]; // FOKUS-A z předchozího kroku
+      await fetch(`/api/collections/users/records/${id}`, {
+        method: 'PATCH', headers: H,
+        body: JSON.stringify({ focus: { [today]: entry, [tomorrowKey]: entry } }),
+      });
+    }, today, tomorrowKey);
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
+    await sleep(2000);
+    expect(await markFocus(page, 'FOKUS-A', 'clear'), 'hvězda → zrušit fokus u FOKUS-A');
+    badges = await badgeInfo(page);
+    const poZruseni = await page.evaluate(async () => {
+      const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
+      const r = await (await fetch(`/api/collections/users/records/${auth.record?.id || auth.model?.id}`,
+        { headers: { Authorization: auth.token } })).json();
+      return r.focus;
+    });
+    expect(badges.length === 0 && (!poZruseni || Object.keys(poZruseni).length === 0),
+      `po zrušení žádný badge a účet bez záznamů (${JSON.stringify({ badges, poZruseni })})`);
+
+    // stav pro lite kontrolu níže: dnešní FOKUS-A + zítřejší FOKUS-B
+    expect(await markFocus(page, 'FOKUS-A', 'today'), 'obnova: FOKUS-A na Dnes');
+    expect(await markFocus(page, 'FOKUS-B', 'tomorrow'), 'obnova: FOKUS-B na Zítra');
 
     console.log('== lite: hvězda i na telefonu ==');
     await page.setViewport(PHONE);

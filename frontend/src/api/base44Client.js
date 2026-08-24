@@ -406,10 +406,12 @@ export const base44 = {
   // Hlášení chyby nebo nápadu provozovateli. Server routu vůbec nemá, když
   // není nastavené KB_REPORT_TO — proto se tlačítko ukazuje jen podle
   // `report_enabled` z /api/kb/config.
-  async reportIssue({ kind, text, page, browser, reply }) {
+  async reportIssue({ kind, text, page, browser, reply, image_base64, image_name }) {
     return await pb.send('/api/kb/report', {
       method: 'POST',
-      body: { kind, text, page, browser, reply: !!reply },
+      // snímek jde jako base64 v JSONu (vzor audio přepisu) — multipart by
+      // rozbil jednotný tvar requestInfo().body v routě
+      body: { kind, text, page, browser, reply: !!reply, ...(image_base64 ? { image_base64, image_name } : {}) },
     });
   },
 

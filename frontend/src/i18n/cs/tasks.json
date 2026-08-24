@@ -216,7 +216,9 @@
     "recordedDescInbox": "{{minutes}} min — poznámka uložena i do zásobníku nápadů",
     "stopFailed": "Zastavení se nepovedlo",
     "confirmDeleteEntry": "Opravdu smazat záznam {{time}}?",
-    "confirmDeleteEntryNote": "Opravdu smazat záznam {{time}} („{{note}}\")?"
+    "confirmDeleteEntryNote": "Opravdu smazat záznam {{time}} („{{note}}\")?",
+    "startButton": "Spustit měření času",
+    "startFailed": "Spuštění se nepovedlo"
   },
   "timeSummary": {
     "heading": "Odpracovaný čas",

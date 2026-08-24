@@ -20,13 +20,15 @@ const entryFor = (user, when) => {
   return f && typeof f === 'object' ? f[focusDateKey(when)] || null : null;
 };
 
+const isSameTarget = (e, t) =>
+  !!e && !!t && e.kind === t.kind && e.id === t.id && String(e.map || '') === String(t.mapId || '');
+
 // → 'today' | 'tomorrow' | null — je TENHLE řádek můj nejdůležitější?
 export const focusStateOf = (user, item) => {
   const t = toTarget(item);
   if (!t || t.kind === 'idea') return null;
   for (const when of ['today', 'tomorrow']) {
-    const e = entryFor(user, when);
-    if (e && e.kind === t.kind && e.id === t.id && String(e.map || '') === String(t.mapId || '')) return when;
+    if (isSameTarget(entryFor(user, when), t)) return when;
   }
   return null;
 };
@@ -53,9 +55,28 @@ export const setFocus = async (user, patchUser, when, item) => {
   if (item) {
     const t = toTarget(item);
     if (!t || t.kind === 'idea') return prev;
+    // JEDEN cíl smí být fokusem jen JEDNOHO dne — před zápisem ho smazat
+    // z ostatních dnů, jinak štítek u řádku navždy hlásí ten dřívější den.
+    for (const k of Object.keys(clean)) if (isSameTarget(clean[k], t)) delete clean[k];
     clean[key] = { kind: t.kind, id: t.id, map: String(t.mapId || '') };
   } else {
     delete clean[key];
+  }
+  if (user?.id) await base44.entities.User.update(user.id, { focus: clean });
+  patchUser?.({ focus: clean });
+  return prev;
+};
+
+// Zrušit fokus KONKRÉTNÍHO řádku — maže ho ze všech dnů naráz (starší účty
+// můžou mít tentýž cíl uložený pod dneškem i zítřkem z dob před výlučností).
+export const clearFocusOf = async (user, patchUser, item) => {
+  const prev = user?.focus && typeof user.focus === 'object' ? { ...user.focus } : {};
+  const t = toTarget(item);
+  if (!t) return prev;
+  const clean = {};
+  for (const w of ['today', 'tomorrow']) {
+    const k = focusDateKey(w);
+    if (prev[k] && !isSameTarget(prev[k], t)) clean[k] = prev[k];
   }
   if (user?.id) await base44.entities.User.update(user.id, { focus: clean });
   patchUser?.({ focus: clean });

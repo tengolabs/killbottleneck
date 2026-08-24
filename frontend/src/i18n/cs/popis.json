@@ -50,6 +50,11 @@
     "chciOdpoved": "Chci odpověď — přiložit moji e-mailovou adresu",
     "coOdejdeVerze": "verze aplikace",
     "coOdejdeAdresa": "vaše adresa",
-    "bezAdresy": "vaše adresa ani název firmy NE"
+    "bezAdresy": "vaše adresa ani název firmy NE",
+    "priloha": "Přiložit snímek obrazovky",
+    "prilohaHint": "nebo ho vložte do textu klávesami Ctrl+V",
+    "prilohaOdebrat": "Odebrat snímek",
+    "prilohaChyba": "Obrázek se nepodařilo zpracovat.",
+    "coOdejdeSnimek": "přiložený snímek obrazovky"
   }
 }

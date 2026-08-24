@@ -175,6 +175,60 @@ const ucet = async (email) => {
     // zůstanou („instance {127.0.0.1}"), takže hledat samotné {org} nestačí.
     ok(!/\{[^}\n]*\}/.test((mn.match(/^Subject:.*$/m) || [''])[0]), 'v předmětu nezůstaly složené závorky kolem hodnoty');
 
+    console.log('== snímek obrazovky: dojde jako skutečná příloha ==');
+    // Podnět z bety 21. 8. 2026. Snímek jde jako base64 v JSONu a mailem jako
+    // SKUTEČNÁ příloha — žádné URL instance (neprozrazovat firmu) ani data: URI
+    // (Gmail je zahazuje). Vlastní účet, ať se nepletou kvóty s dřívějšími kroky.
+    const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const ts = await ucet('snimkar@example.com');
+    maily.length = 0;
+    const rs = await api('POST', '/api/kb/report', { token: ts, body: {
+      kind: 'chyba', text: 'Tohle je vidět jen na obrázku.', image_base64: PNG_B64, image_name: 'snimek.png' } });
+    ok(rs.status === 200, `hlášení se snímkem přijato (${rs.status} ${rs.json && rs.json.error ? rs.json.error : ''})`);
+    await sleep(1500);
+    const ms = maily[0] || '';
+    ok(/Content-Disposition:\s*attachment/i.test(ms) && /snimek\.png/.test(ms), 'mail nese skutečnou přílohu snimek.png');
+    ok(ms.includes('iVBORw0KGgo'), 'a v příloze jsou data obrázku (PNG signatura)');
+    ok(!/data:image/i.test(ms), 'žádné data: URI v těle (Gmail je zahazuje)');
+    ok(/v příloze|attached/i.test(dekoduj(ms)), 'karta v mailu snímek přiznává');
+    // snímek zůstal u záznamu — pisatel ho vidí v „Už jste nahlásili" a při
+    // výpadku pošty se neztratí; maže ho prune_reports s celým záznamem
+    const seznamS = await api('GET', '/api/collections/reports/records?perPage=5&sort=-created', { token: ts });
+    const zaznamS = (seznamS.json.items || [])[0];
+    ok(zaznamS && zaznamS.image, `záznam nese soubor (${zaznamS ? zaznamS.image || 'PRÁZDNÉ' : '—'})`);
+    if (zaznamS && zaznamS.image) {
+      // ⚠️ Soubor je PROTECTED: bez tokenu ho nesmí dostat NIKDO — snímek
+      // obrazovky je nejcitlivější věc v kolekci a zásady slibují „jen vy".
+      const bez = await fetch(`${BASE}/api/files/reports/${zaznamS.id}/${zaznamS.image}`);
+      ok(bez.status !== 200, `bez file tokenu se snímek NEVYDÁ (${bez.status})`);
+      const ftok = (await api('POST', '/api/files/token', { token: ts })).json.token;
+      const fr = await fetch(`${BASE}/api/files/reports/${zaznamS.id}/${zaznamS.image}?token=${ftok}`);
+      const bytes = Buffer.from(await fr.arrayBuffer());
+      ok(fr.status === 200 && bytes.length > 0 && bytes.slice(1, 4).toString() === 'PNG',
+        `s tokenem pisatele jde stáhnout a je to PNG (${fr.status}, ${bytes.length} B)`);
+    }
+
+    console.log('== ochrany snímku ==');
+    const velky = 'A'.repeat(3 * 1024 * 1024);   // ~2,2 MB po dekódování, limit 2 MB
+    const rv = await api('POST', '/api/kb/report', { token: ts, body: { kind: 'chyba', text: 'moc velký obrázek', image_base64: velky, image_name: 'x.png' } });
+    ok(rv.status === 400, `moc velký obrázek odmítnut (${rv.status})`);
+    const rt = await api('POST', '/api/kb/report', { token: ts, body: { kind: 'chyba', text: 'špatný typ souboru', image_base64: PNG_B64, image_name: 'x.svg' } });
+    ok(rt.status === 400, `SVG a jiné ne-rastrové typy odmítnuty (${rt.status})`);
+    // garbage base64 nesmí skončit 500 (výjimka z base64 -d) — srozumitelná 400
+    const rg = await api('POST', '/api/kb/report', { token: ts, body: { kind: 'chyba', text: 'rozbité base64', image_base64: 'data:image/png;base64,©©©', image_name: 'x.png' } });
+    ok(rg.status === 400, `rozbité base64 dostane 400, ne 500 (${rg.status})`);
+    // obsah, co neodpovídá příponě (text vydávaný za PNG) — magic bytes ho chytí
+    const rf = await api('POST', '/api/kb/report', { token: ts, body: { kind: 'chyba', text: 'binárka vydávaná za obrázek', image_base64: Buffer.from('MZ tohle neni obrazek ale binarka').toString('base64'), image_name: 'x.png' } });
+    ok(rf.status === 400, `obsah neodpovídající rastru odmítnut (${rf.status})`);
+    // ⚠️ Odmítnutý obrázek NESMÍ užírat kvótu 5/h — validace je před počítáním
+    // pokusu. Kdyby užíral, čtvrté z těchto hlášení by dostalo 429.
+    let proslo = 0;
+    for (let i = 0; i < 4; i++) {
+      const r = await api('POST', '/api/kb/report', { token: ts, body: { kind: 'chyba', text: `kontrola kvóty po odmítnutí ${i}` } });
+      if (r.status === 200) proslo++;
+    }
+    ok(proslo === 4, `odmítnuté obrázky neužírají kvótu (prošlo ${proslo}/4)`);
+
     console.log('== seznam odeslaných hlášení ==');
     // Richard 18. 8. 2026: „ať vím, co už jsem nahlásil a nedělám to znovu."
     const moje = await api('GET', '/api/collections/reports/records?perPage=10&sort=-created', { token });
@@ -247,10 +301,17 @@ const ucet = async (email) => {
       { body: { identity: SU2.email, password: SU2.pw } })).json.token;
     const predUklidem = (await api('GET', '/api/collections/reports/records?perPage=200', { token: st2 })).json;
     ok(predUklidem.totalItems >= 2, `je co uklízet (${predUklidem.totalItems} záznamů, z toho staré)`);
+    // ⚠️ Úklid musí smazat i SOUBORY snímků ze storage — surové SQL je nechávalo
+    // ležet na disku navždy (nález panelu 24. 8. 2026); proto se maže přes záznamy.
+    const souboruPredUklidem = parseInt(execSync(`docker exec ${NAME} sh -c "find /app/pb_data/storage -type f 2>/dev/null | wc -l"`).toString().trim(), 10);
+    ok(souboruPredUklidem >= 1, `před úklidem je ve storage aspoň snímek (${souboruPredUklidem})`);
     await api('POST', '/api/crons/prune_reports', { token: st2 });
     await sleep(1500);
     const poUklidu = (await api('GET', '/api/collections/reports/records?perPage=200', { token: st2 })).json;
     ok(poUklidu.totalItems === 1, `úklid smazal STARÉ (${predUklidem.totalItems} → ${poUklidu.totalItems})`);
+    const souboruPoUklidu = parseInt(execSync(`docker exec ${NAME} sh -c "find /app/pb_data/storage -type f 2>/dev/null | wc -l"`).toString().trim(), 10);
+    ok(souboruPoUklidu < souboruPredUklidem,
+      `a zmizely i soubory snímků ze storage (${souboruPredUklidem} → ${souboruPoUklidu})`);
     const zbyl = (poUklidu.items || [])[0];
     ok(zbyl && !zbyl.created.startsWith('2020'),
       `a čerstvý záznam NECHAL — dotaz nemaže všechno (zbyl z ${zbyl ? zbyl.created.slice(0, 10) : '—'})`);
