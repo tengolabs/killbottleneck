@@ -443,6 +443,10 @@ přiložený skript:
 
 (Ručně: záloha = zkopírovat složku `pb_data`, obnova = vrátit ji zpět.)
 
+Zálohu jde zašifrovat: nastavte `KB_BACKUP_PASSPHRASE` a skript vytvoří
+`kb-backup-….tgz.gpg` (GPG, AES-256). `restore` bere šifrované i starší
+nešifrované archivy. Heslo držte mimo server — bez něj zálohu nikdo nepřečte.
+
 ## Tým
 
 Instance = jeden tým. Role: **Administrátor** (správa uživatelů a rolí, nastavení

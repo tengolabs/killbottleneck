@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.41.2-beta": {
+    cs: [
+      "Zálohy dat si nově zašifrujete heslem — stačí při zálohování nastavit KB_BACKUP_PASSPHRASE a archiv bez něj nikdo nepřečte.",
+      "Obnova umí šifrované i starší nešifrované zálohy — nic nemusíte převádět.",
+      "Bezpečnostní aktualizace vestavěných knihoven.",
+    ],
+    en: [
+      "Data backups can now be encrypted with a passphrase — set KB_BACKUP_PASSPHRASE when backing up and nobody can read the archive without it.",
+      "Restore handles encrypted as well as older plain backups — nothing to convert.",
+      "Security updates for the bundled libraries.",
+    ],
+  },
   "v0.41.1-beta": {
     cs: [
       "K hlášení chyby teď přiložíte snímek obrazovky — stačí ho vložit klávesami Ctrl+V.",

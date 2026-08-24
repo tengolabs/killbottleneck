@@ -456,6 +456,11 @@ back it up:
 
 (By hand: to back up, copy the `pb_data` folder; to restore, put it back.)
 
+Backups can be encrypted: set `KB_BACKUP_PASSPHRASE` and the script writes
+`kb-backup-….tgz.gpg` (GPG, AES-256). `restore` accepts encrypted as well as
+older plain archives. Keep the passphrase off the server — without it nobody
+can read the backup.
+
 ## Team
 
 One instance = one team. Roles: **Administrator** (manages users and roles, organization

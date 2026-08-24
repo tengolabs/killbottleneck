@@ -4,3 +4,7 @@ pb_data/
 .env
 docker-compose.override.yml
 server/pb_public/
+kb-backup-*.tgz
+kb-backup-*.tgz.gpg
+pb_data.old/
+pb_data.restore-tmp*
