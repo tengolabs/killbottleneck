@@ -341,7 +341,7 @@
     "goalLabel": "Text (popis projektu)",
     "goalPlaceholder": "Zadejte popis projektu...",
     "questionsIntro": "AI položila doplňující otázky pro lepší strukturu cílů:",
-    "answerPlaceholder": "Nebo napište vlastní odpověď...",
+    "answerPlaceholder": "Nebo napište vlastní odpověď (nepovinné)…",
     "previewIntro": "Náhled navržené struktury:",
     "discard": "Zahodit",
     "accept": "Přijmout",

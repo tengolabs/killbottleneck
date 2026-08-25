@@ -341,7 +341,7 @@
     "goalLabel": "Text (project description)",
     "goalPlaceholder": "Describe the project...",
     "questionsIntro": "The AI asked follow-up questions to structure the goals better:",
-    "answerPlaceholder": "Or write your own answer...",
+    "answerPlaceholder": "Or write your own answer (optional)…",
     "previewIntro": "Preview of the suggested structure:",
     "discard": "Discard",
     "accept": "Accept",

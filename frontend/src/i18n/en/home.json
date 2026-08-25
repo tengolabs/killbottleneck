@@ -66,7 +66,7 @@
     "notStarted": "not started",
     "projectTasks": "Project tasks",
     "doneRatio": "({{done}}/{{total}} done)",
-    "noTasksHint": "No tasks yet — create them by clicking a node in the map (the ✓ badge) or on the Tasks page.",
+    "noTasksHint": "No tasks yet — a task is a goal with an owner or a deadline; set them in the goal detail.",
     "taskBarLabel": "Tasks completed ({{inProgress}} in progress, {{todo}} waiting)",
     "nodesCount_one": "{{count}} node",
     "nodesCount_few": "{{count}} nodes",

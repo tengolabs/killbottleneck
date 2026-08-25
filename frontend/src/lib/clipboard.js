@@ -18,7 +18,13 @@ export async function copyToClipboard(text) {
     ta.style.position = 'fixed';
     ta.style.top = '0';
     ta.style.left = '-9999px';
-    document.body.appendChild(ta);
+    // Textarea musí být UVNITŘ otevřeného dialogu/menu: Radix drží fokusovou past
+    // a prvek přidaný do <body> je pro ni „venku" — fokus okamžitě vrátí na
+    // tlačítko, execCommand('copy') pak nemá co kopírovat (změřeno 25. 8. 2026
+    // v dialogu API klíčů přes http: activeElement = BUTTON, selekce žádná).
+    const ae = document.activeElement;
+    const host = (ae && ae.closest && ae.closest('[role="dialog"], [role="menu"], [role="alertdialog"]')) || document.body;
+    host.appendChild(ta);
     ta.select();
     ta.setSelectionRange(0, text.length);
     return document.execCommand('copy');

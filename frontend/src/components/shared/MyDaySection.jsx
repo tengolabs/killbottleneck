@@ -10,6 +10,7 @@ import {
   Circle,
   Clock,
   Flame,
+  Users,
   ImageDown,
   Lightbulb,
   Loader2,
@@ -181,9 +182,13 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
   // Počty počítá server (a jsou tedy shodné s tím, co vidí AI sumář i light
   // režim). Dokud odpověď nedorazí, panel se ukáže s nulami — nový uživatel
   // tak nezůstane bez „Můj den" a nic neposkakuje.
-  const counts = day?.counts || { overdue: 0, today: 0, week: 0, open: 0, done: 0 };
+  const counts = day?.counts || { overdue: 0, today: 0, week: 0, open: 0, done: 0, delegatedOverdue: 0 };
   const chips = [
     { key: 'overdue', label: t('sections.overdue'), value: counts.overdue, icon: Flame, cls: 'text-red-600 dark:text-red-400' },
+    // „u druhých po termínu" — velké číslo dosud počítalo jen vlastní práci, takže
+    // vedoucí viděl „Po termínu 0", zatímco týmu hořely 4 úkoly (nález P3-01).
+    // Z vlastní delegace („Zadal jsem"), soukromí map to neporušuje.
+    { key: 'delegatedOverdue', label: t('sections.delegatedOverdue'), value: counts.delegatedOverdue || 0, icon: Users, cls: 'text-rose-600 dark:text-rose-400' },
     { key: 'today', label: t('sections.today'), value: counts.today, icon: CalendarClock, cls: 'text-amber-600 dark:text-amber-400' },
     { key: 'week', label: t('sections.week'), value: counts.week, icon: Clock, cls: 'text-blue-600 dark:text-blue-400' },
     // „hotovo: N" je KLIKACÍ — Richard 27. 7. 2026: „v plném zobrazení nic
@@ -472,6 +477,7 @@ const ExportCard = forwardRef(function ExportCard({ counts, done, sections, summ
   const proverbs = t('proverbs', { returnObjects: true });
   const rows = [
     { label: t('sections.overdue'), value: counts.overdue, color: '#dc2626' },
+    { label: t('sections.delegatedOverdue'), value: counts.delegatedOverdue || 0, color: '#e11d48' },
     { label: t('sections.today'), value: counts.today, color: '#d97706' },
     { label: t('sections.week'), value: counts.week, color: '#2563eb' },
     { label: t('sections.open'), value: counts.open, color: '#0f172a' },

@@ -172,7 +172,7 @@ instanci, liší se jen adresa.
    ```
 
 Nástroje: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`,
-`delete_node` (plus nástroje pravidel). Cíl s řešitelem nebo termínem JE úkol —
+`delete_node`, `list_people` (plus nástroje pravidel). Cíl s řešitelem nebo termínem JE úkol —
 žádné samostatné úkolové záznamy neexistují.
 
 **Bezpečnost:** klíč zpřístupní mapy svého majitele (stejně jako v aplikaci); sdílené a týmové MAPY přes klíč nejdou

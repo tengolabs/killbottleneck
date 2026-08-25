@@ -11,7 +11,7 @@ const TREE_ITEM = {
     title: { type: "string", description: "Node title (required)" },
     description: { type: "string" },
     deadline: { type: "string", description: "YYYY-MM-DD" },
-    owner: { type: "string", description: "Accountable PERSON: e-mail of an instance member. Stays a human even when the step is performed by an automation — this is who gets notified." },
+    owner: { type: "string", description: "Accountable PERSON: e-mail of an instance member (see list_people). Stays a human even when the step is performed by an automation — this is who gets notified. Unknown e-mails are rejected." },
     status: { type: "string", enum: ["todo", "in_progress", "done"] },
     wait_for_children: { type: "boolean", description: "Node waits until its whole subtree is done" },
     executor_kind: { type: "string", enum: ["human", "automation"], description: "Who performs the step. Default \"human\"." },
@@ -120,7 +120,7 @@ const TOOLS = [
         status: { type: "string", enum: ["todo", "in_progress", "done"] },
         description: { type: "string" },
         deadline: { type: "string" },
-        owner: { type: "string", description: "Accountable PERSON (e-mail). Stays a human even for AI/cron steps — this is who gets notified. Empty string clears." },
+        owner: { type: "string", description: "Accountable PERSON (e-mail of an instance member, see list_people). Stays a human even for AI/cron steps — this is who gets notified. Empty string clears. Unknown e-mails are rejected." },
         wait_for_children: { type: "boolean" },
         executor_kind: { type: "string", enum: ["human", "automation"], description: "Who performs the step. Default \"human\"." },
         executor_name: { type: "string", description: "Which automation handles this step, e.g. \"n8n backup\" — a record of what exists, not an instruction. Empty string clears." },
@@ -217,6 +217,11 @@ const TOOLS = [
   {
     name: "get_org_structure",
     description: "Read the organization structure (the org map): positions and functions with node ids, holders and deputies. Use the node ids as dynamic rule targets \"position:<nodeId>\" / \"deputy_of_position:<nodeId>\". Read-only — holders and deputies are appointed by an admin in the app.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "list_people",
+    description: "List the people work can be assigned to: instance members (e-mail, display name, role) and external contacts visible to the key owner (their owner_email is a pseudo e-mail usable as owner). Use these e-mails as `owner` in create_map/add_nodes/update_node and in set_owner rules — an unknown e-mail is rejected. Read-only.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
 ];
@@ -403,6 +408,14 @@ const EXEC = {
     if (!r.positions.length) return text("The org structure has no positions yet.");
     return text(DATA_FENCE + "\n\n" + r.positions.map((p) =>
       `• ${p.title || "(untitled)"} [${p.position_kind}] (id: ${p.node_id}) — holder: ${p.holder || "vacant"}${p.deputy ? `, deputy: ${p.deputy}` : ""}`).join("\n"));
+  },
+  list_people: (auth) => {
+    const r = vcall(auth, "GET", "/api/kb/v1/members");
+    const lines = (r.members || []).map((m) =>
+      `• ${m.email}${m.name || m.full_name ? ` — ${m.name || m.full_name}` : ""} [${m.role || "user"}]`);
+    for (const c of r.external_contacts || []) lines.push(`• ${c.owner_email} — ${c.name} [external contact]`);
+    if (!lines.length) return text("No people found.");
+    return text(DATA_FENCE + "\n\n" + lines.join("\n"));
   },
 };
 

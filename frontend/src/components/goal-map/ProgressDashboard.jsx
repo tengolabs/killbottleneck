@@ -40,9 +40,11 @@ function StatusDot({ status }) {
   return <Circle className="w-3.5 h-3.5 text-blue-500" />;
 }
 
-// tasks = úkoly mapy z kolekce tasks (exekuce) — dashboard ukazuje obě vrstvy:
-// postup uzlů (strategie) i postup úkolů
-export default function ProgressDashboard({ nodes, edges, tasks = [], mapTitle = '', mapId = '' }) {
+// Dashboard ukazuje obě vrstvy: postup uzlů (strategie) i postup PRÁCE — úkol
+// je uzel s řešitelem nebo termínem (slovník v0.34/v0.35). Kolekce `tasks` je od
+// 17. 8. 2026 prázdná legacy; dashboard ji četl a u projektu s osmi úkoly hlásil
+// „Zatím žádné úkoly" (nález P2-01, analýza 20. 8. 2026).
+export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId = '' }) {
   const { t } = useTranslation('home');
   const ai = useAiModes();
   const { user } = useAuth();
@@ -76,9 +78,14 @@ export default function ProgressDashboard({ nodes, edges, tasks = [], mapTitle =
       const compactNodes = nodes
         .filter((n) => n.type !== 'note')
         .map((n) => ({ id: n.id, title: n.data?.title || n.data?.apexText || '', status: n.data?.status || 'todo', parentId: parentMap[n.id] || null }));
-      const taskLines = tasks.map((task) =>
-        `- ${task.title} [${statusConfig[task.status]?.label || task.status}]${task.assignee_email ? ` @${task.assignee_email}` : ''}${task.deadline ? ` ${t('common:export.deadlineNote', { date: task.deadline })}` : ''}`
-      ).join('\n');
+      // práce = uzly s řešitelem nebo termínem (týž předpis jako karta níže)
+      const taskLines = nodes
+        .filter((n) => n.type !== 'note' && (n.data?.owner || n.data?.deadline))
+        .map((n) => {
+          const d = n.data || {};
+          const st = d.status || 'todo';
+          return `- ${d.title || d.apexText || ''} [${statusConfig[st]?.label || st}]${d.owner ? ` @${d.owner}` : ''}${d.deadline ? ` ${t('common:export.deadlineNote', { date: d.deadline })}` : ''}`;
+        }).join('\n');
       const result = await advisor({
         mode: 'chat',
         message:
@@ -201,38 +208,16 @@ export default function ProgressDashboard({ nodes, edges, tasks = [], mapTitle =
         diffDays: diffDaysOf(deadline),
       });
     }
-    // termíny úkolů patří do stejného přehledu — jsou to reálné závazky projektu
-    for (const task of tasks) {
-      if (!task.deadline || task.status === 'done') continue;
-      pushDeadline({
-        id: task.id,
-        kind: 'task',
-        title: task.title,
-        owner: task.assignee_email || '',
-        deadline: task.deadline,
-        diffDays: diffDaysOf(task.deadline),
-      });
-    }
     overdue.sort((a, b) => a.diffDays - b.diffDays);
     upcoming.sort((a, b) => a.diffDays - b.diffDays);
 
-    // vrstva úkolů (exekuce)
-    const taskDone = tasks.filter((task) => task.status === 'done').length;
-    const taskInProgress = tasks.filter((task) => task.status === 'in_progress').length;
-    const taskPct = tasks.length > 0 ? Math.round((taskDone / tasks.length) * 100) : 0;
-    const assigneeMap = {};
-    for (const task of tasks) {
-      const who = task.assignee_email || UNASSIGNED;
-      if (!assigneeMap[who]) assigneeMap[who] = { done: 0, in_progress: 0, todo: 0 };
-      if (task.status === 'done') assigneeMap[who].done++;
-      else if (task.status === 'in_progress') assigneeMap[who].in_progress++;
-      else assigneeMap[who].todo++;
-    }
-    const taskAssignees = Object.entries(assigneeMap).map(([email, counts]) => ({
-      email,
-      ...counts,
-      total: counts.done + counts.in_progress + counts.todo,
-    }));
+    // vrstva práce (exekuce): úkol = uzel s řešitelem nebo termínem — týž
+    // předpis jako stránka Úkoly (Tasks.jsx nodeTrees). Rozpad podle lidí je
+    // výše v „Podle garanta", tady jen celkový postup.
+    const work = nodes.filter((n) => n.type !== 'note' && (n.data?.owner || n.data?.deadline));
+    const taskDone = work.filter((n) => n.data?.status === 'done').length;
+    const taskInProgress = work.filter((n) => n.data?.status === 'in_progress').length;
+    const taskPct = work.length > 0 ? Math.round((taskDone / work.length) * 100) : 0;
 
     const totalNodes = nodes.length;
     const totalDone = nodes.filter((n) => n.data?.status === 'done').length;
@@ -249,14 +234,13 @@ export default function ProgressDashboard({ nodes, edges, tasks = [], mapTitle =
       totalDone,
       totalInProgress,
       totalTodo,
-      taskTotal: tasks.length,
+      taskTotal: work.length,
       taskDone,
       taskInProgress,
-      taskTodo: tasks.length - taskDone - taskInProgress,
+      taskTodo: work.length - taskDone - taskInProgress,
       taskPct,
-      taskAssignees,
     };
-  }, [nodes, edges, tasks]);
+  }, [nodes, edges]);
 
   if (nodes.length === 0) {
     return (
@@ -357,29 +341,6 @@ export default function ProgressDashboard({ nodes, edges, tasks = [], mapTitle =
                 label={t('dashboard.taskBarLabel', { inProgress: stats.taskInProgress, todo: stats.taskTodo })}
                 color={stats.taskPct === 100 ? 'bg-green-500' : stats.taskPct >= 50 ? 'bg-amber-500' : 'bg-primary'}
               />
-              {stats.taskAssignees.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  {stats.taskAssignees.map((o) => (
-                    <div key={o.email} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50">
-                      <span
-                        className="w-8 h-8 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0"
-                        title={o.email}
-                      >
-                        {getInitials(o.email === UNASSIGNED ? '' : o.email) || '—'}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{o.email === UNASSIGNED ? t('dashboard.unassigned') : o.email}</p>
-                        <p className="text-xs text-muted-foreground">{t('badges.tasksCount', { count: o.total })}</p>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs shrink-0">
-                        <span className="flex items-center gap-1 text-green-600"><CheckCircle2 className="w-3 h-3" />{o.done}</span>
-                        <span className="flex items-center gap-1 text-amber-600"><Loader className="w-3 h-3" />{o.in_progress}</span>
-                        <span className="flex items-center gap-1 text-blue-600"><Circle className="w-3 h-3" />{o.todo}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </>
           )}
         </div>

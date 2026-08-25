@@ -24,6 +24,7 @@
     "task_assigned": "Přiřazený úkol",
     "task_comment": "Komentář u úkolu",
     "node_assigned": "Přiřazený cíl",
+    "node_unassigned": "Odebraný nebo předaný cíl",
     "node_unblocked": "Cíl je na řadě",
     "map_created": "Nový projekt",
     "timer_autostop": "Zastavené stopky",

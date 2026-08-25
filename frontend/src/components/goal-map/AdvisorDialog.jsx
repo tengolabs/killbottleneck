@@ -286,7 +286,9 @@ export function AdvisorFlow({ onAccept, onCancel, initialGoal = '', initialScope
               <Button variant="outline" onClick={handleBack} disabled={loading}>
                 <ArrowLeft className="w-4 h-4" /> {t('toolbar.back')}
               </Button>
-              <Button onClick={handleGenerate} disabled={loading || answers.some((a) => !a.trim())}>
+              {/* odpovědi jsou NEPOVINNÉ (anti-bloat: žádné povinné pole; nález P5-02) —
+                  backend prázdné odpovědi snese, LLM dostane jen to, co člověk ví */}
+              <Button onClick={handleGenerate} disabled={loading}>
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 {loading ? t('advisor.generating') : t('advisor.generateButton')}
               </Button>

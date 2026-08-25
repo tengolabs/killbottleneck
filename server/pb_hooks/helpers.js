@@ -268,6 +268,8 @@ function syncShares(app, map) {
 const NOTIFY_TYPES = [
   "task_assigned", "task_comment", "node_assigned", "node_unblocked",
   "map_created", "timer_autostop",
+  // práce odebrána / předána jinému — tichý přesun působí jako trest (nález P3-02)
+  "node_unassigned",
   "node_comment", "map_shared", "ai_request", "automation_ready", "deadline",
   "agent_done", "agent_failed", "user_joined",
   "deadline_request", "deadline_request_resolved",
@@ -415,6 +417,85 @@ function extContactId(v) {
 
 function extPseudoEmail(contactId) {
   return `ext-${String(contactId).toLowerCase()}@kontakt.invalid`;
+}
+
+// ---------- řešitel z API/MCP musí být SKUTEČNÝ člověk (nález P6-01, 20. 8. 2026) ----------
+// UI to drží OwnerSelect (Select z členů + kontaktů, žádný volný text). API a MCP
+// dosud přijaly libovolný řetězec → úkol vypadal přiřazený (avatar jako u živého
+// člověka), ale nikdo ho nedostal. Neznámá hodnota je CHYBA s nabídkou blízkých
+// shod, ne tiché zahození (stejně jako executor_kind). Platí: e-mail existujícího
+// člena, nebo pseudo-e-mail externího kontaktu, který userId smí vidět.
+// Vrací "" (v pořádku) nebo lokalizovanou chybu.
+function ownerValueError(app, value, userId, lang) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const v = String(value || "").trim();
+  if (!v) return "";
+  if (isExternalOwner(v)) {
+    try {
+      const c = app.findRecordById("external_contacts", extContactId(v));
+      if (!c.getBool("private") || c.getString("owner") === userId) return "";
+    } catch (err) { /* kontakt tu neexistuje */ }
+    return t(lang, "err.ownerUnknown", { owner: v, hint: t(lang, "err.ownerHintList") });
+  }
+  const lower = v.toLowerCase();
+  let users = [];
+  try { users = app.findRecordsByFilter("users", "id != ''", "email", 500, 0); } catch (err) { users = []; }
+  const emails = users.map((u) => u.getString("email"));
+  if (emails.some((m) => m.toLowerCase() === lower)) return "";
+  // nabídka blízkých shod: stejná část před @, nebo společný začátek 3 znaků
+  const local = lower.split("@")[0];
+  const near = emails.filter((m) => {
+    const ml = m.toLowerCase().split("@")[0];
+    return ml === local || (local.length >= 3 && ml.indexOf(local.slice(0, 3)) === 0);
+  }).slice(0, 5);
+  const hint = near.length ? t(lang, "err.ownerHintSimilar", { list: near.join(", ") }) : t(lang, "err.ownerHintList");
+  return t(lang, "err.ownerUnknown", { owner: v, hint: hint });
+}
+
+// totéž pro celou osnovu (create_map / add_nodes) — první chyba vyhrává
+function treeOwnersError(app, items, userId, lang) {
+  const stack = Array.isArray(items) ? items.slice() : [];
+  while (stack.length) {
+    const it = stack.shift();
+    if (!it || typeof it !== "object") continue;
+    const err = ownerValueError(app, it.owner, userId, lang);
+    if (err) return err;
+    if (Array.isArray(it.children)) stack.push.apply(stack, it.children);
+  }
+  return "";
+}
+
+// Adresář lidí instance — JEDEN zdroj pro /members (session) i /v1/members (klíč).
+// POZOR: bezpečná podmnožina polí, routu vidí každý přihlášený i každý klíč.
+// notify_prefs sem NIKDY nepatří.
+function memberRows(app) {
+  const records = app.findRecordsByFilter("users", "id != ''", "email", 500, 0);
+  return records.map((u) => ({
+    id: u.id,
+    email: u.getString("email"),
+    full_name: u.getString("full_name"),
+    // zobrazované jméno (přezdívka z Můj účet) — UI ho preferuje před
+    // full_name i e-mailem (lib/memberLabel.js)
+    name: u.getString("name"),
+    role: u.getString("role"),
+    is_ai_manager: u.getBool("is_ai_manager"),
+    // správce struktury je stejně veřejný jako správce AI — Správa uživatelů
+    // podle něj kreslí přepínač a org struktura podle něj pouští editaci
+    is_org_manager: u.getBool("is_org_manager"),
+    // zástupce (e-mail) je v týmu veřejná informace — kreslí ho org struktura
+    // i tabulka zastupování a RuleBuilder podle něj radí; nastavuje jen admin
+    deputy: u.getString("deputy"),
+  }));
+}
+
+// Externí kontakty, které userId smí vidět (veřejné + vlastní privátní) — pro
+// v1/MCP list_people, ať agent umí přiřadit práci i účetní/dodavateli.
+function externalContactRows(app, userId) {
+  let rows = [];
+  try { rows = app.findRecordsByFilter("external_contacts", "id != ''", "name", 500, 0); } catch (err) { rows = []; }
+  return rows
+    .filter((c) => !c.getBool("private") || c.getString("owner") === userId)
+    .map((c) => ({ id: c.id, owner_email: extPseudoEmail(c.id), name: c.getString("name") }));
 }
 
 // In-app notifikace (+ e-mail, když je SMTP nakonfigurováno a uživatel ho chce).
@@ -1432,12 +1513,40 @@ function notifyOwnerChanges(app, origNodes, record, actorEmail) {
   }
   const changed = {};
   let any = false;
-  for (const n of jsonVal(record, "nodes", [])) {
+  const nodes = jsonVal(record, "nodes", []);
+  for (const n of nodes) {
     const d = n.data || {};
     if (n.type === "note" || !d.owner) continue;
     if ((prev[n.id] || "") !== d.owner) { changed[n.id] = true; any = true; }
   }
   if (any) notifyAssignedFromNodes(app, record, actorEmail, changed);
+  // Komu se práce ODEBRALA nebo PŘEDALA, ten se to musí dozvědět (nález P3-02,
+  // změřeno: dřív +0 zpráv). Jen uzly, které dál existují — smazání uzlu je jiná
+  // událost. Sám sobě notify() neoznamuje; externí kontakt (pseudo-e-mail) není
+  // v users, notify() ho tiše přeskočí.
+  try {
+    for (const n of nodes) {
+      if (!n || n.type === "note" || !prev[n.id]) continue;
+      const d = n.data || {};
+      const nowOwner = d.owner || "";
+      if (nowOwner === prev[n.id]) continue;
+      notify(app, {
+        email: prev[n.id],
+        actorEmail: actorEmail,
+        type: "node_unassigned",
+        mapId: record.id,
+        nodeId: n.id,
+        textKey: nowOwner ? "notify.nodeReassigned" : "notify.nodeUnassigned",
+        params: {
+          actor: actorEmail || record.getString("owner_email"),
+          title: d.title || (d.apexText || "").slice(0, 60) || "",
+          project: record.getString("title"),
+        },
+      });
+    }
+  } catch (err) {
+    try { app.logger().warn("notifyOwnerChanges: odebrání selhalo", "map", record.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
 }
 
 // E-maily všech správců AI agentů. Kolmé na role (admin/manager/user) — příznak
@@ -3757,6 +3866,10 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         }
         owner = dyn.emails[0]; // do logu i uzlu jde ROZŘEŠENÝ e-mail (vzor notify)
       }
+      // e-mail, který v instanci nikdo nemá, se do uzlu NEZAPÍŠE (nález P6-01) —
+      // šablona pravidla mohla přijít z jiné instance; přiznaný skip s radou
+      const ownerErr = owner ? ownerValueError(app, owner, map.getString("owner"), null) : "";
+      if (ownerErr) { skips.push({ type: a.type, reason: ownerErr }); continue; }
       if ((tn.data || {}).owner !== owner) { tn.data = Object.assign({}, tn.data, { owner: owner }); changed = true; }
       done.push({ type: a.type, owner: owner, node: tn.id });
     } else if (a.type === "set_deadline") {
@@ -5316,6 +5429,10 @@ function buildMyDay(app, userId, email, opts) {
       open: items.length,
       done: doneOut.length,
       delegated: delegated.length,
+      // „u druhých po termínu" — velké číslo nahoře dosud počítalo jen VLASTNÍ
+      // práci, takže vedoucí viděl „Po termínu 0", zatímco týmu hořely 4 úkoly
+      // (nález P3-01). Z dat „Zadal jsem" = vlastní delegace, soukromí map drží.
+      delegatedOverdue: delegated.filter((it) => it.deadline && diffOf(it.deadline) < 0).length,
       stuck: stuck.length,
     },
     sections: {
@@ -5593,7 +5710,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 }
 
 module.exports = {
-  oznamNovouVerzi, env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, ownerValueError, treeOwnersError, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

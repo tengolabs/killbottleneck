@@ -3344,7 +3344,7 @@ function EditorContent({ mapId, personalMap = false }) {
           </div>
         )}
         {dashboardOpen ? (
-          <ProgressDashboard nodes={nodes} edges={edges} tasks={mapTasks} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} />
+          <ProgressDashboard nodes={nodes} edges={edges} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} />
         ) : (
         <GoalMapContext.Provider value={contextValue}>
         {/* adresář členů pro uzly: iniciály a bublina garanta ze ZOBRAZOVANÉHO

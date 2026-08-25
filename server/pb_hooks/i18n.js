@@ -298,6 +298,15 @@ const STRINGS = {
     cs: "{actor} vám rozšířil přístup k projektu „{project}\"",
     en: "{actor} expanded your access to the project \"{project}\"",
   },
+  // práce odebrána / předána — tichý přesun působil jako trest (P3-02)
+  "notify.nodeUnassigned": {
+    cs: "{actor} vám odebral cíl „{title}\" v projektu „{project}\"",
+    en: "{actor} took the goal \"{title}\" in project \"{project}\" off your plate",
+  },
+  "notify.nodeReassigned": {
+    cs: "{actor} předal cíl „{title}\" v projektu „{project}\" jinému řešiteli",
+    en: "{actor} handed the goal \"{title}\" in project \"{project}\" to someone else",
+  },
 
   // ── požadavky na automatizaci (chodí správcům AI agentů) ──
   "notify.automationWantedOne": {
@@ -800,6 +809,19 @@ const STRINGS = {
   "err.badExpiry": {
     cs: "Neplatná expirace — zadejte budoucí datum ve formátu RRRR-MM-DD.",
     en: "Invalid expiry — use a future date in YYYY-MM-DD format.",
+  },
+  "err.badScope": {
+    cs: "Neplatné oprávnění klíče — povolené hodnoty: read, read_write.",
+    en: "Invalid key scope — allowed values: read, read_write.",
+  },
+  "err.ownerUnknown": {
+    cs: "Neznámý řešitel „{owner}\" — v instanci není člen ani externí kontakt, práci by nikdo nedostal. {hint}",
+    en: "Unknown owner \"{owner}\" — not a member or external contact of this instance; nobody would receive the work. {hint}",
+  },
+  "err.ownerHintSimilar": { cs: "Mysleli jste: {list}?", en: "Did you mean: {list}?" },
+  "err.ownerHintList": {
+    cs: "Seznam lidí: nástroj list_people (MCP) nebo GET /v1/members.",
+    en: "List people with the list_people tool (MCP) or GET /v1/members.",
   },
   "err.apiKeyExpired": { cs: "API klíč vypršel.", en: "API key has expired." },
   "err.apiKeyScope": {

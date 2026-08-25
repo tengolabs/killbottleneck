@@ -105,6 +105,7 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `add_nodes` | přidání podstromu pod uzel (⚠️ přepočítá layout celé mapy) |
 | `update_node` | název/stav/popis/termín/osoba/čekání-na-podstrom jednoho uzlu |
 | `delete_node` | smaže uzel VČETNĚ podstromu (vrchol nejde; celé mapy přes API nejdou) |
+| `list_people` | lidé instance (členové + viditelné externí kontakty) — platné hodnoty `owner`; neznámý e-mail server odmítne |
 
 **Úkol = uzel s řešitelem (`owner`) nebo termínem** — žádný samostatný úkolový
 záznam neexistuje. Novou práci zakládejte přes `add_nodes`, odbavujte přes

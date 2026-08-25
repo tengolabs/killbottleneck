@@ -42,6 +42,7 @@
     "week": "Within a week",
     "blocking": "Blocking others",
     "delegated": "Delegated (waiting on others)",
+    "delegatedOverdue": "Overdue at others",
     "stuck": "Not moving",
     "open": "Open"
   },

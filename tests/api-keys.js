@@ -50,8 +50,12 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     expect(r.status === 400, `expirace v minulosti 400 (${r.status})`);
     r = await api('POST', '/api/flowmap/api-keys', { token: A, body: { label: 'X', expires_at: 'zítra' } });
     expect(r.status === 400, `nesmyslná expirace 400 (${r.status})`);
+    // P6-05: neplatný scope je CHYBA, ne tiché snížení na read (agent by pak
+    // záhadně dostával 403 na zápis a rotace scope nemění)
     r = await api('POST', '/api/flowmap/api-keys', { token: A, body: { label: 'X', scope: 'admin' } });
-    expect(r.status === 200 && r.json.scope === 'read', `neznámý scope spadne na read (${r.json.scope})`);
+    expect(r.status === 400 && /read_write/.test(r.json.error || ''), `neznámý scope → 400 s výčtem platných (${r.status}: ${r.json.error})`);
+    r = await api('POST', '/api/flowmap/api-keys', { token: A, body: { label: 'X', scope: '' } });
+    expect(r.status === 200 && r.json.scope === 'read', `prázdný scope = výchozí read (${r.status}/${r.json.scope})`);
     await api('POST', '/api/flowmap/api-keys/delete', { token: A, body: { id: r.json.id } });
 
     console.log('== seznam (bez tokenu) ==');

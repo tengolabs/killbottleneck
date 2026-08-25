@@ -24,6 +24,7 @@
     "task_assigned": "Task assigned",
     "task_comment": "Task comment",
     "node_assigned": "Goal assigned",
+    "node_unassigned": "Goal unassigned or handed over",
     "node_unblocked": "Goal is ready",
     "map_created": "New project",
     "timer_autostop": "Timer stopped",

@@ -42,6 +42,7 @@
     "week": "Do týdne",
     "blocking": "Blokuje ostatní",
     "delegated": "Zadal jsem (čekám na druhé)",
+    "delegatedOverdue": "U druhých po termínu",
     "stuck": "Tohle se nehýbe",
     "open": "Otevřené"
   },

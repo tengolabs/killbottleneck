@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.42-beta": {
+    cs: [
+      "V panelu Můj den přibylo číslo „U druhých po termínu“ — na první pohled vidíte, kolik práce, kterou jste zadali, už hoří.",
+      "Komu práci odeberete nebo předáte jinému, dostane o tom zprávu — tichý přesun už nikoho nepřekvapí.",
+      "AI agent si nově umí vypsat lidi instance (nástroj list_people) a práci přiřadí jen skutečnému členovi — překlep v e-mailu server odmítne s nápovědou.",
+      "Dialog API klíčů ukazuje adresu instance a hotový příkaz pro připojení Claude Code.",
+      "Tři otázky AI poradce před generováním cílů už nejsou povinné.",
+    ],
+    en: [
+      "The My Day panel gained an “Overdue at others” number — see at a glance how much of the work you delegated is already late.",
+      "Whoever loses a goal or gets it handed to someone else is now notified — a silent move no longer surprises anyone.",
+      "The AI agent can list the people of the instance (list_people tool) and assigns work only to real members — a typo in an e-mail is rejected with a hint.",
+      "The API keys dialog shows the instance address and a ready-made command to connect Claude Code.",
+      "The three AI advisor questions before generating goals are no longer mandatory.",
+    ],
+  },
   "v0.41.2-beta": {
     cs: [
       "Zálohy dat si nově zašifrujete heslem — stačí při zálohování nastavit KB_BACKUP_PASSPHRASE a archiv bez něj nikdo nepřečte.",

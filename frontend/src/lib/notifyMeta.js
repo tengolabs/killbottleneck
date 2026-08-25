@@ -6,7 +6,7 @@
 // Server má vlastní seznam v pb_hooks/helpers.js (NOTIFY_TYPES) — držet v syncu!
 import {
   KeyRound,
-  MessageSquare, UserPlus, Target, PlayCircle, Timer,
+  MessageSquare, UserPlus, UserMinus, Target, PlayCircle, Timer,
   Share2, Bot, CalendarClock, CheckCircle2, AlertTriangle, Zap, Sparkles,
 } from 'lucide-react';
 
@@ -14,6 +14,7 @@ export const NOTIFY_TYPES = [
   'task_assigned',
   'task_comment',
   'node_assigned',
+  'node_unassigned',
   'node_unblocked',
   'node_comment',
   'map_shared',
@@ -37,6 +38,7 @@ const META = {
   task_assigned: { icon: UserPlus, className: 'text-primary' },
   task_comment: { icon: MessageSquare, className: 'text-primary' },
   node_assigned: { icon: Target, className: 'text-primary' },
+  node_unassigned: { icon: UserMinus, className: 'text-muted-foreground' },
   node_unblocked: { icon: PlayCircle, className: 'text-green-600' },
   node_comment: { icon: MessageSquare, className: 'text-primary' },
   map_shared: { icon: Share2, className: 'text-primary' },

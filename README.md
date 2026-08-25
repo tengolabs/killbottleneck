@@ -177,8 +177,8 @@ only the address differs.
    }
    ```
 
-Tools: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`, `delete_node`
-(plus rule tools). A goal with an assignee or a deadline IS a task — there are no
+Tools: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`, `delete_node`,
+`list_people` (plus rule tools). A goal with an assignee or a deadline IS a task — there are no
 separate task records.
 
 **Security:** a key gives access to its owner's maps (exactly as in the app); shared and team MAPS are deliberately not reachable through a

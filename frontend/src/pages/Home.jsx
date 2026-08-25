@@ -197,6 +197,8 @@ export default function Home() {
                 onChipClick={(kind) => navigate(
                   kind === 'delegated'
                     ? '/tasks?owner=delegated'
+                    : kind === 'delegatedOverdue'
+                      ? '/tasks?owner=delegated&deadline=overdue'
                     : kind === 'done'
                       ? '/tasks?assignee=me&status=done'   // kam zmizela odbavená práce
                       : ['overdue', 'today', 'week'].includes(kind)

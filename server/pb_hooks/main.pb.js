@@ -3438,27 +3438,11 @@ kbRoute("POST", "/reset-user-password", (e) => {
 // adresář členů týmu (instance = jeden tým) — pro výběr přiřazené osoby.
 // users kolekce má listRule jen pro adminy; tady vracíme bezpečnou podmnožinu polí.
 kbRoute("GET", "/members", (e) => {
-  const records = $app.findRecordsByFilter("users", "id != ''", "email", 500, 0);
-  // POZOR: bezpečná podmnožina polí — routu vidí KAŽDÝ přihlášený. is_ai_manager
-  // patří mezi veřejné (editor podle něj předvyplní garanta u AI uzlu),
-  // notify_prefs sem NIKDY nepatří.
-  const members = records.map((u) => ({
-    id: u.id,
-    email: u.getString("email"),
-    full_name: u.getString("full_name"),
-    // zobrazované jméno (přezdívka z Můj účet) — UI ho preferuje před
-    // full_name i e-mailem (lib/memberLabel.js)
-    name: u.getString("name"),
-    role: u.getString("role"),
-    is_ai_manager: u.getBool("is_ai_manager"),
-    // správce struktury je stejně veřejný jako správce AI — Správa uživatelů
-    // podle něj kreslí přepínač a org struktura podle něj pouští editaci
-    is_org_manager: u.getBool("is_org_manager"),
-    // zástupce (e-mail) je v týmu veřejná informace — kreslí ho org struktura
-    // i tabulka zastupování a RuleBuilder podle něj radí; nastavuje jen admin
-    deputy: u.getString("deputy"),
-  }));
-  return e.json(200, { members: members });
+  // POZOR: bezpečná podmnožina polí — routu vidí KAŽDÝ přihlášený (a přes
+  // /v1/members každý klíč). Pole definuje helpers.memberRows; notify_prefs
+  // tam NIKDY nepatří.
+  const { memberRows } = require(`${__hooks}/helpers.js`);
+  return e.json(200, { members: memberRows($app) });
 }, $apis.requireAuth());
 
 // ---------- ORGANIZAČNÍ STRUKTURA (mapa kind='org') ----------
@@ -4366,7 +4350,14 @@ kbRoute("POST", "/api-keys", (e) => {
   const existing = $app.findRecordsByFilter("api_keys", "owner = {:o}", "", 21, 0, { o: e.auth.id });
   if (existing.length >= 20) return e.json(400, { error: t(L, "err.tooManyKeys") });
   const label = String(info.label || "").trim().slice(0, 100);
-  const scope = info.scope === "read_write" ? "read_write" : "read"; // whitelist, default read
+  // scope: nezadaný = read; NEPLATNÁ hodnota je CHYBA, ne tiché snížení na read
+  // (nález P6-05: agent pak záhadně dostával 403 na zápis a rotace scope nemění,
+  // takže překlep zůstal navždy). Stejná přísnost jako u expires_at o pár řádků níž.
+  let scope = "read";
+  if (info.scope !== undefined && info.scope !== null && String(info.scope) !== "") {
+    if (!["read", "read_write"].includes(String(info.scope))) return e.json(400, { error: t(L, "err.badScope") });
+    scope = String(info.scope);
+  }
   const expiresRaw = String(info.expires_at || "").trim();
   let expiresAt = "";
   if (expiresRaw) {
@@ -4468,6 +4459,22 @@ kbRoute("GET", "/v1/org-structure", (e) => {
   return e.json(200, { exists: true, map_id: map.id, positions: orgStructureRows(map) });
 });
 
+// Lidé instance pro integrace/MCP — JEN ČTENÍ. Bez toho agent neměl jak zjistit,
+// komu smí práci přiřadit (nález P6-02): GET /members byl jen pro session.
+// Stejná bezpečná podmnožina polí jako /members (memberRows) + externí kontakty,
+// které vlastník klíče smí vidět (pseudo-e-mail jde použít jako owner).
+// Klíč nesmí eskalovat: žádný zápis, žádné notify_prefs, role se vrací jen
+// jako informace (stejně jako v aplikaci každému přihlášenému).
+kbRoute("GET", "/v1/members", (e) => {
+  const { apiKeyAuth, memberRows, externalContactRows } = require(`${__hooks}/helpers.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const members = memberRows($app).map((m) => ({
+    id: m.id, email: m.email, full_name: m.full_name, name: m.name, role: m.role,
+  }));
+  return e.json(200, { members: members, external_contacts: externalContactRows($app, a.user.id) });
+});
+
 // ---------- v1 API (MCP/integrace) — autentizace VÝHRADNĚ API klíčem ----------
 // Zásady (bezpečnostní kontrakt, viz plán MCP fáze 1):
 //  · owner VŽDY z klíče, nikdy z body; přístup jen k mapám/úkolům majitele klíče
@@ -4533,6 +4540,9 @@ kbRoute("POST", "/v1/maps", (e) => {
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
   const title = String(info.title || "").trim().slice(0, 200);
   if (!title) return e.json(400, { error: t(a.lang, "err.titleRequired") });
+  // řešitel musí být člen nebo viditelný externí kontakt (nález P6-01)
+  const ownerErr = require(`${__hooks}/helpers.js`).treeOwnersError($app, info.tree, a.user.id, a.lang);
+  if (ownerErr) return e.json(400, { error: ownerErr });
   const conv = treeItemsToNodes(Array.isArray(info.tree) ? info.tree : [], null, a.lang);
   if (conv.error) return e.json(400, { error: conv.error });
   if (conv.count > 200) return e.json(400, { error: t(a.lang, "err.tooManyItems", { max: 200 }) });
@@ -4599,6 +4609,8 @@ kbRoute("POST", "/v1/maps/{id}/nodes", (e) => {
     const apex = nodes.find((n) => n.type === "apexNode");
     parentId = apex ? apex.id : "";
   }
+  const ownerErr = require(`${__hooks}/helpers.js`).treeOwnersError($app, info.items, a.user.id, a.lang);
+  if (ownerErr) return e.json(400, { error: ownerErr });
   const conv = treeItemsToNodes(Array.isArray(info.items) ? info.items : [], null, a.lang);
   if (conv.error) return e.json(400, { error: conv.error });
   if (conv.count === 0) return e.json(400, { error: t(a.lang, "err.itemsRequired") });
@@ -4664,7 +4676,12 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   if (info.status !== undefined) d.status = String(info.status);
   if (info.description !== undefined) d.description = String(info.description || "");
   if (info.deadline !== undefined) d.deadline = String(info.deadline || "");
-  if (info.owner !== undefined) d.owner = String(info.owner || "");
+  if (info.owner !== undefined) {
+    // řešitel = člen nebo viditelný externí kontakt; jinak 400 s nápovědou (P6-01)
+    const ownerErr = require(`${__hooks}/helpers.js`).ownerValueError($app, info.owner, a.user.id, a.lang);
+    if (ownerErr) return e.json(400, { error: ownerErr });
+    d.owner = String(info.owner || "").trim();
+  }
   if (info.color !== undefined) d.color = String(info.color || "");
   if (info.wait_for_children !== undefined) d.waitForChildren = !!info.wait_for_children;
   // vykonavatel kroku; neplatná hodnota je CHYBA, ne tichý fallback na "human" —

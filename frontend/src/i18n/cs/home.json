@@ -66,7 +66,7 @@
     "notStarted": "nezahájeno",
     "projectTasks": "Úkoly projektu",
     "doneRatio": "({{done}}/{{total}} hotovo)",
-    "noTasksHint": "Zatím žádné úkoly — založíte je kliknutím na uzel v mapě (badge ✓) nebo na stránce Úkoly.",
+    "noTasksHint": "Zatím žádné úkoly — úkol je cíl s řešitelem nebo termínem; nastavíte je v detailu cíle.",
     "taskBarLabel": "Splněno úkolů ({{inProgress}} probíhá, {{todo}} čeká)",
     "nodesCount_one": "{{count}} uzel",
     "nodesCount_few": "{{count}} uzly",

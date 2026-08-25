@@ -76,6 +76,11 @@ export default function ApiKeysDialog({ open, onClose }) {
 
   const isExpired = (k) => k.expires_at && Date.parse(k.expires_at) <= Date.now();
 
+  // Klient potřebuje DVA údaje — klíč A adresu instance (nález z provozní mapy
+  // 16. 8. 2026 + P6-04). Adresa je v prohlížeči zadarmo; příkaz je 1:1 z README.
+  const instanceUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const mcpCommand = `claude mcp add killbottleneck -e KB_URL=${instanceUrl} -e KB_API_KEY=${freshToken || 'kb_user_…'} -- npx -y killbottleneck-mcp`;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -99,6 +104,29 @@ export default function ApiKeysDialog({ open, onClose }) {
             </div>
           </div>
         )}
+
+        <div className="rounded-lg border bg-secondary/40 p-3 space-y-2" data-testid="api-keys-connect">
+          <p className="text-sm font-medium">{t('apiKeys.connectTitle')}</p>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">{t('apiKeys.instanceUrl')}</Label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs break-all bg-background rounded px-2 py-1.5 border" data-testid="api-keys-url">{instanceUrl}</code>
+              <Button size="icon" variant="outline" className="shrink-0" onClick={() => copy(instanceUrl)} title={t('apiKeys.copyUrl')}>
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">{t('apiKeys.mcpCommand')}</Label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs break-all bg-background rounded px-2 py-1.5 border" data-testid="api-keys-mcp-cmd">{mcpCommand}</code>
+              <Button size="icon" variant="outline" className="shrink-0" onClick={() => copy(mcpCommand)} title={t('apiKeys.copyCommand')}>
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">{freshToken ? t('apiKeys.mcpCommandHintFresh') : t('apiKeys.mcpCommandHint')}</p>
+          </div>
+        </div>
 
         <div className="space-y-2">
           <div className="flex items-end gap-2">

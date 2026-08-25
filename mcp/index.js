@@ -137,7 +137,7 @@ const treeItem = z.lazy(() => z.object({
   title: z.string().describe('Node title (required)'),
   description: z.string().optional(),
   deadline: z.string().optional().describe('YYYY-MM-DD'),
-  owner: z.string().optional().describe('Accountable PERSON: e-mail of an instance member. Stays a human even when the step is performed by an automation — this is who gets notified.'),
+  owner: z.string().optional().describe('Accountable PERSON: e-mail of an instance member (see list_people). Stays a human even when the step is performed by an automation — this is who gets notified. Unknown e-mails are rejected.'),
   status: z.enum(['todo', 'in_progress', 'done']).optional(),
   wait_for_children: z.boolean().optional().describe('Node waits until its whole subtree is done'),
   executor_kind: z.enum(['human', 'automation']).optional().describe('Who performs the step. Default "human".'),
@@ -217,7 +217,7 @@ server.registerTool('update_node', {
     status: z.enum(['todo', 'in_progress', 'done']).optional(),
     description: z.string().optional(),
     deadline: z.string().optional(),
-    owner: z.string().optional().describe('Accountable PERSON (e-mail). Stays a human even for AI/cron steps — this is who gets notified. Empty string clears.'),
+    owner: z.string().optional().describe('Accountable PERSON (e-mail of an instance member, see list_people). Stays a human even for AI/cron steps — this is who gets notified. Empty string clears. Unknown e-mails are rejected.'),
     wait_for_children: z.boolean().optional(),
     executor_kind: z.enum(['human', 'automation']).optional().describe('Who performs the step. Default "human".'),
     executor_name: z.string().optional().describe('Which automation handles this step, e.g. "n8n backup" — a record of what exists, not an instruction. Empty string clears.'),
@@ -411,6 +411,22 @@ server.registerTool('get_org_structure', {
     if (!r.positions.length) return text('The org structure has no positions yet.');
     return text(DATA_FENCE + '\n\n' + r.positions.map((p) =>
       `• ${p.title || '(untitled)'} [${p.position_kind}] (id: ${p.node_id}) — holder: ${p.holder || 'vacant'}${p.deputy ? `, deputy: ${p.deputy}` : ''}`).join('\n'));
+  } catch (e) { return errText(e.message); }
+});
+
+// Lidé instance — bez toho agent neměl jak zjistit, komu smí práci přiřadit
+// (nález P6-02, 20. 8. 2026). Jen čtení; stejná pole jako /members v aplikaci.
+server.registerTool('list_people', {
+  description: 'List the people work can be assigned to: instance members (e-mail, display name, role) and external contacts visible to the key owner (their owner_email is a pseudo e-mail usable as owner). Use these e-mails as `owner` in create_map/add_nodes/update_node and in set_owner rules — an unknown e-mail is rejected. Read-only.',
+  inputSchema: {},
+}, async () => {
+  try {
+    const r = await call('GET', '/api/kb/v1/members');
+    const lines = (r.members || []).map((m) =>
+      `• ${m.email}${m.name || m.full_name ? ` — ${m.name || m.full_name}` : ''} [${m.role || 'user'}]`);
+    for (const c of r.external_contacts || []) lines.push(`• ${c.owner_email} — ${c.name} [external contact]`);
+    if (!lines.length) return text('No people found.');
+    return text(DATA_FENCE + '\n\n' + lines.join('\n'));
   } catch (e) { return errText(e.message); }
 });
 
