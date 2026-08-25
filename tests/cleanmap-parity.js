@@ -31,7 +31,7 @@ const EDITOR_NODES = [
   { id: 'n1', type: 'goalNode', position: { x: 0, y: 0 }, dragging: false,
     data: { title: 'První krok', status: 'in_progress', description: 'popis', collapsed: false,
       color: '#fff', icon: 'star', nodeType: 'normal', goalType: '', apexText: '',
-      deadline: '2026-08-01', owner: 'a@x.cz', plannedOn: '2026-07-28', waitForChildren: true,
+      deadline: '2026-08-01', owner: 'a@x.cz', plannedOn: '2026-07-28', tour: true, waitForChildren: true,
       executorKind: 'automation', executorName: 'n8n reporty',
       automationWanted: false, automationNote: '', automationRequestedBy: '', extra: 42 } },
   // LEGACY uzel: uložený před zavedením vykonavatele, nová pole vůbec nemá —

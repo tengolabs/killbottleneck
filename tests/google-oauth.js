@@ -13,7 +13,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const runContainer = (name, port, env, vol) => {
   execSync(`docker rm -f ${name} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${name} -p ${port}:8090 ${vol ? `-v ${vol}:/app/pb_data` : ''} ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d --name ${name} -e KB_PURPOSE_ASK=0 -p ${port}:8090 ${vol ? `-v ${vol}:/app/pb_data` : ''} ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
 };
 const waitReady = async (port) => {
   for (let i = 0; i < 30; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) return; } catch {} await sleep(1000); }

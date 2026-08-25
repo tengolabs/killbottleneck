@@ -9,6 +9,80 @@ below before you jump several versions.
 
 ---
 
+## v0.42-beta — 2026-08-25
+
+**See what is stuck at others; the agent assigns only to real people**
+
+- The My Day panel gained an “Overdue at others” number — see at a glance
+  how much of the work you delegated is already late; click opens the list.
+- Whoever loses a goal or gets it handed to someone else is now notified —
+  a silent move no longer surprises anyone.
+- The AI agent can list the people of the instance (list_people tool) and
+  assigns work only to a real member or contact — a typo in an e-mail is
+  rejected with a hint of who you probably meant.
+- The API keys dialog shows the instance address and a ready-made command
+  to connect Claude Code; the copy buttons work over plain http too.
+- The three AI advisor questions before generating goals are no longer
+  mandatory.
+- The project dashboard counts tasks as goals with an owner or a deadline —
+  it no longer reports “no tasks yet” for a project that has them.
+- Two instances side by side on one host: the container name can be set
+  with KB_NAME.
+
+**Upgrade notes (breaking for API/MCP integrations):**
+- `owner` in `POST /v1/maps`, `POST /v1/maps/{id}/nodes` and `update_node` must be the e-mail of an
+  instance member (or a visible external contact). Unknown e-mails now return **400** with a hint
+  instead of being stored silently — use the new `list_people` tool / `GET /v1/members` first.
+- `scope` when creating an API key must be `read` or `read_write`; anything else is **400**
+  (previously silently downgraded to `read`).
+- New notification type `node_unassigned` (migration `1787400000`); `KB_NAME` lets you name the
+  container. The npm package `killbottleneck-mcp` 0.42.0 ships with a later release — until then
+  `list_people` is available through the built-in HTTP MCP endpoint (`/mcp`).
+
+## v0.41.2-beta — 2026-08-25
+
+**Encrypted backups and security updates for bundled libraries**
+
+- Data backups can now be encrypted with a passphrase — set KB_BACKUP_PASSPHRASE
+  when backing up and nobody can read the archive without it (GPG, AES-256).
+- Restore handles encrypted as well as older plain backups — nothing to convert,
+  and a forged archive is refused before it touches live data.
+- Security updates for the bundled libraries — 7 reported dependency
+  vulnerabilities fixed (dompurify and build tooling among them).
+
+**Upgrade notes:** nothing to do — encryption is optional; without KB_BACKUP_PASSPHRASE backups behave exactly as before.
+
+## v0.41.1-beta — 2026-08-24
+
+**Screenshots in bug reports, a reliable day star, and timer start from the panel**
+
+- Bug reports and ideas can now carry a screenshot — just paste it with Ctrl+V
+  right into the text, or pick a file. The image is scaled down automatically,
+  arrives as a mail attachment and shows up in your "Already reported" list.
+- The "top today/tomorrow" star switches correctly when you move the same task
+  to the other day; clearing removes it everywhere and can be undone in one click.
+- Time tracking can be started right from the left panel — an empty panel is no
+  longer a dead end.
+- Entries in the time-tracking panel got their own background, so task names and
+  the assignment row no longer blend into their surroundings.
+
+## v0.41-beta — 2026-08-21
+
+**What's new:**
+
+- The "Edit" level is a co-manager: whoever hands out work on a map can also share it
+  with more people. Team access, public link and map deletion stay with the owner.
+- Anyone who was given work can request a different due date on their own step —
+  even with view-only access.
+- The sharing list tells the whole truth: a viewer with work shows "has work here",
+  and team maps got a section for people who have work via team access.
+- Sharing levels now have descriptions — you can see what each level adds.
+- External contacts stand out on the map and in lists: a name badge with "(external)",
+  so a note about a partner doesn't look like work someone is doing.
+- An access upgrade notifies the recipient; assigning work doesn't duplicate notifications.
+- Fixed: buttons on step cards are clickable with the mouse in read-only mode
+  (broken since v0.20).
+
 ## v0.40-beta — 2026-08-20
 
 **Connect the app to OpenAI, OpenRouter or any other service with an API key**

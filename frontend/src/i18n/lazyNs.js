@@ -8,6 +8,12 @@ import i18n from 'i18next';
 // Načítají se OBA jazyky najednou (pár kB) — přepnutí jazyka pak nemusí nic
 // dotahovat a loadLanguage v index.js o těchhle ns nemusí vědět.
 const LOADERS = {
+  // dotazník účelu instance — jen první admin, jednou; dialog se načítá líně
+  // (PurposeGate) a jeho texty do lite balíčku nepatří (strop 500 kB, 25. 8. 2026)
+  ucel: {
+    cs: () => import('./cs/ucel.json'),
+    en: () => import('./en/ucel.json'),
+  },
   billing: {
     cs: () => import('./cs/billing.json'),
     en: () => import('./en/billing.json'),

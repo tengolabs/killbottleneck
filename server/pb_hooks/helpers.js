@@ -425,41 +425,60 @@ function extPseudoEmail(contactId) {
 // člověka), ale nikdo ho nedostal. Neznámá hodnota je CHYBA s nabídkou blízkých
 // shod, ne tiché zahození (stejně jako executor_kind). Platí: e-mail existujícího
 // člena, nebo pseudo-e-mail externího kontaktu, který userId smí vidět.
-// Vrací "" (v pořádku) nebo lokalizovanou chybu.
-function ownerValueError(app, value, userId, lang) {
+//
+// ⚠️ Vrací KANONICKÝ e-mail z databáze (panel /checkup 25. 8.): „Cyril@x.cz" projde,
+// ale buildMyDay a notify() porovnávají přesně — uložený nekanonický tvar by byl
+// tentýž „úkol vypadá přiřazený, nikdo ho nedostal" jinou cestou. Šťastná cesta
+// = jeden dotaz podle e-mailu; celý seznam se tahá až při neshodě (nápověda).
+// Vrací { owner } (kanonický, "" = bez řešitele) nebo { error }.
+function resolveOwner(app, value, userId, lang, cache) {
   const { t } = require(`${__hooks}/i18n.js`);
   const v = String(value || "").trim();
-  if (!v) return "";
+  if (!v) return { owner: "" };
   if (isExternalOwner(v)) {
     try {
       const c = app.findRecordById("external_contacts", extContactId(v));
-      if (!c.getBool("private") || c.getString("owner") === userId) return "";
+      if (!c.getBool("private") || c.getString("owner") === userId) return { owner: extPseudoEmail(c.id) };
     } catch (err) { /* kontakt tu neexistuje */ }
-    return t(lang, "err.ownerUnknown", { owner: v, hint: t(lang, "err.ownerHintList") });
+    return { error: t(lang, "err.ownerUnknown", { owner: v.slice(0, 120), hint: t(lang, "err.ownerHintList") }) };
   }
   const lower = v.toLowerCase();
-  let users = [];
-  try { users = app.findRecordsByFilter("users", "id != ''", "email", 500, 0); } catch (err) { users = []; }
-  const emails = users.map((u) => u.getString("email"));
-  if (emails.some((m) => m.toLowerCase() === lower)) return "";
+  try {
+    const u = app.findFirstRecordByFilter("users", "email = {:e}", { e: lower });
+    if (u) return { owner: u.getString("email") };
+  } catch (err) { /* přesná shoda není → hledat bez ohledu na velikost písmen */ }
+  const c = cache || {};
+  if (!c.emails) {
+    let users = [];
+    try { users = app.findRecordsByFilter("users", "id != ''", "email", 500, 0); } catch (err) { users = []; }
+    c.emails = users.map((u) => u.getString("email"));
+  }
+  const shoda = c.emails.find((m) => m.toLowerCase() === lower);
+  if (shoda) return { owner: shoda };
   // nabídka blízkých shod: stejná část před @, nebo společný začátek 3 znaků
   const local = lower.split("@")[0];
-  const near = emails.filter((m) => {
+  const near = c.emails.filter((m) => {
     const ml = m.toLowerCase().split("@")[0];
     return ml === local || (local.length >= 3 && ml.indexOf(local.slice(0, 3)) === 0);
   }).slice(0, 5);
   const hint = near.length ? t(lang, "err.ownerHintSimilar", { list: near.join(", ") }) : t(lang, "err.ownerHintList");
-  return t(lang, "err.ownerUnknown", { owner: v, hint: hint });
+  return { error: t(lang, "err.ownerUnknown", { owner: v.slice(0, 120), hint: hint }) };
 }
 
-// totéž pro celou osnovu (create_map / add_nodes) — první chyba vyhrává
-function treeOwnersError(app, items, userId, lang) {
+// totéž pro celou osnovu (create_map / add_nodes): první chyba vyhrává, jinak
+// PŘEPÍŠE item.owner kanonickým tvarem (treeItemsToNodes ho pak uloží). Seznam
+// členů se načte nejvýš jednou pro celý strom.
+function resolveTreeOwners(app, items, userId, lang) {
+  const cache = {};
   const stack = Array.isArray(items) ? items.slice() : [];
   while (stack.length) {
     const it = stack.shift();
     if (!it || typeof it !== "object") continue;
-    const err = ownerValueError(app, it.owner, userId, lang);
-    if (err) return err;
+    if (it.owner !== undefined && it.owner !== null && String(it.owner) !== "") {
+      const r = resolveOwner(app, it.owner, userId, lang, cache);
+      if (r.error) return r.error;
+      it.owner = r.owner;
+    }
     if (Array.isArray(it.children)) stack.push.apply(stack, it.children);
   }
   return "";
@@ -1027,6 +1046,8 @@ function canonicalNodeData(d) {
     // jen můj plán. Starý `pinnedOn` se čte jako záloha (pole se přejmenovalo
     // 27. 7. 2026, migrace 1785150000) — data z uzlů se překlopí při dalším uložení.
     plannedOn: d.plannedOn || d.pinnedOn || "",
+    // položka úvodní prohlídky — lite ji řadí POD vlastní zápisy; jinak nic
+    tour: d.tour === true ? true : undefined,
     waitForChildren: !!d.waitForChildren,
     executorKind: normalizeExecutorKind(d.executorKind),
     executorName: d.executorName || "",
@@ -2404,7 +2425,10 @@ function templateToMapServer(tplObj, startDate, layoutOpts) {
     const isRoot = !n.parentId || !aiNodes.some((p) => p.id === n.parentId);
     const hasOffset = n.deadline_offset_days !== null && n.deadline_offset_days !== undefined && n.deadline_offset_days !== "" && isFinite(Number(n.deadline_offset_days));
     const deadline = hasOffset ? addDaysStr(start, Number(n.deadline_offset_days)) : "";
-    const common = {
+    // plán („chci řešit") místo termínu — úvodní mapa (25. 8. 2026): svítí v Můj
+    // den, nikdy nezčervená, do minulosti sám vyprší
+    const hasPlan = n.planned_offset_days !== null && n.planned_offset_days !== undefined && n.planned_offset_days !== "" && isFinite(Number(n.planned_offset_days));
+    const common = Object.assign({
       description: n.description || "",
       status: "todo",
       color: "",
@@ -2412,7 +2436,8 @@ function templateToMapServer(tplObj, startDate, layoutOpts) {
       deadline: deadline,
       owner: n.owner || "",
       waitForChildren: !!n.wait_for_children,
-    };
+    }, hasPlan ? { plannedOn: addDaysStr(start, Number(n.planned_offset_days)) } : {},
+       n.tour ? { tour: true } : {});
     const id = `node-${ts}-${n.id}`;
     idMap[n.id] = id;
     return {
@@ -2584,6 +2609,36 @@ function instantiateTemplate(app, tpl, startDate) {
 //
 // Selhání se POLYKÁ: nepodařená uvítací mapa nesmí shodit registraci prvního
 // účtu, jinak by se zákazník do vlastní instance vůbec nedostal.
+// Účel instance: org_settings.purpose (team/family/solo) — "" dokud se první
+// admin nevyjádřil. Řídí obsah úvodní mapy; dědí ho každý pozvaný.
+function instancePurpose(app) {
+  try {
+    const rec = app.findFirstRecordByFilter("org_settings", "id != ''");
+    return rec ? (rec.getString("purpose") || "") : "";
+  } catch (err) { return ""; }
+}
+
+// Je to nedotčená úvodní mapa? Jen takovou smí dotazník účelu nahradit
+// variantou pro zvolený účel — a nahrazení MAŽE, takže musí platit PŘÍSNĚ
+// (panel /checkup 25. 8.: první verze koukala jen na uzly s řešitelem → cíl
+// bez řešitele, poznámka nebo příloha admina by zmizely): KAŽDÝ uzel nese
+// tour (kořen i oblasti ho mají), žádná poznámka, každý krok todo, žádné přílohy.
+function jeNedotcenaUvodniMapa(app, map) {
+  const nodes = jsonVal(map, "nodes", []);
+  if (!nodes.length) return false;
+  for (const n of nodes) {
+    if (!n || n.type === "note") return false;
+    const d = n.data || {};
+    if (d.tour !== true) return false;
+    if (n.type === "goalNode" && (d.status || "todo") !== "todo") return false;
+  }
+  try {
+    const files = app.findRecordsByFilter("node_files", "map = {:m}", "", 1, 0, { m: map.id });
+    if (files.length) return false;
+  } catch (err) { /* bez příloh */ }
+  return true;
+}
+
 function zalozUvodniMapu(app, user) {
   // Vypínač KB_UVODNI_MAPA=0. Potřebují ho testy, které měří počty úkolů
   // (jinak by musely přepsat čísla a přestaly by chytat skutečné chyby),
@@ -2591,20 +2646,24 @@ function zalozUvodniMapu(app, user) {
   // mapu nechce dostat znovu.
   if ((env("UVODNI_MAPA") || "").trim() === "0") return null;
   try {
-    const { MAPA, aiNodes, nazev } = require(`${__hooks}/uvodni_mapa.js`);
+    const { MAPA, MAPA2, aiNodes, aiNodes2, nazev, nazev2 } = require(`${__hooks}/uvodni_mapa.js`);
     const { userLang } = require(`${__hooks}/i18n.js`);
-    const def = MAPA[userLang(user)] || MAPA.cs;
+    const lang = userLang(user);
+    const def = MAPA[lang] || MAPA.cs;
+    const def2 = MAPA2[lang] || MAPA2.cs;
     const email = user.getString("email");
     const role = user.getString("role") || "user";
+    // účel instance (dotazník prvního admina); prázdné = firma/tým = dnešní obsah
+    const purpose = instancePurpose(app) || "team";
     // ŽÁDNÉ task seeds — model 27. 7.: „uzel JE ta práce; termín z něj dělá
     // úkol." Položky jsou uzly s termínem a řešitelem (drift první verze
     // s úkoly v uzlech Richard 6. 8. večer zamítl).
     // kompaktní styl: 18 položek admina v jedné řadě bylo „hrozně široké"
     // (Richard 11. 8.) — střídavá 2 patra viz layoutTreeServer opts.stagger
-    const conv = templateToMapServer({ ai_nodes: aiNodes(def, role, email) }, new Date(), { stagger: 2 });
+    const conv = templateToMapServer({ ai_nodes: aiNodes(def, role, email, purpose) }, new Date(), { stagger: 2 });
     const col = app.findCollectionByNameOrId("goalmaps");
     const rec = new Record(col);
-    rec.set("title", nazev(def, role));
+    rec.set("title", nazev(def, role, purpose));
     rec.set("description", "");
     rec.set("nodes", conv.nodes);
     rec.set("edges", conv.edges);
@@ -2614,6 +2673,25 @@ function zalozUvodniMapu(app, user) {
     rec.set("shared_with_edit", []);
     rec.set("is_public", false);
     app.save(rec);
+    // DRUHÝ zkušební projekt podle účelu (Richard 25. 8. 2026): od dvou
+    // projektů dává Moje mapa smysl. Bez termínů i plánu, s poznámkou, že je
+    // zkušební. Když selže, první mapa zůstává — druhá je bonus.
+    try {
+      const conv2 = templateToMapServer({ ai_nodes: aiNodes2(def2, purpose, email) }, new Date(), { stagger: 2 });
+      const rec2 = new Record(col);
+      rec2.set("title", nazev2(def2, purpose));
+      rec2.set("description", def2.poznamka);
+      rec2.set("nodes", conv2.nodes);
+      rec2.set("edges", conv2.edges);
+      rec2.set("owner", user.id);
+      rec2.set("owner_email", email);
+      rec2.set("shared_with", []);
+      rec2.set("shared_with_edit", []);
+      rec2.set("is_public", false);
+      app.save(rec2);
+    } catch (err) {
+      try { app.logger().warn("uvodni_mapa: druhý projekt se nepodařilo založit", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
     return rec;
   } catch (err) {
     try { app.logger().warn("uvodni_mapa: nepodařilo se založit", "error", String(err)); } catch (e2) { /* log je bonus */ }
@@ -3868,8 +3946,11 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       }
       // e-mail, který v instanci nikdo nemá, se do uzlu NEZAPÍŠE (nález P6-01) —
       // šablona pravidla mohla přijít z jiné instance; přiznaný skip s radou
-      const ownerErr = owner ? ownerValueError(app, owner, map.getString("owner"), null) : "";
-      if (ownerErr) { skips.push({ type: a.type, reason: ownerErr }); continue; }
+      if (owner) {
+        const ro = resolveOwner(app, owner, map.getString("owner"), null);
+        if (ro.error) { skips.push({ type: a.type, reason: ro.error }); continue; }
+        owner = ro.owner;
+      }
       if ((tn.data || {}).owner !== owner) { tn.data = Object.assign({}, tn.data, { owner: owner }); changed = true; }
       done.push({ type: a.type, owner: owner, node: tn.id });
     } else if (a.type === "set_deadline") {
@@ -5183,7 +5264,7 @@ function buildMyDay(app, userId, email, opts) {
           kind: "node", id: n.id, mapId: m.id, nodeId: n.id,
           title: title, deadline: d.deadline || "", status: d.status || "todo",
           mapTitle: m.getString("title"), planned: d.plannedOn || d.pinnedOn || "",
-          updated: "", blocks: blocking[n.id] || "",
+          updated: "", blocks: blocking[n.id] || "", tour: d.tour === true,
         });
       } else if (iOwnMap && d.owner && (d.status || "todo") !== "done") {
         delegated.push({
@@ -5337,9 +5418,13 @@ function buildMyDay(app, userId, email, opts) {
   const laterOut = buckets.later.filter((it) => !stuckIds[it.kind + ":" + it.id]);
   const noDateOut = buckets.noDate.filter((it) => !stuckIds[it.kind + ":" + it.id]);
 
+  // vlastní zápisy NAD položkami úvodní prohlídky (tour) — obojí má „plán na
+  // dnes", ale první obrazovka na telefonu má být „moje věci" (P4-01, 25. 8.)
   const byUrgency = (a, b) =>
     ((planOf(b.planned) !== null) - (planOf(a.planned) !== null)) || (!!b.blocks - !!a.blocks)
-    || ((a.deadline || "9999") < (b.deadline || "9999") ? -1 : 1);
+    || ((!!a.tour) - (!!b.tour))
+    // shodný termín → 0 (dřív vždy 1: nekonzistentní komparátor, pořadí náhodné)
+    || ((a.deadline || "9999") < (b.deadline || "9999") ? -1 : (a.deadline || "9999") > (b.deadline || "9999") ? 1 : 0);
   for (const k of Object.keys(buckets)) buckets[k].sort(byUrgency);
   delegated.sort(byUrgency);
   const movedAt = (it) => (it.kind === "task" ? it.updated : nodeMoved[it.mapId + ":" + it.id]) || "";
@@ -5710,7 +5795,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 }
 
 module.exports = {
-  oznamNovouVerzi, env, zalozUvodniMapu, isExternalOwner, extContactId, extPseudoEmail, ownerValueError, treeOwnersError, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

@@ -25,7 +25,7 @@ const api = async (m, p, b) => {
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     // instance s OBĚMA funkcemi: Google OAuth (client) + OAuth server (KB_PUBLIC_URL)
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 -e KB_PUBLIC_URL=${BASE} -e KB_GOOGLE_CLIENT_ID=dummy.apps.googleusercontent.com -e KB_GOOGLE_CLIENT_SECRET=dummy ${IMG}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -p ${PORT}:8090 -e KB_PUBLIC_URL=${BASE} -e KB_GOOGLE_CLIENT_ID=dummy.apps.googleusercontent.com -e KB_GOOGLE_CLIENT_SECRET=dummy ${IMG}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
 
     console.log('== obě funkce naráz živé ==');

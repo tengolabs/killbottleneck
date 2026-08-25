@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import PurposeGate from '@/components/shared/PurposeGate';
 import { TimerProvider } from '@/lib/TimerContext';
 import { useTranslation } from 'react-i18next';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -63,6 +64,8 @@ const AuthenticatedApp = () => {
 
   return (
     <Suspense fallback={<Spinner />}>
+      {/* dotazník účelu — jednou, prvnímu adminovi; líně (viz PurposeGate) */}
+      <PurposeGate />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

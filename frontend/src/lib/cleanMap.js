@@ -49,6 +49,11 @@ export function cleanMapData(nodes, edges, posOf = (n) => n.position) {
         // a proto ho posun na zítra NEPŘEPISUJE (rozhodnutí Richarda 27. 7. 2026).
         // Starý `pinnedOn` se čte jako záloha (migrace 1785150000_planned_on.js).
         plannedOn: n.data.plannedOn || n.data.pinnedOn || '',
+        // položka úvodní prohlídky (uvodni_mapa.js) — lite ji řadí pod vlastní zápisy
+        // a dotazník účelu podle ní pozná nedotčenou mapu; jen `true`, jinak vypadne
+        // (server canonicalNodeData dělá totéž; panel /checkup 25. 8. 2026: autosave
+        // z editoru ho dřív smazal ze všech uzlů)
+        tour: n.data.tour === true ? true : undefined,
         waitForChildren: !!n.data.waitForChildren,
         // KDO krok vykoná: člověk, nebo automatizace. Rozdíl mezi AI agentem
         // a cronem uživatele nezajímá (rozhodnutí Richarda 26.7.) — starší data

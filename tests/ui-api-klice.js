@@ -7,7 +7,7 @@
 // Secure context se vypíná podvržením isSecureContext (127.0.0.1 je jinak secure).
 const puppeteer = require('puppeteer-core');
 const { execSync } = require('child_process');
-const BASE = 'http://127.0.0.1:20533';
+const BASE = 'http://127.0.0.1:20562';
 const NAME = 'flowmap-e2e-ui-apiklice';
 let pass = 0, fail = 0;
 const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
@@ -17,7 +17,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let browser;
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20533:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -e KB_UVODNI_MAPA=0 -p 20562:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
     const page = await browser.newPage();

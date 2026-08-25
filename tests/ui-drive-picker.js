@@ -73,8 +73,8 @@ const pripravMapu = async (base) => {
     ok(pickedDocToLink({ url: 'https://x', name: 'a'.repeat(300) }).name.length === 255, 'název se stříhá na 255 (limit kolekce)');
 
     execSync(`docker rm -f ${S.name} ${BEZ.name} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${S.name} -p ${S.port}:8090 -e KB_GOOGLE_CLIENT_ID=dummy.apps.googleusercontent.com -e KB_GOOGLE_CLIENT_SECRET=dummy -e KB_GOOGLE_PICKER_API_KEY=dummy-picker-key ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
-    execSync(`docker run -d --name ${BEZ.name} -p ${BEZ.port}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${S.name} -e KB_PURPOSE_ASK=0 -p ${S.port}:8090 -e KB_GOOGLE_CLIENT_ID=dummy.apps.googleusercontent.com -e KB_GOOGLE_CLIENT_SECRET=dummy -e KB_GOOGLE_PICKER_API_KEY=dummy-picker-key ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${BEZ.name} -e KB_PURPOSE_ASK=0 -p ${BEZ.port}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     const BS = `http://127.0.0.1:${S.port}`, BB = `http://127.0.0.1:${BEZ.port}`;
     for (const b of [BS, BB]) for (let i = 0; i < 40; i++) { try { if ((await fetch(`${b}/api/health`)).ok) break; } catch {} await sleep(1000); }
 

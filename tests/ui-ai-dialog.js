@@ -95,10 +95,10 @@ const NODES = [
     await new Promise((r) => mock.listen(MOCK_PORT, '172.17.0.1', r));
 
     execSync(`docker rm -f ${NAME} ${NAME}-ollama 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 ` +
+    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -p ${PORT}:8090 ` +
              `-e FLOWMAP_AI_PROVIDER=api -e FLOWMAP_AI_URL=http://172.17.0.1:${MOCK_PORT}/v1/advisor ` +
              `-e FLOWMAP_AI_TOKEN=fm_test -e KB_UVODNI_MAPA=0 ${IMAGE}`, { stdio: 'ignore' });
-    execSync(`docker run -d --name ${NAME}-ollama -p ${PORT_OLLAMA}:8090 ` +
+    execSync(`docker run -d --name ${NAME}-ollama -e KB_PURPOSE_ASK=0 -p ${PORT_OLLAMA}:8090 ` +
              `-e FLOWMAP_AI_PROVIDER=ollama -e FLOWMAP_AI_URL=http://172.17.0.1:${MOCK_PORT} ` +
              `-e KB_UVODNI_MAPA=0 ${IMAGE}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }

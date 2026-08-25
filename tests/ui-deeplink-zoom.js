@@ -27,7 +27,7 @@ const api = async (m, p, { token, body } = {}) => {
   let br;
   try {
     execSync('docker rm -f flowmap-e2e-deeplink 2>/dev/null; true');
-    execSync(`docker run -d --name flowmap-e2e-deeplink -p 20516:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name flowmap-e2e-deeplink -e KB_PURPOSE_ASK=0 -p 20516:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break; } catch { /* startuje */ } await sleep(1000); }
     await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.cz', password: PW, passwordConfirm: PW } });
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@e2e.cz', password: PW } })).json.token;

@@ -1,0 +1,12 @@
+{
+  "title": "What will you use killBottleneck for?",
+  "description": "We prepare your starter map accordingly. You can change it any time in Organization settings.",
+  "team": "Company or team",
+  "teamHint": "Colleagues, roles, shared projects, org structure.",
+  "family": "Family and friends",
+  "familyHint": "Shared plans with the people close to you — no roles, no company agenda.",
+  "solo": "Just for myself",
+  "soloHint": "Your own goals and a day under control. You can invite someone any time.",
+  "skip": "Skip (= company or team)",
+  "continue": "Continue"
+}

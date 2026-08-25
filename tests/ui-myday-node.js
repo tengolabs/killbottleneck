@@ -27,7 +27,7 @@ const rozbalDen = async (p) => {
     // KB_UVODNI_MAPA=0: sada POČÍTÁ položky v Můj den — úvodní mapa by je
     // rozhodila. Odhaleno přes půlnoc 7. 8. 2026: server datuje položky v UTC,
     // prohlížeč už měl další den a „dnešní" položky mapy spadly do Po termínu.
-    execSync(`docker run -d --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20505:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -e KB_UVODNI_MAPA=0 -p 20505:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
     const page = await browser.newPage();

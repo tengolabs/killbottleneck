@@ -31,6 +31,7 @@ import BillingSection from '@/components/shared/BillingSection';
 import MembershipSection from '@/components/shared/MembershipSection';
 import { fmtDateShort, fmtDateTimeShort } from '@/lib/locale';
 import { serverOrigin } from '@/lib/serverUrl';
+import { PURPOSES } from '@/lib/purpose';
 
 export default function UserAdmin() {
   const { t } = useTranslation('auth');
@@ -341,6 +342,30 @@ export default function UserAdmin() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">{t('userAdmin.orgSaveHint')}</p>
+          {/* účel instance (dotazník prvního admina) — řídí obsah úvodní mapy
+              nově pozvaných; už založené mapy se nemění */}
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+            <Label htmlFor="org-purpose" className="text-xs text-muted-foreground sm:w-40">{t('userAdmin.purposeLabel')}</Label>
+            <select
+              id="org-purpose"
+              data-testid="org-purpose"
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+              value={org?.purpose || 'team'}
+              onChange={async (e) => {
+                const purpose = e.target.value;
+                try {
+                  await pb.send('/api/kb/purpose', { method: 'POST', body: { purpose } });
+                  base44.org.forget();
+                  setOrg((o) => ({ ...(o || {}), purpose }));
+                } catch (err) { console.error(err); }
+              }}
+            >
+              {PURPOSES.map((p) => (
+                <option key={p} value={p}>{t(`userAdmin.purpose${p[0].toUpperCase()}${p.slice(1)}`)}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">{t('userAdmin.purposeHint')}</span>
+          </div>
         </div>
         )}
 

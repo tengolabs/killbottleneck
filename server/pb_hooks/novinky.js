@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.43-beta": {
+    cs: [
+      "Úvodní mapa už nikoho nestraší termíny — položky prohlídky mají jen plán „chci řešit“, svítí v Můj den první dny a nikdy nezčervenají.",
+      "Při prvním přihlášení se první správce jednou dozví otázku „K čemu budete killBottleneck používat?“ — firma, rodina a přátelé, nebo jen pro sebe — a úvodní mapa se tomu přizpůsobí.",
+      "Každý nový účet dostane dva projekty: úvodní mapu a malý zkušební projekt podle účelu (Lepší pracovní den · Společná radost · Udělat si radost), ať Moje mapa hned dává smysl.",
+      "Účel instance jde kdykoli změnit ve Správě organizace; platí pro nově pozvané, hotové mapy se nemění.",
+    ],
+    en: [
+      "The starter map no longer scares anyone with deadlines — tour items carry only a plan (“I want to do this”), light up in My Day for the first days and never turn red.",
+      "On the first login the first admin is asked once: “What will you use killBottleneck for?” — company, family and friends, or just yourself — and the starter map adapts.",
+      "Every new account gets two projects: the starter map and a small trial project for the chosen purpose (A better working day · Shared joy · Treat yourself), so My map makes sense right away.",
+      "The instance purpose can be changed any time in Organization settings; it applies to newly invited people, existing maps stay as they are.",
+    ],
+  },
   "v0.42-beta": {
     cs: [
       "V panelu Můj den přibylo číslo „U druhých po termínu“ — na první pohled vidíte, kolik práce, kterou jste zadali, už hoří.",

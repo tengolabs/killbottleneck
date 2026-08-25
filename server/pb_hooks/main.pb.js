@@ -2063,6 +2063,12 @@ kbRoute("GET", "/config", (e) => {
     // neomezuje, ale Cloud Lite je pro dva — zákazník musí vidět DOPŘEDU, kolik
     // účtů bude muset odebrat, ne to zjistit až po zaplacení. (Richard 6. 8. 2026.)
     user_count: totalUsers[0].c,
+    // účel instance (team/family/solo); "" = první admin ještě neodpověděl → dialog
+    // jen přihlášenému — nepřihlášený nemá co vědět, k čemu instance je
+    purpose: e.auth ? (() => { const { instancePurpose } = require(`${__hooks}/helpers.js`); return instancePurpose($app); })() : "",
+    // smí se prvního admina ptát na účel? KB_PURPOSE_ASK=0 vypne (testy, obnova
+    // ze zálohy); bez úvodní mapy (KB_UVODNI_MAPA=0) není co skládat → neptat se
+    purpose_ask: (env("PURPOSE_ASK") || "").trim() !== "0" && (env("UVODNI_MAPA") || "").trim() !== "0",
     over_user_limit: (() => { const { userLimitExceeded } = require(`${__hooks}/helpers.js`);
       return userLimitExceeded($app); })(),
     // strop tarifu, na který zkušebka překlápí — ať jde varovat před nákupem
@@ -3445,6 +3451,50 @@ kbRoute("GET", "/members", (e) => {
   return e.json(200, { members: memberRows($app) });
 }, $apis.requireAuth());
 
+// ---------- ÚČEL INSTANCE (dotazník prvního admina, 25. 8. 2026) ----------
+// team / family / solo → org_settings.purpose. Řídí obsah úvodní mapy pro
+// každého dalšího uživatele. Když odpovídá první admin a jeho vlastní úvodní
+// mapa je ještě NEDOTČENÁ (vznikla při registraci jako „team"), nahradí se
+// variantou pro zvolený účel — jinak by sólista dostal „rozdejte role".
+// Přeskočení = team (dnešní chování), ať se dialog už neptá.
+kbRoute("POST", "/purpose", (e) => {
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { instancePurpose, jeNedotcenaUvodniMapa, zalozUvodniMapu } = require(`${__hooks}/helpers.js`);
+  const { PURPOSES } = require(`${__hooks}/uvodni_mapa.js`);
+  const L = userLang(e.auth);
+  if (e.auth.getString("role") !== "admin") return e.json(403, { error: t(L, "err.adminOnly") });
+  const body = e.requestInfo().body || {};
+  const purpose = String(body.purpose || "");
+  if (PURPOSES.indexOf(purpose) === -1) return e.json(400, { error: t(L, "err.badPurpose") });
+  // náhradu map smí vyvolat JEN dialog (replace:true) — select ve Správě
+  // organizace mění účel jen pro budoucí pozvané (panel /checkup 25. 8.)
+  const replace = body.replace === true;
+  const before = instancePurpose($app);
+  let rec;
+  try { rec = $app.findFirstRecordByFilter("org_settings", "id != ''"); } catch (err) { rec = null; }
+  if (!rec) rec = new Record($app.findCollectionByNameOrId("org_settings"));
+  rec.set("purpose", purpose);
+  $app.save(rec);
+  let regenerated = false;
+  const pocet = arrayOf(new DynamicModel({ c: 0 }));
+  $app.db().newQuery("SELECT COUNT(*) as c FROM users").all(pocet);
+  if (replace && !before && purpose !== "team" && pocet[0].c === 1) {
+    // první odpověď PRVNÍHO admina z dialogu: nedotčené „team" úvodní projekty
+    // (úvodní mapa + druhý zkušební) nahradit variantou pro účel — jen když
+    // jsou VŠECHNY jeho mapy nedotčené projekty prohlídky (přísně, viz helper)
+    try {
+      const moje = $app.findRecordsByFilter("goalmaps", "owner = {:o} && archived = false", "created", 50, 0, { o: e.auth.id });
+      if (moje.length >= 1 && moje.every((m) => jeNedotcenaUvodniMapa($app, m))) {
+        for (const m of moje) $app.delete(m);
+        regenerated = !!zalozUvodniMapu($app, e.auth);
+      }
+    } catch (err) {
+      try { $app.logger().warn("purpose: náhrada úvodní mapy selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
+  return e.json(200, { purpose: purpose, regenerated: regenerated });
+}, $apis.requireAuth());
+
 // ---------- ORGANIZAČNÍ STRUKTURA (mapa kind='org') ----------
 // Jeden zdroj pravdy: mapa. Správa organizace je jen tabulkový pohled nad ní.
 
@@ -4541,7 +4591,7 @@ kbRoute("POST", "/v1/maps", (e) => {
   const title = String(info.title || "").trim().slice(0, 200);
   if (!title) return e.json(400, { error: t(a.lang, "err.titleRequired") });
   // řešitel musí být člen nebo viditelný externí kontakt (nález P6-01)
-  const ownerErr = require(`${__hooks}/helpers.js`).treeOwnersError($app, info.tree, a.user.id, a.lang);
+  const ownerErr = require(`${__hooks}/helpers.js`).resolveTreeOwners($app, info.tree, a.user.id, a.lang);
   if (ownerErr) return e.json(400, { error: ownerErr });
   const conv = treeItemsToNodes(Array.isArray(info.tree) ? info.tree : [], null, a.lang);
   if (conv.error) return e.json(400, { error: conv.error });
@@ -4609,7 +4659,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes", (e) => {
     const apex = nodes.find((n) => n.type === "apexNode");
     parentId = apex ? apex.id : "";
   }
-  const ownerErr = require(`${__hooks}/helpers.js`).treeOwnersError($app, info.items, a.user.id, a.lang);
+  const ownerErr = require(`${__hooks}/helpers.js`).resolveTreeOwners($app, info.items, a.user.id, a.lang);
   if (ownerErr) return e.json(400, { error: ownerErr });
   const conv = treeItemsToNodes(Array.isArray(info.items) ? info.items : [], null, a.lang);
   if (conv.error) return e.json(400, { error: conv.error });
@@ -4677,10 +4727,11 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   if (info.description !== undefined) d.description = String(info.description || "");
   if (info.deadline !== undefined) d.deadline = String(info.deadline || "");
   if (info.owner !== undefined) {
-    // řešitel = člen nebo viditelný externí kontakt; jinak 400 s nápovědou (P6-01)
-    const ownerErr = require(`${__hooks}/helpers.js`).ownerValueError($app, info.owner, a.user.id, a.lang);
-    if (ownerErr) return e.json(400, { error: ownerErr });
-    d.owner = String(info.owner || "").trim();
+    // řešitel = člen nebo viditelný externí kontakt; jinak 400 s nápovědou (P6-01);
+    // uloží se KANONICKÝ e-mail, jinak by ho Můj den ani notifikace nenašly
+    const ro = require(`${__hooks}/helpers.js`).resolveOwner($app, info.owner, a.user.id, a.lang);
+    if (ro.error) return e.json(400, { error: ro.error });
+    d.owner = ro.owner;
   }
   if (info.color !== undefined) d.color = String(info.color || "");
   if (info.wait_for_children !== undefined) d.waitForChildren = !!info.wait_for_children;

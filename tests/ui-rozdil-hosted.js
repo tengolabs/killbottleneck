@@ -39,7 +39,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function nastartuj(inst) {
   execSync(`docker rm -f ${inst.name} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${inst.name} -p ${inst.port}:8090 ${inst.env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d --name ${inst.name} -e KB_PURPOSE_ASK=0 -p ${inst.port}:8090 ${inst.env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
   const base = `http://127.0.0.1:${inst.port}`;
   for (let i = 0; i < 40; i++) {
     try { if ((await fetch(`${base}/api/health`)).ok) return base; } catch { /* startuje */ }

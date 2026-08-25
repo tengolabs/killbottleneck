@@ -565,7 +565,7 @@ export const base44 = {
             const res = await pb.collection('org_settings').getList(1, 1);
             const r = res.items[0];
             if (!r) return null;
-            return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '' };
+            return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '', purpose: r.purpose || '' };
           } catch {
             orgCache = null;   // chybu si nedržet, ať to příště zkusí znovu
             return null;

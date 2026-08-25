@@ -6,9 +6,9 @@
 //  P3-01  Můj den: counts.delegatedOverdue = mnou zadaná práce po termínu
 //  P3-02  komu se práce odebere / předá jinému, dostane node_unassigned
 //         (ze session PATCH i z v1 update_node)
-// Čerstvý kontejner na :20531.
+// Čerstvý kontejner na :20561.
 const { execSync } = require('child_process');
-const BASE = 'http://127.0.0.1:20531';
+const BASE = 'http://127.0.0.1:20561';
 const NAME = 'flowmap-e2e-resitel';
 const PW = 'testheslo123';
 let pass = 0, fail = 0;
@@ -36,7 +36,7 @@ const notifs = async (token, type) => ((await api('GET', '/api/collections/notif
 (async () => {
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20531:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20561:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
     await reg('anna@x.cz'); await reg('bara@x.cz'); await reg('cyril@x.cz');
     const A = await login('anna@x.cz'), B = await login('bara@x.cz'), C = await login('cyril@x.cz');
@@ -82,6 +82,14 @@ const notifs = async (token, type) => ((await api('GET', '/api/collections/notif
     ] } });
     expect(r.status === 200, `člen, vlastní kontakt i jiná velikost písmen projdou (${r.status}: ${r.json.error || ''})`);
     const mapId = r.json.id;
+    // panel /checkup 25. 8.: „Cyril@x.cz“ prošel, ale ukládal se s velkým C → Můj den
+    // a notifikace (přesné porovnání) ho nenašly = tentýž nález P6-01 jinou cestou
+    {
+      const ulozeno = (await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token: A })).json.nodes || [];
+      const cyril = ulozeno.find((n) => (n.data || {}).title === 'Velká písmena') || {};
+      expect((cyril.data || {}).owner === 'cyril@x.cz', `řešitel se ukládá KANONICKY z databáze (${(cyril.data || {}).owner})`);
+      expect((await notifs(C, 'node_assigned')).length === 1, 'a Cyril díky tomu dostal node_assigned');
+    }
     let updated = r.json.updated;
     r = await api('GET', `/api/kb/v1/maps/${mapId}`, { bearer: aR });
     // tree[0] = vrchol, položky osnovy jsou jeho děti (stejně jako v v1-api.js)
@@ -115,7 +123,7 @@ const notifs = async (token, type) => ((await api('GET', '/api/collections/notif
     expect(r.status === 200, `předání kroku Cyrilovi přes v1 (${r.status})`);
     let un = await notifs(B, 'node_unassigned');
     expect(un.length === 1 && /jin|someone else/.test(un[0].text || ''), `Bára: node_unassigned „předán jinému" (${un.length}: ${(un[0] || {}).text})`);
-    expect((await notifs(C, 'node_assigned')).length === 1, 'Cyril dostal node_assigned');
+    expect((await notifs(C, 'node_assigned')).length === 2, 'Cyril dostal druhé node_assigned (předání)');
     // session PATCH (jako z editoru): Anna Cyrilovi krok ODEBERE (owner = "")
     r = await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token: A });
     const nodes = (r.json.nodes || []).map((n) => (n.id === (proBaru || {}).id ? { ...n, data: { ...n.data, owner: '' } } : n));

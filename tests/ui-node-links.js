@@ -34,7 +34,7 @@ const tlacitka = (page) => page.evaluate(() =>
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     // hostovaná verze: nahrávání vypnuté, přílohy jen jako odkaz
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 -e FLOWMAP_FILES_MB=0 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -p ${PORT}:8090 -e FLOWMAP_FILES_MB=0 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
     await api('POST', '/api/collections/users/records', { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW } });

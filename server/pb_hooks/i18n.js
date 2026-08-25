@@ -810,6 +810,11 @@ const STRINGS = {
     cs: "Neplatná expirace — zadejte budoucí datum ve formátu RRRR-MM-DD.",
     en: "Invalid expiry — use a future date in YYYY-MM-DD format.",
   },
+  "err.adminOnly": { cs: "Tohle smí jen administrátor.", en: "Administrators only." },
+  "err.badPurpose": {
+    cs: "Neplatný účel — povolené hodnoty: team, family, solo.",
+    en: "Invalid purpose — allowed values: team, family, solo.",
+  },
   "err.badScope": {
     cs: "Neplatné oprávnění klíče — povolené hodnoty: read, read_write.",
     en: "Invalid key scope — allowed values: read, read_write.",

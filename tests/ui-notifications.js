@@ -34,7 +34,7 @@ const api = async (method, p, { token, body } = {}) => {
   let browser;
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e KB_NOTIFY_COALESCE_MIN=0 -p 20514:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -e KB_NOTIFY_COALESCE_MIN=0 -p 20514:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
     // admin (A) nasype příjemci (B) 35 notifikací — víc než se vejde do zvonečku (20)

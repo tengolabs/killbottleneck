@@ -56,7 +56,7 @@ const catcher = http.createServer((req, res) => {
   try {
     await new Promise((r) => catcher.listen(CB_PORT, '127.0.0.1', r));
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -p 20505:8090 -e KB_PUBLIC_URL=${BASE} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -p 20505:8090 -e KB_PUBLIC_URL=${BASE} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
 
     console.log('== discovery ==');
