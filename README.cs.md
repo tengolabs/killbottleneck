@@ -451,7 +451,8 @@ nešifrované archivy. Heslo držte mimo server — bez něj zálohu nikdo nepř
 
 Instance = jeden tým. Role: **Administrátor** (správa uživatelů a rolí, nastavení
 organizace — název a logo), **Manažer** (zve členy, vidí a řídí všechny úkoly),
-**Člen** (své úkoly a sdílené mapy). Zvát jde z Administrace i přímo ze stránky Úkoly.
+**Člen** (své úkoly a sdílené mapy). Administrátor a manažer mají v horní liště navíc
+**Organizaci** — pohled shora napříč týmovými a sdílenými projekty (soukromé projekty se nepočítají). Zvát jde z Administrace i přímo ze stránky Úkoly.
 
 ## Registrace a registrační klíč
 

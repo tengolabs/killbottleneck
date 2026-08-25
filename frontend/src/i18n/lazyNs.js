@@ -53,6 +53,12 @@ const LOADERS = {
     cs: () => import('./cs/historie.json'),
     en: () => import('./en/historie.json'),
   },
+  // přehled Organizace (admin + manager) — plná stránka na počítači, v lite
+  // není (rozhodnutí 25. 8. 2026), takže do jazykového balíku nepatří
+  organizace: {
+    cs: () => import('./cs/organizace.json'),
+    en: () => import('./en/organizace.json'),
+  },
 };
 const nactene = new Set();
 

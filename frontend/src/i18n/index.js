@@ -23,7 +23,10 @@ const PACKS = {
 export async function loadLanguage(lng) {
   if (!PACKS[lng] || i18n.hasResourceBundle(lng, 'common')) return;
   const pack = (await PACKS[lng]()).default;
-  for (const ns of NAMESPACES) i18n.addResourceBundle(lng, ns, pack[ns], true, true);
+  // Jen namespace, které balík opravdu má: líné ns (billing, admin, organizace…)
+  // si react-i18next přidává do options.ns za běhu a v balíku nejsou —
+  // addResourceBundle s undefined shodil celé přepnutí jazyka (nález 25. 8. 2026).
+  for (const ns of NAMESPACES) if (pack[ns]) i18n.addResourceBundle(lng, ns, pack[ns], true, true);
 }
 
 // Init s JEDNÍM jazykem; main.jsx na výsledný promise čeká před renderem.
@@ -34,7 +37,10 @@ export const i18nReady = (async () => {
     resources: { [lng]: pack },
     lng,
     fallbackLng: 'cs',
-    ns: NAMESPACES,
+    // ⚠️ KOPIE, ne sdílená reference: react-i18next do options.ns za běhu
+    // pushuje líné namespace (useTranslation('billing') apod.) — se sdíleným
+    // polem by NAMESPACES rostlo a loadLanguage by pak vkládal undefined.
+    ns: [...NAMESPACES],
     defaultNS: 'common',
     interpolation: { escapeValue: false }, // React escapuje sám
     react: { useSuspense: false },

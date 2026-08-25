@@ -30,6 +30,11 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
     { key: 'projects', label: t('nav.projects'), to: '/' },
     { key: 'tasks', label: t('nav.tasks'), to: '/tasks' },
     { key: 'mymap', label: t('nav.myMap'), to: '/my-map' },
+    // „Organizace" — pohled shora, jen admin a manažer. Vědomé prolomení
+    // anti-bloat pravidla „žádná nová trvalá položka v navigaci" rozhodnutím
+    // majitele produktu (Richard 25. 8. 2026). Člen položku nevidí; v lite není.
+    ...((user?.role === 'admin' || user?.role === 'manager')
+      ? [{ key: 'organizace', label: t('nav.organizace'), to: '/organizace' }] : []),
     { key: 'templates', label: t('nav.templates'), to: '/?view=templates' },
   ];
   const [orgOwn, setOrgOwn] = useState(null);
@@ -69,12 +74,17 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
                 produktu — ne popis „Mapa cílů" (Richard 6. 8. 2026). */}
             {org?.name || t('header.defaultTitle')}
           </h1>
-          <nav className="flex items-center gap-1 ml-2 sm:ml-4 self-stretch">
+          {/* Na úzkém displeji se lišta POSOUVÁ UVNITŘ (swipe), nikdy neroztáhne
+              stránku: pátá položka „Organizace" (admin/manažer) se na 390 px
+              nevejde a bez toho měla celá aplikace vodorovný posun (nález
+              panelu 25. 8. 2026). Posuvník je schovaný, položky se nezalamují. */}
+          <nav className="flex items-center gap-1 ml-2 sm:ml-4 self-stretch min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {NAV.map((item) => (
               <button
                 key={item.key}
+                data-nav={item.key}
                 onClick={() => navigate(item.to)}
-                className={`px-3 h-full text-sm font-medium transition-colors border-b-2 ${
+                className={`px-2 sm:px-3 h-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors border-b-2 ${
                   active === item.key
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'

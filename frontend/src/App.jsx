@@ -32,6 +32,7 @@ const Tasks = lazy(() => import('./pages/Tasks'));
 const Archive = lazy(() => import('./pages/Archive'));
 const UserAdmin = lazy(() => import('./pages/UserAdmin'));
 const Notifications = lazy(() => import('./pages/Notifications'));
+const Organizace = lazy(() => import('./pages/Organizace'));
 const LiteApp = lazy(() => import('./lite/LiteApp'));
 
 const Spinner = () => (
@@ -85,6 +86,8 @@ const AuthenticatedApp = () => {
           <Route path="/archive" element={<Archive />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/admin/users" element={<UserAdmin />} />
+          {/* pohled shora pro admina a manažera (rozhodnutí 25. 8. 2026); role hlídá stránka i server */}
+          <Route path="/organizace" element={<Organizace />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

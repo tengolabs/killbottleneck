@@ -23,7 +23,8 @@
     "projects": "Projekty",
     "tasks": "Úkoly",
     "templates": "Šablony",
-    "myMap": "Moje mapa"
+    "myMap": "Moje mapa",
+    "organizace": "Organizace"
   },
   "notFound": {
     "title": "Stránka nenalezena",

@@ -10,8 +10,8 @@ const path = require('path');
 const DIR = path.join(__dirname, '..', 'frontend', 'src', 'i18n');
 // ⚠️ SEZNAM JE NATVRDO — nový namespace se sem musí dopsat RUČNĚ, jinak se
 // jeho cs↔en drift nikdy neprojeví a sada svítí zeleně (tatáž past jako
-// v tests/run-all.sh). Doplněno 19. 8. 2026: hromadne, historie.
-const NS = ['common', 'nav', 'auth', 'home', 'editor', 'tasks', 'myday', 'notify', 'errors', 'lite', 'billing', 'rules', 'admin', 'popis', 'hromadne', 'historie'];
+// v tests/run-all.sh). Doplněno 19. 8. 2026: hromadne, historie; 25. 8. 2026: organizace.
+const NS = ['common', 'nav', 'auth', 'home', 'editor', 'tasks', 'myday', 'notify', 'errors', 'lite', 'billing', 'rules', 'admin', 'popis', 'hromadne', 'historie', 'organizace'];
 const CZ = /[ěščřžýáíéůúňťďĚŠČŘŽÝÁÍÉŮÚŇŤĎ]/;
 
 let ok = 0, fail = 0;

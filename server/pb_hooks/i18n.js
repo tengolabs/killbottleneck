@@ -791,6 +791,10 @@ const STRINGS = {
     cs: "Zvát uživatele může jen admin nebo manažer.",
     en: "Only an admin or manager can invite users.",
   },
+  "err.portfolioAdminManagerOnly": {
+    cs: "Přehled organizace vidí jen admin nebo manažer.",
+    en: "Only an admin or manager can see the organization overview.",
+  },
   "err.userAlreadyExists": {
     cs: "Uživatel s tímto e-mailem už existuje.",
     en: "A user with this e-mail already exists.",

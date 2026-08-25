@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.44-beta": {
+    cs: [
+      "V horní liště přibyla „Organizace“ — admin a manažer vidí na jedné obrazovce, co je napříč projekty po termínu (kdo a kolik dní), jak jsou projekty daleko, co se přes 14 dní nehýbe a kdo má nejvíc restů.",
+      "Počítá se jen z týmových a sdílených projektů — soukromý projekt se nezapočítává ani do součtů, a stránka říká, z čeho počítala.",
+      "Tlačítko Report stáhne totéž jako Markdown (pondělní report) nebo CSV, se stejnými čísly jako na obrazovce; dole je i „Co se změnilo za 7 dní“ napříč projekty.",
+      "Na stránce Úkoly jde odkazem předfiltrovat práci konkrétního člověka.",
+      "Opraveno: přepnutí jazyka v menu účtu selhávalo, když byla předtím otevřená Správa organizace nebo fakturace.",
+    ],
+    en: [
+      "The top bar gained “Organization” — admins and managers see on one screen what is overdue across projects (who and for how many days), how far projects are, what has not moved for 14+ days and who has the biggest backlog.",
+      "It counts only team and shared projects — a private project is never counted, not even in the totals, and the page says what it counted.",
+      "The Report button downloads the same thing as Markdown (Monday report) or CSV with the numbers you see on screen; at the bottom there is “What changed in the last 7 days” across projects.",
+      "On the Tasks page a link can pre-filter the work of a specific person.",
+      "Fixed: switching the language in the account menu failed after opening Organization settings or billing.",
+    ],
+  },
   "v0.43-beta": {
     cs: [
       "Úvodní mapa už nikoho nestraší termíny — položky prohlídky mají jen plán „chci řešit“, svítí v Můj den první dny a nikdy nezčervenají.",

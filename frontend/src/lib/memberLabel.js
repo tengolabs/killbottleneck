@@ -9,7 +9,8 @@ export const memberLabel = (m) => (m?.name || m?.full_name || m?.email || '');
 
 export const labelForEmail = (members, email) => {
   if (!email) return '';
-  const m = (members || []).find((x) => x.email === email);
+  const wanted = String(email).toLowerCase();
+  const m = (members || []).find((x) => String(x.email || '').toLowerCase() === wanted);
   if (m) return memberLabel(m);
   // pseudo-e-mail externího kontaktu, který v adresáři nevidím (cizí privátní,
   // nebo smazaný) → anonymní popisek; surové ext-…@kontakt.invalid nikdy neukazovat

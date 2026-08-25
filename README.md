@@ -465,7 +465,8 @@ can read the backup.
 
 One instance = one team. Roles: **Administrator** (manages users and roles, organization
 settings — name and logo), **Manager** (invites members, sees and manages all tasks), **Member**
-(their own tasks and shared maps). You can invite people from Administration or straight from
+(their own tasks and shared maps). Administrators and managers also get **Organization** in the
+top bar — the view from above across team and shared projects (private projects are never counted). You can invite people from Administration or straight from
 the Tasks page.
 
 ## Registration and the registration key

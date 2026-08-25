@@ -1669,6 +1669,36 @@ kbRoute("GET", "/map-changes", (e) => {
   });
 }, $apis.requireAuth());
 
+// „ORGANIZACE" — pohled shora (P2-02 + P3-03), rozhodnutí Richarda 25. 8. 2026.
+// Session auth, jen role admin a manager (člen dostane 403 a v liště položku
+// nevidí). Výpočet je v helpers.js:buildPortfolio — JEN týmové a sdílené mapy,
+// které přihlášený smí číst; soukromé mapy nejdou ani do součtů. Stejný
+// rate-limit a `?today=` z klienta jako Můj den; Cache-Control private.
+kbRoute("GET", "/portfolio", (e) => {
+  const { buildPortfolio } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const role = e.auth.getString("role");
+  if (role !== "admin" && role !== "manager") {
+    return e.json(403, { error: t(L, "err.portfolioAdminManagerOnly") });
+  }
+  const store = $app.store();
+  const rlKey = "pfrl:" + e.auth.id;
+  const bucket = Math.floor(Date.now() / 60000);
+  const prevRl = String(store.get(rlKey) || "").split(":");
+  const used = Number(prevRl[0]) === bucket ? Number(prevRl[1]) || 0 : 0;
+  if (used >= 60) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  store.set(rlKey, bucket + ":" + (used + 1));
+
+  const data = buildPortfolio($app, e.auth.id, e.auth.email(), {
+    today: e.request.url.query().get("today") || "",
+    untitled: t(L, "misc.untitled"),
+  });
+  e.response.header().set("Cache-Control", "private, no-store");
+  e.response.header().add("Vary", "Authorization");
+  return e.json(200, data);
+}, $apis.requireAuth());
+
 // ŽIVOTOPIS JEDNOHO CÍLE — „kdo kdy co s tímhle udělal" (Richard 19. 8. 2026).
 //
 // Liší se od /map-changes záměrně: ten je REPORT NA PORADU za celý projekt

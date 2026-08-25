@@ -9,6 +9,52 @@ below before you jump several versions.
 
 ---
 
+## v0.44-beta — 2026-08-25
+
+**Organization: the view from above for admins and managers**
+
+- The top bar gained **Organization** — admins and managers see on one screen what
+  is overdue across projects (who and for how many days), how far projects are,
+  what has not moved for 14+ days and who has the biggest backlog.
+- It counts only team and shared projects — a private project is never counted,
+  not even in the totals, and the page says what it counted.
+- The Report button downloads the same thing as Markdown (Monday report) or CSV
+  with the numbers you see on screen; at the bottom there is “What changed in the
+  last 7 days” across projects.
+- Clicking an item jumps straight to the goal in the map; clicking a person opens
+  Tasks pre-filtered to them (`/tasks?assignee=<e-mail>`).
+- Fixed: switching the language in the account menu failed after opening
+  Organization settings or billing.
+
+**Upgrade notes:** no migration. New session endpoint `GET /api/kb/portfolio`
+(admin and manager only, 403 otherwise). “Not moving” (for goals) and “What
+changed” read the change log, so on maps untouched since the log was introduced
+they may start out empty; tasks are judged by their last change right away. Not
+available through API keys / MCP yet (the key still acts only on its owner's maps).
+
+## v0.43-beta — 2026-08-25
+
+**A starter map without deadlines, a “what is it for” question and two projects to begin with**
+
+- The starter map no longer scares anyone with deadlines — tour items carry only
+  a plan (“I want to do this”): they light up in My Day for the first days, never
+  turn red, and whatever you skip stays in the map.
+- On the first login the first admin is asked once: “What will you use
+  killBottleneck for?” — company or team, family and friends, or just yourself —
+  and the starter map adapts (a solo user is not told to “assign roles”).
+- Every new account gets two projects: the starter map and a small trial project
+  for the chosen purpose (A better working day · Shared joy · Treat yourself), so
+  My map makes sense right away.
+- The instance purpose can be changed any time in Organization settings — it
+  applies to newly invited people, existing maps stay as they are; invited people
+  inherit it and never see the question.
+- On the phone your own entries sort above the tour items.
+
+**Upgrade notes:** the `org_settings.purpose` migration runs automatically. On an
+instance with a single admin the purpose question shows once after the upgrade —
+it only affects newly invited people, existing maps stay. `KB_PURPOSE_ASK=0`
+disables the question.
+
 ## v0.42-beta — 2026-08-25
 
 **See what is stuck at others; the agent assigns only to real people**

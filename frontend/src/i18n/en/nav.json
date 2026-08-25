@@ -23,7 +23,8 @@
     "projects": "Projects",
     "tasks": "Tasks",
     "templates": "Templates",
-    "myMap": "My map"
+    "myMap": "My map",
+    "organizace": "Organization"
   },
   "notFound": {
     "title": "Page Not Found",

@@ -161,10 +161,13 @@ export default function Tasks() {
   };
 
   // předfiltr z titulní strany: /tasks?assignee=me zapne „Moje úkoly"
-  // (user může doběhnout až po mountu, proto effect a ne init state)
+  // (user může doběhnout až po mountu, proto effect a ne init state).
+  // /tasks?assignee=<e-mail> = konkrétní člověk (odkaz z přehledu Organizace).
   useEffect(() => {
-    if (searchParams.get('assignee') !== 'me' || !user?.email) return;
-    setAssigneeFilter(user.email);
+    const wanted = searchParams.get('assignee');
+    if (!wanted || !user?.email) return;
+    if (wanted !== 'me' && !wanted.includes('@')) return;
+    setAssigneeFilter(wanted === 'me' ? user.email : wanted.toLowerCase());
     setOwnerFilter(ALL);
     searchParams.delete('assignee');
     setSearchParams(searchParams, { replace: true });
@@ -266,7 +269,8 @@ export default function Tasks() {
     if (mapFilter !== ALL && mapFilter !== NONE && it.map_id !== mapFilter) return false;
     if (nodeFilter && it.node_id !== nodeFilter) return false;
     if (assigneeFilter === NONE && it.assignee_email) return false;
-    if (assigneeFilter !== ALL && assigneeFilter !== NONE && it.assignee_email !== assigneeFilter) return false;
+    // e-maily bez ohledu na velikost písmen — server (Organizace, v1 API) je posílá malými
+    if (assigneeFilter !== ALL && assigneeFilter !== NONE && String(it.assignee_email || '').toLowerCase() !== String(assigneeFilter).toLowerCase()) return false;
     // „Zadal jsem": já autor (u úkolu created_by = owner_email; u uzlu = vlastník
     // mapy, tj. kdo uzel přiřadil), řešitel někdo jiný. Delegace v killBottlenecku je
     // hlavně přes uzly (vlastník mapy přiřadí uzel osobě), proto e-mail, ne id.

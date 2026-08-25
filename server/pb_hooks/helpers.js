@@ -5133,6 +5133,98 @@ const DG = {
 };
 function dgOf(lang) { return lang === "en" ? DG.en : DG.cs; }
 
+// Poslední SKUTEČNÝ pohyb uzlů podle záznamníku map_changes — pro sekci
+// „Nehýbe se" v Můj den i v přehledu Organizace (stejná definice na obou místech,
+// rozhodnutí Richarda 25. 8. 2026). Vrací { "mapId:nodeId": created } jen pro
+// uzly z `candidates` (kind "node"); uzel bez řádku v mapě chybí = „nevím".
+function nodeLastMoved(app, candidates) {
+  const nodeMoved = {}; // "mapId:nodeId" -> poslední známý pohyb
+  const nodeMaps = {};
+  for (const it of candidates) if (it.kind === "node" && it.mapId) nodeMaps[it.mapId] = true;
+  const nodeMapIds = Object.keys(nodeMaps);
+  // Po dávkách 40 map: okno 3000 řádků platí NA DÁVKU. Jeden dotaz přes všechny
+  // mapy organizace by u rušné instance pokryl pár dní a starší uzly by vypadly
+  // jako „nevím" — sekce „Nehýbe se" by zmlkla právě tam, kde má nejvíc říkat.
+  for (let i0 = 0; i0 < nodeMapIds.length; i0 += 40) {
+    const chunk = nodeMapIds.slice(i0, i0 + 40);
+    const params = {};
+    const parts = chunk.map((id, i) => { params["m" + i] = id; return "map = {:m" + i + "}"; });
+    try {
+      // řazeno od nejnovějšího → první výskyt item_id JE poslední pohyb.
+      // Strop je vědomý: u velmi činné mapy může starší uzel vypadnout z okna
+      // a projeví se jako „nevím" (tedy NEzaseknutý) — bezpečný směr chyby.
+      // ⚠️ Jen SKUTEČNÝ POHYB, ne kosmetika. Od 19. 8. 2026 padají do záznamníku
+      // i změny zadání, ikony, barvy, vykonavatele a čekání — bez tohohle filtru
+      // by přebarvení karty znamenalo „cíl se hýbe" a vyřadilo ho ze sekce
+      // „Nehýbe se". Tím by se sekce tiše vyprázdnila právě u lidí, kteří si
+      // mapu rádi uklízejí, a přesně to má A4 odhalovat.
+      const rows = app.findRecordsByFilter("map_changes",
+        "kind = 'node' && (field = 'status' || field = 'deadline' || field = 'owner'"
+        + " || field = 'title' || field = 'created' || field = 'parent')"
+        + " && (" + parts.join(" || ") + ")", "-created", 3000, 0, params);
+      for (const r of rows) {
+        const key = r.getString("map") + ":" + r.getString("item_id");
+        if (nodeMoved[key] === undefined) nodeMoved[key] = r.getString("created");
+      }
+    } catch (err) { /* bez záznamníku se uzly prostě nevyhodnocují */ }
+  }
+  return nodeMoved;
+}
+
+// Datumová aritmetika přehledů: `today` je datum PODLE UŽIVATELE (klient ho
+// posílá), neplatný vstup spadne na datum serveru. Sdílí Můj den a Organizace.
+function dayMath(todayRaw) {
+  // tvar I platnost: „2026-13-45" tvarem projde, ale Date z něj je Invalid —
+  // všechny rozdíly by byly NaN a přehled by tiše vyšel prázdný
+  const raw = String(todayRaw || "");
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(raw) && !isNaN(new Date(raw + "T00:00:00Z").getTime())
+    && new Date(raw + "T00:00:00Z").toISOString().slice(0, 10) === raw;
+  const today = valid ? raw : nowUtcString().slice(0, 10);
+  const today0 = new Date(today + "T00:00:00Z");
+  const diffOf = (deadline) => (deadline ? Math.round((new Date(deadline + "T00:00:00Z") - today0) / 86400000) : null);
+  const planOf = (v) => { if (!v || String(v) < today) return null; return Math.round((new Date(String(v) + "T00:00:00Z") - today0) / 86400000); };
+  // Horizont položky ve dnech: ⭐ PLÁN ROZHODUJE, dokud sahá nejvýš do týdne
+  // (Richard 8. 8. 2026); dál než týden plán termín nezastíní (min). null = bez
+  // termínu i plánu. Sdílí bucketFor v Můj den a „nehýbe se" v Organizaci.
+  const horizonOf = (planned, deadline) => {
+    const pl = planOf(planned);
+    const dl = diffOf(deadline);
+    if (pl === null) return dl;
+    if (pl <= 7) return pl;
+    return (dl === null) ? pl : Math.min(pl, dl);
+  };
+  return { today: today, today0: today0, diffOf: diffOf, planOf: planOf, horizonOf: horizonOf };
+}
+
+// „Celkové splnění" projektu — TENTÝŽ předpis jako ProgressDashboard.jsx
+// (computeCompletion): počítají se LISTY stromu pod prvním kořenem; uzel
+// s podcíli se sám nepočítá. Poznámky (note) se přeskakují. Přehled Organizace
+// tak ukazuje stejné procento jako dashboard projektu.
+function mapCompletion(nodes, edges) {
+  const list = (Array.isArray(nodes) ? nodes : []).filter((n) => n && n.type !== "note");
+  const byId = {};
+  for (const n of list) byId[n.id] = n;
+  const children = {}, hasParent = {};
+  for (const e of (Array.isArray(edges) ? edges : [])) {
+    if (!byId[e.source] || !byId[e.target]) continue;
+    (children[e.source] = children[e.source] || []).push(e.target);
+    hasParent[e.target] = true;
+  }
+  const roots = list.filter((n) => !hasParent[n.id]);
+  const seen = {};
+  const walk = (id) => {
+    if (seen[id]) return { total: 0, done: 0 };
+    seen[id] = true;
+    const ch = children[id] || [];
+    if (!ch.length) return { total: 1, done: ((byId[id].data || {}).status === "done") ? 1 : 0 };
+    let total = 0, done = 0;
+    for (const c of ch) { const r = walk(c); total += r.total; done += r.done; }
+    return { total: total, done: done };
+  };
+  const c = roots.length ? walk(roots[0].id) : { total: 0, done: 0 };
+  return { total: c.total, done: c.done, pct: c.total > 0 ? Math.round((c.done / c.total) * 100) : 0 };
+}
+
 // „MŮJ DEN" — JEDEN výpočet osobního přehledu pro celý produkt.
 //
 // Zrcadlo frontend/src/components/shared/MyDaySection.jsx (useMemo `day`).
@@ -5155,16 +5247,13 @@ function buildMyDay(app, userId, email, opts) {
   // u úkolů — uzly nemají vlastní razítko (žijí v JSON blobu mapy), takže by
   // jediné uložení mapy „oživilo" všechny její uzly naráz.
   const stuckDays = o.stuckDays || 14;
-  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(o.today || "")) ? String(o.today) : nowUtcString().slice(0, 10);
-  const today0 = new Date(today + "T00:00:00Z");
-  const diffOf = (deadline) => (deadline ? Math.round((new Date(deadline + "T00:00:00Z") - today0) / 86400000) : null);
+  const dm = dayMath(o.today);
+  const today = dm.today, today0 = dm.today0, diffOf = dm.diffOf;
   // Plán = „kdy to chci řešit". NENÍ to termín: termín je dohoda s někým jiným,
   // plán je moje rozhodnutí (Richard 27. 7. 2026). Plán do MINULOSTI neplatí —
-  // po půlnoci se seznam nevleče včerejškem a není potřeba úklidový cron.
-  const planOf = (v) => {
-    if (!v || String(v) < today) return null;
-    return Math.round((new Date(String(v) + "T00:00:00Z") - today0) / 86400000);
-  };
+  // po půlnoci se seznam nevleče včerejškem a není potřeba úklidový cron
+  // (dayMath.planOf — jedna definice pro Můj den i Organizaci).
+  const planOf = dm.planOf;
 
   let maps = [];
   const MAP_LIMIT = 500;
@@ -5320,11 +5409,7 @@ function buildMyDay(app, userId, email, opts) {
   // je po termínu, zůstane vidět červeně na řádku (rozhodnutí Richarda
   // 27. 7. 2026: „plán se má respektovat, ale zpoždění nesmí zmizet").
   const bucketFor = (it) => {
-    const pl = planOf(it.planned);       // 0 = dnes, 1 = zítra… ; null = bez plánu
-    const dl = diffOf(it.deadline);      // může být i záporné (po termínu) nebo null
-
-    let d;
-    if (pl === null) d = dl;
+    // Horizont ve dnech (0 = dnes, 1 = zítra…, záporné = po termínu, null = nic):
     // ⭐ PLÁN ROZHODUJE, dokud sahá nejvýš do týdne. „Kdy to chci řešit" je moje
     // rozhodnutí a seznam, který mi práci drží v jiný den, než jsem si zvolil, lže.
     // Termín se tím NEMĚNÍ a řádek ho dál ukazuje barevně, takže se zpoždění
@@ -5336,11 +5421,11 @@ function buildMyDay(app, userId, email, opts) {
     // chci řešit zítra, změní se jen ikonka a do zítřka se to nepřenese… ten zítřek
     // taky oprav." Nejdřív se opravil jen dnešek (`dl <= 0`) — to ale nechávalo
     // tutéž nevysvětlitelnost o den dál, protože zítřejší termín plán přebíjel.
-    else if (pl <= 7) d = pl;
     // Dál než týden dopředu plán neposune — jinak by naplánováním na za měsíc šel
     // schovat termín za tři dny (rozhodnutí Richarda 27. 7. 2026, platí dál:
     // „ať to nikdo neposouvá moc dozadu"). Z lišty to nejde, přes API/MCP ano.
-    else d = (dl === null) ? pl : Math.min(pl, dl);
+    // Výpočet je v dayMath.horizonOf — sdílí ho i „nehýbe se" v Organizaci.
+    const d = dm.horizonOf(it.planned, it.deadline);
 
     if (d === null) return it.blocks ? "blocking" : "noDate";
     if (d < 0) return "overdue";
@@ -5379,32 +5464,7 @@ function buildMyDay(app, userId, email, opts) {
   // U nových uzlů to nevadí, zakládání se loguje (field "created").
   const stuckBefore = new Date(today0.getTime() - stuckDays * 86400000);
   const candidates = [].concat(buckets.later, buckets.noDate);
-  const nodeMoved = {}; // "mapId:nodeId" -> poslední známý pohyb
-  const nodeMaps = {};
-  for (const it of candidates) if (it.kind === "node" && it.mapId) nodeMaps[it.mapId] = true;
-  const nodeMapIds = Object.keys(nodeMaps);
-  if (nodeMapIds.length) {
-    const params = {};
-    const parts = nodeMapIds.map((id, i) => { params["m" + i] = id; return "map = {:m" + i + "}"; });
-    try {
-      // řazeno od nejnovějšího → první výskyt item_id JE poslední pohyb.
-      // Strop je vědomý: u velmi činné mapy může starší uzel vypadnout z okna
-      // a projeví se jako „nevím" (tedy NEzaseknutý) — bezpečný směr chyby.
-      // ⚠️ Jen SKUTEČNÝ POHYB, ne kosmetika. Od 19. 8. 2026 padají do záznamníku
-      // i změny zadání, ikony, barvy, vykonavatele a čekání — bez tohohle filtru
-      // by přebarvení karty znamenalo „cíl se hýbe" a vyřadilo ho ze sekce
-      // „Nehýbe se". Tím by se sekce tiše vyprázdnila právě u lidí, kteří si
-      // mapu rádi uklízejí, a přesně to má A4 odhalovat.
-      const rows = app.findRecordsByFilter("map_changes",
-        "kind = 'node' && (field = 'status' || field = 'deadline' || field = 'owner'"
-        + " || field = 'title' || field = 'created' || field = 'parent')"
-        + " && (" + parts.join(" || ") + ")", "-created", 3000, 0, params);
-      for (const r of rows) {
-        const key = r.getString("map") + ":" + r.getString("item_id");
-        if (nodeMoved[key] === undefined) nodeMoved[key] = r.getString("created");
-      }
-    } catch (err) { /* bez záznamníku se uzly prostě nevyhodnocují */ }
-  }
+  const nodeMoved = nodeLastMoved(app, candidates);
   const stuck = candidates.filter((it) => {
     const stampRaw = it.kind === "task" ? it.updated : nodeMoved[it.mapId + ":" + it.id];
     if (!stampRaw) return false;
@@ -5540,6 +5600,286 @@ function buildMyDay(app, userId, email, opts) {
     },
     // `rest` panel nezobrazuje (práce bez blízkého termínu) — používá ho AI sumář
     rest: [].concat(buckets.later, buckets.noDate),
+  };
+}
+
+// „ORGANIZACE" — pohled shora pro admina a manažera (nálezy P2-02 + P3-03,
+// rozhodnutí Richarda 25. 8. 2026; maketa 8099/kb-sedm-pohledu/krok3/ = závazná).
+//
+// Počítá se JEN z TÝMOVÝCH a SDÍLENÝCH map: mapa s týmovým přístupem, nebo mapa
+// s aspoň jedním řádkem v map_shares — a zároveň mapa, kterou přihlášený smí
+// číst (userSeesMap: vlastník, příjemce sdílení, člen týmu). Mapa jen s vlastníkem
+// je soukromá a do přehledu nejde ANI DO SOUČTŮ — ani anonymně. Admin nemá
+// „vševidoucí" výjimku (nikde v produktu ji nemá). Archiv a organizační
+// struktura (kind=org) se nepočítají. Veřejné mapy cizích lidí taky ne —
+// vývěska není práce organizace.
+//
+// Definice sdílí s Můj den (dayMath, nodeLastMoved) a s dashboardem projektu
+// (mapCompletion), aby stejná věc měla na všech místech stejné číslo:
+//  • položka práce = uzel (ne poznámka) s řešitelem nebo termínem, nehotový
+//    + úkol nejvyšší úrovně (úkol se stejným řešitelem jako jeho uzel se
+//    nepočítá dvakrát — jako v Můj den);
+//  • po termínu = termín < dnes; plán termín NESCHOVÁ (termín je dohoda);
+//  • % hotovo = listy pod vrcholem (mapCompletion);
+//  • nehýbe se = bez blízkého termínu/plánu (dál než 7 dní nebo bez termínu),
+//    poslední pohyb v záznamníku starší než 14 dní; bez záznamu ≠ zaseknuté;
+//  • lidé = seskupení podle řešitele; bez řešitele zvlášť;
+//  • co se změnilo = záznamník za 7 dní napříč sledovanými mapami, stejná pole
+//    jako /map-changes (název a kosmetika se nehlásí).
+// Report Markdown/CSV se na klientovi skládá z TÉHOŽ JSON — stejná čísla.
+function buildPortfolio(app, userId, email, opts) {
+  const o = opts || {};
+  const untitled = o.untitled || "Bez názvu";
+  const stuckDays = o.stuckDays || 14;
+  const dm = dayMath(o.today);
+  const today = dm.today, today0 = dm.today0, diffOf = dm.diffOf, planOf = dm.planOf;
+
+  const MAP_LIMIT = 500;
+  let maps = [];
+  let mapsTruncated = false;
+  try {
+    // Filtr v DOTAZU (jako Můj den): vlastní mapy, týmové a sdílené mně.
+    // Veřejné mapy záměrně ne. Autorita práv je userSeesMap níž.
+    maps = app.findRecordsByFilter(
+      "goalmaps",
+      'archived = false && kind != "org" && (owner = {:uid} || team_access != "" || map_shares_via_map.email ?= {:email})',
+      "", MAP_LIMIT, 0, { uid: userId, email: email }
+    );
+  } catch (err) { maps = []; }
+  if (maps.length >= MAP_LIMIT) mapsTruncated = true;
+
+  // Řádek sdílení stačí zjistit u VLASTNÍCH netýmových map (cizí mapa se do
+  // výběru dostala jen přes team_access nebo přes sdílení mně) — jedním
+  // dávkovým dotazem místo dotazu na každou mapu (500 map = 500 dotazů).
+  const withShare = {};
+  {
+    const own = maps.filter((m) => m.getString("owner") === userId && m.getString("team_access") === "").map((m) => m.id);
+    for (let i = 0; i < own.length; i += 40) {
+      const chunk = own.slice(i, i + 40);
+      const params = {};
+      const parts = chunk.map((id, k) => { params["m" + k] = id; return "map = {:m" + k + "}"; });
+      try {
+        for (const r of app.findRecordsByFilter("map_shares", parts.join(" || "), "", 2000, 0, params)) withShare[r.getString("map")] = true;
+      } catch (err) { /* bez řádků = soukromé */ }
+    }
+  }
+  const hasShareRow = (m) => (m.getString("owner") === userId ? !!withShare[m.id] : true);
+  // Sdílení MNĚ jedním dotazem: userSeesMap by se u každé cizí netýmové mapy
+  // ptal map_shares zvlášť (až 500 dotazů). Sémantika je táž jako v userSeesMap
+  // (vlastník / týmová / řádek map_shares s mým e-mailem, bez veřejných).
+  const sharedToMe = {};
+  try {
+    for (const r of app.findRecordsByFilter("map_shares", "email = {:e}", "", 2000, 0, { e: email })) sharedToMe[r.getString("map")] = true;
+  } catch (err) { /* bez řádků */ }
+  const seesMap = (m) => m.getString("owner") === userId || m.getString("team_access") !== "" || !!sharedToMe[m.id]
+    || userSeesMap(app, m, userId, email); // pojistka: autorita zůstává userSeesMap
+  const excluded = [];
+  const scoped = [];
+  for (const m of maps) {
+    if (m.getBool("archived") || m.getString("kind") === "org") continue;
+    if (!seesMap(m)) continue; // bez includePublic
+    const team = m.getString("team_access") !== "";
+    const shared = team || hasShareRow(m);
+    if (!shared) {
+      // vlastní soukromá mapa — do přehledu nejde; patička to říká nahlas
+      excluded.push({ id: m.id, title: m.getString("title") || untitled, why: "private" });
+      continue;
+    }
+    scoped.push({ rec: m, access: team ? "team" : "shared" });
+  }
+
+  const items = [];
+  const projects = [];
+  const projectById = {};
+  const titleByMap = {};
+  const nodeByKey = {};
+  // e-maily porovnáváme bez ohledu na velikost písmen (jinde na serveru `eqi`) —
+  // jinak by „Eva@X.cz" a „eva@x.cz" byly dva lidé a úkol by se nesložil do uzlu
+  const lc = (v) => String(v || "").trim().toLowerCase();
+  for (const sm of scoped) {
+    const m = sm.rec;
+    const nodes = jsonVal(m, "nodes", []);
+    const edges = jsonVal(m, "edges", []);
+    titleByMap[m.id] = m.getString("title") || untitled;
+    const c = mapCompletion(nodes, edges);
+    let open = 0;
+    for (const n of nodes) {
+      if (!n || n.type === "note") continue;
+      const d = n.data || {};
+      nodeByKey[m.id + ":" + n.id] = { owner: lc(d.owner), done: (d.status || "todo") === "done" };
+      if (!d.owner && !d.deadline) continue; // vrstva práce (jako dashboard projektu)
+      if ((d.status || "todo") === "done") continue;
+      open++;
+      items.push({
+        kind: "node", id: n.id, mapId: m.id, nodeId: n.id,
+        title: d.title || (d.apexText || "").slice(0, 60) || untitled,
+        owner: lc(d.owner), deadline: d.deadline || "", planned: d.plannedOn || d.pinnedOn || "",
+        status: d.status || "todo", mapTitle: titleByMap[m.id], updated: "",
+      });
+    }
+    projectById[m.id] = projects.length;
+    projects.push({
+      id: m.id, title: titleByMap[m.id], access: sm.access, team_access: m.getString("team_access"),
+      owner_email: m.getString("owner_email"), updated: m.getString("updated"),
+      pct: c.pct, done: c.done, total: c.total, open: open, overdue: 0, stuck: 0,
+    });
+  }
+
+  // úkoly sledovaných map — po dávkách, ať filtr nenaroste přes rozumnou délku
+  let tasksTruncated = false;
+  const TASK_LIMIT = 2000;
+  let tasksSeen = 0;
+  const mapIds = scoped.map((sm) => sm.rec.id);
+  for (let i = 0; i < mapIds.length && tasksSeen < TASK_LIMIT; i += 40) {
+    const chunk = mapIds.slice(i, i + 40);
+    const params = {};
+    const parts = chunk.map((id, k) => { params["m" + k] = id; return "map = {:m" + k + "}"; });
+    let rows = [];
+    try {
+      rows = app.findRecordsByFilter("tasks", "status != 'done' && (" + parts.join(" || ") + ")", "", TASK_LIMIT - tasksSeen, 0, params);
+    } catch (err) { rows = []; }
+    tasksSeen += rows.length;
+    if (tasksSeen >= TASK_LIMIT) tasksTruncated = true;
+    for (const t of rows) {
+      if (t.getString("parent")) continue; // podúkoly přehled neukazuje
+      const mid = t.getString("map");
+      const nid = t.getString("node_id");
+      const node = (mid && nid) ? nodeByKey[mid + ":" + nid] : null;
+      const assignee = lc(t.getString("assignee_email"));
+      // Úkol je detail uzlu téhož řešitele → nepočítat dvakrát. Ale jen dokud
+      // uzel NENÍ hotový: hotový uzel z přehledu vypadl, takže by s ním zmizel
+      // i otevřený (třeba propadlý) úkol — v pohledu shora to nesmí (Můj den
+      // skládá i do hotového, tam jde o „moji" práci; nález panelu 25. 8.).
+      if (node && node.owner && node.owner === assignee && !node.done) continue;
+      items.push({
+        kind: "task", id: t.id, mapId: mid, nodeId: nid || "",
+        title: t.getString("title") || untitled, owner: assignee,
+        deadline: t.getString("deadline"), planned: t.getString("planned_on"),
+        status: t.getString("status"), mapTitle: titleByMap[mid] || "", updated: t.getString("updated"),
+      });
+      if (projectById[mid] !== undefined) projects[projectById[mid]].open++;
+    }
+  }
+
+  // po termínu — dní zpoždění podle termínu; plán nic neschová
+  const byTitle = (a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0);
+  const overdue = [];
+  for (const it of items) {
+    const dl = diffOf(it.deadline);
+    if (dl !== null && dl < 0) overdue.push(Object.assign({}, it, { daysOver: -dl }));
+  }
+  overdue.sort((a, b) => (b.daysOver - a.daysOver) || byTitle(a, b));
+
+  // nehýbe se — kandidáti = bez blízkého termínu/plánu (týž horizont jako bucketFor v Můj den)
+  const candidates = items.filter((it) => { const d = dm.horizonOf(it.planned, it.deadline); return d === null || d > 7; });
+  const nodeMoved = nodeLastMoved(app, candidates);
+  const stuckBefore = new Date(today0.getTime() - stuckDays * 86400000);
+  const stuck = [];
+  for (const it of candidates) {
+    const stampRaw = it.kind === "task" ? it.updated : nodeMoved[it.mapId + ":" + it.id];
+    if (!stampRaw) continue;
+    const u = parsePbDate(stampRaw);
+    if (!u || !(u < stuckBefore)) continue;
+    stuck.push(Object.assign({}, it, { movedAt: stampRaw, daysIdle: Math.floor((today0 - u) / 86400000) }));
+  }
+  stuck.sort((a, b) => (b.daysIdle - a.daysIdle) || byTitle(a, b));
+
+  for (const p of projects) {
+    p.overdue = overdue.filter((x) => x.mapId === p.id).length;
+    p.stuck = stuck.filter((x) => x.mapId === p.id).length;
+  }
+  projects.sort((a, b) => ((b.total > 0) - (a.total > 0)) || (a.pct - b.pct) || byTitle(a, b)); // prázdný projekt až na konec
+
+  // lidé — podle řešitele; „bez řešitele" jako vlastní řádek (owner "")
+  const byPerson = {};
+  const personOf = (em) => (byPerson[em] = byPerson[em] || { email: em, open: 0, overdue: 0, stuck: 0, worst: 0, maps: {} });
+  for (const it of items) { const p = personOf(it.owner || ""); p.open++; p.maps[it.mapId] = true; }
+  for (const it of overdue) { const p = personOf(it.owner || ""); p.overdue++; if (it.daysOver > p.worst) p.worst = it.daysOver; }
+  for (const it of stuck) personOf(it.owner || "").stuck++;
+  const people = Object.keys(byPerson).map((k) => {
+    const p = byPerson[k];
+    return { email: p.email, open: p.open, overdue: p.overdue, stuck: p.stuck, worst: p.worst, maps: Object.keys(p.maps).length };
+  });
+  people.sort((a, b) => (b.overdue - a.overdue) || (b.worst - a.worst) || (b.open - a.open) || (a.email < b.email ? -1 : a.email > b.email ? 1 : 0));
+
+  // Jména externích kontaktů (pseudo-e-mail → jméno z adresáře, jen viditelné
+  // přihlášenému); surový ext-…@kontakt.invalid se klientovi jako popisek neposílá.
+  const extLabels = {};
+  const labelExt = (row, field, labelField) => {
+    const cid = extContactId(row[field]);
+    if (!cid) return;
+    if (!(cid in extLabels)) {
+      let label = "";
+      try {
+        const c = app.findRecordById("external_contacts", cid);
+        if (!c.getBool("private") || c.getString("owner_email") === email) label = c.getString("name");
+      } catch (err) { /* smazaný kontakt → anonymně */ }
+      extLabels[cid] = label;
+    }
+    row.external = true;
+    if (extLabels[cid]) row[labelField || "owner_label"] = extLabels[cid];
+  };
+  for (const r of overdue) labelExt(r, "owner");
+  for (const r of stuck) labelExt(r, "owner");
+  for (const r of people) labelExt(r, "email");
+
+  // co se změnilo za 7 dní napříč sledovanými mapami — stejná pole jako /map-changes
+  // Strop 500 změn platí CELKEM (ne na dávku): každá dávka smí přinést nejvýš
+  // 500 nejnovějších, po sloučení se ořízne na 500 a zkrácení se přizná.
+  const CHANGES_LIMIT = 500;
+  let changes = [];
+  let changesTruncated = false;
+  if (mapIds.length) {
+    const since = pbDateString(new Date(today0.getTime() - 7 * 86400000));
+    for (let i = 0; i < mapIds.length; i += 40) {
+      const chunk = mapIds.slice(i, i + 40);
+      const params = { since: since };
+      const parts = chunk.map((id, k) => { params["m" + k] = id; return "map = {:m" + k + "}"; });
+      let rows = [];
+      try {
+        rows = app.findRecordsByFilter("map_changes",
+          "(field = 'status' || field = 'deadline' || field = 'owner' || field = 'created' || field = 'deleted' || field = 'parent')"
+          + " && created >= {:since} && (" + parts.join(" || ") + ")", "-created", CHANGES_LIMIT, 0, params);
+      } catch (err) { rows = []; }
+      if (rows.length >= CHANGES_LIMIT) changesTruncated = true;
+      for (const r of rows) {
+        changes.push({
+          mapId: r.getString("map"), mapTitle: titleByMap[r.getString("map")] || "",
+          kind: r.getString("kind"), id: r.getString("item_id"), title: r.getString("title"),
+          field: r.getString("field"), from: r.getString("from"), to: r.getString("to"),
+          actor: r.getString("actor_email"), when: r.getString("created"),
+        });
+      }
+    }
+    changes.sort((a, b) => (a.when < b.when ? 1 : a.when > b.when ? -1 : 0));
+    if (changes.length > CHANGES_LIMIT) { changes = changes.slice(0, CHANGES_LIMIT); changesTruncated = true; }
+    // změna řešitele na/z externího kontaktu: jméno stejně jako v ostatních sekcích
+    for (const c of changes) {
+      if (c.field !== "owner") continue;
+      labelExt(c, "from", "from_label");
+      labelExt(c, "to", "to_label");
+    }
+  }
+
+  const peopleWithOverdue = people.filter((p) => p.email && p.overdue > 0).length;
+  return {
+    today: today,
+    scope: {
+      team: projects.filter((p) => p.access === "team").length,
+      shared: projects.filter((p) => p.access === "shared").length,
+      excluded: excluded,
+    },
+    truncated: (mapsTruncated || tasksTruncated || changesTruncated)
+      ? { maps: mapsTruncated, tasks: tasksTruncated, changes: changesTruncated } : null,
+    counts: {
+      overdue: overdue.length,
+      stuck: stuck.length,
+      projects: projects.length,
+      people: peopleWithOverdue,
+      open: items.length,
+      changes: changes.length,
+    },
+    sections: { overdue: overdue, projects: projects, stuck: stuck, people: people, changes: changes },
   };
 }
 
@@ -5796,7 +6136,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 
 module.exports = {
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,
