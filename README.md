@@ -177,9 +177,17 @@ only the address differs.
    }
    ```
 
-Tools: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`, `delete_node`,
-`list_people`, `get_portfolio` (plus rule tools). A goal with an assignee or a deadline IS a task — there are no
-separate task records.
+Tools (17): `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`, `delete_node`,
+`list_people`, `get_portfolio`, `get_org_structure` and the rule tools (`create_rule`, `list_rules`,
+`update_rule`, `delete_rule`, `list_rule_runs`, `list_rule_templates`, `save_rule_template`,
+`delete_rule_template`). A goal with an assignee or a deadline IS a task — there are no
+separate task records. Assigning an `owner` through the API shares the map with that person as a
+collaborator, so the work shows up in their My Day (the response lists who was shared with).
+
+**Remote, without anything local:** every instance also serves MCP directly at **`/mcp`**
+(Streamable HTTP, same keys, same tools) — `claude mcp add --transport http killbottleneck
+https://your-instance/mcp --header "Authorization: Bearer kb_user_..."`; the claude.ai connector
+signs in through OAuth. Details: [MCP server](https://killbottleneck.com/reference/mcp).
 
 **Security:** a key acts as its owner — it sees and edits exactly what the owner can in the app,
 shared and team maps included (`edit`/own = full write; `work` and `read` = only the status of

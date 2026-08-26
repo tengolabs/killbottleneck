@@ -15,9 +15,10 @@ locally next to the assistant; works identically for self-hosted and hosted inst
 
 ## Instalace
 
-```bash
-cd mcp && npm install
-```
+Nic — balíček je na npm (`killbottleneck-mcp`, verze sleduje verzi aplikace) a v MCP Registry
+(`com.killbottleneck/killbottleneck`); `npx -y killbottleneck-mcp` si ho stáhne sám. Z repozitáře
+(offline stroj, přibitá verze): `cd mcp && npm install` a `node /cesta/mcp/index.js`.
+Aplikace hotový příkaz `claude mcp add …` ukáže v dialogu **API klíče**.
 
 ## Konfigurace (env)
 
@@ -65,7 +66,7 @@ docker run -i --rm -e KB_URL=https://firma.killbottleneck.com -e KB_API_KEY=kb_u
 ## Vzdálené připojení (bez lokálního serveru)
 
 Každá instance vystavuje MCP i přímo na **`/mcp`** (Streamable HTTP, stateless,
-stejných 9 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
+stejných 17 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
 doméně — asistent se připojí odkudkoli, bez instalace čehokoli lokálně.
 
 **Claude Code:**
@@ -105,6 +106,15 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `add_nodes` | přidání podstromu pod uzel (⚠️ přepočítá layout celé mapy) |
 | `update_node` | název/stav/popis/termín/osoba/čekání-na-podstrom jednoho uzlu |
 | `delete_node` | smaže uzel VČETNĚ podstromu (vrchol nejde; celé mapy přes API nejdou) |
+| `create_rule` | nové automatizační pravidlo mapy (spouštěč, podmínky, akce) — jen editoři mapy |
+| `list_rules` | pravidla mapy (jen editoři) |
+| `update_rule` | úprava/zapnutí/vypnutí pravidla |
+| `delete_rule` | smazání pravidla |
+| `list_rule_runs` | log běhů pravidel mapy (co, kdy, s jakým výsledkem) |
+| `list_rule_templates` | šablony pravidel instance |
+| `save_rule_template` | uložení pravidla jako šablony |
+| `delete_rule_template` | smazání šablony (autor nebo admin) |
+| `get_org_structure` | organizační struktura: pozice a funkce s držiteli a zástupci (jen čtení) |
 | `list_people` | lidé instance (členové + viditelné externí kontakty) — platné hodnoty `owner`; neznámý e-mail server odmítne |
 | `get_portfolio` | pohled shora jako stránka Organizace: projekty s % hotovo, po termínu, nehýbe se, lidé, změny za 7 dní — nad týmovými a sdílenými mapami, které vlastník klíče vidí |
 

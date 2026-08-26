@@ -171,9 +171,17 @@ instanci, liší se jen adresa.
    }
    ```
 
-Nástroje: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`,
-`delete_node`, `list_people`, `get_portfolio` (plus nástroje pravidel). Cíl s řešitelem nebo termínem JE úkol —
-žádné samostatné úkolové záznamy neexistují.
+Nástroje (17): `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`,
+`delete_node`, `list_people`, `get_portfolio`, `get_org_structure` a nástroje pravidel
+(`create_rule`, `list_rules`, `update_rule`, `delete_rule`, `list_rule_runs`, `list_rule_templates`,
+`save_rule_template`, `delete_rule_template`). Cíl s řešitelem nebo termínem JE úkol —
+žádné samostatné úkolové záznamy neexistují. Přiřazení řešitele přes API mu mapu nasdílí jako
+spolupracovníkovi, aby práci viděl v Můj den (odpověď nese, komu se sdílelo).
+
+**Vzdáleně, bez čehokoli lokálně:** každá instance vystavuje MCP i přímo na **`/mcp`**
+(Streamable HTTP, stejné klíče, stejné nástroje) — `claude mcp add --transport http killbottleneck
+https://vase-instance/mcp --header "Authorization: Bearer kb_user_..."`; konektor claude.ai se
+přihlásí přes OAuth. Detail: [MCP server](https://killbottleneck.cz/reference/mcp).
 
 **Bezpečnost:** klíč jedná za svého majitele — vidí a upravuje přesně to, co on v aplikaci,
 včetně sdílených a týmových map (`edit`/vlastní = plný zápis; `work` i `read` = jen stav
