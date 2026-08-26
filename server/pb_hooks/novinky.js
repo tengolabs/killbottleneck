@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.46-beta": {
+    cs: [
+      "API klíč teď jedná za svého vlastníka: přes API a AI asistenta (MCP) vidíte a upravujete i sdílené a týmové projekty — přesně to, co v aplikaci.",
+      "Úroveň sdílení platí i pro klíč: čtenář i spolupracovník přes klíč odškrtnou jen svou práci, editor upravuje vše — přesně jako v aplikaci.",
+      "Když přes API někomu přiřadíte práci, projekt se mu rovnou nasdílí jako spolupracovníkovi — uvidí ho v Můj den, stejně jako z aplikace.",
+      "Nový nástroj MCP get_portfolio: pohled shora jako stránka Organizace — projekty, po termínu, nehýbe se, lidé.",
+    ],
+    en: [
+      "An API key now acts as its owner: through the API and AI assistants (MCP) you see and edit shared and team projects too — exactly what you can in the app.",
+      "The share level applies to keys as well: readers and collaborators tick off only their own work through a key, an editor edits everything — exactly as in the app.",
+      "Assigning work to someone through the API shares the project with them as a collaborator — they see it in My day, just like from the app.",
+      "New MCP tool get_portfolio: the view from above, same as the Organization page — projects, overdue, stuck, people.",
+    ],
+  },
   "v0.45-beta": {
     cs: [
       "V Můj účet je „Stáhnout všechna moje data“ — jeden soubor se všemi projekty, které vidíte, úkoly, komentáři, seznamem příloh, měřením času, zásobníkem nápadů a kontakty.",

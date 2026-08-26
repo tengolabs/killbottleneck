@@ -100,7 +100,7 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const stdioTools = (await stdioRpc('tools/list', {})).result.tools;
     const httpTools = (await mcpPost(keyRW, 'tools/list', {})).json.result.tools;
-    expect(httpTools.length === 16, `HTTP tools/list → 16 nástrojů (${httpTools.length})`);
+    expect(httpTools.length === 17, `HTTP tools/list → 17 nástrojů (${httpTools.length})`);
     const podle = (arr) => Object.fromEntries(arr.map((t) => [t.name, t]));
     const S = podle(stdioTools), H = podle(httpTools);
     expect(JSON.stringify(Object.keys(S).sort()) === JSON.stringify(Object.keys(H).sort()), 'stejná JMÉNA nástrojů');
@@ -133,6 +133,11 @@ let mcp = null;
     const gmStdio = await stdioRpc('tools/call', { name: 'get_map', arguments: { map_id: mapId } });
     const stdioText = (gmStdio.result.content || []).map((c) => c.text).join('\n');
     expect(stdioText === toolText(gm), 'výstup get_map je BYTE-SHODNÝ se stdio serverem');
+    // totéž pro get_portfolio (renderPortfolio je v obou serverech opsaný — hlídá jen tenhle test)
+    const gp = await mcpPost(keyRW, 'tools/call', { name: 'get_portfolio', arguments: {} });
+    const gpStdio = await stdioRpc('tools/call', { name: 'get_portfolio', arguments: {} });
+    const gpStdioText = (gpStdio.result.content || []).map((c) => c.text).join('\n');
+    expect(/Portfolio as of/.test(toolText(gp)) && gpStdioText === toolText(gp), 'výstup get_portfolio je BYTE-SHODNÝ se stdio serverem');
 
     console.log('== autorizace nástrojů ==');
     const ro = await mcpPost(keyRO, 'tools/call', { name: 'add_nodes', arguments: { map_id: mapId, items: [{ title: 'X' }] } });

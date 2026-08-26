@@ -71,12 +71,12 @@ const RULE_ACTION = {
 const TOOLS = [
   {
     name: "list_maps",
-    description: "List goal maps in the killBottleneck account (id, title, node count, last update). Use archived=true to list archived maps instead.",
+    description: "List goal maps the key owner can see — own, team and shared maps (id, title, node count, last update, access: owner/edit/work/read). Use archived=true to list archived maps instead.",
     inputSchema: { type: "object", properties: { archived: { type: "boolean" } }, required: [] },
   },
   {
     name: "get_map",
-    description: "Read one map as an indented tree with node ids, statuses ([✓] done, [~] in progress, [ ] todo), deadlines and owners. Always call this before modifying a map you have not read yet.",
+    description: "Read one map as an indented tree with node ids, statuses ([✓] done, [~] in progress, [ ] todo), deadlines and owners. The header shows the key's access level (owner/edit = full write; work and read = only the status of the key owner's own nodes, like ticking off in the app). Always call this before modifying a map you have not read yet.",
     inputSchema: { type: "object", properties: { map_id: { type: "string" } }, required: ["map_id"] },
   },
   {
@@ -224,6 +224,11 @@ const TOOLS = [
     description: "List the people work can be assigned to: instance members (e-mail, display name, role) and external contacts visible to the key owner (their owner_email is a pseudo e-mail usable as owner). Use these e-mails as `owner` in create_map/add_nodes/update_node and in set_owner rules — an unknown e-mail is rejected. Read-only.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
+  {
+    name: "get_portfolio",
+    description: "Read the portfolio overview across all team and shared maps the key owner can read (private maps are excluded, exactly like the Organization page): per-project completion, overdue and stuck items, people with overdue work and a 7-day change summary. Optional today=YYYY-MM-DD. Read-only.",
+    inputSchema: { type: "object", properties: { today: { type: "string", description: "YYYY-MM-DD, defaults to the server date" } }, required: [] },
+  },
 ];
 
 // ---------- obsluha /mcp (Streamable HTTP, stateless) ----------
@@ -262,9 +267,10 @@ function renderNode(n, depth) {
   return lines.join("\n");
 }
 function renderMap(m) {
+  const acc = m.access ? `, access: ${m.access}` : "";
   const head = m.title
-    ? `Map "${m.title}" (id: ${m.id}, updated: ${m.updated})`
-    : `Map (id: ${m.id}, updated: ${m.updated})`;
+    ? `Map "${m.title}" (id: ${m.id}, updated: ${m.updated}${acc})`
+    : `Map (id: ${m.id}, updated: ${m.updated}${acc})`;
   const body = (m.tree || []).map((r) => renderNode(r, 0)).join("\n");
   const notes = (m.notes || []).length
     ? "\nNotes:\n" + m.notes.map((n) => `  • ${n.text.slice(0, 200)} (id: ${n.id})`).join("\n")
@@ -282,6 +288,43 @@ function renderRule(r) {
   const conds = (r.conditions || []).length ? `, if ${(r.conditions || []).length} condition(s)` : "";
   return `${r.name} (id: ${r.id}, ${r.enabled ? "enabled" : "DISABLED"}, when ${trig}${conds}, do ${acts}`
     + `${r.node_id ? `, node ${r.node_id}` : ""}${r.last_error ? `, ⚠ last_error: ${r.last_error.slice(0, 100)}` : ""})`;
+}
+
+// souhrn Organizace (get_portfolio) — 1:1 se stdio serverem (product/mcp/index.js)
+function renderPortfolio(p) {
+  const c = p.counts || {};
+  const sc = p.scope || {};
+  const s = p.sections || {};
+  const who = (r) => (r.owner_label ? `${r.owner_label} (${r.owner})` : (r.owner || "unassigned"));
+  const out = [`Portfolio as of ${p.today}: ${c.projects || 0} projects (team ${sc.team || 0}, shared ${sc.shared || 0}), ${c.open || 0} open items, ${c.overdue || 0} overdue, ${c.stuck || 0} stuck, ${c.people || 0} people with overdue work.`];
+  const projects = s.projects || [];
+  out.push("", projects.length ? "Projects:" : "Projects: none (no team or shared maps visible to the key owner).");
+  for (const pr of projects) {
+    out.push(`• ${pr.title} (id: ${pr.id}, ${pr.access}) — ${pr.pct}% done (${pr.done}/${pr.total}), open ${pr.open}, overdue ${pr.overdue}, stuck ${pr.stuck}, owner @${pr.owner_email || "?"}`);
+  }
+  const overdue = (s.overdue || []).slice(0, 20);
+  if (overdue.length) {
+    out.push("", `Overdue (top ${overdue.length} of ${(s.overdue || []).length}):`);
+    for (const r of overdue) out.push(`• ${r.title} — ${r.daysOver}d over, @${who(r)}, in "${r.mapTitle}" (${r.kind} id: ${r.id})`);
+  }
+  const stuck = (s.stuck || []).slice(0, 20);
+  if (stuck.length) {
+    out.push("", `Stuck (top ${stuck.length} of ${(s.stuck || []).length}, no movement for 14+ days):`);
+    for (const r of stuck) out.push(`• ${r.title} — ${r.daysIdle}d idle, @${who(r)}, in "${r.mapTitle}" (${r.kind} id: ${r.id})`);
+  }
+  const people = s.people || [];
+  if (people.length) {
+    out.push("", "People:");
+    for (const r of people) out.push(`• ${r.owner_label ? `${r.owner_label} (${r.email})` : (r.email || "unassigned")} — open ${r.open}, overdue ${r.overdue}${r.worst ? ` (worst ${r.worst}d)` : ""}, stuck ${r.stuck}, maps ${r.maps}`);
+  }
+  const changes = (s.changes || []).slice(0, 10);
+  if (changes.length) {
+    out.push("", `Changed in the last 7 days (${changes.length} of ${(s.changes || []).length}):`);
+    for (const r of changes) out.push(`• ${r.when.slice(0, 10)} ${r.field}: ${r.title} ${r.from ? `${r.from} → ` : ""}${r.to || ""} by ${r.actor || "system"} in "${r.mapTitle}"`);
+  }
+  const tr = p.truncated;
+  if (tr && (tr.maps || tr.tasks || tr.changes)) out.push("", `[Truncated: ${["maps", "tasks", "changes"].filter((k) => tr[k]).join(", ")}]`);
+  return DATA_FENCE + "\n\n" + out.join("\n");
 }
 
 const text = (s) => ({ content: [{ type: "text", text: s }] });
@@ -332,7 +375,7 @@ const EXEC = {
     const r = vcall(auth, "GET", `/api/kb/v1/maps${a.archived ? "?archived=1" : ""}`);
     if (!r.maps.length) return text(a.archived ? "No archived maps." : "No maps.");
     return text(DATA_FENCE + "\n\n"
-      + r.maps.map((m) => `• ${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated})`).join("\n"));
+      + r.maps.map((m) => `• ${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || "owner"})`).join("\n"));
   },
   get_map: (auth, a) => text(renderMap(freshMap(auth, a.map_id))),
   create_map: (auth, a) => {
@@ -416,6 +459,10 @@ const EXEC = {
     for (const c of r.external_contacts || []) lines.push(`• ${c.owner_email} — ${c.name} [external contact]`);
     if (!lines.length) return text("No people found.");
     return text(DATA_FENCE + "\n\n" + lines.join("\n"));
+  },
+  get_portfolio: (auth, a) => {
+    const q = a && a.today ? `?today=${enc(String(a.today))}` : "";
+    return text(renderPortfolio(vcall(auth, "GET", `/api/kb/v1/portfolio${q}`)));
   },
 };
 

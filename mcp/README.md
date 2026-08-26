@@ -106,6 +106,7 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `update_node` | název/stav/popis/termín/osoba/čekání-na-podstrom jednoho uzlu |
 | `delete_node` | smaže uzel VČETNĚ podstromu (vrchol nejde; celé mapy přes API nejdou) |
 | `list_people` | lidé instance (členové + viditelné externí kontakty) — platné hodnoty `owner`; neznámý e-mail server odmítne |
+| `get_portfolio` | pohled shora jako stránka Organizace: projekty s % hotovo, po termínu, nehýbe se, lidé, změny za 7 dní — nad týmovými a sdílenými mapami, které vlastník klíče vidí |
 
 **Úkol = uzel s řešitelem (`owner`) nebo termínem** — žádný samostatný úkolový
 záznam neexistuje. Novou práci zakládejte přes `add_nodes`, odbavujte přes
@@ -114,8 +115,15 @@ záznam neexistuje. Novou práci zakládejte přes `add_nodes`, odbavujte přes
 
 ## Chování a limity
 
-- Klíč vidí **mapy svého majitele** (parita s aplikací) — žádnou administraci,
-  nastavení AI, uživatele ani sdílené/týmové mapy.
+- Klíč **jedná za svého majitele** (parita s aplikací): vidí vlastní, týmové i
+  sdílené mapy a zapisuje podle úrovně (`edit`/vlastní zapisuje vše; `work` i
+  `read` mění jen stav vlastních uzlů — jako odškrtnutí v aplikaci); `list_maps`/`get_map` úroveň
+  vrací jako `access`. Roli nečte — cizí soukromé i cizí veřejné mapy jsou 404.
+  Administraci, nastavení AI ani uživatele klíč neotevře nikdy.
+- Přiřazení řešitele přes API mu mapu automaticky nasdílí jako spolupracovníkovi
+  (stejně jako v aplikaci), aby práci viděl v Můj den — jen když vlastník klíče smí
+  sdílet (vlastník mapy / jmenovaný editor); odpověď nese `shared`. Pravidla a jejich
+  log vidí jen editoři mapy.
 - Výstupy nástrojů jsou anglicky (LLM jim rozumí vždy); chybové hlášky serveru
   chodí v jazyce vlastníka klíče.
 - Rate-limit na klíč: 120 čtení + 30 zápisů za minutu; max 200 uzlů na volání;

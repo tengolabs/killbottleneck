@@ -882,8 +882,20 @@ const STRINGS = {
     en: "Only the requester can withdraw the request.",
   },
   "err.nodeStatusOwnOnly": {
-    cs: "Spolupracovník mění stav jen u vlastních úkolů (kde je zodpovědná osoba nebo řešitel).",
-    en: "A collaborator can change status only on their own tasks (as responsible person or assignee).",
+    cs: "Stav uzlu smí měnit jen ten, kdo na něm má svou práci (zodpovědná osoba nebo řešitel).",
+    en: "Only someone with their own work on this node (responsible person or assignee) can change its status.",
+  },
+  "err.apiWorkStatusOnly": {
+    cs: "Bez práva upravovat mapu lze přes API měnit jen stav (status) vlastního uzlu; ostatní pole mění vlastník nebo editor.",
+    en: "Without edit rights the API lets you change only the status of your own node; other fields are for the map owner or an editor.",
+  },
+  "err.statusRequired": {
+    cs: "Chybí pole status (todo, in_progress, done).",
+    en: "The status field is missing (todo, in_progress, done).",
+  },
+  "err.ownerAmbiguous": {
+    cs: "Řešitel „{owner}“ je nejednoznačný — v instanci je víc účtů lišících se jen velikostí písmen: {list}. Zadejte e-mail přesně.",
+    en: "Assignee \"{owner}\" is ambiguous - several accounts differ only in letter case: {list}. Use the exact e-mail.",
   },
   "err.parentNotFound": { cs: "Rodičovský uzel nebyl nalezen.", en: "Parent node not found." },
   "err.apexDeleteForbidden": {

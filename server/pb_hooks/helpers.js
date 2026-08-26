@@ -442,9 +442,13 @@ function resolveOwner(app, value, userId, lang, cache) {
     } catch (err) { /* kontakt tu neexistuje */ }
     return { error: t(lang, "err.ownerUnknown", { owner: v.slice(0, 120), hint: t(lang, "err.ownerHintList") }) };
   }
+  // ⚠️ Nejdřív PŘESNÁ shoda se vstupem (PocketBase e-maily nenormalizuje, `Dup@x.cz`
+  // a `dup@x.cz` mohou být dva účty — bezpečnostní panel 26. 8. 2026 živě ukázal, že
+  // lowercase-first by přiřadil práci a přístup k mapě dvojčeti). Teprve pak bez
+  // ohledu na velikost písmen — a když tak sedí VÍC účtů, je to nejednoznačné = chyba.
   const lower = v.toLowerCase();
   try {
-    const u = app.findFirstRecordByFilter("users", "email = {:e}", { e: lower });
+    const u = app.findFirstRecordByFilter("users", "email = {:e}", { e: v });
     if (u) return { owner: u.getString("email") };
   } catch (err) { /* přesná shoda není → hledat bez ohledu na velikost písmen */ }
   const c = cache || {};
@@ -453,8 +457,9 @@ function resolveOwner(app, value, userId, lang, cache) {
     try { users = app.findRecordsByFilter("users", "id != ''", "email", 500, 0); } catch (err) { users = []; }
     c.emails = users.map((u) => u.getString("email"));
   }
-  const shoda = c.emails.find((m) => m.toLowerCase() === lower);
-  if (shoda) return { owner: shoda };
+  const shody = c.emails.filter((m) => m.toLowerCase() === lower);
+  if (shody.length > 1) return { error: t(lang, "err.ownerAmbiguous", { owner: v.slice(0, 120), list: shody.join(", ") }) };
+  if (shody.length === 1) return { owner: shody[0] };
   // nabídka blízkých shod: stejná část před @, nebo společný začátek 3 znaků
   const local = lower.split("@")[0];
   const near = c.emails.filter((m) => {
@@ -1745,18 +1750,138 @@ function notifyAutomationReady(app, record, pending, actorEmail) {
   }
 }
 
-// v1: dohledá mapu a ověří, že patří majiteli API klíče. RLS se u vlastních rout
-// NEuplatní, autorizace je tady — a 404 nerozlišuje cizí/neexistující mapu
-// (neprozrazovat existenci). Vrací record nebo null.
-function v1OwnedMap(app, mapId, userId) {
-  if (!mapId) return null;
-  try {
-    const map = app.findRecordById("goalmaps", String(mapId));
-    if (map.getString("owner") !== userId) return null;
-    return map;
-  } catch (err) {
-    return null;
+// Úroveň přístupu člověka k mapě — JEDNO místo výpočtu (krok 4c, 26. 8. 2026):
+// "" (nevidí) < "read" < "work" (spolupracovník: jen stav svých uzlů) < "edit".
+// Maximum z: vlastník → edit; team_access edit → edit; jmenovitý řádek map_shares
+// → jeho permission; team_access read → read (jmenovitý read + týmový edit = edit,
+// stejně jako canEdit v editoru). `is_public` ZÁMĚRNĚ NE — veřejná vývěska není
+// pracovní přístup (parita s /node-status). Úroveň se čte z map_shares (JSON
+// zrcadla shared_with_* NEJSOU autorizace — invariant migrace 1785020006).
+// ⚠️ E-mail se hledá PŘESNĚ (parita s RLS `email = @request.auth.email`). Žádná
+// case-insensitive záloha: PocketBase e-maily nenormalizuje a unikát je
+// case-sensitive, takže `Editor@x.cz` může být JINÝ účet než `editor@x.cz` —
+// záloha by mu dala práva oběti (živý PoC bezpečnostního panelu 26. 8. 2026).
+// `opts.shareRows` = {mapId: permission} předpočítané jedním dotazem (seznamy),
+// ať se nedělá dotaz na každou mapu; bez něj se ptá map_shares přímo.
+const ACCESS_RANK = { "": 0, read: 1, work: 2, edit: 3 };
+function mapAccessLevel(app, map, userId, email, opts) {
+  if (!map) return "";
+  if (map.getString("owner") === userId) return "edit";
+  let level = "";
+  const team = map.getString("team_access");
+  if (team === "edit" || team === "read") level = team;
+  let perm = "";
+  const rows = (opts || {}).shareRows;
+  if (rows) {
+    perm = rows[map.id] || "";
+  } else {
+    try {
+      perm = app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: String(email || "") }).getString("permission");
+    } catch (err) { /* nesdíleno jmenovitě */ }
   }
+  if ((ACCESS_RANK[perm] || 0) > (ACCESS_RANK[level] || 0)) level = perm;
+  return level;
+}
+
+// Jmenovitá sdílení JEDNOHO člověka jedním dotazem: {mapId: permission}. Pro
+// seznamy (GET /v1/maps) místo dotazu na každou mapu; sémantika = mapAccessLevel.
+function shareRowsFor(app, email) {
+  const out = {};
+  try {
+    for (const r of app.findRecordsByFilter("map_shares", "email = {:e}", "", 2000, 0, { e: String(email || "") })) {
+      out[r.getString("map")] = r.getString("permission");
+    }
+  } catch (err) { /* bez řádků */ }
+  return out;
+}
+
+// Má člověk na uzlu SVOU práci? Garant (data.owner) nebo řešitel úkolu na uzlu.
+// Právo plyne z práce (Richard 20. 8. 2026) — jedna kontrola pro /node-status,
+// /deadline-requests i v1 update_node (klíč spolupracovníka).
+function nodeIsMine(app, mapId, node, email) {
+  if (!node) return false;
+  if (String(((node.data || {}).owner) || "") === String(email || "")) return true;
+  try {
+    app.findFirstRecordByFilter("tasks", "map = {:m} && node_id = {:n} && assignee_email = {:e}",
+      { m: mapId, n: node.id, e: email });
+    return true;
+  } catch (err) { return false; }
+}
+
+// v1: mapa, kterou vlastník API klíče VIDÍ — klíč jedná za svého vlastníka
+// (Richard 25. 8. 2026; do té doby vědomý dluh „jen vlastní mapy"). RLS se
+// u vlastních rout NEuplatní, autorizace je tady. Vrací {map, level, isOwner}
+// nebo null; 404 nerozlišuje cizí/neexistující (neprozrazovat existenci).
+// Veřejné mapy cizích lidí (is_public) tudy NEJDOU — vývěska není pracovní přístup.
+function v1ReadableMap(app, mapId, user) {
+  if (!mapId || !user) return null;
+  let map;
+  try { map = app.findRecordById("goalmaps", String(mapId)); } catch (err) { return null; }
+  const level = mapAccessLevel(app, map, user.id, user.email());
+  if (!level) return null;
+  return { map: map, level: level, isOwner: map.getString("owner") === user.id };
+}
+
+// v1: mapa k ZÁPISU. `need` = "edit" (plný zápis: vlastník / jmenovitý edit /
+// týmový edit), "work" (i spolupracovník) nebo "read" (kdokoli, kdo mapu vidí —
+// volající pak sám zúží rozsah na stav vlastního uzlu, jako /node-status).
+// Vrací {map, level, isOwner}, nebo {status, error}: 404 když mapu nevidí,
+// 403 když vidí, ale na požadovanou úroveň nedosáhne.
+function v1WritableMap(app, mapId, user, need, lang) {
+  const i18n = require(`${__hooks}/i18n.js`);
+  const r = v1ReadableMap(app, mapId, user);
+  if (!r) return { status: 404, error: i18n.t(lang, "err.mapNotFound") };
+  const min = need === "work" ? "work" : (need === "read" ? "read" : "edit");
+  if ((ACCESS_RANK[r.level] || 0) < ACCESS_RANK[min]) return { status: 403, error: i18n.t(lang, "err.noWriteAccess") };
+  return r;
+}
+
+// Auto-sdílení řešitelům při zadání práce přes v1 API / MCP (rozhodnuto 26. 8. 2026).
+// V aplikaci OwnerSelect po přiřazení volá /share {permission:"work", quiet:true};
+// přes API to nikdo nedělal — řešitel dostal node_assigned, ale mapu v Můj den
+// neviděl (nález kroku 1 vlny „sedm pohledů"). Pravidla stejná jako /share:
+// jen NAHORU (read → work; edit zůstává), nikdy řádek pro vlastníka ani aktéra,
+// externí kontakty (ext-…@kontakt.invalid) se nesdílí, a sdílet smí jen vlastník
+// nebo jmenovaný spolusprávce (mapShareAdminAccess) — týmový editor práci přiřadit
+// smí, sdílet ne (v UI mu /share vrátí 403 a jen se toastne). Bez notifikace
+// o sdílení (quiet): souhrn o přidělené práci posílá volající. ⚠️ E-mail se
+// ukládá PŘESNĚ tak, jak ho vrátil resolveOwner (= users.email), NE lowercase:
+// práva se párují přesně a lowercase by dal přístup účtu-dvojčeti `dup@x.cz`
+// místo `Dup@x.cz` (bezpečnostní panel 26. 8. 2026). Vrací e-maily, kterým
+// přístup vznikl nebo se povýšil.
+// ⚠️ app.save(map) posune `updated` — odpověď routy musí `updated` číst AŽ potom.
+function autoShareAssignees(app, map, actorUser, emails) {
+  const changed = [];
+  if (!map || !actorUser || !Array.isArray(emails) || !emails.length) return changed;
+  if (!mapShareAdminAccess(app, map, actorUser)) return changed;
+  // Všechna porovnání PŘESNÁ (jako práva a RLS): `Editor@x.cz` je jiný účet než
+  // `editor@x.cz` a musí dostat vlastní řádek, ne být „už nasdílen" přes dvojče.
+  let ownerEmail = map.getString("owner_email");
+  if (!ownerEmail) {
+    // parita s /share: vlastníka dohledat z users, jinak by mu mohl vzniknout řádek sdílení
+    try { ownerEmail = app.findRecordById("users", map.getString("owner")).getString("email"); } catch (err) { return changed; }
+  }
+  const actorEmail = actorUser.email();
+  let sharedWith = jsonList(map, "shared_with");
+  const sharedEdit = jsonList(map, "shared_with_edit");
+  let sharedWork = jsonList(map, "shared_with_work");
+  const seen = {};
+  for (const raw of emails) {
+    const email = String(raw || "").trim();
+    if (!email || !email.includes("@") || seen[email]) continue;
+    seen[email] = true;
+    if (isExternalOwner(email) || email === ownerEmail || email === actorEmail) continue;
+    if (sharedEdit.includes(email) || sharedWork.includes(email)) continue; // už work/edit
+    if (!sharedWith.includes(email)) sharedWith = sharedWith.concat([email]);
+    sharedWork = sharedWork.concat([email]); // syncShares páruje shared_with ↔ shared_with_work přesně
+    changed.push(email);
+  }
+  if (!changed.length) return changed;
+  map.set("shared_with", sharedWith);
+  map.set("shared_with_work", sharedWork);
+  app.save(map);
+  syncShares(app, map);
+  return changed;
 }
 
 // v1: společný zápis obsahu mapy — normalizace (parita cleanMap + sémantika) →
@@ -1970,10 +2095,10 @@ function v1SaveMapData(app, map, nodes, edges, lang, relayout, actorEmail, opts)
     const i18n = require(`${__hooks}/i18n.js`);
     return { status: 400, error: i18n.t(lang, "err.apexRequired") };
   }
-  // Zadavatelský model termínů — parita s goalmaps update hookem. Všechny
-  // dnešní v1 cesty jsou owner-only (v1OwnedMap) a agent pracuje pro vlastníka,
-  // proto opts.isOwner default true; kdo někdy otevře v1 sdíleným editorům,
-  // MUSÍ předat isOwner=false + actorEmail, jinak by stráže mlčely.
+  // Zadavatelský model termínů — parita s goalmaps update hookem. opts.isOwner
+  // default true (interní volající pracují za vlastníka); v1 routy od kroku 4c
+  // (klíč jedná za vlastníka, i sdílený editor) POSÍLAJÍ isOwner podle skutečného
+  // vztahu k mapě + actorEmail, jinak by stráže termínu/mazání mlčely.
   const origNodes = jsonVal(map, "nodes", []); // parse JEDNOU (pole má až 5 MB)
   const origEdges = jsonVal(map, "edges", []); // pro diff automatizačních pravidel (node_unblocked)
   // ⚠️ v1 API (a MCP) má org strukturu POUZE KE ČTENÍ — závazné rozhodnutí
@@ -6527,7 +6652,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 }
 
 module.exports = {
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

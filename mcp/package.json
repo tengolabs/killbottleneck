@@ -1,6 +1,6 @@
 {
   "name": "killbottleneck-mcp",
-  "version": "0.42.0",
+  "version": "0.46.0",
   "description": "MCP server for killBottleneck — connect your AI assistant (Claude Desktop, Claude Code, …) to your killBottleneck instance and build goal maps conversationally.",
   "type": "module",
   "bin": {

@@ -178,12 +178,14 @@ only the address differs.
    ```
 
 Tools: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`, `delete_node`,
-`list_people` (plus rule tools). A goal with an assignee or a deadline IS a task — there are no
+`list_people`, `get_portfolio` (plus rule tools). A goal with an assignee or a deadline IS a task — there are no
 separate task records.
 
-**Security:** a key gives access to its owner's maps (exactly as in the app); shared and team MAPS are deliberately not reachable through a
-key (for now), and administration, AI settings and users never are. Writes can add/edit/delete
-goals and tasks; **a whole map cannot be deleted through the API**, and neither can the apex of
+**Security:** a key acts as its owner — it sees and edits exactly what the owner can in the app,
+shared and team maps included (`edit`/own = full write; `work` and `read` = only the status of
+the owner's own nodes, exactly like ticking off in the app); it never reads the account's role, so an admin's key cannot see
+anyone's private map, and someone else's public map is not reachable either (404). Administration,
+AI settings and users are never reachable. Writes can add/edit/delete goals and tasks; **a whole map cannot be deleted through the API**, and neither can the apex of
 a map. Limits: 120 reads + 30 writes per minute per key, at most 200 nodes per call, at most 20
 keys per account. Working alongside an open editor is handled by conflict detection (the editor
 offers to reload, the assistant reloads the map itself). Note: `add_nodes` re-runs the layout

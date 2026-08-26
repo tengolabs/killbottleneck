@@ -9,6 +9,36 @@ below before you jump several versions.
 
 ---
 
+## v0.46-beta — 2026-08-27
+
+**An API key acts as its owner — shared and team maps through API and MCP, plus `get_portfolio`**
+
+- **API keys and MCP now see and edit exactly what the key owner can in the app**: own maps,
+  team maps and maps shared with the owner. The share level decides what a write may do —
+  `owner`/`edit` = full write; `work` (collaborate) and `read` = only the `status` of the
+  owner's own nodes (like ticking off in the app), other fields 403. Rules and their run log
+  need edit rights (as in the app). `GET /v1/maps` and
+  `GET /v1/maps/{id}` return the level as `access`; `list_maps`/`get_map` show it too.
+- **Assigning an owner through the API shares the map with that person** as a collaborator
+  (`work`), exactly like the app does — the assignee finally sees the work in My day. Never
+  downgrades an existing share, never for external contacts, only when the key owner may share
+  (map owner or named editor); the response says who was shared with in `shared`.
+- **New MCP tool `get_portfolio`** (+ `GET /api/kb/v1/portfolio`): the Organization page for
+  assistants — completion per project, overdue and stuck items, people with overdue work,
+  changes in the last 7 days — over the team and shared maps the key owner can read.
+- Still true: the role is never read (an admin's key sees no one's private map), a `read`-scope
+  key never writes, someone else's private **and public** maps are 404, the org map stays
+  read-only through a key, administration/AI settings/users are never reachable.
+
+**Upgrade notes (breaking for API/MCP integrations):** a key now reaches **more** than before —
+shared and team maps used to be deliberately unreachable (404). If an integration relied on
+"a key sees only its owner's maps", review it: `list_maps` may return more maps, and writes on
+them follow the share level (403 where the owner is only a reader or collaborator). No migration.
+The npm package `killbottleneck-mcp` 0.46.0 adds `get_portfolio` — and it is the first npm
+release since 0.35.0, so `npx killbottleneck-mcp@latest` also picks up everything from 0.36–0.45
+(rule tools, `get_org_structure`, `list_people`). Older clients keep working (they simply do
+not offer the new tools).
+
 ## v0.45-beta — 2026-08-26
 
 **Download all my data — leaving is part of the product**

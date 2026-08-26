@@ -3,7 +3,8 @@
 // checků s aRW hlídej součet, jinak test začne flakat na 429 — klidně si vydej
 // další klíč (create klíče jde přes session, nepočítá se).
 // v1 API pro MCP/integrace (autentizace API klíčem): scope vynucení, izolace
-// uživatelů (cizí = 404), create_map → get_map roundtrip, add_nodes + konflikt 409
+// uživatelů (cizí nesdílená = 404; řešitel po auto-sdílení vidí, ale nepřidává —
+// od kroku 4c klíč jedná za vlastníka), create_map → get_map roundtrip, add_nodes + konflikt 409
 // + řetězení updated, update_node (vč. odblokování → notifikace), delete_node
 // podstromu (apex zakázán), odstraněné /v1/tasks (410 + zákaz create), normalizace vstupu,
 // rate-limit 429, body 413, žádná eskalace klíčem. Čerstvý kontejner na :20502.
@@ -34,13 +35,14 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     execSync(`docker run -d --name ${NAME} -p 20502:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
-    await reg('a@x.cz'); await reg('b@x.cz');
-    const A = await login('a@x.cz'), B = await login('b@x.cz');
+    await reg('a@x.cz'); await reg('b@x.cz'); await reg('c@x.cz');
+    const A = await login('a@x.cz'), B = await login('b@x.cz'), C = await login('c@x.cz');
     const keyOf = async (session, scope) =>
       (await api('POST', '/api/flowmap/api-keys', { token: session, body: { label: scope, scope } })).json.token;
     const aRW = await keyOf(A, 'read_write');
     const aRO = await keyOf(A, 'read');
     const bRW = await keyOf(B, 'read_write');
+    const cRW = await keyOf(C, 'read_write'); // C nemá s mapou nic společného
     // base_updated je povinné → před každým zápisem si vyzvedni aktuální verzi mapy
     const ver = async (mid) => (await api('GET', `/api/flowmap/v1/maps/${mid}`, { bearer: aRW })).json.updated;
 
@@ -91,10 +93,16 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     const child1 = r.json.tree[0].children[0].children[0]; // Napsat changelog
     const waitNode = r.json.tree[0].children[1]; // Nasazení (wait_for_children, owner b)
     const waitChild = waitNode.children[0]; // Deploy skript
-    r = await api('GET', `/api/flowmap/v1/maps/${mapId}`, { bearer: bRW });
+    r = await api('GET', `/api/flowmap/v1/maps/${mapId}`, { bearer: cRW });
     expect(r.status === 404, `cizí klíč mapu nevidí — 404, ne 403 (${r.status})`);
-    r = await api('POST', `/api/flowmap/v1/maps/${mapId}/nodes`, { bearer: bRW, body: { items: [{ title: 'hack' }] } });
+    r = await api('POST', `/api/flowmap/v1/maps/${mapId}/nodes`, { bearer: cRW, body: { items: [{ title: 'hack' }] } });
     expect(r.status === 404, `cizí klíč nepřidá uzly (${r.status})`);
+    // B je řešitel uzlu „Nasazení" → create_map ho auto-nasdílel jako spolupracovníka (work):
+    // mapu VIDÍ (klíč jedná za vlastníka, krok 4c), ale uzly nepřidá — 403, ne 404
+    r = await api('GET', `/api/flowmap/v1/maps/${mapId}`, { bearer: bRW });
+    expect(r.status === 200 && r.json.access === 'work', `řešitel po auto-sdílení mapu vidí s access=work (${r.status}, ${r.json.access})`);
+    r = await api('POST', `/api/flowmap/v1/maps/${mapId}/nodes`, { bearer: bRW, body: { items: [{ title: 'hack' }], base_updated: r.json.updated } });
+    expect(r.status === 403, `spolupracovník (work) uzly nepřidá — 403 (${r.status})`);
     r = await api('GET', '/api/flowmap/v1/maps/neexistuje123', { bearer: aRW });
     expect(r.status === 404, `neexistující mapa 404 — stejné jako cizí (${r.status})`);
 

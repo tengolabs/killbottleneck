@@ -174,6 +174,17 @@ const portfolio = (u, today) => api(`/api/kb/portfolio?today=${today || day(0)}`
     expect(r.json.sections.people.filter((p) => /eva@e2e\.cz/i.test(p.email)).length === 1, 'Eva je v tabulce lidí jednou (bez ohledu na velikost písmen)');
     expect(ov3.includes('UKOL-SIROTEK'), 'úkol na smazaném uzlu se počítá samostatně');
     expect(ov3.includes('UKOL-NA-HOTOVEM'), 'otevřený úkol na hotovém uzlu z přehledu nezmizí');
+
+    console.log('== přes API klíč (krok 4c): stejná čísla, bez čtení role ==');
+    const kA = await api(`/api/kb/v1/portfolio?today=${day(0)}`, { bearer: admin.klic });
+    const sA = await portfolio(admin);
+    expect(kA.status === 200 && JSON.stringify(kA.json.counts) === JSON.stringify(sA.json.counts),
+      `admin: GET /v1/portfolio klíčem = session /portfolio (${kA.status}, ${JSON.stringify(kA.json.counts)})`);
+    const kC = await api(`/api/kb/v1/portfolio?today=${day(0)}`, { bearer: clen.klic });
+    const sC = await portfolio(clen);
+    expect(sC.status === 403 && kC.status === 200 && titles(kC.json.sections.projects).includes('TYMOVA') && titles(kC.json.sections.projects).includes('SDILENA'),
+      `člen: session 403, klíč 200 = jen jeho rozsah (${sC.status}/${kC.status}: ${titles(kC.json.sections.projects).join(',')})`);
+    expect(!titles(kC.json.sections.projects).includes('SOUKROMA'), 'člen přes klíč nevidí adminovu soukromou mapu');
   } catch (e) {
     fail++; console.log('  ❌ výjimka', e.message);
   } finally {

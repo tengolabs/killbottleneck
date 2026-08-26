@@ -1528,8 +1528,9 @@ kbRoute("POST", "/run-email-digests", (e) => {
 // Kvůli tomu tenhle endpoint vůbec vznikl: na telefonu je objem stažených dat
 // větší bolest než velikost JS (změřeno v product/tests/scale-limits.js).
 //
-// Session auth (ne v1 API klíč): tohle je pohled pro přihlášeného člověka —
-// v1 klíč vidí jen mapy svého vlastníka, takže by sdílené projekty vypadly.
+// Session auth (ne v1 API klíč): tohle je pohled pro přihlášeného člověka;
+// stroje mají od kroku 4c GET /v1/portfolio (buildPortfolio nad tím, co vlastník
+// klíče vidí — od 26. 8. 2026 klíč jedná za vlastníka včetně sdílených map).
 //
 // ?today=YYYY-MM-DD posílá KLIENT ze svého zařízení. Kontejner běží v UTC a po
 // půlnoci SELČ by se serverový „dnešek" rozešel s tím, co má člověk na
@@ -2586,7 +2587,7 @@ kbRoute("POST", "/share", (e) => {
 // na uzlu úkol jako řešitel. Kdo dostal práci, musí ji umět odškrtnout —
 // rozhodnuto Richardem 20. 8. 2026 (do té doby to uměl jen „spolupracovník").
 kbRoute("POST", "/node-status", (e) => {
-  const { jsonVal, v1SaveMapData, notifyUnblockedTransitions, triggerReadyAgents } = require(`${__hooks}/helpers.js`);
+  const { jsonVal, v1SaveMapData, notifyUnblockedTransitions, triggerReadyAgents, mapAccessLevel, nodeIsMine } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const info = e.requestInfo().body || {};
@@ -2602,14 +2603,10 @@ kbRoute("POST", "/node-status", (e) => {
   }
   const email = e.auth.email();
   const isOwner = map.getString("owner") === e.auth.id;
-  // úroveň z map_shares — JSON zrcadla shared_with_* nejsou autorizace
-  let perm = "";
-  try {
-    const row = $app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: email });
-    perm = row.getString("permission");
-  } catch (err) { /* nesdíleno jmenovitě */ }
-  const teamAccess = map.getString("team_access");
-  const canEditMap = isOwner || perm === "edit" || teamAccess === "edit";
+  // úroveň = mapAccessLevel (map_shares + team_access; JSON zrcadla shared_with_*
+  // nejsou autorizace) — tentýž výpočet používá v1 API pro klíč spolupracovníka
+  const level = mapAccessLevel($app, map, e.auth.id, email);
+  const canEditMap = level === "edit";
   // ⭐ PRÁVO PLYNE Z PRÁCE (Richard 20. 8. 2026): kdo mapu VIDÍ a má na uzlu
   // SVOU práci (garant / řešitel úkolu — kontrola `mine` níže), ten smí přepnout
   // stav TOHO uzlu. Dřív to uměl jen „spolupracovník" (work), takže komu se mapa
@@ -2621,7 +2618,7 @@ kbRoute("POST", "/node-status", (e) => {
   // pořád jen na vlastní práci. Kdo mapu nevidí vůbec, nemá tu co pohledávat.
   // ⚠️ `is_public` tu ZÁMĚRNĚ NENÍ: veřejná mapa je vývěska ke čtení, ne pozvánka
   // k zápisu pro kohokoli, komu se ve `data.owner` objeví jeho adresa.
-  const canSeeMap = canEditMap || perm !== "" || teamAccess === "read";
+  const canSeeMap = level !== "";
   if (!canSeeMap) {
     return e.json(403, { error: t(L, "err.noWriteAccess") });
   }
@@ -2629,16 +2626,8 @@ kbRoute("POST", "/node-status", (e) => {
   const origEdges = jsonVal(map, "edges", []);
   const node = origNodes.find((n) => n.id === String(info.nodeId || "") && n.type !== "note");
   if (!node) return e.json(404, { error: t(L, "err.nodeNotFound") });
-  if (!canEditMap) {
-    let mine = String((node.data || {}).owner || "") === email;
-    if (!mine) {
-      try {
-        $app.findFirstRecordByFilter("tasks", "map = {:m} && node_id = {:n} && assignee_email = {:e}",
-          { m: map.id, n: node.id, e: email });
-        mine = true;
-      } catch (err) { /* na uzlu nemá žádný svůj úkol */ }
-    }
-    if (!mine) return e.json(403, { error: t(L, "err.nodeStatusOwnOnly") });
+  if (!canEditMap && !nodeIsMine($app, map.id, node, email)) {
+    return e.json(403, { error: t(L, "err.nodeStatusOwnOnly") });
   }
   const newNodes = origNodes.map((n) => (n.id === node.id
     ? Object.assign({}, n, { data: Object.assign({}, n.data || {}, { status: status }) })
@@ -2669,7 +2658,7 @@ kbRoute("POST", "/node-status", (e) => {
 // SCHVÁLENÍ tu záměrně NENÍ: zadavatel prostě změní termín (kteroukoli
 // zapisovací cestou) a satisfyDeadlineRequests žádost uzavře + oznámí.
 kbRoute("POST", "/deadline-requests", (e) => {
-  const { jsonVal, v1SaveMapData, notify } = require(`${__hooks}/helpers.js`);
+  const { jsonVal, v1SaveMapData, notify, mapAccessLevel, nodeIsMine } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const info = e.requestInfo().body || {};
@@ -2682,33 +2671,21 @@ kbRoute("POST", "/deadline-requests", (e) => {
   }
   const email = e.auth.email();
   const isOwner = map.getString("owner") === e.auth.id;
-  let perm = "";
-  try {
-    const row = $app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: email });
-    perm = row.getString("permission");
-  } catch (err) { /* nesdíleno jmenovitě */ }
+  const level = mapAccessLevel($app, map, e.auth.id, email); // map_shares + team_access, bez is_public
   // úrovně se vztahem k práci: work/edit (jmenovitě), tým s editací, vlastník —
   // ti žádají kdekoli. ČTENÁŘ (jmenovitý i org-wide) navíc JEN u uzlu se SVOU
   // prací (garant/řešitel) — právo plyne z práce (Richard 21. 8. 2026): kdo
   // práci dostal, musí umět říct, že termín nestíhá. Cizí uzly čtenáři dál
   // nežádají (původní spam argument platí). Veřejná mapa tudy nezapisuje.
-  const hasAccess = isOwner || ["work", "edit"].includes(perm) || map.getString("team_access") === "edit";
-  const canSee = hasAccess || perm !== "" || map.getString("team_access") === "read";
+  const hasAccess = ["work", "edit"].includes(level);
+  const canSee = level !== "";
   if (!canSee) return e.json(403, { error: t(L, "err.noWriteAccess") });
   const origNodes = jsonVal(map, "nodes", []);
   const origEdges = jsonVal(map, "edges", []);
   const node = origNodes.find((n) => n.id === String(info.nodeId || "") && n.type !== "note");
   if (!node) return e.json(404, { error: t(L, "err.nodeNotFound") });
-  if (!hasAccess) {
-    let mine = String(((node.data || {}).owner) || "") === email;
-    if (!mine) {
-      try {
-        $app.findFirstRecordByFilter("tasks", "map = {:m} && node_id = {:n} && assignee_email = {:e}",
-          { m: map.id, n: node.id, e: email });
-        mine = true;
-      } catch (err) { /* na uzlu nemá žádný svůj úkol */ }
-    }
-    if (!mine) return e.json(403, { error: t(L, "err.deadlineRequestOwnWorkOnly") });
+  if (!hasAccess && !nodeIsMine($app, map.id, node, email)) {
+    return e.json(403, { error: t(L, "err.deadlineRequestOwnWorkOnly") });
   }
   const d = node.data || {};
   const assigner = d.assignedBy || map.getString("owner_email");
@@ -4364,20 +4341,34 @@ kbRoute("POST", "/api-keys/delete", (e) => {
 
 // Ověřený API endpoint (základ pro MCP/integrace): autentizace přes API klíč
 // v hlavičce Authorization: Bearer kb_user_... (PŘECHOD: staré fm_user_ platí dál; NE přes cookie/JWT — samostatná routa,
-// bez requireAuth, aby nekolidovala se standardním přihlášením). Vrací mapy vlastníka klíče.
+// bez requireAuth, aby nekolidovala se standardním přihlášením). Vrací mapy, které
+// VLASTNÍK KLÍČE VIDÍ (vlastní, týmové, sdílené jemu) — zrcadlo userSeesMap bez
+// veřejných cizích; filtr v DOTAZU jako Můj den/Organizace, autorita je mapAccessLevel.
+// Každá položka nese `access` (owner/edit/work/read), aby klient věděl, co smí.
 kbRoute("GET", "/v1/maps", (e) => {
-  const { jsonVal, apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const { jsonVal, apiKeyAuth, mapAccessLevel, shareRowsFor } = require(`${__hooks}/helpers.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
   const wantArchived = String((e.requestInfo().query || {})["archived"] || "") === "1";
-  const maps = $app.findRecordsByFilter("goalmaps",
-    "owner = {:o} && archived = {:ar}", "-updated", 200, 0,
-    { o: a.user.id, ar: wantArchived });
-  return e.json(200, { maps: maps.map((mp) => ({
-    id: mp.id, title: mp.getString("title"),
-    node_count: jsonVal(mp, "nodes", []).length,
-    updated: mp.getString("updated"),
-  })) });
+  const email = a.user.email();
+  // org mapa (kind=org) v seznamu NENÍ — aplikace ji z Projektů filtruje (Home.jsx),
+  // struktura má vlastní GET /v1/org-structure; get_map podle id dál funguje
+  const rows = $app.findRecordsByFilter("goalmaps",
+    '(owner = {:o} || team_access != "" || map_shares_via_map.email ?= {:e}) && archived = {:ar} && kind != "org"', "-updated", 200, 0,
+    { o: a.user.id, e: email, ar: wantArchived });
+  const shareRows = shareRowsFor($app, email); // jedním dotazem, ne 200×
+  const maps = [];
+  for (const mp of rows) {
+    const level = mapAccessLevel($app, mp, a.user.id, email, { shareRows: shareRows });
+    if (!level) continue;
+    maps.push({
+      id: mp.id, title: mp.getString("title"),
+      node_count: jsonVal(mp, "nodes", []).length,
+      updated: mp.getString("updated"),
+      access: mp.getString("owner") === a.user.id ? "owner" : level,
+    });
+  }
+  return e.json(200, { maps: maps });
 });
 
 // Organizační struktura pro integrace/MCP — JEN ČTENÍ. Jmenování držitelů
@@ -4408,11 +4399,41 @@ kbRoute("GET", "/v1/members", (e) => {
   return e.json(200, { members: members, external_contacts: externalContactRows($app, a.user.id) });
 });
 
+// Přehled „Organizace" pro integrace/MCP (get_portfolio) — spočítaný nad mapami,
+// které VLASTNÍK KLÍČE vidí (buildPortfolio: týmové + sdílené, soukromé ani do
+// součtů). Role se v souladu s v1 kontraktem NEČTE: i člen dostane souhrn svého
+// rozsahu (rozhodnutí Richarda 26. 8. 2026). V aplikaci stránku vidí admin a
+// manager, ale klíč tu neumí víc než člověk v prohlížeči — jen jeho mapy.
+// Rate-limit: apiKeyAuth (120 čtení/min na klíč) + 60/min na uživatele (sdílené se session).
+kbRoute("GET", "/v1/portfolio", (e) => {
+  const { apiKeyAuth, buildPortfolio, minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  // nejtěžší dotaz v1: limit NA ČLOVĚKA (jako session /portfolio 60/min), ne jen na klíč —
+  // 20 klíčů × 120/min by z členského účtu položilo instanci (bezpečnostní panel 26. 8.)
+  if (minuteLimitHit($app.store(), "pfrl:" + a.user.id, 60)) return e.json(429, { error: t(a.lang, "err.tooManyRequests") });
+  const today = String((e.requestInfo().query || {})["today"] || "");
+  if (today && !/^\d{4}-\d{2}-\d{2}$/.test(today)) return e.json(400, { error: t(a.lang, "err.badDate") });
+  const data = buildPortfolio($app, a.user.id, a.user.email(), { today: today, untitled: t(a.lang, "misc.untitled") });
+  e.response.header().set("Cache-Control", "private, no-store");
+  e.response.header().add("Vary", "Authorization");
+  return e.json(200, data);
+});
+
 // ---------- v1 API (MCP/integrace) — autentizace VÝHRADNĚ API klíčem ----------
-// Zásady (bezpečnostní kontrakt, viz plán MCP fáze 1):
-//  · owner VŽDY z klíče, nikdy z body; přístup jen k mapám/úkolům majitele klíče
-//    (v1OwnedMap; 404 nerozlišuje cizí/neexistující — neprozrazovat existenci)
+// Zásady (bezpečnostní kontrakt; od 26. 8. 2026 „klíč jedná za svého vlastníka"):
+//  · vlastník VŽDY z klíče, nikdy z body; klíč vidí a zapisuje PŘESNĚ to, co jeho
+//    vlastník v aplikaci (map_shares / team_access / úroveň): vlastní mapa, týmová
+//    a sdílená „edit" = plný zápis; „work" i „read" = čtení + jen stav VLASTNÍHO
+//    uzlu (jako /node-status, právo plyne z práce); cizí soukromá i cizí VEŘEJNÁ (is_public)
+//    = 404 (vývěska není pracovní přístup; neprozrazovat existenci). Helpery
+//    v1ReadableMap / v1WritableMap nad mapAccessLevel.
+//  · klíč se scope `read` nikdy nezapisuje — úroveň sdílení ho nepovýší
 //  · e.auth se NIKDY nenastavuje, role se NEČTE → klíč nemůže eskalovat
+//    (admin klíč nevidí cizí soukromé mapy; klíč nikdy neumí víc než člověk)
+//  · zápis sdíleného editora jde přes v1SaveMapData s isOwner=false (stráže
+//    termínu/mazání jako v UI); org mapa přes klíč dál jen ke čtení
 //  · zápis: normalizace+validace+layout přes v1SaveMapData (request hooky se
 //    u $app.save nespustí!); konflikt base_updated → 409; response nese `updated`
 //  · notifikace stejné jako z UI (assigned/unblocked/recurrence — sdílené helpery)
@@ -4420,12 +4441,13 @@ kbRoute("GET", "/v1/members", (e) => {
 
 // detail mapy jako strom pro LLM (bez pozic; id uzlů pro následné úpravy)
 kbRoute("GET", "/v1/maps/{id}", (e) => {
-  const { apiKeyAuth, v1OwnedMap, jsonVal, mapToTree } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1ReadableMap, jsonVal, mapToTree } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  const r = v1ReadableMap($app, e.request.pathValue("id"), a.user);
+  if (!r) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  const map = r.map;
   const tr = mapToTree(jsonVal(map, "nodes", []), jsonVal(map, "edges", []));
   return e.json(200, {
     id: map.id,
@@ -4433,6 +4455,7 @@ kbRoute("GET", "/v1/maps/{id}", (e) => {
     description: map.getString("description"),
     archived: map.getBool("archived"),
     updated: map.getString("updated"),
+    access: r.isOwner ? "owner" : r.level,
     tree: tr.tree,
     notes: tr.notes,
   });
@@ -4465,7 +4488,7 @@ kbRoute("POST", "/v1/tasks/{id}", tasksGonePost);
 // založení mapy ze stromu: {title, tree:[{title, description?, deadline?, owner?,
 // status?, wait_for_children?, children?}], description?, apex_text?}
 kbRoute("POST", "/v1/maps", (e) => {
-  const { apiKeyAuth, treeItemsToNodes, v1SaveMapData, notifyAssignedFromNodes, notifyAutomationRequests, stampAutomationRequesters, mapToTree, jsonVal } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, treeItemsToNodes, v1SaveMapData, notifyAssignedFromNodes, notifyAutomationRequests, stampAutomationRequesters, autoShareAssignees, mapToTree, jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
@@ -4504,27 +4527,37 @@ kbRoute("POST", "/v1/maps", (e) => {
   rec.set("series_title", "");
   rec.set("series_year", 0);
   rec.set("kind", ""); // org mapu zakládá jen /api/kb/org-map
-  const saved = v1SaveMapData($app, rec, nodes, edges, a.lang, true, a.user.email());
+  const saved = v1SaveMapData($app, rec, nodes, edges, a.lang, true, a.user.email(), { isOwner: true });
   if (saved.error) return e.json(saved.status, { error: saved.error });
+  // řešitelé dostanou mapu nasdílenou jako spolupracovníci (work) — jinak by
+  // dostali zprávu o práci, kterou v Můj den nevidí; PŘED notifikací, ať odkaz vede
+  let shared = [];
+  try {
+    shared = autoShareAssignees($app, rec, a.user, conv.nodes.map((n) => (n.data || {}).owner));
+  } catch (err) {
+    try { $app.logger().warn("v1 create_map: auto-sdílení řešitelům selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
   notifyAssignedFromNodes($app, rec, a.user.getString("email"));
   try { notifyAutomationRequests($app, [], rec, a.user.getString("email")); } catch (err) {
     try { $app.logger().warn("v1 create_map: notifikace požadavku na automatizaci selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
   const tr = mapToTree(jsonVal(rec, "nodes", []), jsonVal(rec, "edges", []));
-  return e.json(200, { id: rec.id, title: title, updated: rec.getString("updated"), tree: tr.tree });
+  // `shared` = komu se mapa právě nasdílela (work); prázdné i když aktér sdílet nesmí
+  return e.json(200, { id: rec.id, title: title, updated: rec.getString("updated"), shared: shared, tree: tr.tree });
 });
 
 // přidání podstromu: {parent_id?, items:[...], base_updated?} — bez parent_id se
 // věší na vrchol (apex). POZOR: přepočítá kanonický layout celé mapy.
 kbRoute("POST", "/v1/maps/{id}/nodes", (e) => {
-  const { apiKeyAuth, v1OwnedMap, treeItemsToNodes, v1SaveMapData, notifyAssignedFromNodes, notifyAutomationRequests, stampAutomationRequesters, mapToTree, jsonVal } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap, treeItemsToNodes, v1SaveMapData, notifyAssignedFromNodes, notifyAutomationRequests, stampAutomationRequesters, autoShareAssignees, mapToTree, jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const map = w.map;
   // base_updated je POVINNÉ: klient musí mapu nejdřív načíst (rozhodnutí 2026-07-25)
   // — tvrdá ochrana proti přepsání beze čtení. Neshoda verze = 409.
   const baseUpdated = String(info.base_updated || "");
@@ -4555,30 +4588,40 @@ kbRoute("POST", "/v1/maps/{id}/nodes", (e) => {
   // žadatele o automatizaci plní VÝHRADNĚ server (zrcadlo goalmaps hooků) — bez
   // toho zůstalo pole prázdné a splněné přání se nemělo komu oznámit
   const stampedNodes = stampAutomationRequesters(nodes, nodes.concat(conv.nodes), a.user.getString("email"));
-  const saved = v1SaveMapData($app, map, stampedNodes, edges.concat(conv.edges, newEdges), a.lang, true, a.user.email());
+  const saved = v1SaveMapData($app, map, stampedNodes, edges.concat(conv.edges, newEdges), a.lang, true, a.user.email(), { isOwner: w.isOwner });
   if (saved.error) return e.json(saved.status, { error: saved.error });
   const onlyIds = {};
   conv.nodes.forEach((n) => { onlyIds[n.id] = true; });
+  // noví řešitelé → spolupracovníci mapy (work), PŘED notifikací o práci
+  let shared = [];
+  try {
+    shared = autoShareAssignees($app, map, a.user, conv.nodes.map((n) => (n.data || {}).owner));
+  } catch (err) {
+    try { $app.logger().warn("v1 add_nodes: auto-sdílení řešitelům selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
   notifyAssignedFromNodes($app, map, a.user.getString("email"), onlyIds);
   // `nodes` = stav PŘED přidáním, takže se notifikují jen nově vzniklá zadání
   try { notifyAutomationRequests($app, nodes, map, a.user.getString("email")); } catch (err) {
     try { $app.logger().warn("v1 add_nodes: notifikace požadavku na automatizaci selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
-  return e.json(200, { updated: map.getString("updated"), added_ids: conv.nodes.map((n) => n.id),
+  return e.json(200, { updated: map.getString("updated"), added_ids: conv.nodes.map((n) => n.id), shared: shared,
     tree: mapToTree(jsonVal(map, "nodes", []), jsonVal(map, "edges", [])).tree });
 });
 
 // úprava uzlu: allowlist polí; status done může odblokovat čekající uzel →
 // notifikace jako z UI. Pozice se NEMĚNÍ (žádný relayout).
 kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
-  const { apiKeyAuth, v1OwnedMap, v1SaveMapData, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, jsonVal } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap, nodeIsMine, autoShareAssignees, v1SaveMapData, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  // pustí KAŽDÉHO, kdo mapu vidí (i čtenáře) — kdo není editor, dostane níž jen
+  // stav vlastního uzlu (rozhodnutí Richarda 26. 8. 2026, volba A: klíč = jako aplikace)
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "read", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const map = w.map;
   // base_updated je POVINNÉ: klient musí mapu nejdřív načíst (rozhodnutí 2026-07-25)
   // — tvrdá ochrana proti přepsání beze čtení. Neshoda verze = 409.
   const baseUpdated = String(info.base_updated || "");
@@ -4591,6 +4634,18 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   const nodeId = e.request.pathValue("nodeId");
   const idx = origNodes.findIndex((n) => n.id === nodeId && n.type !== "note");
   if (idx < 0) return e.json(404, { error: t(a.lang, "err.nodeNotFound") });
+  // kdo mapu NEEDITUJE (spolupracovník „work" i čtenář „read"/týmový read): JEN
+  // `status`, a jen na uzlu se SVOU prací — zrcadlo routy /node-status (právo plyne
+  // z práce, Richard 20. 8.; přes klíč potvrzeno 26. 8. 2026 — klíč = jako aplikace).
+  // Cokoli navíc = 403.
+  if (w.level !== "edit") {
+    const extra = Object.keys(info).filter((k) => k !== "status" && k !== "base_updated");
+    if (extra.length) return e.json(403, { error: t(a.lang, "err.apiWorkStatusOnly") });
+    if (info.status === undefined) return e.json(400, { error: t(a.lang, "err.statusRequired") }); // bez status = nic k uložení
+    if (!nodeIsMine($app, map.id, origNodes[idx], a.user.email())) {
+      return e.json(403, { error: t(a.lang, "err.nodeStatusOwnOnly") });
+    }
+  }
   if (info.status !== undefined && !["todo", "in_progress", "done"].includes(String(info.status))) {
     return e.json(400, { error: t(a.lang, "err.badStatus") });
   }
@@ -4643,8 +4698,17 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   } catch (err) {
     try { $app.logger().warn("v1 update_node: srovnání požadavků na automatizaci selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
-  const saved = v1SaveMapData($app, map, finalNodes, origEdges, a.lang, false, a.user.email());
+  const saved = v1SaveMapData($app, map, finalNodes, origEdges, a.lang, false, a.user.email(), { isOwner: w.isOwner });
   if (saved.error) return e.json(saved.status, { error: saved.error });
+  // nový řešitel → spolupracovník mapy (work), PŘED notifikací o přiřazení
+  let shared = [];
+  if (info.owner !== undefined && d.owner && d.owner !== String((origNodes[idx].data || {}).owner || "")) {
+    try {
+      shared = autoShareAssignees($app, map, a.user, [d.owner]);
+    } catch (err) {
+      try { $app.logger().warn("v1 update_node: auto-sdílení řešiteli selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
   try {
     notifyUnblockedTransitions($app, origNodes, origEdges, map, a.user.getString("email"));
   } catch (err) {
@@ -4675,7 +4739,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   // sestavení `d`, takže objekt v paměti už nemusí odpovídat tomu, co je v DB
   const stored = jsonVal(map, "nodes", []).find((n) => n.id === nodeId) || node;
   const sd = stored.data || {};
-  return e.json(200, { updated: map.getString("updated"),
+  return e.json(200, { updated: map.getString("updated"), shared: shared,
     node: { id: stored.id, title: stored.type === "apexNode" ? (sd.apexText || sd.title) : sd.title,
       status: sd.status, deadline: sd.deadline, owner: sd.owner,
       executor_kind: sd.executorKind || "human", executor_name: sd.executorName || "",
@@ -4685,13 +4749,14 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
 // smazání uzlu VČETNĚ podstromu (reorganizace map přes AI); vrchol (apex) mazat
 // nejde a mazání celé mapy přes API neexistuje (jen člověk v UI) — Richard 25.7.
 kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/delete", (e) => {
-  const { apiKeyAuth, v1OwnedMap, v1SaveMapData, notifyUnblockedTransitions, jsonVal } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap, v1SaveMapData, notifyUnblockedTransitions, jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const map = w.map;
   // base_updated je POVINNÉ: klient musí mapu nejdřív načíst (rozhodnutí 2026-07-25)
   // — tvrdá ochrana proti přepsání beze čtení. Neshoda verze = 409.
   const baseUpdated = String(info.base_updated || "");
@@ -4717,7 +4782,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/delete", (e) => {
   }
   const keptNodes = nodes.filter((n) => !toDelete[n.id]);
   const keptEdges = edges.filter((ed) => !toDelete[ed.source] && !toDelete[ed.target]);
-  const saved = v1SaveMapData($app, map, keptNodes, keptEdges, a.lang, false, a.user.email());
+  const saved = v1SaveMapData($app, map, keptNodes, keptEdges, a.lang, false, a.user.email(), { isOwner: w.isOwner });
   if (saved.error) return e.json(saved.status, { error: saved.error });
   // smazání posledního nehotového podstromu může odblokovat čekající uzel —
   // stejná notifikace jako z UI (update hook)
@@ -4734,12 +4799,15 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/delete", (e) => {
 
 // seznam pravidel mapy
 kbRoute("GET", "/v1/maps/{id}/rules", (e) => {
-  const { apiKeyAuth, v1OwnedMap, ruleDto } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap, ruleDto } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  // pravidla VIDÍ jen kdo mapu edituje — parita se session GET /rules (mapEditAccess);
+  // čtenář by jinak přes klíč viděl definice, cizí adresy v notify a chyby (panel 26. 8.)
+  const r = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (r.error) return e.json(r.status, { error: r.error });
+  const map = r.map;
   let rows = [];
   try { rows = $app.findRecordsByFilter("automation_rules", "map = {:m}", "created", 200, 0, { m: map.id }); } catch (err) { /* prázdno */ }
   return e.json(200, { rules: rows.map(ruleDto) });
@@ -4747,14 +4815,16 @@ kbRoute("GET", "/v1/maps/{id}/rules", (e) => {
 
 // založení pravidla: {name, trigger:{type,…}, actions:[…], conditions?, node_id?, enabled?}
 kbRoute("POST", "/v1/maps/{id}/rules", (e) => {
-  const { apiKeyAuth, v1OwnedMap, validateRuleInput, ruleDto, MAX_RULES_PER_MAP } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap, validateRuleInput, ruleDto, MAX_RULES_PER_MAP } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  // pravidla spravuje, kdo mapu EDITUJE (parita s mapEditAccess u session rout)
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const map = w.map;
   const v = validateRuleInput($app, map, info);
   if (v.error) return e.json(400, { error: t(a.lang, "err.ruleInvalid", { reason: v.error }) });
   let count = 0;
@@ -4775,14 +4845,15 @@ kbRoute("POST", "/v1/maps/{id}/rules", (e) => {
 
 // úprava pravidla (plný tvar, nebo jen {enabled} pro zapnout/vypnout)
 kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}", (e) => {
-  const { apiKeyAuth, v1OwnedMap, validateRuleInput, ruleDto } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap, validateRuleInput, ruleDto } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const map = w.map;
   let rec;
   try {
     rec = $app.findRecordById("automation_rules", e.request.pathValue("ruleId"));
@@ -4817,12 +4888,13 @@ kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}", (e) => {
 
 // smazání pravidla
 kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}/delete", (e) => {
-  const { apiKeyAuth, v1OwnedMap } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const map = w.map;
   let rec;
   try {
     rec = $app.findRecordById("automation_rules", e.request.pathValue("ruleId"));
@@ -4836,12 +4908,14 @@ kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}/delete", (e) => {
 
 // log běhů pravidel mapy (?rule= filtr na jedno pravidlo)
 kbRoute("GET", "/v1/maps/{id}/rule-runs", (e) => {
-  const { apiKeyAuth, v1OwnedMap, ruleRunDto } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap, ruleRunDto } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  const map = v1OwnedMap($app, e.request.pathValue("id"), a.user.id);
-  if (!map) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  // log běhů jen pro editory — parita se session GET /rule-runs (mapEditAccess)
+  const r = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (r.error) return e.json(r.status, { error: r.error });
+  const map = r.map;
   const q = e.requestInfo().query || {};
   let filter = "map = {:m}";
   const params = { m: map.id };

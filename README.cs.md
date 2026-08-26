@@ -172,11 +172,14 @@ instanci, liší se jen adresa.
    ```
 
 Nástroje: `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`,
-`delete_node`, `list_people` (plus nástroje pravidel). Cíl s řešitelem nebo termínem JE úkol —
+`delete_node`, `list_people`, `get_portfolio` (plus nástroje pravidel). Cíl s řešitelem nebo termínem JE úkol —
 žádné samostatné úkolové záznamy neexistují.
 
-**Bezpečnost:** klíč zpřístupní mapy svého majitele (stejně jako v aplikaci); sdílené a týmové MAPY přes klíč nejdou
-(zatím záměrně) a nikdy administrace, nastavení AI ani uživatelé. Zápis umí
+**Bezpečnost:** klíč jedná za svého majitele — vidí a upravuje přesně to, co on v aplikaci,
+včetně sdílených a týmových map (`edit`/vlastní = plný zápis; `work` i `read` = jen stav
+vlastních uzlů, přesně jako odškrtnutí v aplikaci); roli účtu nikdy nečte, takže klíč admina nevidí cizí soukromé
+mapy a cizí veřejná mapa přes klíč nejde (404). Administrace, nastavení AI a uživatelé nejsou
+přes klíč nikdy. Zápis umí
 přidat/upravit/smazat uzly a úkoly; **celou mapu přes API smazat nejde** a vrchol
 mapy taky ne. Limity: 120 čtení + 30 zápisů za minutu na klíč, max 200 uzlů na
 volání, max 20 klíčů na účet. Souběh s otevřeným editorem řeší detekce konfliktu
