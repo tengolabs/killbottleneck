@@ -163,7 +163,9 @@
     "remaining_other": "Trial — {{count}} days left",
     "expired": "The trial has ended — your data is safe, writing is paused",
     "cta": "Choose a plan",
-    "remaining_few": "Trial — {{count}} days left"
+    "remaining_few": "Trial — {{count}} days left",
+    "exportCta": "Download data",
+    "exportFailed": "Downloading the data failed, try again in a moment."
   },
   "links": {
     "inDescription": "Links in the description:"

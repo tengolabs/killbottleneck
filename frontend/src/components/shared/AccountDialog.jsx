@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { downloadAllMyData, uploadAllMyData } from '@/lib/exportAll';
 import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import {
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { UserCog, Loader2 } from 'lucide-react';
+import { UserCog, Loader2, Download, Upload } from 'lucide-react';
 import { useLazyNs } from '@/i18n/lazyNs';
 
 // Můj účet (Richard 8. 8. 2026): jméno + ZOBRAZOVANÉ jméno (přezdívka, pod
@@ -27,6 +28,28 @@ export default function AccountDialog({ open, onClose }) {
   const [newPassword, setNewPassword] = useState('');
   const [newPassword2, setNewPassword2] = useState('');
   const [saving, setSaving] = useState(false);
+  const fileRef = useRef(null);
+
+  // nahrání souboru z exportu: ověřit formát v prohlížeči, poslat celý na /import-all
+  const importFile = async (file) => {
+    if (file.size > 50 * 1024 * 1024) { toast({ title: t('account.data.uploadTooLarge'), variant: 'destructive' }); return; }
+    setSaving(true);
+    try {
+      let data;
+      try { data = JSON.parse(await file.text()); } catch { data = null; }
+      if (!data || data.format !== 'killbottleneck.export/1') { toast({ title: t('account.data.uploadBadFile'), variant: 'destructive' }); return; }
+      const r = await uploadAllMyData(data);
+      const desc = [
+        r.maps_skipped?.length ? t('account.data.uploadedSkipped', { count: r.maps_skipped.length }) : '',
+        r.assignments_dropped ? t('account.data.uploadedDropped', { count: r.assignments_dropped }) : '',
+      ].filter(Boolean).join(' ');
+      toast({ title: t('account.data.uploaded', { maps: r.maps_imported, nodes: r.nodes_imported, rules: r.rules_imported, ideas: r.ideas_imported }), description: desc || undefined });
+    } catch (e) {
+      toast({ title: t('account.data.uploadFailed'), description: e?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -126,6 +149,25 @@ export default function AccountDialog({ open, onClose }) {
               {t('account.changePassword')}
             </Button>
             <p className="text-xs text-muted-foreground">{t('account.passwordRelogin')}</p>
+          </div>
+
+          {/* Moje data (P2-03): stažení všeho, co vidím, a nahrání zpět. Patří sem,
+              ne do menu pod panáčkem — dělá se jednou nebo nikdy (Richard 26. 8. 2026). */}
+          <div className="border-t pt-3 space-y-2">
+            <p className="text-sm font-medium">{t('account.data.heading')}</p>
+            <p className="text-xs text-muted-foreground">{t('account.data.hint')}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={saving} data-testid="account-export-all"
+                onClick={() => downloadAllMyData().catch(() => toast({ title: t('account.data.downloadFailed'), variant: 'destructive' }))}>
+                <Download className="w-4 h-4 mr-2" /> {t('account.data.download')}
+              </Button>
+              <Button variant="outline" disabled={saving} data-testid="account-import-all"
+                onClick={() => fileRef.current?.click()}>
+                <Upload className="w-4 h-4 mr-2" /> {t('account.data.upload')}
+              </Button>
+              <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" data-testid="account-import-file"
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importFile(f); }} />
+            </div>
           </div>
         </div>
       </DialogContent>

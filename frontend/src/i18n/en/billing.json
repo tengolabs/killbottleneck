@@ -58,6 +58,19 @@
     "passwordMismatch": "The new passwords do not match.",
     "passwordChanged": "Password changed — please sign in again.",
     "passwordFailed": "Password change failed.",
-    "passwordRelogin": "After changing the password you will be signed out — the old session stops working everywhere on purpose."
+    "passwordRelogin": "After changing the password you will be signed out — the old session stops working everywhere on purpose.",
+    "data": {
+      "heading": "My data",
+      "hint": "Download one file with everything you can see — projects, tasks, comments, the attachment list, the idea stash, time tracking and contacts. From an export file you can bring projects (with rules) and the idea stash back; comments, attachments and shares stay in the file for reading only.",
+      "download": "Download all my data",
+      "downloadFailed": "Downloading the data failed, try again in a moment.",
+      "upload": "Upload data from an export",
+      "uploadBadFile": "This is not a killBottleneck export file (killbottleneck.export/1).",
+      "uploadTooLarge": "The file is larger than 50 MB.",
+      "uploadFailed": "The upload failed.",
+      "uploaded": "Uploaded: {{maps}} projects ({{nodes}} goals, {{rules}} rules), {{ideas}} ideas.",
+      "uploadedSkipped": "Projects skipped: {{count}} (organization structure or invalid map).",
+      "uploadedDropped": "Assignments to people who are not here: {{count}} cleared."
+    }
   }
 }

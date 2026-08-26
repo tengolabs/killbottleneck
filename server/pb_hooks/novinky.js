@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.45-beta": {
+    cs: [
+      "V Můj účet je „Stáhnout všechna moje data“ — jeden soubor se všemi projekty, které vidíte, úkoly, komentáři, seznamem příloh, měřením času, zásobníkem nápadů a kontakty.",
+      "Vedle toho „Nahrát data z exportu“ přinese celý soubor zpět — projekty s pravidly a zásobník nápadů, sem nebo do jiné instance.",
+      "Funguje i po skončení zkušební doby: odkaz „Stáhnout data“ je přímo v pruhu nahoře.",
+      "S vámi odejde jen to, co vidíte — cizí soukromé projekty v souboru nejsou.",
+    ],
+    en: [
+      "My account has “Download all my data” — one file with every project you can see, tasks, comments, the attachment list, time tracking, the idea stash and contacts.",
+      "Next to it, “Upload data from an export” brings a whole file back — projects with rules and the idea stash, here or into another instance.",
+      "It works even after the trial has ended: the “Download data” link sits right in the top bar.",
+      "Only what you can see leaves with you — other people's private projects are not in the file.",
+    ],
+  },
   "v0.44-beta": {
     cs: [
       "V horní liště přibyla „Organizace“ — admin a manažer vidí na jedné obrazovce, co je napříč projekty po termínu (kdo a kolik dní), jak jsou projekty daleko, co se přes 14 dní nehýbe a kdo má nejvíc restů.",

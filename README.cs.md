@@ -447,6 +447,14 @@ Zálohu jde zašifrovat: nastavte `KB_BACKUP_PASSPHRASE` a skript vytvoří
 `kb-backup-….tgz.gpg` (GPG, AES-256). `restore` bere šifrované i starší
 nešifrované archivy. Heslo držte mimo server — bez něj zálohu nikdo nepřečte.
 
+## Odnést si všechna data
+
+V **Můj účet** je **Stáhnout všechna moje data**: jeden JSON (`killbottleneck.export/1`) s každým
+projektem, který vidíte — každý ve stejném tvaru jako export jedné mapy, takže jde naimportovat
+jinam — plus úkoly, pravidla, komentáře, záznam změn, seznam příloh, zásobník nápadů, měření času,
+externí kontakty a notifikace. Funguje i po vypršení zkušební doby a **Nahrát data z exportu** přinese projekty (s pravidly) a zásobník nápadů zpět do jiné instance. Self-hoster má navíc
+`./backup.sh`, který zálohuje celou složku `pb_data` včetně nahraných souborů.
+
 ## Tým
 
 Instance = jeden tým. Role: **Administrátor** (správa uživatelů a rolí, nastavení

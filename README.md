@@ -461,6 +461,14 @@ Backups can be encrypted: set `KB_BACKUP_PASSPHRASE` and the script writes
 older plain archives. Keep the passphrase off the server — without it nobody
 can read the backup.
 
+## Taking all your data with you
+
+**My account** has **Download all my data**: one JSON file (`killbottleneck.export/1`) with every
+project you can see — each in the same shape as a single map export, so it imports elsewhere —
+plus tasks, rules, comments, change log, attachment list, idea stash, time entries, external
+contacts and notifications. It works even after a trial has expired, and **Upload data from an export** brings the projects (with rules) and the idea stash back into another instance. Self-hosters additionally
+have `./backup.sh`, which backs up the whole `pb_data` folder including uploaded files.
+
 ## Team
 
 One instance = one team. Roles: **Administrator** (manages users and roles, organization

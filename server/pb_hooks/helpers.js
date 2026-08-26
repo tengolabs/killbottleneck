@@ -5225,6 +5225,398 @@ function mapCompletion(nodes, edges) {
   return { total: c.total, done: c.done, pct: c.total > 0 ? Math.round((c.done / c.total) * 100) : 0 };
 }
 
+// Levná minutová brzda (fixní okno, bez atomicity) — jeden vzor pro Můj den,
+// Organizaci i export místo tří kopií. Vrací true = strop vyčerpán.
+function minuteLimitHit(store, key, max) {
+  const bucket = Math.floor(Date.now() / 60000);
+  const prev = String(store.get(key) || "").split(":");
+  const used = Number(prev[0]) === bucket ? Number(prev[1]) || 0 : 0;
+  if (used >= max) return true;
+  store.set(key, bucket + ":" + (used + 1));
+  return false;
+}
+
+// „STÁHNOUT VŠECHNA MOJE DATA" — jeden JSON pro odchod, zálohu nebo stěhování
+// (nález P2-03, rozhodnutí Richarda 25. 8. 2026: postavit před v1.0). Web slibuje
+// „data zůstanou k exportu" — tohle je ta cesta pro zákazníka na hostingu, který
+// nemá pb_data na disku (self-hoster má backup.sh).
+//
+// Co obsahuje: všechny mapy, které uživatel VIDÍ (vlastní, týmové, sdílené mu —
+// zrcadlo userSeesMap bez veřejných cizích), každá ve stejném tvaru jako export
+// jedné mapy z editoru (killbottleneck.map/1: map.title/description/nodes/edges,
+// tasks, rules) → jde ji vzít a naimportovat zpět přes /map-import; k tomu
+// komentáře uzlů i úkolů, přílohy JEN SEZNAMEM (název, velikost, cesta k souboru
+// nebo odkaz — soubory se nebalí), pravidla, záznam změn, sdílení. Mimo mapy:
+// zásobník nápadů, měření času, externí kontakty (vlastní privátní + veřejné),
+// notifikace (vlastní), šablony pravidel, členové (bezpečná podmnožina jako
+// /members) a nastavení organizace.
+//
+// Stropy platí NA MAPU a přiznávají se v `truncated` (která kolekce, u které
+// mapy); selhaný dotaz se přiznává v `errors` — export, který mlčky vynechá
+// část dat, je horší než žádný. Funguje i po vypršení zkušebky (GET).
+function buildExport(app, userId, email, opts) {
+  const o = opts || {};
+  const MAP_LIMIT = 500, PER_MAP = 2000, ROWS = 2000, CHANGES_PER_MAP = 1000;
+  const truncated = {};
+  const errors = [];
+  const stamp = nowUtcString();
+  const rowsOf = (coll, filter, params, limit, sort) => {
+    try { return app.findRecordsByFilter(coll, filter, sort || "", limit, 0, params); } catch (err) {
+      if (!errors.includes(coll)) errors.push(coll);
+      try { app.logger().warn("export: dotaz selhal", "coll", coll, "error", String(err)); } catch (e2) { /* log je bonus */ }
+      return [];
+    }
+  };
+  const perMap = (coll, field, mapId, limit, sort) => {
+    const rows = rowsOf(coll, field + " = {:m}", { m: mapId }, limit, sort);
+    if (rows.length >= limit) (truncated[coll] = truncated[coll] || []).push(mapId);
+    return rows;
+  };
+
+  // mapy: dotaz je zrcadlo userSeesMap bez veřejných cizích; nejnovější napřed,
+  // ať při stropu odpadnou nejstarší
+  const maps = rowsOf("goalmaps", 'owner = {:uid} || team_access != "" || map_shares_via_map.email ?= {:email}', { uid: userId, email: email }, MAP_LIMIT, "-updated")
+    .filter((m) => userSeesMap(app, m, userId, email)); // autorita (bez includePublic)
+  if (maps.length >= MAP_LIMIT) truncated.maps = true;
+
+  const mapsOut = maps.map((m) => {
+    const tasks = perMap("tasks", "map", m.id, PER_MAP, "sort_order").map((t) => ({
+      id: t.id, title: t.getString("title"), description: t.getString("description"), status: t.getString("status"),
+      deadline: t.getString("deadline"), planned_on: t.getString("planned_on"), recurrence: t.getString("recurrence"),
+      assignee_email: t.getString("assignee_email"), node_id: t.getString("node_id"), parent_id: t.getString("parent"),
+      sort_order: t.get("sort_order"), created_by: t.getString("owner_email"), created: t.getString("created"), updated: t.getString("updated"),
+    }));
+    // komentáře úkolů (starší data — kolekce task_comments) navěšené na id úkolu
+    const taskIds = tasks.map((t) => t.id);
+    const taskComments = [];
+    for (let i = 0; i < taskIds.length; i += 40) {
+      const chunk = taskIds.slice(i, i + 40);
+      const params = {};
+      const parts = chunk.map((id, k) => { params["t" + k] = id; return "task = {:t" + k + "}"; });
+      for (const c of rowsOf("task_comments", parts.join(" || "), params, PER_MAP, "created")) {
+        taskComments.push({ task_id: c.getString("task"), text: c.getString("text"), author_email: c.getString("author_email"), created: c.getString("created") });
+      }
+    }
+    const rules = perMap("automation_rules", "map", m.id, PER_MAP, "created").map((r) => {
+      const d = ruleDto(r);
+      return { name: d.name, node_id: d.node_id, trigger: d.trigger, conditions: d.conditions, actions: d.actions, enabled: d.enabled, created_by: d.created_by, last_fired: d.last_fired };
+    });
+    const comments = perMap("comments", "goalmap", m.id, PER_MAP, "created").map((c) => ({
+      node_id: c.getString("node_id"), text: c.getString("text"), author_email: c.getString("author_email"), created: c.getString("created"),
+    }));
+    const files = perMap("node_files", "map", m.id, PER_MAP, "created").map((f) => ({
+      node_id: f.getString("node_id"), name: f.getString("name"), size: f.get("size"), owner_email: f.getString("owner_email"), created: f.getString("created"),
+      url: f.getString("url") || "",
+      // soubor se NEBALÍ — jen cesta, kterou si přihlášený stáhne přes /api/files (chráněný soubor, token souboru)
+      file: f.getString("file") ? `/api/files/node_files/${f.id}/${f.getString("file")}` : "",
+    }));
+    const shares = perMap("map_shares", "map", m.id, PER_MAP, "created").map((sh) => ({ email: sh.getString("email"), permission: sh.getString("permission") }));
+    const changes = perMap("map_changes", "map", m.id, CHANGES_PER_MAP, "-created").map((r) => ({
+      kind: r.getString("kind"), item_id: r.getString("item_id"), title: r.getString("title"), field: r.getString("field"),
+      from: r.getString("from"), to: r.getString("to"), actor_email: r.getString("actor_email"), created: r.getString("created"),
+    }));
+    return {
+      format: "killbottleneck.map/1",
+      exported_at: stamp,
+      exported_by: email,
+      map: {
+        id: m.id, title: m.getString("title"), description: m.getString("description"),
+        nodes: jsonVal(m, "nodes", []), edges: jsonVal(m, "edges", []),
+        color: m.getString("color"), kind: m.getString("kind"), client: m.getString("client"),
+        archived: m.getBool("archived"), archived_at: m.getString("archived_at"),
+        series: m.getString("series"), series_number: m.get("series_number"), series_title: m.getString("series_title"), series_year: m.get("series_year"),
+        created: m.getString("created"), updated: m.getString("updated"),
+      },
+      access: { owner_email: m.getString("owner_email"), team_access: m.getString("team_access"), is_public: m.getBool("is_public"), shares: shares },
+      tasks: tasks, task_comments: taskComments, rules: rules, comments: comments, files: files, changes: changes,
+    };
+  });
+
+  const own = (coll, sort, mapper) => {
+    const rows = rowsOf(coll, "owner = {:u}", { u: userId }, ROWS, sort);
+    if (rows.length >= ROWS) truncated[coll] = true;
+    return rows.map(mapper);
+  };
+  const buffer = own("buffer_nodes", "created", (b) => ({
+    title: b.getString("title"), description: b.getString("description"), color: b.getString("color"),
+    deadline: b.getString("deadline"), planned_on: b.getString("planned_on"), created: b.getString("created"),
+  }));
+  const timeEntries = own("time_entries", "started", (t) => ({
+    id: t.id, label: t.getString("label"), note: t.getString("note"), started: t.getString("started"), ended: t.getString("ended"),
+    duration_min: t.get("duration_min"), map: t.getString("map"), node_id: t.getString("node_id"), task: t.getString("task"), client: t.getString("client"),
+  }));
+  // kontakty CELÉ (e-mail, poznámka) — jen viditelné: veřejné a vlastní privátní
+  const contacts = rowsOf("external_contacts", "private = false || owner = {:u}", { u: userId }, ROWS, "name").map((c) => ({
+    id: c.id, name: c.getString("name"), email: c.getString("email"), note: c.getString("note"), private: c.getBool("private"),
+    owner_email: c.getString("owner_email"), pseudo_email: extPseudoEmail(c.id),
+  }));
+  if (contacts.length >= ROWS) truncated.external_contacts = true;
+  const notifications = rowsOf("notifications", "user = {:u}", { u: userId }, ROWS, "-created").map((n) => ({
+    type: n.getString("type"), text: n.getString("text"), read: n.getBool("read"), map: n.getString("map"), task: n.getString("task"), node_id: n.getString("node_id"), created: n.getString("created"),
+  }));
+  if (notifications.length >= ROWS) truncated.notifications = true;
+  const ruleTemplates = rowsOf("rule_templates", "id != ''", {}, ROWS, "created").map(ruleTemplateDto);
+  let org = null;
+  try {
+    const rec = app.findFirstRecordByFilter("org_settings", "id != ''");
+    org = { name: rec.getString("name"), purpose: rec.getString("purpose"), logo: rec.getString("logo") ? `/api/files/org_settings/${rec.id}/${rec.getString("logo")}` : "" };
+  } catch (err) { /* bez nastavení */ }
+  let me = { email: email };
+  try {
+    const u = app.findRecordById("users", userId);
+    me = { email: u.getString("email"), full_name: u.getString("full_name"), name: u.getString("name"), role: u.getString("role"), language: u.getString("language"), created: u.getString("created") };
+  } catch (err) { /* jen e-mail */ }
+
+  const sum = (k) => mapsOut.reduce((a, m) => a + (m[k] || []).length, 0);
+  return {
+    format: "killbottleneck.export/1",
+    exported_at: stamp,
+    exported_by: email,
+    version: o.version || "",
+    instance: org,
+    user: me,
+    members: memberRows(app),
+    maps: mapsOut,
+    buffer_nodes: buffer,
+    time_entries: timeEntries,
+    external_contacts: contacts,
+    notifications: notifications,
+    rule_templates: ruleTemplates,
+    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
+    truncated: Object.keys(truncated).length ? truncated : null,
+    errors: errors.length ? errors : null,
+  };
+}
+
+// Import JEDNÉ mapy ze souboru — sdílí ho main.pb.js /map-import (jeden projekt) a
+// /import-all (celý soubor „Stáhnout všechna moje data"). Vrací
+// { status, body }; volající z toho udělá odpověď. `auth` = importující účet.
+// ⚠️ Žije TADY, ne v main.pb.js: PocketBase handlery se serializují a funkce
+// definované vedle nich v souboru rout nevidí (past z 26. 8. 2026 — 400
+// „Something went wrong" bez jediného řádku v logu).
+function importJednuMapu(app, auth, L, info, opts) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const vysledek = (status, body) => ({ status: status, body: body });
+  const o = opts || {};
+  // PŘECHOD: bereme i staré exporty (soubor leží uživateli na disku, nemůže se „přepsat")
+  if (info.format !== "killbottleneck.map/1" && info.format !== "flowmap.map/1") {
+    return vysledek(400, { error: t(L, "err.badImportFormat") });
+  }
+  const src = info.map || {};
+  const srcNodes = Array.isArray(src.nodes) ? src.nodes : [];
+  const srcEdges = Array.isArray(src.edges) ? src.edges : [];
+  if (srcNodes.length === 0) return vysledek(400, { error: t(L, "err.importNoNodes") });
+
+  // id se PŘEGENERUJÍ — importovaná mapa nikdy nesmí sdílet identifikátory
+  // s originálem (komentáře, úkoly a měření času visí na textovém node_id)
+  const ts = String(new Date().getTime());
+  const idMap = {};
+  let i = 0;
+  const nodes = srcNodes.map((n) => {
+    const oldId = n && n.id ? String(n.id) : "";
+    const newId = "node-" + ts + "-" + (++i);
+    if (oldId) idMap[oldId] = newId;
+    return Object.assign({}, n, { id: newId });
+  });
+  let j = 0;
+  const edges = [];
+  for (const ed of srcEdges) {
+    if (!ed || !idMap[ed.source] || !idMap[ed.target]) continue; // hrana do prázdna → zahodit
+    edges.push({ id: "edge-" + ts + "-" + (++j), source: idMap[ed.source], target: idMap[ed.target] });
+  }
+
+  // přiřazení lidí: co v téhle instanci neexistuje, se vyprázdní a spočítá
+  const srcTasks = Array.isArray(info.tasks) ? info.tasks.slice(0, 500) : [];
+  const wanted = {};
+  for (const n of nodes) {
+    const owner = ((n.data || {}).owner || "").trim();
+    if (owner) wanted[owner] = true;
+  }
+  for (const tk of srcTasks) {
+    const em = String((tk && tk.assignee_email) || "").trim();
+    if (em) wanted[em] = true;
+  }
+  // pravidla nad strop 50/mapa se PŘIZNANĚ přeskočí (rules_skipped v odpovědi)
+  const allRules = Array.isArray(info.rules) ? info.rules : [];
+  const srcRules = allRules.slice(0, MAX_RULES_PER_MAP);
+  let rulesSkipped = allRules.length - srcRules.length;
+  // e-mail se pozná podle „@" — role (node_owner, position:<id>, zástupci) ho
+  // nemají a kontrole známosti nepodléhají (platnost pozice ověří
+  // validateRuleInput). E-maily se sbírají i z checklistů create_subnodes.items
+  // a z hodnot podmínek owner (checkup 15. 8. — dřív unikaly).
+  const sbirejItemOwnery = (items) => {
+    for (const it of (Array.isArray(items) ? items : [])) {
+      if (!it) continue;
+      if (String(it.owner || "").includes("@")) wanted[String(it.owner).trim()] = true;
+      sbirejItemOwnery(it.children);
+    }
+  };
+  for (const r of srcRules) {
+    for (const a of (Array.isArray(r && r.actions) ? r.actions : [])) {
+      if (!a) continue;
+      if (a.type === "set_owner" && String(a.owner || "").includes("@")) wanted[String(a.owner).trim()] = true;
+      if (a.type === "notify" && String(a.to || "").includes("@")) wanted[String(a.to).trim()] = true;
+      if (a.type === "create_subnodes") sbirejItemOwnery(a.items);
+    }
+    for (const c of (Array.isArray(r && r.conditions) ? r.conditions : [])) {
+      if (c && c.field === "owner" && String(c.value || "").includes("@")) wanted[String(c.value).trim()] = true;
+    }
+  }
+  const known = {};
+  const extHelpers = { isExternalOwner: isExternalOwner, extContactId: extContactId };
+  for (const email of Object.keys(wanted)) {
+    // pseudo-e-mail externího kontaktu: platí, jen když kontakt v TÉHLE instanci
+    // existuje a importér ho smí vidět (cizí či privátní cizí id → zahodit stejně
+    // jako neregistrovaného uživatele — id z jiné instance by ukazovalo na
+    // náhodný, potenciálně cizí privátní kontakt)
+    if (extHelpers.isExternalOwner(email)) {
+      try {
+        const c = app.findRecordById("external_contacts", extHelpers.extContactId(email));
+        if (!c.getBool("private") || c.getString("owner") === auth.id) known[email] = true;
+      } catch (err) { /* kontakt tu neexistuje → přiřazení zahodíme */ }
+      continue;
+    }
+    try {
+      app.findFirstRecordByFilter("users", "email = {:e}", { e: email });
+      known[email] = true;
+    } catch (err) { /* neregistrovaný → přiřazení zahodíme */ }
+  }
+  let dropped = 0;
+  for (const n of nodes) {
+    const d = n.data || {};
+    if (d.owner && !known[d.owner]) {
+      n.data = Object.assign({}, d, { owner: "" });
+      dropped++;
+    }
+  }
+
+  // Žadatel o automatizaci ze souboru je e-mail z CIZÍ instance — přerazítkovat
+  // na importujícího, ať se do dat nedostane cizí osobní údaj ani falešné autorství.
+  const stamped = stampAutomationRequesters([], nodes, auth.email());
+  // ořez délek jako u autosave (normalizeNodeShapes) — importní cesta ho
+  // neměla a 2MB název prošel do DB celý (nález checkup mutace před v0.13.2);
+  // canonicalNodeData měnit nejde, drží bit-paritu s FE cleanMap
+  const trimmed = normalizeNodeShapes(stamped);
+  const norm = normalizeMapData(trimmed, edges, L);
+  if (norm.error) return vysledek(400, { error: t(L, "err.invalidMapData", { reason: norm.error }) });
+  const bad = validateMapData(norm.nodes, norm.edges, L);
+  if (bad) return vysledek(400, { error: t(L, "err.invalidMapData", { reason: bad }) });
+  // „Mapa je strom" drží pro import normalizeMapData VÝŠ (víc rodičů, cykly
+  // i hrany na neznámé uzly → 400) — import jde přes app.save a request
+  // hooky ho nechrání, tohle je jeho jediný štít. Přibito testy v
+  // map-portable.js (vč. exportu S pozicemi a odpojeného kruhu) — kdo by
+  // normalizeMapData rozvolňoval, regrese ho zastaví.
+
+  // export z jiné instance nemusí nést pozice (nebo je má nulové) → dopočítat
+  let finalNodes = norm.nodes;
+  const hasPositions = norm.nodes.some((n) => n.position && (n.position.x !== 0 || n.position.y !== 0));
+  if (!hasPositions) {
+    const positions = layoutTreeServer(norm.nodes, norm.edges);
+    finalNodes = norm.nodes.map((n) => (n.type === "note"
+      ? n : Object.assign({}, n, { position: positions[n.id] || n.position })));
+  }
+
+  const rec = new Record(app.findCollectionByNameOrId("goalmaps"));
+  rec.set("title", String(src.title || "").trim().slice(0, 200) || "Import");
+  rec.set("description", String(src.description || "").slice(0, 2000));
+  rec.set("nodes", finalNodes);
+  rec.set("edges", norm.edges);
+  // vše ostatní patří instanci, ne souboru — nikdy z těla
+  rec.set("owner", auth.id);
+  rec.set("owner_email", auth.email());
+  rec.set("is_public", false);
+  rec.set("shared_with", []);
+  rec.set("shared_with_edit", []);
+  rec.set("team_access", "");
+  // hromadný import z vlastního exportu smí zachovat archivaci (opts.keepArchived)
+  rec.set("archived", !!(o.keepArchived && info.map && info.map.archived));
+  rec.set("archived_at", (o.keepArchived && info.map && info.map.archived) ? String(info.map.archived_at || "") : "");
+  rec.set("series", "");
+  rec.set("series_number", 0);
+  rec.set("series_title", "");
+  rec.set("series_year", 0);
+  rec.set("client", "");
+  rec.set("kind", ""); // import nikdy nezakládá org mapu
+  app.save(rec);
+
+  // Pravidla ze souboru: remap přes idMap → osoby z cizí instance ven (jako u
+  // přiřazení: neznámý e-mail → akce se dropne a spočítá) → validateRuleInput →
+  // založení. Nevalidní pravidlo = PŘIZNANÝ skip (rules_skipped v odpovědi),
+  // žádný tichý zánik. Kolekce automation_rules je zamčená a app.save obchází
+  // request hooky — validace proto běží explicitně v createRulesFromList.
+  let rulesImported = 0;
+  {
+    // vyprázdní neznámé garanty v checklistu (rekurzivně, jako u uzlů mapy)
+    const cistiItemOwnery = (items) => (Array.isArray(items) ? items : []).map((it) => {
+      if (!it) return it;
+      const out = Object.assign({}, it);
+      const em = String(out.owner || "").trim();
+      if (em.includes("@") && !known[em]) { out.owner = ""; dropped++; }
+      if (Array.isArray(out.children)) out.children = cistiItemOwnery(out.children);
+      return out;
+    });
+    const prepared = [];
+    for (const r of srcRules) {
+      if (!r) { rulesSkipped++; continue; }
+      const m = remapRuleIdsServer(r, idMap);
+      // PODMÍNKA na neznámou osobu = přeskočit CELÉ pravidlo (vyhozením
+      // podmínky by střílelo šířeji; cizí e-mail se do DB nesmí dostat)
+      if ((m.conditions || []).some((c) => c && c.field === "owner"
+        && String(c.value || "").includes("@") && !known[String(c.value || "").trim()])) {
+        rulesSkipped++;
+        continue;
+      }
+      m.actions = (Array.isArray(m.actions) ? m.actions : []).filter((a) => {
+        if (!a) return false;
+        if (a.type === "set_owner") {
+          // jen skutečné e-maily — role (position:<id>, zástupci) „@" nemají
+          // a jejich platnost ověří validateRuleInput
+          const em = String(a.owner || "").trim();
+          if (em.includes("@") && !known[em]) { dropped++; return false; }
+          return true;
+        }
+        if (a.type === "notify" && String(a.to || "").includes("@")) {
+          if (!known[String(a.to || "").trim()]) { dropped++; return false; }
+          return true;
+        }
+        return true;
+      }).map((a) => (a && a.type === "create_subnodes" ? Object.assign({}, a, { items: cistiItemOwnery(a.items) }) : a));
+      if (m.actions.length === 0) { rulesSkipped++; continue; }
+      m.enabled = !(r.enabled === false);
+      prepared.push(m);
+    }
+    const res = createRulesFromList(app, rec, prepared, auth.email());
+    rulesImported = res.created;
+    rulesSkipped += res.skipped;
+  }
+
+  // Položky-úkoly se NEIMPORTUJÍ (slovník 17. 8. 2026): úkol = uzel s řešitelem
+  // nebo termínem a import nesmí zakládat, co by dnes nešlo vytvořit. Úkoly ze
+  // starých záloh se poctivě spočítají jako přeskočené — data v záloze zůstávají.
+  const imported = 0;
+  const tasksSkipped = srcTasks.filter((tk) => tk && String((tk.title || "")).trim()).length;
+
+  // Přání o automatizaci z importované mapy musí dojít správcům AI — jinak by
+  // zůstala jen jako odznak na uzlu a nikdo by o nich nevěděl.
+  // (Notifikace o PŘIŘAZENÍ se záměrně neposílají: import nikomu nic nesdílí.)
+  try {
+    notifyAutomationRequests(app, [], rec, auth.email());
+  } catch (err) {
+    try { app.logger().warn("map-import: notifikace požadavků na automatizaci selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+
+  return vysledek(200, {
+    id: rec.id,
+    title: rec.getString("title"),
+    nodes_imported: finalNodes.length,
+    tasks_imported: imported,
+    tasks_skipped: tasksSkipped,
+    assignments_dropped: dropped,
+    rules_imported: rulesImported,
+    rules_skipped: rulesSkipped,
+  });
+}
+
 // „MŮJ DEN" — JEDEN výpočet osobního přehledu pro celý produkt.
 //
 // Zrcadlo frontend/src/components/shared/MyDaySection.jsx (useMemo `day`).
@@ -6136,7 +6528,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 
 module.exports = {
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, v1OwnedMap, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, buildExport, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

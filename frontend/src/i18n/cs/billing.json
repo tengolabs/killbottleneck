@@ -58,6 +58,19 @@
     "passwordMismatch": "Nová hesla se neshodují.",
     "passwordChanged": "Heslo změněno — přihlaste se prosím znovu.",
     "passwordFailed": "Změna hesla se nepovedla.",
-    "passwordRelogin": "Po změně hesla vás aplikace odhlásí — je to schválně, staré přihlášení přestává platit všude."
+    "passwordRelogin": "Po změně hesla vás aplikace odhlásí — je to schválně, staré přihlášení přestává platit všude.",
+    "data": {
+      "heading": "Moje data",
+      "hint": "Stáhnete jeden soubor se vším, co vidíte — projekty, úkoly, komentáře, seznam příloh, zásobník, měření času i kontakty. Ze souboru z exportu jde zpátky nahrát projekty (s pravidly) a zásobník nápadů; komentáře, přílohy a sdílení zůstávají v souboru jen ke čtení.",
+      "download": "Stáhnout všechna moje data",
+      "downloadFailed": "Stažení dat se nepodařilo, zkuste to za chvíli.",
+      "upload": "Nahrát data z exportu",
+      "uploadBadFile": "Tohle není soubor z exportu killBottlenecku (killbottleneck.export/1).",
+      "uploadTooLarge": "Soubor je větší než 50 MB.",
+      "uploadFailed": "Nahrání se nepodařilo.",
+      "uploaded": "Nahráno: {{maps}} projektů ({{nodes}} cílů, {{rules}} pravidel), {{ideas}} nápadů.",
+      "uploadedSkipped": "Přeskočeno projektů: {{count}} (organizační struktura nebo neplatná mapa).",
+      "uploadedDropped": "Přiřazení lidem, kteří tu nejsou: {{count}} vyprázdněno."
+    }
   }
 }

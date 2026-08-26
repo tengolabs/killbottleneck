@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { pb } from '@/api/pb';
+import { downloadAllMyData } from '@/lib/exportAll';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { Clock, Lock } from 'lucide-react';
 
@@ -85,6 +87,17 @@ export default function TrialBanner() {
       <a {...cta} className="underline underline-offset-2 font-semibold whitespace-nowrap">
         {t('trial.cta')}
       </a>
+      {/* po vypršení je cesta k datům hned v pruhu — slib „data zůstanou k exportu" (P2-03) */}
+      {vyprselo && (
+        <button
+          type="button"
+          data-testid="trial-export"
+          onClick={() => downloadAllMyData().catch(() => toast.error(t('trial.exportFailed')))}
+          className="underline underline-offset-2 whitespace-nowrap"
+        >
+          {t('trial.exportCta')}
+        </button>
+      )}
     </div>
   );
 }

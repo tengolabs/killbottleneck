@@ -1535,7 +1535,7 @@ kbRoute("POST", "/run-email-digests", (e) => {
 // půlnoci SELČ by se serverový „dnešek" rozešel s tím, co má člověk na
 // hodinkách. Neplatná hodnota tiše spadne na datum serveru.
 kbRoute("GET", "/my-day", (e) => {
-  const { buildMyDay } = require(`${__hooks}/helpers.js`);
+  const { buildMyDay, minuteLimitHit } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   // Brzda: přehled je nejdražší čtecí operace v aplikaci (projde všechny mé
@@ -1544,13 +1544,7 @@ kbRoute("GET", "/my-day", (e) => {
   // je nad rámec i svižného odbavování a pod prahem, kde to začne bolet.
   // Stejný levný vzor jako u API klíčů (helpers.apiKeyAuth) — fixní minutové
   // okno, bez atomicity; jde o brzdu, ne o účtování.
-  const store = $app.store();
-  const rlKey = "mdrl:" + e.auth.id;
-  const bucket = Math.floor(Date.now() / 60000);
-  const prevRl = String(store.get(rlKey) || "").split(":");
-  const used = Number(prevRl[0]) === bucket ? Number(prevRl[1]) || 0 : 0;
-  if (used >= 60) return e.json(429, { error: t(L, "err.tooManyRequests") });
-  store.set(rlKey, bucket + ":" + (used + 1));
+  if (minuteLimitHit($app.store(), "mdrl:" + e.auth.id, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
 
   const day = buildMyDay($app, e.auth.id, e.auth.email(), {
     today: e.request.url.query().get("today") || "",
@@ -1675,20 +1669,14 @@ kbRoute("GET", "/map-changes", (e) => {
 // které přihlášený smí číst; soukromé mapy nejdou ani do součtů. Stejný
 // rate-limit a `?today=` z klienta jako Můj den; Cache-Control private.
 kbRoute("GET", "/portfolio", (e) => {
-  const { buildPortfolio } = require(`${__hooks}/helpers.js`);
+  const { buildPortfolio, minuteLimitHit } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const role = e.auth.getString("role");
   if (role !== "admin" && role !== "manager") {
     return e.json(403, { error: t(L, "err.portfolioAdminManagerOnly") });
   }
-  const store = $app.store();
-  const rlKey = "pfrl:" + e.auth.id;
-  const bucket = Math.floor(Date.now() / 60000);
-  const prevRl = String(store.get(rlKey) || "").split(":");
-  const used = Number(prevRl[0]) === bucket ? Number(prevRl[1]) || 0 : 0;
-  if (used >= 60) return e.json(429, { error: t(L, "err.tooManyRequests") });
-  store.set(rlKey, bucket + ":" + (used + 1));
+  if (minuteLimitHit($app.store(), "pfrl:" + e.auth.id, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
 
   const data = buildPortfolio($app, e.auth.id, e.auth.email(), {
     today: e.request.url.query().get("today") || "",
@@ -1696,6 +1684,35 @@ kbRoute("GET", "/portfolio", (e) => {
   });
   e.response.header().set("Cache-Control", "private, no-store");
   e.response.header().add("Vary", "Authorization");
+  return e.json(200, data);
+}, $apis.requireAuth());
+
+// „STÁHNOUT VŠECHNA MOJE DATA" (P2-03) — jeden JSON pro odchod/zálohu; session
+// auth, každá role (jen to, co uživatel vidí — helpers.js:buildExport). GET,
+// takže projde i po vypršení zkušebky (middleware níž pouští čtení vždy).
+// Rate-limit 5/min: dotahuje všechny mapy včetně JSON blobů.
+kbRoute("GET", "/export", (e) => {
+  const { buildExport, minuteLimitHit, env } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const store = $app.store();
+  if (minuteLimitHit(store, "exrl:" + e.auth.id, 5)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  // Na instanci běží NEJVÝŠ JEDEN export naráz: celý JSON se skládá v paměti
+  // (500 map × bloby uzlů + změny) a pět souběžných by mohlo položit sdílený
+  // kontejner na hostingu (nález panelu 26. 8. 2026). Zámek sám vyprší po 2 min.
+  const lockKey = "export:running";
+  const lockAt = Number(store.get(lockKey) || 0);
+  if (lockAt && Date.now() - lockAt < 120000) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  store.set(lockKey, Date.now());
+  let data;
+  try {
+    data = buildExport($app, e.auth.id, e.auth.email(), { version: env("VERSION") || "" });
+  } finally {
+    store.remove(lockKey);
+  }
+  e.response.header().set("Cache-Control", "private, no-store");
+  e.response.header().add("Vary", "Authorization");
+  e.response.header().set("Content-Disposition", `attachment; filename="killbottleneck-export-${data.exported_at.slice(0, 10)}.json"`);
   return e.json(200, data);
 }, $apis.requireAuth());
 
@@ -3689,223 +3706,59 @@ kbRoute("POST", "/map-import", (e) => {
   if (used >= 3) return e.json(429, { error: t(L, "err.tooManyRequests") });
   store.set(rlKey, bucket + ":" + (used + 1));
 
-  // PŘECHOD: bereme i staré exporty (soubor leží uživateli na disku, nemůže se „přepsat")
-  if (info.format !== "killbottleneck.map/1" && info.format !== "flowmap.map/1") {
-    return e.json(400, { error: t(L, "err.badImportFormat") });
-  }
-  const src = info.map || {};
-  const srcNodes = Array.isArray(src.nodes) ? src.nodes : [];
-  const srcEdges = Array.isArray(src.edges) ? src.edges : [];
-  if (srcNodes.length === 0) return e.json(400, { error: t(L, "err.importNoNodes") });
+  const { importJednuMapu } = require(`${__hooks}/helpers.js`);
+  const vys = importJednuMapu($app, e.auth, L, info, {});
+  return e.json(vys.status, vys.body);
+}, $apis.requireAuth());
 
-  // id se PŘEGENERUJÍ — importovaná mapa nikdy nesmí sdílet identifikátory
-  // s originálem (komentáře, úkoly a měření času visí na textovém node_id)
-  const ts = String(new Date().getTime());
-  const idMap = {};
-  let i = 0;
-  const nodes = srcNodes.map((n) => {
-    const oldId = n && n.id ? String(n.id) : "";
-    const newId = "node-" + ts + "-" + (++i);
-    if (oldId) idMap[oldId] = newId;
-    return Object.assign({}, n, { id: newId });
-  });
-  let j = 0;
-  const edges = [];
-  for (const ed of srcEdges) {
-    if (!ed || !idMap[ed.source] || !idMap[ed.target]) continue; // hrana do prázdna → zahodit
-    edges.push({ id: "edge-" + ts + "-" + (++j), source: idMap[ed.source], target: idMap[ed.target] });
+// „NAHRÁT DATA Z EXPORTU" — celý soubor killbottleneck.export/1 (P2-03, Richard
+// 26. 8. 2026: „kde jde naimportovat všechna data?"). Každý projekt jde stejnou
+// cestou jako /map-import (mapa + pravidla; úkoly-položky se přiznaně
+// přeskakují, komentáře/přílohy/sdílení/změny zůstávají v souboru jen ke
+// čtení), navíc zásobník nápadů importujícího. Org mapa se nezakládá. Vše
+// vlastní importér, nikomu se nic nesdílí, žádné notifikace. Zápis → po
+// vypršení zkušebky 402 (middleware). Strop 50 MB, 500 map, 2 za minutu.
+kbRoute("POST", "/import-all", (e) => {
+  const { minuteLimitHit, importJednuMapu } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const clen = Number(e.request.header.get("Content-Length") || 0);
+  if (clen > 50 * 1024 * 1024) return e.json(413, { error: t(L, "err.importTooLarge") });
+  if (minuteLimitHit($app.store(), "iarl:" + e.auth.id, 2)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const info = e.requestInfo().body || {};
+  if (info.format !== "killbottleneck.export/1") return e.json(400, { error: t(L, "err.badImportFormat") });
+  const maps = (Array.isArray(info.maps) ? info.maps : []).slice(0, 500);
+  const out = { maps_imported: 0, maps_skipped: [], nodes_imported: 0, rules_imported: 0, rules_skipped: 0, tasks_skipped: 0, assignments_dropped: 0, ideas_imported: 0 };
+  for (const mp of maps) {
+    if (!mp || !mp.map) { out.maps_skipped.push({ title: "", reason: "empty" }); continue; }
+    if (mp.map.kind === "org") { out.maps_skipped.push({ title: String(mp.map.title || ""), reason: "org" }); continue; }
+    const vys = importJednuMapu($app, e.auth, L, { format: mp.format || "killbottleneck.map/1", map: mp.map, tasks: mp.tasks, rules: mp.rules }, { keepArchived: true });
+    if (vys.status !== 200) { out.maps_skipped.push({ title: String(mp.map.title || ""), reason: String((vys.body || {}).error || vys.status) }); continue; }
+    out.maps_imported++;
+    out.nodes_imported += vys.body.nodes_imported || 0;
+    out.rules_imported += vys.body.rules_imported || 0;
+    out.rules_skipped += vys.body.rules_skipped || 0;
+    out.tasks_skipped += vys.body.tasks_skipped || 0;
+    out.assignments_dropped += vys.body.assignments_dropped || 0;
   }
-
-  // přiřazení lidí: co v téhle instanci neexistuje, se vyprázdní a spočítá
-  const srcTasks = Array.isArray(info.tasks) ? info.tasks.slice(0, 500) : [];
-  const wanted = {};
-  for (const n of nodes) {
-    const owner = ((n.data || {}).owner || "").trim();
-    if (owner) wanted[owner] = true;
-  }
-  for (const tk of srcTasks) {
-    const em = String((tk && tk.assignee_email) || "").trim();
-    if (em) wanted[em] = true;
-  }
-  // pravidla nad strop 50/mapa se PŘIZNANĚ přeskočí (rules_skipped v odpovědi)
-  const allRules = Array.isArray(info.rules) ? info.rules : [];
-  const srcRules = allRules.slice(0, MAX_RULES_PER_MAP);
-  let rulesSkipped = allRules.length - srcRules.length;
-  // e-mail se pozná podle „@" — role (node_owner, position:<id>, zástupci) ho
-  // nemají a kontrole známosti nepodléhají (platnost pozice ověří
-  // validateRuleInput). E-maily se sbírají i z checklistů create_subnodes.items
-  // a z hodnot podmínek owner (checkup 15. 8. — dřív unikaly).
-  const sbirejItemOwnery = (items) => {
-    for (const it of (Array.isArray(items) ? items : [])) {
-      if (!it) continue;
-      if (String(it.owner || "").includes("@")) wanted[String(it.owner).trim()] = true;
-      sbirejItemOwnery(it.children);
-    }
-  };
-  for (const r of srcRules) {
-    for (const a of (Array.isArray(r && r.actions) ? r.actions : [])) {
-      if (!a) continue;
-      if (a.type === "set_owner" && String(a.owner || "").includes("@")) wanted[String(a.owner).trim()] = true;
-      if (a.type === "notify" && String(a.to || "").includes("@")) wanted[String(a.to).trim()] = true;
-      if (a.type === "create_subnodes") sbirejItemOwnery(a.items);
-    }
-    for (const c of (Array.isArray(r && r.conditions) ? r.conditions : [])) {
-      if (c && c.field === "owner" && String(c.value || "").includes("@")) wanted[String(c.value).trim()] = true;
-    }
-  }
-  const known = {};
-  const extHelpers = require(`${__hooks}/helpers.js`);
-  for (const email of Object.keys(wanted)) {
-    // pseudo-e-mail externího kontaktu: platí, jen když kontakt v TÉHLE instanci
-    // existuje a importér ho smí vidět (cizí či privátní cizí id → zahodit stejně
-    // jako neregistrovaného uživatele — id z jiné instance by ukazovalo na
-    // náhodný, potenciálně cizí privátní kontakt)
-    if (extHelpers.isExternalOwner(email)) {
-      try {
-        const c = $app.findRecordById("external_contacts", extHelpers.extContactId(email));
-        if (!c.getBool("private") || c.getString("owner") === e.auth.id) known[email] = true;
-      } catch (err) { /* kontakt tu neexistuje → přiřazení zahodíme */ }
-      continue;
-    }
+  // zásobník nápadů — vlastní záznamy importéra
+  const ideas = (Array.isArray(info.buffer_nodes) ? info.buffer_nodes : []).slice(0, 2000);
+  for (const b of ideas) {
+    const title = String((b && b.title) || "").trim().slice(0, 200);
+    if (!title) continue;
     try {
-      $app.findFirstRecordByFilter("users", "email = {:e}", { e: email });
-      known[email] = true;
-    } catch (err) { /* neregistrovaný → přiřazení zahodíme */ }
+      const rec = new Record($app.findCollectionByNameOrId("buffer_nodes"));
+      rec.set("title", title);
+      rec.set("description", String(b.description || "").slice(0, 2000));
+      rec.set("color", String(b.color || "").slice(0, 20));
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(b.deadline || ""))) rec.set("deadline", String(b.deadline));
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(b.planned_on || ""))) rec.set("planned_on", String(b.planned_on));
+      rec.set("owner", e.auth.id);
+      $app.save(rec);
+      out.ideas_imported++;
+    } catch (err) { /* nápad, který neprojde, se přeskočí */ }
   }
-  let dropped = 0;
-  for (const n of nodes) {
-    const d = n.data || {};
-    if (d.owner && !known[d.owner]) {
-      n.data = Object.assign({}, d, { owner: "" });
-      dropped++;
-    }
-  }
-
-  // Žadatel o automatizaci ze souboru je e-mail z CIZÍ instance — přerazítkovat
-  // na importujícího, ať se do dat nedostane cizí osobní údaj ani falešné autorství.
-  const stamped = stampAutomationRequesters([], nodes, e.auth.email());
-  // ořez délek jako u autosave (normalizeNodeShapes) — importní cesta ho
-  // neměla a 2MB název prošel do DB celý (nález checkup mutace před v0.13.2);
-  // canonicalNodeData měnit nejde, drží bit-paritu s FE cleanMap
-  const { normalizeNodeShapes, apexNodeId } = require(`${__hooks}/helpers.js`);
-  const trimmed = normalizeNodeShapes(stamped);
-  const norm = normalizeMapData(trimmed, edges, L);
-  if (norm.error) return e.json(400, { error: t(L, "err.invalidMapData", { reason: norm.error }) });
-  const bad = validateMapData(norm.nodes, norm.edges, L);
-  if (bad) return e.json(400, { error: t(L, "err.invalidMapData", { reason: bad }) });
-  // „Mapa je strom" drží pro import normalizeMapData VÝŠ (víc rodičů, cykly
-  // i hrany na neznámé uzly → 400) — import jde přes $app.save a request
-  // hooky ho nechrání, tohle je jeho jediný štít. Přibito testy v
-  // map-portable.js (vč. exportu S pozicemi a odpojeného kruhu) — kdo by
-  // normalizeMapData rozvolňoval, regrese ho zastaví.
-
-  // export z jiné instance nemusí nést pozice (nebo je má nulové) → dopočítat
-  let finalNodes = norm.nodes;
-  const hasPositions = norm.nodes.some((n) => n.position && (n.position.x !== 0 || n.position.y !== 0));
-  if (!hasPositions) {
-    const positions = layoutTreeServer(norm.nodes, norm.edges);
-    finalNodes = norm.nodes.map((n) => (n.type === "note"
-      ? n : Object.assign({}, n, { position: positions[n.id] || n.position })));
-  }
-
-  const rec = new Record($app.findCollectionByNameOrId("goalmaps"));
-  rec.set("title", String(src.title || "").trim().slice(0, 200) || "Import");
-  rec.set("description", String(src.description || "").slice(0, 2000));
-  rec.set("nodes", finalNodes);
-  rec.set("edges", norm.edges);
-  // vše ostatní patří instanci, ne souboru — nikdy z těla
-  rec.set("owner", e.auth.id);
-  rec.set("owner_email", e.auth.email());
-  rec.set("is_public", false);
-  rec.set("shared_with", []);
-  rec.set("shared_with_edit", []);
-  rec.set("team_access", "");
-  rec.set("archived", false);
-  rec.set("archived_at", "");
-  rec.set("series", "");
-  rec.set("series_number", 0);
-  rec.set("series_title", "");
-  rec.set("series_year", 0);
-  rec.set("client", "");
-  rec.set("kind", ""); // import nikdy nezakládá org mapu
-  $app.save(rec);
-
-  // Pravidla ze souboru: remap přes idMap → osoby z cizí instance ven (jako u
-  // přiřazení: neznámý e-mail → akce se dropne a spočítá) → validateRuleInput →
-  // založení. Nevalidní pravidlo = PŘIZNANÝ skip (rules_skipped v odpovědi),
-  // žádný tichý zánik. Kolekce automation_rules je zamčená a $app.save obchází
-  // request hooky — validace proto běží explicitně v createRulesFromList.
-  let rulesImported = 0;
-  {
-    // vyprázdní neznámé garanty v checklistu (rekurzivně, jako u uzlů mapy)
-    const cistiItemOwnery = (items) => (Array.isArray(items) ? items : []).map((it) => {
-      if (!it) return it;
-      const out = Object.assign({}, it);
-      const em = String(out.owner || "").trim();
-      if (em.includes("@") && !known[em]) { out.owner = ""; dropped++; }
-      if (Array.isArray(out.children)) out.children = cistiItemOwnery(out.children);
-      return out;
-    });
-    const prepared = [];
-    for (const r of srcRules) {
-      if (!r) { rulesSkipped++; continue; }
-      const m = remapRuleIdsServer(r, idMap);
-      // PODMÍNKA na neznámou osobu = přeskočit CELÉ pravidlo (vyhozením
-      // podmínky by střílelo šířeji; cizí e-mail se do DB nesmí dostat)
-      if ((m.conditions || []).some((c) => c && c.field === "owner"
-        && String(c.value || "").includes("@") && !known[String(c.value || "").trim()])) {
-        rulesSkipped++;
-        continue;
-      }
-      m.actions = (Array.isArray(m.actions) ? m.actions : []).filter((a) => {
-        if (!a) return false;
-        if (a.type === "set_owner") {
-          // jen skutečné e-maily — role (position:<id>, zástupci) „@" nemají
-          // a jejich platnost ověří validateRuleInput
-          const em = String(a.owner || "").trim();
-          if (em.includes("@") && !known[em]) { dropped++; return false; }
-          return true;
-        }
-        if (a.type === "notify" && String(a.to || "").includes("@")) {
-          if (!known[String(a.to || "").trim()]) { dropped++; return false; }
-          return true;
-        }
-        return true;
-      }).map((a) => (a && a.type === "create_subnodes" ? Object.assign({}, a, { items: cistiItemOwnery(a.items) }) : a));
-      if (m.actions.length === 0) { rulesSkipped++; continue; }
-      m.enabled = !(r.enabled === false);
-      prepared.push(m);
-    }
-    const res = createRulesFromList($app, rec, prepared, e.auth.email());
-    rulesImported = res.created;
-    rulesSkipped += res.skipped;
-  }
-
-  // Položky-úkoly se NEIMPORTUJÍ (slovník 17. 8. 2026): úkol = uzel s řešitelem
-  // nebo termínem a import nesmí zakládat, co by dnes nešlo vytvořit. Úkoly ze
-  // starých záloh se poctivě spočítají jako přeskočené — data v záloze zůstávají.
-  const imported = 0;
-  const tasksSkipped = srcTasks.filter((tk) => tk && String((tk.title || "")).trim()).length;
-
-  // Přání o automatizaci z importované mapy musí dojít správcům AI — jinak by
-  // zůstala jen jako odznak na uzlu a nikdo by o nich nevěděl.
-  // (Notifikace o PŘIŘAZENÍ se záměrně neposílají: import nikomu nic nesdílí.)
-  try {
-    notifyAutomationRequests($app, [], rec, e.auth.email());
-  } catch (err) {
-    try { $app.logger().warn("map-import: notifikace požadavků na automatizaci selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
-  }
-
-  return e.json(200, {
-    id: rec.id,
-    title: rec.getString("title"),
-    nodes_imported: finalNodes.length,
-    tasks_imported: imported,
-    tasks_skipped: tasksSkipped,
-    assignments_dropped: dropped,
-    rules_imported: rulesImported,
-    rules_skipped: rulesSkipped,
-  });
+  return e.json(200, out);
 }, $apis.requireAuth());
 
 // ---------- registr AI agentů ----------

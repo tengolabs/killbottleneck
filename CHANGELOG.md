@@ -9,6 +9,26 @@ below before you jump several versions.
 
 ---
 
+## v0.45-beta — 2026-08-26
+
+**Download all my data — leaving is part of the product**
+
+- **My account** has **Download all my data**: one JSON file (`killbottleneck.export/1`)
+  with every project you can see — each in the same shape as a single map export, so it
+  imports elsewhere — plus tasks, rules, comments, the change log, the attachment list,
+  who can see the project, the idea stash, time tracking, external contacts, notifications,
+  rule templates and the member list.
+- It works even after the trial has expired: the “Download data” link sits right in the
+  top bar.
+- **Upload data from an export** brings a whole file back: every project (with rules,
+  archived ones stay archived) and the idea stash — into the same or another instance.
+- Nothing you cannot see leaves with you: other people's private projects and public
+  notice boards are not in the file, members come as a safe subset (no secrets).
+
+**Upgrade notes:** no migration. New session endpoints `GET /api/kb/export` (5 per minute,
+one at a time per instance) and `POST /api/kb/import-all` (50 MB, 2 per minute). Very large instances are truncated per list and the file says
+so in `truncated`.
+
 ## v0.44-beta — 2026-08-25
 
 **Organization: the view from above for admins and managers**

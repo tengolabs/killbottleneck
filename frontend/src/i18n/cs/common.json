@@ -163,7 +163,9 @@
     "remaining_few": "Zkušební verze — zbývají {{count}} dny",
     "remaining_other": "Zkušební verze — zbývá {{count}} dní",
     "expired": "Zkušební doba skončila — data jsou v bezpečí, zápis je pozastavený",
-    "cta": "Vybrat tarif"
+    "cta": "Vybrat tarif",
+    "exportCta": "Stáhnout data",
+    "exportFailed": "Stažení dat se nepodařilo, zkuste to za chvíli."
   },
   "links": {
     "inDescription": "Odkazy v popisu:"
