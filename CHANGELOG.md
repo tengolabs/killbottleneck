@@ -9,6 +9,30 @@ below before you jump several versions.
 
 ---
 
+## v0.46.1-beta — 2026-08-27
+
+**Bug-fix release from the full code review (wave A) — no new features**
+
+- **Organization → Report → Markdown works again.** Since v0.44 it threw `md is not a function`
+  for any organization with at least one project — no file, no message. A UI test now clicks it.
+- **My account: the display name no longer disappears after a reload** (the user DTO dropped
+  `name`, so the next save wiped it).
+- **Daily e-mail digest is sent once after a server restart**, not twice: the "sent today" mark
+  was 17 characters long but the field allowed 10, so it was never saved (migration widens the field).
+- **Sharing validates the e-mail address first.** A typo without `@` used to be written after the
+  map was saved, poisoning the map's share list (later shares failed, removing one member dropped all).
+- **Orphaned attachments are cleaned up beyond the first 500 files**; the nightly job now pages.
+- **Creating a project no longer fails silently** (expired trial 402, seat limit 409, network).
+- **API keys: `token_hash` is now a hidden field** — the raw collection list returned it to its
+  owner; the test that should have caught it could not fail (`|| true`). Two more tests fixed the same way.
+- Housekeeping: 32 unused npm packages removed (node_modules −32 MB), ESLint now covers the whole
+  frontend `src/` (44 % of files were unlinted), 5 dead UI files and 25 unused translation keys removed,
+  missing translation keys added (a raw key showed in the org-position dialog and in AI error toasts),
+  EN welcome map link fixed (404), `@capacitor/*` moved to runtime dependencies.
+
+**Upgrade notes:** two automatic migrations (`mail_budget.day` max length, `api_keys.token_hash`
+hidden). No config changes.
+
 ## v0.46-beta — 2026-08-27
 
 **An API key acts as its owner — shared and team maps through API and MCP, plus `get_portfolio`**

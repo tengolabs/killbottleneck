@@ -130,7 +130,9 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
 
     console.log('== zamčená kolekce ==');
     r = await api('GET', '/api/collections/api_keys/records', { token: A });
-    expect(r.status === 200 && (r.json.items || []).every((k) => k.token_hash === undefined || true), 'api_keys list přes API (owner vidí své; hash je jen v DB)');
+    expect(r.status === 200 && Array.isArray(r.json.items) && r.json.items.every((k) => k.token_hash === undefined), `api_keys list přes API bez hashe (A má ${(r.json.items || []).length} klíčů; kotva na počet je u B níž)`);
+    r = await api('GET', '/api/collections/api_keys/records?perPage=50', { token: B });
+    expect(r.status === 200 && r.json.items.length === 20 && r.json.items.every((k) => k.token_hash === undefined), `B vidí svých 20 klíčů bez hashe (${r.json.items.length})`);
     r = await api('POST', '/api/collections/api_keys/records', { token: A, body: { owner: 'x', token_hash: 'y' } });
     expect(r.status !== 200, `přímý create přes kolekci zablokován (createRule null) (${r.status})`);
   } catch (e) {

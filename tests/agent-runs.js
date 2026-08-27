@@ -203,7 +203,7 @@ const EDGES = [
     expect(runs.totalItems === 1 && runs.items[0].status === 'done', `vlastník mapy vidí běh (${runs.totalItems})`);
     expect(!runs.items[0].token_hash, 'token_hash je po uzavření běhu prázdný');
     const runsOther = (await api('GET', '/api/collections/agent_runs/records', { token: MGR })).json;
-    expect(runsOther.totalItems >= 0, 'cizí čtení běhů projde jen přes RLS mapy');
+    expect(runsOther.totalItems === 1 && !runsOther.items[0].token_hash, `kolega se sdílenou mapou vidí právě 1 běh bez hashe (${runsOther.totalItems})`);
 
     console.log('== nedostupný agent uzel neshodí ==');
     mockStatus = 500;

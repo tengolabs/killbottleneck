@@ -6,13 +6,13 @@ import pluginUnusedImports from "eslint-plugin-unused-imports";
 
 export default [
   {
-    files: [
-      "src/components/**/*.{js,mjs,cjs,jsx}",
-      "src/pages/**/*.{js,mjs,cjs,jsx}",
-      "src/lite/**/*.{js,mjs,cjs,jsx}",
-      "src/Layout.jsx",
-    ],
-    ignores: ["src/lib/**/*", "src/components/ui/**/*"],
+    // Celý src/ — do 27. 8. 2026 bylo 44 % zdrojáků (lib/, api/, hooks/, …)
+    // mimo lint a no-shadow tak neviděl pád Markdown exportu (nález F6-08/F5-01).
+    // Výjimka jen shadcn boilerplate v ui/.
+    files: ["src/**/*.{js,mjs,cjs,jsx}"],
+    // skinValidator.js je bytová kopie sdílená s galerií skinů (killbottleneck-skins,
+    // hlídá ji check-upstream.mjs) — lintovat ji tady by vyrobilo drift ve třetí kopii.
+    ignores: ["src/components/ui/**/*", "src/lib/skinValidator.js"],
     // Pravidla doporučených sad se vtahují DOLE v `rules` — spready na téhle
     // úrovni by stejně přebil klíč `rules` níž a konfig by říkal dvě věci naráz.
     languageOptions: {
@@ -58,7 +58,7 @@ export default [
       "react/react-in-jsx-scope": "off",
       "react/no-unknown-property": [
         "error",
-        { ignore: ["cmdk-input-wrapper", "toast-close"] },
+        { ignore: ["toast-close"] },
       ],
       "react-hooks/rules-of-hooks": "error",
       // Zastínění vnější proměnné: callback pojmenovaný `t` zastínil překladovou

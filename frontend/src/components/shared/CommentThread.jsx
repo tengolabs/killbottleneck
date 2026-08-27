@@ -34,7 +34,7 @@ export default function CommentThread({ entity, filter, onCountChange }) {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [entity, filterKey, ready]);
 
   useEffect(() => {

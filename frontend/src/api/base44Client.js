@@ -79,6 +79,7 @@ const toDto = (name, r) => {
         ...base,
         email: r.email,
         full_name: r.full_name,
+        name: r.name || '',
         role: r.role,
         language: r.language || '',
         is_ai_manager: !!r.is_ai_manager,

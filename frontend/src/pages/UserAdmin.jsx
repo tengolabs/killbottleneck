@@ -62,8 +62,7 @@ export default function UserAdmin() {
   const [hosted, setHosted] = useState(null);
   const [billingComplete, setBillingComplete] = useState(false);
   useEffect(() => {
-    fetch('/api/kb/config')
-      .then((r) => (r.ok ? r.json() : null))
+    pb.send('/api/kb/config', { method: 'GET' })
       .then((cfg) => setHosted(!!(cfg && cfg.hosted)))
       .catch(() => setHosted(false));
   }, []);

@@ -53,7 +53,7 @@ const csvEscape = (v) => {
 
 const fieldLabel = (f) => t(`changeField.${f}`);
 // Markdown: názvy a jména jsou cizí text — svislítko by rozbilo tabulku, zalomení řádek
-const md = (v) => String(v ?? '').replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+const esc = (v) => String(v ?? '').replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
 
 export function exportPortfolioMarkdown({ data, nameOf, orgName }) {
   const s = data.sections;
@@ -63,23 +63,23 @@ export function exportPortfolioMarkdown({ data, nameOf, orgName }) {
 
   md += `\n## ${t('sections.overdue')} (${data.counts.overdue})\n`;
   if (!s.overdue.length) md += `${t('emptyOverdue')}\n`;
-  for (const o of s.overdue) md += `- ${md(o.title)} — ${md(who(o.owner, o))} (${md(o.mapTitle)}) — ${t('cols.deadline').toLowerCase()} ${o.deadline}, **${days(o.daysOver)}**\n`;
+  for (const o of s.overdue) md += `- ${esc(o.title)} — ${esc(who(o.owner, o))} (${esc(o.mapTitle)}) — ${t('cols.deadline').toLowerCase()} ${o.deadline}, **${days(o.daysOver)}**\n`;
 
   md += `\n## ${t('sections.projects')}\n`;
   for (const p of s.projects) {
-    md += `- **${md(p.title)}** [${accessLabel(p)}] ${p.pct} % (${t('projMeta', { done: p.done, total: p.total })}) · ${t('projOverdue', { count: p.overdue })} · ${t('projStuck', { count: p.stuck })} · ${t('projOpen', { count: p.open })}\n`;
+    md += `- **${esc(p.title)}** [${accessLabel(p)}] ${p.pct} % (${t('projMeta', { done: p.done, total: p.total })}) · ${t('projOverdue', { count: p.overdue })} · ${t('projStuck', { count: p.stuck })} · ${t('projOpen', { count: p.open })}\n`;
   }
 
   md += `\n## ${t('sections.stuck')} (${data.counts.stuck})\n`;
   if (!s.stuck.length) md += `${t('emptyStuck')}\n`;
-  for (const o of s.stuck) md += `- ${md(o.title)} — ${md(who(o.owner, o))} (${md(o.mapTitle)}) — ${o.deadline ? `${t('cols.deadline').toLowerCase()} ${o.deadline}` : t('noDeadline')}, **${t('idle', { days: days(o.daysIdle) })}**\n`;
+  for (const o of s.stuck) md += `- ${esc(o.title)} — ${esc(who(o.owner, o))} (${esc(o.mapTitle)}) — ${o.deadline ? `${t('cols.deadline').toLowerCase()} ${o.deadline}` : t('noDeadline')}, **${t('idle', { days: days(o.daysIdle) })}**\n`;
 
   md += `\n## ${t('sections.people')}\n\n| ${t('cols.who')} | ${t('cols.overdue')} | ${t('cols.stuck')} | ${t('cols.open')} | ${t('cols.projects')} |\n|---|---:|---:|---:|---:|\n`;
-  for (const p of s.people) md += `| ${md(p.email ? nameOf(p.email, { owner_label: p.owner_label }) : t('unassigned'))} | ${p.overdue}${p.worst ? ` (${t('worst', { days: days(p.worst) })})` : ''} | ${p.stuck} | ${p.open} | ${p.maps} |\n`;
+  for (const p of s.people) md += `| ${esc(p.email ? nameOf(p.email, { owner_label: p.owner_label }) : t('unassigned'))} | ${p.overdue}${p.worst ? ` (${t('worst', { days: days(p.worst) })})` : ''} | ${p.stuck} | ${p.open} | ${p.maps} |\n`;
 
   md += `\n## ${t('sections.changes')} (${data.counts.changes})\n`;
   if (!s.changes.length) md += `${t('emptyChanges')}\n`;
-  for (const c of s.changes) md += `- ${whenLabel(c.when, data.today)} · ${md(c.title)} (${md(c.mapTitle)}) · ${fieldLabel(c.field)}: ${md(changeValue(c, c.from, nameOf))} → ${md(changeValue(c, c.to, nameOf))} · ${md(actorLabel(c.actor, nameOf))}\n`;
+  for (const c of s.changes) md += `- ${whenLabel(c.when, data.today)} · ${esc(c.title)} (${esc(c.mapTitle)}) · ${fieldLabel(c.field)}: ${esc(changeValue(c, c.from, nameOf))} → ${esc(changeValue(c, c.to, nameOf))} · ${esc(actorLabel(c.actor, nameOf))}\n`;
 
   md += `\n---\n${t('footer', { team: data.scope.team, shared: data.scope.shared })}`;
   if (data.scope.excluded?.length) md += ` ${excludedLabel(data.scope.excluded)}`;

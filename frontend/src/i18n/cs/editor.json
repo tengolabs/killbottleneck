@@ -130,6 +130,7 @@
     "subgoalsAdded": "Podcíle přidány",
     "subgoalsAddedDesc": "{{count}} nových cílů bylo přidáno.",
     "aiConnectionError": "Chyba spojení s AI poradcem.",
+    "aiError": "Chyba AI",
     "aiTimeout": "Omlouváme se, pracujeme na nápravě. Zkuste to prosím později.",
     "opsApplied": "Změny aplikovány",
     "opsAppliedDesc": "{{count}} operací bylo aplikováno na mapu.",
@@ -146,6 +147,7 @@
   },
   "nodeDialog": {
     "title": "Upravit cíl",
+    "descriptionLabel": "Popis",
     "categoriesNav": "Kategorie nastavení uzlu",
     "categories": {
       "basics": "Základ",
@@ -153,7 +155,6 @@
       "executor": "Automatizace",
       "files": "Přílohy",
       "tasks": "Úkoly a komentáře",
-      "behavior": "Chování",
       "org": "Pozice",
       "history": "Životopis"
     },
@@ -301,7 +302,6 @@
   "buffer": {
     "editTitle": "Upravit nápad",
     "descPlaceholder": "Poznámky, detaily…",
-    "convertedDesc": "„{{title}}\" najdete na stránce Úkoly.",
     "closeTitle": "Zavřít zásobník",
     "heading": "Zásobník",
     "newPlaceholder": "Nový nápad…",
@@ -519,8 +519,6 @@
     "notSharedNote": "Projekt jsme nikomu nenasdíleli — pokud na něm máte spolupracovat, nasdílejte ho ručně.",
     "openProject": "Otevřít projekt",
     "close": "Zavřít",
-    "from_asana": "Rozpoznán export z Asany —",
-    "from_trello": "Rozpoznán export z Trella —",
     "foreignTooBig": "Soubor má {{count}} položek — import zvládne nejvýš {{max}}. Rozdělte projekt na menší části.",
     "fileTooLarge": "Soubor je větší než 5 MB — to import nezvládne."
   },

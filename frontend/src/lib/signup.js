@@ -18,6 +18,7 @@ export const MIN_SLUG = 3;
 export const slugifyCompany = (text) => {
   let t = String(text || '')
     .normalize('NFKD')
+    // eslint-disable-next-line no-control-regex -- záměrně: ořez mimo ASCII
     .replace(/[^\x00-\x7f]/g, '');
   t = t.replace(/\b(s\.?\s?r\.?\s?o|a\.?\s?s|spol|z\.?\s?s|o\.?\s?p\.?\s?s)\b\.?/gi, ' ');
   t = t.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();

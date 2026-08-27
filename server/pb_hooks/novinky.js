@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.46.1-beta": {
+    cs: [
+      "Report Organizace ve formátu Markdown se zase stáhne — od v0.44 potichu padal, jakmile měla organizace aspoň jeden projekt.",
+      "Zobrazované jméno v Můj účet už po obnovení stránky nezmizí a další uložení ho nesmaže.",
+      "Denní souhrn e-mailem přijde po restartu serveru jen jednou, ne podruhé.",
+      "Sdílení odmítne překlep v e-mailu hned — dřív rozbilo sdílení celého projektu.",
+      "Založení projektu už nemlčí, když se nepovede (vypršená zkušebka, plný počet účtů), a přílohy smazaných cílů se uklidí i na instancích s více než 500 soubory.",
+    ],
+    en: [
+      "The Organization report in Markdown downloads again — since v0.44 it silently failed as soon as the organization had at least one project.",
+      "The display name in My account no longer disappears after a page reload, and the next save no longer wipes it.",
+      "The daily e-mail summary arrives once after a server restart, not twice.",
+      "Sharing rejects a mistyped e-mail right away — before, it broke sharing for the whole project.",
+      "Creating a project no longer fails silently (expired trial, seat limit), and attachments of deleted goals are cleaned up on instances with more than 500 files too.",
+    ],
+  },
   "v0.46-beta": {
     cs: [
       "API klíč teď jedná za svého vlastníka: přes API a AI asistenta (MCP) vidíte a upravujete i sdílené a týmové projekty — přesně to, co v aplikaci.",

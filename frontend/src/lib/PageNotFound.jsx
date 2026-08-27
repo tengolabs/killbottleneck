@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-export default function PageNotFound({}) {
+export default function PageNotFound() {
     const { t } = useTranslation('nav');
     const location = useLocation();
     const pageName = location.pathname.substring(1);
@@ -22,7 +22,7 @@ export default function PageNotFound({}) {
                             {t('notFound.title')}
                         </h2>
                         <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                            {t('notFound.descBefore')} <span className="font-medium text-slate-700 dark:text-slate-300">"{pageName}"</span> {t('notFound.descAfter')}
+                            {t('notFound.descBefore')} <span className="font-medium text-slate-700 dark:text-slate-300">&quot;{pageName}&quot;</span> {t('notFound.descAfter')}
                         </p>
                     </div>
 

@@ -62,7 +62,7 @@ const wrap = (title, description, nodes, edges) => ({
 export function detectForeign(fileName, text) {
   // UTF-8 BOM pryč — Excel ho při přeuložení CSV přidá vždy a regex na
   // „Task ID" na začátku řádku by jinak nechytil (checkup před v0.13.2)
-  const t = String(text || '').replace(/^﻿/, '');
+  const t = String(text || '').replace(/^\uFEFF/, '');
   if (t.trimStart().startsWith('{') || t.trimStart().startsWith('[')) {
     try {
       const obj = JSON.parse(t);
@@ -109,7 +109,7 @@ export function parseCsv(text) {
 // Section/Column → úkoly; podúkoly přes Parent Task ID (novější exporty) nebo
 // Parent task = NÁZEV rodiče (starší). Completed At ≠ prázdné → hotovo.
 export function asanaToPortable(text, fallbackTitle) {
-  const rows = parseCsv(String(text || '').replace(/^﻿/, ''));
+  const rows = parseCsv(String(text || '').replace(/^\uFEFF/, ''));
   if (rows.length < 2) return { error: 'empty' };
   // strop ověřit PŘED zpracováním (žádná zbytečná práce nad obřím souborem);
   // sekce přibývají k úkolům, finální kontrola uzlů je níž

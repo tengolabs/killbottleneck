@@ -51,7 +51,6 @@
   },
   "loadFailed": "Couldn't load your data.",
   "retry": "Try again",
-  "offline": "You're offline — showing the last loaded state.",
   "error": {
     "actionFailed": "The action could not be completed"
   },

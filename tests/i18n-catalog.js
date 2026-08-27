@@ -8,10 +8,8 @@ const fs = require('fs');
 const path = require('path');
 
 const DIR = path.join(__dirname, '..', 'frontend', 'src', 'i18n');
-// ⚠️ SEZNAM JE NATVRDO — nový namespace se sem musí dopsat RUČNĚ, jinak se
-// jeho cs↔en drift nikdy neprojeví a sada svítí zeleně (tatáž past jako
-// v tests/run-all.sh). Doplněno 19. 8. 2026: hromadne, historie; 25. 8. 2026: organizace.
-const NS = ['common', 'nav', 'auth', 'home', 'editor', 'tasks', 'myday', 'notify', 'errors', 'lite', 'billing', 'rules', 'admin', 'popis', 'hromadne', 'historie', 'organizace'];
+// Od 27. 8. 2026 se namespace čtou z disku (nález M1-03: `ucel` v seznamu chyběl).
+const NS = fs.readdirSync(path.join(DIR, 'cs')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
 const CZ = /[ěščřžýáíéůúňťďĚŠČŘŽÝÁÍÉŮÚŇŤĎ]/;
 
 let ok = 0, fail = 0;

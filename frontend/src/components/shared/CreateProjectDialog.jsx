@@ -101,6 +101,9 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
       }
       onCreated(map);
       onClose();
+    } catch (e) {
+      // 402 (zkušebka), 409 (strop účtů), 503, síť — mlčet se nesmí (nález F4-02)
+      toast({ title: tr('createProject.createFailed'), description: e?.response?.error || e?.message, variant: 'destructive' });
     } finally {
       setCreating(false);
     }

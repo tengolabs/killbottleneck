@@ -40,7 +40,7 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
     setParentId(parentOk ? defaultParentId : APEX);
     setTitle('');
     setCreating(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open]);
 
   const parentOptions = useMemo(() => {

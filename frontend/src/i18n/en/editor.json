@@ -130,6 +130,7 @@
     "subgoalsAdded": "Subgoals added",
     "subgoalsAddedDesc": "{{count}} new goals were added.",
     "aiConnectionError": "Could not reach the AI advisor.",
+    "aiError": "AI error",
     "aiTimeout": "We are sorry — we are working on a fix. Please try again later.",
     "opsApplied": "Changes applied",
     "opsAppliedDesc": "{{count}} operations were applied to the map.",
@@ -146,6 +147,7 @@
   },
   "nodeDialog": {
     "title": "Edit goal",
+    "descriptionLabel": "Description",
     "categoriesNav": "Node settings categories",
     "categories": {
       "basics": "Basics",
@@ -153,7 +155,6 @@
       "executor": "Automation",
       "files": "Attachments",
       "tasks": "Tasks & comments",
-      "behavior": "Behavior",
       "org": "Position",
       "history": "History"
     },
@@ -301,7 +302,6 @@
   "buffer": {
     "editTitle": "Edit idea",
     "descPlaceholder": "Notes, details…",
-    "convertedDesc": "You'll find \"{{title}}\" on the Tasks page.",
     "closeTitle": "Close the stash",
     "heading": "Stash",
     "newPlaceholder": "New idea…",
@@ -519,8 +519,6 @@
     "notSharedNote": "We shared the project with nobody — if you are meant to collaborate on it, share it manually.",
     "openProject": "Open project",
     "close": "Close",
-    "from_asana": "Recognized an Asana export —",
-    "from_trello": "Recognized a Trello export —",
     "foreignTooBig": "The file has {{count}} items — import handles at most {{max}}. Split the project into smaller parts.",
     "fileTooLarge": "The file is larger than 5 MB — import cannot handle that."
   },

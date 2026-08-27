@@ -171,7 +171,7 @@ export default function Tasks() {
     setOwnerFilter(ALL);
     searchParams.delete('assignee');
     setSearchParams(searchParams, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [user, searchParams]);
 
   // předfiltr /tasks?owner=delegated zapne „Zadal jsem"
@@ -181,7 +181,7 @@ export default function Tasks() {
     setAssigneeFilter(ALL);
     searchParams.delete('owner');
     setSearchParams(searchParams, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams]);
 
   // deep-link termínu z panelu „Můj den" na Home: /tasks?deadline=overdue|today|week
@@ -191,7 +191,7 @@ export default function Tasks() {
     setDeadlineFilter(dl);
     searchParams.delete('deadline');
     setSearchParams(searchParams, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams]);
 
   // deep-link z Home: /tasks?status=done ukáže odbavenou práci — odpověď na
@@ -202,7 +202,7 @@ export default function Tasks() {
     setStatusFilter(st);
     searchParams.delete('status');
     setSearchParams(searchParams, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams]);
 
   // deep-link z Home: /tasks?convert=<id nápadu> otevře převod nápadu na úkol
@@ -214,7 +214,7 @@ export default function Tasks() {
     searchParams.delete('convert'); // param uklidit i když nápad mezitím zmizel
     setSearchParams(searchParams, { replace: true });
     if (item) handleConvertBuffer(item);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams, buffer.items, buffer.loaded]);
 
   // deep-link z notifikace: /tasks?task=<id> otevře rovnou dialog úkolu.
@@ -234,7 +234,7 @@ export default function Tasks() {
       deepLinkRefreshRef.current = taskId;
       tasksApi.refresh();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [items, searchParams]);
 
   // počty komentářů úkolů pro badge v tabulce/kanbanu; přenačítá se po zavření dialogu

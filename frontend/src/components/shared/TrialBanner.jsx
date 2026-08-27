@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { pb } from '@/api/pb';
 import { downloadAllMyData } from '@/lib/exportAll';
-import { toast } from 'sonner';
+import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import { Clock, Lock } from 'lucide-react';
 
@@ -22,6 +22,7 @@ const DNI_PRED = 7;
 
 export default function TrialBanner() {
   const { t } = useTranslation('common');
+  const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stav, setStav] = useState(null);
@@ -92,7 +93,7 @@ export default function TrialBanner() {
         <button
           type="button"
           data-testid="trial-export"
-          onClick={() => downloadAllMyData().catch(() => toast.error(t('trial.exportFailed')))}
+          onClick={() => downloadAllMyData().catch(() => toast({ title: t('trial.exportFailed'), variant: 'destructive' }))}
           className="underline underline-offset-2 whitespace-nowrap"
         >
           {t('trial.exportCta')}

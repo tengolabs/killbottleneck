@@ -99,7 +99,7 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
         }
       })
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [aiAvailable, user]);
 
   const handleRefreshSummary = async () => {
@@ -172,7 +172,7 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
         setExporting(null);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [exporting]);
 
   // Panel se ukáže hned po přihlášení (i s nulami — datum, svátek, prázdné chipy);

@@ -76,6 +76,28 @@ const api = async (path, { token, bearer, body, method } = {}) => {
     expect(personRows.length === 1 && /clen@e2e\.cz|CL/.test(personRows[0]), `tabulka lidí: 1 řádek (člen) (${personRows.length})`);
     expect(!!(await page.$('[data-testid="organizace-report"]')), 'tlačítko Report je na stránce');
 
+    console.log('== Report → Markdown: nesmí spadnout a musí stáhnout soubor (nález F5-01, 27. 8.) ==');
+    // do v0.46 padal export na `md is not a function` u každé neprázdné organizace —
+    // bez hlášky, bez souboru; chytá se pageerror + zachycené a.click() s `download`
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+    await page.evaluate(() => {
+      window.__stazeno = [];
+      const orig = HTMLElement.prototype.click;
+      HTMLElement.prototype.click = function () { if (this.tagName === 'A' && this.download) window.__stazeno.push(this.download); return orig.call(this); };
+    });
+    await page.click('[data-testid="organizace-report"]');
+    await page.waitForSelector('[role="menuitem"]', { timeout: 5000 }).catch(() => {});
+    let mdKlik = false;
+    for (const it of await page.$$('[role="menuitem"]')) {
+      if (/Markdown/.test(await it.evaluate((el) => el.textContent))) { await it.click(); mdKlik = true; break; }
+    }
+    await new Promise((r) => setTimeout(r, 800));
+    const stazeno = await page.evaluate(() => window.__stazeno || []);
+    expect(mdKlik && stazeno.some((f) => f.endsWith('.md')), `Markdown report se stáhl (${JSON.stringify(stazeno)})`);
+    expect(pageErrors.length === 0, `export nevyhodil chybu na stránce (${pageErrors.join(' | ').slice(0, 140)})`);
+    await page.keyboard.press('Escape');
+
     console.log('== kliky: položka → uzel v mapě, projekt → dashboard, člověk → Úkoly ==');
     // klik na položku po termínu vede PŘÍMO NA UZEL (deep-link ?node=), ne jen na mapu (Richard 25. 8.)
     const itemHref = await page.$eval('[data-testid="organizace-item"]', (a) => a.getAttribute('href'));

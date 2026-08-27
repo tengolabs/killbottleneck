@@ -65,10 +65,6 @@ const STRINGS = {
 
   // ── e-maily (notify) ─────────────────────────────────────────────
   "mail.subjectPrefix": { cs: "killBottleneck: ", en: "killBottleneck: " },
-  "mail.openApp": {
-    cs: "Otevřete killBottleneck pro detail.",
-    en: "Open killBottleneck for details.",
-  },
   // patička všech mailů (jednotná šablona v mailTemplate.js)
   "mail.footerSupport": {
     cs: "Potřebujete pomoc? Napište na support@killbottleneck.com.",
@@ -249,10 +245,6 @@ const STRINGS = {
   "notify.taskAssigned": {
     cs: "{actor} vám přiřadil úkol „{title}\"",
     en: "{actor} assigned you the task \"{title}\"",
-  },
-  "notify.taskRecurring": {
-    cs: "Opakující se úkol „{title}\" — nový termín {deadline}",
-    en: "Recurring task \"{title}\" — new due date {deadline}",
   },
   "notify.taskComment": {
     cs: "{actor} komentoval úkol „{title}\"",
@@ -502,10 +494,6 @@ const STRINGS = {
 
   // sdílení map (share routa) + veřejné mapy
   "err.mapNotFound": { cs: "Mapa nebyla nalezena.", en: "Map not found." },
-  "err.taskNeedsProject": {
-    cs: "Úkol musí patřit do projektu. Rychlé poznámky patří do zásobníku nápadů.",
-    en: "A task must belong to a project. Quick notes go to the idea buffer.",
-  },
   "err.taskCreateDisabled": {
     cs: "Samostatné položky úkolů už nejde zakládat — úkol je cíl v mapě s řešitelem nebo termínem. Založte nový uzel.",
     en: "Standalone task items can no longer be created — a task is a map goal with an assignee or deadline. Create a new node instead.",
@@ -543,6 +531,7 @@ const STRINGS = {
     en: "The map owner already has full access — they can't be added to sharing.",
   },
   "err.emailRequired": { cs: "E-mail je povinný.", en: "E-mail is required." },
+  "err.emailInvalid": { cs: "Zadejte platný e-mail.", en: "Enter a valid e-mail address." },
   "err.userNotFound": { cs: "Takový uživatel na instanci není.", en: "No such user on this instance." },
   "err.resetPasswordNotSelf": {
     cs: "Vlastní heslo si takhle obnovit nelze — v hostované verzi si nechte poslat e-mail, na vlastním serveru vede cesta přes konzoli PocketBase.",
@@ -712,7 +701,6 @@ const STRINGS = {
     en: "Where the report came from",
   },
   "report.boxFrom": { cs: "Od", en: "From" },
-  "report.boxInstance": { cs: "Instance", en: "Instance" },
   "report.boxVersion": { cs: "Verze", en: "Version" },
   "report.boxPage": { cs: "Stránka", en: "Page" },
   "report.boxImage": { cs: "Snímek", en: "Screenshot" },
@@ -803,7 +791,6 @@ const STRINGS = {
     cs: "Token se zobrazuje jen jednou — uložte si ho.",
     en: "The token is shown only once — save it.",
   },
-  "err.notYourKey": { cs: "Tohle není váš klíč.", en: "This is not your key." },
   "err.keyNotFound": { cs: "Klíč nenalezen.", en: "Key not found." },
   "err.missingApiKey": {
     cs: "Chybí API klíč (Authorization: Bearer kb_user_...).",
@@ -906,7 +893,6 @@ const STRINGS = {
     cs: "Příliš mnoho položek najednou (max {max}).",
     en: "Too many items at once (max {max}).",
   },
-  "err.taskNotFound": { cs: "Úkol nebyl nalezen.", en: "Task not found." },
   "err.titleRequired": { cs: "Chybí název.", en: "Title is required." },
   "err.badStatus": {
     cs: "Neplatný stav — povolené: todo, in_progress, done.",

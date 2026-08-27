@@ -107,6 +107,7 @@
   },
   "createProject": {
     "title": "Nový projekt",
+    "createFailed": "Projekt se nepodařilo založit",
     "tabEmpty": "Prázdný",
     "tabTemplate": "Ze šablony",
     "goalLabel": "Cíl projektu",
@@ -174,7 +175,6 @@
     "deadlineCleared": "termín zrušen",
     "ownerTo": "→ {{to}}",
     "ownerCleared": "bez řešitele",
-    "byActor": "{{actor}}",
     "truncated": "Zobrazeno posledních 500 změn — starší se sem nevešly.",
     "loadFailed": "Přehled změn se nepodařilo načíst.",
     "historyNote": "Záznamník běží od nasazení téhle verze — starší změny v něm nejsou."

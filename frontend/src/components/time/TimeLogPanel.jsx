@@ -41,7 +41,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
       .catch(() => {});
   };
   // načíst při otevření a po startu/zastavení stopek (running mění identitu jen tehdy)
-  useEffect(() => { if (open) load(); }, [open, running]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) load(); }, [open, running]);  
 
   const nodeOptions = useMemo(
     () => nodes

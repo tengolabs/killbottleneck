@@ -2,11 +2,8 @@
   "title": "K čemu budete killBottleneck používat?",
   "description": "Podle toho vám připravíme úvodní mapu. Dá se kdykoli změnit ve Správě organizace.",
   "team": "Firma nebo tým",
-  "teamHint": "Kolegové, role, sdílené projekty, org struktura.",
   "family": "Rodina a přátelé",
-  "familyHint": "Společné plány s blízkými — bez rolí a firemní agendy.",
   "solo": "Jen pro sebe",
-  "soloHint": "Vlastní cíle a den pod kontrolou. Kdykoli můžete někoho přizvat.",
   "skip": "Přeskočit (= firma nebo tým)",
   "continue": "Pokračovat"
 }

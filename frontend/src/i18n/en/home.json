@@ -107,6 +107,7 @@
   },
   "createProject": {
     "title": "New project",
+    "createFailed": "Could not create the project",
     "tabEmpty": "Blank",
     "tabTemplate": "From template",
     "goalLabel": "Project goal",
@@ -174,7 +175,6 @@
     "deadlineCleared": "due date cleared",
     "ownerTo": "→ {{to}}",
     "ownerCleared": "unassigned",
-    "byActor": "{{actor}}",
     "truncated": "Showing the last 500 changes — older ones did not fit.",
     "loadFailed": "Couldn't load the change overview.",
     "historyNote": "The log starts when this version was deployed — earlier changes are not in it."

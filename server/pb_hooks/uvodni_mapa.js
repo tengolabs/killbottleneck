@@ -144,7 +144,7 @@ const MAPA = {
         title: "Set up the organization: name and logo",
         description: "Organization settings → Organization. All members see the name and logo in the header. Guide: https://killbottleneck.com/tutorials/team-admin",
         family: { title: "Name your family or crew (and give it a picture)",
-          description: "Organization settings → Organization. Everyone you invite sees the name and picture in the header. Guide: https://killbottleneck.com/tutorials/team-management" } },
+          description: "Organization settings → Organization. Everyone you invite sees the name and picture in the header. Guide: https://killbottleneck.com/tutorials/team-admin" } },
       { id: "i03", node: "n1", role: ["admin"], purpose: ["team"],
         title: "Pick the instance default look",
         description: "Organization settings → Default appearance. Applies to everyone who has not picked their own. Guide: https://killbottleneck.com/tutorials/team-admin" },

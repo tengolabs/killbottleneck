@@ -1375,7 +1375,14 @@ cronAdd("prune_rule_runs", "35 3 * * *", () => {
 cronAdd("prune_orphan_node_files", "50 3 * * *", () => {
   try {
     const { jsonVal } = require(`${__hooks}/helpers.js`);
-    const rows = $app.findRecordsByFilter("node_files", "id != ''", "created", 500, 0);
+    // VŠECHNY přílohy po stránkách — jednorázových 500 nechávalo sirotky nad
+    // 500. záznamem navždy (nález S8-01); mazat až po sběru, ať se offset neposune
+    const rows = [];
+    for (let off = 0; ; off += 500) {
+      const page = $app.findRecordsByFilter("node_files", "id != ''", "created", 500, off);
+      for (const r of page) rows.push(r);
+      if (page.length < 500) break;
+    }
     const nodesByMap = {};
     let removed = 0;
     for (const r of rows) {
@@ -2468,6 +2475,9 @@ kbRoute("POST", "/share", (e) => {
   if (action === "share") {
     const email = (info.email || "").trim().toLowerCase();
     if (!email) return e.json(400, { error: t(L, "err.emailRequired") });
+    // Bez tvaru e-mailu by `map_shares.email` (typ email) odmítl zápis AŽ po
+    // uložení mapy → zrcadlo říká „sdíleno", řádky chybí (nález S7-04).
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return e.json(400, { error: t(L, "err.emailInvalid") });
     if (email === e.auth.email().toLowerCase()) {
       return e.json(400, { error: t(L, "err.cannotShareWithSelf") });
     }

@@ -595,7 +595,7 @@ function EditorContent({ mapId, personalMap = false }) {
     });
     // opravitStrom schválně mimo deps — jinak by se hláška vyrobila znovu při
     // každé změně mapy a přebila by všechno ostatní
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [poskozenaMapa]);
 
   const editNodeRaw = editNodeId ? nodes.find((n) => n.id === editNodeId) : null;
@@ -923,7 +923,7 @@ function EditorContent({ mapId, personalMap = false }) {
     // loadPersonalMap záměrně mimo deps — jinak by změna identity user/t
     // reloadla i BĚŽNOU mapu a zahodila rozpracované změny; „Moje mapa" má
     // na přepnutí záložky/seskupení vlastní efekt níže
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [mapId, personalMap]);
 
   // „Moje mapa": přepnutí záložky (Mám udělat/Zadal jsem) nebo seskupení.
@@ -934,7 +934,7 @@ function EditorContent({ mapId, personalMap = false }) {
     loadPersonalMap().then(() => {
       setTimeout(() => { try { rfInstance?.fitView({ padding: 0.2, maxZoom: 1, duration: 300 }); } catch { /* ignore */ } }, 80);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [personalView, delegatedGrouping]);
 
   // „Moje mapa": adresář (členové + externí kontakty) dobíhá async — první
@@ -944,7 +944,7 @@ function EditorContent({ mapId, personalMap = false }) {
   useEffect(() => {
     if (!personalMap || loading || !members.length) return;
     loadPersonalMap();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [members]);
 
   // „Moje mapa": při změně zásobníku (nápad→volný úkol) přenačíst, ať se úkol
@@ -952,7 +952,7 @@ function EditorContent({ mapId, personalMap = false }) {
   useEffect(() => {
     if (!personalMap || loading) return;
     loadPersonalMap();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [buffer.items]);
 
   // Load comment counts for this map
@@ -1384,7 +1384,7 @@ function EditorContent({ mapId, personalMap = false }) {
     }
     // cleanMapData čte refy, ne uzávěr — proto do závislostí nepatří (a nesmí,
     // jinak by se hlídač na pozadí restartoval při každé změně plátna)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [activeMapId, nasadNaPlatno, uzlyBehlychPravidel, toast, t]);
 
   // „Ponechat moje změny" v dialogu konfliktu: převezme čerstvou verzi jako
@@ -2279,11 +2279,11 @@ function EditorContent({ mapId, personalMap = false }) {
         });
         const data = result.data;
         if (data?.error) {
-          toast({ title: t('tasks:nodeTasksDialog.aiError'), description: data.error, variant: 'destructive' });
+          toast({ title: t('toasts.aiError'), description: data.error, variant: 'destructive' });
           return;
         }
         if (!data?.nodes || !Array.isArray(data.nodes)) {
-          toast({ title: t('tasks:nodeTasksDialog.aiError'), description: t('toasts.aiInvalidResponse'), variant: 'destructive' });
+          toast({ title: t('toasts.aiError'), description: t('toasts.aiInvalidResponse'), variant: 'destructive' });
           return;
         }
 
@@ -2342,7 +2342,7 @@ function EditorContent({ mapId, personalMap = false }) {
         });
       } catch (err) {
         const msg = err.response?.data?.error || err.message || t('toasts.aiConnectionError');
-        toast({ title: t('tasks:nodeTasksDialog.aiError'), description: msg, variant: 'destructive' });
+        toast({ title: t('toasts.aiError'), description: msg, variant: 'destructive' });
       } finally {
         setExpandingNodeId(null);
       }

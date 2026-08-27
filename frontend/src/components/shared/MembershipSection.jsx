@@ -30,7 +30,7 @@ export default function MembershipSection({ billingComplete }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/kb/config').then((r) => (r.ok ? r.json() : null)).then(setConfig).catch(() => {});
+    pb.send('/api/kb/config', { method: 'GET' }).then(setConfig).catch(() => {});
   }, []);
 
   if (user?.role !== 'admin' || !config?.hosted || !nsReady) return null;

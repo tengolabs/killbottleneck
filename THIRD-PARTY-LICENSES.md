@@ -29,6 +29,13 @@ node scripts/gen-third-party-licenses.mjs
 |---|---|---|
 | @alloc/quick-lru@5.2.0 | MIT | https://github.com/sindresorhus/quick-lru |
 | @babel/runtime@7.29.7 | MIT | https://github.com/babel/babel |
+| @capacitor/app@8.1.1 | MIT | https://github.com/ionic-team/capacitor-plugins |
+| @capacitor/core@8.5.0 | MIT | https://github.com/ionic-team/capacitor |
+| @capacitor/filesystem@8.1.2 | MIT | https://github.com/ionic-team/capacitor-filesystem |
+| @capacitor/local-notifications@8.2.1 | MIT | https://github.com/ionic-team/capacitor-plugins |
+| @capacitor/preferences@8.0.1 | MIT | https://github.com/ionic-team/capacitor-plugins |
+| @capacitor/share@8.0.1 | MIT | https://github.com/ionic-team/capacitor-plugins |
+| @capacitor/synapse@1.0.4 | ISC | — |
 | @dnd-kit/accessibility@3.1.1 | MIT | https://github.com/clauderic/dnd-kit |
 | @dnd-kit/core@6.3.1 | MIT | https://github.com/clauderic/dnd-kit |
 | @dnd-kit/utilities@3.2.2 | MIT | https://github.com/clauderic/dnd-kit |
@@ -37,7 +44,6 @@ node scripts/gen-third-party-licenses.mjs
 | @floating-ui/react-dom@2.1.8 | MIT | https://github.com/floating-ui/floating-ui |
 | @floating-ui/utils@0.2.11 | MIT | https://github.com/floating-ui/floating-ui |
 | @hono/node-server@1.19.15 | MIT | https://github.com/honojs/node-server |
-| @hookform/resolvers@4.1.3 | MIT | https://github.com/react-hook-form/resolvers |
 | @jridgewell/gen-mapping@0.3.13 | MIT | https://github.com/jridgewell/sourcemaps |
 | @jridgewell/resolve-uri@3.1.2 | MIT | https://github.com/jridgewell/resolve-uri |
 | @jridgewell/sourcemap-codec@1.5.5 | MIT | https://github.com/jridgewell/sourcemaps |
@@ -48,15 +54,9 @@ node scripts/gen-third-party-licenses.mjs
 | @nodelib/fs.walk@1.2.8 | MIT | https://github.com/nodelib/nodelib/tree/master/packages/fs/fs.walk |
 | @radix-ui/number@1.1.2 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/primitive@1.1.5 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-accordion@1.2.16 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-alert-dialog@1.1.19 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-arrow@1.1.11 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-aspect-ratio@1.1.11 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-avatar@1.2.2 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-collapsible@1.1.16 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-collection@1.1.12 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-compose-refs@1.1.3 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-context-menu@2.3.3 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-context@1.2.0 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-dialog@1.1.19 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-direction@1.1.2 | MIT | https://github.com/radix-ui/primitives |
@@ -64,32 +64,19 @@ node scripts/gen-third-party-licenses.mjs
 | @radix-ui/react-dropdown-menu@2.1.20 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-focus-guards@1.1.4 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-focus-scope@1.1.12 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-hover-card@1.1.19 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-checkbox@1.3.7 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-id@1.1.2 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-label@2.1.11 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-menu@2.1.20 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-menubar@1.1.20 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-navigation-menu@1.2.18 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-popover@1.1.19 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-popper@1.3.3 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-portal@1.1.13 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-presence@1.1.7 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-primitive@2.1.7 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-progress@1.1.12 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-radio-group@1.4.3 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-roving-focus@1.1.15 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-scroll-area@1.2.14 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-select@2.3.3 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-separator@1.1.11 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-slider@1.4.3 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-slot@1.3.0 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-switch@1.3.3 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-tabs@1.1.17 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-toast@1.2.19 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-toggle-group@1.1.15 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-toggle@1.1.14 | MIT | https://github.com/radix-ui/primitives |
-| @radix-ui/react-tooltip@1.2.12 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-use-callback-ref@1.1.2 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-use-controllable-state@1.2.3 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-use-effect-event@0.0.3 | MIT | https://github.com/radix-ui/primitives |
@@ -100,19 +87,11 @@ node scripts/gen-third-party-licenses.mjs
 | @radix-ui/react-use-size@1.1.2 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/react-visually-hidden@1.2.7 | MIT | https://github.com/radix-ui/primitives |
 | @radix-ui/rect@1.1.2 | MIT | https://github.com/radix-ui/primitives |
-| @remix-run/router@1.23.3 | MIT | https://github.com/remix-run/react-router |
-| @standard-schema/utils@0.3.0 | MIT | https://github.com/standard-schema/standard-schema |
-| @types/d3-array@3.2.2 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
+| @remix-run/router@1.23.4 | MIT | https://github.com/remix-run/react-router |
 | @types/d3-color@3.1.3 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/d3-drag@3.0.7 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
-| @types/d3-ease@3.0.2 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/d3-interpolate@3.0.4 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
-| @types/d3-path@3.1.1 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
-| @types/d3-scale@4.0.9 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/d3-selection@3.0.11 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
-| @types/d3-shape@3.1.8 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
-| @types/d3-time@3.0.4 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
-| @types/d3-timer@3.0.2 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/d3-transition@3.0.9 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/d3-zoom@3.0.8 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/pako@2.0.4 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
@@ -142,7 +121,6 @@ node scripts/gen-third-party-licenses.mjs
 | class-variance-authority@0.7.1 | Apache-2.0 | https://github.com/joe-bell/cva |
 | classcat@5.0.5 | MIT | https://github.com/jorgebucaran/classcat |
 | clsx@2.1.1 | MIT | https://github.com/lukeed/clsx |
-| cmdk@1.1.1 | MIT | https://github.com/pacocoursey/cmdk |
 | commander@4.1.1 | MIT | https://github.com/tj/commander.js |
 | content-disposition@1.1.0 | MIT | https://github.com/jshttp/content-disposition |
 | content-type@1.0.5 | MIT | https://github.com/jshttp/content-type |
@@ -155,49 +133,35 @@ node scripts/gen-third-party-licenses.mjs
 | css-line-break@2.1.0 | MIT | https://github.com/niklasvh/css-line-break |
 | cssesc@3.0.0 | MIT | https://github.com/mathiasbynens/cssesc |
 | csstype@3.2.3 | MIT | https://github.com/frenic/csstype |
-| d3-array@3.2.4 | ISC | https://github.com/d3/d3-array |
 | d3-color@3.1.0 | ISC | https://github.com/d3/d3-color |
 | d3-dispatch@3.0.1 | ISC | https://github.com/d3/d3-dispatch |
 | d3-drag@3.0.0 | ISC | https://github.com/d3/d3-drag |
 | d3-ease@3.0.1 | BSD-3-Clause | https://github.com/d3/d3-ease |
-| d3-format@3.1.2 | ISC | https://github.com/d3/d3-format |
 | d3-interpolate@3.0.1 | ISC | https://github.com/d3/d3-interpolate |
-| d3-path@3.1.0 | ISC | https://github.com/d3/d3-path |
-| d3-scale@4.0.2 | ISC | https://github.com/d3/d3-scale |
 | d3-selection@3.0.0 | ISC | https://github.com/d3/d3-selection |
-| d3-shape@3.2.0 | ISC | https://github.com/d3/d3-shape |
-| d3-time-format@4.1.0 | ISC | https://github.com/d3/d3-time-format |
-| d3-time@3.1.0 | ISC | https://github.com/d3/d3-time |
 | d3-timer@3.0.1 | ISC | https://github.com/d3/d3-timer |
 | d3-transition@3.0.1 | ISC | https://github.com/d3/d3-transition |
 | d3-zoom@3.0.0 | ISC | https://github.com/d3/d3-zoom |
 | date-fns@3.6.0 | MIT | https://github.com/date-fns/date-fns |
 | debug@4.4.3 | MIT | https://github.com/debug-js/debug |
-| decimal.js-light@2.5.1 | MIT | https://github.com/MikeMcl/decimal.js-light |
 | depd@2.0.0 | MIT | https://github.com/dougwilson/nodejs-depd |
 | detect-node-es@1.1.0 | MIT | https://github.com/thekashey/detect-node |
 | didyoumean@1.2.2 | Apache-2.0 | https://github.com/dcporter/didyoumean.js |
 | dlv@1.1.3 | MIT | https://github.com/developit/dlv |
-| dom-helpers@5.2.1 | MIT | https://github.com/react-bootstrap/dom-helpers |
-| dompurify@3.4.11 | (MPL-2.0 OR Apache-2.0) | https://github.com/cure53/DOMPurify |
+| dompurify@3.4.14 | (MPL-2.0 OR Apache-2.0) | https://github.com/cure53/DOMPurify |
 | dunder-proto@1.0.1 | MIT | https://github.com/es-shims/dunder-proto |
 | ee-first@1.1.1 | MIT | https://github.com/jonathanong/ee-first |
-| embla-carousel-react@8.6.0 | MIT | https://github.com/davidjerleke/embla-carousel |
-| embla-carousel-reactive-utils@8.6.0 | MIT | https://github.com/davidjerleke/embla-carousel |
-| embla-carousel@8.6.0 | MIT | https://github.com/davidjerleke/embla-carousel |
 | encodeurl@2.0.0 | MIT | https://github.com/pillarjs/encodeurl |
 | es-define-property@1.0.1 | MIT | https://github.com/ljharb/es-define-property |
 | es-errors@1.3.0 | MIT | https://github.com/ljharb/es-errors |
 | es-object-atoms@1.1.2 | MIT | https://github.com/ljharb/es-object-atoms |
 | escape-html@1.0.3 | MIT | https://github.com/component/escape-html |
 | etag@1.8.1 | MIT | https://github.com/jshttp/etag |
-| eventemitter3@4.0.7 | MIT | https://github.com/primus/eventemitter3 |
 | eventsource-parser@3.1.0 | MIT | https://github.com/rexxars/eventsource-parser |
 | eventsource@3.0.7 | MIT | git://git@github.com/EventSource/eventsource |
 | express-rate-limit@8.6.0 | MIT | https://github.com/express-rate-limit/express-rate-limit |
 | express@5.2.1 | MIT | https://github.com/expressjs/express |
 | fast-deep-equal@3.1.3 | MIT | https://github.com/epoberezkin/fast-deep-equal |
-| fast-equals@5.4.1 | MIT | https://github.com/planttheidea/fast-equals |
 | fast-glob@3.3.3 | MIT | https://github.com/mrmlnc/fast-glob |
 | fast-png@6.4.0 | MIT | https://github.com/image-js/fast-png |
 | fast-uri@3.1.4 | BSD-3-Clause | https://github.com/fastify/fast-uri |
@@ -214,7 +178,6 @@ node scripts/gen-third-party-licenses.mjs
 | get-proto@1.0.1 | MIT | https://github.com/ljharb/get-proto |
 | glob-parent@5.1.2 | ISC | https://github.com/gulpjs/glob-parent |
 | glob-parent@6.0.2 | ISC | https://github.com/gulpjs/glob-parent |
-| goober@2.1.19 | MIT | https://github.com/cristianbote/goober |
 | gopd@1.2.0 | MIT | https://github.com/ljharb/gopd |
 | has-symbols@1.1.0 | MIT | https://github.com/inspect-js/has-symbols |
 | hasown@2.0.4 | MIT | https://github.com/inspect-js/hasOwn |
@@ -227,8 +190,6 @@ node scripts/gen-third-party-licenses.mjs
 | i18next@26.3.6 | MIT | https://github.com/i18next/i18next |
 | iconv-lite@0.7.3 | MIT | https://github.com/pillarjs/iconv-lite |
 | inherits@2.0.4 | ISC | https://github.com/isaacs/inherits |
-| input-otp@1.4.2 | MIT | https://github.com/guilhermerodz/input-otp |
-| internmap@2.0.3 | ISC | https://github.com/mbostock/internmap |
 | iobuffer@5.4.0 | MIT | https://github.com/image-js/iobuffer |
 | ip-address@10.3.1 | MIT | https://github.com/beaugunderson/ip-address |
 | ipaddr.js@1.9.1 | MIT | https://github.com/whitequark/ipaddr.js |
@@ -247,7 +208,6 @@ node scripts/gen-third-party-licenses.mjs
 | jspdf@4.2.1 | MIT | https://github.com/parallax/jsPDF |
 | lilconfig@3.1.3 | MIT | https://github.com/antonk52/lilconfig |
 | lines-and-columns@1.2.4 | MIT | https://github.com/eventualbuddha/lines-and-columns |
-| lodash@4.18.1 | MIT | https://github.com/lodash/lodash |
 | loose-envify@1.4.0 | MIT | https://github.com/zertosh/loose-envify |
 | lucide-react@0.475.0 | ISC | https://github.com/lucide-icons/lucide |
 | math-intrinsics@1.1.0 | MIT | https://github.com/es-shims/math-intrinsics |
@@ -259,9 +219,8 @@ node scripts/gen-third-party-licenses.mjs
 | mime-types@3.0.2 | MIT | https://github.com/jshttp/mime-types |
 | ms@2.1.3 | MIT | https://github.com/vercel/ms |
 | mz@2.7.0 | MIT | https://github.com/normalize/mz |
-| nanoid@3.3.15 | MIT | https://github.com/ai/nanoid |
+| nanoid@3.3.18 | MIT | https://github.com/ai/nanoid |
 | negotiator@1.0.0 | MIT | https://github.com/jshttp/negotiator |
-| next-themes@0.4.6 | MIT | https://github.com/pacocoursey/next-themes |
 | normalize-path@3.0.0 | MIT | https://github.com/jonschlinkert/normalize-path |
 | object-assign@4.1.1 | MIT | https://github.com/sindresorhus/object-assign |
 | object-hash@3.0.0 | MIT | https://github.com/puleos/object-hash |
@@ -287,8 +246,7 @@ node scripts/gen-third-party-licenses.mjs
 | postcss-nested@6.2.0 | MIT | https://github.com/postcss/postcss-nested |
 | postcss-selector-parser@6.1.4 | MIT | https://github.com/postcss/postcss-selector-parser |
 | postcss-value-parser@4.2.0 | MIT | https://github.com/TrySound/postcss-value-parser |
-| postcss@8.5.16 | MIT | https://github.com/postcss/postcss |
-| prop-types@15.8.1 | MIT | https://github.com/facebook/prop-types |
+| postcss@8.5.26 | MIT | https://github.com/postcss/postcss |
 | proxy-addr@2.0.7 | MIT | https://github.com/jshttp/proxy-addr |
 | qs@6.15.3 | BSD-3-Clause | https://github.com/ljharb/qs |
 | queue-microtask@1.2.3 | MIT | https://github.com/feross/queue-microtask |
@@ -297,25 +255,16 @@ node scripts/gen-third-party-licenses.mjs
 | raw-body@3.0.2 | MIT | https://github.com/stream-utils/raw-body |
 | react-day-picker@8.10.2 | MIT | https://github.com/gpbl/react-day-picker |
 | react-dom@18.3.1 | MIT | https://github.com/facebook/react |
-| react-hook-form@7.81.0 | MIT | https://github.com/react-hook-form/react-hook-form |
-| react-hot-toast@2.6.0 | MIT | https://github.com/timolins/react-hot-toast |
 | react-i18next@17.0.11 | MIT | https://github.com/i18next/react-i18next |
-| react-is@16.13.1 | MIT | https://github.com/facebook/react |
-| react-is@18.3.1 | MIT | https://github.com/facebook/react |
 | react-remove-scroll-bar@2.3.8 | MIT | https://github.com/theKashey/react-remove-scroll-bar |
 | react-remove-scroll@2.7.2 | MIT | https://github.com/theKashey/react-remove-scroll |
-| react-resizable-panels@2.1.9 | MIT | https://github.com/bvaughn/react-resizable-panels |
-| react-router-dom@6.30.4 | MIT | https://github.com/remix-run/react-router |
-| react-router@6.30.4 | MIT | https://github.com/remix-run/react-router |
-| react-smooth@4.0.4 | MIT | https://github.com/recharts/react-smooth |
+| react-router-dom@6.30.6 | MIT | https://github.com/remix-run/react-router |
+| react-router@6.30.6 | MIT | https://github.com/remix-run/react-router |
 | react-style-singleton@2.2.3 | MIT | https://github.com/theKashey/react-style-singleton |
-| react-transition-group@4.4.5 | BSD-3-Clause | https://github.com/reactjs/react-transition-group |
 | react@18.3.1 | MIT | https://github.com/facebook/react |
 | read-cache@1.0.0 | MIT | https://github.com/TrySound/read-cache |
 | readdirp@3.6.0 | MIT | https://github.com/paulmillr/readdirp |
 | regenerator-runtime@0.13.11 | MIT | https://github.com/facebook/regenerator/tree/main/packages/runtime |
-| recharts-scale@0.4.5 | MIT | https://github.com/recharts/recharts-scale |
-| recharts@2.15.4 | MIT | https://github.com/recharts/recharts |
 | require-from-string@2.0.2 | MIT | https://github.com/floatdrop/require-from-string |
 | resolve@1.22.12 | MIT | https://github.com/browserify/resolve |
 | reusify@1.1.0 | MIT | https://github.com/mcollina/reusify |
@@ -333,7 +282,6 @@ node scripts/gen-third-party-licenses.mjs
 | side-channel-map@1.0.1 | MIT | https://github.com/ljharb/side-channel-map |
 | side-channel-weakmap@1.0.2 | MIT | https://github.com/ljharb/side-channel-weakmap |
 | side-channel@1.1.1 | MIT | https://github.com/ljharb/side-channel |
-| sonner@2.0.7 | MIT | https://github.com/emilkowalski/sonner |
 | source-map-js@1.2.1 | BSD-3-Clause | https://github.com/7rulnik/source-map-js |
 | stackblur-canvas@2.7.0 | MIT | https://github.com/flozz/StackBlur |
 | statuses@2.0.2 | MIT | https://github.com/jshttp/statuses |
@@ -346,7 +294,6 @@ node scripts/gen-third-party-licenses.mjs
 | text-segmentation@1.0.3 | MIT | https://github.com/niklasvh/text-segmentation |
 | thenify-all@1.6.0 | MIT | https://github.com/thenables/thenify-all |
 | thenify@3.3.1 | MIT | https://github.com/thenables/thenify |
-| tiny-invariant@1.3.3 | MIT | https://github.com/alexreardon/tiny-invariant |
 | tinyglobby@0.2.17 | MIT | https://github.com/SuperchupuDev/tinyglobby |
 | to-regex-range@5.0.1 | MIT | https://github.com/micromatch/to-regex-range |
 | toidentifier@1.0.1 | MIT | https://github.com/component/toidentifier |
@@ -361,8 +308,6 @@ node scripts/gen-third-party-licenses.mjs
 | util-deprecate@1.0.2 | MIT | https://github.com/TooTallNate/util-deprecate |
 | utrie@1.0.2 | MIT | https://github.com/niklasvh/utrie |
 | vary@1.1.2 | MIT | https://github.com/jshttp/vary |
-| vaul@1.1.2 | MIT | https://github.com/emilkowalski/vaul |
-| victory-vendor@36.9.2 | MIT AND ISC | https://github.com/FormidableLabs/victory |
 | which@2.0.2 | ISC | https://github.com/isaacs/node-which |
 | wrappy@1.0.2 | ISC | https://github.com/npm/wrappy |
 | zod-to-json-schema@3.25.2 | ISC | https://github.com/StefanTerdell/zod-to-json-schema |
@@ -418,6 +363,224 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+---
+
+### @capacitor/app@8.1.1
+
+License: MIT
+
+```
+Copyright 2020-present Ionic
+https://ionic.io
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+---
+
+### @capacitor/core@8.5.0
+
+License: MIT
+
+```
+MIT License
+
+Copyright (c) 2017-present Drifty Co.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+### @capacitor/filesystem@8.1.2
+
+License: MIT
+
+```
+MIT License
+
+Copyright (c) 2025 Ionic
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+### @capacitor/local-notifications@8.2.1
+
+License: MIT
+
+```
+Copyright 2020-present Ionic
+https://ionic.io
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+---
+
+### @capacitor/preferences@8.0.1
+
+License: MIT
+
+```
+Copyright 2020-present Ionic
+https://ionic.io
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+---
+
+### @capacitor/share@8.0.1
+
+License: MIT
+
+```
+Copyright 2020-present Ionic
+https://ionic.io
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+---
+
+### @capacitor/synapse@1.0.4
+
+License: ISC
+
+```
+MIT License
+
+Copyright (c) 2025 Ionic
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ---
@@ -636,36 +799,6 @@ License: MIT
 MIT License
 
 Copyright (c) 2022 - present, Yusuke Wada and Hono contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @hookform/resolvers@4.1.3
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2019-present Beier(Bill) Luo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -980,157 +1113,7 @@ SOFTWARE.
 
 ---
 
-### @radix-ui/react-accordion@1.2.16
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-alert-dialog@1.1.19
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### @radix-ui/react-arrow@1.1.11
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-aspect-ratio@1.1.11
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-avatar@1.2.2
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-collapsible@1.1.16
 
 License: MIT
 
@@ -1191,36 +1174,6 @@ SOFTWARE.
 ---
 
 ### @radix-ui/react-compose-refs@1.1.3
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-context-menu@2.3.3
 
 License: MIT
 
@@ -1460,66 +1413,6 @@ SOFTWARE.
 
 ---
 
-### @radix-ui/react-hover-card@1.1.19
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-checkbox@1.3.7
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### @radix-ui/react-id@1.1.2
 
 License: MIT
@@ -1581,66 +1474,6 @@ SOFTWARE.
 ---
 
 ### @radix-ui/react-menu@2.1.20
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-menubar@1.1.20
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-navigation-menu@1.2.18
 
 License: MIT
 
@@ -1820,66 +1653,6 @@ SOFTWARE.
 
 ---
 
-### @radix-ui/react-progress@1.1.12
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-radio-group@1.4.3
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### @radix-ui/react-roving-focus@1.1.15
 
 License: MIT
@@ -1910,97 +1683,7 @@ SOFTWARE.
 
 ---
 
-### @radix-ui/react-scroll-area@1.2.14
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### @radix-ui/react-select@2.3.3
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-separator@1.1.11
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-slider@1.4.3
 
 License: MIT
 
@@ -2091,126 +1774,6 @@ SOFTWARE.
 ---
 
 ### @radix-ui/react-tabs@1.1.17
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-toast@1.2.19
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-toggle-group@1.1.15
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-toggle@1.1.14
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 WorkOS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @radix-ui/react-tooltip@1.2.12
 
 License: MIT
 
@@ -2540,7 +2103,7 @@ SOFTWARE.
 
 ---
 
-### @remix-run/router@1.23.3
+### @remix-run/router@1.23.4
 
 License: MIT
 
@@ -2568,66 +2131,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
----
-
-### @standard-schema/utils@0.3.0
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2024 Fabian Hiller
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### @types/d3-array@3.2.2
-
-License: MIT
-
-```
-MIT License
-
-    Copyright (c) Microsoft Corporation.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE
 ```
 
 ---
@@ -2692,36 +2195,6 @@ MIT License
 
 ---
 
-### @types/d3-ease@3.0.2
-
-License: MIT
-
-```
-MIT License
-
-    Copyright (c) Microsoft Corporation.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE
-```
-
----
-
 ### @types/d3-interpolate@3.0.4
 
 License: MIT
@@ -2752,157 +2225,7 @@ MIT License
 
 ---
 
-### @types/d3-path@3.1.1
-
-License: MIT
-
-```
-MIT License
-
-    Copyright (c) Microsoft Corporation.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE
-```
-
----
-
-### @types/d3-scale@4.0.9
-
-License: MIT
-
-```
-MIT License
-
-    Copyright (c) Microsoft Corporation.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE
-```
-
----
-
 ### @types/d3-selection@3.0.11
-
-License: MIT
-
-```
-MIT License
-
-    Copyright (c) Microsoft Corporation.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE
-```
-
----
-
-### @types/d3-shape@3.1.8
-
-License: MIT
-
-```
-MIT License
-
-    Copyright (c) Microsoft Corporation.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE
-```
-
----
-
-### @types/d3-time@3.0.4
-
-License: MIT
-
-```
-MIT License
-
-    Copyright (c) Microsoft Corporation.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE
-```
-
----
-
-### @types/d3-timer@3.0.2
 
 License: MIT
 
@@ -3933,36 +3256,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ---
 
-### cmdk@1.1.1
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 Paco Coursey
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### commander@4.1.1
 
 License: MIT
@@ -4328,28 +3621,6 @@ SOFTWARE.
 
 ---
 
-### d3-array@3.2.4
-
-License: ISC
-
-```
-Copyright 2010-2023 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
-
----
-
 ### d3-color@3.1.0
 
 License: ISC
@@ -4453,73 +3724,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ---
 
-### d3-format@3.1.2
-
-License: ISC
-
-```
-Copyright 2010-2026 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
-
----
-
 ### d3-interpolate@3.0.1
-
-License: ISC
-
-```
-Copyright 2010-2021 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
-
----
-
-### d3-path@3.1.0
-
-License: ISC
-
-```
-Copyright 2015-2022 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
-
----
-
-### d3-scale@4.0.2
 
 License: ISC
 
@@ -4547,72 +3752,6 @@ License: ISC
 
 ```
 Copyright 2010-2021 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
-
----
-
-### d3-shape@3.2.0
-
-License: ISC
-
-```
-Copyright 2010-2022 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
-
----
-
-### d3-time-format@4.1.0
-
-License: ISC
-
-```
-Copyright 2010-2021 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
-
----
-
-### d3-time@3.1.0
-
-License: ISC
-
-```
-Copyright 2010-2022 Mike Bostock
 
 Permission to use, copy, modify, and/or distribute this software for any purpose
 with or without fee is hereby granted, provided that the above copyright notice
@@ -4753,37 +3892,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-### decimal.js-light@2.5.1
-
-License: MIT
-
-```
-The MIT Expat Licence.
-
-Copyright (c) 2020 Michael Mclaughlin
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
----
-
 ### depd@2.0.0
 
 License: MIT
@@ -4876,37 +3984,7 @@ _(License text not shipped in the package; see the repository above: https://git
 
 ---
 
-### dom-helpers@5.2.1
-
-License: MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2015 Jason Quense
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### dompurify@3.4.11
+### dompurify@3.4.14
 
 License: (MPL-2.0 OR Apache-2.0)
 
@@ -5176,30 +4254,6 @@ THE SOFTWARE.
 
 ---
 
-### embla-carousel-react@8.6.0
-
-License: MIT
-
-_(License text not shipped in the package; see the repository above: https://github.com/davidjerleke/embla-carousel.)_
-
----
-
-### embla-carousel-reactive-utils@8.6.0
-
-License: MIT
-
-_(License text not shipped in the package; see the repository above: https://github.com/davidjerleke/embla-carousel.)_
-
----
-
-### embla-carousel@8.6.0
-
-License: MIT
-
-_(License text not shipped in the package; see the repository above: https://github.com/davidjerleke/embla-carousel.)_
-
----
-
 ### encodeurl@2.0.0
 
 License: MIT
@@ -5385,36 +4439,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-### eventemitter3@4.0.7
-
-License: MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2014 Arnout Kazemier
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### eventsource-parser@3.1.0
 
 License: MIT
@@ -5546,36 +4570,6 @@ License: MIT
 MIT License
 
 Copyright (c) 2017 Evgeny Poberezkin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### fast-equals@5.4.1
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2025 Tony Quetano
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -6055,36 +5049,6 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ---
 
-### goober@2.1.19
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2019 Cristian Bote
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### gopd@1.2.0
 
 License: MIT
@@ -6437,36 +5401,6 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
 LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
-```
-
----
-
-### input-otp@1.4.2
-
-License: MIT
-
-_(License text not shipped in the package; see the repository above: https://github.com/guilhermerodz/input-otp.)_
-
----
-
-### internmap@2.0.3
-
-License: ISC
-
-```
-Copyright 2021 Mike Bostock
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
 ```
 
 ---
@@ -7023,62 +5957,6 @@ THE SOFTWARE.
 
 ---
 
-### lodash@4.18.1
-
-License: MIT
-
-```
-Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
-
-Based on Underscore.js, copyright Jeremy Ashkenas,
-DocumentCloud and Investigative Reporters & Editors <http://underscorejs.org/>
-
-This software consists of voluntary contributions made by many
-individuals. For exact contribution history, see the revision history
-available at https://github.com/lodash/lodash
-
-The following license applies to all parts of this software except as
-documented below:
-
-====
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-====
-
-Copyright and related rights for sample code are waived via CC0. Sample
-code is defined as all source code displayed within the prose of the
-documentation.
-
-CC0: http://creativecommons.org/publicdomain/zero/1.0/
-
-====
-
-Files located in the node_modules and vendor directories are externally
-maintained libraries used by this software which have their own
-licenses; we recommend you read them, as their terms may differ from the
-terms above.
-```
-
----
-
 ### loose-envify@1.4.0
 
 License: MIT
@@ -7398,7 +6276,7 @@ THE SOFTWARE.
 
 ---
 
-### nanoid@3.3.15
+### nanoid@3.3.18
 
 License: MIT
 
@@ -7456,36 +6334,6 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
----
-
-### next-themes@0.4.6
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2022 Paco Coursey
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ---
@@ -8200,7 +7048,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-### postcss@8.5.16
+### postcss@8.5.26
 
 License: MIT
 
@@ -8225,36 +7073,6 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
----
-
-### prop-types@15.8.1
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2013-present, Facebook, Inc.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ---
@@ -8496,66 +7314,6 @@ SOFTWARE.
 
 ---
 
-### react-hook-form@7.81.0
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2019-present Beier(Bill) Luo
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### react-hot-toast@2.6.0
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2020 Timo Lins
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### react-i18next@17.0.11
 
 License: MIT
@@ -8564,66 +7322,6 @@ License: MIT
 The MIT License (MIT)
 
 Copyright (c) 2015-present i18next
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### react-is@16.13.1
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) Facebook, Inc. and its affiliates.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### react-is@18.3.1
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) Facebook, Inc. and its affiliates.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -8684,37 +7382,7 @@ SOFTWARE.
 
 ---
 
-### react-resizable-panels@2.1.9
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2023 Brian Vaughn
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### react-router-dom@6.30.4
+### react-router-dom@6.30.6
 
 License: MIT
 
@@ -8746,7 +7414,7 @@ SOFTWARE.
 
 ---
 
-### react-router@6.30.4
+### react-router@6.30.6
 
 License: MIT
 
@@ -8756,36 +7424,6 @@ MIT License
 Copyright (c) React Training LLC 2015-2019
 Copyright (c) Remix Software Inc. 2020-2021
 Copyright (c) Shopify Inc. 2022-2023
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### react-smooth@4.0.4
-
-License: MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2016 recharts
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -8834,45 +7472,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
----
-
-### react-transition-group@4.4.5
-
-License: BSD-3-Clause
-
-```
-BSD 3-Clause License
-
-Copyright (c) 2018, React Community
-Forked from React (https://github.com/facebook/react) Copyright 2013-present, Facebook, Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-* Neither the name of the copyright holder nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ---
@@ -8974,66 +7573,6 @@ License: MIT
 MIT License
 
 Copyright (c) 2014-present, Facebook, Inc.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### recharts-scale@0.4.5
-
-License: MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2015 Sen Yang
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-### recharts@2.15.4
-
-License: MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2015-present recharts
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9546,36 +8085,6 @@ SOFTWARE.
 
 ---
 
-### sonner@2.0.7
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2023 Emil Kowalski
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ### source-map-js@1.2.1
 
 License: BSD-3-Clause
@@ -9940,36 +8449,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-```
-
----
-
-### tiny-invariant@1.3.3
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2019 Alexander Reardon
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ---
@@ -10604,32 +9083,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
-
----
-
-### vaul@1.1.2
-
-License: MIT
-
-```
-MIT License
-
-Copyright (c) 2023 Emil Kowalski
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
----
-
-### victory-vendor@36.9.2
-
-License: MIT AND ISC
-
-_(License text not shipped in the package; see the repository above: https://github.com/FormidableLabs/victory.)_
 
 ---
 

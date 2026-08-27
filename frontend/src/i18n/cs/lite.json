@@ -51,7 +51,6 @@
   },
   "loadFailed": "Nepodařilo se načíst data.",
   "retry": "Zkusit znovu",
-  "offline": "Jste offline — vidíte poslední načtený stav.",
   "error": {
     "actionFailed": "Akci se nepodařilo provést"
   },
