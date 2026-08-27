@@ -241,6 +241,12 @@ function token(e) {
     return e.json(400, { error: "invalid_grant", error_description: "User no longer exists." });
   }
 
+  // Expirované klíče (z dřívějších připojení) nikdo nemazal → po 20 připojeních
+  // „too many API keys" (nález S9-06). Úklid vlastních expirovaných PŘED stropem.
+  try {
+    $app.db().newQuery("DELETE FROM api_keys WHERE owner = {:o} AND expires_at != '' AND expires_at < {:now}")
+      .bind({ o: user.id, now: new Date().toISOString() }).execute();
+  } catch (err) { /* úklid je bonus */ }
   // strop 20 klíčů na účet platí i tady — poctivá chyba místo tichého mazání
   const existing = $app.findRecordsByFilter("api_keys", "owner = {:o}", "", 21, 0, { o: user.id });
   if (existing.length >= 20) {

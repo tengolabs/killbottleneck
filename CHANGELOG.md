@@ -9,6 +9,39 @@ below before you jump several versions.
 
 ---
 
+## v0.47-beta — 2026-08-27
+
+**Second bug-fix wave from the full code review — write ordering, one core for rules, faster overviews**
+
+- **Editor:** editing and leaving the map within 1.2 s (Back, logo, another map opened from inside the
+  editor) now flushes the pending save instead of dropping it; Undo after Align is saved.
+- **Notifications:** e-mail-only recipients no longer get deadline reminders again after every server
+  restart (dedup barrier now also covers the e-mail path).
+- **Agents:** two concurrent callbacks for the same run — exactly one wins (atomic token claim); the run is
+  closed only after the map write, so a failed write marks the run `failed` instead of `done` over an open
+  node; a callback arriving before the webhook 2xx no longer revives the token; the dispatch cron cannot
+  overlap itself; rule-chain depth is carried through agent runs (`agent_runs.depth`).
+- **Rules:** one shared core (`rules-api.js`) for the app routes and the v1 API. **Behaviour change:** a full
+  edit via `POST /api/kb/rules/save` without `enabled` no longer silently re-enables a disabled rule (the v1
+  semantics apply everywhere; the app UI always sends `enabled`). A failed scheduled run no longer burns
+  its dedup key, so a fixed rule fires again.
+- **Sharing / import:** map and its share rows are saved in one transaction; creating a map no longer
+  fails on share sync; `/import-all` skips a map whose nodes exceed 5 MB with a reason and imports the rest.
+- **Trial lock:** read-only POSTs pass after the trial ends — MCP `initialize`/`ping`/`tools/list` and the
+  read tools, and `share {action:"list"}`; writes stay 402.
+- **MCP over HTTP:** argument types and enums are validated like the stdio server — `"false"` is rejected
+  with `-32602` instead of being coerced to `true`. **Behaviour change** for HTTP clients that sent strings.
+- **OAuth (MCP connectors):** connecting again deletes your own *expired* API keys first, so the 20-key cap
+  no longer blocks reconnecting after months of use. **Behaviour change:** the key list may shrink on its own.
+- **Access checks:** six map-access helpers collapsed into one computation; My day and the full export look
+  up shares in one batch (≈520 → ≈10 queries for 500 shared maps); `jeAdmin()` replaces 31 hand-written role checks.
+- Tests: new suites `notify-email-dedup` and `ui-autosave-odchod`; concurrency, type, OAuth, import and
+  trial checks added; an align-order test made deterministic.
+
+**Upgrade notes:** two automatic migrations (`agent_runs.depth`, `mail_budget.day` max 250). Integrations:
+see the three behaviour changes above (rules `enabled`, HTTP MCP types, OAuth key cleanup) and note that
+an agent run is reported `failed` when the node could not be marked done. No configuration changes.
+
 ## v0.46.1-beta — 2026-08-27
 
 **Bug-fix release from the full code review (wave A) — no new features**

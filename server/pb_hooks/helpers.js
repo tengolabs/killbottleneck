@@ -224,18 +224,12 @@ function userLimitExceeded(app) {
 // a co vlastník smazal. Kdo chce historii, musí mapu opravdu sdílet.
 // Proto parametr `opts.publicCounts` — kdo smí i veřejné mapy (přehled práce),
 // a kdo ne (záznamník změn).
+// Od 27. 8. 2026 obálka nad mapAccessLevel (analýza kódu S4-03: šest helperů
+// = jeden výpočet, dotaz do map_shares byl opsaný 4×); sémantika beze změny.
 function userSeesMap(app, map, userId, email, opts) {
   if (!map) return false;
-  if (map.getString("owner") === userId) return true;
-  if (map.getString("team_access") !== "") return true;
   if ((opts || {}).includePublic && map.getBool("is_public")) return true;
-  try {
-    return !!app.findFirstRecordByFilter(
-      "map_shares", "map = {:m} && email = {:e}", { m: map.id, e: email }
-    );
-  } catch (err) {
-    return false; // řádek neexistuje → nesdíleno
-  }
+  return mapAccessLevel(app, map, userId, email, opts) !== "";
 }
 
 // přestaví map_shares řádky podle JSON zrcadla na mapě (autorizační zdroj pravdy)
@@ -667,6 +661,27 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, textKey, 
         { u: user.id, d: dayUtc });
       if (mb && (Number(mb.get("sent")) || 0) >= B.emailDailyCap) return;
     } catch (err) { /* žádný záznam = dnes ještě nic neodešlo → posílat */ }
+    // E-mail-only příjemce (zvoneček vypnutý): dedup závoru nesla jen kolekce
+    // notifications, takže mu termínový e-mail chodil znovu po každém restartu
+    // cronu (nález S2-02, 27. 8. 2026). Závora = řádek mail_budget s
+    // `day = "n:" + klíč` (UNIQUE user+day, prune po 40 dnech). Zapisuje se AŽ ZA kontrolou SMTP
+    // a denního stropu — dřív se uložila i pro e-mail, který se nakonec neposlal,
+    // a ten pak nepřišel už nikdy (panel 27. 8.). Když se závora
+    // neuloží z JINÉHO důvodu než UNIQUE, e-mail se pošle a chyba zaloguje —
+    // tiché „nikdy neposlat" je horší než výjimečná duplicita (past S2-01).
+    if (dedupKey && !ch.inApp && ch.email) {
+      try {
+        const zavora = new Record(app.findCollectionByNameOrId("mail_budget"));
+        zavora.set("user", user.id);
+        zavora.set("day", ("n:" + dedupKey).slice(0, 250));
+        zavora.set("sent", 0);
+        app.save(zavora);
+      } catch (err) {
+        const zprava = String(err && err.message ? err.message : err);
+        if (/UNIQUE|unique/i.test(zprava)) return; // už posláno
+        try { app.logger().warn("notify: závora e-mailu se neuložila", "type", type, "error", zprava); } catch (e2) { /* log je bonus */ }
+      }
+    }
     try {
       // jednotný vzhled se systémovými maily (mailTemplate.js) — jinak by
       // uživatel dostával dvě různě vypadající pošty z jedné aplikace
@@ -1602,7 +1617,7 @@ function aiManagerEmails(app) {
 // adminovi (goalmaps delete hook). Editace ≠ zrušení.
 function smiEditovatOrgStrukturu(auth) {
   if (!auth) return false;
-  return auth.getString("role") === "admin" || auth.getBool("is_org_manager") === true;
+  return jeAdmin(auth) || auth.getBool("is_org_manager") === true;
 }
 
 // E-maily všech, kdo mají mít edit na org mapě. Fallback stejný jako u AI:
@@ -1763,22 +1778,37 @@ function notifyAutomationReady(app, record, pending, actorEmail) {
 // záloha by mu dala práva oběti (živý PoC bezpečnostního panelu 26. 8. 2026).
 // `opts.shareRows` = {mapId: permission} předpočítané jedním dotazem (seznamy),
 // ať se nedělá dotaz na každou mapu; bez něj se ptá map_shares přímo.
+// Role „admin" na jednom místě — do 27. 8. 2026 bylo `getString("role") === "admin"`
+// opsané 28× v routách a hoocích (analýza kódu S6-08/S7-10/S8-06). `auth` = záznam
+// users (session e.auth i a.user z API klíče); superusera řeší volající (e.hasSuperuserAuth()).
+function jeAdmin(auth) {
+  return !!auth && auth.getString("role") === "admin";
+}
+function jeAdminNeboAiManazer(auth) {
+  return jeAdmin(auth) || (!!auth && auth.getBool("is_ai_manager") === true);
+}
+
 const ACCESS_RANK = { "": 0, read: 1, work: 2, edit: 3 };
+
+// JEDINÝ dotaz na jmenovité sdílení jednoho člověka na jedné mapě: "" (žádný
+// řádek) / read / work / edit. Všechny přístupové helpery jdou tudy.
+function shareLevel(app, map, email) {
+  try {
+    const row = app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: String(email || "") });
+    return row.getString("permission"); // required select (read/work/edit) — stejná sémantika jako dávkový shareRowsFor
+  } catch (err) {
+    return ""; // řádek neexistuje → nesdíleno jmenovitě
+  }
+}
+
 function mapAccessLevel(app, map, userId, email, opts) {
   if (!map) return "";
   if (map.getString("owner") === userId) return "edit";
   let level = "";
   const team = map.getString("team_access");
   if (team === "edit" || team === "read") level = team;
-  let perm = "";
   const rows = (opts || {}).shareRows;
-  if (rows) {
-    perm = rows[map.id] || "";
-  } else {
-    try {
-      perm = app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: String(email || "") }).getString("permission");
-    } catch (err) { /* nesdíleno jmenovitě */ }
-  }
+  const perm = rows ? (rows[map.id] || "") : shareLevel(app, map, email);
   if ((ACCESS_RANK[perm] || 0) > (ACCESS_RANK[level] || 0)) level = perm;
   return level;
 }
@@ -3501,6 +3531,9 @@ function queueAgentRun(app, map, node, actorEmail, opts) {
     run.set("started", nowUtcString());
     run.set("triggered_by", actorEmail || "system");
     run.set("attempt", 0); // 0 = zařazeno, ještě neodesláno
+    // hloubka řetězu pravidel, ze kterého běh vzešel — callback ji vrátí do
+    // v1SaveMapData, ať pojistka MAX_RULE_DEPTH platí i přes HTTP (nález S1-03)
+    run.set("depth", Number((opts && opts.depth) || 0));
     app.save(run);
     return run;
   } catch (err) {
@@ -3624,8 +3657,15 @@ function dispatchAgentRun(app, run) {
       timeout: 5,
     });
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      run.set("status", "running");
-      app.save(run);
+      // Agent mohl callback zavolat ještě PŘED odpovědí na webhook — běh je pak
+      // už uzavřený a `app.save(run)` ze zastaralé instance by ho vrátil na
+      // `running` a oživil token (nález S5-02). Proto podmíněný UPDATE.
+      try {
+        app.db().newQuery("UPDATE agent_runs SET status = 'running' WHERE id = {:id} AND status = 'pending'")
+          .bind({ id: run.id }).execute();
+      } catch (err) {
+        try { app.logger().warn("dispatchAgentRun: přepnutí na running selhalo", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+      }
       return true;
     }
     return failRun(i18n.t(null, "err.agentUnreachable", { status: res.statusCode }));
@@ -3649,22 +3689,34 @@ function startAgentRun(app, map, node, actorEmail) {
 // Bere jen `pending` starší než 20 s, ať nezávodí s odesláním, které právě probíhá.
 function dispatchQueuedAgentRuns(app) {
   if (pracovatSeNesmi()) return 0;
-  let rows = [];
+  // Tiky cronu běží FireAndForget: při >60 s (≥ 12 nedostupných agentů × 5 s
+  // timeout) startuje druhý tik a tytéž `pending` běhy dostaly webhook dvakrát
+  // (nález S6-05, doloženo skutečným cronem). Zámek ve store, pojistka 5 min.
+  const store = app.store();
+  const lockKey = "cron:agent_run_dispatch";
+  const lockedAt = Number(store.get(lockKey) || 0);
+  if (lockedAt && Date.now() - lockedAt < 5 * 60 * 1000) return 0;
+  store.set(lockKey, Date.now());
   try {
-    rows = app.findRecordsByFilter("agent_runs", 'status = "pending" && started < {:cut}', "started", 50, 0,
-      { cut: pbDateString(new Date(Date.now() - 20 * 1000)) });
-  } catch (err) {
-    return 0;
-  }
-  let n = 0;
-  for (const r of rows) {
+    let rows = [];
     try {
-      if (dispatchAgentRun(app, r)) n++;
+      rows = app.findRecordsByFilter("agent_runs", 'status = "pending" && started < {:cut}', "started", 50, 0,
+        { cut: pbDateString(new Date(Date.now() - 20 * 1000)) });
     } catch (err) {
-      try { app.logger().warn("agent_run_dispatch: odeslání selhalo", "run", r.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+      return 0;
     }
+    let n = 0;
+    for (const r of rows) {
+      try {
+        if (dispatchAgentRun(app, r)) n++;
+      } catch (err) {
+        try { app.logger().warn("agent_run_dispatch: odeslání selhalo", "run", r.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+      }
+    }
+    return n;
+  } finally {
+    store.set(lockKey, 0);
   }
-  return n;
 }
 
 // „Uzel je na řadě" → spustit jeho automatizaci. Dvě cesty, obě řízené diffem
@@ -3764,7 +3816,7 @@ function failStaleAgentRuns(app) {
       r.set("status", "failed");
       r.set("result", i18n.t(null, "err.agentTimedOut", { minutes: limit, minuteWord: i18n.plural(null, limit, "minute") }));
       r.set("finished", nowUtcString());
-      r.set("token_hash", ""); // token propadá spolu s během
+      r.set("token_hash", ""); // token propadá spolu s během (testované chování; S8-03 = k rozhodnutí)
       app.save(r);
       n++;
       let project = "", owner = "";
@@ -4219,7 +4271,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       // v inline cestě uložení mapy nesmí viset žádné HTTP
       // autorizace agenta (allowed_emails) vůči AUTOROVI pravidla, ne vůči
       // owneru uzlu, který mohl set_owner v témže běhu přepsat
-      const run = queueAgentRun(app, map, tn, authorActor, { agentName: agentName });
+      const run = queueAgentRun(app, map, tn, authorActor, { agentName: agentName, depth: depth + 1 });
       if (run) agentRunId = run.id;
       done.push({ type: a.type, agent: agentName, queued: !!run });
     } else {
@@ -4444,7 +4496,9 @@ function runScheduledRules(app, opts) {
           if (rule.getBool("error_notified") || rule.getString("last_error")) { rule.set("error_notified", false); rule.set("last_error", ""); }
           app.save(rule);
         } catch (err) {
-          logRuleRun(app, Object.assign({}, base, { status: "failed", detail: String(err && err.message || err) }));
+          // BEZ dedup klíče: selhaný běh dřív klíč spotřeboval natrvalo, takže
+          // opravené pravidlo pro ten uzel/termín už nikdy nevystřelilo (nález S1-02)
+          logRuleRun(app, Object.assign({}, base, { dedupKey: "", status: "failed", detail: String(err && err.message || err) }));
           ruleBroken(app, rule, map, String(err && err.message || err));
         }
       };
@@ -4515,12 +4569,7 @@ function runScheduledRules(app, opts) {
 // (JSON zrcadla shared_with_* NEJSOU autorizace — invariant migrace 1785020006).
 function mapEditAccess(app, map, auth) {
   if (!auth) return false;
-  if (map.getString("owner") === auth.id) return true;
-  if (map.getString("team_access") === "edit") return true;
-  try {
-    const row = app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: auth.email() });
-    return row.getString("permission") === "edit";
-  } catch (err) { return false; }
+  return mapAccessLevel(app, map, auth.id, auth.email()) === "edit";
 }
 
 // Kdo smí SPRAVOVAT SDÍLENÍ mapy = vlastník, nebo JMENOVANÝ spolusprávce
@@ -4534,10 +4583,7 @@ function mapEditAccess(app, map, auth) {
 function mapShareAdminAccess(app, map, auth) {
   if (!auth) return false;
   if (map.getString("owner") === auth.id) return true;
-  try {
-    const row = app.findFirstRecordByFilter("map_shares", "map = {:m} && email = {:e}", { m: map.id, e: auth.email() });
-    return row.getString("permission") === "edit";
-  } catch (err) { return false; }
+  return shareLevel(app, map, auth.email()) === "edit";
 }
 
 // Ověření reference na pozici při UKLÁDÁNÍ pravidla (anglicky — obalí to
@@ -5400,8 +5446,9 @@ function buildExport(app, userId, email, opts) {
 
   // mapy: dotaz je zrcadlo userSeesMap bez veřejných cizích; nejnovější napřed,
   // ať při stropu odpadnou nejstarší
+  const sdileno = shareRowsFor(app, email); // jmenovitá sdílení jedním dotazem (S3-08)
   const maps = rowsOf("goalmaps", 'owner = {:uid} || team_access != "" || map_shares_via_map.email ?= {:email}', { uid: userId, email: email }, MAP_LIMIT, "-updated")
-    .filter((m) => userSeesMap(app, m, userId, email)); // autorita (bez includePublic)
+    .filter((m) => userSeesMap(app, m, userId, email, { shareRows: sdileno })); // autorita (bez includePublic); dávkově, ne dotaz na mapu (S3-08)
   if (maps.length >= MAP_LIMIT) truncated.maps = true;
 
   const mapsOut = maps.map((m) => {
@@ -5789,7 +5836,9 @@ function buildMyDay(app, userId, email, opts) {
     );
   } catch (err) { /* bez map zbydou aspoň úkoly */ }
   if (maps.length >= MAP_LIMIT) mapsTruncated = true;
-  maps = maps.filter((m) => userSeesMap(app, m, userId, email, { includePublic: true }));
+  // jmenovitá sdílení jedním dotazem — dřív 1 dotaz map_shares na KAŽDOU sdílenou mapu (S3-08)
+  const sdileno = shareRowsFor(app, email);
+  maps = maps.filter((m) => userSeesMap(app, m, userId, email, { includePublic: true, shareRows: sdileno }));
 
   const archived = {};
   const titleByMap = {};
@@ -6652,7 +6701,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 }
 
 module.exports = {
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

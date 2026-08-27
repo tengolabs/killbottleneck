@@ -41,7 +41,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       localStorage.setItem('kb-lang', 'cs');
     }, auth.token, auth.record);
     // úvodní mapa admina = 5 sekcí s listy — přesně tvar, na kterém se to rozbilo
-    const mapy = await (await fetch(`${BASE}/api/collections/goalmaps/records?perPage=1`, { headers: { Authorization: auth.token } })).json();
+    const mapy = await (await fetch(`${BASE}/api/collections/goalmaps/records?perPage=1&filter=${encodeURIComponent('title="Zavedení killBottlenecku"')}`, { headers: { Authorization: auth.token } })).json();
     await page.goto(`${BASE}/map/${mapy.items[0].id}`, { waitUntil: 'networkidle2' });
     // čekat na VYKRESLENÉ uzly — pevný spánek v souběhu s dalšími sadami nestačil
     // (plátno se načetlo později a sada měřila prázdno)
@@ -65,7 +65,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     // mění a sada by tlačítko „ztratila"
     const zarovnat = async () => {
       await page.evaluate(() => document.querySelector('button[data-align-lock]')?.click());
-      await sleep(1200);
+      // ⚠️ pevných 1 200 ms = přesně debounce autosave → sada měřila plátno
+      // uprostřed uložení a náhodně viděla prázdno (padalo i na v0.46.1).
+      // Počkat, až „Ukládání…" zhasne, a pak ještě chvíli na překreslení.
+      await sleep(1300);
+      await page.waitForFunction(() => !(document.body.innerText || '').includes('Ukládání'), { timeout: 15000 }).catch(() => {});
+      await sleep(400);
     };
 
     console.log('== vodorovné view: 4× zarovnat (celý cyklus stylů) ==');

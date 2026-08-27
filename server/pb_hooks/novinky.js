@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.47-beta": {
+    cs: [
+      "Úprava mapy a okamžitý odchod (šipka Zpět, jiná mapa) se už neztratí — uloží se hned; a Zpět po Zarovnat se do mapy zapíše.",
+      "Kdo má termínová upozornění jen e-mailem, nedostane je znovu po každém restartu serveru.",
+      "AI asistent (MCP) po vypršení zkušebky dál vidí projekty a pravidla — jen nezapisuje; totéž výpis sdílení.",
+      "Nahrání dat z exportu už neshodí celou dávku kvůli jedné obří mapě — přeskočí ji s důvodem a zbytek naimportuje.",
+      "Můj den a export všech dat jsou u lidí s desítkami sdílených projektů výrazně rychlejší.",
+    ],
+    en: [
+      "Editing a map and leaving right away (Back, another map) no longer loses the change — it saves immediately; Undo after Align is written to the map too.",
+      "People who get deadline reminders by e-mail only no longer receive them again after every server restart.",
+      "After the trial ends, AI assistants (MCP) still see projects and rules — they just cannot write; same for the sharing list.",
+      "Uploading data from an export no longer fails the whole batch because of one huge map — it is skipped with a reason and the rest is imported.",
+      "My day and the full data export are much faster for people with dozens of shared projects.",
+    ],
+  },
   "v0.46.1-beta": {
     cs: [
       "Report Organizace ve formátu Markdown se zase stáhne — od v0.44 potichu padal, jakmile měla organizace aspoň jeden projekt.",

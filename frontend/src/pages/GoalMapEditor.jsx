@@ -477,6 +477,9 @@ function EditorContent({ mapId, personalMap = false }) {
   const highlightDone = useRef(false);
 
   const skipNextSave = useRef(true);
+  const pendingSave = useRef(null); // rozpracované uložení k odeslání při odchodu z mapy (F1-04)
+  const mapIdNow = useRef(mapId); // mapa, kterou editor PRÁVĚ má — odpověď opožděného flush-PATCHe se pozná
+  mapIdNow.current = mapId;
   // „latest ref" aktuálních uzlů/hran: callbacky s dlouhým životem (letící
   // autosave) potřebují vidět SOUČASNÝ stav, ne uzávěr z doby naplánování
   const nodesNow = useRef([]);
@@ -560,7 +563,9 @@ function EditorContent({ mapId, personalMap = false }) {
   const handleUndo = useCallback(() => {
     if (historyRef.current.length === 0) return;
     const prev = historyRef.current.pop();
-    skipNextSave.current = true;
+    // BEZ skipNextSave: relikt z doby před otiskem — Zpět po Zarovnat/přesunu
+    // se do DB nedostalo (plátno původní, DB zarovnaná; nález F1-02). Otisk
+    // v autosave sám pozná, že se stav liší, a pošle ho.
     setNodes(prev.nodes.map((n) => ({ ...n })));
     setEdges(prev.edges.map((e) => ({ ...e })));
     setCanUndo(historyRef.current.length > 0);
@@ -923,7 +928,18 @@ function EditorContent({ mapId, personalMap = false }) {
     // loadPersonalMap záměrně mimo deps — jinak by změna identity user/t
     // reloadla i BĚŽNOU mapu a zahodila rozpracované změny; „Moje mapa" má
     // na přepnutí záložky/seskupení vlastní efekt níže
-     
+
+    // Odchod z mapy (šipka Zpět, logo, i JINÁ mapa odkazem uvnitř editoru —
+    // route /map/:id nemá key, komponenta se nepřemontuje) dřív než za 1,2 s po
+    // úpravě: cleanup autosave efektu jen zrušil časovač a úprava se tiše
+    // ztratila (nález F1-04). Tady se rozpracované uložení pošle hned, ještě
+    // s uzávěrem a uzly STARÉ mapy (cleanup běží před načtením nové; panel 27. 8.).
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      const fn = pendingSave.current;
+      pendingSave.current = null;
+      if (fn) fn();
+    };
   }, [mapId, personalMap]);
 
   // „Moje mapa": přepnutí záložky (Mám udělat/Zadal jsem) nebo seskupení.
@@ -1133,7 +1149,7 @@ function EditorContent({ mapId, personalMap = false }) {
     // „Ukládání…" a zhasla — a tooltip i návod přitom slibují, že se do mapy
     // nic nezapisuje. Uživatel viděl opak toho, co mu říkáme (panel 13. 8.).
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
+    const odesli = async () => {
       try {
         const { cleanNodes, cleanEdges } = cleanMapData();
         // PRÁZDNÉ ULOŽENÍ SE NEPOSÍLÁ (panel /checkup 13. 8. 2026).
@@ -1157,6 +1173,10 @@ function EditorContent({ mapId, personalMap = false }) {
           edges: cleanEdges,
           base_updated: baseUpdated.current, // B3: verze, ze které vycházíme
         });
+        // Flush při přechodu na JINOU mapu: odpověď dorazí, až když editor drží
+        // novou mapu — základnu merge ani otisk té nové nesmí přepsat (jinak
+        // první autosave nové mapy skončil 409; panel 27. 8.). Uloženo je, hotovo.
+        if (mapIdNow.current !== mapId) return;
         // B3: posunout základnu na verzi, kterou jsme právě zapsali
         zapamatujServer({
           updated_date: updated.updated_date,
@@ -1193,6 +1213,7 @@ function EditorContent({ mapId, personalMap = false }) {
           }
         }
       } catch (e) {
+        if (mapIdNow.current !== mapId) { console.error(e); return; } // odpověď staré mapy po přechodu — nic nad novou neřešit
         // B3: cizí klient mezitím mapu změnil → nabídnout přenačtení místo přepsání
         if (e?.status === 409) {
           // Automatizace doběhla a označila uzel za hotový → mapa se posunula pod
@@ -1218,7 +1239,9 @@ function EditorContent({ mapId, personalMap = false }) {
       } finally {
         saveInFlight.current = false;
       }
-    }, 1200);
+    };
+    pendingSave.current = odesli;
+    saveTimer.current = setTimeout(() => { pendingSave.current = null; odesli(); }, 1200);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
@@ -2744,7 +2767,7 @@ function EditorContent({ mapId, personalMap = false }) {
   const handleUndoAi = useCallback(() => {
     const snapshot = aiSnapshotRef.current;
     if (!snapshot) return;
-    skipNextSave.current = true;
+    // bez skipNextSave — stejný důvod jako u handleUndo (nález F1-02)
     setNodes(snapshot.nodes.map((n) => ({ ...n })));
     setEdges(snapshot.edges.map((e) => ({ ...e })));
     aiSnapshotRef.current = null;

@@ -360,6 +360,34 @@ const EDGES = [
     expect(queued.items.filter((x) => x.status === 'pending').length === 5 - sentInline,
       `zbytek čeká na cron (${queued.items.filter((x) => x.status === 'pending').length})`);
 
+    console.log('== dva SOUBĚŽNÉ callbacky téhož běhu → projde právě jeden (nález S8-02, 27. 8.) ==');
+    // dřív prošly oba (17/20 pokusů): běh skončil podle druhého, uzel podle prvního
+    received.length = 0;
+    const map2 = (await api('POST', '/api/collections/goalmaps/records', { token: A, body: {
+      title: 'Souběh callbacků', nodes: buildNodes('todo', 'todo'), edges: EDGES,
+    } })).json;
+    await api('POST', '/api/flowmap/share', { token: A, body: { action: 'share', mapId: map2.id, email: 'mgr@example.com', permission: 'edit' } });
+    const fresh2 = (await api('GET', `/api/collections/goalmaps/records/${map2.id}`, { token: A })).json;
+    await api('PATCH', `/api/collections/goalmaps/records/${map2.id}`, { token: A, body: { nodes: buildNodes('done', 'todo'), edges: EDGES, base_updated: fresh2.updated } });
+    await waitFor(() => received.length >= 1);
+    const hook2 = received.length ? JSON.parse(received[received.length - 1].body) : null;
+    expect(!!hook2 && hook2.run_id, `druhý běh odeslán (${received.length})`);
+    if (hook2) {
+      // 6 naráz, střídavě done/failed — vítěz je právě jeden, ostatní 401/409
+      // (token je po převzetí přepsaný, takže poražený ho už nenajde)
+      const salva = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => api('POST', '/api/flowmap/agent-callback', { body: {
+        run_id: hook2.run_id, run_token: hook2.run_token, status: i % 2 ? 'failed' : 'done', result: 'volání ' + i,
+      } })));
+      const kody = salva.map((x) => x.status).sort();
+      expect(kody.filter((k) => k === 200).length === 1 && kody.every((k) => k === 200 || k === 401 || k === 409),
+        `právě jeden callback prošel, ostatní odmítnuty (${kody.join(',')})`);
+      const beh2 = (await api('GET', `/api/collections/agent_runs/records/${hook2.run_id}`, { token: A })).json;
+      const mapa2 = (await api('GET', `/api/collections/goalmaps/records/${map2.id}`, { token: A })).json;
+      const stavB = mapa2.nodes.find((n) => n.id === 'B').data.status;
+      expect((beh2.status === 'done' && stavB === 'done') || (beh2.status === 'failed' && stavB !== 'done'),
+        `stav běhu odpovídá stavu uzlu (běh ${beh2.status}, uzel ${stavB})`);
+    }
+
     console.log('== watchdog zaseknutých běhů ==');
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@example.com superheslo123`, { stdio: 'ignore' });
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@example.com', password: 'superheslo123' } })).json.token;

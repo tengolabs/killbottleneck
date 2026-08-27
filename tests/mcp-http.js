@@ -129,6 +129,12 @@ let mcp = null;
     expect(/Added 1 node/.test(toolText(an)), 'add_nodes přidal uzel (base_updated si server načetl sám)');
     const gm = await mcpPost(keyRW, 'tools/call', { name: 'get_map', arguments: { map_id: mapId } });
     expect(/Krok 3/.test(toolText(gm)) && /user DATA/.test(toolText(gm)), 'get_map vrací strom i DATA_FENCE');
+    // typy argumentů: HTTP dřív koercoval `archived:"false"` na true (nález S9-03) — stdio (zod) odmítá
+    const spatnyTyp = await mcpPost(keyRW, 'tools/call', { name: 'list_maps', arguments: { archived: 'false' } });
+    expect(spatnyTyp.json && spatnyTyp.json.error && spatnyTyp.json.error.code === -32602 && /archived/.test(spatnyTyp.json.error.message || ''),
+      `řetězec místo boolean → -32602 jako u stdio (${String(JSON.stringify((spatnyTyp.json || {}).error)).slice(0, 80)})`);
+    const spatnyEnum = await mcpPost(keyRW, 'tools/call', { name: 'update_node', arguments: { map_id: mapId, node_id: 'x', status: 'hotovo' } });
+    expect(spatnyEnum.json && spatnyEnum.json.error && spatnyEnum.json.error.code === -32602, `hodnota mimo enum → -32602 (${String(JSON.stringify((spatnyEnum.json || {}).error)).slice(0, 80)})`);
     // parita výstupu get_map se stdio serverem (stejná mapa, stejný text)
     const gmStdio = await stdioRpc('tools/call', { name: 'get_map', arguments: { map_id: mapId } });
     const stdioText = (gmStdio.result.content || []).map((c) => c.text).join('\n');

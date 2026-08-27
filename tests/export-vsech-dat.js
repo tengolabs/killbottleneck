@@ -149,6 +149,20 @@ const titles = (maps) => (maps || []).map((m) => m.map.title);
     const arch2 = po.items.find((m) => m.title === 'ADMINOVA-ARCHIV');
     expect(!!arch2 && arch2.archived === true && arch2.owner_email === clen.email, 'archivovaná mapa zůstala archivovaná a patří importérovi');
     expect(po.items.filter((m) => m.owner_email === clen.email && m.title === 'TYMOVA').every((m) => m.team_access === '' && !m.is_public), 'importovaná kopie nikomu nesdílí (team_access prázdné, neveřejná)');
+    // jedna mapa s `nodes` nad 5 MB (maxSize pole) dřív shodila celou dávku na
+    // „Something went wrong" a už založené mapy zůstaly (nález S3-03, 27. 8.)
+    const obr = { format: 'killbottleneck.export/1', maps: [
+      // normalizace řeže title 500 / description 10 000 znaků, počet uzlů ne → 600 uzlů ≈ 6 MB
+      { format: 'killbottleneck.map/1', map: { title: 'OBRI',
+        nodes: [{ id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { title: 'Obří', status: 'todo' } }]
+          .concat(Array.from({ length: 600 }, (_, i) => ({ id: 'o' + i, type: 'goalNode', position: { x: 0, y: i + 1 }, data: { title: 'Uzel ' + i, status: 'todo', description: 'x'.repeat(10000) } }))),
+        edges: Array.from({ length: 600 }, (_, i) => ({ id: 'e' + i, source: 'root', target: 'o' + i })) } },
+      { format: 'killbottleneck.map/1', map: { title: 'MALA-PO-OBRI', nodes: [{ id: 'n1', type: 'apex', position: { x: 0, y: 0 }, data: { title: 'Malá', status: 'todo' } }], edges: [] } },
+    ] };
+    await sleep(61000); // minutové okno importu (2/min, počítá se i odmítnutý formát) — čistá minuta
+    r = await api('/api/kb/import-all', { token: clen.token, body: obr });
+    expect(r.status === 200 && r.json.maps_imported === 1 && r.json.maps_skipped.some((x) => x.title === 'OBRI'),
+      `obří mapa se přeskočí přiznaně, malá za ní projde (${r.status} imported=${r.json && r.json.maps_imported} skipped=${String(JSON.stringify((r.json || {}).maps_skipped)).slice(0, 80)})`);
     r = await api('/api/kb/import-all', { token: clen.token, body: A }); r = await api('/api/kb/import-all', { token: clen.token, body: A });
     expect(r.status === 429, `třetí import za minutu → 429 (${r.status})`);
 

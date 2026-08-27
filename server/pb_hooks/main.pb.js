@@ -116,7 +116,7 @@ onRecordCreateRequest((e) => {
   // v users NENAJDE. Účet s touto adresou by ji obešel. Platí pro obě cesty do
   // users — druhá (routa /invite přes $app.save) má týž guard u sebe.
   {
-    const { isExternalOwner } = require(`${__hooks}/helpers.js`);
+    const { isExternalOwner, jeAdmin } = require(`${__hooks}/helpers.js`);
     if (isExternalOwner(e.record.getString("email"))) {
       const { t, userLang } = require(`${__hooks}/i18n.js`);
       throw new BadRequestError(t(userLang(null), "err.extEmailReserved"));
@@ -125,7 +125,7 @@ onRecordCreateRequest((e) => {
   const total = arrayOf(new DynamicModel({ c: 0 }));
   e.app.db().newQuery("SELECT COUNT(*) as c FROM users").all(total);
   const isFirst = total[0].c === 0;
-  const byAdmin = e.hasSuperuserAuth() || (e.auth && e.auth.getString("role") === "admin");
+  const byAdmin = e.hasSuperuserAuth() || (e.auth && jeAdmin(e.auth));
   if (!byAdmin) {
     // Registrační klíč instance (cloud): je-li KB_SETUP_CODE nastaven, chce ho
     // KAŽDÁ self-registrace — doména hostované instance je veřejná (CT logy), takže
@@ -213,8 +213,8 @@ onRecordCreateRequest((e) => {
 
 // roli smí měnit jen admin
 onRecordUpdateRequest((e) => {
-  const { NOTIFY_TYPES, NOTIFY_ALWAYS } = require(`${__hooks}/helpers.js`);
-  const byAdmin = e.hasSuperuserAuth() || (e.auth && e.auth.getString("role") === "admin");
+  const { NOTIFY_TYPES, NOTIFY_ALWAYS, jeAdmin } = require(`${__hooks}/helpers.js`);
+  const byAdmin = e.hasSuperuserAuth() || (e.auth && jeAdmin(e.auth));
   // ⚠️ Zástupce zapisuje správce struktury VÝHRADNĚ routou /member-deputy.
   // Tady žádná výjimka být nesmí: `users.updateRule` pouští ne-adminovi jen
   // JEHO VLASTNÍ účet, takže by výjimka nedovolila zapsat zástupce kolegům
@@ -289,8 +289,8 @@ onRecordUpdateRequest((e) => {
   // nález panelu 15. 8., rozšířeno o správce struktury 17. 8.).
   try {
     const { findOrgMapAnyState, jsonList, syncShares } = require(`${__hooks}/helpers.js`);
-    const smiTeď = e.record.getString("role") === "admin" || e.record.getBool("is_org_manager") === true;
-    const smělDřív = e.record.original().getString("role") === "admin" || e.record.original().getBool("is_org_manager") === true;
+    const smiTeď = jeAdmin(e.record) || e.record.getBool("is_org_manager") === true;
+    const smělDřív = jeAdmin(e.record.original()) || e.record.original().getBool("is_org_manager") === true;
     if (smiTeď !== smělDřív) {
       const om = findOrgMapAnyState(e.app);
       const em = e.record.getString("email");
@@ -418,8 +418,9 @@ onRecordAfterDeleteSuccess((e) => {
 // org mapu smaže jen ADMIN (RLS pouští vlastníka — degradovaný admin-vlastník
 // by jinak mohl strukturu celé instance zrušit)
 onRecordDeleteRequest((e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   if (e.record.getString("kind") === "org" && !e.hasSuperuserAuth()
-    && (!e.auth || e.auth.getString("role") !== "admin")) {
+    && (!e.auth || !jeAdmin(e.auth))) {
     const { t, userLang } = require(`${__hooks}/i18n.js`);
     throw new BadRequestError(t(userLang(e.auth), "err.orgAdminOnly"));
   }
@@ -507,7 +508,13 @@ onRecordCreateRequest((e) => {
     }
   }
   e.next();
-  syncShares(e.app, e.record); // duplikace mapy může nést shared_with
+  try {
+    syncShares(e.app, e.record); // duplikace mapy může nést shared_with
+  } catch (err) {
+    // mapa už je uložená — chyba by klientovi vrátila 400/500 a druhý klik
+    // by založil duplicitní mapu (nález S6-03)
+    try { e.app.logger().warn("goalmaps create: synchronizace sdílení selhala", "map", e.record.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
 
   // uzly s přiřazenou osobou (typicky projekt z procesní šablony) → jedna
   // souhrnná notifikace per osoba: počet uzlů + nejbližší termín (sdílené s cronem)
@@ -522,7 +529,7 @@ onRecordCreateRequest((e) => {
 
 // goalmaps: pole sdílení smí měnit jen vlastník (sdílený editor edituje jen obsah)
 onRecordUpdateRequest((e) => {
-  const { jsonVal, validateMapData, strukturaZhorsena, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, normalizeNodeShapes, logMapChanges, apexRemoved, deadlineChangeDenied, nodeDeleteDenied, stampAssignedBy, stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved, runAutomationRules } = require(`${__hooks}/helpers.js`);
+  const { jsonVal, validateMapData, strukturaZhorsena, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, normalizeNodeShapes, logMapChanges, apexRemoved, deadlineChangeDenied, nodeDeleteDenied, stampAssignedBy, stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved, runAutomationRules, jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const orig = e.record.original();
@@ -543,7 +550,7 @@ onRecordUpdateRequest((e) => {
     // (map_shares) tu nestačí: degradovaný admin by si ho jinak podržel a dál
     // řídil, komu pravidla přiřazují práci (nález panelu 15. 8.)
     const { smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
-    const jeAdmin = e.hasSuperuserAuth() || (e.auth && e.auth.getString("role") === "admin");
+    const byAdmin = e.hasSuperuserAuth() || (e.auth && jeAdmin(e.auth));
     if (!e.hasSuperuserAuth() && !smiEditovatOrgStrukturu(e.auth)) {
       throw new BadRequestError(t(L, "err.orgManagerOnly"));
     }
@@ -553,7 +560,7 @@ onRecordUpdateRequest((e) => {
     // — a admin by ji nevrátil, protože tahle pole smí měnit jen vlastník.
     // Ověřeno živě 17. 8.: správce strukturu archivoval a admin ji neodarchivoval.
     // Zákaz mazání (delete hook) by bez tohohle šel obejít archivací.
-    if (!jeAdmin) {
+    if (!byAdmin) {
       for (const f of ["archived", "archived_at", "is_public", "team_access", "owner", "owner_email",
         "shared_with", "shared_with_edit", "shared_with_work"]) {
         e.record.set(f, orig.get(f));
@@ -1919,6 +1926,23 @@ routerUse((e) => {
   // ⚠️ Kotveno na CELOU cestu, jako všechny výjimky výše (sufix šlo obejít
   // pojmenováním uzlu, nález kontrolního panelu 6. 8. 2026).
   if (cesta === "/api/kb/report" || cesta === "/api/flowmap/report") return e.next();
+  // Čtení přes POST: MCP (JSON-RPC je vždy POST) a výpis sdílení. Zámek má
+  // vypnout zápis, ne čtení — bez tohohle po vypršení zkušebky zhasl i
+  // `tools/list` a dialog sdílení (nález S7-01). Tělo se čte AŽ když zámek
+  // platí (ne na každém požadavku zdravé instance — panel 27. 8.) a jen pro
+  // tyhle cesty; nečitelné tělo = normální zámek (fail-closed).
+  const jeCteciPost = () => {
+    if (cesta !== "/mcp" && cesta !== "/api/kb/share" && cesta !== "/api/flowmap/share") return false;
+    try {
+      const b = e.requestInfo().body || {};
+      if (cesta !== "/mcp") return b.action === "list";
+      const metodaRpc = String(b.method || "");
+      const cteciMetody = ["initialize", "notifications/initialized", "ping", "tools/list"];
+      const cteciNastroje = ["list_maps", "get_map", "list_rules", "list_rule_runs", "list_rule_templates", "get_org_structure", "list_people", "get_portfolio"];
+      if (cteciMetody.includes(metodaRpc)) return true;
+      return metodaRpc === "tools/call" && cteciNastroje.includes(String(((b.params || {}).name) || ""));
+    } catch (err) { return false; }
+  };
   // Superuser = MY, provozovatel. Musíme umět na zamčené instanci zasáhnout
   // (záloha, oprava, ruční spuštění). Zákazník se superuserem nestane: na
   // hostované instanci Caddy zvenku zavírá /api/collections/_superusers,
@@ -1932,14 +1956,15 @@ routerUse((e) => {
   if (stehujeme()) {
     return e.json(503, { error: t(userLang(e.auth), "err.stehujeme"), code: "migrating" });
   }
-  if (trialExpired()) {
+  if (trialExpired() && !jeCteciPost()) {
     return e.json(402, { error: t(userLang(e.auth), "err.trialExpired") });
   }
   // Účtů je víc, než na kolik je tarif. Stane se přechodem ze zkušebky (ta počet
   // lidí neomezuje) na Cloud Lite (dva). Zápis se zamkne, dokud si zákazník
   // účty neprobere — mazat je za něj nebudeme. Odebírání účtů proto musí projít,
   // jinak by se z toho nedalo dostat.
-  if (userLimitExceeded($app)) {
+  // čtecí POSTy (MCP výpisy, výpis sdílení) projdou i při překročeném počtu účtů — záměrně, ne pořadím
+  if (userLimitExceeded($app) && !jeCteciPost()) {
     const jeMazaniUctu = metoda === "DELETE"
       && /^\/api\/collections\/users\/records\/[^/]+$/.test(cesta);
     if (!jeMazaniUctu) {
@@ -2180,7 +2205,7 @@ kbRoute("GET", "/config", (e) => {
 // polohy: none (vypnuto) | api (killBottleneck API) | custom (vlastní endpoint)
 //         | ollama (vlastní Ollama) | openai (OpenAI-kompatibilní rozhraní)
 kbRoute("POST", "/advisor", (e) => {
-  const { aiConfig } = require(`${__hooks}/helpers.js`);
+  const { aiConfig, jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const cfg = aiConfig($app);
@@ -2266,7 +2291,7 @@ kbRoute("POST", "/advisor", (e) => {
       return e.json(200, advisorRun(body, {
         provider: provider, url: cfg.url, model: cfg.model, token: cfg.token,
         // podrobnost cizí chyby jen adminovi — může nést i materiál klíče
-        podrobneChyby: e.auth.getString("role") === "admin",
+        podrobneChyby: jeAdmin(e.auth),
       }));
     } catch (err) {
       const klic = provider === "openai" ? "err.aiFailed" : "err.localModel";
@@ -2342,7 +2367,7 @@ kbRoute("POST", "/advisor", (e) => {
 // Každá mutující akce vrací `updated`, aby si editor posunul base_updated
 // a další autosave nespadl na falešný 409 (routa ukládá mimo request hook).
 kbRoute("POST", "/share", (e) => {
-  const { jsonList, jsonVal, syncShares, notify, mapShareAdminAccess } = require(`${__hooks}/helpers.js`);
+  const { jsonList, jsonVal, syncShares, notify, mapShareAdminAccess, jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const info = e.requestInfo().body || {};
@@ -2386,7 +2411,7 @@ kbRoute("POST", "/share", (e) => {
   // (nález panelu 21. 8.).
   if (map.getString("kind") === "org") {
     if (!isOwner) return e.json(403, { error: t(L, "err.orgAdminOnly") });
-    if (e.auth.getString("role") !== "admin") {
+    if (!jeAdmin(e.auth)) {
       return e.json(403, { error: t(L, "err.orgAdminOnly") });
     }
   }
@@ -2408,6 +2433,11 @@ kbRoute("POST", "/share", (e) => {
       ? sharedWithWork.filter((x) => !eqi(x, emailVal)).concat([emailVal])
       : sharedWithWork.filter((x) => !eqi(x, emailVal)));
   };
+
+  // Mapa (JSON zrcadlo shared_with*) a map_shares (jediný zdroj autorizace) se
+  // ukládají V JEDNÉ TRANSAKCI — dřív selhání uprostřed syncShares (smaž vše,
+  // vlož znovu) nechalo zrcadlo „sdíleno" a řádky prázdné (nález S7-04).
+  const ulozSeSdilenim = (m) => $app.runInTransaction((tx) => { tx.save(m); syncShares(tx, m); });
 
   if (action === "list") {
     // `has_work`: člen má na mapě SVOU práci (garant uzlu / řešitel legacy
@@ -2467,8 +2497,7 @@ kbRoute("POST", "/share", (e) => {
   if (action === "toggle_public") {
     const newValue = !map.getBool("is_public");
     map.set("is_public", newValue);
-    $app.save(map);
-    syncShares($app, map);
+    ulozSeSdilenim(map);
     return e.json(200, { success: true, is_public: newValue, updated: map.getString("updated") });
   }
 
@@ -2499,8 +2528,7 @@ kbRoute("POST", "/share", (e) => {
         return e.json(400, { error: t(L, "err.alreadyShared") });
       }
       setPermLists(email, perm);
-      $app.save(map);
-      syncShares($app, map);
+      ulozSeSdilenim(map);
       let jmeno = null;
       try {
         jmeno = $app.findFirstRecordByFilter("users", "email = {:email}", { email: email }).getString("full_name") || null;
@@ -2532,8 +2560,7 @@ kbRoute("POST", "/share", (e) => {
     // přístup naváže na e-mail — uživatel ho získá, jakmile se s ním zaregistruje.
     map.set("shared_with", sharedWith.concat([email]));
     setPermLists(email, perm);
-    $app.save(map);
-    syncShares($app, map);
+    ulozSeSdilenim(map);
     let fullName = null;
     try {
       const u = $app.findFirstRecordByFilter("users", "email = {:email}", { email: email });
@@ -2569,8 +2596,7 @@ kbRoute("POST", "/share", (e) => {
     }
     const perm = ["edit", "work"].includes(info.permission) ? info.permission : "read";
     setPermLists(memberEmail, perm);
-    $app.save(map);
-    syncShares($app, map);
+    ulozSeSdilenim(map);
     return e.json(200, { success: true, permission: perm, updated: map.getString("updated") });
   }
 
@@ -2580,8 +2606,7 @@ kbRoute("POST", "/share", (e) => {
     map.set("shared_with", sharedWith.filter((x) => !eqi(x, memberEmail)));
     map.set("shared_with_edit", sharedWithEdit.filter((x) => !eqi(x, memberEmail)));
     map.set("shared_with_work", sharedWithWork.filter((x) => !eqi(x, memberEmail)));
-    $app.save(map);
-    syncShares($app, map);
+    ulozSeSdilenim(map);
     return e.json(200, { success: true, updated: map.getString("updated") });
   }
 
@@ -2818,9 +2843,10 @@ kbRoute("POST", "/public-maps", (e) => {
 // dostane jen token_set. Prázdný provider v DB = fallback na .env.
 
 kbRoute("GET", "/ai-settings", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") {
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
   }
   const { aiConfig } = require(`${__hooks}/helpers.js`);
@@ -2837,9 +2863,10 @@ kbRoute("GET", "/ai-settings", (e) => {
 }, $apis.requireAuth());
 
 kbRoute("POST", "/ai-settings", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") {
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
   }
   const info = e.requestInfo().body || {};
@@ -2888,8 +2915,9 @@ kbRoute("POST", "/ai-settings", (e) => {
 // Na rozdíl od users hooku (tichá sanitizace) tady chybu VRACÍME — admin má
 // vidět, PROČ jeho skin neprošel.
 kbRoute("GET", "/instance-skin", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  if (e.auth.getString("role") !== "admin") {
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(userLang(e.auth), "err.instanceSkinAdminOnly") });
   }
   let skin = null;
@@ -2904,9 +2932,10 @@ kbRoute("GET", "/instance-skin", (e) => {
 }, $apis.requireAuth());
 
 kbRoute("POST", "/instance-skin", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") {
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.instanceSkinAdminOnly") });
   }
   const { validateSkin, KNOWN_SKIN_IDS } = require(`${__hooks}/skinValidator.js`);
@@ -2944,8 +2973,8 @@ kbRoute("POST", "/instance-skin", (e) => {
 
 kbRoute("GET", "/billing", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const { billingNacti, billingKompletni } = require(`${__hooks}/helpers.js`);
-  if (e.auth.getString("role") !== "admin") {
+  const { billingNacti, billingKompletni, jeAdmin } = require(`${__hooks}/helpers.js`);
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(userLang(e.auth), "err.billingAdminOnly") });
   }
   const billing = billingNacti($app);
@@ -2954,8 +2983,8 @@ kbRoute("GET", "/billing", (e) => {
 
 kbRoute("POST", "/billing", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const { billingKompletni } = require(`${__hooks}/helpers.js`);
-  if (e.auth.getString("role") !== "admin") {
+  const { billingKompletni, jeAdmin } = require(`${__hooks}/helpers.js`);
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(userLang(e.auth), "err.billingAdminOnly") });
   }
   const L = userLang(e.auth);
@@ -2982,13 +3011,14 @@ kbRoute("POST", "/billing", (e) => {
 }, $apis.requireAuth());
 
 kbRoute("POST", "/order-transfer", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   // Objednávka členství PŘEVODEM — jen ROČNÍ tarify (rozhodnutí Richarda
   // 8. 8. 2026: měsíční se převodem nehlídají, karta ano). Objednávka letí
   // na AI bránu (/v1/orders) pod zákaznickým tokenem — tudy instance k
   // provozovateli už mluví, žádný nový kanál se neotvírá.
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") {
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.billingAdminOnly") });
   }
   const body = e.requestInfo().body || {};
@@ -3027,9 +3057,10 @@ kbRoute("POST", "/order-transfer", (e) => {
 
 // test připojení — bere hodnoty z formuláře (neuložené), prázdný token = uložený
 kbRoute("POST", "/ai-test", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") {
+  if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
   }
   const { aiConfig, aiHostBlocked } = require(`${__hooks}/helpers.js`);
@@ -3410,7 +3441,7 @@ kbRoute("POST", "/reset-user-password", (e) => {
   // Reset hesla dělá admin a správce struktury (personální agenda). Hranice
   // níž ZŮSTÁVAJÍ: ne sobě a ne adminovi — jinak by si správce struktury
   // přepsáním admina převzal celou instanci.
-  const { smiEditovatOrgStrukturu: smiReset } = require(`${__hooks}/helpers.js`);
+  const { smiEditovatOrgStrukturu: smiReset, jeAdmin } = require(`${__hooks}/helpers.js`);
   if (!smiReset(e.auth)) {
     return e.json(403, { error: t(L, "err.resetPasswordAdminOnly") });
   }
@@ -3433,7 +3464,7 @@ kbRoute("POST", "/reset-user-password", (e) => {
   }
   // ANI JINÉMU ADMINOVI (Richard 11. 8.): dva rovnocenní správci by si mohli
   // navzájem převzít účet a vystrnadit se z instance. Role je hranice, ne řád.
-  if (rec.getString("role") === "admin") {
+  if (jeAdmin(rec)) {
     return e.json(403, { error: t(L, "err.resetPasswordNotAdmin") });
   }
   // ⚠️ A NE-ADMIN nesmí sáhnout ani na účet, který nese JAKÝKOLI správcovský
@@ -3441,7 +3472,7 @@ kbRoute("POST", "/reset-user-password", (e) => {
   // ale mezitím vyrostly příznaky se skutečnou mocí (registr AI agentů, org
   // struktura). Přepsáním hesla by si správce struktury převzal účet správce AI
   // i manažera — a s ním jeho pravomoci (nález panelu 17. 8.).
-  if (e.auth.getString("role") !== "admin"
+  if (!jeAdmin(e.auth)
       && (rec.getString("role") !== "user" || rec.getBool("is_ai_manager") || rec.getBool("is_org_manager"))) {
     return e.json(403, { error: t(L, "err.resetPasswordNotAdmin") });
   }
@@ -3493,10 +3524,10 @@ kbRoute("GET", "/members", (e) => {
 // Přeskočení = team (dnešní chování), ať se dialog už neptá.
 kbRoute("POST", "/purpose", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const { instancePurpose, jeNedotcenaUvodniMapa, zalozUvodniMapu } = require(`${__hooks}/helpers.js`);
+  const { instancePurpose, jeNedotcenaUvodniMapa, zalozUvodniMapu, jeAdmin } = require(`${__hooks}/helpers.js`);
   const { PURPOSES } = require(`${__hooks}/uvodni_mapa.js`);
   const L = userLang(e.auth);
-  if (e.auth.getString("role") !== "admin") return e.json(403, { error: t(L, "err.adminOnly") });
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.adminOnly") });
   const body = e.requestInfo().body || {};
   const purpose = String(body.purpose || "");
   if (PURPOSES.indexOf(purpose) === -1) return e.json(400, { error: t(L, "err.badPurpose") });
@@ -3615,7 +3646,7 @@ kbRoute("POST", "/org-structure/add", (e) => {
 // jedinou věc: nastavit `deputy`, se stejnou validací jako admin (Richard
 // 17. 8.: „mohla by dávat zástupce, to patří k personální").
 kbRoute("POST", "/member-deputy", (e) => {
-  const { smiEditovatOrgStrukturu, deputyValueError } = require(`${__hooks}/helpers.js`);
+  const { smiEditovatOrgStrukturu, deputyValueError, jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   if (!smiEditovatOrgStrukturu(e.auth)) return e.json(403, { error: t(L, "err.orgManagerOnly") });
@@ -3637,8 +3668,8 @@ kbRoute("POST", "/member-deputy", (e) => {
   // klik-test 18. 8.: „nemohu sobě dát zástupce"). Manažeři jsou taky v pořádku
   // — manažer dnes nemá žádné rozšířené právo kromě zvaní lidí.
   const jeSam = rec.id === e.auth.id;
-  if (e.auth.getString("role") !== "admin" && !jeSam
-      && (rec.getString("role") === "admin" || rec.getBool("is_ai_manager") || rec.getBool("is_org_manager"))) {
+  if (!jeAdmin(e.auth) && !jeSam
+      && (jeAdmin(rec) || rec.getBool("is_ai_manager") || rec.getBool("is_org_manager"))) {
     return e.json(403, { error: t(L, "err.deputyPrivilegedTarget") });
   }
   const bad = deputyValueError($app, rec.getString("email"), deputy, L);
@@ -3719,7 +3750,16 @@ kbRoute("POST", "/import-all", (e) => {
   for (const mp of maps) {
     if (!mp || !mp.map) { out.maps_skipped.push({ title: "", reason: "empty" }); continue; }
     if (mp.map.kind === "org") { out.maps_skipped.push({ title: String(mp.map.title || ""), reason: "org" }); continue; }
-    const vys = importJednuMapu($app, e.auth, L, { format: mp.format || "killbottleneck.map/1", map: mp.map, tasks: mp.tasks, rules: mp.rules }, { keepArchived: true });
+    let vys;
+    try {
+      vys = importJednuMapu($app, e.auth, L, { format: mp.format || "killbottleneck.map/1", map: mp.map, tasks: mp.tasks, rules: mp.rules }, { keepArchived: true });
+    } catch (err) {
+      // např. `nodes` nad 5 MB (maxSize pole) — bez tohohle celá dávka skončila
+      // „Something went wrong" a už založené mapy zůstaly (nález S3-03)
+      try { $app.logger().warn("import-all: mapa přeskočena", "title", String(mp.map.title || ""), "error", String(err)); } catch (e2) { /* log je bonus */ }
+      out.maps_skipped.push({ title: String(mp.map.title || ""), reason: String(err && err.message || err).slice(0, 200) });
+      continue;
+    }
     if (vys.status !== 200) { out.maps_skipped.push({ title: String(mp.map.title || ""), reason: String((vys.body || {}).error || vys.status) }); continue; }
     out.maps_imported++;
     out.nodes_imported += vys.body.nodes_imported || 0;
@@ -3774,8 +3814,8 @@ kbRoute("GET", "/ai-agents", (e) => {
 // a funkce z okolního scope handler NEVIDÍ (viz hlavička helpers.js).
 kbRoute("GET", "/ai-agents/admin", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const { publicBaseUrl } = require(`${__hooks}/helpers.js`);
-  if (!(e.auth.getBool("is_ai_manager") || e.auth.getString("role") === "admin")) {
+  const { publicBaseUrl, jeAdmin, jeAdminNeboAiManazer } = require(`${__hooks}/helpers.js`);
+  if (!jeAdminNeboAiManazer(e.auth)) {
     return e.json(403, { error: t(userLang(e.auth), "err.aiManagerOnly") });
   }
   let rows = [];
@@ -3807,9 +3847,10 @@ kbRoute("GET", "/ai-agents/admin", (e) => {
 
 // založení i úprava; prázdný `secret` v těle znamená „nech stávající"
 kbRoute("POST", "/ai-agents/save", (e) => {
+  const { jeAdmin, jeAdminNeboAiManazer } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (!(e.auth.getBool("is_ai_manager") || e.auth.getString("role") === "admin")) {
+  if (!jeAdminNeboAiManazer(e.auth)) {
     return e.json(403, { error: t(L, "err.aiManagerOnly") });
   }
   const info = e.requestInfo().body || {};
@@ -3865,9 +3906,10 @@ kbRoute("POST", "/ai-agents/save", (e) => {
 }, $apis.requireAuth());
 
 kbRoute("POST", "/ai-agents/delete", (e) => {
+  const { jeAdmin, jeAdminNeboAiManazer } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  if (!(e.auth.getBool("is_ai_manager") || e.auth.getString("role") === "admin")) {
+  if (!jeAdminNeboAiManazer(e.auth)) {
     return e.json(403, { error: t(L, "err.aiManagerOnly") });
   }
   try {
@@ -3882,86 +3924,34 @@ kbRoute("POST", "/ai-agents/delete", (e) => {
 // Pravidla spravuje EDITOR MAPY (mapEditAccess) — kolekce je zamčená, tohle je
 // jediná session cesta. Tvar pravidla drží validateRuleInput (sdílená s v1/MCP).
 
+// ---------- pravidla (session) ----------
+// Jádro (validace, limity, toggle, šablony) je v rules-api.js — SPOLEČNÉ s v1 API.
+// Tady jen: přihlášení, nalezení mapy a právo editora (mapEditAccess).
 kbRoute("GET", "/rules", (e) => {
-  const { mapEditAccess, ruleDto } = require(`${__hooks}/helpers.js`);
-  const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const L = userLang(e.auth);
-  let map;
-  try {
-    map = $app.findRecordById("goalmaps", String((e.requestInfo().query || {}).map || ""));
-  } catch (err) {
-    return e.json(404, { error: t(L, "err.mapNotFound") });
-  }
-  if (!mapEditAccess($app, map, e.auth)) return e.json(403, { error: t(L, "err.noWriteAccess") });
-  let rows = [];
-  try { rows = $app.findRecordsByFilter("automation_rules", "map = {:m}", "created", 200, 0, { m: map.id }); } catch (err) { /* žádná pravidla */ }
-  return e.json(200, { rules: rows.map(ruleDto) });
+  const R = require(`${__hooks}/rules-api.js`);
+  const m = R.editableMapSession($app, e, (e.requestInfo().query || {}).map);
+  if (m.error) return e.json(m.error.status, m.error.body);
+  const r = R.listRules($app, m.map);
+  return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
 kbRoute("POST", "/rules/save", (e) => {
-  const { mapEditAccess, validateRuleInput, ruleDto, MAX_RULES_PER_MAP } = require(`${__hooks}/helpers.js`);
-  const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const L = userLang(e.auth);
+  const R = require(`${__hooks}/rules-api.js`);
   const info = e.requestInfo().body || {};
-  let map;
-  try {
-    map = $app.findRecordById("goalmaps", String(info.map || ""));
-  } catch (err) {
-    return e.json(404, { error: t(L, "err.mapNotFound") });
-  }
-  if (!mapEditAccess($app, map, e.auth)) return e.json(403, { error: t(L, "err.noWriteAccess") });
-
+  const m = R.editableMapSession($app, e, info.map);
+  if (m.error) return e.json(m.error.status, m.error.body);
   let rec = null;
   if (info.id) {
-    try {
-      rec = $app.findRecordById("automation_rules", String(info.id));
-    } catch (err) {
-      return e.json(404, { error: t(L, "err.ruleNotFound") });
-    }
-    if (rec.getString("map") !== map.id) return e.json(404, { error: t(L, "err.ruleNotFound") });
+    const f = R.findRule($app, m.map, info.id, m.lang);
+    if (f.error) return e.json(f.error.status, f.error.body);
+    rec = f.rec;
   }
-
-  // pouhé zapnutí/vypnutí: enabled je JEDINÉ datové pole. Když přijde i tvar
-  // (name/trigger/actions/conditions/node_id), NESMÍ se tiše zahodit — spadne
-  // to do plné validace níž (nález panelu 14. 8.: {enabled, actions} dřív
-  // vrátil 200 a akce ztratil).
-  const onlyToggle = rec && info.enabled !== undefined
-    && info.name === undefined && info.trigger === undefined
-    && info.actions === undefined && info.conditions === undefined && info.node_id === undefined;
-  if (onlyToggle) {
-    rec.set("enabled", !!info.enabled);
-    $app.save(rec);
-    return e.json(200, { rule: ruleDto(rec) });
-  }
-
-  const v = validateRuleInput($app, map, info);
-  if (v.error) return e.json(400, { error: t(L, "err.ruleInvalid", { reason: v.error }) });
-
-  if (!rec) {
-    // strukturální limit à la Asana (50/mapa) je v pořádku; měsíční metr NIKDY
-    let count = 0;
-    try { count = $app.findRecordsByFilter("automation_rules", "map = {:m}", "", 500, 0, { m: map.id }).length; } catch (err) { /* prázdno */ }
-    if (count >= MAX_RULES_PER_MAP) return e.json(400, { error: t(L, "err.ruleLimit", { max: MAX_RULES_PER_MAP }) });
-    rec = new Record($app.findCollectionByNameOrId("automation_rules"));
-    rec.set("map", map.id);
-  }
-  rec.set("name", v.data.name);
-  rec.set("node_id", v.data.node_id);
-  rec.set("trigger", v.data.trigger);
-  rec.set("conditions", v.data.conditions);
-  rec.set("actions", v.data.actions);
-  rec.set("enabled", info.enabled === undefined ? true : !!info.enabled);
-  rec.set("created_by", e.auth.email());
-  // editace = nová šance: „už jsem si stěžoval" se resetuje (mail přijde znovu
-  // jen pokud selže i opravená podoba)
-  rec.set("last_error", "");
-  rec.set("error_notified", false);
-  $app.save(rec);
-  return e.json(200, { rule: ruleDto(rec) });
+  const r = R.saveRule($app, m.map, rec, info, { lang: m.lang, userEmail: e.auth.email() });
+  return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
 kbRoute("POST", "/rules/delete", (e) => {
-  const { mapEditAccess } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   let rec;
@@ -3970,103 +3960,45 @@ kbRoute("POST", "/rules/delete", (e) => {
   } catch (err) {
     return e.json(404, { error: t(L, "err.ruleNotFound") });
   }
-  let map;
-  try {
-    map = $app.findRecordById("goalmaps", rec.getString("map"));
-  } catch (err) {
-    return e.json(404, { error: t(L, "err.mapNotFound") });
-  }
-  if (!mapEditAccess($app, map, e.auth)) return e.json(403, { error: t(L, "err.noWriteAccess") });
-  $app.delete(rec);
-  return e.json(200, { success: true });
+  const m = R.editableMapSession($app, e, rec.getString("map"));
+  if (m.error) return e.json(m.error.status, m.error.body);
+  const r = R.deleteRule($app, rec);
+  return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
 // log běhů — jednotný tvar pro UI (kolekce rule_runs je čitelná i přímo přes
 // RLS, ale routa drží DTO a filtr na pravidlo)
 kbRoute("GET", "/rule-runs", (e) => {
-  const { mapEditAccess, ruleRunDto } = require(`${__hooks}/helpers.js`);
-  const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const L = userLang(e.auth);
+  const R = require(`${__hooks}/rules-api.js`);
   const q = e.requestInfo().query || {};
-  let map;
-  try {
-    map = $app.findRecordById("goalmaps", String(q.map || ""));
-  } catch (err) {
-    return e.json(404, { error: t(L, "err.mapNotFound") });
-  }
-  if (!mapEditAccess($app, map, e.auth)) return e.json(403, { error: t(L, "err.noWriteAccess") });
-  let filter = "map = {:m}";
-  const params = { m: map.id };
-  if (q.rule) { filter += " && rule = {:r}"; params.r = String(q.rule); }
-  let rows = [];
-  try { rows = $app.findRecordsByFilter("rule_runs", filter, "-created", 100, 0, params); } catch (err) { /* prázdno */ }
-  return e.json(200, { runs: rows.map(ruleRunDto) });
+  const m = R.editableMapSession($app, e, q.map);
+  if (m.error) return e.json(m.error.status, m.error.body);
+  const r = R.listRuleRuns($app, m.map, q);
+  return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
 // ---------- šablony pravidel (knihovna instance) ----------
-// Šablona = tvar pravidla bez mapy a bez scope; načtením do mapy vzniká KOPIE
-// (žádné bundly — úprava šablony existující kopie nemění; Richard 14. 8. 2026).
-// Číst smí každý přihlášený, přepsat/smazat jen autor nebo admin.
-
+// Číst smí každý přihlášený, přepsat/smazat jen autor nebo admin (rules-api.js).
 kbRoute("GET", "/rule-templates", (e) => {
-  const { ruleTemplateDto } = require(`${__hooks}/helpers.js`);
-  let rows = [];
-  try { rows = $app.findRecordsByFilter("rule_templates", "id != ''", "name", 200, 0); } catch (err) { /* prázdno */ }
-  return e.json(200, { templates: rows.map(ruleTemplateDto) });
+  const R = require(`${__hooks}/rules-api.js`);
+  const r = R.listRuleTemplates($app);
+  return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
 kbRoute("POST", "/rule-templates/save", (e) => {
-  const { validateRuleInput, ruleTemplateDto } = require(`${__hooks}/helpers.js`);
-  const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const L = userLang(e.auth);
-  const info = e.requestInfo().body || {};
-  let rec = null;
-  if (info.id) {
-    try {
-      rec = $app.findRecordById("rule_templates", String(info.id));
-    } catch (err) {
-      return e.json(404, { error: t(L, "err.ruleNotFound") });
-    }
-    if (rec.getString("created_by") !== e.auth.email() && e.auth.getString("role") !== "admin") {
-      return e.json(403, { error: t(L, "err.templateAuthorOnly") });
-    }
-  }
-  const v = validateRuleInput($app, null, info); // null = šablonový režim (bez mapy/scope)
-  if (v.error) return e.json(400, { error: t(L, "err.ruleInvalid", { reason: v.error }) });
-  if (!rec) {
-    const { MAX_TEMPLATES_PER_AUTHOR } = require(`${__hooks}/helpers.js`);
-    let mine = 0;
-    try { mine = $app.findRecordsByFilter("rule_templates", "created_by = {:e}", "", 500, 0, { e: e.auth.email() }).length; } catch (err) { /* prázdno */ }
-    if (mine >= MAX_TEMPLATES_PER_AUTHOR) return e.json(400, { error: t(L, "err.templateLimit", { max: MAX_TEMPLATES_PER_AUTHOR }) });
-    rec = new Record($app.findCollectionByNameOrId("rule_templates"));
-    rec.set("created_by", e.auth.email());
-  }
-  rec.set("name", v.data.name);
-  rec.set("trigger", v.data.trigger);
-  rec.set("conditions", v.data.conditions);
-  rec.set("actions", v.data.actions);
-  try {
-    $app.save(rec);
-  } catch (err) {
-    return e.json(400, { error: t(L, "err.templateNameTaken", { name: v.data.name }) }); // UNIQUE jméno
-  }
-  return e.json(200, { template: ruleTemplateDto(rec) });
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const r = R.saveRuleTemplate($app, e.requestInfo().body || {}, { lang: userLang(e.auth), userEmail: e.auth.email(), isAdmin: jeAdmin(e.auth) });
+  return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
 kbRoute("POST", "/rule-templates/delete", (e) => {
-  const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const L = userLang(e.auth);
-  let rec;
-  try {
-    rec = $app.findRecordById("rule_templates", String((e.requestInfo().body || {}).id || ""));
-  } catch (err) {
-    return e.json(404, { error: t(L, "err.ruleNotFound") });
-  }
-  if (rec.getString("created_by") !== e.auth.email() && e.auth.getString("role") !== "admin") {
-    return e.json(403, { error: t(L, "err.templateAuthorOnly") });
-  }
-  $app.delete(rec);
-  return e.json(200, { success: true });
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const r = R.deleteRuleTemplate($app, (e.requestInfo().body || {}).id, { lang: userLang(e.auth), userEmail: e.auth.email(), isAdmin: jeAdmin(e.auth) });
+  return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
 // ---------- přílohy pro agenta ----------
@@ -4183,15 +4115,23 @@ kbRoute("POST", "/agent-callback", (e) => {
   if (prev !== "pending" && prev !== "running") {
     return e.json(409, { error: t(L, "err.runAlreadyClosed") });
   }
-  const status = String(info.status || "done");
+  let status = String(info.status || "done");
   if (!["done", "failed"].includes(status)) return e.json(400, { error: t(L, "err.badRunStatus") });
+  let result = String(info.result || "").slice(0, 4000);
 
-  const result = String(info.result || "").slice(0, 4000);
-  run.set("status", status);
-  run.set("result", result);
-  run.set("finished", nowUtcString());
-  run.set("token_hash", ""); // JEDNORÁZOVÝ: další volání se stejným tokenem už klíč nenajde
-  $app.save(run);
+  // ATOMICKÉ převzetí tokenu (nález S8-02): handlery běží paralelně a dva
+  // callbacky se stejným tokenem dřív oba prošly (17/20 pokusů) — běh skončil
+  // podle druhého, uzel podle prvního, notifikace 2×. Kdo token přepíše na svou
+  // značku, ten běh uzavírá; druhý dostane 409. Bez rowsAffected: stačí přečíst.
+  const claim = "claimed:" + $security.randomString(24);
+  try {
+    $app.db().newQuery("UPDATE agent_runs SET token_hash = {:c} WHERE id = {:id} AND token_hash = {:h} AND status IN ('pending', 'running')")
+      .bind({ c: claim, id: run.id, h: $security.sha256(token) }).execute();
+    run = $app.findRecordById("agent_runs", run.id);
+  } catch (err) {
+    return e.json(409, { error: t(L, "err.runAlreadyClosed") });
+  }
+  if (run.getString("token_hash") !== claim) return e.json(409, { error: t(L, "err.runAlreadyClosed") });
 
   let map = null, node = null;
   try {
@@ -4199,35 +4139,55 @@ kbRoute("POST", "/agent-callback", (e) => {
     node = jsonVal(map, "nodes", []).find((n) => n.id === run.getString("node_id"));
   } catch (err) { /* mapa mohla mezitím zmizet */ }
 
-  if (map && node && status === "done") {
-    // uzel se splní jménem automatizace; relayout=false, ať se nepřepíše
-    // ruční rozmístění mapy
-    const origNodes = jsonVal(map, "nodes", []);
-    const origEdges = jsonVal(map, "edges", []);
-    const nodes = origNodes.map((n) => (n.id === node.id
-      ? Object.assign({}, n, { data: Object.assign({}, n.data, { status: "done" }) })
-      : n));
-    const saved = v1SaveMapData($app, map, nodes, origEdges, L, false, run.getString("agent_name") || "AI");
-    if (saved.error) {
-      // běh je „done", ale uzel se nedokončil — bez logu by to bylo neviditelné
-      try { $app.logger().warn("agent-callback: uzel se nepodařilo označit jako hotový", "run", run.id, "reason", String(saved.error)); } catch (e2) { /* log je bonus */ }
-    }
-    if (!saved.error) {
-      // TOHLE je řetěz ze zadání: dokončený uzel odblokuje navazující a jeho
-      // garant dostane „můžete začít". Request hooky se u $app.save nespustí,
-      // proto ručně — a stejně tak se rozjede případná navazující automatizace.
-      try {
-        notifyUnblockedTransitions($app, origNodes, origEdges, map, "");
-      } catch (err) {
-        try { $app.logger().warn("agent-callback: notifikace odblokování selhala", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+  // Zápis mapy v try/catch: po převzetí tokenu by výjimka (validace, maxSize)
+  // vrátila 500 a běh by visel `running` s tokenem `claimed:…` až do watchdogu
+  // (panel 27. 8.). Výjimka = běh selhal, uzavře se níž s důvodem.
+  try {
+    if (map && node && status === "done") {
+      // uzel se splní jménem automatizace; relayout=false, ať se nepřepíše
+      // ruční rozmístění mapy
+      const origNodes = jsonVal(map, "nodes", []);
+      const origEdges = jsonVal(map, "edges", []);
+      const nodes = origNodes.map((n) => (n.id === node.id
+        ? Object.assign({}, n, { data: Object.assign({}, n.data, { status: "done" }) })
+        : n));
+      const saved = v1SaveMapData($app, map, nodes, origEdges, L, false, run.getString("agent_name") || "AI",
+        { rulesDepth: run.getInt("depth") || 0 }); // hloubka řetězu pravidel platí i přes HTTP (S1-03)
+      if (saved.error) {
+        // uzel se nedokončil → běh NENÍ „done": garant by dostal „hotovo" nad
+        // otevřeným uzlem (nález S8-04)
+        try { $app.logger().warn("agent-callback: uzel se nepodařilo označit jako hotový", "run", run.id, "reason", String(saved.error)); } catch (e2) { /* log je bonus */ }
+        status = "failed";
+        result = ((result ? result + " | " : "") + String(saved.error)).slice(0, 4000);
       }
-      try {
-        triggerReadyAgents($app, origNodes, origEdges, map, "system");
-      } catch (err) {
-        try { $app.logger().warn("agent-callback: navazující automatizace selhala", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+      if (!saved.error) {
+        // TOHLE je řetěz ze zadání: dokončený uzel odblokuje navazující a jeho
+        // garant dostane „můžete začít". Request hooky se u $app.save nespustí,
+        // proto ručně — a stejně tak se rozjede případná navazující automatizace.
+        try {
+          notifyUnblockedTransitions($app, origNodes, origEdges, map, "");
+        } catch (err) {
+          try { $app.logger().warn("agent-callback: notifikace odblokování selhala", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+        }
+        try {
+          triggerReadyAgents($app, origNodes, origEdges, map, "system");
+        } catch (err) {
+          try { $app.logger().warn("agent-callback: navazující automatizace selhala", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+        }
       }
     }
+
+  } catch (err) {
+    try { $app.logger().warn("agent-callback: zápis mapy vyhodil výjimku", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+    status = "failed";
+    result = ((result ? result + " | " : "") + String((err && err.message) || err)).slice(0, 4000);
   }
+  // uzavření běhu AŽ po pokusu o zápis mapy — stav běhu odpovídá stavu mapy (S8-04)
+  run.set("status", status);
+  run.set("result", result);
+  run.set("finished", nowUtcString());
+  run.set("token_hash", ""); // JEDNORÁZOVÝ: další volání se stejným tokenem už klíč nenajde
+  $app.save(run);
 
   // výsledek běhu garantovi uzlu (+ správcům AI, když to selhalo)
   try {
@@ -4808,54 +4768,39 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/delete", (e) => {
 // (rozhodnutí Richarda 14. 8. 2026, MCP tools nad těmito routami).
 
 // seznam pravidel mapy
+// jádro v rules-api.js (společné se session routami); tady jen API klíč,
+// strop těla a právo editora mapy (v1WritableMap "edit" = parita s mapEditAccess:
+// čtenář by jinak přes klíč viděl definice, cizí adresy v notify a chyby)
 kbRoute("GET", "/v1/maps/{id}/rules", (e) => {
-  const { apiKeyAuth, v1WritableMap, ruleDto } = require(`${__hooks}/helpers.js`);
-  const { t } = require(`${__hooks}/i18n.js`);
+  const { apiKeyAuth, v1WritableMap } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  // pravidla VIDÍ jen kdo mapu edituje — parita se session GET /rules (mapEditAccess);
-  // čtenář by jinak přes klíč viděl definice, cizí adresy v notify a chyby (panel 26. 8.)
-  const r = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
-  if (r.error) return e.json(r.status, { error: r.error });
-  const map = r.map;
-  let rows = [];
-  try { rows = $app.findRecordsByFilter("automation_rules", "map = {:m}", "created", 200, 0, { m: map.id }); } catch (err) { /* prázdno */ }
-  return e.json(200, { rules: rows.map(ruleDto) });
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const r = R.listRules($app, w.map);
+  return e.json(r.status, r.body);
 });
 
 // založení pravidla: {name, trigger:{type,…}, actions:[…], conditions?, node_id?, enabled?}
 kbRoute("POST", "/v1/maps/{id}/rules", (e) => {
-  const { apiKeyAuth, v1WritableMap, validateRuleInput, ruleDto, MAX_RULES_PER_MAP } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  // pravidla spravuje, kdo mapu EDITUJE (parita s mapEditAccess u session rout)
   const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
   if (w.error) return e.json(w.status, { error: w.error });
-  const map = w.map;
-  const v = validateRuleInput($app, map, info);
-  if (v.error) return e.json(400, { error: t(a.lang, "err.ruleInvalid", { reason: v.error }) });
-  let count = 0;
-  try { count = $app.findRecordsByFilter("automation_rules", "map = {:m}", "", 500, 0, { m: map.id }).length; } catch (err) { /* prázdno */ }
-  if (count >= MAX_RULES_PER_MAP) return e.json(400, { error: t(a.lang, "err.ruleLimit", { max: MAX_RULES_PER_MAP }) });
-  const rec = new Record($app.findCollectionByNameOrId("automation_rules"));
-  rec.set("map", map.id);
-  rec.set("name", v.data.name);
-  rec.set("node_id", v.data.node_id);
-  rec.set("trigger", v.data.trigger);
-  rec.set("conditions", v.data.conditions);
-  rec.set("actions", v.data.actions);
-  rec.set("enabled", info.enabled === undefined ? true : !!info.enabled);
-  rec.set("created_by", a.user.getString("email"));
-  $app.save(rec);
-  return e.json(200, { rule: ruleDto(rec) });
+  const r = R.saveRule($app, w.map, null, info, { lang: a.lang, userEmail: a.user.getString("email") });
+  return e.json(r.status, r.body);
 });
 
 // úprava pravidla (plný tvar, nebo jen {enabled} pro zapnout/vypnout)
 kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}", (e) => {
-  const { apiKeyAuth, v1WritableMap, validateRuleInput, ruleDto } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, v1WritableMap } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
@@ -4863,76 +4808,36 @@ kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}", (e) => {
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
   const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
   if (w.error) return e.json(w.status, { error: w.error });
-  const map = w.map;
-  let rec;
-  try {
-    rec = $app.findRecordById("automation_rules", e.request.pathValue("ruleId"));
-  } catch (err) {
-    return e.json(404, { error: t(a.lang, "err.ruleNotFound") });
-  }
-  if (rec.getString("map") !== map.id) return e.json(404, { error: t(a.lang, "err.ruleNotFound") });
-  // toggle jen když je enabled JEDINÉ datové pole; jinak plná validace (jinak
-  // by {enabled, actions} tiše zahodilo akce — nález panelu 14. 8.)
-  const onlyToggle = info.enabled !== undefined
-    && info.name === undefined && info.trigger === undefined
-    && info.actions === undefined && info.conditions === undefined && info.node_id === undefined;
-  if (onlyToggle) {
-    rec.set("enabled", !!info.enabled);
-    $app.save(rec);
-    return e.json(200, { rule: ruleDto(rec) });
-  }
-  const v = validateRuleInput($app, map, info);
-  if (v.error) return e.json(400, { error: t(a.lang, "err.ruleInvalid", { reason: v.error }) });
-  rec.set("name", v.data.name);
-  rec.set("node_id", v.data.node_id);
-  rec.set("trigger", v.data.trigger);
-  rec.set("conditions", v.data.conditions);
-  rec.set("actions", v.data.actions);
-  if (info.enabled !== undefined) rec.set("enabled", !!info.enabled);
-  rec.set("created_by", a.user.getString("email"));
-  rec.set("last_error", "");
-  rec.set("error_notified", false);
-  $app.save(rec);
-  return e.json(200, { rule: ruleDto(rec) });
+  const f = R.findRule($app, w.map, e.request.pathValue("ruleId"), a.lang);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = R.saveRule($app, w.map, f.rec, info, { lang: a.lang, userEmail: a.user.getString("email") });
+  return e.json(r.status, r.body);
 });
 
 // smazání pravidla
 kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}/delete", (e) => {
   const { apiKeyAuth, v1WritableMap } = require(`${__hooks}/helpers.js`);
-  const { t } = require(`${__hooks}/i18n.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
   if (w.error) return e.json(w.status, { error: w.error });
-  const map = w.map;
-  let rec;
-  try {
-    rec = $app.findRecordById("automation_rules", e.request.pathValue("ruleId"));
-  } catch (err) {
-    return e.json(404, { error: t(a.lang, "err.ruleNotFound") });
-  }
-  if (rec.getString("map") !== map.id) return e.json(404, { error: t(a.lang, "err.ruleNotFound") });
-  $app.delete(rec);
-  return e.json(200, { success: true });
+  const f = R.findRule($app, w.map, e.request.pathValue("ruleId"), a.lang);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = R.deleteRule($app, f.rec);
+  return e.json(r.status, r.body);
 });
 
-// log běhů pravidel mapy (?rule= filtr na jedno pravidlo)
+// log běhů pravidel mapy (?rule= filtr na jedno pravidlo) — jen pro editory
 kbRoute("GET", "/v1/maps/{id}/rule-runs", (e) => {
-  const { apiKeyAuth, v1WritableMap, ruleRunDto } = require(`${__hooks}/helpers.js`);
-  const { t } = require(`${__hooks}/i18n.js`);
+  const { apiKeyAuth, v1WritableMap } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  // log běhů jen pro editory — parita se session GET /rule-runs (mapEditAccess)
-  const r = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
-  if (r.error) return e.json(r.status, { error: r.error });
-  const map = r.map;
-  const q = e.requestInfo().query || {};
-  let filter = "map = {:m}";
-  const params = { m: map.id };
-  if (q.rule) { filter += " && rule = {:r}"; params.r = String(q.rule); }
-  let rows = [];
-  try { rows = $app.findRecordsByFilter("rule_runs", filter, "-created", 100, 0, params); } catch (err) { /* prázdno */ }
-  return e.json(200, { runs: rows.map(ruleRunDto) });
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const r = R.listRuleRuns($app, w.map, e.requestInfo().query || {});
+  return e.json(r.status, r.body);
 });
 
 // ---------- v1: šablony pravidel ----------
@@ -4940,70 +4845,33 @@ kbRoute("GET", "/v1/maps/{id}/rule-runs", (e) => {
 // vezme obsah šablony a zavolá create_rule (kopie, žádná vazba).
 
 kbRoute("GET", "/v1/rule-templates", (e) => {
-  const { apiKeyAuth, ruleTemplateDto } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  let rows = [];
-  try { rows = $app.findRecordsByFilter("rule_templates", "id != ''", "name", 200, 0); } catch (err) { /* prázdno */ }
-  return e.json(200, { templates: rows.map(ruleTemplateDto) });
+  const r = R.listRuleTemplates($app);
+  return e.json(r.status, r.body);
 });
 
 // založení/úprava šablony: {name, trigger, actions, conditions?, id?}
 kbRoute("POST", "/v1/rule-templates", (e) => {
-  const { apiKeyAuth, validateRuleInput, ruleTemplateDto } = require(`${__hooks}/helpers.js`);
+  const { apiKeyAuth, jeAdmin } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  let rec = null;
-  if (info.id) {
-    try {
-      rec = $app.findRecordById("rule_templates", String(info.id));
-    } catch (err) {
-      return e.json(404, { error: t(a.lang, "err.ruleNotFound") });
-    }
-    if (rec.getString("created_by") !== a.user.getString("email") && a.user.getString("role") !== "admin") {
-      return e.json(403, { error: t(a.lang, "err.templateAuthorOnly") });
-    }
-  }
-  const v = validateRuleInput($app, null, info);
-  if (v.error) return e.json(400, { error: t(a.lang, "err.ruleInvalid", { reason: v.error }) });
-  if (!rec) {
-    const { MAX_TEMPLATES_PER_AUTHOR } = require(`${__hooks}/helpers.js`);
-    let mine = 0;
-    try { mine = $app.findRecordsByFilter("rule_templates", "created_by = {:e}", "", 500, 0, { e: a.user.getString("email") }).length; } catch (err) { /* prázdno */ }
-    if (mine >= MAX_TEMPLATES_PER_AUTHOR) return e.json(400, { error: t(a.lang, "err.templateLimit", { max: MAX_TEMPLATES_PER_AUTHOR }) });
-    rec = new Record($app.findCollectionByNameOrId("rule_templates"));
-    rec.set("created_by", a.user.getString("email"));
-  }
-  rec.set("name", v.data.name);
-  rec.set("trigger", v.data.trigger);
-  rec.set("conditions", v.data.conditions);
-  rec.set("actions", v.data.actions);
-  try {
-    $app.save(rec);
-  } catch (err) {
-    return e.json(400, { error: t(a.lang, "err.templateNameTaken", { name: v.data.name }) });
-  }
-  return e.json(200, { template: ruleTemplateDto(rec) });
+  const r = R.saveRuleTemplate($app, info, { lang: a.lang, userEmail: a.user.getString("email"), isAdmin: jeAdmin(a.user) });
+  return e.json(r.status, r.body);
 });
 
 kbRoute("POST", "/v1/rule-templates/{id}/delete", (e) => {
-  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
-  const { t } = require(`${__hooks}/i18n.js`);
+  const { apiKeyAuth, jeAdmin } = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
-  let rec;
-  try {
-    rec = $app.findRecordById("rule_templates", e.request.pathValue("id"));
-  } catch (err) {
-    return e.json(404, { error: t(a.lang, "err.ruleNotFound") });
-  }
-  if (rec.getString("created_by") !== a.user.getString("email") && a.user.getString("role") !== "admin") {
-    return e.json(403, { error: t(a.lang, "err.templateAuthorOnly") });
-  }
-  $app.delete(rec);
-  return e.json(200, { success: true });
+  const r = R.deleteRuleTemplate($app, e.request.pathValue("id"), { lang: a.lang, userEmail: a.user.getString("email"), isAdmin: jeAdmin(a.user) });
+  return e.json(r.status, r.body);
 });
 

@@ -556,6 +556,10 @@ function zpracujMcpPost(e) {
     for (const req of tool.inputSchema.required || []) {
       if (args[req] === undefined) return e.json(200, rpcErr(msg.id, -32602, `Missing required argument: ${req}`));
     }
+    // typy a enumy — stdio (zod) odmítá `archived:"false"`, HTTP ho dřív
+    // koercoval na true (nález S9-03); parita chování obou transportů
+    const chybaTypu = validujArgumenty(tool.inputSchema, args);
+    if (chybaTypu) return e.json(200, rpcErr(msg.id, -32602, chybaTypu));
     try {
       return e.json(200, rpcOk(msg.id, EXEC[tool.name](authHeader, args)));
     } catch (err) {
@@ -564,6 +568,28 @@ function zpracujMcpPost(e) {
     }
   }
   return e.json(200, rpcErr(msg.id, -32601, `Method not found: ${String(msg.method).slice(0, 60)}`));
+}
+
+// Mělká validace podle JSON Schema nástroje: typ a enum vlastností první úrovně
+// + typ prvků pole. Bez knihovny (Goja nemá npm), stačí na to, co zod odmítá.
+function validujArgumenty(schema, args) {
+  const props = (schema && schema.properties) || {};
+  const nazevTypu = (v) => (Array.isArray(v) ? "array" : v === null ? "null" : typeof v);
+  const sedi = (t, v) => (t === "integer" ? (typeof v === "number" && Number.isInteger(v))
+    : t === "number" ? typeof v === "number"
+    : t === "array" ? Array.isArray(v)
+    : t === "object" ? (v !== null && typeof v === "object" && !Array.isArray(v))
+    : typeof v === t);
+  for (const k of Object.keys(args || {})) {
+    const p = props[k];
+    const v = args[k];
+    if (!p || v === undefined) continue;
+    const typy = Array.isArray(p.type) ? p.type : (p.type ? [p.type] : []);
+    if (typy.length && !typy.some((t) => sedi(t, v))) return `Invalid type for "${k}": expected ${typy.join("|")}, got ${nazevTypu(v)}`;
+    if (Array.isArray(p.enum) && !p.enum.includes(v)) return `Invalid value for "${k}": expected one of ${p.enum.join(", ")}`;
+    if (Array.isArray(v) && p.items && typeof p.items.type === "string" && v.some((x) => !sedi(p.items.type, x))) return `Invalid item type in "${k}": expected ${p.items.type}`;
+  }
+  return "";
 }
 
 module.exports = { TOOLS, zpracujMcpPost };

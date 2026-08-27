@@ -132,6 +132,27 @@ const catcher = http.createServer((req, res) => {
     const oauthKey = keys.find((k) => /^OAuth:/.test(k.label));
     expect(!!oauthKey && oauthKey.scope === 'read_write' && !!oauthKey.expires_at,
       'token je vidět v API klíčích jako „OAuth: …" s expirací (revokace v UI)');
+
+    console.log('== expirované klíče se při dalším připojení uklidí (nález S9-06, 27. 8.) ==');
+    // dřív: po 20 (re)připojeních „too many API keys", expirované nikdo nemazal
+    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@example.com superheslo123`, { stdio: 'ignore' });
+    const ST2 = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@example.com', password: 'superheslo123' } })).json.token;
+    for (let i = 0; i < 19; i++) {
+      const k = await api('POST', '/api/kb/api-keys', { token: U, body: { label: 'stary' + i, expires_at: '2099-01-01' } });
+      if (k.status === 200) await api('PATCH', `/api/collections/api_keys/records/${k.json.id}`, { token: ST2, body: { expires_at: '2001-01-01T00:00:00.000Z' } });
+    }
+    const pred = (await api('GET', '/api/kb/api-keys', { token: U })).json.keys.length;
+    expect(pred === 20, `účet má 20 klíčů, 19 expirovaných (${pred})`);
+    const ap3 = await api('POST', '/api/kb/oauth/approve', { token: U, body: {
+      client_id: CID, redirect_uri: CB, code_challenge: S256(verifier), code_challenge_method: 'S256', scope: 'read_write',
+    } });
+    const kod3 = new URL(ap3.json.redirect).searchParams.get('code');
+    const tok3 = await api('POST', '/oauth/token', { form: true, body: {
+      grant_type: 'authorization_code', code: kod3, redirect_uri: CB, client_id: CID, code_verifier: verifier,
+    } });
+    expect(tok3.status === 200, `21. připojení projde — expirované klíče se uklidily (${tok3.status} ${JSON.stringify(tok3.json).slice(0, 60)})`);
+    const po = (await api('GET', '/api/kb/api-keys', { token: U })).json.keys;
+    expect(po.length === 2 && po.every((k) => !/^stary/.test(k.label)), `zbyly jen 2 živé klíče (${po.length})`);
     // revokace v UI = konec přístupu; smazaný klíč /mcp odchytí lokálně → 401
     await api('POST', '/api/kb/api-keys/delete', { token: U, body: { id: oauthKey.id } });
     const poRevokaci = await mcpCall(TOKEN, 'list_maps');
