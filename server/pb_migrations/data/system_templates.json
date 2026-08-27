@@ -1,0 +1,5166 @@
+[
+  {
+    "title": "5 Proč (5 Whys)",
+    "description": "Opakovaným ptáním 'proč?' se dostaneš ke kořenové příčině.",
+    "category": "kvalita",
+    "icon": "HelpCircle",
+    "goal": "Hledání kořenové příčiny (5 Proč)",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Jasně a konkrétně popiš problém, který chceš vyřešit.",
+        "id": "root",
+        "parentId": null,
+        "title": "Problém (popiš)"
+      },
+      {
+        "description": "Proč k problému došlo? (první příčina)",
+        "id": "w1",
+        "parentId": "root",
+        "title": "1. Proč?"
+      },
+      {
+        "description": "Proč nastala předchozí příčina?",
+        "id": "w2",
+        "parentId": "w1",
+        "title": "2. Proč?"
+      },
+      {
+        "description": "Proč nastala předchozí příčina?",
+        "id": "w3",
+        "parentId": "w2",
+        "title": "3. Proč?"
+      },
+      {
+        "description": "Proč nastala předchozí příčina?",
+        "id": "w4",
+        "parentId": "w3",
+        "title": "4. Proč?"
+      },
+      {
+        "description": "Pravděpodobná kořenová příčina – na ni zaměř nápravné opatření.",
+        "id": "w5",
+        "parentId": "w4",
+        "title": "5. Proč? → kořenová příčina"
+      }
+    ],
+    "title_en": "5 Whys",
+    "description_en": "By repeatedly asking 'why?' you get to the root cause.",
+    "goal_en": "Finding the root cause (5 Whys)",
+    "ai_nodes_en": [
+      {
+        "description": "Clearly and specifically describe the problem you want to solve.",
+        "id": "root",
+        "parentId": null,
+        "title": "Problem (describe)"
+      },
+      {
+        "description": "Why did the problem occur? (first cause)",
+        "id": "w1",
+        "parentId": "root",
+        "title": "1. Why?"
+      },
+      {
+        "description": "Why did the previous cause occur?",
+        "id": "w2",
+        "parentId": "w1",
+        "title": "2. Why?"
+      },
+      {
+        "description": "Why did the previous cause occur?",
+        "id": "w3",
+        "parentId": "w2",
+        "title": "3. Why?"
+      },
+      {
+        "description": "Why did the previous cause occur?",
+        "id": "w4",
+        "parentId": "w3",
+        "title": "4. Why?"
+      },
+      {
+        "description": "The likely root cause – target your corrective action here.",
+        "id": "w5",
+        "parentId": "w4",
+        "title": "5. Why? → root cause"
+      }
+    ]
+  },
+  {
+    "title": "5S metoda",
+    "description": "Organizace pracoviště v 5 krocích (Seiri…Shitsuke).",
+    "category": "kvalita",
+    "icon": "Sparkles",
+    "goal": "5S – organizace pracoviště",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Které pracoviště nebo oblast chceš zorganizovat.",
+        "id": "root",
+        "parentId": null,
+        "title": "5S – pracoviště ke zlepšení (definuj)"
+      },
+      {
+        "description": "Odstraň z pracoviště všechno zbytečné.",
+        "id": "s1",
+        "parentId": "root",
+        "title": "1S – Třídit (Seiri)"
+      },
+      {
+        "description": "Dej věcem jasné a logické místo.",
+        "id": "s2",
+        "parentId": "root",
+        "title": "2S – Uspořádat (Seiton)"
+      },
+      {
+        "description": "Ukliď a udržuj pracoviště v čistotě.",
+        "id": "s3",
+        "parentId": "root",
+        "title": "3S – Čistit (Seiso)"
+      },
+      {
+        "description": "Nastav pravidla a standardy pro první 3S.",
+        "id": "s4",
+        "parentId": "root",
+        "title": "4S – Standardizovat (Seiketsu)"
+      },
+      {
+        "description": "Udržuj disciplínu a neustále zlepšuj.",
+        "id": "s5",
+        "parentId": "root",
+        "title": "5S – Udržovat (Shitsuke)"
+      }
+    ],
+    "title_en": "5S Method",
+    "description_en": "Workplace organization in 5 steps (Seiri…Shitsuke).",
+    "goal_en": "5S – workplace organization",
+    "ai_nodes_en": [
+      {
+        "description": "Which workplace or area you want to organize.",
+        "id": "root",
+        "parentId": null,
+        "title": "5S – workplace to improve (define)"
+      },
+      {
+        "description": "Remove everything unnecessary from the workplace.",
+        "id": "s1",
+        "parentId": "root",
+        "title": "1S – Sort (Seiri)"
+      },
+      {
+        "description": "Give things a clear and logical place.",
+        "id": "s2",
+        "parentId": "root",
+        "title": "2S – Set in Order (Seiton)"
+      },
+      {
+        "description": "Clean up and keep the workplace clean.",
+        "id": "s3",
+        "parentId": "root",
+        "title": "3S – Shine (Seiso)"
+      },
+      {
+        "description": "Set rules and standards for the first 3S.",
+        "id": "s4",
+        "parentId": "root",
+        "title": "4S – Standardize (Seiketsu)"
+      },
+      {
+        "description": "Maintain discipline and keep improving.",
+        "id": "s5",
+        "parentId": "root",
+        "title": "5S – Sustain (Shitsuke)"
+      }
+    ]
+  },
+  {
+    "title": "8D report (8 disciplín)",
+    "description": "Strukturovaný 8krokový postup řešení problémů (automotive).",
+    "category": "kvalita",
+    "icon": "ClipboardList",
+    "goal": "Řešení problému (8D)",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Popiš problém, který řešíš metodou 8D (8 disciplín).",
+        "id": "root",
+        "parentId": null,
+        "title": "Problém (8D report)"
+      },
+      {
+        "description": "Sestav tým s potřebnými znalostmi a pravomocemi.",
+        "id": "d1",
+        "parentId": "root",
+        "title": "D1 – Sestavení týmu"
+      },
+      {
+        "description": "Přesně popiš problém (co, kde, kdy, rozsah).",
+        "id": "d2",
+        "parentId": "root",
+        "title": "D2 – Popis problému"
+      },
+      {
+        "description": "Zaveď dočasná opatření, aby problém neškodil dál.",
+        "id": "d3",
+        "parentId": "root",
+        "title": "D3 – Okamžitá opatření"
+      },
+      {
+        "description": "Urči a ověř skutečnou kořenovou příčinu.",
+        "id": "d4",
+        "parentId": "root",
+        "title": "D4 – Kořenová příčina"
+      },
+      {
+        "description": "Vyber trvalá nápravná opatření.",
+        "id": "d5",
+        "parentId": "root",
+        "title": "D5 – Trvalá náprava"
+      },
+      {
+        "description": "Zaveď nápravu a ověř její účinnost.",
+        "id": "d6",
+        "parentId": "root",
+        "title": "D6 – Zavedení a ověření"
+      },
+      {
+        "description": "Uprav systém, aby se problém neopakoval.",
+        "id": "d7",
+        "parentId": "root",
+        "title": "D7 – Prevence opakování"
+      },
+      {
+        "description": "Uzavři případ a oceň tým.",
+        "id": "d8",
+        "parentId": "root",
+        "title": "D8 – Uzavření a ocenění"
+      }
+    ],
+    "title_en": "8D Report (8 Disciplines)",
+    "description_en": "A structured 8-step problem-solving process (automotive).",
+    "goal_en": "Problem solving (8D)",
+    "ai_nodes_en": [
+      {
+        "description": "Describe the problem you're solving with the 8D (8 Disciplines) method.",
+        "id": "root",
+        "parentId": null,
+        "title": "Problem (8D report)"
+      },
+      {
+        "description": "Assemble a team with the necessary knowledge and authority.",
+        "id": "d1",
+        "parentId": "root",
+        "title": "D1 – Team formation"
+      },
+      {
+        "description": "Describe the problem precisely (what, where, when, extent).",
+        "id": "d2",
+        "parentId": "root",
+        "title": "D2 – Problem description"
+      },
+      {
+        "description": "Put temporary measures in place so the problem causes no further harm.",
+        "id": "d3",
+        "parentId": "root",
+        "title": "D3 – Interim containment actions"
+      },
+      {
+        "description": "Identify and verify the true root cause.",
+        "id": "d4",
+        "parentId": "root",
+        "title": "D4 – Root cause"
+      },
+      {
+        "description": "Select permanent corrective actions.",
+        "id": "d5",
+        "parentId": "root",
+        "title": "D5 – Permanent corrective actions"
+      },
+      {
+        "description": "Implement the corrective action and verify its effectiveness.",
+        "id": "d6",
+        "parentId": "root",
+        "title": "D6 – Implementation and validation"
+      },
+      {
+        "description": "Adjust the system so the problem doesn't recur.",
+        "id": "d7",
+        "parentId": "root",
+        "title": "D7 – Recurrence prevention"
+      },
+      {
+        "description": "Close the case and recognize the team.",
+        "id": "d8",
+        "parentId": "root",
+        "title": "D8 – Closure and team recognition"
+      }
+    ]
+  },
+  {
+    "title": "8D report — kanban",
+    "description": "8 disciplín jako kanban: případy zakládej pod D1, hotová karta se sama posune do dalšího kroku a vrátí na Založeno.",
+    "category": "kanban",
+    "icon": "ClipboardList",
+    "goal": "Řešení problému (8D)",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Popiš problém, který řešíš metodou 8D. Každý případ založ jako pod-uzel D1 — po dokončení se karta sama posune dál.",
+        "id": "root",
+        "parentId": null,
+        "title": "Problém (8D report)"
+      },
+      {
+        "description": "Sestav tým s potřebnými znalostmi a pravomocemi.",
+        "id": "d1",
+        "parentId": "root",
+        "title": "D1 – Sestavení týmu"
+      },
+      {
+        "description": "Přesně popiš problém (co, kde, kdy, rozsah).",
+        "id": "d2",
+        "parentId": "root",
+        "title": "D2 – Popis problému"
+      },
+      {
+        "description": "Zaveď dočasná opatření, aby problém neškodil dál.",
+        "id": "d3",
+        "parentId": "root",
+        "title": "D3 – Okamžitá opatření"
+      },
+      {
+        "description": "Urči a ověř skutečnou kořenovou příčinu.",
+        "id": "d4",
+        "parentId": "root",
+        "title": "D4 – Kořenová příčina"
+      },
+      {
+        "description": "Vyber trvalá nápravná opatření.",
+        "id": "d5",
+        "parentId": "root",
+        "title": "D5 – Trvalá náprava"
+      },
+      {
+        "description": "Zaveď nápravu a ověř její účinnost.",
+        "id": "d6",
+        "parentId": "root",
+        "title": "D6 – Zavedení a ověření"
+      },
+      {
+        "description": "Uprav systém, aby se problém neopakoval.",
+        "id": "d7",
+        "parentId": "root",
+        "title": "D7 – Prevence opakování"
+      },
+      {
+        "description": "Uzavři případ a oceň tým.",
+        "id": "d8",
+        "parentId": "root",
+        "title": "D8 – Uzavření a ocenění"
+      }
+    ],
+    "title_en": "8D Report — Kanban",
+    "description_en": "8 Disciplines as a kanban: create cases under D1; a finished card moves itself to the next step and resets its status.",
+    "goal_en": "Problem solving (8D)",
+    "ai_nodes_en": [
+      {
+        "description": "Describe the problem you're solving with the 8D method. Create each case as a sub-node of D1 — a finished card moves on by itself.",
+        "id": "root",
+        "parentId": null,
+        "title": "Problem (8D report)"
+      },
+      {
+        "description": "Assemble a team with the necessary knowledge and authority.",
+        "id": "d1",
+        "parentId": "root",
+        "title": "D1 – Team formation"
+      },
+      {
+        "description": "Describe the problem precisely (what, where, when, extent).",
+        "id": "d2",
+        "parentId": "root",
+        "title": "D2 – Problem description"
+      },
+      {
+        "description": "Put temporary measures in place so the problem causes no further harm.",
+        "id": "d3",
+        "parentId": "root",
+        "title": "D3 – Interim containment actions"
+      },
+      {
+        "description": "Identify and verify the true root cause.",
+        "id": "d4",
+        "parentId": "root",
+        "title": "D4 – Root cause"
+      },
+      {
+        "description": "Select permanent corrective actions.",
+        "id": "d5",
+        "parentId": "root",
+        "title": "D5 – Permanent corrective actions"
+      },
+      {
+        "description": "Implement the corrective action and verify its effectiveness.",
+        "id": "d6",
+        "parentId": "root",
+        "title": "D6 – Implementation and validation"
+      },
+      {
+        "description": "Adjust the system so the problem doesn't recur.",
+        "id": "d7",
+        "parentId": "root",
+        "title": "D7 – Recurrence prevention"
+      },
+      {
+        "description": "Close the case and recognize the team.",
+        "id": "d8",
+        "parentId": "root",
+        "title": "D8 – Closure and team recognition"
+      }
+    ],
+    "rules": [
+      {
+        "actions": [
+          {
+            "to": "d2",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "d1"
+          }
+        ],
+        "id": "r1",
+        "name": "Kanban: D1 – Sestavení týmu → D2 – Popis problému",
+        "name_en": "Kanban: D1 – Team formation → D2 – Problem description",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "d3",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "d2"
+          }
+        ],
+        "id": "r2",
+        "name": "Kanban: D2 – Popis problému → D3 – Okamžitá opatření",
+        "name_en": "Kanban: D2 – Problem description → D3 – Interim containment actions",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "d4",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "d3"
+          }
+        ],
+        "id": "r3",
+        "name": "Kanban: D3 – Okamžitá opatření → D4 – Kořenová příčina",
+        "name_en": "Kanban: D3 – Interim containment actions → D4 – Root cause",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "d5",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "d4"
+          }
+        ],
+        "id": "r4",
+        "name": "Kanban: D4 – Kořenová příčina → D5 – Trvalá náprava",
+        "name_en": "Kanban: D4 – Root cause → D5 – Permanent corrective actions",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "d6",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "d5"
+          }
+        ],
+        "id": "r5",
+        "name": "Kanban: D5 – Trvalá náprava → D6 – Zavedení a ověření",
+        "name_en": "Kanban: D5 – Permanent corrective actions → D6 – Implementation and validation",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "d7",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "d6"
+          }
+        ],
+        "id": "r6",
+        "name": "Kanban: D6 – Zavedení a ověření → D7 – Prevence opakování",
+        "name_en": "Kanban: D6 – Implementation and validation → D7 – Recurrence prevention",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "d8",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "d7"
+          }
+        ],
+        "id": "r7",
+        "name": "Kanban: D7 – Prevence opakování → D8 – Uzavření a ocenění",
+        "name_en": "Kanban: D7 – Recurrence prevention → D8 – Closure and team recognition",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      }
+    ]
+  },
+  {
+    "title": "A3 problem solving",
+    "description": "Řešení problému na jednu stránku A3 v 7 krocích.",
+    "category": "kvalita",
+    "icon": "FileText",
+    "goal": "A3 – řešení problému",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Stručně pojmenuj problém, který řešíš na jednu stránku A3.",
+        "id": "root",
+        "parentId": null,
+        "title": "A3 – řešený problém (definuj)"
+      },
+      {
+        "description": "Proč je téma důležité a jaké jsou souvislosti.",
+        "id": "a1",
+        "parentId": "root",
+        "title": "1. Pozadí a kontext"
+      },
+      {
+        "description": "Popiš fakta a data o aktuálním stavu.",
+        "id": "a2",
+        "parentId": "root",
+        "title": "2. Současný stav"
+      },
+      {
+        "description": "Čeho chceš dosáhnout – měřitelně.",
+        "id": "a3",
+        "parentId": "root",
+        "title": "3. Cílový stav"
+      },
+      {
+        "description": "Najdi kořenové příčiny (např. 5 Proč, Ishikawa).",
+        "id": "a4",
+        "parentId": "root",
+        "title": "4. Analýza příčin"
+      },
+      {
+        "description": "Protiopatření, která řeší kořenové příčiny.",
+        "id": "a5",
+        "parentId": "root",
+        "title": "5. Navrhovaná opatření"
+      },
+      {
+        "description": "Kdo, co, kdy – konkrétní kroky a termíny.",
+        "id": "a6",
+        "parentId": "root",
+        "title": "6. Plán realizace"
+      },
+      {
+        "description": "Jak ověříš účinnost a zajistíš udržení.",
+        "id": "a7",
+        "parentId": "root",
+        "title": "7. Ověření a následná opatření"
+      }
+    ],
+    "title_en": "A3 Problem Solving",
+    "description_en": "Solving a problem on a single A3 page in 7 steps.",
+    "goal_en": "A3 – problem solving",
+    "ai_nodes_en": [
+      {
+        "description": "Briefly name the problem you are solving on a single A3 page.",
+        "id": "root",
+        "parentId": null,
+        "title": "A3 – problem to solve (define)"
+      },
+      {
+        "description": "Why the topic matters and what the context is.",
+        "id": "a1",
+        "parentId": "root",
+        "title": "1. Background and Context"
+      },
+      {
+        "description": "Describe the facts and data about the current state.",
+        "id": "a2",
+        "parentId": "root",
+        "title": "2. Current State"
+      },
+      {
+        "description": "What you want to achieve – measurably.",
+        "id": "a3",
+        "parentId": "root",
+        "title": "3. Target State"
+      },
+      {
+        "description": "Find the root causes (e.g. 5 Whys, Ishikawa).",
+        "id": "a4",
+        "parentId": "root",
+        "title": "4. Root Cause Analysis"
+      },
+      {
+        "description": "Countermeasures that address the root causes.",
+        "id": "a5",
+        "parentId": "root",
+        "title": "5. Proposed Countermeasures"
+      },
+      {
+        "description": "Who, what, when – concrete steps and deadlines.",
+        "id": "a6",
+        "parentId": "root",
+        "title": "6. Implementation Plan"
+      },
+      {
+        "description": "How you will verify effectiveness and ensure it sticks.",
+        "id": "a7",
+        "parentId": "root",
+        "title": "7. Verification and Follow-up"
+      }
+    ]
+  },
+  {
+    "title": "Budování startupu",
+    "description": "Strategie pro spuštění a růst vlastního byznysu od nápadu po produkt.",
+    "category": "byznys",
+    "icon": "Rocket",
+    "goal": "Vybudovat úspěšný startup",
+    "node_type": "strategie",
+    "ai_nodes": [
+      {
+        "description": "Hlavní strategie budování byznysu",
+        "id": "n1",
+        "parentId": null,
+        "title": "Vybudovat úspěšný startup"
+      },
+      {
+        "description": "Ověření tržního potenciálu",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Validace nápadu"
+      },
+      {
+        "description": "Analýza konkurence a cílové skupiny",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Průzkum trhu"
+      },
+      {
+        "description": "30 rozhovorů s potenciálními uživateli",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Rozhovory se zákazníky"
+      },
+      {
+        "description": "Vytvoření minimálního životaschopného produktu",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Vývoj MVP"
+      },
+      {
+        "description": "Funkční prototyp pro testování",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Prototyp"
+      },
+      {
+        "description": "Testování s 50 uživateli",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "Beta testování"
+      },
+      {
+        "description": "Strategie pro první platící zákazníky",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Získání zákazníků"
+      },
+      {
+        "description": "Content marketing a sítě",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Marketing"
+      },
+      {
+        "description": "Spolupráce s doplňkovými službami",
+        "id": "n10",
+        "parentId": "n8",
+        "title": "Partnerská spolupráce"
+      }
+    ],
+    "title_en": "Building a Startup",
+    "description_en": "A strategy to launch and grow your own business — from idea to product.",
+    "goal_en": "Build a successful startup",
+    "ai_nodes_en": [
+      {
+        "description": "The overarching strategy for building the business",
+        "id": "n1",
+        "parentId": null,
+        "title": "Build a successful startup"
+      },
+      {
+        "description": "Verify the market potential",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Idea validation"
+      },
+      {
+        "description": "Analyze the competition and target audience",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Market research"
+      },
+      {
+        "description": "30 interviews with potential users",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Customer interviews"
+      },
+      {
+        "description": "Build the minimum viable product",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "MVP development"
+      },
+      {
+        "description": "A working prototype for testing",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Prototype"
+      },
+      {
+        "description": "Testing with 50 users",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "Beta testing"
+      },
+      {
+        "description": "A strategy for the first paying customers",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Customer acquisition"
+      },
+      {
+        "description": "Content marketing and social media",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Marketing"
+      },
+      {
+        "description": "Team up with complementary services",
+        "id": "n10",
+        "parentId": "n8",
+        "title": "Partnerships"
+      }
+    ]
+  },
+  {
+    "title": "Business Model Canvas",
+    "description": "9 stavebních bloků byznys modelu na jedné mapě.",
+    "category": "strategie",
+    "icon": "Layout",
+    "goal": "Business Model Canvas",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Popiš byznys, jehož model skládáš.",
+        "id": "root",
+        "parentId": null,
+        "title": "Business Model Canvas (definuj byznys)"
+      },
+      {
+        "description": "Komu sloužíš – pro koho tvoříš hodnotu.",
+        "id": "bm1",
+        "parentId": "root",
+        "title": "Zákaznické segmenty"
+      },
+      {
+        "description": "Jakou hodnotu a řešení přinášíš.",
+        "id": "bm2",
+        "parentId": "root",
+        "title": "Hodnotová nabídka"
+      },
+      {
+        "description": "Jak hodnotu doručuješ a komunikuješ.",
+        "id": "bm3",
+        "parentId": "root",
+        "title": "Distribuční kanály"
+      },
+      {
+        "description": "Jak zákazníky získáváš a udržuješ.",
+        "id": "bm4",
+        "parentId": "root",
+        "title": "Vztahy se zákazníky"
+      },
+      {
+        "description": "Za co a jak vyděláváš.",
+        "id": "bm5",
+        "parentId": "root",
+        "title": "Zdroje příjmů"
+      },
+      {
+        "description": "Co k podnikání nezbytně potřebuješ.",
+        "id": "bm6",
+        "parentId": "root",
+        "title": "Klíčové zdroje"
+      },
+      {
+        "description": "Co musíš dělat, aby model fungoval.",
+        "id": "bm7",
+        "parentId": "root",
+        "title": "Klíčové činnosti"
+      },
+      {
+        "description": "Kdo ti pomáhá (dodavatelé, partneři).",
+        "id": "bm8",
+        "parentId": "root",
+        "title": "Klíčoví partneři"
+      },
+      {
+        "description": "Hlavní náklady tvého modelu.",
+        "id": "bm9",
+        "parentId": "root",
+        "title": "Struktura nákladů"
+      }
+    ],
+    "title_en": "Business Model Canvas",
+    "description_en": "The 9 building blocks of a business model on one map.",
+    "goal_en": "Business Model Canvas",
+    "ai_nodes_en": [
+      {
+        "description": "Describe the business whose model you're building.",
+        "id": "root",
+        "parentId": null,
+        "title": "Business Model Canvas (define the business)"
+      },
+      {
+        "description": "Who you serve – who you create value for.",
+        "id": "bm1",
+        "parentId": "root",
+        "title": "Customer Segments"
+      },
+      {
+        "description": "What value and solution you deliver.",
+        "id": "bm2",
+        "parentId": "root",
+        "title": "Value Proposition"
+      },
+      {
+        "description": "How you deliver and communicate the value.",
+        "id": "bm3",
+        "parentId": "root",
+        "title": "Channels"
+      },
+      {
+        "description": "How you acquire and retain customers.",
+        "id": "bm4",
+        "parentId": "root",
+        "title": "Customer Relationships"
+      },
+      {
+        "description": "What you earn from and how.",
+        "id": "bm5",
+        "parentId": "root",
+        "title": "Revenue Streams"
+      },
+      {
+        "description": "What you absolutely need to run the business.",
+        "id": "bm6",
+        "parentId": "root",
+        "title": "Key Resources"
+      },
+      {
+        "description": "What you must do to make the model work.",
+        "id": "bm7",
+        "parentId": "root",
+        "title": "Key Activities"
+      },
+      {
+        "description": "Who helps you (suppliers, partners).",
+        "id": "bm8",
+        "parentId": "root",
+        "title": "Key Partners"
+      },
+      {
+        "description": "The main costs of your model.",
+        "id": "bm9",
+        "parentId": "root",
+        "title": "Cost Structure"
+      }
+    ]
+  },
+  {
+    "title": "Cesta kolem světa",
+    "description": "Naplánujte rozpočet, trasu i logistiku velké cesty.",
+    "category": "cestovani",
+    "icon": "Plane",
+    "goal": "Naplánovat dlouhou cestu kolem světa",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Základní plánování trasy po celém světě",
+        "id": "root",
+        "parentId": null,
+        "title": "Plánování dlouhé cesty kolem světa"
+      },
+      {
+        "description": "Rozvrhnout hlavní body a přestupy",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Plánování trasy"
+      },
+      {
+        "description": "Identifikovat klíčové body cesty a body přestupů",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Vybrat hlavní trasy a místa"
+      },
+      {
+        "description": "Rozvrhnout dobu pobytu na jednotlivých místech a celkový plán",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Stanovit časový harmonogram"
+      },
+      {
+        "description": "Zajistit ubytování a základní služby na každém místě",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Vyhledat a rezervovat ubytování"
+      },
+      {
+        "description": "Zajistit rozpočet, vize a dopravní prostředky",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Finanční a logistické zabezpečení"
+      },
+      {
+        "description": "Odhadnout náklady na dopravu, ubytování, stravu a další výdaje",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Vytvořit rozpočet"
+      },
+      {
+        "description": "Zajistit prostředky prostřednictvím úspor, sponzorů nebo půjček",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Získat financování"
+      },
+      {
+        "description": "Získat cestovní pojištění a potřebné víza a pasy",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Zajistit pojištění a cestovní dokumenty"
+      },
+      {
+        "description": "Připravit se na zdravotní, bezpečnostní a osobní aspekty",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Osobní a zdravotní příprava"
+      },
+      {
+        "description": "Ověřit zdravotní stav a požadovaná očkování",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Zdravotní kontrola a očkování"
+      },
+      {
+        "description": "Připravit se na nouzové situace a evakuační scénáře",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Zabezpečit bezpečnost a evakuační plán"
+      }
+    ],
+    "title_en": "Travel Around the World",
+    "description_en": "Plan the budget, route and logistics of a big trip.",
+    "goal_en": "Plan a long trip around the world",
+    "ai_nodes_en": [
+      {
+        "description": "Plan the basic route around the world",
+        "id": "root",
+        "parentId": null,
+        "title": "Plan a long trip around the world"
+      },
+      {
+        "description": "Map out the main stops and transfers",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Route planning"
+      },
+      {
+        "description": "Identify the key stops of the trip and transfer points",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Choose main routes and places"
+      },
+      {
+        "description": "Schedule the length of stay at each place and the overall plan",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Set a timeline"
+      },
+      {
+        "description": "Arrange accommodation and basic services at each location",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Find and book accommodation"
+      },
+      {
+        "description": "Secure the budget, visas and means of transport",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Financial and logistical arrangements"
+      },
+      {
+        "description": "Estimate costs for transport, accommodation, food and other expenses",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Create a budget"
+      },
+      {
+        "description": "Raise funds through savings, sponsors or loans",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Secure funding"
+      },
+      {
+        "description": "Get travel insurance and the required visas and passports",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Arrange insurance and travel documents"
+      },
+      {
+        "description": "Prepare for health, safety and personal aspects",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Personal and health preparation"
+      },
+      {
+        "description": "Check your health and get the required vaccinations",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Health check-up and vaccinations"
+      },
+      {
+        "description": "Prepare for emergencies and evacuation scenarios",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Prepare a safety and evacuation plan"
+      }
+    ]
+  },
+  {
+    "title": "DMAIC (Six Sigma)",
+    "description": "Definuj–Měř–Analyzuj–Zlepši–Řiď: zlepšení procesu daty.",
+    "category": "kvalita",
+    "icon": "Sigma",
+    "goal": "Zlepšení procesu (DMAIC)",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Který proces chceš zlepšit metodou DMAIC (Six Sigma).",
+        "id": "root",
+        "parentId": null,
+        "title": "Proces ke zlepšení (definuj)"
+      },
+      {
+        "description": "Definuj problém, cíl, zákazníka a rozsah projektu.",
+        "id": "d",
+        "parentId": "root",
+        "title": "Define – Definuj"
+      },
+      {
+        "description": "Změř současný stav a sesbírej relevantní data.",
+        "id": "m",
+        "parentId": "root",
+        "title": "Measure – Měř"
+      },
+      {
+        "description": "Najdi kořenové příčiny na základě dat.",
+        "id": "a",
+        "parentId": "root",
+        "title": "Analyze – Analyzuj"
+      },
+      {
+        "description": "Navrhni, otestuj a zaveď řešení.",
+        "id": "i",
+        "parentId": "root",
+        "title": "Improve – Zlepši"
+      },
+      {
+        "description": "Zafixuj zlepšení a nastav průběžnou kontrolu.",
+        "id": "c",
+        "parentId": "root",
+        "title": "Control – Řiď"
+      }
+    ],
+    "title_en": "DMAIC (Six Sigma)",
+    "description_en": "Define–Measure–Analyze–Improve–Control: data-driven process improvement.",
+    "goal_en": "Process improvement (DMAIC)",
+    "ai_nodes_en": [
+      {
+        "description": "Which process you want to improve using DMAIC (Six Sigma).",
+        "id": "root",
+        "parentId": null,
+        "title": "Process to improve (define)"
+      },
+      {
+        "description": "Define the problem, goal, customer and project scope.",
+        "id": "d",
+        "parentId": "root",
+        "title": "Define"
+      },
+      {
+        "description": "Measure the current state and collect relevant data.",
+        "id": "m",
+        "parentId": "root",
+        "title": "Measure"
+      },
+      {
+        "description": "Find the root causes based on the data.",
+        "id": "a",
+        "parentId": "root",
+        "title": "Analyze"
+      },
+      {
+        "description": "Design, test and implement solutions.",
+        "id": "i",
+        "parentId": "root",
+        "title": "Improve"
+      },
+      {
+        "description": "Lock in the improvement and set up ongoing control.",
+        "id": "c",
+        "parentId": "root",
+        "title": "Control"
+      }
+    ]
+  },
+  {
+    "title": "Eisenhowerova matice",
+    "description": "Roztřiď úkoly podle důležitosti a naléhavosti.",
+    "category": "strategie",
+    "icon": "Grid2x2",
+    "goal": "Eisenhowerova matice úkolů",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Sepiš úkoly a roztřiď je do kvadrantů.",
+        "id": "root",
+        "parentId": null,
+        "title": "Eisenhowerova matice – úkoly (definuj)"
+      },
+      {
+        "description": "Krize a termíny, které nesnesou odklad.",
+        "id": "q1",
+        "parentId": "root",
+        "title": "Důležité + naléhavé → Udělej hned"
+      },
+      {
+        "description": "Rozvoj a prevence – naplánuj si čas.",
+        "id": "q2",
+        "parentId": "root",
+        "title": "Důležité + nenaléhavé → Naplánuj"
+      },
+      {
+        "description": "Vyrušení a úkoly, které může udělat někdo jiný.",
+        "id": "q3",
+        "parentId": "root",
+        "title": "Naléhavé + nedůležité → Deleguj"
+      },
+      {
+        "description": "Žrouti času, které lze zrušit.",
+        "id": "q4",
+        "parentId": "root",
+        "title": "Nedůležité + nenaléhavé → Vypusť"
+      }
+    ],
+    "title_en": "Eisenhower Matrix",
+    "description_en": "Sort tasks by importance and urgency.",
+    "goal_en": "Eisenhower task matrix",
+    "ai_nodes_en": [
+      {
+        "description": "List your tasks and sort them into quadrants.",
+        "id": "root",
+        "parentId": null,
+        "title": "Eisenhower Matrix – tasks (define)"
+      },
+      {
+        "description": "Crises and deadlines that cannot wait.",
+        "id": "q1",
+        "parentId": "root",
+        "title": "Important + urgent → Do it now"
+      },
+      {
+        "description": "Growth and prevention – schedule time for it.",
+        "id": "q2",
+        "parentId": "root",
+        "title": "Important + not urgent → Schedule"
+      },
+      {
+        "description": "Interruptions and tasks someone else can do.",
+        "id": "q3",
+        "parentId": "root",
+        "title": "Urgent + not important → Delegate"
+      },
+      {
+        "description": "Time wasters that can be dropped.",
+        "id": "q4",
+        "parentId": "root",
+        "title": "Not important + not urgent → Eliminate"
+      }
+    ]
+  },
+  {
+    "title": "FMEA",
+    "description": "Analýza možných selhání, jejich důsledků a rizik (RPN).",
+    "category": "kvalita",
+    "icon": "AlertTriangle",
+    "goal": "FMEA – analýza rizik selhání",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Co analyzuješ na možná selhání.",
+        "id": "root",
+        "parentId": null,
+        "title": "FMEA – proces/produkt (definuj)"
+      },
+      {
+        "description": "Jak může proces nebo díl selhat.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Možné způsoby selhání"
+      },
+      {
+        "description": "Co selhání způsobí; ohodnoť závažnost 1–10.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Důsledky a závažnost (S)"
+      },
+      {
+        "description": "Proč k selhání dojde; ohodnoť pravděpodobnost 1–10.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Příčiny a výskyt (O)"
+      },
+      {
+        "description": "Jak selhání zachytíš; ohodnoť odhalitelnost 1–10.",
+        "id": "f4",
+        "parentId": "root",
+        "title": "Kontroly a odhalitelnost (D)"
+      },
+      {
+        "description": "Spočítej prioritu rizika a seřaď selhání.",
+        "id": "f5",
+        "parentId": "root",
+        "title": "Rizikové číslo RPN (S×O×D)"
+      },
+      {
+        "description": "Sniž závažnost, výskyt nebo zlepši odhalení.",
+        "id": "f6",
+        "parentId": "root",
+        "title": "Nápravná opatření"
+      }
+    ],
+    "title_en": "FMEA",
+    "description_en": "Analysis of potential failures, their effects and risks (RPN).",
+    "goal_en": "FMEA – failure risk analysis",
+    "ai_nodes_en": [
+      {
+        "description": "What you are analyzing for potential failures.",
+        "id": "root",
+        "parentId": null,
+        "title": "FMEA – process/product (define)"
+      },
+      {
+        "description": "How the process or part can fail.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Potential Failure Modes"
+      },
+      {
+        "description": "What the failure causes; rate severity 1–10.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Effects and Severity (S)"
+      },
+      {
+        "description": "Why the failure happens; rate probability 1–10.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Causes and Occurrence (O)"
+      },
+      {
+        "description": "How you catch the failure; rate detectability 1–10.",
+        "id": "f4",
+        "parentId": "root",
+        "title": "Controls and Detection (D)"
+      },
+      {
+        "description": "Calculate the risk priority and rank the failures.",
+        "id": "f5",
+        "parentId": "root",
+        "title": "Risk Priority Number RPN (S×O×D)"
+      },
+      {
+        "description": "Reduce severity or occurrence, or improve detection.",
+        "id": "f6",
+        "parentId": "root",
+        "title": "Corrective Actions"
+      }
+    ]
+  },
+  {
+    "title": "FMEA — kanban",
+    "description": "Analýza selhání (RPN) jako kanban: položky zakládej pod první sloupec, hotová karta se sama posune do dalšího kroku.",
+    "category": "kanban",
+    "icon": "AlertTriangle",
+    "goal": "FMEA – analýza rizik selhání",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Co analyzuješ na možná selhání. Položky zakládej jako pod-uzly prvního sloupce — hotová karta se posune sama.",
+        "id": "root",
+        "parentId": null,
+        "title": "FMEA – proces/produkt (definuj)"
+      },
+      {
+        "description": "Jak může proces nebo díl selhat.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Možné způsoby selhání"
+      },
+      {
+        "description": "Co selhání způsobí; ohodnoť závažnost 1–10.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Důsledky a závažnost (S)"
+      },
+      {
+        "description": "Proč k selhání dojde; ohodnoť pravděpodobnost 1–10.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Příčiny a výskyt (O)"
+      },
+      {
+        "description": "Jak selhání zachytíš; ohodnoť odhalitelnost 1–10.",
+        "id": "f4",
+        "parentId": "root",
+        "title": "Kontroly a odhalitelnost (D)"
+      },
+      {
+        "description": "Spočítej prioritu rizika a seřaď selhání.",
+        "id": "f5",
+        "parentId": "root",
+        "title": "Rizikové číslo RPN (S×O×D)"
+      },
+      {
+        "description": "Sniž závažnost, výskyt nebo zlepši odhalení.",
+        "id": "f6",
+        "parentId": "root",
+        "title": "Nápravná opatření"
+      }
+    ],
+    "title_en": "FMEA — Kanban",
+    "description_en": "Failure analysis (RPN) as a kanban: create items under the first column; a finished card moves itself to the next step.",
+    "goal_en": "FMEA – failure risk analysis",
+    "ai_nodes_en": [
+      {
+        "description": "What you are analyzing for potential failures. Create items as sub-nodes of the first column — a finished card moves on by itself.",
+        "id": "root",
+        "parentId": null,
+        "title": "FMEA – process/product (define)"
+      },
+      {
+        "description": "How the process or part can fail.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Potential Failure Modes"
+      },
+      {
+        "description": "What the failure causes; rate severity 1–10.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Effects and Severity (S)"
+      },
+      {
+        "description": "Why the failure happens; rate probability 1–10.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Causes and Occurrence (O)"
+      },
+      {
+        "description": "How you catch the failure; rate detectability 1–10.",
+        "id": "f4",
+        "parentId": "root",
+        "title": "Controls and Detection (D)"
+      },
+      {
+        "description": "Calculate the risk priority and rank the failures.",
+        "id": "f5",
+        "parentId": "root",
+        "title": "Risk Priority Number RPN (S×O×D)"
+      },
+      {
+        "description": "Reduce severity or occurrence, or improve detection.",
+        "id": "f6",
+        "parentId": "root",
+        "title": "Corrective Actions"
+      }
+    ],
+    "rules": [
+      {
+        "actions": [
+          {
+            "to": "f2",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "f1"
+          }
+        ],
+        "id": "r1",
+        "name": "Kanban: Možné způsoby selhání → Důsledky a závažnost (S)",
+        "name_en": "Kanban: Potential Failure Modes → Effects and Severity (S)",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "f3",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "f2"
+          }
+        ],
+        "id": "r2",
+        "name": "Kanban: Důsledky a závažnost (S) → Příčiny a výskyt (O)",
+        "name_en": "Kanban: Effects and Severity (S) → Causes and Occurrence (O)",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "f4",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "f3"
+          }
+        ],
+        "id": "r3",
+        "name": "Kanban: Příčiny a výskyt (O) → Kontroly a odhalitelnost (D)",
+        "name_en": "Kanban: Causes and Occurrence (O) → Controls and Detection (D)",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "f5",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "f4"
+          }
+        ],
+        "id": "r4",
+        "name": "Kanban: Kontroly a odhalitelnost (D) → Rizikové číslo RPN (S×O×D)",
+        "name_en": "Kanban: Controls and Detection (D) → Risk Priority Number RPN (S×O×D)",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      },
+      {
+        "actions": [
+          {
+            "to": "f6",
+            "type": "move_node"
+          },
+          {
+            "status": "todo",
+            "type": "set_status"
+          }
+        ],
+        "conditions": [
+          {
+            "field": "parent",
+            "op": "eq",
+            "value": "f5"
+          }
+        ],
+        "id": "r5",
+        "name": "Kanban: Rizikové číslo RPN (S×O×D) → Nápravná opatření",
+        "name_en": "Kanban: Risk Priority Number RPN (S×O×D) → Corrective Actions",
+        "trigger": {
+          "status": "done",
+          "type": "node_status_changed"
+        }
+      }
+    ]
+  },
+  {
+    "title": "Finanční nezávislost",
+    "description": "Cesta k finanční stabilitě a svobodě prostřednictvím úspor a investic.",
+    "category": "finance",
+    "icon": "Wallet",
+    "goal": "Dosáhnout finanční nezávislosti",
+    "node_type": "vize",
+    "ai_nodes": [
+      {
+        "description": "Dlouhodobá vize finanční svobody",
+        "id": "n1",
+        "parentId": null,
+        "title": "Dosáhnout finanční nezávislosti"
+      },
+      {
+        "description": "Postupné splacení všech úvěrů",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Snižování dluhů"
+      },
+      {
+        "description": "Prioritně splatit drahé úvěry",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Splacení spotřebitelských úvěrů"
+      },
+      {
+        "description": "Naspořit 6× měsíční výdaje",
+        "id": "n4",
+        "parentId": "n1",
+        "title": "Tvorba zálohy"
+      },
+      {
+        "description": "10% příjmů automaticky odkládat",
+        "id": "n5",
+        "parentId": "n4",
+        "title": "Pravidelné úspory"
+      },
+      {
+        "description": "Dlouhodobé budování investičního portfolia",
+        "id": "n6",
+        "parentId": "n1",
+        "title": "Investování"
+      },
+      {
+        "description": "Měsíční investice do diverzifikovaných ETF",
+        "id": "n7",
+        "parentId": "n6",
+        "title": "ETF portfólio"
+      },
+      {
+        "description": "Vytvořit zdroj pasivního příjmu",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Doplňkové příjmy"
+      },
+      {
+        "description": "Knihy a kurzy o investicích",
+        "id": "n9",
+        "parentId": "n1",
+        "title": "Finanční vzdělávání"
+      }
+    ],
+    "title_en": "Financial Independence",
+    "description_en": "The path to financial stability and freedom through saving and investing.",
+    "goal_en": "Achieve financial independence",
+    "ai_nodes_en": [
+      {
+        "description": "Long-term vision of financial freedom",
+        "id": "n1",
+        "parentId": null,
+        "title": "Achieve financial independence"
+      },
+      {
+        "description": "Gradually paying off all loans",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Reducing debt"
+      },
+      {
+        "description": "Pay off expensive loans first",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Paying off consumer loans"
+      },
+      {
+        "description": "Save six months' worth of expenses",
+        "id": "n4",
+        "parentId": "n1",
+        "title": "Building an emergency fund"
+      },
+      {
+        "description": "Automatically set aside 10% of income",
+        "id": "n5",
+        "parentId": "n4",
+        "title": "Regular savings"
+      },
+      {
+        "description": "Long-term building of an investment portfolio",
+        "id": "n6",
+        "parentId": "n1",
+        "title": "Investing"
+      },
+      {
+        "description": "Monthly investments in diversified ETFs",
+        "id": "n7",
+        "parentId": "n6",
+        "title": "ETF portfolio"
+      },
+      {
+        "description": "Create a source of passive income",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Additional income"
+      },
+      {
+        "description": "Books and courses on investing",
+        "id": "n9",
+        "parentId": "n1",
+        "title": "Financial education"
+      }
+    ]
+  },
+  {
+    "title": "GROW model",
+    "description": "Koučovací model: Cíl – Realita – Možnosti – Vůle.",
+    "category": "strategie",
+    "icon": "MessageCircle",
+    "goal": "GROW – koučovací rozhovor",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "O čem je koučovací rozhovor.",
+        "id": "root",
+        "parentId": null,
+        "title": "GROW – téma rozhovoru (definuj)"
+      },
+      {
+        "description": "Čeho chceš dosáhnout.",
+        "id": "g",
+        "parentId": "root",
+        "title": "G – Cíl (Goal)"
+      },
+      {
+        "description": "Jaký je současný stav a fakta.",
+        "id": "r",
+        "parentId": "root",
+        "title": "R – Realita (Reality)"
+      },
+      {
+        "description": "Jaké máš možnosti a varianty.",
+        "id": "o",
+        "parentId": "root",
+        "title": "O – Možnosti (Options)"
+      },
+      {
+        "description": "Co konkrétně a kdy uděláš.",
+        "id": "w",
+        "parentId": "root",
+        "title": "W – Vůle / další kroky (Will)"
+      }
+    ],
+    "title_en": "GROW Model",
+    "description_en": "Coaching model: Goal – Reality – Options – Will.",
+    "goal_en": "GROW – coaching conversation",
+    "ai_nodes_en": [
+      {
+        "description": "What the coaching conversation is about.",
+        "id": "root",
+        "parentId": null,
+        "title": "GROW – conversation topic (define)"
+      },
+      {
+        "description": "What you want to achieve.",
+        "id": "g",
+        "parentId": "root",
+        "title": "G – Goal"
+      },
+      {
+        "description": "The current state and the facts.",
+        "id": "r",
+        "parentId": "root",
+        "title": "R – Reality"
+      },
+      {
+        "description": "What options and alternatives you have.",
+        "id": "o",
+        "parentId": "root",
+        "title": "O – Options"
+      },
+      {
+        "description": "What exactly you'll do and when.",
+        "id": "w",
+        "parentId": "root",
+        "title": "W – Will / next steps"
+      }
+    ]
+  },
+  {
+    "title": "Ishikawa (diagram příčin)",
+    "description": "Diagram rybí kosti – najdi příčiny problému v 6 oblastech (6M).",
+    "category": "kvalita",
+    "icon": "Fish",
+    "goal": "Analýza příčin problému (Ishikawa)",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Popiš konkrétní problém nebo nežádoucí následek, jehož příčiny hledáš.",
+        "id": "root",
+        "parentId": null,
+        "title": "Problém / následek (definuj)"
+      },
+      {
+        "description": "Příčiny související s lidmi – znalosti, chyby, motivace, komunikace, školení.",
+        "id": "lide",
+        "parentId": "root",
+        "title": "Lidé"
+      },
+      {
+        "description": "Příčiny v technice, strojích, nástrojích, údržbě a vybavení.",
+        "id": "stroje",
+        "parentId": "root",
+        "title": "Stroje / zařízení"
+      },
+      {
+        "description": "Příčiny v procesech, postupech, pravidlech a instrukcích.",
+        "id": "metody",
+        "parentId": "root",
+        "title": "Metody / postupy"
+      },
+      {
+        "description": "Příčiny v materiálech, surovinách, dílech a vstupech.",
+        "id": "material",
+        "parentId": "root",
+        "title": "Materiál"
+      },
+      {
+        "description": "Příčiny v měření, datech, kontrolách a kalibraci.",
+        "id": "mereni",
+        "parentId": "root",
+        "title": "Měření"
+      },
+      {
+        "description": "Příčiny v prostředí, podmínkách, okolí a vnějších vlivech.",
+        "id": "prostredi",
+        "parentId": "root",
+        "title": "Prostředí"
+      }
+    ],
+    "title_en": "Ishikawa (Cause-and-Effect Diagram)",
+    "description_en": "Fishbone diagram – find the causes of a problem across 6 areas (6M).",
+    "goal_en": "Root cause analysis (Ishikawa)",
+    "ai_nodes_en": [
+      {
+        "description": "Describe the specific problem or unwanted effect whose causes you're looking for.",
+        "id": "root",
+        "parentId": null,
+        "title": "Problem / effect (define)"
+      },
+      {
+        "description": "Causes related to people – knowledge, errors, motivation, communication, training.",
+        "id": "lide",
+        "parentId": "root",
+        "title": "People"
+      },
+      {
+        "description": "Causes in technology, machines, tools, maintenance and equipment.",
+        "id": "stroje",
+        "parentId": "root",
+        "title": "Machines / equipment"
+      },
+      {
+        "description": "Causes in processes, procedures, rules and instructions.",
+        "id": "metody",
+        "parentId": "root",
+        "title": "Methods / procedures"
+      },
+      {
+        "description": "Causes in materials, raw materials, parts and inputs.",
+        "id": "material",
+        "parentId": "root",
+        "title": "Materials"
+      },
+      {
+        "description": "Causes in measurement, data, inspections and calibration.",
+        "id": "mereni",
+        "parentId": "root",
+        "title": "Measurement"
+      },
+      {
+        "description": "Causes in the environment, conditions, surroundings and external influences.",
+        "id": "prostredi",
+        "parentId": "root",
+        "title": "Environment"
+      }
+    ]
+  },
+  {
+    "title": "Kanban tabule",
+    "description": "Vizuální řízení práce v tocích (sloupcích) s limitem rozpracovanosti.",
+    "category": "strategie",
+    "icon": "Columns3",
+    "goal": "Kanban – tok práce",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Jaký tok práce chceš vizuálně řídit.",
+        "id": "root",
+        "parentId": null,
+        "title": "Kanban – proces/projekt (definuj)"
+      },
+      {
+        "description": "Nápady a úkoly čekající na zařazení.",
+        "id": "k1",
+        "parentId": "root",
+        "title": "Zásobník (Backlog)"
+      },
+      {
+        "description": "Úkoly připravené k zahájení.",
+        "id": "k2",
+        "parentId": "root",
+        "title": "K udělání (To Do)"
+      },
+      {
+        "description": "Na čem se právě pracuje – omez počet (WIP limit).",
+        "id": "k3",
+        "parentId": "root",
+        "title": "Probíhá (In Progress)"
+      },
+      {
+        "description": "Hotovo k ověření nebo schválení.",
+        "id": "k4",
+        "parentId": "root",
+        "title": "Kontrola (Review)"
+      },
+      {
+        "description": "Dokončené úkoly.",
+        "id": "k5",
+        "parentId": "root",
+        "title": "Hotovo (Done)"
+      }
+    ],
+    "title_en": "Kanban Board",
+    "description_en": "Visual management of work in columns (flow-based), with a work-in-progress (WIP) limit.",
+    "goal_en": "Kanban – flow of work",
+    "ai_nodes_en": [
+      {
+        "description": "Which workflow you want to manage visually.",
+        "id": "root",
+        "parentId": null,
+        "title": "Kanban – process/project (define)"
+      },
+      {
+        "description": "Ideas and tasks waiting to be scheduled.",
+        "id": "k1",
+        "parentId": "root",
+        "title": "Backlog"
+      },
+      {
+        "description": "Tasks ready to be started.",
+        "id": "k2",
+        "parentId": "root",
+        "title": "To Do"
+      },
+      {
+        "description": "What is being worked on right now – limit the count (WIP limit).",
+        "id": "k3",
+        "parentId": "root",
+        "title": "In Progress"
+      },
+      {
+        "description": "Finished, awaiting review or approval.",
+        "id": "k4",
+        "parentId": "root",
+        "title": "Review"
+      },
+      {
+        "description": "Completed tasks.",
+        "id": "k5",
+        "parentId": "root",
+        "title": "Done"
+      }
+    ]
+  },
+  {
+    "title": "Kariérní růst",
+    "description": "Plán pro postup v kariéře a dosažení profesních cílů.",
+    "category": "prace",
+    "icon": "Briefcase",
+    "goal": "Dosáhnout pozice senior specialisty",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Hlavní kariérní cíl na 2 roky",
+        "id": "n1",
+        "parentId": null,
+        "title": "Dosáhnout pozice senior specialisty"
+      },
+      {
+        "description": "Prohloubení technických dovedností",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Rozvoj odborných znalostí"
+      },
+      {
+        "description": "Získat 2 oborové certifikace",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Certifikace"
+      },
+      {
+        "description": "Najít si mentora v oboru",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Mentoring"
+      },
+      {
+        "description": "Networking a vztahy v oboru",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Budování sítě kontaktů"
+      },
+      {
+        "description": "2 konference ročně",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Účast na konferencích"
+      },
+      {
+        "description": "Pravidelné příspěvky a komentáře",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "LinkedIn aktivita"
+      },
+      {
+        "description": "Převzít zodpovědnost za klíčové projekty",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Vedení projektů"
+      },
+      {
+        "description": "Mentoring junior kolegů",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Vést tým"
+      }
+    ],
+    "title_en": "Career Growth",
+    "description_en": "A plan for advancing your career and achieving professional goals.",
+    "goal_en": "Reach a senior specialist position",
+    "ai_nodes_en": [
+      {
+        "description": "Main career goal for the next 2 years",
+        "id": "n1",
+        "parentId": null,
+        "title": "Reach a senior specialist position"
+      },
+      {
+        "description": "Deepening technical skills",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Developing professional expertise"
+      },
+      {
+        "description": "Earn 2 industry certifications",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Certifications"
+      },
+      {
+        "description": "Find a mentor in the field",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Mentoring"
+      },
+      {
+        "description": "Networking and industry relationships",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Building a network"
+      },
+      {
+        "description": "2 conferences per year",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Attending conferences"
+      },
+      {
+        "description": "Regular posts and comments",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "LinkedIn activity"
+      },
+      {
+        "description": "Take responsibility for key projects",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Leading projects"
+      },
+      {
+        "description": "Mentoring junior colleagues",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Lead a team"
+      }
+    ]
+  },
+  {
+    "title": "Lean Canvas",
+    "description": "9 bloků pro rychlé ověření startupu/produktu (Ash Maurya).",
+    "category": "strategie",
+    "icon": "Lightbulb",
+    "goal": "Lean Canvas",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Popiš nápad, jehož model ověřuješ.",
+        "id": "root",
+        "parentId": null,
+        "title": "Lean Canvas (definuj startup/produkt)"
+      },
+      {
+        "description": "Top 1–3 problémy zákazníka, které řešíš.",
+        "id": "lc1",
+        "parentId": "root",
+        "title": "Problém"
+      },
+      {
+        "description": "Cíloví zákazníci a early adopters.",
+        "id": "lc2",
+        "parentId": "root",
+        "title": "Zákaznické segmenty"
+      },
+      {
+        "description": "Jasná zpráva, proč jsi jiný a proč za to stojí.",
+        "id": "lc3",
+        "parentId": "root",
+        "title": "Unikátní hodnotová nabídka"
+      },
+      {
+        "description": "Top 3 funkce, které problém řeší.",
+        "id": "lc4",
+        "parentId": "root",
+        "title": "Řešení"
+      },
+      {
+        "description": "Cesty, jak se dostaneš k zákazníkům.",
+        "id": "lc5",
+        "parentId": "root",
+        "title": "Kanály"
+      },
+      {
+        "description": "Jak a za co vyděláváš.",
+        "id": "lc6",
+        "parentId": "root",
+        "title": "Zdroje příjmů"
+      },
+      {
+        "description": "Hlavní náklady.",
+        "id": "lc7",
+        "parentId": "root",
+        "title": "Struktura nákladů"
+      },
+      {
+        "description": "Čísla, podle kterých měříš úspěch.",
+        "id": "lc8",
+        "parentId": "root",
+        "title": "Klíčové metriky"
+      },
+      {
+        "description": "Co nelze snadno zkopírovat ani koupit.",
+        "id": "lc9",
+        "parentId": "root",
+        "title": "Nespravedlivá výhoda"
+      }
+    ],
+    "title_en": "Lean Canvas",
+    "description_en": "9 blocks for quickly validating a startup/product (Ash Maurya).",
+    "goal_en": "Lean Canvas",
+    "ai_nodes_en": [
+      {
+        "description": "Describe the idea whose model you are validating.",
+        "id": "root",
+        "parentId": null,
+        "title": "Lean Canvas (define your startup/product)"
+      },
+      {
+        "description": "Top 1–3 customer problems you are solving.",
+        "id": "lc1",
+        "parentId": "root",
+        "title": "Problem"
+      },
+      {
+        "description": "Target customers and early adopters.",
+        "id": "lc2",
+        "parentId": "root",
+        "title": "Customer Segments"
+      },
+      {
+        "description": "A clear message about why you're different and worth choosing.",
+        "id": "lc3",
+        "parentId": "root",
+        "title": "Unique Value Proposition"
+      },
+      {
+        "description": "Top 3 features that solve the problem.",
+        "id": "lc4",
+        "parentId": "root",
+        "title": "Solution"
+      },
+      {
+        "description": "Paths to reach your customers.",
+        "id": "lc5",
+        "parentId": "root",
+        "title": "Channels"
+      },
+      {
+        "description": "How you make money and from what.",
+        "id": "lc6",
+        "parentId": "root",
+        "title": "Revenue Streams"
+      },
+      {
+        "description": "Main costs.",
+        "id": "lc7",
+        "parentId": "root",
+        "title": "Cost Structure"
+      },
+      {
+        "description": "Numbers you use to measure success.",
+        "id": "lc8",
+        "parentId": "root",
+        "title": "Key Metrics"
+      },
+      {
+        "description": "What cannot be easily copied or bought.",
+        "id": "lc9",
+        "parentId": "root",
+        "title": "Unfair Advantage"
+      }
+    ]
+  },
+  {
+    "title": "MoSCoW priorizace",
+    "description": "Priorizace požadavků: Must / Should / Could / Won't.",
+    "category": "strategie",
+    "icon": "ListChecks",
+    "goal": "MoSCoW – priorizace",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Co priorizuješ (funkce, požadavky, úkoly).",
+        "id": "root",
+        "parentId": null,
+        "title": "MoSCoW – projekt/požadavky (definuj)"
+      },
+      {
+        "description": "Nezbytné – bez toho projekt nedává smysl.",
+        "id": "m",
+        "parentId": "root",
+        "title": "Must have (musí mít)"
+      },
+      {
+        "description": "Důležité, ale ne kritické – lze odložit.",
+        "id": "s",
+        "parentId": "root",
+        "title": "Should have (mělo by mít)"
+      },
+      {
+        "description": "Příjemné, pokud zbude čas a zdroje.",
+        "id": "co",
+        "parentId": "root",
+        "title": "Could have (mohlo by mít)"
+      },
+      {
+        "description": "Mimo rozsah pro tuto fázi.",
+        "id": "wo",
+        "parentId": "root",
+        "title": "Won't have (teď nebude)"
+      }
+    ],
+    "title_en": "MoSCoW Prioritization",
+    "description_en": "Requirement prioritization: Must / Should / Could / Won't.",
+    "goal_en": "MoSCoW – prioritization",
+    "ai_nodes_en": [
+      {
+        "description": "What you are prioritizing (features, requirements, tasks).",
+        "id": "root",
+        "parentId": null,
+        "title": "MoSCoW – project/requirements (define)"
+      },
+      {
+        "description": "Essential – the project makes no sense without it.",
+        "id": "m",
+        "parentId": "root",
+        "title": "Must have"
+      },
+      {
+        "description": "Important but not critical – can be postponed.",
+        "id": "s",
+        "parentId": "root",
+        "title": "Should have"
+      },
+      {
+        "description": "Nice to have if time and resources allow.",
+        "id": "co",
+        "parentId": "root",
+        "title": "Could have"
+      },
+      {
+        "description": "Out of scope for this phase.",
+        "id": "wo",
+        "parentId": "root",
+        "title": "Won't have (this time)"
+      }
+    ]
+  },
+  {
+    "title": "Najít novou práci",
+    "description": "Od přípravy CV po podepsání nové smlouvy.",
+    "category": "prace",
+    "icon": "Search",
+    "goal": "Najít a získat lepší novou práci",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cílem je identifikovat, připravit a získat pozici, která lépe odpovídá vašim požadavkům a schopnostem.",
+        "id": "root",
+        "parentId": null,
+        "title": "Najít a získat lepší novou práci"
+      },
+      {
+        "description": "Zmapujte požadavky odvětví a určete, která role vám nejlépe vyhovuje.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Prozkoumejte trh a své preference"
+      },
+      {
+        "description": "Zkontrolujte vývoj odvětví a poptávku po pozicích.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Analyzujte průmyslové trendy"
+      },
+      {
+        "description": "Určete požadavky jako plat, benefity, kultura.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Definujte vlastní kritéria"
+      },
+      {
+        "description": "Vyhledejte společnosti, které odpovídají vašim kritériím.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Sestavte seznam potenciálních firem"
+      },
+      {
+        "description": "Zlepšete dovednosti a rozšiřte kontakty pro lepší šance.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Zvyšte své kvalifikace a síť"
+      },
+      {
+        "description": "Zjistěte, jaké dovednosti chybí k požadované pozici.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Udělejte gap analýzu"
+      },
+      {
+        "description": "Projděte certifikace, které posílí váš profil.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Zúčastněte se školení nebo kurzů"
+      },
+      {
+        "description": "Navazujte vztahy na LinkedIn, networkingových akcích.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Budujte profesní síť"
+      },
+      {
+        "description": "Optimalizujte životopis, motivační dopis a připravte se na pohovory.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Připravte aplikace a pohovory"
+      },
+      {
+        "description": "Zahrňte klíčová slova a výsledky.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Aktualizujte CV a LinkedIn"
+      },
+      {
+        "description": "Přizpůsobte dopis konkrétní firmě.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Připravte motivační dopis"
+      },
+      {
+        "description": "Procvičte otázky a simulujte situace.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Trénujte pohovory"
+      }
+    ],
+    "title_en": "Find a New Job",
+    "description_en": "From preparing your CV to signing a new contract.",
+    "goal_en": "Find and land a better new job",
+    "ai_nodes_en": [
+      {
+        "description": "The goal is to identify, prepare for, and land a position that better matches your needs and skills.",
+        "id": "root",
+        "parentId": null,
+        "title": "Find and land a better new job"
+      },
+      {
+        "description": "Map industry requirements and figure out which role suits you best.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Research the market and your preferences"
+      },
+      {
+        "description": "Review industry developments and demand for positions.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Analyze industry trends"
+      },
+      {
+        "description": "Set requirements like salary, benefits, culture.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Define your own criteria"
+      },
+      {
+        "description": "Find companies that match your criteria.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Build a list of potential companies"
+      },
+      {
+        "description": "Improve your skills and expand your contacts for better chances.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Level up your skills and network"
+      },
+      {
+        "description": "Find out which skills you're missing for the desired position.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Do a gap analysis"
+      },
+      {
+        "description": "Complete certifications that strengthen your profile.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Take training or courses"
+      },
+      {
+        "description": "Make connections on LinkedIn and at networking events.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Build a professional network"
+      },
+      {
+        "description": "Optimize your CV and cover letter, and prepare for interviews.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Prepare applications and interviews"
+      },
+      {
+        "description": "Include keywords and results.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Update your CV and LinkedIn"
+      },
+      {
+        "description": "Tailor the letter to each specific company.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Prepare a cover letter"
+      },
+      {
+        "description": "Rehearse questions and simulate scenarios.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Practice interviews"
+      }
+    ]
+  },
+  {
+    "title": "Naplánovat dovolenou",
+    "description": "Vyberte destinaci, rozpočet a program dovolené.",
+    "category": "cestovani",
+    "icon": "Palmtree",
+    "goal": "Naplánovat ideální letní dovolenou",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Celkový cíl: naplánovat dokonalou letní dovolenou.",
+        "id": "root",
+        "parentId": null,
+        "title": "Naplánovat ideální letní dovolenou"
+      },
+      {
+        "description": "Určení finančních a časových parametrů.",
+        "id": "p1",
+        "parentId": "root",
+        "title": "Stanovení rozpočtu a časového rámce"
+      },
+      {
+        "description": "Stanovte maximální částku na dovolenou.",
+        "id": "p1s1",
+        "parentId": "p1",
+        "title": "Určete celkový rozpočet"
+      },
+      {
+        "description": "Určete počet a rozvrh volných dnů.",
+        "id": "p1s2",
+        "parentId": "p1",
+        "title": "Rozplánujte dostupné dny"
+      },
+      {
+        "description": "Přidejte předpokládané výdaje na dopravu a ubytování.",
+        "id": "p1s3",
+        "parentId": "p1",
+        "title": "Zohledněte náklady na cestu a ubytování"
+      },
+      {
+        "description": "Výběr místa a stylu odpočinku.",
+        "id": "p2",
+        "parentId": "root",
+        "title": "Výběr destinace a typ dovolené"
+      },
+      {
+        "description": "Zvolte mezi plážovou, dobrodružnou nebo kulturní dovolenou.",
+        "id": "p2s1",
+        "parentId": "p2",
+        "title": "Rozhodněte se pro typ dovolené"
+      },
+      {
+        "description": "Vyberte konkrétní oblast a stát.",
+        "id": "p2s2",
+        "parentId": "p2",
+        "title": "Vyberte region a země"
+      },
+      {
+        "description": "Zjistěte klimatické podmínky a významné události.",
+        "id": "p2s3",
+        "parentId": "p2",
+        "title": "Zkontrolujte počasí a sezónní události"
+      },
+      {
+        "description": "Zajištění detailního plánu a potvrzení služeb.",
+        "id": "p3",
+        "parentId": "root",
+        "title": "Plánování itinéře a rezervací"
+      },
+      {
+        "description": "Rozvrhněte aktivity pro každý den.",
+        "id": "p3s1",
+        "parentId": "p3",
+        "title": "Vytvořte denní plán aktivity"
+      },
+      {
+        "description": "Zajistěte místa k pobytu a způsob dopravy.",
+        "id": "p3s2",
+        "parentId": "p3",
+        "title": "Rezervujte ubytování a dopravu"
+      },
+      {
+        "description": "Ujistěte se, že máte cestovní pojištění a platné dokumenty.",
+        "id": "p3s3",
+        "parentId": "p3",
+        "title": "Zajistěte pojištění a dokumenty"
+      }
+    ],
+    "title_en": "Plan a Vacation",
+    "description_en": "Pick a destination, budget, and vacation itinerary.",
+    "goal_en": "Plan the ideal summer vacation",
+    "ai_nodes_en": [
+      {
+        "description": "Overall goal: plan the perfect summer vacation.",
+        "id": "root",
+        "parentId": null,
+        "title": "Plan the ideal summer vacation"
+      },
+      {
+        "description": "Define the financial and time parameters.",
+        "id": "p1",
+        "parentId": "root",
+        "title": "Set the budget and time frame"
+      },
+      {
+        "description": "Decide the maximum amount for the vacation.",
+        "id": "p1s1",
+        "parentId": "p1",
+        "title": "Set the total budget"
+      },
+      {
+        "description": "Determine the number and schedule of days off.",
+        "id": "p1s2",
+        "parentId": "p1",
+        "title": "Plan your available days"
+      },
+      {
+        "description": "Add estimated expenses for transport and lodging.",
+        "id": "p1s3",
+        "parentId": "p1",
+        "title": "Factor in travel and accommodation costs"
+      },
+      {
+        "description": "Pick the place and style of getaway.",
+        "id": "p2",
+        "parentId": "root",
+        "title": "Choose the destination and vacation type"
+      },
+      {
+        "description": "Choose between a beach, adventure, or cultural vacation.",
+        "id": "p2s1",
+        "parentId": "p2",
+        "title": "Decide on the vacation type"
+      },
+      {
+        "description": "Select a specific area and country.",
+        "id": "p2s2",
+        "parentId": "p2",
+        "title": "Pick a region and country"
+      },
+      {
+        "description": "Look up climate conditions and major events.",
+        "id": "p2s3",
+        "parentId": "p2",
+        "title": "Check the weather and seasonal events"
+      },
+      {
+        "description": "Put together a detailed plan and confirm services.",
+        "id": "p3",
+        "parentId": "root",
+        "title": "Plan the itinerary and bookings"
+      },
+      {
+        "description": "Schedule activities for each day.",
+        "id": "p3s1",
+        "parentId": "p3",
+        "title": "Create a daily activity plan"
+      },
+      {
+        "description": "Secure places to stay and how you'll get there.",
+        "id": "p3s2",
+        "parentId": "p3",
+        "title": "Book accommodation and transport"
+      },
+      {
+        "description": "Make sure you have travel insurance and valid documents.",
+        "id": "p3s3",
+        "parentId": "p3",
+        "title": "Arrange insurance and documents"
+      }
+    ]
+  },
+  {
+    "title": "Naplánovat svatbu",
+    "description": "Zorganizujte svatbu krok za krokem bez chaosu.",
+    "category": "osobni",
+    "icon": "PartyPopper",
+    "goal": "Naplánovat a zorganizovat vlastní svatbu",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Celkový cíl: naplánovat a zorganizovat vlastní svatbu",
+        "id": "root",
+        "parentId": null,
+        "title": "Naplánovat a zorganizovat svatbu"
+      },
+      {
+        "description": "Určíte finanční rámec a časovou osu svatby",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Rozpočet a časový plán"
+      },
+      {
+        "description": "Zapište všechny položky a odhadované náklady na svatbu",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Vypracovat rozpočet"
+      },
+      {
+        "description": "Naplánujte klíčové milníky od přípravy po den svatby",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Stanovit časový harmonogram"
+      },
+      {
+        "description": "Rozhodnete o lokaci a klíčových dodavatelích",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Výběr místa a dodavatelů"
+      },
+      {
+        "description": "Zajistěte místo, které odpovídá vašim představám a kapacitě hostů",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Vybrat místo svatby"
+      },
+      {
+        "description": "Zvolte dodavatele pro catering, hudbu, floristiku a další služby",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Vybrat dodavatele"
+      },
+      {
+        "description": "Zajistíte plynulý průběh a úspěšnou realizaci dne",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Koordinace a den svatby"
+      },
+      {
+        "description": "Uchraňte si koordinátora, který bude řídit průběh svatby",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Zajistit koordinaci dne"
+      },
+      {
+        "description": "Proveďte svatební ceremonií a následnou hostinu podle plánu",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Realizovat ceremonii a hostinu"
+      }
+    ],
+    "title_en": "Plan a Wedding",
+    "description_en": "Organize your wedding step by step, without the chaos.",
+    "goal_en": "Plan and organize a wedding",
+    "ai_nodes_en": [
+      {
+        "description": "Overall goal: plan and organize your own wedding",
+        "id": "root",
+        "parentId": null,
+        "title": "Plan and organize a wedding"
+      },
+      {
+        "description": "Set the financial frame and timeline of the wedding",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Budget and timeline"
+      },
+      {
+        "description": "List all items and estimated wedding costs",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Draw up a budget"
+      },
+      {
+        "description": "Plan the key milestones from preparation to the wedding day",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Set a timeline"
+      },
+      {
+        "description": "Decide on the location and key vendors",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Choose the venue and vendors"
+      },
+      {
+        "description": "Secure a venue that matches your vision and guest capacity",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Pick the wedding venue"
+      },
+      {
+        "description": "Choose vendors for catering, music, flowers, and other services",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Pick the vendors"
+      },
+      {
+        "description": "Ensure everything runs smoothly and the day goes to plan",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Coordination and the wedding day"
+      },
+      {
+        "description": "Line up a coordinator who will run the wedding day",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Arrange day-of coordination"
+      },
+      {
+        "description": "Carry out the wedding ceremony and the reception as planned",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Hold the ceremony and reception"
+      }
+    ]
+  },
+  {
+    "title": "Naučit se anglicky",
+    "description": "Dostaňte angličtinu na plynulou pokročilou úroveň.",
+    "category": "skola",
+    "icon": "Languages",
+    "goal": "Naučit se plynně anglicky na pokročilou úroveň",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Dosáhnout pokročilého úrovně angličtiny v oblasti slovní zásoby, gramatiky, poslechu, výslovnosti, konverzace a psaní",
+        "id": "root",
+        "parentId": null,
+        "title": "Naučit se plynně anglicky na pokročilou úroveň"
+      },
+      {
+        "description": "Základní pilíř pro pokročilou úroveň",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Rozšířená slovní zásoba a gramatika"
+      },
+      {
+        "description": "Získat 3000 nových slov a frází",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Rozšířit slovní zásobu"
+      },
+      {
+        "description": "Zaměřit se na pokročilé struktury",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Procvičit gramatiku"
+      },
+      {
+        "description": "Rozvíjet porozumění a správnou výslovnost",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Poslech a výslovnost"
+      },
+      {
+        "description": "Denně 1 hodinu autentických zdrojů",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Poslouchat materiál"
+      },
+      {
+        "description": "Nahrávat a analyzovat chyby",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Opakovat výslovnost"
+      },
+      {
+        "description": "Praktická aplikace jazyka v reálných situacích",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Konverzace a psaní"
+      },
+      {
+        "description": "Pravidelně mluvit s rodilými mluvčími",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Konverzace s rodilými"
+      },
+      {
+        "description": "Piš eseje a získávej kritické hodnocení",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Psaní a zpětná vazba"
+      }
+    ],
+    "title_en": "Learn English",
+    "description_en": "Take your English to a fluent advanced level.",
+    "goal_en": "Learn to speak English fluently at an advanced level",
+    "ai_nodes_en": [
+      {
+        "description": "Reach an advanced level of English in vocabulary, grammar, listening, pronunciation, speaking, and writing",
+        "id": "root",
+        "parentId": null,
+        "title": "Learn to speak English fluently at an advanced level"
+      },
+      {
+        "description": "The core pillar of the advanced level",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Advanced vocabulary and grammar"
+      },
+      {
+        "description": "Learn 3000 new words and phrases",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Expand vocabulary"
+      },
+      {
+        "description": "Focus on advanced structures",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Practice grammar"
+      },
+      {
+        "description": "Develop comprehension and correct pronunciation",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Listening and pronunciation"
+      },
+      {
+        "description": "1 hour of authentic material every day",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Listen to English daily"
+      },
+      {
+        "description": "Record yourself and analyze mistakes",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Drill pronunciation"
+      },
+      {
+        "description": "Practical use of the language in real situations",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Speaking and writing"
+      },
+      {
+        "description": "Speak with native speakers regularly",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Talk with native speakers"
+      },
+      {
+        "description": "Write essays and get critical feedback",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Writing and feedback"
+      }
+    ]
+  },
+  {
+    "title": "Naučit se fotit",
+    "description": "Od ovládání foťáku ke skvělým snímkům.",
+    "category": "koniky",
+    "icon": "Camera",
+    "goal": "Naučit se dobře fotografovat",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cíl: osvojit si dovednosti fotografování.",
+        "id": "root",
+        "parentId": null,
+        "title": "Naučit se dobře fotografovat"
+      },
+      {
+        "description": "Seznámit se se svým fotoaparátem a naučit se ovládat jeho nastavení.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Základy techniky a zařízení"
+      },
+      {
+        "description": "Projděte manuál a ověřte funkce objektivu, vyvážení bílé a režimy.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Seznámit se s fotoaparátem"
+      },
+      {
+        "description": "Naučte se ovládat ISO, clonu a čas závěrky pro správnou expozici.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Základy expozice"
+      },
+      {
+        "description": "Zvládněte úplný manuální režim a prakticky upravujte expozici.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Manuální režim"
+      },
+      {
+        "description": "Rozumět pravidlům kompozice a estetickým prvkům.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Kompozice a estetika"
+      },
+      {
+        "description": "Používejte pravidla třetin a zlatého řezu k esteticky příjemným snímkům.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Pravidlo třetin a zlatý řez"
+      },
+      {
+        "description": "Vnímejte a využívejte světlo a barevné tóny ve fotografii.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Rozpoznání světla a barev"
+      },
+      {
+        "description": "Experimentujte s úhly a perspektivou pro zajímavé záběry.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Perspektiva a úhly"
+      },
+      {
+        "description": "Zlepšujte se pravidelným fotografováním a analýzou snímků.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Praktická praxe a revize"
+      },
+      {
+        "description": "Fotografujte pravidelně a zkoušejte naučené techniky.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Denní fotografování"
+      },
+      {
+        "description": "Revidujte své snímky, vyhledejte chyby a získejte zpětnou vazbu.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Vyhodnocení a kritika"
+      },
+      {
+        "description": "Sestavte portfolio, které ukazuje váš styl a pokrok.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Vytvoření portfolia"
+      }
+    ],
+    "title_en": "Learn Photography",
+    "description_en": "From mastering your camera to great shots.",
+    "goal_en": "Learn to take great photos",
+    "ai_nodes_en": [
+      {
+        "description": "Goal: master photography skills.",
+        "id": "root",
+        "parentId": null,
+        "title": "Learn to take great photos"
+      },
+      {
+        "description": "Get to know your camera and learn to control its settings.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Gear and technical basics"
+      },
+      {
+        "description": "Go through the manual and check the lens features, white balance, and modes.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Get to know your camera"
+      },
+      {
+        "description": "Learn to control ISO, aperture, and shutter speed for correct exposure.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Exposure basics"
+      },
+      {
+        "description": "Master full manual mode and adjust exposure hands-on.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Manual mode"
+      },
+      {
+        "description": "Understand composition rules and aesthetic elements.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Composition and aesthetics"
+      },
+      {
+        "description": "Use the rule of thirds and the golden ratio for pleasing shots.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Rule of thirds and golden ratio"
+      },
+      {
+        "description": "Notice and use light and color tones in your photography.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Reading light and color"
+      },
+      {
+        "description": "Experiment with angles and perspective for interesting shots.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Perspective and angles"
+      },
+      {
+        "description": "Improve through regular shooting and analyzing your photos.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Practice and review"
+      },
+      {
+        "description": "Shoot regularly and try out the techniques you've learned.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Daily shooting"
+      },
+      {
+        "description": "Review your shots, spot mistakes, and get feedback.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Review and critique"
+      },
+      {
+        "description": "Put together a portfolio that shows your style and progress.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Build a portfolio"
+      }
+    ]
+  },
+  {
+    "title": "Naučit se na kytaru",
+    "description": "Od prvních akordů k hraní oblíbených písní.",
+    "category": "koniky",
+    "icon": "Music",
+    "goal": "Naučit se hrát na kytaru",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cíl: osvojit si hraní na kytaru",
+        "id": "root",
+        "parentId": null,
+        "title": "Naučit se hrát na kytaru"
+      },
+      {
+        "description": "Základní technické dovednosti pro hraní kytary",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Základy a technika"
+      },
+      {
+        "description": "Rozšíření znalostí a repertoáru",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Repertoár a hudební teorie"
+      },
+      {
+        "description": "Úspěšný vývoj a udržení dovedností",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Pravidelný trénink a zlepšování"
+      },
+      {
+        "description": "Zajistit si kvalitní kytaru a příslušenství",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Získat kytaru a vybavení"
+      },
+      {
+        "description": "Vysvětlit a procvičovat základní akordy a přechody",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Naučit se základní akordy"
+      },
+      {
+        "description": "Zlepšit rytmické dovednosti a ergonomii hry",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Procvičovat rytmus a držení ruky"
+      },
+      {
+        "description": "Zvládnout noty a tabulatury pro kytaru",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Naučit se hudební zápis"
+      },
+      {
+        "description": "Zvolit jednoduchou skladbu a postupně ji rozebrat",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Vybrat první píseň"
+      },
+      {
+        "description": "Přidat další skladby a rozvíjet styl",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Rozšířit repertoár"
+      },
+      {
+        "description": "Určit frekvenci a délku cvičení",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Stanovit tréninkový plán"
+      },
+      {
+        "description": "Cvičit každý den a sledovat pokrok",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Denní praxe a vyhodnocení"
+      },
+      {
+        "description": "Získat zpětnou vazbu a zdokonalovat techniku",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Konzultace s učitelem"
+      }
+    ],
+    "title_en": "Learn to Play Guitar",
+    "description_en": "From first chords to playing your favorite songs.",
+    "goal_en": "Learn to play the guitar",
+    "ai_nodes_en": [
+      {
+        "description": "Goal: master playing the guitar",
+        "id": "root",
+        "parentId": null,
+        "title": "Learn to play the guitar"
+      },
+      {
+        "description": "Basic technical skills for playing the guitar",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Basics and technique"
+      },
+      {
+        "description": "Expanding knowledge and repertoire",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Repertoire and music theory"
+      },
+      {
+        "description": "Steady progress and maintaining skills",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Regular practice and improvement"
+      },
+      {
+        "description": "Get a quality guitar and accessories",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Get a guitar and equipment"
+      },
+      {
+        "description": "Learn and practice basic chords and transitions",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Learn basic chords"
+      },
+      {
+        "description": "Improve rhythm skills and playing ergonomics",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Practice rhythm and hand position"
+      },
+      {
+        "description": "Master notes and tablature for guitar",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Learn music notation"
+      },
+      {
+        "description": "Choose a simple piece and break it down step by step",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Pick a first song"
+      },
+      {
+        "description": "Add more songs and develop your style",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Expand the repertoire"
+      },
+      {
+        "description": "Determine the frequency and length of practice",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Set a practice plan"
+      },
+      {
+        "description": "Practice every day and track progress",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Daily practice and review"
+      },
+      {
+        "description": "Get feedback and refine your technique",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Consult a teacher"
+      }
+    ]
+  },
+  {
+    "title": "OKR",
+    "description": "Ambiciózní cíl (Objective) a měřitelné klíčové výsledky.",
+    "category": "strategie",
+    "icon": "Target",
+    "goal": "OKR – cíl a klíčové výsledky",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Inspirativní a kvalitativní cíl na období (např. kvartál).",
+        "id": "root",
+        "parentId": null,
+        "title": "Objective – ambiciózní cíl (definuj)"
+      },
+      {
+        "description": "Měřitelný výsledek s jasnou cílovou hodnotou.",
+        "id": "kr1",
+        "parentId": "root",
+        "title": "Klíčový výsledek 1 (KR1)"
+      },
+      {
+        "description": "Měřitelný výsledek s jasnou cílovou hodnotou.",
+        "id": "kr2",
+        "parentId": "root",
+        "title": "Klíčový výsledek 2 (KR2)"
+      },
+      {
+        "description": "Měřitelný výsledek s jasnou cílovou hodnotou.",
+        "id": "kr3",
+        "parentId": "root",
+        "title": "Klíčový výsledek 3 (KR3)"
+      }
+    ],
+    "title_en": "OKR",
+    "description_en": "An ambitious goal (Objective) and measurable key results.",
+    "goal_en": "OKR – objective and key results",
+    "ai_nodes_en": [
+      {
+        "description": "An inspiring, qualitative goal for a period (e.g. a quarter).",
+        "id": "root",
+        "parentId": null,
+        "title": "Objective – ambitious goal (define)"
+      },
+      {
+        "description": "A measurable result with a clear target value.",
+        "id": "kr1",
+        "parentId": "root",
+        "title": "Key Result 1 (KR1)"
+      },
+      {
+        "description": "A measurable result with a clear target value.",
+        "id": "kr2",
+        "parentId": "root",
+        "title": "Key Result 2 (KR2)"
+      },
+      {
+        "description": "A measurable result with a clear target value.",
+        "id": "kr3",
+        "parentId": "root",
+        "title": "Key Result 3 (KR3)"
+      }
+    ]
+  },
+  {
+    "title": "Osobní rozvoj",
+    "description": "Komplexní plán pro rozvoj osobních dovedností, návyků a mindsetu.",
+    "category": "osobni",
+    "icon": "Brain",
+    "goal": "Stanovit sebyzmění a osobní růst",
+    "node_type": "mise",
+    "ai_nodes": [
+      {
+        "description": "Hlavní mise osobního rozvoje",
+        "id": "n1",
+        "parentId": null,
+        "title": "Stanovit sebyzmění a osobní růst"
+      },
+      {
+        "description": "Zavedení denních rutin a zdravých návyků",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Budování návyků"
+      },
+      {
+        "description": "20 min čtení, meditace, plánování dne",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Ranní rutina"
+      },
+      {
+        "description": "Denní zhodnocení a příprava na další den",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Večerní reflexe"
+      },
+      {
+        "description": "Pravidelné učení a praktikování nových dovedností",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Rozvoj dovedností"
+      },
+      {
+        "description": "1 kniha měsíčně z oblasti osobního rozvoje",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Čtení knih"
+      },
+      {
+        "description": "Dokončit 2 kurzy ročně",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "Online kurzy"
+      },
+      {
+        "description": "Péče o psychickou pohodu a resilience",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Mentální zdraví"
+      },
+      {
+        "description": "10 min denně",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Meditace"
+      },
+      {
+        "description": "Záznam myšlenek a emocí 3x týdně",
+        "id": "n10",
+        "parentId": "n8",
+        "title": "Žurnálování"
+      }
+    ],
+    "title_en": "Personal Development",
+    "description_en": "A comprehensive plan for developing personal skills, habits and mindset.",
+    "goal_en": "Commit to self-improvement and personal growth",
+    "ai_nodes_en": [
+      {
+        "description": "The main mission of personal development",
+        "id": "n1",
+        "parentId": null,
+        "title": "Commit to self-improvement and personal growth"
+      },
+      {
+        "description": "Establishing daily routines and healthy habits",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Building habits"
+      },
+      {
+        "description": "20 min of reading, meditation, planning the day",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Morning routine"
+      },
+      {
+        "description": "Daily review and preparation for the next day",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Evening reflection"
+      },
+      {
+        "description": "Regular learning and practicing of new skills",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Skill development"
+      },
+      {
+        "description": "1 book per month on personal development",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Reading books"
+      },
+      {
+        "description": "Complete 2 courses per year",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "Online courses"
+      },
+      {
+        "description": "Caring for mental well-being and resilience",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Mental health"
+      },
+      {
+        "description": "10 min daily",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Meditation"
+      },
+      {
+        "description": "Recording thoughts and emotions 3x a week",
+        "id": "n10",
+        "parentId": "n8",
+        "title": "Journaling"
+      }
+    ]
+  },
+  {
+    "title": "PDCA cyklus",
+    "description": "Plánuj–Dělej–Kontroluj–Jednej: cyklus neustálého zlepšování.",
+    "category": "kvalita",
+    "icon": "RefreshCw",
+    "goal": "Zlepšení procesu (PDCA)",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Co chceš zlepšit nebo vyřešit pomocí cyklu PDCA.",
+        "id": "root",
+        "parentId": null,
+        "title": "Zlepšení / cíl (definuj)"
+      },
+      {
+        "description": "Identifikuj problém, analyzuj příčiny a navrhni plán řešení.",
+        "id": "p",
+        "parentId": "root",
+        "title": "Plánuj (Plan)"
+      },
+      {
+        "description": "Realizuj plán – nejlépe nejprve v malém / pilotně.",
+        "id": "d",
+        "parentId": "root",
+        "title": "Dělej (Do)"
+      },
+      {
+        "description": "Změř výsledky a porovnej je s očekáváním.",
+        "id": "c",
+        "parentId": "root",
+        "title": "Kontroluj (Check)"
+      },
+      {
+        "description": "Zaveď, co funguje; uprav, co ne; a cyklus opakuj.",
+        "id": "a",
+        "parentId": "root",
+        "title": "Jednej (Act)"
+      }
+    ],
+    "title_en": "PDCA Cycle",
+    "description_en": "Plan–Do–Check–Act: a cycle of continuous improvement.",
+    "goal_en": "Process improvement (PDCA)",
+    "ai_nodes_en": [
+      {
+        "description": "What you want to improve or solve using the PDCA cycle.",
+        "id": "root",
+        "parentId": null,
+        "title": "Improvement / goal (define)"
+      },
+      {
+        "description": "Identify the problem, analyze the causes and propose a solution plan.",
+        "id": "p",
+        "parentId": "root",
+        "title": "Plan"
+      },
+      {
+        "description": "Implement the plan – ideally on a small scale / as a pilot first.",
+        "id": "d",
+        "parentId": "root",
+        "title": "Do"
+      },
+      {
+        "description": "Measure the results and compare them against expectations.",
+        "id": "c",
+        "parentId": "root",
+        "title": "Check"
+      },
+      {
+        "description": "Adopt what works; adjust what doesn't; and repeat the cycle.",
+        "id": "a",
+        "parentId": "root",
+        "title": "Act"
+      }
+    ]
+  },
+  {
+    "title": "Pareto (80/20)",
+    "description": "Najdi pár klíčových příčin, které dělají většinu problému.",
+    "category": "kvalita",
+    "icon": "BarChart3",
+    "goal": "Pareto analýza (80/20)",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Najdi 20 % příčin, které způsobují 80 % problému.",
+        "id": "root",
+        "parentId": null,
+        "title": "Pareto analýza (80/20)"
+      },
+      {
+        "description": "Urči, co měříš a jaké jsou kategorie příčin.",
+        "id": "p1",
+        "parentId": "root",
+        "title": "1. Definuj problém a kategorie příčin"
+      },
+      {
+        "description": "Změř četnost nebo dopad jednotlivých příčin.",
+        "id": "p2",
+        "parentId": "root",
+        "title": "2. Sesbírej data"
+      },
+      {
+        "description": "Od největší po nejmenší.",
+        "id": "p3",
+        "parentId": "root",
+        "title": "3. Seřaď příčiny podle dopadu"
+      },
+      {
+        "description": "Najdi příčiny, které dělají 80 % dopadu.",
+        "id": "p4",
+        "parentId": "root",
+        "title": "4. Urči klíčových 20 %"
+      },
+      {
+        "description": "Soustřeď úsilí tam, kde má největší efekt.",
+        "id": "p5",
+        "parentId": "root",
+        "title": "5. Zaměř řešení na klíčové příčiny"
+      }
+    ],
+    "title_en": "Pareto (80/20)",
+    "description_en": "Find the few key causes that account for most of the problem.",
+    "goal_en": "Pareto analysis (80/20)",
+    "ai_nodes_en": [
+      {
+        "description": "Find the 20% of causes that create 80% of the problem.",
+        "id": "root",
+        "parentId": null,
+        "title": "Pareto Analysis (80/20)"
+      },
+      {
+        "description": "Determine what you measure and what the cause categories are.",
+        "id": "p1",
+        "parentId": "root",
+        "title": "1. Define the problem and cause categories"
+      },
+      {
+        "description": "Measure the frequency or impact of each cause.",
+        "id": "p2",
+        "parentId": "root",
+        "title": "2. Collect data"
+      },
+      {
+        "description": "From largest to smallest.",
+        "id": "p3",
+        "parentId": "root",
+        "title": "3. Rank causes by impact"
+      },
+      {
+        "description": "Find the causes that account for 80% of the impact.",
+        "id": "p4",
+        "parentId": "root",
+        "title": "4. Identify the key 20%"
+      },
+      {
+        "description": "Concentrate effort where it has the greatest effect.",
+        "id": "p5",
+        "parentId": "root",
+        "title": "5. Focus solutions on the key causes"
+      }
+    ]
+  },
+  {
+    "title": "Přestěhovat se do zahraničí",
+    "description": "Vízum, bydlení a práce krok za krokem.",
+    "category": "cestovani",
+    "icon": "Globe",
+    "goal": "Přestěhovat se a začít žít v zahraničí",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Plánování kroků k přestěhování a životu v zahraničí",
+        "id": "root",
+        "parentId": null,
+        "title": "Přestěhovat se a začít žít v zahraničí"
+      },
+      {
+        "description": "Základní kroky před samotným přestěhováním",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Příprava"
+      },
+      {
+        "description": "Určit cílovou zemi podle preferencí a možností",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Vybrat země"
+      },
+      {
+        "description": "Zjistit vízové a vstupní požadavky dané země",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Zjistit požadavky"
+      },
+      {
+        "description": "Získat základní jazykové dovednosti pro komunikaci",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Zlepšit jazyk"
+      },
+      {
+        "description": "Vyřešení právních a finančních aspektů přestěhování",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Právní & Finanční"
+      },
+      {
+        "description": "Vyřídit a získat potřebné vízum nebo povolení k pobytu",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Zajistit vízum"
+      },
+      {
+        "description": "Založit bankovní účet v cílové zemi",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Otevřít účet"
+      },
+      {
+        "description": "Připravit rozpočet a ujistit se, že máte dostatečné úspory",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Rozpočet a úspory"
+      },
+      {
+        "description": "Integrovat se a uspořádat život v nové zemi",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Přijmout se"
+      },
+      {
+        "description": "Najít a rezervovat vhodné bydlení",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Vyhledat bydlení"
+      },
+      {
+        "description": "Zaregistrovat se na místní úřad a získat potřebné dokumenty",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Registrovat se a získat doklady"
+      },
+      {
+        "description": "Zapojit se do místní komunity a navázat kontakty",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Integrovat se do komunity"
+      }
+    ],
+    "title_en": "Move Abroad",
+    "description_en": "Visa, housing, and work, step by step.",
+    "goal_en": "Move abroad and start a new life",
+    "ai_nodes_en": [
+      {
+        "description": "Planning the steps to move and live abroad",
+        "id": "root",
+        "parentId": null,
+        "title": "Move abroad and start a new life"
+      },
+      {
+        "description": "Basic steps before the move itself",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Preparation"
+      },
+      {
+        "description": "Pick the destination country based on your preferences and options",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Choose a country"
+      },
+      {
+        "description": "Find out the country's visa and entry requirements",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Check the requirements"
+      },
+      {
+        "description": "Gain basic language skills for communication",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Improve your language skills"
+      },
+      {
+        "description": "Sorting out the legal and financial aspects of the move",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Legal and financial matters"
+      },
+      {
+        "description": "Apply for and obtain the necessary visa or residence permit",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Secure a visa"
+      },
+      {
+        "description": "Set up a bank account in the destination country",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Open an account"
+      },
+      {
+        "description": "Prepare a budget and make sure you have enough savings",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Budget and savings"
+      },
+      {
+        "description": "Integrate and set up your life in the new country",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Settle in"
+      },
+      {
+        "description": "Find and secure suitable housing",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Find housing"
+      },
+      {
+        "description": "Register with the local authorities and get the necessary documents",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Register and get documents"
+      },
+      {
+        "description": "Get involved in the local community and make connections",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Integrate into the community"
+      }
+    ]
+  },
+  {
+    "title": "RACI matice",
+    "description": "Rozdělení rolí a odpovědností v úkolu/projektu.",
+    "category": "strategie",
+    "icon": "Users",
+    "goal": "RACI – role a odpovědnosti",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Pro jaký úkol nebo projekt rozdělujeme role.",
+        "id": "root",
+        "parentId": null,
+        "title": "RACI – úkol/projekt (definuj)"
+      },
+      {
+        "description": "Kdo úkol fakticky vykoná (jeden i více lidí).",
+        "id": "r",
+        "parentId": "root",
+        "title": "R – Responsible (vykoná)"
+      },
+      {
+        "description": "Kdo má konečnou odpovědnost – právě jeden.",
+        "id": "a",
+        "parentId": "root",
+        "title": "A – Accountable (odpovídá)"
+      },
+      {
+        "description": "Koho se ptáš na názor (obousměrná komunikace).",
+        "id": "c",
+        "parentId": "root",
+        "title": "C – Consulted (konzultuje se)"
+      },
+      {
+        "description": "Koho informuješ o průběhu a výsledku.",
+        "id": "i",
+        "parentId": "root",
+        "title": "I – Informed (informuje se)"
+      }
+    ],
+    "title_en": "RACI Matrix",
+    "description_en": "Assigning roles and responsibilities in a task/project.",
+    "goal_en": "RACI – roles and responsibilities",
+    "ai_nodes_en": [
+      {
+        "description": "Which task or project we are assigning roles for.",
+        "id": "root",
+        "parentId": null,
+        "title": "RACI – task/project (define)"
+      },
+      {
+        "description": "Who actually performs the task (one or more people).",
+        "id": "r",
+        "parentId": "root",
+        "title": "R – Responsible (does the work)"
+      },
+      {
+        "description": "Who has final accountability – exactly one person.",
+        "id": "a",
+        "parentId": "root",
+        "title": "A – Accountable (owns the outcome)"
+      },
+      {
+        "description": "Whose opinion you ask for (two-way communication).",
+        "id": "c",
+        "parentId": "root",
+        "title": "C – Consulted (provides input)"
+      },
+      {
+        "description": "Who you inform about progress and results.",
+        "id": "i",
+        "parentId": "root",
+        "title": "I – Informed (kept in the loop)"
+      }
+    ]
+  },
+  {
+    "title": "SMART cíl",
+    "description": "Cíl, který je Specifický, Měřitelný, Dosažitelný, Relevantní a Termínovaný.",
+    "category": "strategie",
+    "icon": "CheckCircle2",
+    "goal": "SMART cíl",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Naformuluj cíl tak, aby splňoval všech 5 kritérií.",
+        "id": "root",
+        "parentId": null,
+        "title": "SMART cíl (definuj)"
+      },
+      {
+        "description": "Konkrétní a jasně vymezený.",
+        "id": "sm1",
+        "parentId": "root",
+        "title": "S – Specifický"
+      },
+      {
+        "description": "Jak poznáš, že je splněn.",
+        "id": "sm2",
+        "parentId": "root",
+        "title": "M – Měřitelný"
+      },
+      {
+        "description": "Reálný vzhledem ke zdrojům a schopnostem.",
+        "id": "sm3",
+        "parentId": "root",
+        "title": "A – Dosažitelný"
+      },
+      {
+        "description": "Smysluplný a v souladu s prioritami.",
+        "id": "sm4",
+        "parentId": "root",
+        "title": "R – Relevantní"
+      },
+      {
+        "description": "Má jasný termín splnění.",
+        "id": "sm5",
+        "parentId": "root",
+        "title": "T – Termínovaný"
+      }
+    ],
+    "title_en": "SMART Goal",
+    "description_en": "A goal that is Specific, Measurable, Achievable, Relevant and Time-bound.",
+    "goal_en": "SMART goal",
+    "ai_nodes_en": [
+      {
+        "description": "Formulate the goal so it meets all 5 criteria.",
+        "id": "root",
+        "parentId": null,
+        "title": "SMART goal (define)"
+      },
+      {
+        "description": "Concrete and clearly defined.",
+        "id": "sm1",
+        "parentId": "root",
+        "title": "S – Specific"
+      },
+      {
+        "description": "How you'll know it's been met.",
+        "id": "sm2",
+        "parentId": "root",
+        "title": "M – Measurable"
+      },
+      {
+        "description": "Realistic given your resources and abilities.",
+        "id": "sm3",
+        "parentId": "root",
+        "title": "A – Achievable"
+      },
+      {
+        "description": "Meaningful and aligned with priorities.",
+        "id": "sm4",
+        "parentId": "root",
+        "title": "R – Relevant"
+      },
+      {
+        "description": "Has a clear deadline.",
+        "id": "sm5",
+        "parentId": "root",
+        "title": "T – Time-bound"
+      }
+    ]
+  },
+  {
+    "title": "SWOT analýza",
+    "description": "Silné a slabé stránky, příležitosti a hrozby.",
+    "category": "strategie",
+    "icon": "LayoutGrid",
+    "goal": "SWOT analýza",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Co analyzuješ – firmu, projekt, produkt, tým nebo sebe.",
+        "id": "root",
+        "parentId": null,
+        "title": "Předmět analýzy (definuj)"
+      },
+      {
+        "description": "Interní výhody a to, co děláš dobře.",
+        "id": "s",
+        "parentId": "root",
+        "title": "Silné stránky (Strengths)"
+      },
+      {
+        "description": "Interní nedostatky a co je potřeba zlepšit.",
+        "id": "w",
+        "parentId": "root",
+        "title": "Slabé stránky (Weaknesses)"
+      },
+      {
+        "description": "Externí příležitosti, které můžeš využít.",
+        "id": "o",
+        "parentId": "root",
+        "title": "Příležitosti (Opportunities)"
+      },
+      {
+        "description": "Externí rizika a hrozby, na které si dát pozor.",
+        "id": "t",
+        "parentId": "root",
+        "title": "Hrozby (Threats)"
+      }
+    ],
+    "title_en": "SWOT Analysis",
+    "description_en": "Strengths, weaknesses, opportunities and threats.",
+    "goal_en": "SWOT analysis",
+    "ai_nodes_en": [
+      {
+        "description": "What you're analyzing – a company, project, product, team or yourself.",
+        "id": "root",
+        "parentId": null,
+        "title": "Subject of analysis (define)"
+      },
+      {
+        "description": "Internal advantages and what you do well.",
+        "id": "s",
+        "parentId": "root",
+        "title": "Strengths"
+      },
+      {
+        "description": "Internal shortcomings and what needs improving.",
+        "id": "w",
+        "parentId": "root",
+        "title": "Weaknesses"
+      },
+      {
+        "description": "External opportunities you can take advantage of.",
+        "id": "o",
+        "parentId": "root",
+        "title": "Opportunities"
+      },
+      {
+        "description": "External risks and threats to watch out for.",
+        "id": "t",
+        "parentId": "root",
+        "title": "Threats"
+      }
+    ]
+  },
+  {
+    "title": "Spustit YouTube kanál",
+    "description": "Od nápadu po rostoucí a vydělávající kanál.",
+    "category": "byznys",
+    "icon": "Youtube",
+    "goal": "Spustit a rozjet úspěšný YouTube kanál",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cílem je vytvořit a rozvinout kanál s pravidelným úspěšným obsahem.",
+        "id": "root",
+        "parentId": null,
+        "title": "Spustit a rozjet úspěšný YouTube kanál"
+      },
+      {
+        "description": "Určení tématu a cílového publika, které bude kanál oslovovat.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Definice značky a cílové skupiny"
+      },
+      {
+        "description": "Rozlišit klíčové zaměření a vizuální identitu kanálu.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Vymezit unikátní téma a styl"
+      },
+      {
+        "description": "Definovat demografii a nástroje pro sledování zpětné vazby.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Určit cílové publikum a analytickou metodu"
+      },
+      {
+        "description": "Připravit, nahrát a publikovat videa podle stanoveného plánu.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Vytvoření a publikace obsahu"
+      },
+      {
+        "description": "Sestavit skripty a vytvořit první obsahový materiál.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Napsat scénáře a nahrát první videa"
+      },
+      {
+        "description": "Zajistit, aby videa byla snadno vyhledatelné a atraktivní.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Optimalizovat tituly, popisy a thumbnail"
+      },
+      {
+        "description": "Stanovit a dodržovat harmonogram nahrávání a zveřejňování.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Zajistit pravidelný plán publikací"
+      },
+      {
+        "description": "Vybudovat publikum a zajišťovat příjmy z kanálu.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Rozvoj a monetizace"
+      },
+      {
+        "description": "Podporovat růst odběratelů prostřednictvím kvalitního obsahu a zapojení.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Získávat odběratele a interakce"
+      },
+      {
+        "description": "Navazovat partnerství a sdílet obsah s jinými tvůrcemi.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Vyhledávat spolupráce a cross-promo"
+      },
+      {
+        "description": "Implementovat reklamy, sponzorství, merch a další příjmové kanály.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Zavést monetizační strategie"
+      }
+    ],
+    "title_en": "Launch a YouTube Channel",
+    "description_en": "From idea to a growing, money-making channel.",
+    "goal_en": "Launch and grow a successful YouTube channel",
+    "ai_nodes_en": [
+      {
+        "description": "The goal is to create and grow a channel with regular successful content.",
+        "id": "root",
+        "parentId": null,
+        "title": "Launch and grow a successful YouTube channel"
+      },
+      {
+        "description": "Determine the topic and target audience the channel will appeal to.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Define brand and target audience"
+      },
+      {
+        "description": "Define the channel's distinctive focus and visual identity.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Define a unique topic and style"
+      },
+      {
+        "description": "Define demographics and tools for tracking feedback.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Define your target audience and how you'll measure results"
+      },
+      {
+        "description": "Prepare, record and publish videos according to the set plan.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Content creation and publishing"
+      },
+      {
+        "description": "Put together scripts and create the first content material.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Write scripts and record the first videos"
+      },
+      {
+        "description": "Make sure videos are easy to find and attractive.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Optimize titles, descriptions and thumbnails"
+      },
+      {
+        "description": "Set and stick to a recording and publishing schedule.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Establish a regular publishing schedule"
+      },
+      {
+        "description": "Build an audience and generate income from the channel.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Growth and monetization"
+      },
+      {
+        "description": "Drive subscriber growth through quality content and engagement.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Gain subscribers and engagement"
+      },
+      {
+        "description": "Build partnerships and share content with other creators.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Seek collaborations and cross-promotion"
+      },
+      {
+        "description": "Implement ads, sponsorships, merch and other revenue streams.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Introduce monetization strategies"
+      }
+    ]
+  },
+  {
+    "title": "Uběhnout maraton",
+    "description": "Od prvních kilometrů až po cílovou pásku maratonu.",
+    "category": "zdravi",
+    "icon": "Activity",
+    "goal": "Připravit se a uběhnout svůj první maraton",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cíl: úspěšně dokončit první maraton",
+        "id": "root",
+        "parentId": null,
+        "title": "Připravit se a uběhnout svůj první maraton"
+      },
+      {
+        "description": "Základní tréninková struktura",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Tréninkový plán"
+      },
+      {
+        "description": "Zvolte datum maratonu a vytvořte čtyřměsíční tréninkový rozvrh.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Stanovit datum a rozvrh"
+      },
+      {
+        "description": "Rozplánujte týdně běhy, tempo, a odpočinek.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Vytvořit tréninkový plán"
+      },
+      {
+        "description": "Začněte postupně zvyšovat kilometrový objem a tempo.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Zahájit trénink"
+      },
+      {
+        "description": "Stravovací a regenerativní strategie",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Výživa a zotavení"
+      },
+      {
+        "description": "Zaznamenejte současné jídelníčky a příjem tekutin.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Analyzovat stravu a hydrataci"
+      },
+      {
+        "description": "Zajistěte denní kalorie, makroživiny a doplňky podle tréninku.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Navrhnout výživový plán"
+      },
+      {
+        "description": "Zahrňte protahování, masáže a spánek do denního režimu.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Implementovat regeneraci"
+      },
+      {
+        "description": "Mentální strategie a motivace",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Psychická příprava"
+      },
+      {
+        "description": "Určete klíčové mentální cíle pro trénink i závod.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Stanovit mentální cíle"
+      },
+      {
+        "description": "Denně si představujte úspěšné dokončení maratonu.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Vytvořit vizualizační rutinu"
+      },
+      {
+        "description": "Naplánujte rozvrh jídel, tempa a copingové techniky.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Připravit strategii závodního dne"
+      }
+    ],
+    "title_en": "Run a Marathon",
+    "description_en": "From your first kilometers to the marathon finish line.",
+    "goal_en": "Train for and finish your first marathon",
+    "ai_nodes_en": [
+      {
+        "description": "Goal: successfully complete your first marathon",
+        "id": "root",
+        "parentId": null,
+        "title": "Train for and finish your first marathon"
+      },
+      {
+        "description": "Core training structure",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Training plan"
+      },
+      {
+        "description": "Pick a marathon date and create a four-month training schedule.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Set a date and schedule"
+      },
+      {
+        "description": "Plan weekly runs, pace, and rest.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Create a training plan"
+      },
+      {
+        "description": "Gradually increase your mileage and pace.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Start training"
+      },
+      {
+        "description": "Eating and recovery strategies",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Nutrition and recovery"
+      },
+      {
+        "description": "Log your current meals and fluid intake.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Analyze diet and hydration"
+      },
+      {
+        "description": "Set daily calories, macros, and supplements based on your training.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Design a nutrition plan"
+      },
+      {
+        "description": "Include stretching, massage, and sleep in your daily routine.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Build in recovery"
+      },
+      {
+        "description": "Mental strategies and motivation",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Mental preparation"
+      },
+      {
+        "description": "Define key mental goals for training and race day.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Set mental goals"
+      },
+      {
+        "description": "Picture yourself finishing the marathon every day.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Create a visualization routine"
+      },
+      {
+        "description": "Plan your meal schedule, pacing, and coping techniques.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Prepare a race-day strategy"
+      }
+    ]
+  },
+  {
+    "title": "Work-life balance",
+    "description": "Najděte zdravou rovnováhu mezi prací, odpočinkem a vztahy.",
+    "category": "osobni",
+    "icon": "Heart",
+    "goal": "Najít zdravou rovnováhu mezi prací a osobním životem",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cíl zlepšit poměr pracovního a osobního času",
+        "id": "root",
+        "parentId": null,
+        "title": "Najít zdravou rovnováhu mezi prací a osobním životem"
+      },
+      {
+        "description": "Zavedení jasných časových pravidel a omezení pracovního zatížení",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Správa času a hranice"
+      },
+      {
+        "description": "Zaznamenat, kolik času trváte práci, volný čas a jiné aktivity",
+        "id": "f1a1",
+        "parentId": "f1",
+        "title": "Vyhodnotit současné rozdělení času"
+      },
+      {
+        "description": "Určit a dodržovat konkrétní pracovní hodiny a volný čas",
+        "id": "f1a2",
+        "parentId": "f1",
+        "title": "Stanovit pevné pracovní a volné doby"
+      },
+      {
+        "description": "Použít kalendář pro rezervaci bloků na práci a osobní činnosti",
+        "id": "f1a3",
+        "parentId": "f1",
+        "title": "Implementovat blokování času"
+      },
+      {
+        "description": "Podpora tělesné pohody a duševní rovnováhy",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Fyzické a mentální zdraví"
+      },
+      {
+        "description": "Začlenit alespoň 30 minut sportu do týdenního plánu",
+        "id": "f2a1",
+        "parentId": "f2",
+        "title": "Vytvořit pravidelný režim cvičení"
+      },
+      {
+        "description": "Stanovit si pravidelný spánkový režim a dodržovat 7-8 hodin spánku",
+        "id": "f2a2",
+        "parentId": "f2",
+        "title": "Zajistit dostatečný spánek"
+      },
+      {
+        "description": "Cvičit mindfulness nebo dechová cvičení alespoň 10 minut denně",
+        "id": "f2a3",
+        "parentId": "f2",
+        "title": "Praktikovat relaxační techniky"
+      },
+      {
+        "description": "Rozvíjet osobní život a mezilidské vztahy",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Osobní vztahy a rozvoj"
+      },
+      {
+        "description": "Určit, co je nejdůležitější mimo práci (rodina, přátelé, hobby)",
+        "id": "f3a1",
+        "parentId": "f3",
+        "title": "Definovat priority v osobním životě"
+      },
+      {
+        "description": "Zarezervovat týdně určité dny nebo hodiny pro společné aktivity",
+        "id": "f3a2",
+        "parentId": "f3",
+        "title": "Plánovat pravidelný čas pro rodinu a přátele"
+      },
+      {
+        "description": "Vyhradit si čas na oblíbené hobby a kreativní činnosti",
+        "id": "f3a3",
+        "parentId": "f3",
+        "title": "Začlenit koníčky do denního režimu"
+      }
+    ],
+    "title_en": "Work-Life Balance",
+    "description_en": "Find a healthy balance between work, rest and relationships.",
+    "goal_en": "Find a healthy balance between work and personal life",
+    "ai_nodes_en": [
+      {
+        "description": "Improve the balance between work and personal time",
+        "id": "root",
+        "parentId": null,
+        "title": "Find a healthy balance between work and personal life"
+      },
+      {
+        "description": "Establishing clear time rules and limiting workload",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Time management and boundaries"
+      },
+      {
+        "description": "Track how much time you spend on work, leisure, and other activities",
+        "id": "f1a1",
+        "parentId": "f1",
+        "title": "Assess your current time allocation"
+      },
+      {
+        "description": "Define and stick to specific working hours and free time",
+        "id": "f1a2",
+        "parentId": "f1",
+        "title": "Set fixed working hours and time off"
+      },
+      {
+        "description": "Use a calendar to reserve blocks for work and personal activities",
+        "id": "f1a3",
+        "parentId": "f1",
+        "title": "Implement time blocking"
+      },
+      {
+        "description": "Supporting physical well-being and mental balance",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Physical and mental health"
+      },
+      {
+        "description": "Include at least 30 minutes of exercise in your weekly plan",
+        "id": "f2a1",
+        "parentId": "f2",
+        "title": "Create a regular exercise routine"
+      },
+      {
+        "description": "Set a regular sleep schedule and stick to 7–8 hours of sleep",
+        "id": "f2a2",
+        "parentId": "f2",
+        "title": "Get enough sleep"
+      },
+      {
+        "description": "Practice mindfulness or breathing exercises for at least 10 minutes a day",
+        "id": "f2a3",
+        "parentId": "f2",
+        "title": "Practice relaxation techniques"
+      },
+      {
+        "description": "Developing your personal life and interpersonal relationships",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Personal relationships and growth"
+      },
+      {
+        "description": "Determine what matters most outside of work (family, friends, hobbies)",
+        "id": "f3a1",
+        "parentId": "f3",
+        "title": "Define priorities in your personal life"
+      },
+      {
+        "description": "Reserve specific days or hours each week for shared activities",
+        "id": "f3a2",
+        "parentId": "f3",
+        "title": "Schedule regular time for family and friends"
+      },
+      {
+        "description": "Set aside time for favorite hobbies and creative activities",
+        "id": "f3a3",
+        "parentId": "f3",
+        "title": "Build hobbies into your daily routine"
+      }
+    ]
+  },
+  {
+    "title": "Začít investovat",
+    "description": "Od základů investování k prvnímu portfoliu.",
+    "category": "finance",
+    "icon": "TrendingUp",
+    "goal": "Začít chytře a zodpovědně investovat peníze",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cíl: začít chytře a zodpovědně investovat peníze.",
+        "id": "root",
+        "parentId": null,
+        "title": "Začít chytře a zodpovědně investovat peníze"
+      },
+      {
+        "description": "Základní kroky pro vytvoření stabilní finanční podloží.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Finanční základ"
+      },
+      {
+        "description": "Proveďte přehled příjmů, výdajů a úspor.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Zhodnocení finanční situace"
+      },
+      {
+        "description": "Určete konkrétní investiční cíle a dobu jejich dosažení.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Stanovení cílů a časového rámce"
+      },
+      {
+        "description": "Zajistěte si rezervu 3-6 měsíčních výdajů.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Vytvoření nouzového fondu"
+      },
+      {
+        "description": "Navrhněte strategii přizpůsobenou rizikovému profilu.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Investiční strategie"
+      },
+      {
+        "description": "Zhodnoťte, kolik rizika jste ochotni nést.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Tolerance k riziku"
+      },
+      {
+        "description": "Rozdělte prostředky mezi akcie, dluhopisy a další.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Výběr investičních nástrojů"
+      },
+      {
+        "description": "Vyberte nízkonákladové fondy a minimalizujte poplatky.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Snížení nákladů"
+      },
+      {
+        "description": "Zavedení a pravidelné hodnocení investic.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Realizace a sledování"
+      },
+      {
+        "description": "Zvolte vhodnou platformu a proveďte první vklad.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Otevření investičního účtu"
+      },
+      {
+        "description": "Přizpůsobujte složení portfolia podle plánované alokace.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Pravidelné rebalancování"
+      },
+      {
+        "description": "Každých 6-12 měsíců aktualizujte cíle a přizpůsobte plán.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Přehodnocení cílů a strategie"
+      }
+    ],
+    "title_en": "Start Investing",
+    "description_en": "From investing basics to your first portfolio.",
+    "goal_en": "Start investing money smartly and responsibly",
+    "ai_nodes_en": [
+      {
+        "description": "Goal: start investing money smartly and responsibly.",
+        "id": "root",
+        "parentId": null,
+        "title": "Start investing money smartly and responsibly"
+      },
+      {
+        "description": "Basic steps to build a stable financial base.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Financial foundation"
+      },
+      {
+        "description": "Review your income, expenses, and savings.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Assess your financial situation"
+      },
+      {
+        "description": "Define specific investment goals and when to reach them.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Set goals and a time frame"
+      },
+      {
+        "description": "Set aside a reserve of 3–6 months of expenses.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Build an emergency fund"
+      },
+      {
+        "description": "Design a strategy tailored to your risk profile.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Investment strategy"
+      },
+      {
+        "description": "Assess how much risk you're willing to take.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Assess your risk tolerance"
+      },
+      {
+        "description": "Split funds between stocks, bonds, and other assets.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Choose investment vehicles"
+      },
+      {
+        "description": "Pick low-cost funds and minimize fees.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Cut costs"
+      },
+      {
+        "description": "Put investments in place and review them regularly.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Execution and monitoring"
+      },
+      {
+        "description": "Choose a suitable platform and make your first deposit.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Open an investment account"
+      },
+      {
+        "description": "Adjust your portfolio mix to match your planned allocation.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Rebalance regularly"
+      },
+      {
+        "description": "Update your goals and adjust the plan every 6–12 months.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Review goals and strategy"
+      }
+    ]
+  },
+  {
+    "title": "Zdravý životní styl",
+    "description": "Komplexní plán pro fyzickou i mentální pohodu a dlouhodobé zdraví.",
+    "category": "zdravi",
+    "icon": "Dumbbell",
+    "goal": "Žít zdravý a vyvážený život",
+    "node_type": "mise",
+    "ai_nodes": [
+      {
+        "description": "Celková mise zdravého životního stylu",
+        "id": "n1",
+        "parentId": null,
+        "title": "Žít zdravý a vyvážený život"
+      },
+      {
+        "description": "Pohyb minimálně 3x týdně",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Pravidelné cvičení"
+      },
+      {
+        "description": "2x týdně posilování",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Sílový trénink"
+      },
+      {
+        "description": "Běh nebo kolo 1x týdně",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Kardio"
+      },
+      {
+        "description": "Plánování jídelníčku a zdravé volby",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Vyvážená strava"
+      },
+      {
+        "description": "Meal prep 2x týdně",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Příprava jídel"
+      },
+      {
+        "description": "2-3 litry vody denně",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "Pitný režim"
+      },
+      {
+        "description": "7-8 hodin spánku a pravidelný režim",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Kvalitní spánek"
+      },
+      {
+        "description": "Bez obrazovek 1 hodinu před spaním",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Digitální detox"
+      }
+    ],
+    "title_en": "Healthy Lifestyle",
+    "description_en": "A comprehensive plan for physical and mental well-being and long-term health.",
+    "goal_en": "Live a healthy and balanced life",
+    "ai_nodes_en": [
+      {
+        "description": "The overall mission of a healthy lifestyle",
+        "id": "n1",
+        "parentId": null,
+        "title": "Live a healthy and balanced life"
+      },
+      {
+        "description": "Physical activity at least 3x a week",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Regular exercise"
+      },
+      {
+        "description": "Weight training 2x a week",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Strength training"
+      },
+      {
+        "description": "Running or cycling 1x a week",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Cardio"
+      },
+      {
+        "description": "Meal planning and healthy choices",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Balanced diet"
+      },
+      {
+        "description": "Meal prep 2x a week",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Meal preparation"
+      },
+      {
+        "description": "2–3 liters of water daily",
+        "id": "n7",
+        "parentId": "n5",
+        "title": "Hydration"
+      },
+      {
+        "description": "7–8 hours of sleep and a regular schedule",
+        "id": "n8",
+        "parentId": "n1",
+        "title": "Quality sleep"
+      },
+      {
+        "description": "No screens 1 hour before bed",
+        "id": "n9",
+        "parentId": "n8",
+        "title": "Digital detox"
+      }
+    ]
+  },
+  {
+    "title": "Zlepšit se ve vaření",
+    "description": "Od základních technik k vlastním receptům.",
+    "category": "koniky",
+    "icon": "ChefHat",
+    "goal": "Naučit se vařit a zlepšit kuchařské dovednosti",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Cílem je zvládnout vaření a rozšířit kuchařský repertár.",
+        "id": "root",
+        "parentId": null,
+        "title": "Naučit se vařit a zlepšit kuchařské dovednosti"
+      },
+      {
+        "description": "Základní techniky a vybavení potřebné k úspěšnému vaření.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Základy vaření"
+      },
+      {
+        "description": "Zjistěte, co jsou smažení, dušení, péct, a jejich základní rozdíly.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Základní techniky"
+      },
+      {
+        "description": "Získejte základní vybavení: nůž, pánve, hrnce a odměrky.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Seznam nástrojů"
+      },
+      {
+        "description": "Vyzkoušejte několik základních receptů, např. pomazánky, stir-fry a polévky.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Jednoduché pokrmy"
+      },
+      {
+        "description": "Osvojte si oblíbená jídla a naučte se je upravovat.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Rozšíření receptového repertáru"
+      },
+      {
+        "description": "Vyberte si jídla, která chcete ovládnout, a vytvořte seznam.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Vybrat jídla"
+      },
+      {
+        "description": "Rozumět postupům, časům a přidat variace podle vlastního vkusu.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Číst recepty"
+      },
+      {
+        "description": "Přidávejte koření a dochucovadla a zkoušejte nové kombinace.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Experimentovat s kořením"
+      },
+      {
+        "description": "Vylepšete techniku a efektivitu při vaření.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Zlepšení kuchařských dovedností"
+      },
+      {
+        "description": "Procvičujte přesné řezání zeleniny, masa a dalších surovin.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Přesné řezání"
+      },
+      {
+        "description": "Používejte techniky pre-prep a plánujte jídla týdne.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Plánování jídel"
+      },
+      {
+        "description": "Dodržujte hygienické postupy a bezpečnostní pravidla v kuchyni.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Bezpečnost a hygiena"
+      }
+    ],
+    "title_en": "Get Better at Cooking",
+    "description_en": "From basic techniques to your own recipes.",
+    "goal_en": "Learn to cook and improve your kitchen skills",
+    "ai_nodes_en": [
+      {
+        "description": "The goal is to master cooking and expand your culinary repertoire.",
+        "id": "root",
+        "parentId": null,
+        "title": "Learn to cook and improve your kitchen skills"
+      },
+      {
+        "description": "Basic techniques and equipment needed to cook successfully.",
+        "id": "f1",
+        "parentId": "root",
+        "title": "Cooking basics"
+      },
+      {
+        "description": "Learn what frying, braising, and baking are, and how they differ.",
+        "id": "f1a",
+        "parentId": "f1",
+        "title": "Basic techniques"
+      },
+      {
+        "description": "Get the essential equipment: a knife, pans, pots, and measuring cups.",
+        "id": "f1b",
+        "parentId": "f1",
+        "title": "Tool checklist"
+      },
+      {
+        "description": "Try a few basic recipes, e.g. dips and spreads, stir-fries, and soups.",
+        "id": "f1c",
+        "parentId": "f1",
+        "title": "Simple dishes"
+      },
+      {
+        "description": "Master your favorite dishes and learn to adapt them.",
+        "id": "f2",
+        "parentId": "root",
+        "title": "Expand your recipe repertoire"
+      },
+      {
+        "description": "Choose the dishes you want to master and make a list.",
+        "id": "f2a",
+        "parentId": "f2",
+        "title": "Pick dishes"
+      },
+      {
+        "description": "Understand steps and timings, and add variations to your taste.",
+        "id": "f2b",
+        "parentId": "f2",
+        "title": "Read recipes"
+      },
+      {
+        "description": "Add spices and seasonings and try new combinations.",
+        "id": "f2c",
+        "parentId": "f2",
+        "title": "Experiment with spices"
+      },
+      {
+        "description": "Refine your technique and efficiency in the kitchen.",
+        "id": "f3",
+        "parentId": "root",
+        "title": "Improve your cooking skills"
+      },
+      {
+        "description": "Practice cutting vegetables, meat, and other ingredients precisely.",
+        "id": "f3a",
+        "parentId": "f3",
+        "title": "Precise knife work"
+      },
+      {
+        "description": "Use meal-prep techniques and plan the week's meals.",
+        "id": "f3b",
+        "parentId": "f3",
+        "title": "Meal planning"
+      },
+      {
+        "description": "Follow hygiene practices and safety rules in the kitchen.",
+        "id": "f3c",
+        "parentId": "f3",
+        "title": "Safety and hygiene"
+      }
+    ]
+  },
+  {
+    "title": "Úspěšné studium",
+    "description": "Plán pro efektivní učení, dobré známky a rozvoj akademických dovedností.",
+    "category": "skola",
+    "icon": "GraduationCap",
+    "goal": "Úspěšně dokončit studium s vyznamenáním",
+    "node_type": "cíl",
+    "ai_nodes": [
+      {
+        "description": "Hlavní akademický cíl",
+        "id": "n1",
+        "parentId": null,
+        "title": "Úspěšně dokončit studium s vyznamenáním"
+      },
+      {
+        "description": "Zavedení studijních metod a technik",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Efektivní učení"
+      },
+      {
+        "description": "Týdenní studijní plán",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Plánování času"
+      },
+      {
+        "description": "Spaced repetition a flashcards",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Aktivní opakování"
+      },
+      {
+        "description": "Pravidelný a kvalitní průběh",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Zpracování seminárek"
+      },
+      {
+        "description": "Odevzdání 2 dny před termínem",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Předčasné zadání"
+      },
+      {
+        "description": "Systematická příprava včas",
+        "id": "n7",
+        "parentId": "n1",
+        "title": "Příprava na zkoušky"
+      },
+      {
+        "description": "Pravidelné setkávání se spolužáky",
+        "id": "n8",
+        "parentId": "n7",
+        "title": "Studijní skupina"
+      },
+      {
+        "description": "Získání praxe v oboru během studia",
+        "id": "n9",
+        "parentId": "n1",
+        "title": "Praxe a stáže"
+      }
+    ],
+    "title_en": "Successful Studies",
+    "description_en": "A plan for effective learning, good grades and developing academic skills.",
+    "goal_en": "Successfully graduate with honors",
+    "ai_nodes_en": [
+      {
+        "description": "Main academic goal",
+        "id": "n1",
+        "parentId": null,
+        "title": "Successfully graduate with honors"
+      },
+      {
+        "description": "Establishing study methods and techniques",
+        "id": "n2",
+        "parentId": "n1",
+        "title": "Effective learning"
+      },
+      {
+        "description": "Weekly study plan",
+        "id": "n3",
+        "parentId": "n2",
+        "title": "Time management"
+      },
+      {
+        "description": "Spaced repetition and flashcards",
+        "id": "n4",
+        "parentId": "n2",
+        "title": "Active recall"
+      },
+      {
+        "description": "Steady, high-quality progress",
+        "id": "n5",
+        "parentId": "n1",
+        "title": "Working on term papers"
+      },
+      {
+        "description": "Submitting 2 days before the deadline",
+        "id": "n6",
+        "parentId": "n5",
+        "title": "Early submission"
+      },
+      {
+        "description": "Systematic preparation in advance",
+        "id": "n7",
+        "parentId": "n1",
+        "title": "Exam preparation"
+      },
+      {
+        "description": "Regular meetings with classmates",
+        "id": "n8",
+        "parentId": "n7",
+        "title": "Study group"
+      },
+      {
+        "description": "Gaining industry experience during studies",
+        "id": "n9",
+        "parentId": "n1",
+        "title": "Work experience and internships"
+      }
+    ]
+  }
+]

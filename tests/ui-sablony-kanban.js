@@ -321,8 +321,10 @@ const api = async (method, path, { token, body } = {}) => {
     const poNaboru = (await api('GET', '/api/collections/goalmaps/records?perPage=50&sort=-created', { token: SEF })).json.items || [];
     const nabor = poNaboru.find((m) => m.title === 'Nábor s kolegou');
     ok(!!nabor, `projekt z vlastní šablony vznikl (${nabor ? 'ano' : 'ne'})`);
-    ok(nabor && (nabor.shared_with_edit || []).includes('kolega@example.com'),
-      `přiřazený kolega má na projekt edit (${JSON.stringify((nabor || {}).shared_with_edit || [])})`);
+    // spolupracovník (work), NE editor: rozhodnutí 7. 8. 2026 — do 27. 8. test
+    // tvrdil `shared_with_edit` a tím zakódoval drift dialogu (nález S5-03)
+    ok(nabor && (nabor.shared_with_work || []).includes('kolega@example.com') && !(nabor.shared_with_edit || []).includes('kolega@example.com'),
+      `přiřazený kolega je na projektu spolupracovník, ne editor (work ${JSON.stringify((nabor || {}).shared_with_work || [])}, edit ${JSON.stringify((nabor || {}).shared_with_edit || [])})`);
     ok(nabor && (nabor.shared_with || []).includes('kolega@example.com'),
       `a je i ve sdílení (${JSON.stringify((nabor || {}).shared_with || [])})`);
 

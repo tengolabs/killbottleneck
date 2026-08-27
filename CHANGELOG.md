@@ -9,6 +9,29 @@ below before you jump several versions.
 
 ---
 
+## v0.48-beta — 2026-08-27
+
+**Third wave from the code review — test foundation, one source for system templates, dead code out**
+
+- **Behaviour change (approved drift fix):** a person assigned in a template gets the project as a
+  *collaborator* (`work`) when the project is created from the app, exactly as the automatic
+  creation already did — until now the app granted `edit` (decision of 7 Aug 2026, S5-03).
+- **System templates:** the 40 built-in templates now come from one file
+  (`pb_migrations/data/system_templates.json`) and one migration instead of six layered
+  migrations (6 369 lines). Existing instances are untouched (every template already exists);
+  fresh instances get the final state directly. Dedup is by title *and* `owner = ''`, so a
+  user's own template with the same name no longer blocks a system one.
+- **Stripe:** period end is read with a fallback to the subscription item (API `basil`).
+- **Tests:** shared `product/tests/_harness.js` (docker-assigned ports, image-hashed container
+  names, mandatory `KB_TEST_IMAGE`, one summary format, `HARNESS_MUTACE` self-test); five suites
+  converted; `tests/run-all.sh` discovers suites itself (two suites had been missing from the
+  hard-coded list three times).
+- Removed the dead Base44 export `app/` and `sync/sync-from-base44.sh` (private monorepo only).
+- Cloud: one `.env` loader (`konfig.nacti_env`) instead of eight copies.
+
+**Upgrade notes:** one automatic migration (system templates seed — no-op on existing data).
+No configuration changes.
+
 ## v0.47-beta — 2026-08-27
 
 **Second bug-fix wave from the full code review — write ordering, one core for rules, faster overviews**

@@ -5,51 +5,28 @@
 //
 // Mock webhook běží na hostu; kontejner na něj vidí přes host.docker.internal
 // (vzor schema-version.js). Vlastní port kontejneru i mocku, ať sada nekoliduje.
-const http = require('http');
 const crypto = require('crypto');
-const { execSync } = require('child_process');
-
-const NAME = 'flowmap-e2e-agents';
-const PORT = 20512;
-const MOCK_PORT = 20612;
-const BASE = `http://127.0.0.1:${PORT}`;
-const PW = 'testheslo123';
+const H = require('./_harness');
+const { expect, sleep, PW } = H;
 const SECRET = 'tajny-klic-agenta';
-
-let pass = 0, fail = 0;
-const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // co mock zachytil z odchozího webhooku
 const received = [];
 let mockStatus = 200;
-const mock = http.createServer((req, res) => {
-  let body = '';
-  req.on('data', (c) => { body += c; });
-  req.on('end', () => {
-    received.push({
-        body: body,
-        signature: req.headers['x-signature'] || '',
-        runHeader: req.headers['x-kb-run'] || '',
-        runHeaderStary: req.headers['x-flowmap-run'] || '',   // PŘECHOD: co čtou workflow zákazníků
-      });
-    res.statusCode = mockStatus;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ accepted: mockStatus < 300 }));
-  });
-});
-
-const api = async (method, path, { token, body } = {}) => {
-  const res = await fetch(BASE + path, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
-  return { status: res.status, json };
+let mock = null; // H.httpMock — port přidělí OS, zavře finish()
+const mockHandler = (req, res, body) => {
+  received.push({
+      body: body,
+      signature: req.headers['x-signature'] || '',
+      runHeader: req.headers['x-kb-run'] || '',
+      runHeaderStary: req.headers['x-flowmap-run'] || '',   // PŘECHOD: co čtou workflow zákazníků
+    });
+  res.statusCode = mockStatus;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ accepted: mockStatus < 300 }));
 };
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
-const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
+
+let api, reg, login;
 const waitFor = async (fn, tries = 25) => {
   for (let i = 0; i < tries; i++) { if (await fn()) return true; await sleep(200); }
   return false;
@@ -74,13 +51,13 @@ const EDGES = [
   { id: 'e3', source: 'B', target: 'A' },
 ];
 
-(async () => {
-  try {
-    await new Promise((r) => mock.listen(MOCK_PORT, '0.0.0.0', r));
-    execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 --add-host=host.docker.internal:host-gateway \
-      -e FLOWMAP_PUBLIC_URL=https://flowmap.example.com ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
-    for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
+H.beh(async () => {
+    mock = await H.httpMock(mockHandler);
+    const inst = await H.startInstance({ slug: 'agents', addHostGateway: true, env: { FLOWMAP_PUBLIC_URL: 'https://flowmap.example.com' } });
+    api = inst.api;
+    reg = (email) => inst.register(email);
+    login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
+    const ST_SU = () => inst.superuser({ email: 'su@example.com', pw: 'superheslo123' });
 
     const rA = await reg('a@example.com');
     await reg('mgr@example.com');
@@ -99,7 +76,7 @@ const EDGES = [
 
     r = await api('POST', '/api/flowmap/ai-agents/save', { token: MGR2, body: {
       name: 'n8n test', description: 'testovací', enabled: true, secret: SECRET,
-      webhook_url: `http://host.docker.internal:${MOCK_PORT}/webhook/test`,
+      webhook_url: `http://host.docker.internal:${mock.port}/webhook/test`,
     } });
     expect(r.status === 200 && !!r.json.agent.id, `správce AI agenta založí (${r.status})`);
     expect(r.json.agent.secret === undefined, 'odpověď nevrací tajný klíč');
@@ -267,7 +244,7 @@ const EDGES = [
     // rozdíl proti výše: agent v registru JE, jen ho někdo vypnul → o tom informujeme
     const agentId = (await api('GET', '/api/flowmap/ai-agents/admin', { token: MGR2 })).json.agents[0].id;
     await api('POST', '/api/flowmap/ai-agents/save', { token: MGR2, body: {
-      id: agentId, name: 'n8n test', webhook_url: `http://host.docker.internal:${MOCK_PORT}/webhook/test`, enabled: false,
+      id: agentId, name: 'n8n test', webhook_url: `http://host.docker.internal:${mock.port}/webhook/test`, enabled: false,
     } });
     const disBefore = await failCount();
     const f5a = (await api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
@@ -282,14 +259,14 @@ const EDGES = [
       'vypnutý zaregistrovaný agent → hláška správci PŘIJDE');
     // úklid: agenta zase zapnout (navazující sekce ho používá zapnutého)
     await api('POST', '/api/flowmap/ai-agents/save', { token: MGR2, body: {
-      id: agentId, name: 'n8n test', webhook_url: `http://host.docker.internal:${MOCK_PORT}/webhook/test`, enabled: true,
+      id: agentId, name: 'n8n test', webhook_url: `http://host.docker.internal:${mock.port}/webhook/test`, enabled: true,
     } });
 
     console.log('== kdo smí agenta spustit ==');
     // omezíme agenta na mgr@ → A ho spustit nesmí, i když mapu vlastní
     let ra = await api('POST', '/api/flowmap/ai-agents/save', { token: MGR2, body: {
       id: (await api('GET', '/api/flowmap/ai-agents/admin', { token: MGR2 })).json.agents[0].id,
-      name: 'n8n test', webhook_url: `http://host.docker.internal:${MOCK_PORT}/webhook/test`,
+      name: 'n8n test', webhook_url: `http://host.docker.internal:${mock.port}/webhook/test`,
       enabled: true, allowed_emails: ['mgr@example.com'],
     } });
     expect(ra.status === 200 && ra.json.agent.allowed_emails.length === 1,
@@ -318,7 +295,7 @@ const EDGES = [
     // vrátit na „smí kdokoli", ať navazující části sady fungují
     await api('POST', '/api/flowmap/ai-agents/save', { token: MGR2, body: {
       id: (await api('GET', '/api/flowmap/ai-agents/admin', { token: MGR2 })).json.agents[0].id,
-      name: 'n8n test', webhook_url: `http://host.docker.internal:${MOCK_PORT}/webhook/test`,
+      name: 'n8n test', webhook_url: `http://host.docker.internal:${mock.port}/webhook/test`,
       enabled: true, allowed_emails: [],
     } });
 
@@ -389,8 +366,7 @@ const EDGES = [
     }
 
     console.log('== watchdog zaseknutých běhů ==');
-    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@example.com superheslo123`, { stdio: 'ignore' });
-    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@example.com', password: 'superheslo123' } })).json.token;
+    const ST = await ST_SU();
     // běhy z testu fronty výš zůstaly viset → hlídač je po vypršení uzavře.
     // Kontejner běží s FLOWMAP_AGENT_TIMEOUT_MIN=0? Ne — posuneme čas u záznamů
     // přes superuser API není možné, takže ověříme aspoň, že routa existuje,
@@ -424,13 +400,4 @@ const EDGES = [
     // POZOR: jen PŮVODNÍ mapa — mapa z testu fronty výš nechává běhy otevřené záměrně
     const openRuns = (await api('GET', `/api/collections/agent_runs/records?filter=${encodeURIComponent(`map="${map.id}" && (status="pending" || status="running")`)}`, { token: A })).json;
     expect(openRuns.totalItems === 0, `po callbacku i selháních nezůstal viset žádný běh (${openRuns.totalItems})`);
-  } catch (err) {
-    fail++;
-    console.log('  ❌ výjimka: ' + (err && err.stack ? err.stack : err));
-  } finally {
-    try { execSync(`docker rm -f ${NAME}`, { stdio: 'ignore' }); } catch { /* už je pryč */ }
-    mock.close();
-  }
-  console.log(`\n${fail === 0 ? '🟢' : '🔴'} AGENT RUNS PASS ${pass} / FAIL ${fail}`);
-  process.exit(fail === 0 ? 0 : 1);
-})();
+}, { nazev: 'AGENT RUNS' });

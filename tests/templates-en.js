@@ -1,11 +1,11 @@
 // EN texty systémových šablon — kompletnost + jazykové korekce (5. 8. 2026).
 // Co hlídá:
 //  - všech 40 systémových šablon má vyplněná _en pole (title/description/goal/ai_nodes)
-//    (38 původních + 2 kanban varianty z 1787220000 — vlna kanbanových šablon)
+//    (38 původních + 2 kanban varianty; od 27. 8. 2026 jeden seed z pb_migrations/data/system_templates.json)
 //  - EN strom má stejný počet uzlů a stejná id jako CZ strom (nic se překladem neztratilo)
 //  - MUTAČNĚ: vzorek jazykových korekcí z reportu killbottleneck-en-sablony-kontrola
 //    opravdu sedí v datech (kdyby korekce někdo vrátil/přepsal, test spadne)
-// Čerstvý kontejner na :20520 → migrace seed → templates_en → templates_en_korekce.
+// Čerstvý kontejner na :20520 → jediná migrace seed_system_templates (dřív řetěz CS seed → EN → korekce).
 const { execSync } = require('child_process');
 
 const NAME = 'kb-e2e-templates-en';

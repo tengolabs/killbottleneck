@@ -9,28 +9,9 @@
 // Pravidla se v této sadě zakládají SUPERUSEREM přímo do kolekce (routy CRUD
 // jsou samostatná vrstva testovaná v rules-schedule.js / v1-api). Motor sám
 // o routách nic neví — přesně to se tu testuje.
-const { execSync } = require('child_process');
-
-const NAME = 'kb-e2e-rules';
-const PORT = 20721;
-const BASE = `http://127.0.0.1:${PORT}`;
-const PW = 'testheslo123';
-
-let pass = 0, fail = 0, code = 1;
-const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const api = async (method, path, { token, body } = {}) => {
-  const res = await fetch(BASE + path, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
-  return { status: res.status, json };
-};
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
-const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
+const H = require('./_harness');
+const { expect, sleep, PW } = H;
+let api, reg, login;
 
 const node = (id, data, type) => ({ id, type: type || 'goalNode', position: { x: 0, y: 100 }, data });
 const freshMap = async (token, id) => (await api('GET', `/api/collections/goalmaps/records/${id}`, { token })).json;
@@ -40,14 +21,12 @@ const patchMap = async (token, map, nodes, edges) => {
 };
 const findNode = (m, id) => (m.nodes || []).find((n) => n.id === id);
 
-(async () => {
-  try {
-    execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
-    for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
-
-    execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
-    const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+H.beh(async () => {
+    const inst = await H.startInstance({ slug: 'rules' });
+    api = inst.api;
+    reg = (email) => inst.register(email);
+    login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
+    const ST = await inst.superuser();
     await reg('a@example.com'); // první registrace = admin, vlastník mapy
     await reg('b@example.com');
     await reg('c@example.com'); // cizí — mapu nevidí
@@ -55,7 +34,7 @@ const findNode = (m, id) => (m.nodes || []).find((n) => n.id === id);
     const C = await login('c@example.com');
 
     // „dnes" v LOKÁLNÍM čase KONTEJNERU — hostitel může mít jinou TZ
-    const dnes = execSync(`docker exec ${NAME} date +%F`).toString().trim();
+    const dnes = inst.exec('date +%F').trim();
     const plusDny = (n) => {
       const [y, m, d] = dnes.split('-').map(Number);
       const x = new Date(y, m - 1, d); x.setDate(x.getDate() + n);
@@ -328,7 +307,7 @@ const findNode = (m, id) => (m.nodes || []).find((n) => n.id === id);
     const form = new FormData();
     form.append('map', map.id); form.append('node_id', 'F'); form.append('name', 'podklady.txt');
     form.append('size', '5'); form.append('file', new Blob(['ahoj!'], { type: 'text/plain' }), 'podklady.txt');
-    let up = await fetch(`${BASE}/api/collections/node_files/records`, { method: 'POST', headers: { Authorization: A }, body: form });
+    let up = await fetch(`${inst.base}/api/collections/node_files/records`, { method: 'POST', headers: { Authorization: A }, body: form });
     expect(up.status === 200, `nahrání přílohy prošlo (${up.status})`);
     rr = await runs(`rule = "${r5.id}"`);
     expect(rr.length === 1 && rr[0].trigger_type === 'file_uploaded', 'nahraný soubor pravidlo spustil');
@@ -400,17 +379,9 @@ const findNode = (m, id) => (m.nodes || []).find((n) => n.id === id);
     expect(r.status === 403 || r.status === 400, `pravidlo nejde založit přímým zápisem do kolekce (${r.status})`);
 
     console.log('== celoinstanční brzda KB_RULES_DISABLED=1 ==');
-    execSync(`docker rm -f ${NAME}-off 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME}-off -p ${PORT + 1}:8090 -e KB_RULES_DISABLED=1 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
-    const BASE2 = `http://127.0.0.1:${PORT + 1}`;
-    for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE2}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
-    execSync(`docker exec ${NAME}-off /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
-    const api2 = async (method, path, { token, body } = {}) => {
-      const res = await fetch(BASE2 + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
-      let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
-      return { status: res.status, json };
-    };
-    const ST2 = (await api2('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
+    const off = await H.startInstance({ slug: 'rules-off', env: { KB_RULES_DISABLED: 1 } });
+    const api2 = off.api;
+    const ST2 = await off.superuser();
     await api2('POST', '/api/collections/users/records', { body: { email: 'a@example.com', password: PW, passwordConfirm: PW } });
     const A2 = (await api2('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@example.com', password: PW } })).json.token;
     const map2 = (await api2('POST', '/api/collections/goalmaps/records', { token: A2, body: { title: 'Brzda', nodes: [node('root', { apexText: 'x', title: 'x', status: 'todo' }, 'apexNode'), node('Q', { title: 'q', status: 'todo' })], edges: [{ id: 'e', source: 'root', target: 'Q' }] } })).json;
@@ -420,15 +391,4 @@ const findNode = (m, id) => (m.nodes || []).find((n) => n.id === id);
     r = await api2('GET', '/api/collections/rule_runs/records', { token: ST2 });
     expect(r.json.totalItems === 0, 'brzda KB_RULES_DISABLED=1 motor úplně vypnula');
 
-    console.log(`\nVýsledek: ${pass} ✅ / ${fail} ❌`);
-    code = fail === 0 ? 0 : 1;
-  } catch (err) {
-    console.error('NEOČEKÁVANÁ CHYBA SADY:', err);
-    code = 1;
-  } finally {
-    // ⚠️ process.exit AŽ ZA úklidem — uvnitř try by finally přeskočil a
-    // kontejnery kb-e2e-rules* by zůstaly viset (nález panelu 14. 8.)
-    execSync(`docker rm -f ${NAME} ${NAME}-off 2>/dev/null; true`);
-  }
-  process.exit(code);
-})();
+}, { nazev: 'RULES ENGINE' });

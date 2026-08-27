@@ -1542,7 +1542,7 @@ function EditorContent({ mapId, personalMap = false }) {
         nodes: cleanNodes,
         edges: cleanEdges,
         shared_with: owners,
-        shared_with_edit: owners,
+        shared_with_work: owners, // řešitel ze šablony = spolupracovník (Richard 7. 8. 2026; nález S5-03)
         ...(templateSeriesRef.current ? { series: templateSeriesRef.current } : {}),
       });
       setIsTemplatePreview(false);

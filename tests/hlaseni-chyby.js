@@ -8,56 +8,14 @@
 //
 // Nejdůležitější tvrzení sady: BEZ KB_REPORT_TO routa neexistuje. Na tom stojí
 // Richardovo zadání „jen z našich instancí" — cizí self-host nesmí odesílat nic.
-const net = require('net');
 const { execSync } = require('child_process');
-
-const SMTP_PORT = 20532;
-const PORT = 20534;
-const BASE = `http://127.0.0.1:${PORT}`;
-const NAME = 'kb-e2e-hlaseni';
-const PW = 'testheslo123';
+const H = require('./_harness');
+const { ok, sleep, PW } = H;
 const SU = { email: 'su@example.com', pw: 'superheslo123' };
 const SU2 = SU;
+let inst = null, api = null, sink = null, maily = [];
 const CIL = 'podpora@example.com';
 
-let pass = 0, fail = 0;
-const ok = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const api = async (method, path, { token, body } = {}) => {
-  const res = await fetch(BASE + path, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
-  return { status: res.status, json };
-};
-
-const maily = [];
-const jimka = () => net.createServer((sock) => {
-  let buf = '', vData = false, zprava = '';
-  sock.write('220 jimka ESMTP\r\n');
-  sock.on('data', (d) => {
-    buf += d.toString('utf8');
-    let i;
-    while ((i = buf.indexOf('\r\n')) >= 0) {
-      const radek = buf.slice(0, i); buf = buf.slice(i + 2);
-      if (vData) {
-        if (radek === '.') { maily.push(zprava); zprava = ''; vData = false; sock.write('250 OK\r\n'); }
-        else zprava += radek + '\n';
-        continue;
-      }
-      const cmd = radek.toUpperCase();
-      if (cmd.startsWith('EHLO')) sock.write('250-jimka\r\n250 8BITMIME\r\n');
-      else if (cmd.startsWith('HELO')) sock.write('250 jimka\r\n');
-      else if (cmd.startsWith('DATA')) { vData = true; sock.write('354 go\r\n'); }
-      else if (cmd.startsWith('QUIT')) { sock.write('221 bye\r\n'); sock.end(); }
-      else sock.write('250 OK\r\n');
-    }
-  });
-  sock.on('error', () => { /* klient odpojen, nevadí */ });
-});
 
 const qp = (s) => Buffer.from(
   s.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))),
@@ -73,34 +31,27 @@ const dekoduj = (s) => {
   return out;
 };
 
-const spust = (env) => {
-  execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} --add-host=host.docker.internal:host-gateway -p 127.0.0.1:${PORT}:8090 ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+const spust = async (env) => {
+  if (inst) inst.stop();
+  inst = await H.startInstance({ slug: 'hlaseni', addHostGateway: true, extraArgs: env });
+  api = inst.api;
 };
-const pockej = async () => {
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) return true; } catch { /* startuje */ } await sleep(1000); }
-  return false;
-};
+const pockej = async () => (await api('GET', '/api/health')).status === 200;
 const nastavSmtp = async () => {
-  execSync(`docker exec ${NAME} /app/pocketbase superuser upsert ${SU.email} ${SU.pw}`, { stdio: 'ignore' });
-  const st = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: SU.email, password: SU.pw } })).json.token;
-  await api('PATCH', '/api/settings', { token: st, body: {
-    meta: { appName: 'killBottleneck', appURL: BASE, senderName: 'killBottleneck', senderAddress: 'noreply@killbottleneck.com' },
-    smtp: { enabled: true, host: 'host.docker.internal', port: SMTP_PORT, tls: false },
-  } });
+  const st = await inst.superuser({ email: SU.email, pw: SU.pw });
+  await sink.zapoj(inst, st);
 };
 const ucet = async (email) => {
   await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
   return (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 };
 
-(async () => {
-  const server = jimka();
-  try {
-    await new Promise((r) => server.listen(SMTP_PORT, '0.0.0.0', r));
+H.beh(async () => {
+    sink = await H.smtpSink();
+    maily = sink.maily;
 
     console.log('== BEZ KB_REPORT_TO: funkce vůbec neexistuje ==');
-    spust('');
+    await spust('');
     ok(await pockej(), 'instance bez KB_REPORT_TO naběhla');
     await nastavSmtp();
     const t0 = await ucet('kdokoli@example.com');
@@ -113,7 +64,7 @@ const ucet = async (email) => {
     ok(maily.length === 0, `a NEODEŠLA žádná zpráva (${maily.length})`);
 
     console.log('== S KB_REPORT_TO: hlášení dojde ==');
-    spust(`-e KB_REPORT_TO=${CIL} -e KB_VERSION=v0.38-test`);
+    await spust(`-e KB_REPORT_TO=${CIL} -e KB_VERSION=v0.38-test`);
     ok(await pockej(), 'instance s KB_REPORT_TO naběhla');
     await nastavSmtp();
     const token = await ucet('uzivatel@example.com');
@@ -199,10 +150,10 @@ const ucet = async (email) => {
     if (zaznamS && zaznamS.image) {
       // ⚠️ Soubor je PROTECTED: bez tokenu ho nesmí dostat NIKDO — snímek
       // obrazovky je nejcitlivější věc v kolekci a zásady slibují „jen vy".
-      const bez = await fetch(`${BASE}/api/files/reports/${zaznamS.id}/${zaznamS.image}`);
+      const bez = await fetch(`${inst.base}/api/files/reports/${zaznamS.id}/${zaznamS.image}`);
       ok(bez.status !== 200, `bez file tokenu se snímek NEVYDÁ (${bez.status})`);
       const ftok = (await api('POST', '/api/files/token', { token: ts })).json.token;
-      const fr = await fetch(`${BASE}/api/files/reports/${zaznamS.id}/${zaznamS.image}?token=${ftok}`);
+      const fr = await fetch(`${inst.base}/api/files/reports/${zaznamS.id}/${zaznamS.image}?token=${ftok}`);
       const bytes = Buffer.from(await fr.arrayBuffer());
       ok(fr.status === 200 && bytes.length > 0 && bytes.slice(1, 4).toString() === 'PNG',
         `s tokenem pisatele jde stáhnout a je to PNG (${fr.status}, ${bytes.length} B)`);
@@ -279,9 +230,9 @@ const ucet = async (email) => {
     // Richard 19. 8. 2026 zkrátil dobu ze tří let na 30 dnů.
     await api('POST', '/api/kb/report', { token, body: { kind: 'napad', text: 'cerstvy zaznam musi zustat' } });
     await sleep(800);
-    execSync(`docker stop ${NAME}`, { stdio: 'ignore' });
+    inst.pause();
     const tmp = `/tmp/kb-ret-${process.pid}.db`;
-    execSync(`docker cp ${NAME}:/app/pb_data/data.db ${tmp}`, { stdio: 'ignore' });
+    execSync(`docker cp ${inst.name}:/app/pb_data/data.db ${tmp}`, { stdio: 'ignore' });
     // starý = všechno kromě posledního; python3 je na stroji, sqlite3 binárka ne
     const skript = `/tmp/kb-ret-${process.pid}.py`;
     require('fs').writeFileSync(skript, [
@@ -293,23 +244,22 @@ const ucet = async (email) => {
     ].join('\n'));
     execSync(`python3 ${skript} ${tmp}`, { stdio: 'ignore' });
     execSync(`rm -f ${skript}`, { stdio: 'ignore' });
-    execSync(`docker cp ${tmp} ${NAME}:/app/pb_data/data.db`, { stdio: 'ignore' });
+    execSync(`docker cp ${tmp} ${inst.name}:/app/pb_data/data.db`, { stdio: 'ignore' });
     execSync(`rm -f ${tmp}`, { stdio: 'ignore' });
-    execSync(`docker start ${NAME}`, { stdio: 'ignore' });
-    await pockej();
+    await inst.resume(); // port se po startu mění — resume ho přečte znovu
     const st2 = (await api('POST', '/api/collections/_superusers/auth-with-password',
       { body: { identity: SU2.email, password: SU2.pw } })).json.token;
     const predUklidem = (await api('GET', '/api/collections/reports/records?perPage=200', { token: st2 })).json;
     ok(predUklidem.totalItems >= 2, `je co uklízet (${predUklidem.totalItems} záznamů, z toho staré)`);
     // ⚠️ Úklid musí smazat i SOUBORY snímků ze storage — surové SQL je nechávalo
     // ležet na disku navždy (nález panelu 24. 8. 2026); proto se maže přes záznamy.
-    const souboruPredUklidem = parseInt(execSync(`docker exec ${NAME} sh -c "find /app/pb_data/storage -type f 2>/dev/null | wc -l"`).toString().trim(), 10);
+    const souboruPredUklidem = parseInt(execSync(`docker exec ${inst.name} sh -c "find /app/pb_data/storage -type f 2>/dev/null | wc -l"`).toString().trim(), 10);
     ok(souboruPredUklidem >= 1, `před úklidem je ve storage aspoň snímek (${souboruPredUklidem})`);
     await api('POST', '/api/crons/prune_reports', { token: st2 });
     await sleep(1500);
     const poUklidu = (await api('GET', '/api/collections/reports/records?perPage=200', { token: st2 })).json;
     ok(poUklidu.totalItems === 1, `úklid smazal STARÉ (${predUklidem.totalItems} → ${poUklidu.totalItems})`);
-    const souboruPoUklidu = parseInt(execSync(`docker exec ${NAME} sh -c "find /app/pb_data/storage -type f 2>/dev/null | wc -l"`).toString().trim(), 10);
+    const souboruPoUklidu = parseInt(execSync(`docker exec ${inst.name} sh -c "find /app/pb_data/storage -type f 2>/dev/null | wc -l"`).toString().trim(), 10);
     ok(souboruPoUklidu < souboruPredUklidem,
       `a zmizely i soubory snímků ze storage (${souboruPredUklidem} → ${souboruPoUklidu})`);
     const zbyl = (poUklidu.items || [])[0];
@@ -320,13 +270,4 @@ const ucet = async (email) => {
     const t2 = await ucet('druhy@example.com');
     const stara = await api('POST', '/api/flowmap/report', { token: t2, body: { kind: 'chyba', text: 'přes starou cestu' } });
     ok(stara.status === 200, `stará cesta funguje taky (${stara.status})`);
-  } catch (e) {
-    fail++;
-    console.log(`  ❌ výjimka: ${e.message}`);
-  } finally {
-    try { server.close(); } catch { /* nevadí */ }
-    execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  }
-  console.log(`\n${fail === 0 ? '🟢' : '🔴'} HLÁŠENÍ PASS ${pass} / FAIL ${fail}`);
-  process.exit(fail === 0 ? 0 : 1);
-})();
+}, { nazev: 'HLÁŠENÍ' });

@@ -9,35 +9,20 @@
 // musí ollama na 172.17.0.1 / v LAN dál projít, jinak by aktualizace tiše
 // rozbila existující domácí instalace (je to tak i v README).
 const { execSync } = require('child_process');
+const HN = require('./_harness');
+const { expect, sleep, PW } = HN;
 
-const HOSTED = { name: 'flowmap-e2e-hosted', port: 20519 };
-const SELFHOST = { name: 'flowmap-e2e-selfhost', port: 20520 };
-const PW = 'testheslo123';
+const HOSTED = { name: null, slug: 'hosted' };
+const SELFHOST = { name: null, slug: 'selfhost' };
 const SETUP_CODE = 'FM-TEST-KOD1';
+const api = HN.apiBaseFirst();
 
-let pass = 0, fail = 0;
-const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const api = async (base, method, path, { token, body } = {}) => {
-  const res = await fetch(base + path, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
-  return { status: res.status, json };
-};
-
+// vrací base URL (sada je psaná base-first); jméno kontejneru pro docker cp/stop/start
 async function start(inst, env) {
-  execSync(`docker rm -f ${inst.name} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${inst.name} -p ${inst.port}:8090 ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
-  const base = `http://127.0.0.1:${inst.port}`;
-  for (let i = 0; i < 40; i++) {
-    try { if ((await fetch(`${base}/api/health`)).ok) return base; } catch { /* startuje */ }
-    await sleep(1000);
-  }
-  throw new Error(`${inst.name} nenaběhl`);
+  const i = await HN.startInstance({ slug: inst.slug, extraArgs: env });
+  inst.name = i.name;
+  inst.inst = i;
+  return i.base;
 }
 
 const register = (base, email, extra = {}) =>
@@ -48,14 +33,13 @@ const login = async (base, email) => {
   return r.json.token;
 };
 
-(async () => {
-  try {
+HN.beh(async () => {
     // ── hostovaná instance ────────────────────────────────────────────────
     console.log('== hostovaná instance (FLOWMAP_HOSTED=1) ==');
     // --add-host = podvržené DNS pro past na rebinding (níž). Přes /etc/hosts,
     // protože getent i Go resolver ho čtou první — sada tak nezávisí na veřejném
     // DNS a běží i offline. `verejne.test` je KONTROLA opačným směrem.
-    const H = await start(HOSTED, `-e FLOWMAP_HOSTED=1 -e FLOWMAP_SETUP_CODE=${SETUP_CODE}`
+    let H = await start(HOSTED, `-e FLOWMAP_HOSTED=1 -e FLOWMAP_SETUP_CODE=${SETUP_CODE}`
       + ' --add-host benigni.test:10.0.0.5'
       + ' --add-host benigni6.test:fd00::1'
       + ' --add-host verejne.test:93.184.216.34');
@@ -126,7 +110,7 @@ const login = async (base, email) => {
       `veřejná adresa se v /advisor nehlásí jako privátní (${adv.status})`);
     // Teď se uložená adresa přepíše PŘÍMO V DATABÁZI na metadata službu —
     // stejný postup jako v hlaseni-chyby.js (python3 je na stroji, sqlite3 v image není).
-    execSync(`docker stop ${HOSTED.name}`, { stdio: 'ignore' });
+    HOSTED.inst.pause();
     const dbTmp = `/tmp/kb-toctou-${process.pid}.db`;
     execSync(`docker cp ${HOSTED.name}:/app/pb_data/data.db ${dbTmp}`, { stdio: 'ignore' });
     const pySkript = `/tmp/kb-toctou-${process.pid}.py`;
@@ -139,11 +123,7 @@ const login = async (base, email) => {
     execSync(`python3 ${pySkript} ${dbTmp}`, { stdio: 'ignore' });
     execSync(`docker cp ${dbTmp} ${HOSTED.name}:/app/pb_data/data.db`, { stdio: 'ignore' });
     execSync(`rm -f ${pySkript} ${dbTmp}`, { stdio: 'ignore' });
-    execSync(`docker start ${HOSTED.name}`, { stdio: 'ignore' });
-    for (let i = 0; i < 40; i++) {
-      try { if ((await fetch(`${H}/api/health`)).ok) break; } catch { /* startuje */ }
-      await sleep(1000);
-    }
+    H = await HOSTED.inst.resume(); // port se po startu mění — resume vrací nový base
     const A2 = await login(H, 'admin@example.com');
     adv = await api(H, 'POST', '/api/flowmap/advisor', { token: A2, body: { mode: 'chat', message: 'ahoj', map: { nodes: [], edges: [] } } });
     expect(adv.status === 503 && /privátní|private/i.test(JSON.stringify(adv.json || {})),
@@ -152,6 +132,12 @@ const login = async (base, email) => {
     await api(H, 'POST', '/api/flowmap/ai-settings', { token: A2, body: { provider: 'custom', url: 'https://ai.example.com/v1/advisor' } });
 
     console.log('-- brzda na hádání aktivačního kódu --');
+    // Server počítá pokusy v PEVNÉM 10minutovém kyblíku (floor(now/600000)). Když série
+    // špatných pokusů přeteče přes hranici okna, správný kód už padne do nového (prázdného)
+    // kyblíku a kontrola níž zčervená — 2× v plné regresi 27. 8. (běhy kolem 13:00 a 13:30).
+    // Proto před sekcí počkat, je-li hranice okna blíž než 30 s.
+    const doOkna = 600000 - (Date.now() % 600000);
+    if (doOkna < 30000) { console.log(`   (hranice 10min okna za ${Math.round(doOkna / 1000)} s — čekám)`); await sleep(doOkna + 500); }
     let limited = 0, rejected = 0;
     for (let i = 0; i < 14; i++) {
       const bad = await register(H, `utok${i}@example.com`, { setup_code: 'FM-XXXX-XXXX' });
@@ -185,11 +171,4 @@ const login = async (base, email) => {
     expect(!/privátní|private/i.test(t2.json?.message || ''), 'lokální ollama se na self-hostu NEBLOKUJE (regrese README nastavení)');
     const s2 = await api(S, 'POST', '/api/flowmap/ai-settings', { token: SA, body: { provider: 'ollama', url: 'http://172.17.0.1:11434' } });
     expect(s2.status === 200, 'a jde i uložit');
-  } catch (e) {
-    fail++; console.log(`  ❌ výjimka: ${e.message}`);
-  } finally {
-    for (const inst of [HOSTED, SELFHOST]) execSync(`docker rm -f ${inst.name} 2>/dev/null; true`);
-  }
-  console.log(`\n${pass} OK, ${fail} chyb`);
-  process.exit(fail ? 1 : 0);
-})();
+}, { nazev: 'HOSTED GUARDS' });

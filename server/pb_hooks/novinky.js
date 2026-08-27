@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.48-beta": {
+    cs: [
+      "Řešitel, kterého přiřadíte v šabloně, dostane projekt jako spolupracovník — stejně z aplikace i z automatického zakládání (dřív z aplikace dostal plná práva editora).",
+      "Připomínky obnovy předplatného a fakturace jsou připravené i na novou verzi Stripe API.",
+      "Pod kapotou: testy mají společný základ (žádné kolize portů), regrese si sady najde sama, 40 systémových šablon má jeden zdroj místo šesti vrstev migrací.",
+    ],
+    en: [
+      "A person assigned in a template gets the project as a collaborator — the same from the app and from automatic creation (before, the app granted full editor rights).",
+      "Renewal reminders and invoicing are ready for the new Stripe API version.",
+      "Under the hood: tests share one foundation (no port collisions), the regression finds suites on its own, and the 40 system templates have a single source instead of six migration layers.",
+    ],
+  },
   "v0.47-beta": {
     cs: [
       "Úprava mapy a okamžitý odchod (šipka Zpět, jiná mapa) se už neztratí — uloží se hned; a Zpět po Zarovnat se do mapy zapíše.",

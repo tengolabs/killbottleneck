@@ -70,8 +70,12 @@ export async function createProjectFromTemplate(tpl, titleOverride, startDate, {
     edges,
     color,
     client_id: client,
+    // řešitelé ze šablony = SPOLUPRACOVNÍCI (work), ne editoři: rozhodnutí
+    // Richarda 7. 8. 2026 (999d50f, server 1ee70a8); tenhle dialog posílal
+    // `shared_with_edit` od 16. 7., kdy úroveň work ještě neexistovala →
+    // projekt z UI dával jiná práva než tentýž projekt z cronu (nález S5-03).
     shared_with: owners,
-    shared_with_edit: owners,
+    shared_with_work: owners,
     // číslovaná série: posílá se jen id šablony — pořadové číslo a finální
     // název složí server (goalmaps create hook), vrácený záznam už je má
     ...(tpl.number_format && tpl.id ? { series: tpl.id } : {}),
