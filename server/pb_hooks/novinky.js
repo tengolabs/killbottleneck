@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.50-beta": {
+    cs: [
+      "Zpět v editoru po „Opravit strom“ už nezahodí uzly, které jste mezitím přidali — vrací se přesně poslední stav.",
+      "Zarovnat a zámek zarovnání se v editoru přepočítávají jen, když se něco změní — lišta reaguje svižněji.",
+      "Pod kapotou: editor mapy je rozdělený na menší díly (pravidla, AI, zásobník, Moje mapa, rozvržení) — základ pro další zrychlení; chování 1:1, ověřeno celým proklikem i plnou regresí.",
+    ],
+    en: [
+      "Undo in the editor after “Repair tree” no longer discards nodes you added in the meantime — it returns exactly the last state.",
+      "Align and the align lock in the editor recompute only when something changes — the toolbar feels snappier.",
+      "Under the hood: the map editor is split into smaller parts (rules, AI, buffer, My map, layout) — groundwork for further speed-ups; behaviour 1:1, verified by the full click-test and regression.",
+    ],
+  },
   "v0.49-beta": {
     cs: [
       "Aplikace se ptá serveru na nastavení instance jednou místo šestkrát při každém otevření — načítání je lehčí, zvlášť na telefonu.",

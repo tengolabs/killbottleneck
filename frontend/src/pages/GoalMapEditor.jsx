@@ -11,7 +11,6 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
-  useUpdateNodeInternals,
   addEdge,
   SelectionMode,
 } from '@xyflow/react';
@@ -39,7 +38,6 @@ import PersonalRootNode from '@/components/goal-map/PersonalRootNode';
 import DeletableEdge from '@/components/goal-map/DeletableEdge';
 import NodeEditDialog from '@/components/shared/NodeEditDialog';
 import RecurrenceSwitch from '@/components/node-dialog/sections/RecurrenceSwitch';
-import { recurrenceOf } from '@/lib/recurrenceRule';
 import RulesDialog from '@/components/rules/RulesDialog';
 import NodeRulesPanel from '@/components/rules/NodeRulesPanel';
 import UnblockRulesHint from '@/components/rules/UnblockRulesHint';
@@ -48,21 +46,20 @@ import SkinDialog from '@/components/shared/SkinDialog';
 import UserMenu from '@/components/shared/UserMenu';
 import AdvisorDialog from '@/components/goal-map/AdvisorDialog';
 import AIChatPanel from '@/components/goal-map/AIChatPanel';
-import BufferPanel, { useBufferNodes, BUFFER_DRAG_MIME } from '@/components/goal-map/BufferPanel';
+import BufferPanel, { useBufferNodes } from '@/components/goal-map/BufferPanel';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ProgressDashboard from '@/components/goal-map/ProgressDashboard';
 import ReportRailButton from '@/components/shared/ReportRailButton';
-import { advisor, shareMap, getPublicMap } from '@/api/kb';
+import { shareMap, getPublicMap } from '@/api/kb';
 import { layoutTree, findFreeChildSpot } from '@/lib/treeLayout';
-import { isApexNode as isApexNodeShared, advisorPreviewToMap } from '@/lib/mapNodes';
+import { isApexNode as isApexNodeShared } from '@/lib/mapNodes';
 import { spojeniPovoleno, poskozeneHrany } from '@/lib/mapStructure';
 import { cleanMapData as cleanMap } from '@/lib/cleanMap';
 import { trojcestnyMerge, stableJson } from '@/lib/mergeMap';
-import { useMapDirection } from '@/lib/useMapDirection';
 import GoalMapContext from '@/components/goal-map/GoalMapContext';
 import { useToast } from '@/components/ui/use-toast';
 import i18next from 'i18next';
-import { useLazyNs, ensureNs } from '@/i18n/lazyNs';
+import { ensureNs } from '@/i18n/lazyNs';
 import { ToastAction } from '@/components/ui/toast';
 import { useAiModes } from '@/hooks/useAiEnabled';
 import { effectiveTheme, setTheme } from '@/lib/theme';
@@ -73,7 +70,7 @@ import NodeTasksDialog from '@/components/tasks/NodeTasksDialog';
 import BulkEditDialog from '@/components/goal-map/BulkEditDialog';
 import SaveTemplateDialog from '@/components/shared/SaveTemplateDialog';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
-import { ALIGN_STYLES, ALIGN_OPTS, KLIC_ZAMEK, zamcenyStyl, platnyStyl, stylNoveMapy } from '@/lib/alignStyles';
+import { ALIGN_OPTS, stylNoveMapy } from '@/lib/alignStyles';
 import { createRulesFromTemplate, ownersFromNodes, createProjectRecord } from '@/lib/createProject';
 import { computeWaitingSet } from '@/lib/waitStatus';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
@@ -81,8 +78,12 @@ import { useSidePanels } from '@/hooks/useSidePanels';
 import { useMapCounts } from '@/hooks/useMapCounts';
 import { useMapHistory } from '@/hooks/useMapHistory';
 import { useMapExport } from '@/hooks/useMapExport';
-import { KLIC_CITELNOST, nactiStupen, dalsiStupen } from '@/lib/citelnost';
-import { PERSONAL_LAYOUT, buildPersonalMap, buildDelegatedMap } from '@/lib/personalMap';
+import { useMapRules } from '@/hooks/useMapRules';
+import { useAiActions } from '@/hooks/useAiActions';
+import { useMapLayoutRefs } from '@/hooks/useMapLayoutRefs';
+import { useMapLayout } from '@/hooks/useMapLayout';
+import { useBufferInsert } from '@/hooks/useBufferInsert';
+import { usePersonalMapView } from '@/hooks/usePersonalMapView';
 import { buildChildrenMap, descendantCounts, hiddenByCollapse, computeProgressMap } from '@/lib/mapProgress';
 import { jeZadavatelNeboVlastnik, mojePracovniUzlyZ } from '@/lib/nodePermissions';
 
@@ -130,15 +131,9 @@ function EditorContent({ mapId, personalMap = false }) {
   const [color, setColor] = useState('');
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  // směr rozložení mapy (na výšku/na šířku); na mobilu se v režimu auto překlopí
-  const { setMode: setDirMode, direction, narrow } = useMapDirection();
-  const updateNodeInternals = useUpdateNodeInternals(); // přeměřit konektory po změně strany (jinak hrany vedou ke staré pozici)
-  // zámek proti omylnému posunu uzlu (hlavně na mobilu) — default zamčeno na malém displeji
-  const [locked, setLocked] = useState(narrow);
   // motiv (světlý/tmavý) — přesunut z lišty dolů k ovládání mapy
   const [theme, setThemeState] = useState(effectiveTheme);
   const toggleTheme = () => { const next = theme === 'dark' ? 'light' : 'dark'; setTheme(next); setThemeState(next); };
-  const recenterMap = () => { setTimeout(() => { try { rfInstance?.fitView({ padding: 0.2, duration: 300 }); } catch { /* ignore */ } }, 60); };
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [conflict, setConflict] = useState(false); // B3: mapa změněna z jiného místa
@@ -159,10 +154,6 @@ function EditorContent({ mapId, personalMap = false }) {
   // (viz „PRÁZDNÉ ULOŽENÍ SE NEPOSÍLÁ" u saveTimer). `null` = zatím nevíme,
   // pak se porovnání nikdy netrefí a chová se to jako dřív.
   const ulozenyOtisk = useRef(null);
-  // Stupeň Čitelnosti přes ref: rozestupy „Mojí mapy" ho potřebují v callbacích,
-  // které vznikají DŘÍV, než se stav deklaruje (viz PERSONAL_LAYOUT). Výchozí
-  // hodnota se čte z prohlížeče, ať první vykreslení nesedí vedle.
-  const citelnostRef = useRef(nactiStupen());
   const [saveStatus, setSaveStatus] = useState('idle');
   const [editNodeId, setEditNodeId] = useState(null);
   // minimapa jde schovat — překrývá malůvku skinu a na malých mapách zavazí
@@ -172,8 +163,6 @@ function EditorContent({ mapId, personalMap = false }) {
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [nazevEditace, setNazevEditace] = useState(false);
   const ai = useAiModes();
-  const [advisorOpen, setAdvisorOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false); // lupa v levé liště
@@ -183,12 +172,6 @@ function EditorContent({ mapId, personalMap = false }) {
   // plošný team_access=edit (Richard 20. 8. 2026). Zrcadlo je tu jen UI
   // nápověda — autorizaci drží server (map_shares v routě /share).
   const [canShare, setCanShare] = useState(false);
-  const personalTargets = useRef({}); // „Moje mapa": vid uzlu → { type, mapId/nodeId/taskId }
-  // „Moje mapa": záložka mine=„Mám udělat" / delegated=„Zadal jsem" (?view=delegated)
-  // + seskupení záložky Zadal jsem (flat=dle termínu / people / projects)
-  const [personalView, setPersonalView] = useState(() =>
-    new URLSearchParams(location.search).get('view') === 'delegated' ? 'delegated' : 'mine');
-  const [delegatedGrouping, setDelegatedGrouping] = useState(() => nactiKlic('kb-delegated-grouping') || 'flat');
   const [sharedCount, setSharedCount] = useState(0);
   const [isPublicView, setIsPublicView] = useState(false);  // veřejně sdílená mapa ≠ demo
   // Logo organizace i v liště mapy (Richard 18. 8. 2026: „v organizaci DUVE jsem
@@ -209,7 +192,6 @@ function EditorContent({ mapId, personalMap = false }) {
   const [activeMapId, setActiveMapId] = useState(null);
   const [isTemplatePreview, setIsTemplatePreview] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
-  const [expandingNodeId, setExpandingNodeId] = useState(null);
   const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [ownerEmails, setOwnerEmails] = useState([]);
   // Deep-link /map/:id?view=dashboard — druhá cesta k dashboardu z dlaždice
@@ -273,10 +255,13 @@ function EditorContent({ mapId, personalMap = false }) {
   // PATCH mapy právě letí — hlídání na pozadí musí mlčet, jinak GET verze
   // předběhne odpověď vlastního uložení a vyrobí falešný poplach.
   const saveInFlight = useRef(false);
-  const directionRef = useRef('vertical'); // aktuální směr pro save/handlery (bez re-renderu)
-  const appliedDirRef = useRef('vertical'); // směr posledního přerovnání view (detekce překlopení)
-  const canonicalPosRef = useRef(new Map()); // svislé (kanonické) pozice — vodorovné view je NEpřepisuje
-  const alignMapKeyRef = useRef(null); // klíč stylu TÉTO mapy — čte i AI přelayout, který nemá závislosti
+  // Rozložení mapy — raná část (směr, zámek posunu, refy směru/pozic, závora
+  // deep-linku, centerOnNode, cleanMapData) — hooks/useMapLayoutRefs.js (F1-07).
+  // Refy čtou už loadPersonalMap, load mapy a autosave níž, proto vzniká tady.
+  const {
+    setDirMode, direction, narrow, updateNodeInternals, locked, setLocked, recenterMap, citelnostRef,
+    directionRef, appliedDirRef, canonicalPosRef, alignMapKeyRef, pendingDeepLink, centerOnNode, cleanMapData,
+  } = useMapLayoutRefs({ nodes, rfInstance, nodesNow, edgesNow, location });
   const templateSeriesRef = useRef(null); // id číslované šablony z náhledu (state maže replaceState)
   // VZOROVÁ (needitovaná) podoba šablony — projekt vzniká z ní, ne z rozklikaného náhledu
   const sablonaCistaRef = useRef(null);
@@ -285,7 +270,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // Zpět + Vrátit AI změny — hooks/useMapHistory.js (F1-07)
   const {
     canUndo, pushHistory, handleUndo, aiSnapshotRef, canUndoAi, setCanUndoAi, handleUndoAi,
-  } = useMapHistory({ nodes, edges, setNodes, setEdges, toast, t });
+  } = useMapHistory({ nodesNow, edgesNow, setNodes, setEdges, toast, t });
   const buffer = useBufferNodes(user);
   const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
 
@@ -378,10 +363,6 @@ function EditorContent({ mapId, personalMap = false }) {
     }
   }, [activeMapId, toast]);
   const isDraft = mapId === 'new' && !activeMapId;
-  // Zásobník jen pro přihlášené a mimo demo/náhled šablony (tam se mapa neukládá
-  // a vložení by nápad ze zásobníku nenávratně spotřebovalo)
-  const bufferEnabled = !!user && !isPublicView && !isTemplatePreview;
-
   // Build children map from edges
   const childrenMap = useMemo(() => buildChildrenMap(edges), [edges]);
 
@@ -430,34 +411,15 @@ function EditorContent({ mapId, personalMap = false }) {
     return { visibleNodes: vNodes, visibleEdges: vEdges, hiddenCounts: counts };
   }, [nodes, edges, childrenMap]);
 
-  // „Moje mapa": (pře)načte agregaci mých uzlů + volných úkolů. Voláno při vstupu
-  // i při změně zásobníku (nápad+termín→volný úkol se objeví bez ruční aktualizace).
-  const loadPersonalMap = useCallback(async () => {
-    try {
-      const [allMaps, allTasks] = await Promise.all([
-        base44.entities.GoalMap.list('-updated_date', 200),
-        user ? base44.entities.Task.list('-created_date', 1000) : Promise.resolve([]),
-      ]);
-      const rootLabel = user?.full_name || t('myday:myMap.rootLabel');
-      const { nodes: pn, edges: pe, targets } = personalView === 'delegated'
-        ? buildDelegatedMap(allMaps, allTasks, user?.email, rootLabel, delegatedGrouping, members)
-        : buildPersonalMap(allMaps, allTasks, user?.email, rootLabel);
-      personalTargets.current = targets;
-      // Respektovat AKTUÁLNÍ směr zobrazení (mobil auto = vodorovně): buildery
-      // vracejí kanonické svislé pozice a view-only překlopení se jinak aplikuje
-      // jen při ZMĚNĚ směru — re-build (záložka, seskupení, zásobník) by mapu
-      // na mobilu tiše vrátil do svislé podoby.
-      if (directionRef.current === 'horizontal') {
-        canonicalPosRef.current = new Map(pn.filter((n) => n.type !== 'note').map((n) => [n.id, { ...n.position }]));
-        const hpos = layoutTree(pn, pe, 'horizontal', PERSONAL_LAYOUT('horizontal', citelnostRef.current));
-        for (const n of pn) { const p = hpos[n.id]; if (p) n.position = p; }
-        appliedDirRef.current = 'horizontal'; // překlopeno už tady — efekt směru nesmí přerovnávat podruhé
-      }
-      skipNextSave.current = true;
-      setNodes(pn);
-      setEdges(pe);
-    } catch (e) { console.error(e); }
-  }, [user, t, setNodes, setEdges, personalView, delegatedGrouping, members]);
+  // „Moje mapa": záložka, seskupení, cíle uzlů a (pře)načtení agregace —
+  // hooks/usePersonalMapView.js (F1-07). Volá se tady, protože loadPersonalMap
+  // čte load-efekt níž; efekty přenačtení zůstávají pod ním (pořadí spouštění).
+  const {
+    personalView, setPersonalView, delegatedGrouping, setDelegatedGrouping, loadPersonalMap, onNodeClick,
+  } = usePersonalMapView({
+    personalMap, user, t, members, setNodes, setEdges, skipNextSave, location, navigate,
+    directionRef, canonicalPosRef, appliedDirRef, citelnostRef,
+  });
 
   // Load map
   useEffect(() => {
@@ -674,27 +636,6 @@ function EditorContent({ mapId, personalMap = false }) {
     return () => { meta.setAttribute('content', prev || 'width=device-width, initial-scale=1.0'); };
   }, []);
 
-  // Deep-link ?node= má PŘEDNOST před automatickými fitView. Bez téhle závory
-  // spolu obojí závodí: onInit fituje 120 ms po initu plátna, centrování na uzel
-  // 60 ms po tom, co jsou k dispozici data mapy. Podle toho, jestli data dorazí
-  // před initem nebo po něm, jednou vyhraje zaostření na uzel a podruhé celková
-  // mapa — přesně to „jednou to funguje, jindy ne".
-  const pendingDeepLink = useRef(false);
-  useEffect(() => {
-    if (new URLSearchParams(location.search).get('node')) pendingDeepLink.current = true;
-  }, [location.search]);
-
-  // Vycentrovat pohled na uzel (i s okolím) — deep-link, AI-expand, přepínač směru.
-  const centerOnNode = useCallback((nodeId, opts = {}) => {
-    const n = nodes.find((x) => x.id === nodeId);
-    const pos = opts.pos || n?.position;
-    if (!pos || !rfInstance) return;
-    const w = n?.measured?.width || n?.width || 220;
-    const h = n?.measured?.height || n?.height || 150;
-    const z = opts.zoom ?? (narrow ? 0.7 : 1.0);
-    setTimeout(() => { try { rfInstance.setCenter(pos.x + w / 2, pos.y + h / 2, { zoom: z, duration: 500 }); } catch { /* ignore */ } }, opts.delay ?? 60);
-  }, [nodes, rfInstance, narrow]);
-
   // Deep-link /map/:id?node=<id> — najet na uzel a zvýraznit ho (výběr = ring)
   useEffect(() => {
     if (highlightDone.current || loading || !rfInstance) return;
@@ -723,23 +664,6 @@ function EditorContent({ mapId, personalMap = false }) {
   // pozadí, a kdyby si drželo `title` z uzávěru, každé písmeno v názvu mapy by
   // restartovalo 45s interval — hlídač by při psaní nikdy nedoběhl.
   hlavickaNow.current = { title, color };
-
-  const cleanMapData = () => {
-    // Ve vodorovném (mobilním) view jsou pozice jen pro ZOBRAZENÍ — nikdy je
-    // neukládat, jinak by mobil rozhodil svislé rozložení sdílené s desktopem.
-    // Uloží se kanonické svislé: existující dle snapshotu, nové dopočítat.
-    // Kanonický tvar dat drží sdílená lib/cleanMap.js (parita se serverem).
-    // Čte se z refů (nodesNow/edgesNow), ne z uzávěru — letící autosave po
-    // await potřebuje SOUČASNÝ stav (viz převzetí mutací pravidel níže).
-    const nds = nodesNow.current;
-    const eds = edgesNow.current;
-    const horizontalView = directionRef.current === 'horizontal';
-    const vlayForSave = horizontalView ? layoutTree(nds, eds, 'vertical') : null;
-    const posOf = (n) => (horizontalView
-      ? (canonicalPosRef.current.get(n.id) || vlayForSave[n.id] || n.position)
-      : n.position);
-    return cleanMap(nds, eds, posOf);
-  };
 
   // Debounced auto-save
   useEffect(() => {
@@ -1107,45 +1031,20 @@ function EditorContent({ mapId, personalMap = false }) {
     return () => { clearInterval(iv); window.removeEventListener('kb-native-resume', tick); };
   }, [activeMapId, isDraft, isPublicView, isTemplatePreview, canEdit, conflict, remoteChanged, slitCiziZmenu]);
 
-  // Přepnutí směru (na výšku ↔ na šířku) = VIEW-ONLY přerovnání. Pozice se
-  // nepersistují (cleanMapData ukládá kanonické svislé); konektory uzlů se
-  // přehodí přes context. Záměrně bez nodes/edges v deps, ať to neběhá pořád.
-  useEffect(() => {
-    directionRef.current = direction;
-    if (loading) return;
-    if (appliedDirRef.current === direction) return;
-    appliedDirRef.current = direction;
-    // Zvolený styl musí přepnutí směru PŘEŽÍT (Richard 11. 8. v noci: „jsem
-    // v PC režimu dle kategorií, přepnu na mobilní a neudrží to, dá do šířky").
-    // Dřív se tu layoutovalo bez stylu, takže přepnutí směru zarovnání zahodilo.
-    const stylOpts = ALIGN_OPTS[alignStyleRef.current] || {};
-    const smerOpts = (dir) => (personalMap ? { ...PERSONAL_LAYOUT(dir, citelnostRef.current), ...stylOpts } : stylOpts);
-    if (direction === 'horizontal') {
-      const snap = new Map();
-      nodes.forEach((n) => { if (n.type !== 'note') snap.set(n.id, n.position); });
-      canonicalPosRef.current = snap;
-      const pos = layoutTree(nodes, edges, 'horizontal', smerOpts('horizontal'));
-      skipNextSave.current = true;
-      setNodes((prev) => prev.map((n) => (pos[n.id] ? { ...n, position: pos[n.id] } : n)));
-    } else {
-      const canon = canonicalPosRef.current;
-      const vlay = layoutTree(nodes, edges, 'vertical', smerOpts('vertical'));
-      skipNextSave.current = true;
-      setNodes((prev) => prev.map((n) => {
-        if (n.type === 'note') return n;
-        const p = canon.get(n.id) || vlay[n.id];
-        return p ? { ...n, position: p } : n;
-      }));
-    }
-    setTimeout(() => {
-      try {
-        // KLÍČOVÉ: po překlopení strany konektorů přeměřit uzly, jinak React Flow
-        // drží starou pozici konektoru a hrany vedou špatným směrem (doprava místo dolů)
-        nodes.forEach((n) => { if (n.type !== 'note') updateNodeInternals(n.id); });
-        if (!pendingDeepLink.current) rfInstance?.fitView({ padding: 0.2, duration: 300 });
-      } catch { /* ignore */ }
-    }, 80);
-  }, [direction, loading]);
+  // Rozložení mapy (efekt směru, layoutAllForView, Zarovnat + zámek stylu,
+  // Čitelnost) — hooks/useMapLayout.js (F1-07). Volá se TADY, na místě
+  // původního efektu směru: hlídač na pozadí nad tím zůstává první, nabídka
+  // archivace pod tím; vstupy už všechny existují a layoutAllForView musí
+  // vzniknout dřív, než ho převezme useAiActions.
+  const {
+    layoutAllForView, alignStyle, setAlignStyle, alignStyleRef, alignLock,
+    alignPressStart, alignPressEnd, handleAlign, citelnost, handleCitelnost,
+  } = useMapLayout({
+    nodes, edges, setNodes, loading, personalMap, activeMapId, isPublicView, canEdit, isMapOwner,
+    user, patchUser, toast, t, pushHistory, rfInstance, skipNextSave,
+    direction, updateNodeInternals, recenterMap, directionRef, appliedDirRef, canonicalPosRef,
+    alignMapKeyRef, citelnostRef, pendingDeepLink,
+  });
 
   const handleSaveTemplate = useCallback(async () => {
     if (!user) {
@@ -1491,115 +1390,16 @@ function EditorContent({ mapId, personalMap = false }) {
     [setEdges, pushHistory]
   );
 
-  // Zásobník: vložení = přesun (uzel vznikne v mapě, ze zásobníku zmizí)
-  const insertBufferItem = useCallback(
-    (item, position) => {
-      // Bez pozice (tlačítko se šipkou, typicky mobil) se uzel VĚŠÍ POD VRCHOL
-      // i s hranou. Dřív vznikl volně plovoucí uzel uprostřed viewportu — na
-      // mobilu bez drag&drop slepá ulička: „skočil náhodně a neměl jsem ho kam
-      // dát" (Richard 7. 8. 2026 v noci). Strom nezná uzly bez rodiče.
-      // Drop myší (position) nechává pozici i volnost napojení jak byly.
-      const id = `node-${Date.now()}`;
-      const apex = nodes.find((n) => n.type === 'apexNode');
-      let pos = position;
-      if (!pos) {
-        if (apex) {
-          const sourozenci = edges.filter((e) => e.source === apex.id).length;
-          pos = direction === 'vertical'
-            ? { x: apex.position.x + 40 + sourozenci * 40, y: apex.position.y + 260 }
-            : { x: apex.position.x + 320, y: apex.position.y + 40 + sourozenci * 40 };
-        } else if (rfInstance) {
-          const center = rfInstance.screenToFlowPosition({
-            x: window.innerWidth / 2,
-            y: window.innerHeight / 2,
-          });
-          pos = { x: center.x - 110, y: center.y - 60 };
-        } else {
-          pos = { x: 250, y: 150 };
-        }
-      }
-      pushHistory();
-      setNodes((prev) => [
-        ...prev,
-        {
-          id: id,
-          type: 'goalNode',
-          position: pos,
-          data: {
-            title: item.title,
-            status: 'todo',
-            description: item.description || '',
-            color: item.color || '',
-            deadline: item.deadline || '',
-            nodeType: 'normal',
-            goalType: '',
-            apexText: '',
-          },
-        },
-      ]);
-      if (!position && apex) {
-        setEdges((prev) => [...prev, { id: `edge-${Date.now()}`, source: apex.id, target: id }]);
-      }
-      buffer.remove(item.id);
-    },
-    [rfInstance, setNodes, setEdges, pushHistory, buffer, nodes, edges, direction]
-  );
-
-  const handleBufferDragOver = useCallback((e) => {
-    if (e.dataTransfer.types.includes(BUFFER_DRAG_MIME)) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    }
-  }, []);
-
-  const handleBufferDrop = useCallback(
-    (e) => {
-      const raw = e.dataTransfer.getData(BUFFER_DRAG_MIME);
-      if (!raw) return;
-      e.preventDefault();
-      let item;
-      try {
-        item = JSON.parse(raw);
-      } catch {
-        return;
-      }
-      let pos;
-      if (rfInstance) {
-        const p = rfInstance.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-        pos = { x: p.x - 110, y: p.y - 30 };
-      }
-      insertBufferItem(item, pos);
-    },
-    [rfInstance, insertBufferItem]
-  );
-
-  const handleStashNode = useCallback(
-    async (nodeId, override) => {
-      const node = nodes.find((n) => n.id === nodeId);
-      // override = rozeditované hodnoty z dialogu (uzel v mapě je může mít starší/prázdné)
-      const nodeTitle = (override?.title ?? node?.data?.title ?? '').trim();
-      if (!node || !nodeTitle) return;
-      // stash = odstranění z mapy — cizí zadaný úkol nesmí zmizet do soukromého
-      // zásobníku (obchvat zámku termínu); kontrola PŘED zápisem do bufferu,
-      // jinak by se nápad zduplikoval a uzel v mapě zůstal
-      if (!canRemoveNodeShared(node)) { assignedDeleteRefused(node); return; }
-      try {
-        await buffer.add({
-          title: nodeTitle,
-          description: override?.description ?? node.data?.description ?? '',
-          color: override?.color ?? node.data?.color ?? '',
-          deadline: override?.deadline ?? node.data?.deadline ?? '',
-        });
-      } catch {
-        toast({ title: t('tasks:tasksPage.stashFailed'), description: t('common:misc.tryAgainPlease'), variant: 'destructive' });
-        return;
-      }
-      handleDeleteNode(nodeId);
-      setEditNodeId(null);
-      toast({ title: t('tasks:tasksPage.stashedToBuffer'), description: nodeTitle });
-    },
-    [nodes, buffer, handleDeleteNode, toast, canRemoveNodeShared, assignedDeleteRefused]
-  );
+  // Zásobník: dostupnost, vložení nápadu (tlačítko/drag&drop) a odložení uzlu —
+  // hooks/useBufferInsert.js (F1-07). Volá se až tady: čte pushHistory,
+  // handleDeleteNode a canRemoveNodeShared; `buffer` (useBufferNodes) vzniká
+  // výš, protože jeho items čte efekt „Mojí mapy".
+  const {
+    bufferEnabled, insertBufferItem, handleBufferDragOver, handleBufferDrop, handleStashNode,
+  } = useBufferInsert({
+    user, isPublicView, isTemplatePreview, nodes, edges, setNodes, setEdges, direction, rfInstance,
+    pushHistory, buffer, canRemoveNodeShared, assignedDeleteRefused, handleDeleteNode, setEditNodeId, toast, t,
+  });
 
   // Odpojení uzlu od rodiče (ikonka na uzlu) — smaže příchozí hrany
   const handleDetachNode = useCallback(
@@ -1640,54 +1440,11 @@ function EditorContent({ mapId, personalMap = false }) {
   // navíc přebíjel štítek stavu, takže se ztratila i jediná funkční akce.
   const ctenarSPraci = !!user && !!activeMapId && !personalMap && !isPublicView
     && !canEdit && !canWork && mojePracovniUzly.size > 0;
-  // automatizační pravidla mapy — pro badge blesku na uzlech a kategorii
-  // Automatizace v okně uzlu. Jen editor (routa /rules je editor-only);
-  // bez realtime — pravidla se mění výhradně přes RulesDialog, který po
-  // změně zavolá reload (onRulesChanged).
-  const [rulesOpen, setRulesOpen] = useState(false);
-  const [rulesDefaults, setRulesDefaults] = useState({});
-  const [mapRules, setMapRules] = useState([]);
-  mapRulesNow.current = mapRules; // latest-ref pro letící autosave (viz výš)
-  useEffect(() => {
-    if (!activeMapId || !canEdit || isPublicView) { setMapRules([]); return; }
-    rulesApi.list(activeMapId).then(setMapRules).catch(() => setMapRules([]));
-  }, [activeMapId, canEdit, isPublicView]);
-  const ruleNodes = useMemo(() => new Set(mapRules.filter((r) => r.node_id).map((r) => r.node_id)), [mapRules]);
-  // 🔁 uzly s čistým opakovacím pravidlem (v0.35) — badge na kartě cíle
-  const recurrenceNodes = useMemo(() => {
-    const out = new Set();
-    for (const r of mapRules) {
-      if (!r?.node_id) continue;
-      const st = recurrenceOf(mapRules, r.node_id);
-      if (st && !st.custom) out.add(r.node_id);
-    }
-    return out;
-  }, [mapRules]);
-  // KANBAN REŽIM: mapa má zapnutá pravidla posunu. Tlačítko Zarovnat se mění
-  // na indikátor „Kanban" (Richard 15. 8.): na kanban desce styly zarovnání
-  // nemají co přeskládat (sloupce mají děti), cyklení názvů naprázdno matlo —
-  // rozložení tu drží pravidla posunu, ne styly. Vědomá výjimka z pravidla
-  // „Zarovnat musí vždy něco udělat": tady místo akce ŘEKNE, proč nekoná.
-  const kanbanAktivni = useMemo(() => mapRules.some((r) => r.enabled && (r.actions || []).some((a) => a.type === 'move_node')), [mapRules]);
-  // texty indikátoru žijí v LAZY namespace `rules` (lite dieta — práh 490 kB
-  // se nezvedá); než se donačte, ukazuje se běžné Zarovnat
-  const kanbanNsReady = useLazyNs('rules');
-  // společný vstup do builderu z kontextu uzlu (panel Automatizace, Chování);
-  // triggerType přednastaví spouštěč (propojka „po odblokování")
-  const openRulesFromNode = useCallback((nid, openNew, triggerType, showRunsRule, openKanban) => {
-    // showRunsRule: undefined = bez logu; '' = log celé mapy; id = log pravidla
-    // (nález Richarda 15. 8.: z panelu uzlu se na log běhů nedalo dostat)
-    // openKanban: rovnou průvodce „Zapnout kanban na řadě" s uzlem jako řadou
-    setRulesDefaults({ node_id: nid, openNew, trigger_type: triggerType || '', showRunsRule, openKanban });
-    setRulesOpen(true);
-  }, []);
-  // slíbená náprava z builderu: pravidlo „po odblokování" na uzlu bez čekání
-  // by se nikdy nespustilo → zapnout standardní cestou (setNodes + autosave).
-  // ⚠️ Otevřený dialog uzlu se tím přenačte ze stavu mapy (stejné chování jako
-  // u každé jiné změny uzlu na pozadí) — přepínač v Chování ukáže nový stav.
-  const handleEnableWaiting = useCallback((nodeId) => {
-    setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, waitForChildren: true } } : n)));
-  }, [setNodes]);
+  // automatizační pravidla mapy (dialog, načtení, blesk/opakování, kanban) — hooks/useMapRules.js (F1-07)
+  const {
+    rulesOpen, setRulesOpen, rulesDefaults, setRulesDefaults, mapRules, setMapRules,
+    ruleNodes, recurrenceNodes, kanbanAktivni, kanbanNsReady, openRulesFromNode, handleEnableWaiting,
+  } = useMapRules({ activeMapId, canEdit, isPublicView, setNodes, mapRulesNow });
 
   // spolupracovník: stav vlastního uzlu přes cílenou routu (RLS mu PATCH mapy nedá)
   const handleCycleStatusWork = useCallback(
@@ -1756,279 +1513,18 @@ function EditorContent({ mapId, personalMap = false }) {
     [setNodes, nodes]
   );
 
-  // Plný přelayout mapy (AI rozpad, AI operace, Zarovnat): kanonické pozice
-  // jsou VŽDY svislé. Ve vodorovném (mobilním) view se svislé zapíší do
-  // canonicalPosRef (odtud čte ukládání) a ZOBRAZENÍ dostane vodorovný layout.
-  // Dřív každé místo řešilo směr po svém: rozpad layoutoval v aktuálním směru
-  // bez zápisu kanonu, AI operace vždy svisle i ve vodorovném view (uzly přes
-  // sebe / špatně otočené) — část nálezu „AI mapa na šířku" (task #17).
-  const layoutAllForView = useCallback((allNodes, allEdges, layoutOpts) => {
-    // Bez explicitních opts (AI rozpad/operace) se drží styl TÉHLE MAPY.
-    // ⚠️ Dřív se četl GLOBÁLNÍ klíč, takže na mapě A stačilo zmáčknout
-    // „kompaktně", otevřít mapu B (kde je uložené „kolem středu", a popisek to
-    // hlásí) a spustit AI operaci — mapa se přerovnala kompaktně, ale tlačítko
-    // dál tvrdilo „kolem středu". Je to TÁŽ vada „popisek lže", kterou vlna
-    // opravovala pro tlačítko, jen jinou cestou (nález panelu 12. 8. 2026).
-    // Globální klíč zůstává jako záloha pro stav, kdy mapa ještě nemá id.
-    const klicMapy = alignMapKeyRef.current;
-    const stylMapy = klicMapy ? platnyStyl(nactiKlic('kb-zarovnat-styl:' + klicMapy)) : '';
-    const styl = layoutOpts
-      || ALIGN_OPTS[stylMapy || platnyStyl(nactiKlic('kb-zarovnat-styl')) || 'classic']
-      || {};
-    // „Moje mapa" má vlastní, těsnější rozestupy (PERSONAL_LAYOUT) — styl se
-    // s nimi slučuje, aby tam Zarovnat dělalo totéž co jinde, ale mapa si
-    // udržela svůj tvar (Richard 11. 8. v noci: „stačí tam vložit stejné
-    // funkce zarovnání"). Rozestupy dává PERSONAL_LAYOUT, střídání styl.
-    const o = (dir) => (personalMap ? { ...PERSONAL_LAYOUT(dir, citelnostRef.current), ...styl } : styl);
-    // Ve vodorovném view nesou node.position VODOROVNÉ souřadnice — svislý
-    // (kanonický) průchod by sourozence řadil podle X, což je tam HLOUBKA,
-    // ne pořadí v řadě. Jakmile sevřené styly daly sourozencům různou hloubku,
-    // zarovnání ve vodorovném view PŘEHÁZELO pořadí (nález Richarda 11. 8.:
-    // „podcíl se mi dostane doprostřed mapy"). Pro svislý výpočet se proto
-    // osy prohodí — pořadí sourozenců pak odpovídá tomu, co uživatel vidí.
-    const horiz = directionRef.current === 'horizontal';
-    const vstup = horiz
-      ? allNodes.map((n) => (n.type === 'note' || !n.position ? n : { ...n, position: { x: n.position.y, y: n.position.x } }))
-      : allNodes;
-    const vpos = layoutTree(vstup, allEdges, 'vertical', o('vertical'));
-    if (!horiz) return vpos;
-    canonicalPosRef.current = new Map(
-      allNodes.filter((n) => n.type !== 'note').map((n) => [n.id, vpos[n.id] || n.position])
-    );
-    return layoutTree(allNodes, allEdges, 'horizontal', o('horizontal'));
-  }, [personalMap]);
-
-  const handleAcceptAdvisor = useCallback(
-    (preview, goalType, goalText) => {
-      // Konverze náhledu je sdílená s useMapCreation (lib/mapNodes.js) a vrací
-      // KANONICKÉ SVISLÉ pozice. Dřív se layoutovalo v aktuálním směru — na
-      // mobilu (vodorovné view) pak save vydával vodorovné pozice za svislé
-      // a mapa se po otevření na desktopu rozsypala (task #17).
-      const { nodes: newNodes, edges: newEdges } = advisorPreviewToMap(preview, goalType, goalText, t('defaults.newGoal'));
-
-      let laidOutNodes = newNodes;
-      if (directionRef.current === 'horizontal') {
-        // vodorovné view: kanonické svislé pozice zapsat do canonicalPosRef
-        // (ať je save čte odtud) a pro ZOBRAZENÍ spočítat vodorovný layout
-        for (const n of newNodes) canonicalPosRef.current.set(n.id, { ...n.position });
-        const hpos = layoutTree(newNodes, newEdges, 'horizontal');
-        laidOutNodes = newNodes.map((n) => ({ ...n, position: hpos[n.id] || n.position }));
-      }
-
-      setNodes((prev) => [...prev, ...laidOutNodes]);
-      setEdges((prev) => [...prev, ...newEdges]);
-
-      toast({
-        title: t('toasts.structureAdded'),
-        description: t('toasts.structureAddedDesc', { count: newNodes.length }),
-      });
-    },
-    [setNodes, setEdges, toast, t]
-  );
-
-  const handleExpandNode = useCallback(
-    async (nodeId, action = 'subgoals') => {
-      const clickedNode = nodes.find((n) => n.id === nodeId);
-      if (!clickedNode) return;
-
-      // Build parent map from edges
-      const parentMap = {};
-      for (const edge of edges) {
-        parentMap[edge.target] = edge.source;
-      }
-
-      // Find root node by following parent chain
-      let rootId = nodeId;
-      while (parentMap[rootId]) {
-        rootId = parentMap[rootId];
-      }
-      const rootNode = nodes.find((n) => n.id === rootId);
-      const rootText = rootNode?.data?.apexText || rootNode?.data?.title || '';
-
-      // Build path from root to clicked node
-      const path = [];
-      let currentId = nodeId;
-      while (currentId) {
-        const node = nodes.find((n) => n.id === currentId);
-        if (!node) break;
-        path.unshift(node.data.title || node.data.apexText || '');
-        currentId = parentMap[currentId];
-      }
-
-      setExpandingNodeId(nodeId);
-      try {
-        const isRewrite = action === 'rewrite';
-        const result = await advisor({
-          goal: rootText,
-          mode: 'expand',
-          action,
-          path,
-          node: {
-            id: nodeId,
-            title: clickedNode.data.title || clickedNode.data.apexText || '',
-            description: clickedNode.data.description || '',
-          },
-          count: isRewrite ? 1 : 3,
-        });
-        const data = result;
-        if (data?.error) {
-          toast({ title: t('toasts.aiError'), description: data.error, variant: 'destructive' });
-          return;
-        }
-        if (!data?.nodes || !Array.isArray(data.nodes)) {
-          toast({ title: t('toasts.aiError'), description: t('toasts.aiInvalidResponse'), variant: 'destructive' });
-          return;
-        }
-
-        if (isRewrite) {
-          const updated = data.nodes[0];
-          if (updated) {
-            setNodes((prev) => prev.map((n) =>
-              n.id === nodeId
-                ? { ...n, data: { ...n.data, title: updated.title || n.data.title, description: updated.description || n.data.description } }
-                : n
-            ));
-          }
-          toast({ title: t('toasts.nodeImproved'), description: t('toasts.nodeImprovedDesc') });
-          return;
-        }
-
-        const ts = Date.now();
-        const newNodes = data.nodes.map((n, i) => ({
-          id: `node-${ts}-${i}`,
-          type: 'goalNode',
-          position: { x: 0, y: 0 },
-          data: {
-            title: n.title || t('defaults.newGoal'),
-            description: n.description || '',
-            status: 'todo',
-            color: '',
-            collapsed: false,
-          },
-        }));
-        const newEdges = data.nodes.map((n, i) => ({
-          id: `edge-${ts}-${i}`,
-          source: nodeId,
-          target: `node-${ts}-${i}`,
-          type: 'deletable',
-        }));
-
-        const allNodes = [...nodes, ...newNodes];
-        const allEdges = [...edges, ...newEdges];
-        const positions = layoutAllForView(allNodes, allEdges);
-        const laidOutNodes = allNodes.map((n) => ({
-          ...n,
-          position: positions[n.id] || n.position,
-        }));
-
-        pushHistory();
-        setNodes(laidOutNodes);
-        setEdges(allEdges);
-
-        // Přepočet layoutu uzel posune → vycentrovat pohled zpět NA NĚJ (i s okolím),
-        // ať to „neuletí" jinam. Stejně jako při otevření mapy na uzel.
-        centerOnNode(nodeId, { pos: positions[nodeId], delay: 80 });
-
-        toast({
-          title: t('toasts.subgoalsAdded'),
-          description: t('toasts.subgoalsAddedDesc', { count: newNodes.length }),
-        });
-      } catch (err) {
-        const msg = err.response?.error || err.message || t('toasts.aiConnectionError');
-        toast({ title: t('toasts.aiError'), description: msg, variant: 'destructive' });
-      } finally {
-        setExpandingNodeId(null);
-      }
-    },
-    [nodes, edges, toast, setNodes, setEdges, pushHistory, centerOnNode, layoutAllForView]
-  );
-
-  const handleApplyOperations = useCallback(
-    (operations) => {
-      if (!operations || !operations.length) return;
-      aiSnapshotRef.current = { nodes: nodes.map((n) => ({ ...n })), edges: edges.map((e) => ({ ...e })) };
-      setCanUndoAi(true);
-      pushHistory();
-
-      const parentMap = {};
-      for (const edge of edges) {
-        parentMap[edge.target] = edge.source;
-      }
-      const rootNode = nodes.find((n) => !parentMap[n.id]);
-      const rootId = rootNode?.id;
-
-      let updatedNodes = [...nodes];
-      let updatedEdges = [...edges];
-      let counter = 0;
-
-      for (const op of operations) {
-        const suffix = `${Date.now()}-${counter++}`;
-
-        if (op.op === 'add') {
-          const parentId = op.parentId || rootId;
-          if (!parentId) continue;
-          const newId = `node-${suffix}`;
-          updatedNodes = [
-            ...updatedNodes,
-            {
-              id: newId,
-              type: 'goalNode',
-              position: { x: 0, y: 0 },
-              data: {
-                title: op.title || t('defaults.newGoal'),
-                description: op.description || '',
-                status: 'todo',
-                color: '',
-                collapsed: false,
-              },
-            },
-          ];
-          updatedEdges = [
-            ...updatedEdges,
-            { id: `edge-${suffix}`, source: parentId, target: newId, type: 'deletable' },
-          ];
-        } else if (op.op === 'update') {
-          updatedNodes = updatedNodes.map((n) => {
-            if (n.id !== op.id) return n;
-            const dataUpdate = {};
-            if (op.title !== undefined) dataUpdate.title = op.title;
-            if (op.description !== undefined) dataUpdate.description = op.description;
-            if (op.status !== undefined) dataUpdate.status = op.status;
-            return { ...n, data: { ...n.data, ...dataUpdate } };
-          });
-        } else if (op.op === 'delete') {
-          const parentId = (updatedEdges.find((e) => e.target === op.id) || {}).source;
-          updatedEdges = updatedEdges
-            .filter((e) => e.target !== op.id)
-            .map((e) => e.source === op.id ? (parentId ? { ...e, source: parentId } : e) : e);
-          updatedNodes = updatedNodes.filter((n) => n.id !== op.id);
-        } else if (op.op === 'move') {
-          updatedEdges = updatedEdges.map((e) =>
-            e.target === op.id
-              ? op.newParentId
-                ? { ...e, source: op.newParentId }
-                : null
-              : e
-          ).filter(Boolean);
-        }
-      }
-
-      const positions = layoutAllForView(updatedNodes, updatedEdges);
-      const laidOutNodes = updatedNodes.map((n) => ({
-        ...n,
-        position: positions[n.id] || n.position,
-      }));
-
-      setNodes(laidOutNodes);
-      setEdges(updatedEdges);
-
-      toast({
-        title: t('toasts.opsApplied'),
-        description: t('toasts.opsAppliedDesc', { count: operations.length }),
-      });
-    },
-    [nodes, edges, setNodes, setEdges, pushHistory, toast, layoutAllForView]
-  );
+  // AI: Poradce, chat s AI, rozpad/přepis uzlu — hooks/useAiActions.js (F1-07).
+  // Volá se až tady (ne u ostatních useState nahoře): layoutAllForView a
+  // centerOnNode vznikají výš v tomhle pořadí, žádný podmíněný return nad tím
+  // není a výstupy (expandingNodeId, advisorOpen, chatOpen, handlery) čte
+  // teprve contextValue a JSX pod ním.
+  const {
+    advisorOpen, setAdvisorOpen, chatOpen, setChatOpen, expandingNodeId,
+    handleAcceptAdvisor, handleExpandNode, handleApplyOperations,
+  } = useAiActions({
+    nodes, edges, setNodes, setEdges, pushHistory, aiSnapshotRef, setCanUndoAi,
+    layoutAllForView, centerOnNode, directionRef, canonicalPosRef, toast, t,
+  });
 
   const handleDeleteSelected = useCallback(() => {
     // vrchol se z hromadného mazání vyjme — smazat ho jde jen s celou mapou;
@@ -2114,181 +1610,6 @@ function EditorContent({ mapId, personalMap = false }) {
   const { exporting, handleExport, handleExportJson } = useMapExport({
     visibleNodes, title, cleanMapData, activeMapId, user, t, toast,
   });
-
-  // Zarovnat STŘÍDÁ tři styly jedním tlačítkem (Richard 11. 8.: „rozklikávání
-  // je několik zbytečných kliků — mačkám a mění se to; ať jsou 3"). Tlačítko
-  // ukazuje styl, který na mapě PRÁVĚ JE — stisk přepne na další a popisek
-  // se srovná s plátnem. (První verze ukazovala styl PŘÍŠTÍHO stisku a Richard
-  // ji četl jako popis plátna — přirozeně; popisek musí sedět s tím, co vidí.)
-  // Vzhled tlačítka nahrazuje vyskakovací hlášky. Poslední použitý styl se
-  // pamatuje a drží ho i AI přelayouty.
-  // Styl si pamatuje KAŽDÁ MAPA zvlášť. Dřív byl klíč jeden pro všechny, takže
-  // čerstvě otevřená mapa zdědila popisek z mapy, kde se naposledy mačkalo, a
-  // tvrdila styl, který na ní vůbec nebyl — první stisk pak popisek jen srovnal
-  // a mapa se nehnula (Richard 11. 8. v noci). Globální klíč zůstává, ale slouží
-  // už jen AI přelayoutům, které si drží poslední volbu uživatele.
-  const [alignStyle, setAlignStyle] = useState('');
-  // Styl čte i efekt přepínače směru, který ZÁMĚRNĚ nemá nodes/edges v deps —
-  // proto přes ref, ne přes závislost (jinak by se mapa přerovnávala pořád).
-  const alignStyleRef = useRef(alignStyle);
-  alignStyleRef.current = alignStyle;
-  // „Moje mapa" nemá záznam v databázi (staví se za běhu), ale styl si pamatovat
-  // má taky — dostane vlastní jméno klíče
-  const alignMapKey = personalMap ? 'moje-mapa' : activeMapId;
-  // čte i layoutAllForView (AI přelayout), který záměrně nemá závislosti
-  alignMapKeyRef.current = alignMapKey;
-  useEffect(() => {
-    if (!alignMapKey) return;                       // rozepsaná mapa ještě nemá id
-    const ulozeny = platnyStyl(nactiKlic('kb-zarovnat-styl:' + alignMapKey));
-    if (ulozeny) { setAlignStyle(ulozeny); return; }
-    // Mapa právě vznikla (autosave jí přidělil id) — styl zvolený PŘED
-    // uložením se přenese, jinak se popisek sám vynuloval, ačkoli mapa v tom
-    // stylu je (panel /checkup 12. 8.).
-    if (alignStyleRef.current) { ulozKlic('kb-zarovnat-styl:' + alignMapKey, alignStyleRef.current); return; }
-    setAlignStyle('');
-  }, [alignMapKey]);
-
-  // ZÁMEČEK: zamčený styl platí pro všechny mapy (Richard 11. 8. v noci:
-  // „na jedné to prokliká, zjistí, že se mu to líbí, a pak dá zámeček").
-  // Richard vědomě zvolil, že se má uplatnit VŽDY při otevření mapy — tedy
-  // i tam, kde si někdo uzly rozmístil ručně. Proto se při zapnutí říká
-  // nahlas, co to udělá, a zámek nikdy nesahá na cizí/veřejnou mapu ani
-  // na mapu bez práva editace.
-  // ZÁMEK JE NA ÚČTU (vzor skin_id) — Richard 12. 8.: „udělej to stejně jako
-  // skin". Dřív žil jen v prohlížeči, takže zámek zapnutý na počítači na
-  // mobilu neplatil, ačkoli nápověda slibovala „pro všechny mapy".
-  // localStorage zůstává jako záloha pro stav před načtením uživatele.
-  const [alignLock, setAlignLock] = useState(() => zamcenyStyl());
-  useEffect(() => {
-    if (!user) return;
-    const zUctu = platnyStyl(user.align_lock);
-    setAlignLock(zUctu);
-    ulozKlic(KLIC_ZAMEK, zUctu);   // ať to sedí i při příštím startu offline
-  }, [user]);
-  const zamekAplikovan = useRef(null);
-  useEffect(() => {
-    if (!alignLock || loading || !alignMapKey || isPublicView) return;
-    if (!canEdit && !personalMap) return;                 // cizí mapa bez práv
-    // ⚠️ V CIZÍ mapě se zámek NEUPLATNÍ VŮBEC (rozhodnutí Richarda 12. 8. 2026).
-    // Původní „jen překreslit" nestačilo: `skipNextSave` potlačí jen NEJBLIŽŠÍ
-    // uložení, takže první skutečná úprava (přejmenování uzlu, změna stavu)
-    // uložila i přerovnání a vlastníkovi tiše přepsala rozmístění, které si
-    // naklikal. Uživatel v tu chvíli souhlasil s přejmenováním, ne s přeházením
-    // cizí mapy. Zarovnat si jde v cizí mapě pořád zmáčknout ručně.
-    if (!isMapOwner && !personalMap) return;
-    if (zamekAplikovan.current === alignMapKey) return;   // na mapu jen jednou
-    if (!nodes.length) return;                            // ještě se načítá
-    zamekAplikovan.current = alignMapKey;
-    // ⚠️ Zámek jen PŘEKRESLUJE, NEUKLÁDÁ. Bez téhle pojistky autosave uložil
-    // přerovnání hned po otevření — a protože `canEdit` platí i pro CIZÍ
-    // sdílenou mapu, přepsalo by to rozmístění, které si naklikal její
-    // vlastník, a mapě by to změnilo „naposledy upraveno" jen tím, že se na ni
-    // někdo podíval. Schválené bylo „mapa se otevře v mém stylu", ne zápis do
-    // cizích dat (panel /checkup 12. 8.). Uloží se to až s první skutečnou
-    // úpravou, tedy se souhlasem uživatele.
-    skipNextSave.current = true;
-    const positions = layoutAllForView(nodes, edges, ALIGN_OPTS[alignLock] || {});
-    setNodes((prev) => prev.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n)));
-    setAlignStyle(alignLock);
-    ulozKlic('kb-zarovnat-styl:' + alignMapKey, alignLock);
-    recenterMap();
-  }, [alignLock, loading, alignMapKey, isPublicView, canEdit, isMapOwner, personalMap, nodes, edges, layoutAllForView, setNodes, recenterMap]);
-
-  // Zámek se ovládá PODRŽENÍM tlačítka Zarovnat, ne vlastní ikonou (Richard
-  // 11. 8. v noci: „solo tlačítko mě štve… to tlačítko, co přepíná vzhledy,
-  // jestli by nešlo déle podržet a změnilo by barvu"). Další stisk zámek zase
-  // pustí a rovnou přepne styl dál.
-  const DRZENI_MS = 600;
-  const drzeniTimer = useRef(null);
-  const bylDlouhyStisk = useRef(false);
-
-  const ulozZamek = useCallback((styl) => {
-    ulozKlic(KLIC_ZAMEK, styl);
-    setAlignLock(styl);
-    if (user?.id) {
-      base44.entities.User.update(user.id, { align_lock: styl }).catch(() => {});
-      patchUser({ align_lock: styl });
-    }
-  }, [user, patchUser]);
-
-  const zamkniAktualniStyl = useCallback(() => {
-    const styl = alignStyle || 'classic';
-    ulozZamek(styl);
-    // Když se zamyká na dosud nezarovnané mapě, musí se styl projevit HNED —
-    // dřív se tlačítko jen obarvilo a mapa zůstala, jak byla (projevilo se to
-    // až při příštím otevření). Zase ten pocit „tlačítko nic nedělá".
-    if (!alignStyle) zamekAplikovan.current = null;  // ať mapu dorovná efekt zámku
-    else zamekAplikovan.current = alignMapKey;       // v tomhle stylu už je
-    toast({ title: t('toasts.alignLocked', { styl: t(`toolbar.alignShort_${styl}`) }), description: t('toasts.alignLockedDesc') });
-  }, [alignStyle, alignMapKey, toast, t]);
-
-  const alignPressStart = useCallback(() => {
-    bylDlouhyStisk.current = false;
-    clearTimeout(drzeniTimer.current);
-    drzeniTimer.current = setTimeout(() => {
-      bylDlouhyStisk.current = true;
-      zamkniAktualniStyl();
-    }, DRZENI_MS);
-  }, [zamkniAktualniStyl]);
-
-  const alignPressEnd = useCallback(() => { clearTimeout(drzeniTimer.current); }, []);
-  useEffect(() => () => clearTimeout(drzeniTimer.current), []);
-  const handleAlign = useCallback(() => {
-    // po podržení (zamknutí) se klik už nekoná — jinak by zámek hned přeskočil
-    // na další styl
-    if (bylDlouhyStisk.current) { bylDlouhyStisk.current = false; return; }
-    // „Když zase začneš mačkat, tak to zrušíš a změníš" — stisk zámek pustí
-    // a rovnou pokračuje v cyklu stylů
-    if (alignLock) {
-      ulozZamek('');
-      toast({ title: t('toasts.alignUnlocked'), description: t('toasts.alignUnlockedDesc') });
-    }
-    // Zarovnat přepíše rozmístění všech uzlů — musí jít vzít Zpět. Dřív to
-    // jako jediná destruktivní operace historii neplnilo, takže ručně
-    // srovnaná mapa byla po stisku nenávratně pryč (panel /checkup 12. 8.).
-    pushHistory();
-    // z „ještě nezarovnáno" (prázdný styl) jde první stisk na klasiku
-    const dalsi = alignStyle
-      ? (ALIGN_STYLES[(ALIGN_STYLES.indexOf(alignStyle) + 1) % ALIGN_STYLES.length] || 'classic')
-      : 'classic';
-    ulozKlic('kb-zarovnat-styl', dalsi);            // pro AI přelayouty
-    if (alignMapKey) ulozKlic('kb-zarovnat-styl:' + alignMapKey, dalsi); // pro popisek téhle mapy
-    setAlignStyle(dalsi);
-    const positions = layoutAllForView(nodes, edges, ALIGN_OPTS[dalsi] || {});
-    setNodes((prev) =>
-      prev.map((n) => {
-        const pos = positions[n.id];
-        return pos ? { ...n, position: pos } : n;
-      })
-    );
-    // Přerovnaná mapa skončí jinde, než kam se uživatel díval — bez tohohle
-    // zůstane mimo obrazovku a vypadá to, že Zarovnat mapu ztratilo
-    // (Richard 11. 8. v noci). Stejné vycentrování jako tlačítko čtverečku.
-    recenterMap();
-  }, [nodes, edges, setNodes, layoutAllForView, alignStyle, recenterMap, alignMapKey, alignLock, toast, t, pushHistory, ulozZamek]);
-
-  // Čitelnost STŘÍDÁ tři stupně velikosti písma v uzlu, stejným pohybem jako
-  // Zarovnat (Richard 12. 8. 2026: „mačkám a mění se styl"). Na rozdíl od
-  // Zarovnat se NIC NEPŘEPOČÍTÁVÁ — uzly zůstávají na svých pozicích, mění se
-  // jen sazba uvnitř karty. Volba je PER ZAŘÍZENÍ (localStorage): na velkém
-  // monitoru dává smysl jiná než na telefonu.
-  //
-  // ⚠️ Že se uzly nehýbou, NESTAČÍ na to, aby se nic neuložilo — stupně mění
-  // VÝŠKU karty a ReactFlow na to pošle `dimensions` change, což rozhýbe
-  // autosave (panel /checkup 13. 8. 2026, naměřeno: 1 stisk = 1 PATCH).
-  // Řeší se to u příčiny — autosave neposílá změnu, která nic nemění; viz
-  // „prázdné uložení" u saveTimer. Tady se proto nic potlačovat NESMÍ:
-  // `skipNextSave` ruší NEJBLIŽŠÍ uložení, takže kdyby uživatel psal název
-  // a do 1,2 s stiskl Čitelnost, spolkla by se mu skutečná změna.
-  const [citelnost, setCitelnost] = useState(nactiStupen);
-  citelnostRef.current = citelnost;
-  const handleCitelnost = useCallback(() => {
-    setCitelnost((predchozi) => {
-      const dalsi = dalsiStupen(predchozi);
-      ulozKlic(KLIC_CITELNOST, dalsi);
-      return dalsi;
-    });
-  }, []);
 
   const contextValue = useMemo(
     () => ({
@@ -2898,12 +2219,7 @@ function EditorContent({ mapId, personalMap = false }) {
             isValidConnection={isValidConnection}
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
-            onNodeClick={personalMap ? (e, node) => {
-              const tgt = personalTargets.current[node.id];
-              if (!tgt) return;
-              if (tgt.type === 'task') navigate(`/tasks?task=${tgt.taskId}`);
-              else navigate(`/map/${tgt.mapId}?node=${tgt.nodeId}`);
-            } : undefined}
+            onNodeClick={onNodeClick}
             onInit={(inst) => {
               setRfInstance(inst);
               // Dofit po inicializaci plátna: mobilní auto-překlopení směru běží

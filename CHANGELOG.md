@@ -9,6 +9,27 @@ below before you jump several versions.
 
 ---
 
+## v0.50-beta — 2026-08-28
+
+**Fourth wave from the code review — frontend structure (part 2): the map editor split into domains**
+
+- **`GoalMapEditor.jsx` 3 717 → 2 575 lines** (F1-07 steps 1–12). Pure logic in `lib/personalMap.js`,
+  `lib/mapProgress.js`, `lib/nodePermissions.js`; domain hooks `useMapCounts`, `useMapHistory`,
+  `useMapExport`, `useMapRules`, `useAiActions`, `useMapLayoutRefs` + `useMapLayout`, `useBufferInsert`,
+  `usePersonalMapView`. Code moved verbatim (bodies, deps, comments — verified by script in both
+  directions); `contextValue` shape unchanged; `skipNextSave`, `nasadNaPlatno` and the load effect stay in
+  the editor (autosave = next sub-wave).
+- **Fix (F1-05):** `pushHistory` reads the latest `nodesNow/edgesNow` refs instead of a closure — the
+  “Repair tree” toast held a stale handler and Undo after it returned the map without nodes added meanwhile.
+- **F1-06:** `recenterMap` memoised (defined after `rfInstance` — deps above it would hit the TDZ), so the
+  align-lock effect and `handleAlign` no longer recompute every render.
+- **Effect order note (step 12):** three layout effects (`alignMapKey`, `alignLock` from the account, style
+  lock/cleanup) now run before the archive-offer effect and the rules load; they share no state or refs with
+  them. `useMapDirection`'s matchMedia/cleanup effects run after the `org` effect; `pendingDeepLink` before
+  the load effect.
+- New unit test `personal-map.js` (41 checks) + `tests/_alias-loader.mjs` (node hook for `@/` imports).
+- Gates: full click-test 60/60 and full regression 165/165 on the clean tree.
+
 ## v0.49-beta — 2026-08-28
 
 **Fourth wave from the code review — frontend structure (part 1)**
