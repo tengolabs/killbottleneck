@@ -13,8 +13,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 
 // „Nový úkol" z tabulky Úkoly (rozhodnutí Richarda 17. 8. 2026): zakládá UZEL
 // — pod hlavní cíl, nebo pod vybraný uzel. Řešitel a termín se nastaví hned
@@ -26,7 +28,6 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
   const [mapId, setMapId] = useState('');
   const [parentId, setParentId] = useState(APEX);
   const [title, setTitle] = useState('');
-  const [creating, setCreating] = useState(false);
 
   // reset JEN při otevření — refresh map za otevřeného dialogu (dvoufázový load,
   // onChanged) nesmí smazat rozepsaný název ani výběr (nález panelu 17. 8.)
@@ -39,7 +40,6 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
     const parentOk = defaultParentId && (map?.nodes || []).some((n) => n.id === defaultParentId && n.type !== 'note' && !isApexNode(n));
     setParentId(parentOk ? defaultParentId : APEX);
     setTitle('');
-    setCreating(false);
      
   }, [open]);
 
@@ -50,19 +50,18 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
       .map((n) => ({ id: n.id, title: n.data?.title || t('tasksPage.nodeFallback') }));
   }, [maps, mapId, t]);
 
-  const handleCreate = async () => {
-    if (!mapId || !title.trim() || creating) return;
-    setCreating(true);
-    try {
+  const handleCreate = () => {
+    if (!mapId || !title.trim()) return;
+    return f.run(async () => {
       await onCreate(mapId, parentId === APEX ? 'auto' : parentId, title.trim());
       onClose();
-    } catch {
-      setCreating(false);
-    }
+    });
   };
+  // chybu hlásí volající (onCreate v Tasks.jsx toastuje a znovu vyhodí) — tady jen odemknout tlačítko
+  const f = useDialogForm({ open, onClose, submit: handleCreate, onError: () => {} });
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -102,7 +101,7 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
                 id="new-node-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                onKeyDown={f.onEnter}
                 placeholder={t('newNode.titlePlaceholder')}
                 autoFocus
               />
@@ -112,8 +111,8 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t('common:actions.cancel')}</Button>
-          <Button onClick={handleCreate} disabled={!mapId || !title.trim() || creating}>
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {t('newNode.create')}
+          <Button onClick={handleCreate} disabled={!mapId || !title.trim() || f.busy}>
+            <BusyIcon busy={f.busy} icon={Plus} /> {t('newNode.create')}
           </Button>
         </DialogFooter>
       </DialogContent>

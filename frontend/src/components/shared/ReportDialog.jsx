@@ -3,7 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Bug, Lightbulb, Loader2, Send, Check, ImagePlus, X } from 'lucide-react';
+import { Bug, Lightbulb, Send, Check, ImagePlus, X } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
 import { useTranslation } from 'react-i18next';
@@ -63,7 +65,6 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
   const nsReady = useLazyNs('popis');
   const [druh, setDruh] = useState('chyba');
   const [text, setText] = useState('');
-  const [odesilam, setOdesilam] = useState(false);
   const [hotovo, setHotovo] = useState(false);
   const [chyba, setChyba] = useState('');
   // ⚠️ Ve výchozím stavu se adresa NEPOSÍLÁ. Richard 19. 8. 2026: „nepotřebujeme
@@ -111,14 +112,15 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
   };
   useEffect(() => { if (open) nactiHistorii(); }, [open]);
 
-  const reset = () => { setDruh('chyba'); setText(''); setHotovo(false); setChyba(''); setOdesilam(false); setChciOdpoved(false); odeberSnimek(); };
+  const reset = () => { setDruh('chyba'); setText(''); setHotovo(false); setChyba(''); setChciOdpoved(false); odeberSnimek(); };
   const zavri = () => { reset(); onClose(); };
+  // chyba zůstává ve vlastním stavu `chyba` (sdílí ho i příloha) — hook jen dodá text
+  const f = useDialogForm({ open, onClose: zavri, onError: (e, msg) => setChyba(msg || t('report.chybaObecna')) });
 
-  const odesli = async () => {
-    if (text.trim().length < 5 || odesilam) return;
-    setOdesilam(true);
-    setChyba('');
-    try {
+  const odesli = () => {
+    if (text.trim().length < 5) return;
+    return f.run(async () => {
+      setChyba('');
       await base44.reportIssue({
         kind: druh,
         text: text.trim(),
@@ -129,11 +131,7 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
       });
       setHotovo(true);
       nactiHistorii();
-    } catch (err) {
-      setChyba(err?.response?.error || err?.message || t('report.chybaObecna'));
-    } finally {
-      setOdesilam(false);
-    }
+    });
   };
 
   if (!nsReady) return null;
@@ -144,7 +142,7 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
   ];
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) zavri(); }}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -281,8 +279,8 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
             {hotovo ? t('report.zavrit') : t('report.zrusit')}
           </Button>
           {!hotovo && (
-            <Button onClick={odesli} disabled={text.trim().length < 5 || odesilam} data-report-odeslat>
-              {odesilam ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            <Button onClick={odesli} disabled={text.trim().length < 5 || f.busy} data-report-odeslat>
+              <BusyIcon busy={f.busy} icon={Send} />
               {t('report.odeslat')}
             </Button>
           )}

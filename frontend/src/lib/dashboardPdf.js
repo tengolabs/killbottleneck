@@ -2,8 +2,7 @@ import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
 import i18next from 'i18next';
 import { withDefaultLook } from '@/lib/theme';
-import { isNativeShell } from '@/lib/nativeShell';
-import { saveBlob } from '@/lib/saveFile';
+import { savePdf, safeFilename, dateStamp, afterRepaint } from '@/lib/saveFile';
 
 // Uložení dashboardu projektu do PDF — „stav projektu, který můžu poslat".
 //
@@ -52,7 +51,7 @@ async function saveDashboardPdfInner(el, mapTitle) {
   el.style.marginRight = '0px';
 
   try {
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await afterRepaint();
     const width = el.scrollWidth;
     const height = el.scrollHeight;
     // JPEG, ne PNG: dashboard je vysoká stránka a v PNG vycházel soubor přes
@@ -85,12 +84,8 @@ async function saveDashboardPdfInner(el, mapTitle) {
     // Pomlčka a podtržítko se v názvu souboru SMÍ — projekt „Vydání-2026" by
     // se jinak slepil na „Vydání2026". (Export mapy v lib/mapExport.js má tenhle
     // nedostatek pořád; měnit ho by lidem přejmenovalo dosavadní soubory.)
-    const safe = String(mapTitle || i18next.t('common:export.mapFilename'))
-      .replace(/[^a-zA-Z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ _-]/g, '').trim()
-      || i18next.t('common:export.mapFilename');
-    const date = new Date().toLocaleDateString('en-CA');
-    if (isNativeShell()) await saveBlob(pdf.output('blob'), `${safe}-${date}.pdf`);
-    else pdf.save(`${safe}-${date}.pdf`);
+    const safe = safeFilename(mapTitle, i18next.t('common:export.mapFilename'), { mode: 'dash' });
+    await savePdf(pdf, `${safe}-${dateStamp()}.pdf`);
   } finally {
     el.style.overflow = prevOverflow;
     el.style.height = prevHeight;

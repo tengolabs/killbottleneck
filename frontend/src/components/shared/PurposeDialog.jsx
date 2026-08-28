@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pb } from '@/api/pb';
+import { invalidateKbConfig } from '@/hooks/useKbConfig';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Building2, Home, User } from 'lucide-react';
+import { Building2, Home, User } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { PURPOSES } from '@/lib/purpose';
 
@@ -26,29 +29,26 @@ export default function PurposeDialog() {
   const { t } = useTranslation('ucel');
   const [open, setOpen] = useState(true);
   const [choice, setChoice] = useState('team');
-  const [saving, setSaving] = useState(false);
+  // selhání se tiše polyká (jako dřív) — dialog zůstane otevřený a jde to zkusit znovu
+  const f = useDialogForm({ open, onError: () => {} });
 
   // replace:true = jen z tohoto dialogu smí server nahradit nedotčené úvodní
   // projekty variantou pro účel (select ve Správě organizace ho neposílá)
-  const save = async (purpose) => {
-    setSaving(true);
-    try {
-      const r = await pb.send('/api/kb/purpose', { method: 'POST', body: { purpose, replace: true } });
-      base44.org.forget();
-      setOpen(false);
-      // nahrazená úvodní mapa → přehled projektů musí načíst znovu
-      if (r?.regenerated) window.location.reload();
-    } catch {
-      setSaving(false);
-    }
-  };
+  const save = (purpose) => f.run(async () => {
+    const r = await pb.send('/api/kb/purpose', { method: 'POST', body: { purpose, replace: true } });
+    base44.org.forget();
+    invalidateKbConfig(); // účel je i v /api/kb/config (PurposeGate, dotazník)
+    setOpen(false);
+    // nahrazená úvodní mapa → přehled projektů musí načíst znovu
+    if (r?.regenerated) window.location.reload();
+  });
 
   if (!open || !nsReady) return null;
   return (
     // Escape / klik mimo = jen zavřít, NIC neuložit — příště se zeptáme znovu.
     // „Firma natrvalo" je jen výslovné tlačítko Přeskočit (schválené znění);
     // zabloudilý klik nesmí sólistovi navždy sebrat mapu pro sebe.
-    <Dialog open={open} onOpenChange={(v) => { if (!v && !saving) setOpen(false); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !f.busy) setOpen(false); }}>
       <DialogContent className="sm:max-w-md" data-testid="purpose-dialog">
         <DialogHeader>
           <DialogTitle>{t('title')}</DialogTitle>
@@ -76,11 +76,11 @@ export default function PurposeDialog() {
           })}
         </div>
         <div className="flex items-center justify-between pt-1">
-          <button type="button" className="text-xs text-muted-foreground underline underline-offset-2" onClick={() => save('team')} disabled={saving} data-testid="purpose-skip">
+          <button type="button" className="text-xs text-muted-foreground underline underline-offset-2" onClick={() => save('team')} disabled={f.busy} data-testid="purpose-skip">
             {t('skip')}
           </button>
-          <Button onClick={() => save(choice)} disabled={saving} data-testid="purpose-continue">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null} {t('continue')}
+          <Button onClick={() => save(choice)} disabled={f.busy} data-testid="purpose-continue">
+            <BusyIcon busy={f.busy} /> {t('continue')}
           </Button>
         </div>
       </DialogContent>

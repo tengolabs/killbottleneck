@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Table,
@@ -8,349 +8,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Check, ChevronRight, Pencil, Trash2, Plus, Calendar, Map as MapIcon, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, Target, ExternalLink, Inbox, Network, UserPlus, RotateCw, Palette, Timer, CalendarCheck, Handshake } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ChevronRight, Pencil, Plus, Map as MapIcon, Inbox } from 'lucide-react';
 import { labelForEmail } from '@/lib/memberLabel';
-import { isExternalOwner } from '@/lib/externalContacts';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import ProjectColorPicker from '@/components/shared/ProjectColorPicker';
 import { projectIcon, projectName } from '@/lib/projectColors';
-import { EmojiNabidka } from '@/components/shared/EmojiPicker';
-import { statusConfig, cycleStatus } from '@/lib/statusMeta';
-import TaskRowActions from '@/components/shared/TaskRowActions';
-import { planState } from '@/lib/taskActions';
-import { getDeadlineStatus, formatDeadline, getInitials } from '@/lib/nodeMeta';
+import { cycleStatus } from '@/lib/statusMeta';
 import { compareLocale } from '@/lib/locale';
-import { useTimer } from '@/lib/TimerContext';
-import { useToast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
-
-// Stopky u řádku (úkol I cíl-uzel mapy) — VŽDY viditelné hodinky: klik = start
-// měření (běžící timer jinde se zavře); běží-li na TÉTO položce, hodinky se
-// točí červeně a klik je zastaví. Přes globální TimerContext — widget
-// v hlavičce se aktualizuje sám. Měření nemění stav položky.
-function RowTimerButton({ target }) {
-  const { running, start, stop } = useTimer();
-  const { toast } = useToast();
-  const { t } = useTranslation('tasks');
-  const isMine = target.task_id
-    ? running?.task_id === target.task_id
-    : !!target.node_id && running?.node_id === target.node_id;
-  const handle = async (e) => {
-    e.stopPropagation();
-    try {
-      if (isMine) await stop();
-      else await start(target);
-    } catch (err) {
-      toast({ title: t('common:misc.timerToggleFailed'), description: err?.message, variant: 'destructive' });
-    }
-  };
-  return (
-    <Button variant="ghost" size="icon"
-      className={`h-7 w-7 ${isMine ? 'text-red-500 hover:text-red-600' : 'text-muted-foreground hover:text-primary'}`}
-      title={isMine ? t('taskTable.timerStop') : t('taskTable.timerStart')} onClick={handle}>
-      <Timer className={`w-3.5 h-3.5 ${isMine ? 'animate-spin' : ''}`} />
-    </Button>
-  );
-}
-
-// Paleta vzhledu projektu (na hlavičce v tabulce úkolů): název + barva + ikona.
-// JEDEN zdroj ikony: emoji se zapisuje do vrcholového (apex) uzlu přes
-// onSetProjectIcon — propíše se do mapy i všude, kde se projekt zobrazuje.
-function AppearancePopover({ map, onEditAppearance, onSetProjectIcon }) {
-  const { t } = useTranslation('tasks');
-  const icon = projectIcon(map);
-  const bare = projectName(map);
-  const [name, setName] = useState(bare);
-  useEffect(() => { setName(projectName(map)); }, [map.title]);
-
-  const saveNameIfChanged = () => {
-    const trimmed = name.trim();
-    if (trimmed && trimmed !== bare) onEditAppearance(map, { title: trimmed });
-  };
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          onClick={(e) => e.stopPropagation()}
-          title={t('taskTable.appearanceTitle')}
-          className="shrink-0 text-muted-foreground hover:text-primary opacity-60 hover:opacity-100 transition-all"
-        >
-          <Palette className="w-3.5 h-3.5" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-3 space-y-3" onClick={(e) => e.stopPropagation()}>
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground">{t('taskTable.projectNameLabel')}</p>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { saveNameIfChanged(); e.currentTarget.blur(); } }}
-            onBlur={saveNameIfChanged}
-            placeholder={t('taskTable.projectNamePlaceholder')}
-            className="w-full h-8 px-2 rounded-md border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground">{t('taskTable.projectColorLabel')}</p>
-          <ProjectColorPicker value={map.color || ''} onChange={(c) => onEditAppearance(map, { color: c })} />
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground">{t('taskTable.projectIconLabel')}</p>
-          <EmojiNabidka value={icon} onChange={(e) => onSetProjectIcon(map, e)} />
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-const deadlineClass = (task) => {
-  const st = getDeadlineStatus(task.deadline, task.status);
-  if (st === 'overdue') return 'text-red-600 dark:text-red-400 font-medium';
-  if (st === 'upcoming') return 'text-orange-600 dark:text-orange-400 font-medium';
-  return 'text-muted-foreground';
-};
+import TaskTableContext from './table/TaskTableContext';
+import NodeItemRow from './table/NodeItemRow';
+import TaskRow from './table/TaskRow';
+import BufferRow from './table/BufferRow';
+import AppearancePopover from './table/AppearancePopover';
+import { SortHead } from './table/RowBits';
 
 const STATUS_ORDER = { todo: 0, in_progress: 1, done: 2 };
-
-function StatusBadge({ task, onCycle }) {
-  const { t } = useTranslation('tasks');
-  const s = statusConfig[task.status] || statusConfig.todo;
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onCycle?.(task); }}
-      title={onCycle ? t('taskTable.statusCycleTitle') : t('taskTable.statusNodeTitle')}
-      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${onCycle ? 'hover:opacity-80' : 'cursor-default'} ${s.badge}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-      {task.status === 'done' && <Check className="w-3 h-3" />}
-      {s.label}
-    </button>
-  );
-}
-
-// Inline výběr přiřazené osoby — klik na avatar/ikonku otevře seznam členů.
-// Externí kontakty (members s external:true) mají vlastní sekci; jméno i iniciály
-// se berou z popisku (labelForEmail) — pseudo-e-mail kontaktu se nikdy neukazuje.
-function AssigneePicker({ value, members, onAssign }) {
-  const { t } = useTranslation('tasks');
-  const label = value ? labelForEmail(members, value) : '';
-  // externí kontakt vypadá jinak než člen (Richard 21. 8. 2026) — nikdo na tom
-  // „nedělá", je to jen evidence; plné kolečko by lhalo stejně jako v mapě.
-  // Kroužek s iniciálami nestačil (klik-test) → ikona podání ruky místo
-  // iniciál (v úzkém sloupci se štítek se jménem nevejde, jméno nese bublina).
-  const ext = isExternalOwner(value);
-  const kruh = ext
-    ? 'w-6 h-6 rounded-full border border-dashed border-amber-600/70 bg-amber-500/15 text-amber-700 dark:text-amber-400 text-[10px] font-bold inline-flex items-center justify-center'
-    : 'w-6 h-6 rounded-full bg-primary/20 text-primary text-[10px] font-bold inline-flex items-center justify-center';
-  const bublina = ext ? t('nav:externalContacts.cardHint', { name: label }) : label;
-  const obsah = ext ? <Handshake className="w-3.5 h-3.5" /> : getInitials(label);
-  if (!onAssign || members.length === 0) {
-    return value ? (
-      <span className={kruh} title={bublina}>
-        {obsah}
-      </span>
-    ) : (
-      <span className="text-xs text-muted-foreground">—</span>
-    );
-  }
-  const team = members.filter((m) => !m.external);
-  const external = members.filter((m) => m.external);
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          onClick={(e) => e.stopPropagation()}
-          title={value ? (ext ? bublina : t('taskTable.assigneeChangeTitle', { email: label })) : t('taskTable.assignPerson')}
-          className="inline-flex items-center justify-center hover:opacity-80"
-        >
-          {value ? (
-            <span className={kruh}>
-              {obsah}
-            </span>
-          ) : (
-            <span className="w-6 h-6 rounded-full border border-dashed border-muted-foreground/50 text-muted-foreground inline-flex items-center justify-center">
-              <UserPlus className="w-3 h-3" />
-            </span>
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuItem onClick={() => onAssign('')}>{t('taskTable.nobody')}</DropdownMenuItem>
-        {team.map((m) => (
-          <DropdownMenuItem key={m.email} onClick={() => onAssign(m.email)}>
-            {m.full_name ? `${m.full_name} (${m.email})` : m.email}
-          </DropdownMenuItem>
-        ))}
-        {external.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[11px] text-muted-foreground font-normal">
-              {t('nav:externalContacts.group')}
-            </DropdownMenuLabel>
-            {external.map((m) => (
-              <DropdownMenuItem key={m.email} onClick={() => onAssign(m.email)}>
-                {m.name}
-              </DropdownMenuItem>
-            ))}
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-// Rychlá paleta ikony uzlu (jen emoji) — vedle tužky na řádku uzlu v tabulce.
-function NodeIconPopover({ item, onSetNodeIcon }) {
-  const { t } = useTranslation('tasks');
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          onClick={(e) => e.stopPropagation()}
-          title={t('taskTable.nodeIconTitle')}
-          className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-        >
-          <Palette className="w-3.5 h-3.5" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-2" onClick={(e) => e.stopPropagation()}>
-        <EmojiNabidka value={item.icon} onChange={(e) => onSetNodeIcon(item, e)} />
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// Řádek uzlu mapy — osnova projektu. Data žijí v mapě (mapa je nadřazená),
-// ale jdou upravit i odsud — stav klikem, osoba pickerem, zbytek dialogem.
-function NodeItemRow({ item, depth = 0, hasChildren, collapsed, onToggleCollapse, members, onEdit, onCycle, onAssign, onAddChild, onOpenNode, onSetNodeIcon, onStashNodeItem, onRowAction }) {
-  const { t } = useTranslation('tasks');
-  const isDone = item.status === 'done';
-  const planned = planState(item.plannedOn);
-  return (
-    <TableRow className="group cursor-pointer bg-secondary/20 hover:bg-secondary/40" onClick={() => onOpenNode(item)}>
-      <TableCell className="w-[110px]">
-        <StatusBadge task={item} onCycle={onCycle} />
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-1.5" style={{ paddingLeft: `${depth * 1.5}rem` }}>
-          {hasChildren ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleCollapse(item.id); }}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-              title={collapsed ? t('taskTable.expandBranch') : t('taskTable.collapseBranch')}
-            >
-              <ChevronRight className={`w-4 h-4 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
-            </button>
-          ) : (
-            <span className="w-4 shrink-0" />
-          )}
-          {item.icon
-            ? <span className="text-sm leading-none shrink-0 w-3.5 text-center">{item.icon}</span>
-            : <Target className={`w-3.5 h-3.5 shrink-0 ${item.isApex ? 'text-amber-500' : 'text-primary'}`} />}
-          <span className={`text-sm ${item.isApex ? 'font-semibold' : ''} ${isDone ? 'line-through opacity-50' : ''}`}>{item.title}</span>
-          {planned && (
-            <span
-              className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0"
-              title={t(`common:rowActions.planned.${planned}`)}
-            >
-              <CalendarCheck className="w-2.5 h-2.5" />{t('common:rowActions.plannedBadge')}
-            </span>
-          )}
-          {depth === 0 && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
-              {item.isApex ? t('taskTable.apexBadge') : t('taskTable.nodeBadge')}
-            </span>
-          )}
-          {item.waiting && (
-            <span
-              className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 shrink-0"
-              title={t('taskTable.waitingTitle')}
-            >
-              {t('taskTable.waitingBadge')}
-            </span>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(item); }}
-            title={t('taskTable.editGoalTitle')}
-            className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          {onSetNodeIcon && <NodeIconPopover item={item} onSetNodeIcon={onSetNodeIcon} />}
-        </div>
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        <span className="text-xs text-muted-foreground">—</span>
-      </TableCell>
-      <TableCell className="w-[90px]">
-        <AssigneePicker value={item.assignee_email} members={members} onAssign={onAssign ? (email) => onAssign(item, email) : undefined} />
-        {item.created_by && item.assignee_email && item.created_by !== item.assignee_email && (
-          <span className="block text-[10px] text-muted-foreground truncate mt-0.5" title={item.created_by}>
-            {t('taskTable.assignedByShort', { email: item.created_by })}
-          </span>
-        )}
-      </TableCell>
-      <TableCell className="w-[110px]">
-        {item.deadline ? (
-          <span className={`inline-flex items-center gap-1 text-xs whitespace-nowrap ${deadlineClass(item)}`}>
-            <Calendar className="w-3 h-3" />
-            {formatDeadline(item.deadline)}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
-      </TableCell>
-      <TableCell className="w-[110px] text-right">
-        {/* hodinky VŽDY viditelné i u cílů-uzlů mapy */}
-        <RowTimerButton target={{ node_id: item.node_id, map_id: item.map_id, label: item.title }} />
-        {/* Akce se schovávají do hoveru JEN na zařízeních, která hover mají.
-            Na dotyku (tablet, telefon v šířce tabulky) hover neexistuje a
-            řádkové akce by byly nedosažitelné — stejné pravidlo jako v lite
-            režimu, kde jsou vidět pořád. focus-within je odbočka pro klávesnici. */}
-        <div className="inline-flex items-center gap-0.5 transition-opacity focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
-          {/* „hotovo" tu záměrně NENÍ — cykluje ho štítek stavu vlevo */}
-          {onRowAction && (
-            <TaskRowActions item={{ ...item, planned: item.plannedOn }} only={['plan']}
-              onDone={(res, note) => onRowAction(null, note)} onError={(e) => onRowAction(e)} />
-          )}
-          {onStashNodeItem && !item.isApex && (
-            <Button variant="ghost" size="icon" className="h-7 w-7" title={t('taskTable.stashTitle')}
-              onClick={(e) => { e.stopPropagation(); onStashNodeItem(item); }}>
-              <Inbox className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          {onAddChild && (
-            <Button variant="ghost" size="icon" className="h-7 w-7" title={t('taskTable.addSubgoal')}
-              onClick={(e) => { e.stopPropagation(); onAddChild(item); }}>
-              <Plus className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon" className="h-7 w-7" title={t('common:actions.edit')}
-            onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
-            <Pencil className="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" title={t('taskTable.openInMap')}
-            onClick={(e) => { e.stopPropagation(); onOpenNode(item); }}>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
-  );
-}
 
 // Průběžná osnova: řádek pro rychlé psaní cílů projektu (Enter = uložit a psát dál)
 function QuickAddNodeRow({ onAdd }) {
@@ -380,161 +52,6 @@ function QuickAddNodeRow({ onAdd }) {
             disabled={busy}
             className="flex-1 h-7 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
           />
-        </div>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-function TaskRow({ task, sub, subCount, expanded, onToggle, nodeLabel, onEdit, onCycle, onDelete, canDelete = true, onAssign, onOpenTaskMap, onStashTask, onRowAction, members = [], commentCount }) {
-  const { t } = useTranslation('tasks');
-  const isDone = task.status === 'done';
-  const planned = planState(task.planned_on);
-  return (
-    <TableRow className="group cursor-pointer" onClick={() => (task.map_id && onOpenTaskMap ? onOpenTaskMap(task) : onEdit(task))}>
-      <TableCell className="w-[110px]">
-        <StatusBadge task={task} onCycle={onCycle} />
-      </TableCell>
-      <TableCell>
-        <div className={`flex items-center gap-1.5 ${sub ? 'pl-7' : ''}`}>
-          {!sub && subCount > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-              title={expanded ? t('taskTable.collapseSubtasks') : t('taskTable.expandSubtasks', { subCount })}
-            >
-              <ChevronRight className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`} />
-            </button>
-          )}
-          <span className={`text-sm ${isDone ? 'line-through opacity-50' : ''}`}>{task.title}</span>
-          {planned && (
-            <span
-              className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0"
-              title={t(`common:rowActions.planned.${planned}`)}
-            >
-              <CalendarCheck className="w-2.5 h-2.5" />{t('common:rowActions.plannedBadge')}
-            </span>
-          )}
-          {task.recurrence && (
-            <RotateCw className="w-3.5 h-3.5 text-muted-foreground shrink-0" title={t('taskTable.recurringTitle')} />
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-            title={t('taskTable.editTaskTitle')}
-            className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          {!sub && subCount > 0 && (
-            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">({subCount})</span>
-          )}
-          {commentCount > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0">
-              <MessageSquare className="w-3 h-3" />{commentCount}
-            </span>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        {nodeLabel}
-      </TableCell>
-      <TableCell className="w-[90px]">
-        <AssigneePicker value={task.assignee_email} members={members} onAssign={onAssign ? (email) => onAssign(task, email) : undefined} />
-        {task.created_by && task.assignee_email && task.created_by !== task.assignee_email && (
-          <span className="block text-[10px] text-muted-foreground truncate mt-0.5" title={task.created_by}>
-            {t('taskTable.assignedByShort', { email: task.created_by })}
-          </span>
-        )}
-      </TableCell>
-      <TableCell className="w-[110px]">
-        {task.deadline ? (
-          <span className={`inline-flex items-center gap-1 text-xs whitespace-nowrap ${deadlineClass(task)}`}>
-            <Calendar className="w-3 h-3" />
-            {formatDeadline(task.deadline)}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
-      </TableCell>
-      <TableCell className="w-[110px] text-right">
-        {/* hodinky VŽDY viditelné (Richard: hover verzi nenašel); ostatní akce na hover */}
-        <RowTimerButton target={{ task_id: task.id, map_id: task.map_id || '', label: task.title }} />
-        <div className="inline-flex items-center gap-0.5 transition-opacity focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
-          {/* „hotovo" tu záměrně NENÍ — cykluje ho štítek stavu vlevo */}
-          {onRowAction && (
-            <TaskRowActions item={{ ...task, planned: task.planned_on }} only={['plan']}
-              onDone={(res, note) => onRowAction(null, note)} onError={(e) => onRowAction(e)} />
-          )}
-          {!sub && onStashTask && canDelete && (
-            <Button variant="ghost" size="icon" className="h-7 w-7" title={t('taskTable.stashTitle')}
-              onClick={(e) => { e.stopPropagation(); onStashTask(task); }}>
-              <Inbox className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon" className="h-7 w-7" title={t('common:actions.edit')}
-            onClick={(e) => { e.stopPropagation(); onEdit(task); }}>
-            <Pencil className="w-3.5 h-3.5" />
-          </Button>
-          {/* smazat smí jen zadavatel nebo vlastník projektu (deleteRule) — dřív
-              se koš nabízel všem a serverové odmítnutí se tiše spolklo */}
-          {canDelete && (
-            <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" title={t('common:actions.delete')}
-              onClick={(e) => { e.stopPropagation(); onDelete(task); }}>
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-// Řádek nápadu ze zásobníku — plnohodnotně editovatelný (vlastní entita,
-// nekoliduje s mapou). Převod na úkol = přesun.
-function BufferRow({ item, onEdit, onDelete, onConvert }) {
-  const { t } = useTranslation('tasks');
-  return (
-    <TableRow className="group cursor-pointer bg-secondary/20 hover:bg-secondary/40" onClick={() => onEdit(item)}>
-      <TableCell className="w-[110px]">
-        <span className="text-xs text-muted-foreground">—</span>
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-1.5">
-          <Inbox className="w-3.5 h-3.5 text-primary shrink-0" />
-          <span className="text-sm">{item.title}</span>
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">{t('taskTable.ideaBadge')}</span>
-        </div>
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        <span className="text-xs text-muted-foreground">—</span>
-      </TableCell>
-      <TableCell className="w-[90px]">
-        <span className="text-xs text-muted-foreground">—</span>
-      </TableCell>
-      <TableCell className="w-[110px]">
-        {item.deadline ? (
-          <span className={`inline-flex items-center gap-1 text-xs whitespace-nowrap ${deadlineClass(item)}`}>
-            <Calendar className="w-3 h-3" />
-            {formatDeadline(item.deadline)}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
-      </TableCell>
-      <TableCell className="w-[110px] text-right">
-        <div className="inline-flex items-center gap-0.5 transition-opacity focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
-          <Button variant="ghost" size="icon" className="h-7 w-7" title={t('taskTable.insertToProject')}
-            onClick={(e) => { e.stopPropagation(); onConvert(item); }}>
-            <Network className="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" title={t('common:actions.edit')}
-            onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
-            <Pencil className="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" title={t('taskTable.deleteFromBuffer')}
-            onClick={(e) => { e.stopPropagation(); onDelete(item); }}>
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
         </div>
       </TableCell>
     </TableRow>
@@ -593,15 +110,6 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
       hasChildren={(n.children || []).length > 0}
       collapsed={collapsedNodes.has(n.id)}
       onToggleCollapse={toggleNodeCollapse}
-      members={members}
-      onEdit={onEditNodeItem}
-      onCycle={onCycleNodeItem}
-      onAssign={onAssignNodeItem}
-      onAddChild={onAddChildNode}
-      onOpenNode={onOpenNode}
-      onSetNodeIcon={onSetNodeIcon}
-      onStashNodeItem={onStashNodeItem}
-      onRowAction={onRowAction}
     />,
     ...(!collapsedNodes.has(n.id) ? renderNodeRows(n.children || [], depth + 1) : []),
   ]);
@@ -676,15 +184,34 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
     }));
   }, [tasks, nodeTrees, mapById, sort]);
 
-  const SortHead = ({ label, sortKey, className }) => (
-    <TableHead className={className}>
-      <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => sortBy(sortKey)}>
-        {label}
-        {sort.key !== sortKey ? <ArrowUpDown className="w-3 h-3 opacity-40" />
-          : sort.dir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-      </button>
-    </TableHead>
-  );
+  // Handlery a sdílená data pro řádky (F3-07) — dřív 18 props prodrátovaných
+  // přes NodeItemRow/TaskRow/BufferRow. Obal onCycle (cycleStatus) je tentýž,
+  // jaký dřív dostával každý TaskRow inline.
+  const tableCtx = useMemo(() => ({
+    members,
+    meEmail,
+    commentCounts,
+    node: {
+      onEdit: onEditNodeItem,
+      onCycle: onCycleNodeItem,
+      onAssign: onAssignNodeItem,
+      onAddChild: onAddChildNode,
+      onOpen: onOpenNode,
+      onSetIcon: onSetNodeIcon,
+      onStash: onStashNodeItem,
+    },
+    task: {
+      onEdit,
+      onCycle: (changed) => onCycle(changed, cycleStatus(changed.status)),
+      onDelete,
+      onAssign,
+      onOpenMap: onOpenTaskMap,
+      onStash: onStashTask,
+    },
+    buffer: { onEdit: onEditBuffer, onDelete: onDeleteBuffer, onConvert: onConvertBuffer },
+    project: { onEditAppearance, onSetProjectIcon },
+    onRowAction,
+  }), [members, meEmail, commentCounts, onEditNodeItem, onCycleNodeItem, onAssignNodeItem, onAddChildNode, onOpenNode, onSetNodeIcon, onStashNodeItem, onEdit, onCycle, onDelete, onAssign, onOpenTaskMap, onStashTask, onEditBuffer, onDeleteBuffer, onConvertBuffer, onEditAppearance, onSetProjectIcon, onRowAction]);
 
   if (tasks.length === 0 && Object.keys(nodeTrees).length === 0 && bufferItems.length === 0) {
     return (
@@ -695,15 +222,16 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
   }
 
   return (
+    <TaskTableContext.Provider value={tableCtx}>
     <div className="rounded-xl border bg-card overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <SortHead label={t('taskTable.colStatus')} sortKey="status" className="w-[110px]" />
-            <SortHead label={t('taskTable.colTask')} sortKey="title" />
+            <SortHead label={t('taskTable.colStatus')} sortKey="status" className="w-[110px]" sort={sort} onSort={sortBy} />
+            <SortHead label={t('taskTable.colTask')} sortKey="title" sort={sort} onSort={sortBy} />
             <TableHead className="hidden md:table-cell">{t('taskTable.colNode')}</TableHead>
-            <SortHead label={t('taskTable.colAssignee')} sortKey="assignee" className="w-[90px]" />
-            <SortHead label={t('taskTable.colDeadline')} sortKey="deadline" className="w-[110px]" />
+            <SortHead label={t('taskTable.colAssignee')} sortKey="assignee" className="w-[90px]" sort={sort} onSort={sortBy} />
+            <SortHead label={t('taskTable.colDeadline')} sortKey="deadline" className="w-[110px]" sort={sort} onSort={sortBy} />
             <TableHead className="w-[110px]" />
           </TableRow>
         </TableHeader>
@@ -756,7 +284,7 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        {onEditAppearance && <AppearancePopover map={sec.map} onEditAppearance={onEditAppearance} onSetProjectIcon={onSetProjectIcon} />}
+                        {onEditAppearance && <AppearancePopover map={sec.map} />}
                       </span>
                     )}
                   </span>
@@ -776,16 +304,7 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                     expanded={expanded.has(task.id)}
                     onToggle={toggle}
                     nodeLabel={nodeLabel(task)}
-                    onEdit={onEdit}
-                    onCycle={(changed) => onCycle(changed, cycleStatus(changed.status))}
-                    onDelete={onDelete}
                     canDelete={task.created_by === meEmail || mapById[task.map_id]?.created_by === meEmail}
-                    onAssign={onAssign}
-                    onOpenTaskMap={onOpenTaskMap}
-                    onStashTask={onStashTask}
-                    onRowAction={onRowAction}
-                    members={members}
-                    commentCount={commentCounts[task.id] || 0}
                   />
                   {expanded.has(task.id) && (byParent[task.id] || []).sort(cmp).map((s) => (
                     <TaskRow
@@ -793,15 +312,7 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                       task={s}
                       sub
                       nodeLabel={nodeLabel(s)}
-                      onEdit={onEdit}
-                      onCycle={(changed) => onCycle(changed, cycleStatus(changed.status))}
-                      onDelete={onDelete}
                       canDelete={s.created_by === meEmail || mapById[s.map_id]?.created_by === meEmail}
-                      onAssign={onAssign}
-                    onOpenTaskMap={onOpenTaskMap}
-                      onRowAction={onRowAction}
-                      members={members}
-                      commentCount={commentCounts[s.id] || 0}
                     />
                   ))}
                 </Fragment>
@@ -829,12 +340,13 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                 </TableCell>
               </TableRow>
               {bufferItems.map((b) => (
-                <BufferRow key={b.id} item={b} onEdit={onEditBuffer} onDelete={onDeleteBuffer} onConvert={onConvertBuffer} />
+                <BufferRow key={b.id} item={b} />
               ))}
             </Fragment>
           )}
         </TableBody>
       </Table>
     </div>
+    </TaskTableContext.Provider>
   );
 }

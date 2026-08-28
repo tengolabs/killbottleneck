@@ -33,10 +33,10 @@ import {
 import TaskRowActions from '@/components/shared/TaskRowActions';
 import { sortFocusFirst, focusStateOf } from '@/lib/focus';
 import { base44 } from '@/api/base44Client';
-import { refreshMySummary } from '@/functions/dailySummary';
-import { fetchMyDay } from '@/functions/myDay';
+import { refreshMySummary, fetchMyDay } from '@/api/kb';
 import { useAiModes } from '@/hooks/useAiEnabled';
 import { captureElementPng, shareElementPng, canShareImages } from '@/lib/dashboardExport';
+import { dateStamp } from '@/lib/saveFile';
 import { getDeadlineStatus, formatDeadline } from '@/lib/nodeMeta';
 import { todayNameDay } from '@/lib/nameDays';
 import { intlLocale } from '@/lib/locale';
@@ -92,7 +92,7 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
           sessionStorage.setItem('kb-summary-autogen', '1');
           setRefreshing(true);
           try {
-            const { data } = await refreshMySummary();
+            const data = await refreshMySummary();
             if (data?.summary) setSummary({ ...data.summary, updated_date: data.summary.updated });
           } catch { /* ticho — zůstane poslední/žádný */ }
           setRefreshing(false);
@@ -106,10 +106,10 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
     if (refreshing) return;
     setRefreshing(true);
     try {
-      const { data } = await refreshMySummary();
+      const data = await refreshMySummary();
       setSummary(data?.summary ? { ...data.summary, updated_date: data.summary.updated } : null);
     } catch (e) {
-      toast({ title: t('panel.summaryFailed'), description: e?.response?.data?.error || e?.message, variant: 'destructive' });
+      toast({ title: t('panel.summaryFailed'), description: e?.response?.error || e?.message, variant: 'destructive' });
     } finally {
       setRefreshing(false);
     }
@@ -156,7 +156,7 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
     if (!exporting) return;
     (async () => {
       try {
-        const dateStr = new Date().toISOString().slice(0, 10);
+        const dateStr = dateStamp(); // místní den (dřív UTC)
         const fileName = `${t('export.fileName')}-${dateStr}${exporting.anon ? t('export.fileAnonSuffix') : ''}.png`;
         if (exporting.mode === 'share') {
           await shareElementPng(exportRef.current, fileName, t('export.shareTitle'));

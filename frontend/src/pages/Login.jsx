@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PasswordInput from "@/components/shared/PasswordInput";
 import { base44 } from "@/api/base44Client";
-import { pb } from "@/api/pb";
+import { loadKbConfig } from "@/hooks/useKbConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,7 @@ export default function Login() {
   //    ještě nikdo není (Richard 11. 8.) → rovnou na založení účtu správce.
   //    Při výpadku dotazu se nic neděje — zůstane login jako dřív.
   useEffect(() => {
-    pb.send("/api/kb/config", { method: "GET" })
+    loadKbConfig()
       .then((cfg) => {
         setEmailEnabled(!!cfg?.email_enabled);
         // na registraci se posílá JEN když registrace vůbec může projít:

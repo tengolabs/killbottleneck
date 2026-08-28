@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { linkKind } from './linkKind';
@@ -88,7 +89,7 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
   // Google Picker („Vybrat z Disku" → odkaz) — jen když má instance klíče
   const [pickerCfg, setPickerCfg] = useState(null);
   useEffect(() => {
-    pb.send('/api/kb/config', { method: 'GET' })
+    loadKbConfig()
       .then((cfg) => { setUploadsEnabled(cfg.uploads_enabled !== false); setPickerCfg(cfg.google_picker || null); })
       .catch(() => { /* starší server bez pole → necháme zapnuté */ });
   }, []);

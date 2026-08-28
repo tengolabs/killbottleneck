@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
@@ -18,6 +18,7 @@ import MapCard from '@/components/home/MapCard';
 import { useTasks } from '@/hooks/useTasks';
 import { useToast } from '@/components/ui/use-toast';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
+import { useSidePanels } from '@/hooks/useSidePanels';
 import SkinPattern from '@/components/shared/SkinPattern';
 
 export default function Home() {
@@ -43,24 +44,7 @@ export default function Home() {
   const [org, setOrg] = useState(null);
   const buffer = useBufferNodes(user);
   const { items: taskItems, refresh: refreshTasks } = useTasks(user);
-  const [bufferOpen, setBufferOpen] = useState(() => nactiKlic('kb-buffer-open') === '1');
-  // levé panely se vzájemně vylučují (překrývaly by se) a otevřený odsouvá obsah
-  const [timeLogOpen, setTimeLogOpen] = useState(() =>
-    nactiKlic('kb-timelog-open') === '1' && nactiKlic('kb-buffer-open') !== '1');
-  const toggleBuffer = useCallback(() => {
-    setBufferOpen((v) => {
-      ulozKlic('kb-buffer-open', v ? '0' : '1');
-      if (!v) { setTimeLogOpen(false); ulozKlic('kb-timelog-open', '0'); }
-      return !v;
-    });
-  }, []);
-  const toggleTimeLog = useCallback(() => {
-    setTimeLogOpen((v) => {
-      ulozKlic('kb-timelog-open', v ? '0' : '1');
-      if (!v) { setBufferOpen(false); ulozKlic('kb-buffer-open', '0'); }
-      return !v;
-    });
-  }, []);
+  const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
 
   useEffect(() => {
     if (isAuthenticated) {

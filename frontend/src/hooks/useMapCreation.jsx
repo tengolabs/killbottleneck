@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { base44 } from '@/api/base44Client';
+import { createProjectRecord } from '@/lib/createProject';
 import { useAiModes } from '@/hooks/useAiEnabled';
 import { advisorPreviewToMap } from '@/lib/mapNodes';
 import { cleanMapData } from '@/lib/cleanMap';
@@ -43,19 +43,14 @@ export function useMapCreation() {
         toast({ title: t('editor:toasts.aiInvalidResponse'), variant: 'destructive' });
         return;
       }
-      // emoji → ikona vrcholu (jeden zdroj jako u createEmptyProject)
-      if (meta?.emoji) {
-        const apex = nodes.find((n) => n.type === 'apexNode') || nodes[0];
-        if (apex) apex.data = { ...apex.data, icon: meta.emoji };
-      }
       const { cleanNodes, cleanEdges } = cleanMapData(nodes, edges);
-      const newMap = await base44.entities.GoalMap.create({
+      const newMap = await createProjectRecord({
         title: capitalize(goalText) || t('newMap.defaultTitle'),
-        description: '',
         nodes: cleanNodes,
         edges: cleanEdges,
         color: meta?.color || '',
-        client_id: meta?.clientId || '',
+        client: meta?.clientId || '',
+        emoji: meta?.emoji || '',
       });
       toast({
         title: t('editor:toasts.structureAdded'),

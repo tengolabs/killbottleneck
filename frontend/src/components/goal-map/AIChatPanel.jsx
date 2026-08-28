@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { advisor } from '@/functions/advisor';
+import { advisor } from '@/api/kb';
 import { Button } from '@/components/ui/button';
 import { X, Send, Loader2, MessageSquare, Undo2 } from 'lucide-react';
 import OperationsCard from './OperationsCard';
@@ -59,7 +59,7 @@ export default function AIChatPanel({ open, onClose, mapTitle, nodes, edges, onA
         message: text,
         map: serializeMap(),
       });
-      const data = result.data;
+      const data = result;
       if (data?.error) {
         setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${data.error}` }]);
       } else {
@@ -73,7 +73,7 @@ export default function AIChatPanel({ open, onClose, mapTitle, nodes, edges, onA
         ]);
       }
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || t('aiChat.connectionError');
+      const msg = err.response?.error || err.message || t('aiChat.connectionError');
       setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${msg}` }]);
     } finally {
       setLoading(false);

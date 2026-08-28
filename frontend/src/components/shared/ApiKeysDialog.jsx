@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { KeyRound, Trash2, Copy, Loader2, Plus, RefreshCw } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 
 // B2: správa per-user API klíčů. Token se ukáže JEN jednou po vytvoření/rotaci.
 // scope read = AI/integrace jen čte mapy; read_write = smí i zapisovat (MCP).
@@ -25,7 +27,6 @@ export default function ApiKeysDialog({ open, onClose }) {
   const [label, setLabel] = useState('');
   const [scope, setScope] = useState('read');
   const [expiresAt, setExpiresAt] = useState('');
-  const [creating, setCreating] = useState(false);
   const [freshToken, setFreshToken] = useState('');
 
   const load = () => {
@@ -36,19 +37,13 @@ export default function ApiKeysDialog({ open, onClose }) {
     if (open) { setFreshToken(''); setLabel(''); setScope('read'); setExpiresAt(''); load(); }
   }, [open]);
 
-  const create = async () => {
-    setCreating(true);
-    try {
-      const res = await base44.apiKeys.create(label.trim(), scope, expiresAt);
-      setFreshToken(res.token);
-      setLabel('');
-      load();
-    } catch {
-      toast({ title: t('apiKeys.createFailed'), variant: 'destructive' });
-    } finally {
-      setCreating(false);
-    }
-  };
+  const create = () => f.run(async () => {
+    const res = await base44.apiKeys.create(label.trim(), scope, expiresAt);
+    setFreshToken(res.token);
+    setLabel('');
+    load();
+  });
+  const f = useDialogForm({ open, onClose, submit: create, onError: () => toast({ title: t('apiKeys.createFailed'), variant: 'destructive' }) });
 
   const rotate = async (id) => {
     try {
@@ -82,7 +77,7 @@ export default function ApiKeysDialog({ open, onClose }) {
   const mcpCommand = `claude mcp add killbottleneck -e KB_URL=${instanceUrl} -e KB_API_KEY=${freshToken || 'kb_user_…'} -- npx -y killbottleneck-mcp`;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -133,10 +128,10 @@ export default function ApiKeysDialog({ open, onClose }) {
             <div className="flex-1 space-y-1.5">
               <Label htmlFor="key-label">{t('apiKeys.newKeyLabel')}</Label>
               <Input id="key-label" value={label} onChange={(e) => setLabel(e.target.value)}
-                placeholder={t('apiKeys.newKeyPlaceholder')} onKeyDown={(e) => e.key === 'Enter' && create()} />
+                placeholder={t('apiKeys.newKeyPlaceholder')} onKeyDown={f.onEnter} />
             </div>
-            <Button onClick={create} disabled={creating}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            <Button onClick={create} disabled={f.busy}>
+              <BusyIcon busy={f.busy} icon={Plus} />
               {t('common:actions.create')}
             </Button>
           </div>

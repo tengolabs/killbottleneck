@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { base44 } from "@/api/base44Client";
-import { pb } from "@/api/pb";
+import { loadKbConfig } from "@/hooks/useKbConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ export default function ForgotPassword() {
   const [emailEnabled, setEmailEnabled] = useState(null);
   useEffect(() => {
     let zivy = true;
-    pb.send("/api/kb/config", { method: "GET" })
+    loadKbConfig()
       .then((cfg) => { if (zivy) setEmailEnabled(!!cfg?.email_enabled); })
       .catch(() => { if (zivy) setEmailEnabled(false); });
     return () => { zivy = false; };

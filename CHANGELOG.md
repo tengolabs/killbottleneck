@@ -9,6 +9,39 @@ below before you jump several versions.
 
 ---
 
+## v0.49-beta — 2026-08-28
+
+**Fourth wave from the code review — frontend structure (part 1)**
+
+- **Instance config:** one shared loader (`hooks/useKbConfig.js`, shared in-flight promise,
+  in-memory only, invalidated after writes that change it — registration, purpose, AI settings —
+  and forgotten on login/logout). Home used to fire up to six `GET /api/kb/config`; now one.
+- **One boundary for `/api/kb/*` calls:** `api/kb.js` (`kbSend` with client-side timeout, no axios-like
+  `{ data }` wrapper); `functions/` folder removed; one error convention (`err.response?.error`).
+- **Project creation:** `createProjectRecord` is the single path (empty project, template from the
+  dialog, AI preview, "Use template" from the editor preview, draft autosave) — five hand-built
+  `GoalMap.create` bodies before. Empty/AI projects still share with nobody.
+- **Exports:** shared core in `lib/saveFile.js` (`downloadText`, `csvEscape`, `savePdf`,
+  `safeFilename`, `dateStamp`, `afterRepaint`). File-name policies preserved 1:1.
+  **Behaviour change:** the date stamp in task CSV/MD, full data export and My-day PNG file names
+  is now the local day (was UTC → yesterday after 22:00 CEST); CSV now quotes a lone `\r` too.
+  A map **without a title** exported to PNG/PDF is now named `mapa-cilu.png` / `goal-map.pdf`
+  (the fallback used to go through the same character strip as titles → `mapacilu`); named maps unchanged.
+- **Dialogs:** `useDialogForm` + `BusyIcon` in 13 form dialogs (busy flag under six names, double-submit
+  guard, error, close, Enter). Side effect: creating an API key with Enter during save no longer
+  creates it twice.
+- **Tasks page:** `useSidePanels` replaces three copies of the buffer/time-log toggle;
+  `TaskTable.jsx` 840 → 352 lines — rows in `components/tasks/table/`, handlers via
+  `useTaskTable()` context instead of 32 drilled props (component bodies moved verbatim).
+- **Map editor (first steps of the domain split, F1-07):** pure functions out of
+  `GoalMapEditor.jsx` into `lib/personalMap.js`, `lib/mapProgress.js`, `lib/nodePermissions.js`
+  (bodies moved verbatim, new unit test `personal-map.js` with 41 checks) and three hooks
+  `useMapCounts`, `useMapHistory`, `useMapExport` — editor 3 717 → 3 259 lines; `contextValue`
+  shape unchanged.
+- **Lite mode stays at 500 kB:** `kbSend` core and the My-day/Organisation reads live in small
+  modules (`api/kbSend.js`, `api/myDay.js`) so the lite bundle does not drag the whole `api/kb.js`
+  into its shared chunk; `api/kb.js` re-exports them.
+
 ## v0.48-beta — 2026-08-27
 
 **Third wave from the code review — test foundation, one source for system templates, dead code out**

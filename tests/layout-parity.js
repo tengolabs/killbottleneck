@@ -416,7 +416,7 @@ function build(pairs) {
     // s „Moje mapou", kde `PERSONAL_LAYOUT` má JINÉ rozestupy, a tedy JINÝ
     // rozpočet: svisle `step 210 − ELBOW 44 = 166 px`, ne 236 (nález panelu
     // 13. 8.). Je to nejtěsnější rozvržení v aplikaci a nikdo ho neměřil.
-    // ⚠️ OPSAT PŘESNĚ z GoalMapEditor.jsx:117-121 — svisle je slot 245, ne 120.
+    // ⚠️ OPSAT PŘESNĚ z lib/personalMap.js (`PERSONAL_LAYOUT`) — svisle je slot 245, ne 120.
     // Špatně opsaná hodnota tady vyrobí FALEŠNÉ selhání (karty 220 široké
     // v slotu 120 se pochopitelně překrývají) a člověk pak hodinu hledá vadu
     // v produktu, který je v pořádku.

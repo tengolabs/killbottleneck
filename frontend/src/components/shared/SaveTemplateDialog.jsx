@@ -18,7 +18,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { LayoutGrid, Loader2, Building2, Lock, Hash, AlarmClock } from 'lucide-react';
+import { LayoutGrid, Building2, Lock, Hash, AlarmClock } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,7 +47,7 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
   const [autoCreate, setAutoCreate] = useState(''); // '' | weekly | monthly
   const [autoDay, setAutoDay] = useState(1);
   const [myTemplates, setMyTemplates] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const f = useDialogForm({ open, onClose, onError: (e) => toast({ title: t('saveTemplate.saveFailed'), description: e?.message, variant: 'destructive' }) });
 
   useEffect(() => {
     if (!open) return;
@@ -57,7 +59,6 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
     setNumbering(false);
     setAutoCreate('');
     setAutoDay(1);
-    setSaving(false);
     base44.entities.Template.filter({ owner: user?.id }, '-updated_date', 100)
       .then(setMyTemplates)
       .catch(() => setMyTemplates([]));
@@ -65,10 +66,9 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
 
   const hasProcessMeta = (nodes || []).some((n) => n.data?.owner || n.data?.deadline || n.data?.waitForChildren);
 
-  const handleSave = async () => {
-    if (!name.trim() || saving) return;
-    setSaving(true);
-    try {
+  const handleSave = () => {
+    if (!name.trim()) return;
+    return f.run(async () => {
       const { ai_nodes: aiNodes, nodeIdMap } = mapToTemplateNodes(nodes, edges);
       const rootTitle = aiNodes.find((n) => !n.parentId)?.title || name.trim();
       const payload = {
@@ -98,14 +98,11 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
         description: t(visibility === 'personal' ? 'saveTemplate.savedPersonalDesc' : 'saveTemplate.savedOrgDesc', { name: name.trim() }),
       });
       onClose();
-    } catch (e) {
-      toast({ title: t('saveTemplate.saveFailed'), description: e?.message, variant: 'destructive' });
-      setSaving(false);
-    }
+    });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -279,8 +276,8 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t('common:actions.cancel')}</Button>
-          <Button onClick={handleSave} disabled={!name.trim() || saving}>
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          <Button onClick={handleSave} disabled={!name.trim() || f.busy}>
+            <BusyIcon busy={f.busy} />
             {t('saveTemplate.saveButton')}
           </Button>
         </DialogFooter>

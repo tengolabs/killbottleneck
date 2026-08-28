@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertTriangle, Mic, Upload, Sparkles } from 'lucide-react';
-import { advisor } from '@/functions/advisor';
+import { advisor } from '@/api/kb';
 import { useAiModes } from '@/hooks/useAiEnabled';
 
 // value = interní enum posílaný na server (kontrakt s ollama.js SCOPE_COUNTS)
@@ -67,7 +67,7 @@ export function FromTextFlow({ onAccept, onCancel, onShortText, initialText = ''
         reader.readAsDataURL(file);
       });
       const result = await advisor({ mode: 'transcribe', audio_base64: audioBase64, filename: file.name });
-      const data = result.data;
+      const data = result;
       if (data?.error) {
         setError(data.error);
       } else {
@@ -77,7 +77,7 @@ export function FromTextFlow({ onAccept, onCancel, onShortText, initialText = ''
     } catch (err) {
       const msg = err.isTimeout
         ? t('toasts.aiTimeout')
-        : err.response?.data?.error || err.message || t('fromText.transcribeError');
+        : err.response?.error || err.message || t('fromText.transcribeError');
       setError(msg);
     } finally {
       setTranscribing(false);
@@ -95,7 +95,7 @@ export function FromTextFlow({ onAccept, onCancel, onShortText, initialText = ''
     setError('');
     try {
       const result = await advisor({ mode: 'from_text', text, scope });
-      const data = result.data;
+      const data = result;
       if (data?.error) {
         setError(data.error);
       } else if (data?.nodes && Array.isArray(data.nodes)) {
@@ -109,7 +109,7 @@ export function FromTextFlow({ onAccept, onCancel, onShortText, initialText = ''
     } catch (err) {
       const msg = err.isTimeout
         ? t('toasts.aiTimeout')
-        : err.response?.data?.error || err.message || t('toasts.aiConnectionError');
+        : err.response?.error || err.message || t('toasts.aiConnectionError');
       setError(msg);
     } finally {
       setLoading(false);

@@ -1,7 +1,6 @@
 import i18next from 'i18next';
 import { toPng } from 'html-to-image';
-import { isNativeShell } from '@/lib/nativeShell';
-import { saveBlob, saveDataUrl } from '@/lib/saveFile';
+import { saveDataUrl, savePdf, safeFilename, afterRepaint } from '@/lib/saveFile';
 import jsPDF from 'jspdf';
 
 // Export mapy je WYSIWYG (Richard 31. 7.): snímá se PŘESNĚ to, co uživatel vidí —
@@ -56,8 +55,7 @@ export async function captureAndSave(nodes, title, format) {
     viewport.insertBefore(titleEl, viewport.firstChild);
   }
 
-  // Wait for browser to repaint
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await afterRepaint();
 
   try {
     const dataUrl = await toPng(viewport, {
@@ -72,7 +70,8 @@ export async function captureAndSave(nodes, title, format) {
       },
     });
 
-    const fileName = (title || i18next.t('common:export.mapFilename')).replace(/[^a-zA-Z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ ]/g, '').trim() || i18next.t('common:export.mapFilename');
+    // 'map' = historická politika názvu (bez pomlček) — měnit by lidem přejmenovalo soubory
+    const fileName = safeFilename(title, i18next.t('common:export.mapFilename'), { mode: 'map' });
 
     if (format === 'png') {
       await saveDataUrl(dataUrl, `${fileName}.png`);
@@ -90,8 +89,7 @@ export async function captureAndSave(nodes, title, format) {
       const offX = (pageW - imgW) / 2;
       const offY = (pageH - imgH) / 2;
       pdf.addImage(dataUrl, 'PNG', offX, offY, imgW, imgH);
-      if (isNativeShell()) await saveBlob(pdf.output('blob'), `${fileName}.pdf`);
-      else pdf.save(`${fileName}.pdf`);
+      await savePdf(pdf, `${fileName}.pdf`);
     }
   } finally {
     if (titleEl) viewport.removeChild(titleEl);

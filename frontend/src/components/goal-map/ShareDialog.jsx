@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { shareMap } from '@/functions/shareMap';
+import { shareMap } from '@/api/kb';
 import { memberLabel } from '@/lib/memberLabel';
 import { copyToClipboard } from '@/lib/clipboard';
 import {
@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, UserPlus, Trash2, Mail, Users, Eye, Pencil, UserCheck, Globe, Copy, Check, Building2 } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 import { serverOrigin } from '@/lib/serverUrl';
 
 // isOwner: spolusprávce (jmenované „Upravovat") spravuje jen jmenovitý seznam —
@@ -24,12 +26,10 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
   const { t } = useTranslation('editor');
   // každá mutace sdílení bumpne `updated` mapy — poslat editoru, ať si posune
   // base_updated a další autosave nespadne na falešný 409
-  const bump = (res) => { if (res?.data?.updated) onMapBumped?.(res.data.updated); };
+  const bump = (res) => { if (res?.updated) onMapBumped?.(res.updated); };
   const [email, setEmail] = useState('');
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
   const [newPermission, setNewPermission] = useState('read');
   const [isPublic, setIsPublic] = useState(false);
   const [teamAccess, setTeamAccess] = useState('');
@@ -37,6 +37,10 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
   // týmový přístup) — bez nich seznam u týmové mapy říkal míň, než je pravda
   const [teamWorkers, setTeamWorkers] = useState([]);
   const [copied, setCopied] = useState(false);
+  // jeden `busy` pro všech pět mutací (jako dřív jeden `submitting`); texty chyb
+  // se liší akci od akce, proto je hlásí každá sama přes f.setError
+  const f = useDialogForm({ open, onClose, submit: () => handleShare() });
+  const { setError } = f;
 
   const loadMembers = useCallback(async () => {
     if (!mapId) return;
@@ -44,16 +48,16 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
     setError('');
     try {
       const res = await shareMap({ action: 'list', mapId });
-      setMembers(res.data.members || []);
-      setTeamWorkers(res.data.team_workers || []);
-      setIsPublic(res.data.is_public || false);
-      setTeamAccess(res.data.team_access || '');
+      setMembers(res.members || []);
+      setTeamWorkers(res.team_workers || []);
+      setIsPublic(res.is_public || false);
+      setTeamAccess(res.team_access || '');
     } catch (e) {
       setError(t('shareDialog.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [mapId, t]);
+  }, [mapId, t, setError]);
 
   useEffect(() => {
     if (open && mapId) {
@@ -65,107 +69,89 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
     }
   }, [open, mapId, loadMembers]);
 
-  const handleShare = async () => {
+  const handleShare = () => {
     if (!email.trim()) return;
-    setSubmitting(true);
-    setError('');
-    try {
-      const res = await shareMap({ action: 'share', mapId, email: email.trim(), permission: newPermission });
-      if (res.data?.error) {
-        setError(res.data.error);
-      } else {
-        bump(res);
-        // povýšení existujícího člena (server vrací `upgraded`) mění ŘÁDEK,
-        // nepřidává nový — jinak byl e-mail v seznamu dvakrát, se dvěma
-        // úrovněmi a duplicitním React key (nález panelu 20. 8. 2026)
-        setMembers(prev => (res.data.upgraded
-          ? prev.map((m) => (m.email === res.data.member.email
-            ? { ...m, permission: res.data.member.permission }
-            : m))
-          : [...prev, res.data.member]));
-        setEmail('');
+    return f.run(async () => {
+      try {
+        const res = await shareMap({ action: 'share', mapId, email: email.trim(), permission: newPermission });
+        if (res?.error) {
+          setError(res.error);
+        } else {
+          bump(res);
+          // povýšení existujícího člena (server vrací `upgraded`) mění ŘÁDEK,
+          // nepřidává nový — jinak byl e-mail v seznamu dvakrát, se dvěma
+          // úrovněmi a duplicitním React key (nález panelu 20. 8. 2026)
+          setMembers(prev => (res.upgraded
+            ? prev.map((m) => (m.email === res.member.email
+              ? { ...m, permission: res.member.permission }
+              : m))
+            : [...prev, res.member]));
+          setEmail('');
+        }
+      } catch (e) {
+        const msg = e.response?.error || e.response?.message;
+        setError(msg || t('shareDialog.addFailed'));
       }
-    } catch (e) {
-      const msg = e.response?.data?.error || e.response?.data?.message;
-      setError(msg || t('shareDialog.addFailed'));
-    } finally {
-      setSubmitting(false);
-    }
+    });
   };
 
-  const handlePermissionChange = async (memberEmail, permission) => {
-    setSubmitting(true);
-    setError('');
+  const handlePermissionChange = (memberEmail, permission) => f.run(async () => {
     try {
       const res = await shareMap({ action: 'update_permission', mapId, memberEmail, permission });
-      if (res.data?.error) {
-        setError(res.data.error);
+      if (res?.error) {
+        setError(res.error);
       } else {
         bump(res);
         setMembers(prev => prev.map(m =>
-          m.email === memberEmail ? { ...m, permission: res.data.permission } : m
+          m.email === memberEmail ? { ...m, permission: res.permission } : m
         ));
       }
     } catch (e) {
       setError(t('shareDialog.permissionFailed'));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
 
-  const handleUnshare = async (memberEmail) => {
-    setSubmitting(true);
-    setError('');
+  const handleUnshare = (memberEmail) => f.run(async () => {
     try {
       const res = await shareMap({ action: 'unshare', mapId, memberEmail });
-      if (res.data?.error) {
-        setError(res.data.error);
+      if (res?.error) {
+        setError(res.error);
       } else {
         bump(res);
         setMembers(prev => prev.filter(m => m.email !== memberEmail));
       }
     } catch (e) {
       setError(t('shareDialog.removeFailed'));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
 
-  const handleTeamAccess = async (access) => {
-    setSubmitting(true);
-    setError('');
+  const handleTeamAccess = (access) => f.run(async () => {
     try {
       const res = await shareMap({ action: 'set_team_access', mapId, access });
-      if (res.data?.error) {
-        setError(res.data.error);
+      if (res?.error) {
+        setError(res.error);
       } else {
         bump(res);
-        setTeamAccess(res.data.team_access);
+        setTeamAccess(res.team_access);
       }
     } catch (e) {
       setError(t('shareDialog.teamFailed'));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
 
-  const handleTogglePublic = async () => {
-    setSubmitting(true);
-    setError('');
+  const handleTogglePublic = () => f.run(async () => {
     try {
       const res = await shareMap({ action: 'toggle_public', mapId });
-      if (res.data?.error) {
-        setError(res.data.error);
+      if (res?.error) {
+        setError(res.error);
       } else {
         bump(res);
-        setIsPublic(res.data.is_public);
+        setIsPublic(res.is_public);
       }
     } catch (e) {
       setError(t('shareDialog.publicFailed'));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
 
   const handleCopyLink = async () => {
     const url = `${serverOrigin()}/map/${mapId}`;
@@ -176,7 +162,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -196,11 +182,11 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                 placeholder={t('shareDialog.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleShare()}
-                disabled={submitting}
+                onKeyDown={f.onEnter}
+                disabled={f.busy}
               />
-              <Button onClick={handleShare} disabled={submitting || !email.trim()} size="default">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+              <Button onClick={handleShare} disabled={f.busy || !email.trim()} size="default">
+                <BusyIcon busy={f.busy} icon={UserPlus} />
                 {t('tasks:inviteDialog.invite')}
               </Button>
             </div>
@@ -241,8 +227,8 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
             </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
+          {f.error && (
+            <p className="text-sm text-destructive">{f.error}</p>
           )}
 
           <div className="space-y-2">
@@ -290,7 +276,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                       <div className="flex items-center rounded-md border overflow-hidden">
                         <button
                           onClick={() => handlePermissionChange(m.email, 'read')}
-                          disabled={submitting}
+                          disabled={f.busy}
                           className={`flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors ${
                             m.permission === 'read' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
                           }`}
@@ -300,7 +286,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                         </button>
                         <button
                           onClick={() => handlePermissionChange(m.email, 'work')}
-                          disabled={submitting}
+                          disabled={f.busy}
                           className={`flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors ${
                             m.permission === 'work' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
                           }`}
@@ -310,7 +296,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                         </button>
                         <button
                           onClick={() => handlePermissionChange(m.email, 'edit')}
-                          disabled={submitting}
+                          disabled={f.busy}
                           className={`flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors ${
                             m.permission === 'edit' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
                           }`}
@@ -323,7 +309,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                         variant="ghost"
                         size="icon"
                         onClick={() => handleUnshare(m.email)}
-                        disabled={submitting}
+                        disabled={f.busy}
                         className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -373,7 +359,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                 <Switch
                   checked={!!teamAccess}
                   onCheckedChange={(v) => handleTeamAccess(v ? 'read' : '')}
-                  disabled={submitting}
+                  disabled={f.busy}
                 />
               </div>
               {teamAccess && (
@@ -407,7 +393,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                   <p className="text-xs text-muted-foreground mt-0.5">{t('shareDialog.publicDesc')}</p>
                 </div>
               </div>
-              <Switch checked={isPublic} onCheckedChange={handleTogglePublic} disabled={submitting} />
+              <Switch checked={isPublic} onCheckedChange={handleTogglePublic} disabled={f.busy} />
             </div>
             {isPublic && (
               <div className="flex gap-2">

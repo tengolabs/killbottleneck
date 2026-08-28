@@ -13,6 +13,7 @@ import DatePicker from '@/components/DatePicker';
 import { useToast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
 import { Clock } from 'lucide-react';
+import { useDialogForm } from '@/hooks/useDialogForm';
 
 const NONE = '__none__';
 
@@ -28,7 +29,7 @@ export default function TimeEntryDialog({ open, onClose, onSaved, maps = [] }) {
   const [clientId, setClientId] = useState('');
   const [note, setNote] = useState('');
   const [clients, setClients] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const f = useDialogForm({ open, onClose, submit: () => save(), onError: (e) => toast({ title: t('timeEntry.saveFailed'), description: e?.message, variant: 'destructive' }) });
 
   useEffect(() => {
     if (!open) return;
@@ -41,7 +42,6 @@ export default function TimeEntryDialog({ open, onClose, onSaved, maps = [] }) {
     setMapId('');
     setClientId('');
     setNote('');
-    setSaving(false);
     base44.entities.Client.list('name').then(setClients).catch(() => {});
   }, [open]);
 
@@ -52,14 +52,13 @@ export default function TimeEntryDialog({ open, onClose, onSaved, maps = [] }) {
     return th * 60 + tm - (fh * 60 + fm);
   })();
 
-  const save = async () => {
-    if (saving) return;
+  const save = () => {
+    if (f.busy) return; // dřív než validační toast — během ukládání Enter mlčí
     if (!date || minutes <= 0) {
       toast({ title: t('timeEntry.endAfterStart'), variant: 'destructive' });
       return;
     }
-    setSaving(true);
-    try {
+    return f.run(async () => {
       const mapTitle = maps.find((m) => m.id === mapId)?.title || '';
       await base44.entities.TimeEntry.create({
         started: new Date(`${date}T${from}:00`).toISOString(),
@@ -71,14 +70,11 @@ export default function TimeEntryDialog({ open, onClose, onSaved, maps = [] }) {
       });
       onSaved?.();
       onClose();
-    } catch (e) {
-      toast({ title: t('timeEntry.saveFailed'), description: e?.message, variant: 'destructive' });
-      setSaving(false);
-    }
+    });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -137,13 +133,13 @@ export default function TimeEntryDialog({ open, onClose, onSaved, maps = [] }) {
           <div className="space-y-1.5">
             <Label htmlFor="te-note">{t('common:labels.note')}</Label>
             <Input id="te-note" value={note} onChange={(e) => setNote(e.target.value)}
-              placeholder={t('timeEntry.notePlaceholder')} onKeyDown={(e) => e.key === 'Enter' && save()} />
+              placeholder={t('timeEntry.notePlaceholder')} onKeyDown={f.onEnter} />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t('common:actions.cancel')}</Button>
-          <Button onClick={save} disabled={saving || minutes <= 0}>{t('timeEntry.saveButton')}</Button>
+          <Button onClick={save} disabled={f.busy || minutes <= 0}>{t('timeEntry.saveButton')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

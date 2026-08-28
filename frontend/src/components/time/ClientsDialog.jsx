@@ -11,6 +11,8 @@ import ProjectColorPicker from '@/components/shared/ProjectColorPicker';
 import { useToast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
 import { Briefcase, Trash2, Pencil, Loader2, Plus, Check, X as XIcon } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 
 // Číselník klientů (měření času, přiřazení projektů). Vidí ho každý přihlášený,
 // upravovat/mazat smí autor záznamu nebo admin — stejná pravidla vynucuje server (RLS).
@@ -22,10 +24,12 @@ export default function ClientsDialog({ open, onClose, onChanged }) {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState('');
-  const [creating, setCreating] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
+  // jen zakládání nového klienta; `loading` (načtení seznamu) a úpravy/mazání
+  // řádků mají vlastní mechaniku
+  const f = useDialogForm({ open, onClose, submit: () => create(), onError: (e) => toast({ title: t('clients.createFailed'), description: e?.message, variant: 'destructive' }) });
 
   const load = () => {
     setLoading(true);
@@ -35,20 +39,15 @@ export default function ClientsDialog({ open, onClose, onChanged }) {
 
   const canEdit = (c) => user?.role === 'admin' || c.created_by_id === user?.id;
 
-  const create = async () => {
-    if (!name.trim() || creating) return;
-    setCreating(true);
-    try {
+  const create = () => {
+    if (!name.trim()) return;
+    return f.run(async () => {
       await base44.entities.Client.create({ name: name.trim(), color });
       setName('');
       setColor('');
       load();
       onChanged?.();
-    } catch (e) {
-      toast({ title: t('clients.createFailed'), description: e?.message, variant: 'destructive' });
-    } finally {
-      setCreating(false);
-    }
+    });
   };
 
   const saveEdit = async () => {
@@ -75,7 +74,7 @@ export default function ClientsDialog({ open, onClose, onChanged }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -90,9 +89,9 @@ export default function ClientsDialog({ open, onClose, onChanged }) {
           <Label htmlFor="client-name">{t('clients.newClient')}</Label>
           <div className="flex items-center gap-2">
             <Input id="client-name" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder={t('clients.namePlaceholder')} onKeyDown={(e) => e.key === 'Enter' && create()} />
-            <Button onClick={create} disabled={!name.trim() || creating}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              placeholder={t('clients.namePlaceholder')} onKeyDown={f.onEnter} />
+            <Button onClick={create} disabled={!name.trim() || f.busy}>
+              <BusyIcon busy={f.busy} icon={Plus} />
               {t('common:actions.add')}
             </Button>
           </div>

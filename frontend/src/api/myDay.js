@@ -1,3 +1,5 @@
+// Datové čtení „Můj den" a „Organizace" — samostatně a přes holé pb.send kvůli lite
+// režimu (viz api/kb.js; GET bez timeoutu jádro kbSend nepotřebuje a každý kB se v lite počítá).
 import { pb } from '@/api/pb';
 import { todayKey } from '@/lib/taskActions';
 
@@ -25,3 +27,8 @@ const mojePulnocVUtc = () => {
 
 export const fetchMyDay = () =>
   pb.send(`/api/kb/my-day?today=${todayKey()}&since=${encodeURIComponent(mojePulnocVUtc())}`, { method: 'GET' });
+
+// „Organizace" ze serveru — pohled shora pro admina a manažera. Výpočet žije
+// jen na serveru (pb_hooks/helpers.js:buildPortfolio): jen týmové a sdílené
+// projekty, soukromé ani do součtů. `today` ZE ZAŘÍZENÍ — stejně jako Můj den.
+export const fetchPortfolio = () => pb.send(`/api/kb/portfolio?today=${todayKey()}`, { method: 'GET' });

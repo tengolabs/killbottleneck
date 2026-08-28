@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus, Mail, Loader2, KeyRound } from "lucide-react";
-import { pb } from "@/api/pb";
+import { loadKbConfig } from "@/hooks/useKbConfig";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
 
@@ -23,7 +23,7 @@ export default function Register() {
 
   // hostovaná instance chce registrační klíč (viz /api/kb/config)
   useEffect(() => {
-    pb.send("/api/kb/config", { method: "GET" })
+    loadKbConfig()
       .then((c) => setSetupInfo({ required: !!c.setup_code_required, claimed: !!c.claimed }))
       .catch(() => {});
   }, []);

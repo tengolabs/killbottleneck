@@ -1,26 +1,15 @@
 import i18next from 'i18next';
 import { statusConfig } from '@/lib/statusMeta';
 import { fmtDate } from '@/lib/locale';
-import { saveBlob } from '@/lib/saveFile';
+import { downloadText, csvEscape, dateStamp } from '@/lib/saveFile';
 
 // Export úkolů: CSV (tabulkový) a Markdown report (podklad i pro budoucí AI souhrn).
 // Texty přes i18next.t (modul mimo React) — jazyk dle aktuální volby uživatele.
 
 const t = (key, params) => i18next.t(`common:export.${key}`, params);
 
-function download(filename, content, mime) {
-  const blob = new Blob(['﻿' + content], { type: mime });
-  saveBlob(blob, filename);
-}
-
-const csvEscape = (v) => {
-  let s = String(v ?? '');
-  // Formula injection: import z Asany/Trella umí do instance dostat cizí texty
-  // typu `=HYPERLINK(...)` — Excel by je při otevření exportu VYHODNOTIL.
-  // Úvodní vzorcové znaky se neutralizují apostrofem (standardní obrana).
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-};
+// download/csvEscape/datum: sdílené jádro v lib/saveFile.js. BOM dostává CSV (Excel) i Markdown —
+// tak to bylo od začátku (stará `download` ho přidávala vždy) a zůstává 1:1.
 
 const statusLabel = (s) => statusConfig[s]?.label || s;
 
@@ -56,7 +45,7 @@ export function exportTasksCsv({ tasks, byParent, maps }) {
     for (const s of byParent[tk.id] || []) push(s, tk.title);
   }
   const csv = rows.map((r) => r.map(csvEscape).join(';')).join('\r\n');
-  download(`${t('csvFilename')}-${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8');
+  downloadText(`${t('csvFilename')}-${dateStamp()}.csv`, csv, 'text/csv;charset=utf-8', { bom: true });
 }
 
 // nodeTrees = { mapId: [kořeny] } — osnova projektů, tasks/byParent jako výše
@@ -119,5 +108,5 @@ export function exportMarkdownReport({ tasks, byParent, maps, nodeTrees, orgName
     for (const tk of overdue) md += line(tk, 0) + '\n';
   }
 
-  download(`${t('reportFilename')}-${new Date().toISOString().slice(0, 10)}.md`, md, 'text/markdown;charset=utf-8');
+  downloadText(`${t('reportFilename')}-${dateStamp()}.md`, md, 'text/markdown;charset=utf-8', { bom: true });
 }

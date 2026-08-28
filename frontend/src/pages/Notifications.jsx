@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 import { useAuth } from '@/lib/AuthContext';
 import AppHeader from '@/components/shared/AppHeader';
 import NotificationPrefs from '@/components/shared/NotificationPrefs';
@@ -60,7 +61,7 @@ export default function Notifications() {
   useEffect(load, [load]);
 
   useEffect(() => {
-    pb.send('/api/kb/config', { method: 'GET' })
+    loadKbConfig()
       .then((cfg) => setEmailEnabled(!!cfg.email_enabled))
       .catch(() => setEmailEnabled(false));
   }, []);

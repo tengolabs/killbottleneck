@@ -5,7 +5,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, Loader2, CheckCircle2, AlertTriangle, FileJson } from 'lucide-react';
+import { Upload, CheckCircle2, AlertTriangle, FileJson } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
 import { base44 } from '@/api/base44Client';
 import { looksLikeExport } from '@/lib/mapPortable';
 import { foreignToPortable, FOREIGN_MAX_NODES } from '@/lib/importForeign';
@@ -130,7 +131,7 @@ export default function ImportMapDialog({ open, onClose }) {
               onChange={(e) => handleFile(e.target.files?.[0])}
             />
             <Button onClick={() => inputRef.current?.click()} disabled={busy} className="w-full gap-2">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              <BusyIcon busy={busy} icon={Upload} />
               {t('importMap.chooseFile')}
             </Button>
             {error && (

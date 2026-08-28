@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pb } from '@/api/pb';
+import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Loader2, CreditCard, Landmark, Check } from 'lucide-react';
@@ -30,7 +31,7 @@ export default function MembershipSection({ billingComplete }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    pb.send('/api/kb/config', { method: 'GET' }).then(setConfig).catch(() => {});
+    loadKbConfig().then(setConfig).catch(() => {});
   }, []);
 
   if (user?.role !== 'admin' || !config?.hosted || !nsReady) return null;
@@ -53,6 +54,7 @@ export default function MembershipSection({ billingComplete }) {
         method: 'POST', body: { tier: vybrany.tier, period: 'year' },
       });
       setOrderDone(res.order || {});
+      invalidateKbConfig(); // objednávka mění trial_* v configu (TrialBanner)
     } catch (err) {
       setError(err?.response?.error || err.message);
     } finally {

@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.49-beta": {
+    cs: [
+      "Aplikace se ptá serveru na nastavení instance jednou místo šestkrát při každém otevření — načítání je lehčí, zvlášť na telefonu.",
+      "Datum v názvu staženého CSV/Markdownu úkolů a exportu dat je teď váš místní den (dřív po 22:00 nesl soubor včerejšek).",
+      "Rychlé zadání API klíče klávesou Enter během ukládání už nezaloží klíč dvakrát.",
+      "Pod kapotou: dialogy, exporty a zakládání projektu sdílejí jeden základ; tabulka úkolů je rozdělená do menších dílů — příprava na další zrychlení.",
+    ],
+    en: [
+      "The app asks the server for instance settings once instead of six times on every open — lighter loading, especially on the phone.",
+      "The date in the file name of task CSV/Markdown and data exports is now your local day (after 22:00 the file used to carry yesterday's date).",
+      "Pressing Enter on a new API key while it is being saved no longer creates the key twice.",
+      "Under the hood: dialogs, exports and project creation share one foundation; the task table is split into smaller parts — groundwork for further speed-ups.",
+    ],
+  },
   "v0.48-beta": {
     cs: [
       "Řešitel, kterého přiřadíte v šabloně, dostane projekt jako spolupracovník — stejně z aplikace i z automatického zakládání (dřív z aplikace dostal plná práva editora).",

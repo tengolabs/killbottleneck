@@ -34,7 +34,7 @@ const STROP_SVISLE = 236;
 const STROP_VODOROVNE = 250;
 
 // „MOJE MAPA" MÁ VLASTNÍ ROZPOČET — a je to nejtěsnější rozvržení v aplikaci.
-// `PERSONAL_LAYOUT` (GoalMapEditor.jsx) má svisle `step 210` a vodorovně
+// `PERSONAL_LAYOUT` (lib/personalMap.js) má svisle `step 210` a vodorovně
 // `slot 120`, takže stropy výš tam NEPLATÍ: svisle 210 − ELBOW 44 = 166 px,
 // vodorovně rovných 120 px. Karty jsou kompaktní (název na 1 řádek, bez pruhu
 // pokroku), proto jsou o hodně nižší než v běžné mapě.

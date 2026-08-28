@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertTriangle, Check, X, Sparkles, ArrowRight, ArrowLeft, Info } from 'lucide-react';
-import { advisor } from '@/functions/advisor';
+import { advisor } from '@/api/kb';
 import { popisJakoText } from '@/lib/popisFormat';
 
 // value = interní enum posílaný na server (kontrakt s ollama.js SCOPE_COUNTS)
@@ -87,7 +87,7 @@ export function AdvisorFlow({ onAccept, onCancel, initialGoal = '', initialScope
     setError('');
     try {
       const result = await advisor({ goal: goalText, mode: 'questions', scope });
-      const data = result.data;
+      const data = result;
       if (data?.error) {
         setError(data.error);
         setStep('goal');
@@ -102,7 +102,7 @@ export function AdvisorFlow({ onAccept, onCancel, initialGoal = '', initialScope
     } catch (err) {
       const msg = err.isTimeout
         ? t('toasts.aiTimeout')
-        : err.response?.data?.error || err.message || t('toasts.aiConnectionError');
+        : err.response?.error || err.message || t('toasts.aiConnectionError');
       setError(msg);
       setStep('goal');
     } finally {
@@ -126,7 +126,7 @@ export function AdvisorFlow({ onAccept, onCancel, initialGoal = '', initialScope
     setError('');
     try {
       const result = await advisor({ goal, mode: 'generate', answers, scope });
-      const data = result.data;
+      const data = result;
       if (data?.error) {
         setError(data.error);
       } else if (data?.nodes && Array.isArray(data.nodes)) {
@@ -138,7 +138,7 @@ export function AdvisorFlow({ onAccept, onCancel, initialGoal = '', initialScope
     } catch (err) {
       const msg = err.isTimeout
         ? t('toasts.aiTimeout')
-        : err.response?.data?.error || err.message || t('toasts.aiConnectionError');
+        : err.response?.error || err.message || t('toasts.aiConnectionError');
       setError(msg);
     } finally {
       setLoading(false);

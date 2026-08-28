@@ -30,8 +30,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import GoalNode from '@/components/goal-map/GoalNode';
-import { MembersContext, labelForEmail } from '@/lib/memberLabel';
-import { isExternalOwner, useMembersWithContacts } from '@/lib/externalContacts';
+import { MembersContext } from '@/lib/memberLabel';
+import { useMembersWithContacts } from '@/lib/externalContacts';
 import SkinPattern from '@/components/shared/SkinPattern';
 import ApexGoalNode from '@/components/goal-map/ApexGoalNode';
 import StickyNoteNode from '@/components/goal-map/StickyNoteNode';
@@ -52,22 +52,18 @@ import BufferPanel, { useBufferNodes, BUFFER_DRAG_MIME } from '@/components/goal
 import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ProgressDashboard from '@/components/goal-map/ProgressDashboard';
 import ReportRailButton from '@/components/shared/ReportRailButton';
-import { advisor } from '@/functions/advisor';
-import { shareMap } from '@/functions/shareMap';
+import { advisor, shareMap, getPublicMap } from '@/api/kb';
 import { layoutTree, findFreeChildSpot } from '@/lib/treeLayout';
 import { isApexNode as isApexNodeShared, advisorPreviewToMap } from '@/lib/mapNodes';
 import { spojeniPovoleno, poskozeneHrany } from '@/lib/mapStructure';
 import { cleanMapData as cleanMap } from '@/lib/cleanMap';
 import { trojcestnyMerge, stableJson } from '@/lib/mergeMap';
-import { buildMapExport, downloadJson, exportFilename } from '@/lib/mapPortable';
 import { useMapDirection } from '@/lib/useMapDirection';
 import GoalMapContext from '@/components/goal-map/GoalMapContext';
 import { useToast } from '@/components/ui/use-toast';
 import i18next from 'i18next';
 import { useLazyNs, ensureNs } from '@/i18n/lazyNs';
 import { ToastAction } from '@/components/ui/toast';
-import { captureAndSave } from '@/lib/mapExport';
-import { getPublicMap } from '@/functions/getPublicMap';
 import { useAiModes } from '@/hooks/useAiEnabled';
 import { effectiveTheme, setTheme } from '@/lib/theme';
 import NotificationBell from '@/components/shared/NotificationBell';
@@ -78,10 +74,17 @@ import BulkEditDialog from '@/components/goal-map/BulkEditDialog';
 import SaveTemplateDialog from '@/components/shared/SaveTemplateDialog';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { ALIGN_STYLES, ALIGN_OPTS, KLIC_ZAMEK, zamcenyStyl, platnyStyl, stylNoveMapy } from '@/lib/alignStyles';
-import { createRulesFromTemplate, ownersFromNodes } from '@/lib/createProject';
-import { computeWaitingSet, findBlockingForOwner } from '@/lib/waitStatus';
+import { createRulesFromTemplate, ownersFromNodes, createProjectRecord } from '@/lib/createProject';
+import { computeWaitingSet } from '@/lib/waitStatus';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
+import { useSidePanels } from '@/hooks/useSidePanels';
+import { useMapCounts } from '@/hooks/useMapCounts';
+import { useMapHistory } from '@/hooks/useMapHistory';
+import { useMapExport } from '@/hooks/useMapExport';
 import { KLIC_CITELNOST, nactiStupen, dalsiStupen } from '@/lib/citelnost';
+import { PERSONAL_LAYOUT, buildPersonalMap, buildDelegatedMap } from '@/lib/personalMap';
+import { buildChildrenMap, descendantCounts, hiddenByCollapse, computeProgressMap } from '@/lib/mapProgress';
+import { jeZadavatelNeboVlastnik, mojePracovniUzlyZ } from '@/lib/nodePermissions';
 
 const nodeTypes = { goalNode: GoalNode, apexNode: ApexGoalNode, note: StickyNoteNode, personalRoot: PersonalRootNode };
 const edgeTypes = { deletable: DeletableEdge };
@@ -104,11 +107,6 @@ const IconLandscape = (props) => (
   </svg>
 );
 
-// těsnější rozestupy pro „Moje mapu" (plochá struktura pod „Já" → jinak velké mezery).
-// Slot musí být ≥ velikost uzlu (uzly s popisem jsou vysoké) — jinak se překrývají:
-// vodorovně stackují sourozence na Y (slot = výška), svisle vedle sebe na X (slot = šířka).
-// Krok mezi úrovněmi musí být ≥ rozměr uzlu v ose úrovní: vodorovně = ŠÍŘKA uzlu
-// (jinak se řady 2/3 překrývají do strany), svisle = VÝŠKA. Slot = rozestup sourozenců.
 // Tři styly Zarovnat (cyklus jedním tlačítkem): klasika (do šířky) → kompakt
 // (střídavá 2 patra) → sevřít (patra + těsnější sloty a kroky — karty blíž
 // k sobě, mapa se vejde na stránku). Tři patra NEpomáhala: tidy tree je pakuje
@@ -121,242 +119,6 @@ const ALIGN_ICONS = { classic: StretchHorizontal, compact: Shrink, bands: Layout
 // ikony stupňů na tlačítku Čitelnost — stejná logika jako u Zarovnat:
 // tlačítko ukazuje stupeň, který PRÁVĚ platí, stisk přepne na další.
 const CITELNOST_ICONS = { normal: ALargeSmall, large: Type, titleOnly: Heading };
-
-// Styl zvolený v „Moje mapě". Bez tohohle si popisek styl pamatoval, ale mapa
-// se pokaždé stavěla klasicky — tlačítko tedy hlásilo něco, co na plátně
-// nebylo (panel /checkup 12. 8.; táž vada, jakou vlna opravovala pro běžné mapy).
-const optsMojiMapy = () => ALIGN_OPTS[platnyStyl(nactiKlic('kb-zarovnat-styl:moje-mapa'))] || {};
-
-// ⚠️ VODOROVNÝ `slot` MUSÍ BÝT VĚTŠÍ NEŽ VÝŠKA KARTY — je to příčná osa, na
-// které se sourozenci řadí pod sebe, takže při rovnosti se karty dotknou.
-// Kompaktní karta „Mojí mapy" má naměřeno 108 / 116 / 120 px podle stupně
-// Čitelnosti (product/tests/vysky-karet.js), takže ve stupni „jen název"
-// sedí PŘESNĚ na starém slotu 120 — a na telefonu se dva uzly reálně
-// překrývaly (změřeno 13. 8. 2026). Slot proto v tomhle stupni povyroste.
-// Pozice „Mojí mapy" se NIKAM NEUKLÁDAJÍ (je to read-only agregát počítaný
-// při každém vykreslení), takže se tím nic v datech nemění.
-const PERSONAL_LAYOUT = (direction, citelnost) => direction === 'horizontal'
-  ? { slot: citelnost === 'titleOnly' ? 136 : 120, step: 300, apexStep: 200 } // kruh 120 + mezera 80
-  // apexStep i svisle: kořen „Já" je kruh 120 (ne apex 260) — bez toho by
-  // default 380 zdvojnásobil mezeru pod kořenem (checkup před v0.13.2)
-  : { slot: 245, step: 210, apexStep: 210 };
-
-// „Moje mapa": read-only agregace mých uzlů napříč projekty (jen odkazy, ne kopie).
-// Kořen „Já"; hierarchie se drží JEN mezi mými uzly (cizí mezičlánky se vynechají);
-// + moje úkoly s termínem jako listy. Vrací i `targets` (vid→zdroj).
-function buildPersonalMap(maps, tasks, email, rootLabel) {
-  const targets = {};
-  if (!email) return { nodes: [], edges: [], targets };
-  // archivované projekty do osobního přehledu nepatří (uzly ani jejich úkoly) —
-  // stejně jako panel Můj den a serverový digest
-  const archivedIds = new Set(maps.filter((m) => m.archived).map((m) => m.id));
-  const shown = new Set();
-  // sběr položek (uzel + hrana + termín); pushneme až SEŘAZENÉ dle termínu, aby
-  // sourozenci šli zleva od nejbližšího termínu (bez termínu na konec)
-  const items = [];
-  // Struktura kopíruje PROJEKTY (Richard 11. 8.: „moje mapa má řešit více
-  // projektů… proč nevypadá stejně a jde do šířky?" — 18 položek jednoho
-  // projektu viselo vedle sebe přímo pod kořenem). Pod kořenem je uzel za
-  // každý projekt (klik → mapa) a POD ním moje uzly zavěšené přes SKUTEČNÉ
-  // mezičlánky projektu — i cizí/nepřiřazené (jen kontext, klik vede do mapy).
-  const projItems = {};
-  const apexOf = (m) => ((m.nodes || []).find((n) => String(n.type || '').startsWith('apex')) || {}).id || '';
-  const ensureProject = (m) => {
-    if (projItems[m.id]) return projItems[m.id];
-    const vid = `proj::${m.id}`;
-    targets[vid] = { type: 'node', mapId: m.id, nodeId: apexOf(m) };
-    const it = {
-      deadline: '',
-      node: { id: vid, type: 'goalNode', position: { x: 0, y: 0 }, data: {
-        nodeType: 'normal', collapsed: false, title: m.title || '—', status: 'todo',
-        deadline: '', owner: '', color: m.color || '#64748b', description: '' } },
-      edge: { id: `pe-${vid}`, source: 'me', target: vid, type: 'deletable' },
-    };
-    projItems[m.id] = it;
-    items.push(it);
-    return it;
-  };
-  const mapById = {};
-  for (const m of maps) mapById[m.id] = m;
-  for (const m of maps) {
-    if (m.archived) continue;
-    const mine = new Set();
-    const byId = {};
-    for (const n of (m.nodes || [])) {
-      byId[n.id] = n;
-      const d = n.data || {};
-      if (n.type !== 'note' && d.owner === email && d.status !== 'done') mine.add(n.id);
-    }
-    if (!mine.size) continue;
-    ensureProject(m);
-    const apex = apexOf(m);
-    const blocking = findBlockingForOwner(m.nodes || [], m.edges || [], email); // moje uzly, co blokují cizí
-    const parentOf = {};
-    for (const e of (m.edges || [])) parentOf[e.target] = e.source;
-    // mezičlánky: celý řetěz předků mých uzlů až k vrcholu (vrchol zastupuje
-    // uzel projektu) — díky tomu má větev projektu STEJNÝ tvar jako mapa
-    const context = new Set();
-    for (const nid of mine) {
-      let p = parentOf[nid]; const seen = new Set();
-      while (p && p !== apex && !seen.has(p)) {
-        if (!mine.has(p) && byId[p] && byId[p].type !== 'note') context.add(p);
-        seen.add(p); p = parentOf[p];
-      }
-    }
-    for (const nid of mine) shown.add(`${m.id}::${nid}`);
-    const included = (id) => mine.has(id) || context.has(id);
-    const sourceFor = (nid) => {
-      const p = parentOf[nid];
-      if (!p || p === apex || !included(p)) return `proj::${m.id}`;
-      return `${m.id}::${p}`;
-    };
-    for (const nid of [...mine, ...context]) {
-      const d = byId[nid].data || {};
-      const vid = `${m.id}::${nid}`;
-      targets[vid] = { type: 'node', mapId: m.id, nodeId: nid };
-      items.push({
-        deadline: d.deadline || '',
-        // popis vynecháme → uzly mají jednotnou výšku a rozestup jde rovnoměrně těsný
-        node: { id: vid, type: 'goalNode', position: { x: 0, y: 0 }, data: { ...d, nodeType: 'normal', collapsed: false, description: '', title: d.title || d.apexText || '—', blocks: mine.has(nid) ? (blocking[nid] || '') : '' } },
-        edge: { id: `pe-${vid}`, source: sourceFor(nid), target: vid, type: 'deletable' },
-      });
-    }
-  }
-  for (const tk of tasks) {
-    if (tk.parent_id || tk.status === 'done') continue;
-    if (tk.map_id && archivedIds.has(tk.map_id)) continue;
-    const mineTask = tk.assignee_email === email || (tk.created_by === email && !tk.assignee_email);
-    if (!mineTask) continue;
-    // úkol vždy patří do projektu — jako list se ukazuje jen s termínem
-    // (klik vede na uzel/mapu projektu); legacy úkol bez mapy = fallback na dialog
-    if (tk.map_id && !tk.deadline) continue;
-    if (tk.map_id && tk.node_id && shown.has(`${tk.map_id}::${tk.node_id}`)) continue;
-    const vid = `task::${tk.id}`;
-    targets[vid] = tk.map_id ? { type: 'node', mapId: tk.map_id, nodeId: tk.node_id } : { type: 'task', taskId: tk.id };
-    // úkol s projektem visí pod SVÝM projektem; bez mapy (legacy) pod kořenem
-    const proj = tk.map_id && mapById[tk.map_id] && !mapById[tk.map_id].archived ? ensureProject(mapById[tk.map_id]) : null;
-    items.push({
-      deadline: tk.deadline || '',
-      node: { id: vid, type: 'goalNode', position: { x: 0, y: 0 }, data: { nodeType: 'normal', collapsed: false, title: tk.title, status: tk.status, deadline: tk.deadline || '', owner: '', color: '' } },
-      edge: { id: `pe-${vid}`, source: proj ? proj.node.id : 'me', target: vid, type: 'deletable' },
-    });
-  }
-  // řazení dle NEJBLIŽŠÍHO termínu v celém PODSTROMU — větev se posune podle
-  // nejdřívějšího potomka (uzel bez termínu, ale s brzkým potomkem, jde dopředu)
-  const childrenOf = {};
-  const deadlineOf = {};
-  for (const it of items) {
-    deadlineOf[it.node.id] = it.deadline || '9999-99-99';
-    (childrenOf[it.edge.source] = childrenOf[it.edge.source] || []).push(it.node.id);
-  }
-  const subMinCache = {};
-  const subMin = (vid) => {
-    if (subMinCache[vid] !== undefined) return subMinCache[vid];
-    subMinCache[vid] = '…'; // ochrana proti cyklu
-    let m = deadlineOf[vid] || '9999-99-99';
-    for (const c of (childrenOf[vid] || [])) { const cm = subMin(c); if (cm < m) m = cm; }
-    subMinCache[vid] = m;
-    return m;
-  };
-  items.sort((a, b) => subMin(a.node.id).localeCompare(subMin(b.node.id)));
-  const nodes = [{ id: 'me', type: 'personalRoot', position: { x: 0, y: 0 }, data: { title: rootLabel } }];
-  const edges = [];
-  items.forEach((it, i) => {
-    it.node.position = { x: i, y: 0 }; // pořadí dle termínu (crossOf) pro layoutTree
-    nodes.push(it.node);
-    edges.push(it.edge);
-  });
-  const pos = layoutTree(nodes, edges, 'vertical', { ...PERSONAL_LAYOUT('vertical'), ...optsMojiMapy() });
-  for (const n of nodes) { const p = pos[n.id]; if (p) n.position = { x: p.x, y: p.y }; }
-  return { nodes, edges, targets };
-}
-
-// „Zadal jsem" — druhá záložka Mojí mapy: položky, které jsem zadal JINÝM.
-// Uzly s owner≠já v MÝCH mapách + úkoly, které jsem zadal (created_by=já,
-// řešitel≠já); dedup jako panel Můj den (úkol na uzlu téhož řešitele počítá
-// uzel). grouping: 'flat' (dle termínu) | 'people' (dle lidí) | 'projects'.
-function buildDelegatedMap(maps, tasks, email, rootLabel, grouping, members = []) {
-  const targets = {};
-  if (!email) return { nodes: [], edges: [], targets };
-  const items = []; // { deadline, assignee, project, node }
-  const nodeByKey = {};
-  const mapById = {};
-  for (const m of maps) {
-    mapById[m.id] = m;
-    if (m.archived) continue;
-    const iOwn = m.created_by === email;
-    for (const n of (m.nodes || [])) {
-      if (n.type === 'note') continue;
-      const d = n.data || {};
-      nodeByKey[`${m.id}:${n.id}`] = { owner: d.owner || '', mapOwner: m.created_by };
-      if (!iOwn || !d.owner || d.owner === email || d.status === 'done') continue;
-      const vid = `${m.id}::${n.id}`;
-      targets[vid] = { type: 'node', mapId: m.id, nodeId: n.id };
-      items.push({
-        deadline: d.deadline || '', assignee: d.owner, project: m.title || '—', projectId: m.id,
-        node: { id: vid, type: 'goalNode', position: { x: 0, y: 0 }, data: { ...d, nodeType: 'normal', collapsed: false, description: '', title: d.title || d.apexText || '—' } },
-      });
-    }
-  }
-  for (const tk of tasks) {
-    if (tk.parent_id || tk.status === 'done') continue;
-    if (tk.map_id && mapById[tk.map_id]?.archived) continue; // archiv do přehledu nepatří
-    if (tk.created_by !== email || !tk.assignee_email || tk.assignee_email === email) continue;
-    const node = tk.map_id && tk.node_id ? nodeByKey[`${tk.map_id}:${tk.node_id}`] : null;
-    if (node && node.mapOwner === email && node.owner === tk.assignee_email) continue; // fold do uzlu
-    const vid = `task::${tk.id}`;
-    targets[vid] = tk.node_id ? { type: 'node', mapId: tk.map_id, nodeId: tk.node_id } : { type: 'task', taskId: tk.id };
-    items.push({
-      deadline: tk.deadline || '', assignee: tk.assignee_email, project: mapById[tk.map_id]?.title || '—', projectId: tk.map_id || '',
-      node: { id: vid, type: 'goalNode', position: { x: 0, y: 0 }, data: { nodeType: 'normal', collapsed: false, title: tk.title, status: tk.status, deadline: tk.deadline || '', owner: tk.assignee_email, color: '' } },
-    });
-  }
-  const nodes = [{ id: 'me', type: 'personalRoot', position: { x: 0, y: 0 }, data: { title: rootLabel } }];
-  const edges = [];
-  const byDeadline = (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999');
-  let order = 0;
-  if (grouping === 'flat') {
-    items.sort(byDeadline);
-    for (const it of items) {
-      it.node.position = { x: order++, y: 0 }; // pořadí dle termínu (crossOf) pro layoutTree
-      nodes.push(it.node);
-      edges.push({ id: `pe-${it.node.id}`, source: 'me', target: it.node.id, type: 'deletable' });
-    }
-  } else {
-    // mezistupeň = člověk/projekt; skupiny řazené dle nejbližšího termínu uvnitř.
-    // Projekty klíčovat ID (dva stejně pojmenované projekty se nesmí slít).
-    const keyOf = grouping === 'people' ? (it) => it.assignee : (it) => it.projectId;
-    // externí kontakt se ukazuje JMÉNEM (pseudo-e-mail nikdy); členové zůstávají
-    // e-mailem jako dosud — jméno se u nich řeší až v uzlu (labelForEmail v GoalNode)
-    const labelOf = grouping === 'people'
-      ? (it) => (isExternalOwner(it.assignee) ? labelForEmail(members, it.assignee) : it.assignee)
-      : (it) => it.project;
-    const groups = {};
-    for (const it of items) {
-      const k = keyOf(it);
-      (groups[k] = groups[k] || { key: k, label: labelOf(it), list: [] }).list.push(it);
-    }
-    const entries = Object.values(groups);
-    for (const g of entries) g.list.sort(byDeadline);
-    entries.sort((a, b) => (a.list[0]?.deadline || '9999').localeCompare(b.list[0]?.deadline || '9999'));
-    for (const { key, label, list } of entries) {
-      const gid = `grp::${key}`;
-      nodes.push({ id: gid, type: 'goalNode', position: { x: order++, y: 0 }, data: {
-        nodeType: 'normal', collapsed: false, title: label, status: 'todo', deadline: '', color: '#64748b',
-        owner: grouping === 'people' ? label : '', description: '',
-      } });
-      edges.push({ id: `pe-${gid}`, source: 'me', target: gid, type: 'deletable' });
-      for (const it of list) {
-        it.node.position = { x: order++, y: 0 };
-        nodes.push(it.node);
-        edges.push({ id: `pe-${it.node.id}`, source: gid, target: it.node.id, type: 'deletable' });
-      }
-    }
-  }
-  const pos = layoutTree(nodes, edges, 'vertical', { ...PERSONAL_LAYOUT('vertical'), ...optsMojiMapy() });
-  for (const n of nodes) { const p = pos[n.id]; if (p) n.position = { x: p.x, y: p.y }; }
-  return { nodes, edges, targets };
-}
 
 function EditorContent({ mapId, personalMap = false }) {
   const navigate = useNavigate();
@@ -403,7 +165,6 @@ function EditorContent({ mapId, personalMap = false }) {
   const citelnostRef = useRef(nactiStupen());
   const [saveStatus, setSaveStatus] = useState('idle');
   const [editNodeId, setEditNodeId] = useState(null);
-  const [exporting, setExporting] = useState(false);
   // minimapa jde schovat — překrývá malůvku skinu a na malých mapách zavazí
   const [miniMapOpen, setMiniMapOpen] = useState(() => nactiKlic('kb-minimap-open') !== '0');
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -457,12 +218,10 @@ function EditorContent({ mapId, personalMap = false }) {
   // ale jediná rychlá cesta na běžném notebooku.
   const [dashboardOpen, setDashboardOpen] = useState(
     () => new URLSearchParams(location.search).get('view') === 'dashboard');
-  const [commentCounts, setCommentCounts] = useState({});
-  const [fileCounts, setFileCounts] = useState({});
-  const [taskStats, setTaskStats] = useState({});
-  const [mapTasks, setMapTasks] = useState([]);
-  const [mapTaskCount, setMapTaskCount] = useState(0);
-  const [taskStatsVersion, setTaskStatsVersion] = useState(0);
+  // odznaky uzlů (komentáře, přílohy, úkoly, běžící agenti) — hooks/useMapCounts.js (F1-07)
+  const {
+    commentCounts, fileCounts, taskStats, mapTasks, mapTaskCount, setTaskStatsVersion, runningAgentNodes,
+  } = useMapCounts({ activeMapId, isPublicView, user, editNodeId });
   const [taskNodeId, setTaskNodeId] = useState(null);
   // členové + externí kontakty v jednom (kontakty s external:true); reloadMembers
   // po změně adresáře kontaktů (onContactsChanged z OwnerSelect)
@@ -523,29 +282,12 @@ function EditorContent({ mapId, personalMap = false }) {
   const sablonaCistaRef = useRef(null);
   const templateSeedsRef = useRef(null); // {idMap, rules} z náhledu šablony — pravidla se založí až s mapou
   const saveTimer = useRef(null);
-  const historyRef = useRef([]);
-  const [canUndo, setCanUndo] = useState(false);
-  const aiSnapshotRef = useRef(null);
-  const [canUndoAi, setCanUndoAi] = useState(false);
+  // Zpět + Vrátit AI změny — hooks/useMapHistory.js (F1-07)
+  const {
+    canUndo, pushHistory, handleUndo, aiSnapshotRef, canUndoAi, setCanUndoAi, handleUndoAi,
+  } = useMapHistory({ nodes, edges, setNodes, setEdges, toast, t });
   const buffer = useBufferNodes(user);
-  const [bufferOpen, setBufferOpen] = useState(() => nactiKlic('kb-buffer-open') === '1');
-  // levé panely (zásobník × měření času) se vzájemně vylučují — překrývaly by se
-  const [timeLogOpen, setTimeLogOpen] = useState(() =>
-    nactiKlic('kb-timelog-open') === '1' && nactiKlic('kb-buffer-open') !== '1');
-  const toggleBuffer = useCallback(() => {
-    setBufferOpen((v) => {
-      ulozKlic('kb-buffer-open', v ? '0' : '1');
-      if (!v) { setTimeLogOpen(false); ulozKlic('kb-timelog-open', '0'); }
-      return !v;
-    });
-  }, []);
-  const toggleTimeLog = useCallback(() => {
-    setTimeLogOpen((v) => {
-      ulozKlic('kb-timelog-open', v ? '0' : '1');
-      if (!v) { setBufferOpen(false); ulozKlic('kb-buffer-open', '0'); }
-      return !v;
-    });
-  }, []);
+  const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
 
   // Posun levé lišty ikon i proužku s názvem, když je vysunutý zásobník (288 px)
   // nebo časovač (320 px). Oba naráz otevřené BÝT NEMOHOU — přepínače se navzájem
@@ -553,23 +295,6 @@ function EditorContent({ mapId, personalMap = false }) {
   // přednost zásobníku, takže se šířky nikdy nesčítají. Dřív ten výraz stál
   // v souboru třikrát a rozejít se mohl kdykoliv.
   const railLeft = bufferOpen ? 288 : timeLogOpen ? 320 : 0;
-
-  const pushHistory = useCallback(() => {
-    historyRef.current.push({ nodes, edges });
-    if (historyRef.current.length > 50) historyRef.current.shift();
-    setCanUndo(historyRef.current.length > 0);
-  }, [nodes, edges]);
-
-  const handleUndo = useCallback(() => {
-    if (historyRef.current.length === 0) return;
-    const prev = historyRef.current.pop();
-    // BEZ skipNextSave: relikt z doby před otiskem — Zpět po Zarovnat/přesunu
-    // se do DB nedostalo (plátno původní, DB zarovnaná; nález F1-02). Otisk
-    // v autosave sám pozná, že se stav liší, a pošle ho.
-    setNodes(prev.nodes.map((n) => ({ ...n })));
-    setEdges(prev.edges.map((e) => ({ ...e })));
-    setCanUndo(historyRef.current.length > 0);
-  }, [setNodes, setEdges]);
 
   // Mapy poškozené DŘÍV, než začala platit kontrola spojení (lib/mapStructure.js).
   // Server je schválně dál ukládá — jinak by se z nich uživatel nedostal ven a
@@ -629,13 +354,13 @@ function EditorContent({ mapId, personalMap = false }) {
       // quiet: přisdílení je součást ZADÁNÍ PRÁCE — adresát dostane souhrnnou
       // notifikaci o přidělené práci, druhá o sdílení by byla duplikát
       const res = await shareMap({ action: 'share', mapId: activeMapId, email, permission: 'work', quiet: true });
-      if (res.data?.error) {
-        toast({ title: t('tasks:tasksPage.shareFailed'), description: res.data.error, variant: 'destructive' });
+      if (res?.error) {
+        toast({ title: t('tasks:tasksPage.shareFailed'), description: res.error, variant: 'destructive' });
         return false;
       }
       // sdílení bumplo `updated` mapy → posunout základ, jinak následné uložení
       // uzlu (owner+termín) spadne na 409 a přisdílená osoba/termín se ztratí
-      if (res.data?.updated) baseUpdated.current = res.data.updated;
+      if (res?.updated) baseUpdated.current = res.updated;
       // povýšení (už nasdílený čtenář) NEPŘIDÁVÁ řádek — jen mu zvedne úroveň;
       // bez téhle větve se člověk v seznamu i v počtu objevil dvakrát
       setMapShare((s) => ({
@@ -643,11 +368,11 @@ function EditorContent({ mapId, personalMap = false }) {
         sharedWith: (s?.sharedWith || []).includes(email) ? s.sharedWith : [...(s?.sharedWith || []), email],
         sharedWithWork: (s?.sharedWithWork || []).includes(email) ? s.sharedWithWork : [...(s?.sharedWithWork || []), email],
       }));
-      if (!res.data?.upgraded) setSharedCount((c) => c + 1);
+      if (!res?.upgraded) setSharedCount((c) => c + 1);
       toast({ title: t('tasks:tasksPage.mapShared'), description: t('tasks:tasksPage.mapSharedDesc', { email }) });
       return true;
     } catch (e) {
-      const msg = e.response?.data?.error || t('tasks:tasksPage.shareOwnerOnly');
+      const msg = e.response?.error || t('tasks:tasksPage.shareOwnerOnly');
       toast({ title: t('tasks:tasksPage.shareFailed'), description: msg, variant: 'destructive' });
       return false;
     }
@@ -658,44 +383,12 @@ function EditorContent({ mapId, personalMap = false }) {
   const bufferEnabled = !!user && !isPublicView && !isTemplatePreview;
 
   // Build children map from edges
-  const childrenMap = useMemo(() => {
-    const map = {};
-    for (const edge of edges) {
-      if (!map[edge.source]) map[edge.source] = [];
-      map[edge.source].push(edge.target);
-    }
-    return map;
-  }, [edges]);
+  const childrenMap = useMemo(() => buildChildrenMap(edges), [edges]);
 
   // Compute visible nodes/edges based on collapsed state
   const { visibleNodes, visibleEdges, hiddenCounts } = useMemo(() => {
-    const countDescendants = (nodeId) => {
-      let count = 0;
-      const stack = [...(childrenMap[nodeId] || [])];
-      while (stack.length > 0) {
-        const current = stack.pop();
-        count += 1;
-        stack.push(...(childrenMap[current] || []));
-      }
-      return count;
-    };
-
-    const hidden = new Set();
-    for (const node of nodes) {
-      if (node.data?.collapsed) {
-        const stack = [...(childrenMap[node.id] || [])];
-        while (stack.length > 0) {
-          const current = stack.pop();
-          hidden.add(current);
-          stack.push(...(childrenMap[current] || []));
-        }
-      }
-    }
-
-    const counts = {};
-    for (const node of nodes) {
-      counts[node.id] = countDescendants(node.id);
-    }
+    const hidden = hiddenByCollapse(nodes, childrenMap);
+    const counts = descendantCounts(nodes, childrenMap);
 
     const vNodes = nodes
       .filter((n) => !hidden.has(n.id))
@@ -893,7 +586,7 @@ function EditorContent({ mapId, personalMap = false }) {
         } else {
           // Unauthenticated — load public map via backend function (editable but not saved)
           const result = await getPublicMap({ mapId });
-          const map = result.data?.map;
+          const map = result?.map;
           if (map) {
             setCanEdit(true);
             setCanShare(false);
@@ -970,59 +663,6 @@ function EditorContent({ mapId, personalMap = false }) {
     loadPersonalMap();
      
   }, [buffer.items]);
-
-  // Load comment counts for this map
-  useEffect(() => {
-    if (!activeMapId || isPublicView) return;
-    (async () => {
-      try {
-        const comments = await base44.entities.Comment.filter({ goalmap_id: activeMapId }, 'created_date', 500);
-        const counts = {};
-        for (const c of comments || []) {
-          counts[c.node_id] = (counts[c.node_id] || 0) + 1;
-        }
-        setCommentCounts(counts);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, [activeMapId, isPublicView, editNodeId]);
-
-  // Počty příloh → odznak se sponkou na kartě uzlu. Stejný spouštěč jako
-  // u komentářů (zavření detailu uzlu), ať se odznak objeví hned po přidání.
-  useEffect(() => {
-    if (!activeMapId || isPublicView) return;
-    (async () => {
-      try {
-        setFileCounts(await base44.nodeFiles.counts(activeMapId));
-      } catch (e) {
-        setFileCounts({});   // bez příloh se mapa kreslí dál, odznak je bonus
-      }
-    })();
-  }, [activeMapId, isPublicView, editNodeId]);
-
-  // Úkoly mapy → progres na uzlech (podúkoly dědí node_id, počítají se také).
-  // Úkoly žijí ve vlastní kolekci — nezasahují do auto-save JSON mapy.
-  useEffect(() => {
-    if (!activeMapId || isPublicView || !user) return;
-    (async () => {
-      try {
-        const tasks = await base44.entities.Task.filter({ map_id: activeMapId }, 'created_date', 1000);
-        const stats = {};
-        for (const task of tasks || []) {
-          if (!task.node_id) continue;
-          const s = (stats[task.node_id] = stats[task.node_id] || { total: 0, done: 0 });
-          s.total += 1;
-          if (task.status === 'done') s.done += 1;
-        }
-        setTaskStats(stats);
-        setMapTasks(tasks || []);
-        setMapTaskCount((tasks || []).length);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, [activeMapId, isPublicView, user, taskStatsVersion]);
 
   // Jen na stránce editoru vypnout zoom prohlížeče, ať dvouprstové gesto patří plátnu
   // mapy (React Flow pinch). Mimo editor (Home/Úkoly/dialogy) zůstává zoom stránky funkční.
@@ -1118,13 +758,7 @@ function EditorContent({ mapId, personalMap = false }) {
       saveTimer.current = setTimeout(async () => {
         try {
           const { cleanNodes, cleanEdges } = cleanMapData();
-          const newMap = await base44.entities.GoalMap.create({
-            title: title.trim() || t('defaults.newMapTitle'),
-            description: '',
-            nodes: cleanNodes,
-            edges: cleanEdges,
-            color,
-          });
+          const newMap = await createProjectRecord({ title: title.trim() || t('defaults.newMapTitle'), nodes: cleanNodes, edges: cleanEdges, color });
           setActiveMapId(newMap.id);
           // B3 — základna patří NOVÉ mapě; nechat v ní uzly té předchozí by
           // z prvního zásahu pravidla udělalo falešnou kolizi
@@ -1535,15 +1169,12 @@ function EditorContent({ mapId, personalMap = false }) {
       // Ze šablony" (Richard 17. 8.: cesty sjednotit) — server pak rozešle
       // notifikace node_assigned. Vlastníci se berou z ČISTÉ šablony, ne
       // z plátna: co si kdo naklikal v náhledu, se nepřenáší ani tady.
-      const owners = ownersFromNodes(cleanNodes);
-      const newMap = await base44.entities.GoalMap.create({
+      const newMap = await createProjectRecord({
         title: nazev,
-        description: '',
         nodes: cleanNodes,
         edges: cleanEdges,
-        shared_with: owners,
-        shared_with_work: owners, // řešitel ze šablony = spolupracovník (Richard 7. 8. 2026; nález S5-03)
-        ...(templateSeriesRef.current ? { series: templateSeriesRef.current } : {}),
+        owners: ownersFromNodes(cleanNodes), // řešitel ze šablony = spolupracovník (Richard 7. 8. 2026; nález S5-03)
+        series: templateSeriesRef.current || '',
       });
       setIsTemplatePreview(false);
       setActiveMapId(newMap.id);
@@ -1666,12 +1297,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // zadání = odstranit důkaz" (Richard 7. 8.). Server to vynucuje na PATCH;
   // tady jen nenecháme uživatele doklikat do chyby.
   const canRemoveNodeShared = useCallback(
-    (n) => {
-      if (!n?.data?.deadline) return true;
-      if (isMapOwner) return true;
-      const assigner = n.data.assignedBy || effectiveMapAccess.ownerEmail || '';
-      return !!user?.email && user.email === assigner;
-    },
+    (n) => jeZadavatelNeboVlastnik(n, { isMapOwner, ownerEmail: effectiveMapAccess.ownerEmail, userEmail: user?.email }),
     [isMapOwner, effectiveMapAccess.ownerEmail, user?.email]
   );
   const assignedDeleteRefused = useCallback((n) => {
@@ -2002,15 +1628,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // Uzly, kde mám SVOU práci: jsem garant uzlu, nebo na něm mám úkol jako
   // řešitel. Stejný předpis jako serverová kontrola v /node-status — podle něj
   // dostane ČTENÁŘ mapy tlačítka u svého kroku (a jen u něj).
-  const mojePracovniUzly = useMemo(() => {
-    const email = user?.email;
-    if (!email) return new Set();
-    const set = new Set(nodes.filter((n) => n.data?.owner === email).map((n) => n.id));
-    for (const tk of mapTasks || []) {
-      if (tk.node_id && tk.assignee_email === email) set.add(tk.node_id);
-    }
-    return set;
-  }, [nodes, mapTasks, user]);
+  const mojePracovniUzly = useMemo(() => mojePracovniUzlyZ(nodes, mapTasks, user?.email), [nodes, mapTasks, user]);
   // Čtenář (ani vlastník, ani editor, ani spolupracovník), který v mapě přesto
   // nějakou práci má. Veřejný náhled a demo šablony se sem nepočítají — tam se
   // nic neukládá a uživatel nemusí být ani přihlášený.
@@ -2022,30 +1640,6 @@ function EditorContent({ mapId, personalMap = false }) {
   // navíc přebíjel štítek stavu, takže se ztratila i jediná funkční akce.
   const ctenarSPraci = !!user && !!activeMapId && !personalMap && !isPublicView
     && !canEdit && !canWork && mojePracovniUzly.size > 0;
-  // uzly, nad kterými PRÁVĚ běží automatizace (pending/running běh) — jen pro
-  // indikátor na uzlu; realtime na agent_runs drží stav bez reloadu
-  const [runningAgentNodes, setRunningAgentNodes] = useState(new Set());
-  useEffect(() => {
-    if (!activeMapId) { setRunningAgentNodes(new Set()); return undefined; }
-    const load = () => {
-      base44.entities.AgentRun
-        .filter({ map_id: activeMapId }, '-created_date', 200)
-        .then((rows) => setRunningAgentNodes(new Set(
-          rows.filter((r) => r.status === 'pending' || r.status === 'running').map((r) => r.node_id)
-        )))
-        .catch(() => {});
-    };
-    load();
-    // callback agenta mění běh mimo tenhle prohlížeč → bez realtime by indikátor
-    // zůstal tepat i po doběhnutí. Debounce: cron odešle dávku běhů naráz a bez
-    // něj by každá událost spustila vlastní dotaz na 200 řádků.
-    let unsubscribe;
-    let timer;
-    const debounced = () => { clearTimeout(timer); timer = setTimeout(load, 300); };
-    pb.collection('agent_runs').subscribe('*', debounced).then((u) => { unsubscribe = u; }).catch(() => {});
-    return () => { clearTimeout(timer); if (unsubscribe) unsubscribe(); };
-  }, [activeMapId]);
-
   // automatizační pravidla mapy — pro badge blesku na uzlech a kategorii
   // Automatizace v okně uzlu. Jen editor (routa /rules je editor-only);
   // bez realtime — pravidla se mění výhradně přes RulesDialog, který po
@@ -2140,31 +1734,7 @@ function EditorContent({ mapId, personalMap = false }) {
     [setNodes, nodes, waitingSet]
   );
 
-  const progressMap = useMemo(() => {
-    const nodeMap = {};
-    for (const node of nodes) nodeMap[node.id] = node;
-
-    const compute = (nodeId) => {
-      const children = childrenMap[nodeId] || [];
-      if (children.length === 0) {
-        return { total: 1, done: nodeMap[nodeId]?.data?.status === 'done' ? 1 : 0 };
-      }
-      let total = 0, done = 0;
-      for (const childId of children) {
-        const r = compute(childId);
-        total += r.total;
-        done += r.done;
-      }
-      return { total, done };
-    };
-
-    const result = {};
-    for (const node of nodes) {
-      const { total, done } = compute(node.id);
-      result[node.id] = total > 0 ? Math.round((done / total) * 100) : 0;
-    }
-    return result;
-  }, [nodes, childrenMap]);
+  const progressMap = useMemo(() => computeProgressMap(nodes, childrenMap), [nodes, childrenMap]);
 
   const handleSaveNode = useCallback(
     (nodeId, newData, nodeType) => {
@@ -2300,7 +1870,7 @@ function EditorContent({ mapId, personalMap = false }) {
           },
           count: isRewrite ? 1 : 3,
         });
-        const data = result.data;
+        const data = result;
         if (data?.error) {
           toast({ title: t('toasts.aiError'), description: data.error, variant: 'destructive' });
           return;
@@ -2364,7 +1934,7 @@ function EditorContent({ mapId, personalMap = false }) {
           description: t('toasts.subgoalsAddedDesc', { count: newNodes.length }),
         });
       } catch (err) {
-        const msg = err.response?.data?.error || err.message || t('toasts.aiConnectionError');
+        const msg = err.response?.error || err.message || t('toasts.aiConnectionError');
         toast({ title: t('toasts.aiError'), description: msg, variant: 'destructive' });
       } finally {
         setExpandingNodeId(null);
@@ -2484,12 +2054,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // uživateli by se autosave tiše zasekl a nevěděl by proč. Předfiltr je tady,
   // ne v dialogu, a počet přeskočených se hlásí nahlas.
   const smiMenitTermin = useCallback(
-    (n) => {
-      if (!n?.data?.deadline) return true;          // první nastavení je volné
-      if (isMapOwner) return true;
-      const zadavatel = n.data.assignedBy || effectiveMapAccess.ownerEmail || '';
-      return !!user?.email && user.email === zadavatel;
-    },
+    (n) => jeZadavatelNeboVlastnik(n, { isMapOwner, ownerEmail: effectiveMapAccess.ownerEmail, userEmail: user?.email }),
     [isMapOwner, effectiveMapAccess.ownerEmail, user?.email]
   );
   // Poznámky (lístky) NEJSOU cíle: server u nich cizí pole při normalizaci zahodí,
@@ -2543,51 +2108,12 @@ function EditorContent({ mapId, personalMap = false }) {
     });
   }, [nodes, setNodes, pushHistory, toast, smiMenitTermin]);
 
-  const handleExport = async (format) => {
-    setExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    try {
-      await captureAndSave(visibleNodes, title, format);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  // Export schématu do JSON — pro sdílení mezi lidmi i instancemi. Skládá se
-  // z KANONICKÉHO tvaru (cleanMapData), tedy přesně z toho, co je v DB.
-  const handleExportJson = async (includePeople) => {
-    setExporting(true);
-    try {
-      const { cleanNodes, cleanEdges } = cleanMapData();
-      let exportTasks = [];
-      try {
-        exportTasks = await base44.entities.Task.filter({ map_id: activeMapId }, 'created_date', 1000);
-      } catch (err) { /* projekt bez úkolů nebo bez práv na ně */ }
-      let exportRules = [];
-      try {
-        // čerstvě ze serveru (stav v editoru může být starší); GET /rules chce
-        // editační práva — divák exportuje bez pravidel, to je záměr
-        exportRules = await rulesApi.list(activeMapId);
-      } catch (err) { /* bez práv na pravidla → export bez nich */ }
-      downloadJson(exportFilename(title), buildMapExport({
-        map: { title, description: '' },
-        nodes: cleanNodes,
-        edges: cleanEdges,
-        tasks: exportTasks,
-        rules: exportRules,
-        includePeople,
-        exportedBy: user?.email || '',
-      }));
-      toast({ title: t('toasts.jsonExported') });
-    } catch (e) {
-      console.error(e);
-      toast({ title: t('toasts.jsonExportFailed'), variant: 'destructive' });
-    } finally {
-      setExporting(false);
-    }
-  };
+  // Export obrázek/PDF/JSON — hooks/useMapExport.js (F1-07). Volá se až tady
+  // (ne u ostatních useState nahoře): visibleNodes a cleanMapData vznikají
+  // až pod nimi a `exporting` čte jen JSX, takže pořadí hodnot nic nemění.
+  const { exporting, handleExport, handleExportJson } = useMapExport({
+    visibleNodes, title, cleanMapData, activeMapId, user, t, toast,
+  });
 
   // Zarovnat STŘÍDÁ tři styly jedním tlačítkem (Richard 11. 8.: „rozklikávání
   // je několik zbytečných kliků — mačkám a mění se to; ať jsou 3"). Tlačítko
@@ -2763,17 +2289,6 @@ function EditorContent({ mapId, personalMap = false }) {
       return dalsi;
     });
   }, []);
-
-  const handleUndoAi = useCallback(() => {
-    const snapshot = aiSnapshotRef.current;
-    if (!snapshot) return;
-    // bez skipNextSave — stejný důvod jako u handleUndo (nález F1-02)
-    setNodes(snapshot.nodes.map((n) => ({ ...n })));
-    setEdges(snapshot.edges.map((e) => ({ ...e })));
-    aiSnapshotRef.current = null;
-    setCanUndoAi(false);
-    toast({ title: t('toasts.aiUndone'), description: t('toasts.aiUndoneDesc') });
-  }, [setNodes, setEdges, toast]);
 
   const contextValue = useMemo(
     () => ({

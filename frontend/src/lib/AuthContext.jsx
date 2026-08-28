@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import i18next from 'i18next';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
+import { forgetKbConfig } from '@/hooks/useKbConfig';
 import { LANGS, setLang } from '@/lib/lang';
 import { syncSkin } from '@/lib/theme';
 
@@ -27,8 +28,9 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     setAuthError(null);
     // Kdo se právě přihlásil, musí dostat čerstvé údaje organizace — držená
-    // odpověď mohla vzniknout ještě bez přihlášení, tedy prázdná.
+    // odpověď mohla vzniknout ještě bez přihlášení, tedy prázdná. Totéž config.
     base44.org.forget();
+    forgetKbConfig();
     if (!pb.authStore.isValid) {
       setUser(null);
       setIsAuthenticated(false);
@@ -85,6 +87,7 @@ export const AuthProvider = ({ children }) => {
     // Údaje organizace se drží v paměti klienta (base44.org.get). Bez zapomenutí
     // by po odhlášení viděl název a logo firmy i další člověk u téhož počítače.
     base44.org.forget();
+    forgetKbConfig();
     setUser(null);
     setIsAuthenticated(false);
     if (shouldRedirect) {

@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FolderPlus, Loader2, FileText, Sparkles, Users, Calendar, Lock, Building2, LayoutGrid, Hash, AlarmClock, Briefcase, Zap } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -50,10 +52,11 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
   const [color, setColor] = useState('');
   const [templates, setTemplates] = useState(null);
   const [selectedTpl, setSelectedTpl] = useState(null);
-  const [creating, setCreating] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [clientId, setClientId] = useState('');
   const [clients, setClients] = useState([]);
+  // 402 (zkušebka), 409 (strop účtů), 503, síť — mlčet se nesmí (nález F4-02)
+  const f = useDialogForm({ open, onClose, submit: handleCreate, onError: (e) => toast({ title: tr('createProject.createFailed'), description: e?.response?.error || e?.message, variant: 'destructive' }) });
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +65,6 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
     setEmoji('');
     setColor('');
     setSelectedTpl(null);
-    setCreating(false);
     setClientId('');
     base44.entities.Client.list('name').then(setClients).catch(() => {});
     const now = new Date();
@@ -80,10 +82,10 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
 
   const canCreate = tab === 'empty' ? !!name.trim() : !!selectedTpl;
 
-  const handleCreate = async () => {
-    if (!canCreate || creating) return;
-    setCreating(true);
-    try {
+  // function (ne const): hook výš ji dostává jako `submit` — deklarace je hoistovaná
+  function handleCreate() {
+    if (!canCreate) return;
+    return f.run(async () => {
       // Projekt bez pravidel = mrtvý kanban. Selhání zakládání pravidel projekt
       // neshodí (mapa už existuje), ale mlčet se o něm nesmí.
       let pravidlaChybi = 0;
@@ -101,16 +103,11 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
       }
       onCreated(map);
       onClose();
-    } catch (e) {
-      // 402 (zkušebka), 409 (strop účtů), 503, síť — mlčet se nesmí (nález F4-02)
-      toast({ title: tr('createProject.createFailed'), description: e?.response?.error || e?.message, variant: 'destructive' });
-    } finally {
-      setCreating(false);
-    }
-  };
+    });
+  }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -136,7 +133,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
                 id="project-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                onKeyDown={f.onEnter}
                 placeholder={tab === 'empty' ? tr('createProject.goalPlaceholder') : tr('createProject.namePlaceholder')}
                 autoFocus
               />
@@ -304,8 +301,8 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{tr('common:actions.cancel')}</Button>
-          <Button onClick={handleCreate} disabled={!canCreate || creating}>
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+          <Button onClick={handleCreate} disabled={!canCreate || f.busy}>
+            <BusyIcon busy={f.busy} icon={FileText} />
             {tr('createProject.createButton')}
           </Button>
         </DialogFooter>

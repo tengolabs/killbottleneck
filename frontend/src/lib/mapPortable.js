@@ -1,6 +1,6 @@
 // relativně, ne přes @ alias — tenhle soubor načítá node unit test (map-portable.js)
 // a node vite alias nezná
-import { saveBlob } from './saveFile.js';
+import { saveBlob, safeFilename } from './saveFile.js';
 // Přenositelný export projektu do JSON — aby si lidé mohli schémata posílat mezi
 // instancemi. Skládá se na klientovi z dat, která editor stejně má v paměti;
 // import je naopak serverová routa (nedůvěryhodný vstup, viz /api/kb/map-import).
@@ -100,10 +100,7 @@ export function looksLikeExport(obj) {
 
 // název souboru z názvu projektu (diakritika a lomítka pryč)
 export function exportFilename(title) {
-  const base = String(title || 'killbottleneck')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'killbottleneck';
-  return `${base}.kb.json`;
+  return `${safeFilename(title, 'killbottleneck', { mode: 'ascii' })}.kb.json`;
 }
 
 export function downloadJson(filename, obj) {

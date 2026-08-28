@@ -12,6 +12,8 @@ import { base44 } from '@/api/base44Client';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useToast } from '@/components/ui/use-toast';
 import { serverOrigin } from '@/lib/serverUrl';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 
 const EMPTY = { id: '', name: '', description: '', webhook_url: '', secret: '', enabled: true, allowed_emails: [] };
 
@@ -25,8 +27,8 @@ export default function AiAgentsDialog({ open, onClose, onChanged }) {
   const [agents, setAgents] = useState([]);
   const [callback, setCallback] = useState({ url: '', warn: false });
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  const f = useDialogForm({ open, onClose, onError: (err) => toast({ title: err?.response?.message || err?.message || t('aiAgents.saveFailed'), variant: 'destructive' }) });
 
   const load = () => {
     setLoading(true);
@@ -40,10 +42,9 @@ export default function AiAgentsDialog({ open, onClose, onChanged }) {
   };
   useEffect(() => { if (open) { setForm(EMPTY); load(); } }, [open]);
 
-  const save = async () => {
-    if (!form.name.trim() || !form.webhook_url.trim() || saving) return;
-    setSaving(true);
-    try {
+  const save = () => {
+    if (!form.name.trim() || !form.webhook_url.trim()) return;
+    return f.run(async () => {
       await base44.aiAgents.save({
         ...(form.id ? { id: form.id } : {}),
         name: form.name.trim(),
@@ -57,11 +58,7 @@ export default function AiAgentsDialog({ open, onClose, onChanged }) {
       setForm(EMPTY);
       load();
       onChanged?.();
-    } catch (err) {
-      toast({ title: err?.response?.message || err?.message || t('aiAgents.saveFailed'), variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const remove = async (a) => {
@@ -80,7 +77,7 @@ export default function AiAgentsDialog({ open, onClose, onChanged }) {
   const callbackUrl = callback.url || `${serverOrigin()}/api/kb/agent-callback`;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90dvh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Bot className="w-4 h-4" /> {t('aiAgents.title')}</DialogTitle>
@@ -173,8 +170,8 @@ export default function AiAgentsDialog({ open, onClose, onChanged }) {
               <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
             </div>
             <div className="flex gap-2">
-              <Button onClick={save} disabled={saving || !form.name.trim() || !form.webhook_url.trim()} className="gap-1.5">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (form.id ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />)}
+              <Button onClick={save} disabled={f.busy || !form.name.trim() || !form.webhook_url.trim()} className="gap-1.5">
+                <BusyIcon busy={f.busy} icon={form.id ? Check : Plus} />
                 {form.id ? t('aiAgents.saveChanges') : t('aiAgents.create')}
               </Button>
               {form.id && (

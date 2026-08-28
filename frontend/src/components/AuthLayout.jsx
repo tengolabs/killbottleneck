@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { pb } from "@/api/pb";
+import { loadKbConfig } from "@/hooks/useKbConfig";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
@@ -10,7 +10,7 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
   const [firma, setFirma] = useState(null);
   useEffect(() => {
     let zivy = true;
-    pb.send("/api/kb/config", { method: "GET" })
+    loadKbConfig()
       .then((cfg) => { if (zivy) setFirma(cfg?.customer || null); })
       .catch(() => { /* nejde-li načíst, obrazovka funguje i bez jména */ });
     return () => { zivy = false; };

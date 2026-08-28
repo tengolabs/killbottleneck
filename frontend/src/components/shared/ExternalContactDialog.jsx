@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, UserPlus, Lock, Pencil, Trash2, Plus, Check, X as XIcon } from 'lucide-react';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 import { base44 } from '@/api/base44Client';
 import { listExternalContacts } from '@/lib/externalContacts';
 import { useAuth } from '@/lib/AuthContext';
@@ -31,9 +33,9 @@ export default function ExternalContactDialog({ open, onClose, onCreated }) {
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [editId, setEditId] = useState(null);
   const [edit, setEdit] = useState({ name: '', email: '', note: '', private: false });
+  const f = useDialogForm({ open, onClose, submit: create, onError: (e) => toast({ title: t('externalContacts.saveFailed'), description: e?.message, variant: 'destructive' }) });
 
   const load = () => {
     setLoading(true);
@@ -51,22 +53,18 @@ export default function ExternalContactDialog({ open, onClose, onCreated }) {
 
   const canEdit = (c) => c.created_by_id === user?.id || (!c.private && user?.role === 'admin');
 
-  const create = async () => {
-    if (!name.trim() || creating) return;
-    setCreating(true);
-    try {
+  // function (ne const): hook výš ji dostává jako `submit` — deklarace je hoistovaná
+  function create() {
+    if (!name.trim()) return;
+    return f.run(async () => {
       const created = await base44.entities.ExternalContact.create({
         name: name.trim(), email: email.trim(), note: note.trim(), private: isPrivate,
       });
       if (onCreated) { onCreated(created); return; } // volající vybírá → dialog zavře on
       setName(''); setEmail(''); setNote(''); setIsPrivate(false);
       load();
-    } catch (e) {
-      toast({ title: t('externalContacts.saveFailed'), description: e?.message, variant: 'destructive' });
-    } finally {
-      setCreating(false);
-    }
-  };
+    });
+  }
 
   const saveEdit = async () => {
     if (!edit.name.trim()) return;
@@ -106,7 +104,7 @@ export default function ExternalContactDialog({ open, onClose, onCreated }) {
   );
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -119,9 +117,9 @@ export default function ExternalContactDialog({ open, onClose, onCreated }) {
           <Label htmlFor="ext-name">{t('externalContacts.newContact')}</Label>
           <div className="flex items-center gap-2">
             <Input id="ext-name" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder={t('externalContacts.namePlaceholder')} onKeyDown={(e) => e.key === 'Enter' && create()} autoFocus />
-            <Button onClick={create} disabled={!name.trim() || creating}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              placeholder={t('externalContacts.namePlaceholder')} onKeyDown={f.onEnter} autoFocus />
+            <Button onClick={create} disabled={!name.trim() || f.busy}>
+              <BusyIcon busy={f.busy} icon={Plus} />
               {t('common:actions.add')}
             </Button>
           </div>

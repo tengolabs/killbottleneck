@@ -17,7 +17,7 @@ import NodeEditDialog from '@/components/shared/NodeEditDialog';
 import NewMapActions from '@/components/shared/NewMapActions';
 import { useMapCreation } from '@/hooks/useMapCreation';
 import { isExternalOwner, useMembersWithContacts } from '@/lib/externalContacts';
-import { shareMap } from '@/functions/shareMap';
+import { shareMap } from '@/api/kb';
 import { cycleStatus } from '@/lib/statusMeta';
 import { patchNodeData } from '@/lib/taskActions';
 import { addNodeToMap as addNodeToMapShared } from '@/lib/mapNodes';
@@ -52,6 +52,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { STATUSES } from '@/lib/statusMeta';
 import { getDeadlineStatus } from '@/lib/nodeMeta';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
+import { useSidePanels } from '@/hooks/useSidePanels';
 import { popisJakoText } from '@/lib/popisFormat';
 
 // Popis bez značek pro hledání. ⚠️ S pamětí: predikát filtru se volá pro každou
@@ -101,23 +102,7 @@ export default function Tasks() {
   // Levé plovoucí panely (zásobník + měření času, stejné jako na titulce) —
   // sdílené localStorage klíče; otevřený panel obsah ODSOUVÁ doprava a naráz
   // je otevřený nejvýš jeden (jinak by se překrývaly).
-  const [bufferOpen, setBufferOpen] = useState(() => nactiKlic('kb-buffer-open') === '1');
-  const [timeLogOpen, setTimeLogOpen] = useState(() =>
-    nactiKlic('kb-timelog-open') === '1' && nactiKlic('kb-buffer-open') !== '1');
-  const toggleBuffer = () => {
-    setBufferOpen((o) => {
-      ulozKlic('kb-buffer-open', o ? '0' : '1');
-      if (!o) { setTimeLogOpen(false); ulozKlic('kb-timelog-open', '0'); }
-      return !o;
-    });
-  };
-  const toggleTimeLog = () => {
-    setTimeLogOpen((o) => {
-      ulozKlic('kb-timelog-open', o ? '0' : '1');
-      if (!o) { setBufferOpen(false); ulozKlic('kb-buffer-open', '0'); }
-      return !o;
-    });
-  };
+  const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
   // členové + externí kontakty (external:true) — viz useMembersWithContacts
   const [members, reloadMembers] = useMembersWithContacts(user);
   const [org, setOrg] = useState(null);
@@ -509,15 +494,15 @@ export default function Tasks() {
       // quiet: součást zadání práce — adresát dostane notifikaci o přidělené
       // práci, druhá o sdílení by byla duplikát (Richard 21. 8.)
       const res = await shareMap({ action: 'share', mapId, email, permission: 'work', quiet: true });
-      if (res.data?.error) {
-        toast({ title: t('tasksPage.shareFailed'), description: res.data.error, variant: 'destructive' });
+      if (res?.error) {
+        toast({ title: t('tasksPage.shareFailed'), description: res.error, variant: 'destructive' });
         return false;
       }
       setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, shared_with: [...(m.shared_with || []), email] } : m)));
       toast({ title: t('tasksPage.mapShared'), description: t('tasksPage.mapSharedDesc', { email }) });
       return true;
     } catch (e) {
-      toast({ title: t('tasksPage.shareFailed'), description: e.response?.data?.error || t('tasksPage.shareOwnerOnly'), variant: 'destructive' });
+      toast({ title: t('tasksPage.shareFailed'), description: e.response?.error || t('tasksPage.shareOwnerOnly'), variant: 'destructive' });
       return false;
     }
   };

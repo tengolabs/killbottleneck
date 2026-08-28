@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { pb } from '@/api/pb';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 import { downloadAllMyData } from '@/lib/exportAll';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
@@ -39,7 +39,7 @@ export default function TrialBanner() {
 
   useEffect(() => {
     let zivy = true;
-    pb.send('/api/kb/config', { method: 'GET' })
+    loadKbConfig()
       .then((cfg) => {
         if (!zivy || !cfg?.trial_until) return;
         const konec = new Date(cfg.trial_until + 'T23:59:59Z');

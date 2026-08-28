@@ -55,3 +55,58 @@ export async function saveDataUrl(dataUrl, filename) {
   a.download = filename;
   a.click();
 }
+
+// ── Sdílené jádro exportů (analýza kódu 27. 8. 2026, F5-04: download, csvEscape,
+// uložení PDF, název souboru a datum byly opsané 2–3× a už se rozešly — CSV
+// úkolů neuvozovalo osamocený \r, datum bylo jednou UTC a jednou místní).
+
+// Textový soubor ke stažení; `bom` jen pro CSV (Excel), Markdown ho nepotřebuje.
+export function downloadText(filename, text, mime, { bom = false } = {}) {
+  return saveBlob(new Blob([(bom ? '\uFEFF' : '') + text], { type: mime }), filename);
+}
+
+// Buňka CSV (oddělovač `;`). Formula injection: import z Asany/Trella umí do
+// instance dostat cizí texty typu `=HYPERLINK(...)` — Excel by je při otevření
+// exportu VYHODNOTIL; úvodní vzorcové znaky se neutralizují apostrofem.
+export function csvEscape(v) {
+  let s = String(v ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+// jsPDF → soubor: nativní obal (Capacitor) neumí pdf.save, jde přes saveBlob
+export async function savePdf(pdf, filename) {
+  if (isNativeShell()) await saveBlob(pdf.output('blob'), filename);
+  else pdf.save(filename);
+}
+
+// Název souboru z názvu projektu. `mode`:
+//  'map'   = jen písmena/číslice/mezery (export mapy — historická politika; měnit
+//            ji by lidem přejmenovalo dosavadní soubory, pozn. v dashboardPdf),
+//  'dash'  = navíc pomlčka a podtržítko („Vydání-2026" zůstane),
+//  'ascii' = bez diakritiky, mezery → pomlčky, malá písmena (přenosný .kb.json).
+export function safeFilename(title, fallback, { mode = 'dash' } = {}) {
+  const s = String(title || '');
+  let out;
+  if (mode === 'ascii') {
+    out = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '-').toLowerCase();
+  } else if (mode === 'map') {
+    out = s.replace(/[^a-zA-Z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ ]/g, '').trim();
+  } else {
+    out = s.replace(/[^a-zA-Z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ _-]/g, '').trim();
+  }
+  return out || fallback;
+}
+
+// Datové razítko do názvu souboru = MÍSTNÍ den. Je to totéž co todayKey() v
+// lib/taskActions.js — záměrně zvlášť: taskActions tahá datovou vrstvu (@/api) a
+// tenhle soubor musí zůstat načitatelný z node (unit testy). Dřív část exportů
+// brala UTC, takže po 22:00 SELČ nesl soubor včerejšek.
+export function dateStamp(d = new Date()) {
+  return d.toLocaleDateString('en-CA');
+}
+
+// Dvojité rAF: počkat na repaint právě upraveného DOMu před snímkem (html-to-image)
+export function afterRepaint() {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}

@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { Sun, Moon, Send, Bell, Plus, ExternalLink, Palette, ArrowDown, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { fetchMyDay } from '@/functions/myDay';
+import { fetchMyDay } from '@/api/myDay';
 import { saveMode, MODE_FULL } from '@/lib/liteMode';
 import { base44 } from '@/api/base44Client';
 import { BUILTIN_SKINS, DEFAULT_SKIN_ID, getBuiltinSkin } from '@/lib/skins';

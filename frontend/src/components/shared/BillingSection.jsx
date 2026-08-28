@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pb } from '@/api/pb';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,7 @@ export default function BillingSection({ onChange }) {
   const [hosted, setHosted] = useState(null);
 
   useEffect(() => {
-    pb.send('/api/kb/config', { method: 'GET' })
+    loadKbConfig()
       .then((cfg) => setHosted(!!(cfg && cfg.hosted)))
       .catch(() => setHosted(false));
   }, []);

@@ -13,7 +13,7 @@
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
 import { SKIN_COLOR_TOKENS, SKIN_FONT_TOKENS, fontStack, validateSkin } from '@/lib/skinValidator';
 import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
-import { serverOrigin } from '@/lib/serverUrl';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 
 const KEY = 'kb-theme';   // PŘECHOD: starý flowmap-theme se přebere
 const SKIN_KEY = 'kb-skin-cache';   // resolved skin (celý JSON, kvůli anti-FOUC)
@@ -146,9 +146,7 @@ export const resolveSkin = ({ user, instanceSkin } = {}) => {
 export const syncSkin = async (user = null) => {
   let instanceSkin = null;
   try {
-    const res = await fetch(`${serverOrigin()}/api/kb/config`);
-    if (!res.ok) return;
-    const cfg = await res.json();
+    const cfg = await loadKbConfig();
     instanceSkin = cfg && cfg.skin ? cfg.skin : null;
   } catch (e) {
     return;

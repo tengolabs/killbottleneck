@@ -10,6 +10,7 @@ import {
 import { BUILTIN_SKINS, getBuiltinSkin } from '@/lib/skins';
 import { validateSkin } from '@/lib/skinValidator';
 import { syncSkin } from '@/lib/theme';
+import { invalidateKbConfig } from '@/hooks/useKbConfig';
 import { Palette, Loader2, Check } from 'lucide-react';
 
 // Výchozí skin INSTANCE (admin) — platí pro uživatele bez vlastní volby
@@ -70,7 +71,8 @@ export default function InstanceSkinSection() {
       await pb.send('/api/kb/instance-skin', { method: 'POST', body: { skin, builtin_id: builtinId } });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      syncSkin(user).catch(() => {});   // admin s vlastní volbou změnu neuvidí — správně
+      // config nese instanční skin — bez invalidace by syncSkin četl starou cache (nález panelu 28. 8.)
+      invalidateKbConfig().then(() => syncSkin(user)).catch(() => {});   // admin s vlastní volbou změnu neuvidí — správně
     } catch (e) {
       setError(e?.response?.error || t('instanceSkin.saveFailed'));
     } finally {

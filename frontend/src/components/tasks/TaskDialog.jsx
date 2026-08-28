@@ -28,6 +28,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
 import OdkazyVPopisu from '@/components/shared/OdkazyVPopisu';
 import PopisEditor from '@/components/shared/PopisEditor';
+import { useDialogForm } from '@/hooks/useDialogForm';
 
 // hodnota „bez výběru" pro shadcn Select (neumí prázdný string jako item value)
 const NONE = '__none__';
@@ -50,7 +51,6 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
   const [assignee, setAssignee] = useState('');
   const [mapId, setMapId] = useState('');
   const [nodeId, setNodeId] = useState('');
-  const [saving, setSaving] = useState(false);
   const [customAssignee, setCustomAssignee] = useState(false);
 
   const isSubtask = !!task?.parent_id || !!defaults?.parent_id;
@@ -59,6 +59,17 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
   const { toast } = useToast();
   const { t } = useTranslation('tasks');
   const timerRunsHere = !!task && timer.running?.task_id === task.id;
+  const f = useDialogForm({
+    open,
+    onClose,
+    submit: () => handleSave(),
+    // serverové odmítnutí (např. err.taskNotOnApex u legacy dat) NESMÍ být
+    // němé — dřív se tu chyba spolkla a uživatel nevěděl, proč se nic nestalo
+    onError: (e) => {
+      const zprava = e?.response?.message || e?.message || '';
+      if (zprava) toast({ title: zprava, variant: 'destructive' });
+    },
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -72,7 +83,6 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
     setCustomAssignee(!!a && members.length > 0 && !members.some((m) => m.email === a));
     setMapId(task?.map_id ?? defaults?.map_id ?? '');
     setNodeId(task?.node_id ?? defaults?.node_id ?? '');
-    setSaving(false);
   }, [open, task, defaults, members]);
 
   const selectedMap = useMemo(() => maps.find((m) => m.id === mapId), [maps, mapId]);
@@ -93,10 +103,9 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
   // osiřelý stav produkt vědomě snáší, nový úkol v něm ale založit nejde.
   const nodeRequired = !isSubtask && !!mapId && !nodeMissing;
 
-  const handleSave = async () => {
-    if (!title.trim() || saving || (!isSubtask && !mapId) || (nodeRequired && !nodeId)) return;
-    setSaving(true);
-    try {
+  const handleSave = () => {
+    if (!title.trim() || (!isSubtask && !mapId) || (nodeRequired && !nodeId)) return;
+    return f.run(async () => {
       const data = {
         title: title.trim(),
         description,
@@ -112,17 +121,11 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
       if (!task && defaults?.parent_id) data.parent_id = defaults.parent_id;
       await onSave(data, task?.id);
       onClose();
-    } catch (e) {
-      // serverové odmítnutí (např. err.taskNotOnApex u legacy dat) NESMÍ být
-      // němé — dřív se tu chyba spolkla a uživatel nevěděl, proč se nic nestalo
-      const zprava = e?.response?.message || e?.message || '';
-      if (zprava) toast({ title: zprava, variant: 'destructive' });
-      setSaving(false);
-    }
+    });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
@@ -139,7 +142,7 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t('taskDialog.titlePlaceholder')}
               autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+              onKeyDown={f.onEnter}
             />
           </div>
 
@@ -354,7 +357,7 @@ export default function TaskDialog({ open, task, defaults, maps = [], emailOptio
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>{t('common:actions.cancel')}</Button>
-            <Button onClick={handleSave} disabled={!title.trim() || saving || (!isSubtask && !mapId) || (nodeRequired && !nodeId)}>
+            <Button onClick={handleSave} disabled={!title.trim() || f.busy || (!isSubtask && !mapId) || (nodeRequired && !nodeId)}>
               {task ? t('common:actions.save') : t('common:actions.create')}
             </Button>
           </div>

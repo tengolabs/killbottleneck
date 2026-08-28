@@ -1,7 +1,7 @@
 import { toPng } from 'html-to-image';
 import { withDefaultLook } from '@/lib/theme';
 import { isNativeShell } from '@/lib/nativeShell';
-import { saveDataUrl } from '@/lib/saveFile';
+import { saveDataUrl, afterRepaint } from '@/lib/saveFile';
 
 // PNG snímek DOM prvku (denní přehled) — mobilní formát na výšku.
 // Prvek musí mít vynucené světlé barvy (viz ExportCard v MyDaySection),
@@ -10,8 +10,7 @@ import { saveDataUrl } from '@/lib/saveFile';
 // exportovaly ve vkusu odesílatele.
 async function capture(el) {
   return withDefaultLook(async () => {
-    // double-rAF: počkat na repaint právě vyrenderovaného skrytého kontejneru
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await afterRepaint(); // repaint právě vyrenderovaného skrytého kontejneru
     return toPng(el, { pixelRatio: 2, backgroundColor: '#ffffff' });
   });
 }

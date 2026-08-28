@@ -1,6 +1,6 @@
 import i18next from 'i18next';
 import { fmtDate, parsePbDate } from '@/lib/locale';
-import { saveBlob } from '@/lib/saveFile';
+import { downloadText, csvEscape } from '@/lib/saveFile';
 import { statusConfig } from '@/lib/statusMeta';
 import { formatDeadline } from '@/lib/nodeMeta';
 
@@ -13,11 +13,7 @@ import { formatDeadline } from '@/lib/nodeMeta';
 const t = (key, params) => i18next.t(`organizace:organizace.${key}`, params);
 const days = (n) => t('days', { count: n });
 
-// BOM jen do CSV (kvůli Excelu); Markdown ho nepotřebuje
-function download(filename, content, mime, bom) {
-  const blob = new Blob([(bom ? '﻿' : '') + content], { type: mime });
-  saveBlob(blob, filename);
-}
+// download/csvEscape: sdílené jádro v lib/saveFile.js (BOM jen do CSV kvůli Excelu)
 
 // Společné popisky pro stránku i export — jedna definice, stejná slova.
 export const accessLabel = (p) => (p.access === 'team' ? t(p.team_access === 'edit' ? 'teamEdit' : 'teamRead') : t('shared'));
@@ -44,12 +40,6 @@ export const excludedLabel = (excluded) => {
   return t('footerExcluded', { list: head + (list.length > MAX_EXCLUDED ? ' ' + t('excludedMore', { count: list.length - MAX_EXCLUDED }) : '') });
 };
 
-const csvEscape = (v) => {
-  let s = String(v ?? '');
-  // formula injection — cizí názvy cílů mohou začínat `=`; Excel by je vyhodnotil
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-};
 
 const fieldLabel = (f) => t(`changeField.${f}`);
 // Markdown: názvy a jména jsou cizí text — svislítko by rozbilo tabulku, zalomení řádek
@@ -84,7 +74,7 @@ export function exportPortfolioMarkdown({ data, nameOf, orgName }) {
   md += `\n---\n${t('footer', { team: data.scope.team, shared: data.scope.shared })}`;
   if (data.scope.excluded?.length) md += ` ${excludedLabel(data.scope.excluded)}`;
   md += '\n';
-  download(`${t('export.filename')}-${data.today}.md`, md, 'text/markdown;charset=utf-8', false);
+  downloadText(`${t('export.filename')}-${data.today}.md`, md, 'text/markdown;charset=utf-8');
 }
 
 export function exportPortfolioCsv({ data, nameOf }) {
@@ -104,5 +94,5 @@ export function exportPortfolioCsv({ data, nameOf }) {
   rows.push([t('export.colSection'), t('cols.when'), t('cols.what'), t('cols.project'), t('cols.change'), t('cols.who')]);
   for (const c of s.changes) rows.push([t('sections.changes'), String(c.when).slice(0, 10), c.title, c.mapTitle, `${fieldLabel(c.field)}: ${changeValue(c, c.from, nameOf)} → ${changeValue(c, c.to, nameOf)}`, actorLabel(c.actor, nameOf)]);
   const csv = rows.map((r) => r.map(csvEscape).join(';')).join('\r\n');
-  download(`${t('export.filename')}-${data.today}.csv`, csv, 'text/csv;charset=utf-8', true);
+  downloadText(`${t('export.filename')}-${data.today}.csv`, csv, 'text/csv;charset=utf-8', { bom: true });
 }

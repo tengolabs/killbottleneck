@@ -1,5 +1,5 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
-import { pb } from '@/api/pb';
+import { lazy, Suspense } from 'react';
+import { useKbConfig } from '@/hooks/useKbConfig';
 import { useAuth } from '@/lib/AuthContext';
 
 // Brána dotazníku účelu: jediný lehký fetch /api/kb/config; samotný dialog
@@ -10,15 +10,10 @@ const PurposeDialog = lazy(() => import('./PurposeDialog'));
 
 export default function PurposeGate() {
   const { user } = useAuth();
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    if (!user || user.role !== 'admin') { setShow(false); return undefined; }
-    let zivy = true;
-    pb.send('/api/kb/config', { method: 'GET' })
-      .then((c) => { if (zivy) setShow(c.purpose_ask !== false && !c.purpose && c.user_count === 1); })
-      .catch(() => {});
-    return () => { zivy = false; };
-  }, [user]);
+  const jeAdmin = !!user && user.role === 'admin';
+  const { config } = useKbConfig(jeAdmin);
+  // po uložení účelu PurposeDialog config invaliduje → brána se schová sama
+  const show = jeAdmin && !!config && config.purpose_ask !== false && !config.purpose && config.user_count === 1;
   if (!show) return null;
   return (
     <Suspense fallback={null}>

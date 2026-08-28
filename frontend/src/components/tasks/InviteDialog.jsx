@@ -10,10 +10,12 @@ import { Button } from '@/components/ui/button';
 import { copyToClipboard } from '@/lib/clipboard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserPlus, Loader2, Copy, Check } from 'lucide-react';
+import { UserPlus, Copy, Check } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useTranslation } from 'react-i18next';
 import { serverOrigin } from '@/lib/serverUrl';
+import BusyIcon from '@/components/shared/BusyIcon';
+import { useDialogForm } from '@/hooks/useDialogForm';
 
 // Pozvání kolegy do týmu — admin volí roli, manažer zve jen členy
 // (server to vynucuje tak jako tak). Bez SMTP: ukážeme dočasné heslo k předání.
@@ -21,7 +23,6 @@ export default function InviteDialog({ open, currentRole, onClose, onInvited }) 
   const { t } = useTranslation('tasks');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('user');
-  const [inviting, setInviting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -35,20 +36,21 @@ export default function InviteDialog({ open, currentRole, onClose, onInvited }) 
     setEmail(''); setRole('user'); setResult(null); setError(''); setCopied(false);
   };
 
-  const handleInvite = async () => {
-    if (!email.trim() || inviting) return;
-    setInviting(true);
-    setError('');
-    try {
+  const handleInvite = () => {
+    if (!email.trim()) return;
+    return f.run(async () => {
+      setError('');
       const res = await base44.users.inviteUser(email.trim(), role);
       setResult(res);
       onInvited?.();
-    } catch (e) {
-      setError(e?.message || t('inviteDialog.inviteFailed'));
-    } finally {
-      setInviting(false);
-    }
+    });
   };
+  const f = useDialogForm({
+    open,
+    onClose: () => { reset(); onClose(); },
+    submit: handleInvite,
+    onError: (e) => setError(e?.message || t('inviteDialog.inviteFailed')),
+  });
 
   const copyCredentials = async () => {
     if (await copyToClipboard(t('inviteDialog.credentialsCopy', { origin: serverOrigin(), email: result.email, password: result.temp_password }))) {
@@ -58,7 +60,7 @@ export default function InviteDialog({ open, currentRole, onClose, onInvited }) 
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+    <Dialog open={open} onOpenChange={f.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -94,7 +96,7 @@ export default function InviteDialog({ open, currentRole, onClose, onInvited }) 
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                onKeyDown={f.onEnter}
                 placeholder={t('inviteDialog.emailPlaceholder')}
                 autoFocus
               />
@@ -135,8 +137,8 @@ export default function InviteDialog({ open, currentRole, onClose, onInvited }) 
           ) : (
             <>
               <Button variant="outline" onClick={() => { reset(); onClose(); }}>{t('common:actions.cancel')}</Button>
-              <Button onClick={handleInvite} disabled={!email.trim() || inviting}>
-                {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+              <Button onClick={handleInvite} disabled={!email.trim() || f.busy}>
+                <BusyIcon busy={f.busy} icon={UserPlus} />
                 {t('inviteDialog.invite')}
               </Button>
             </>

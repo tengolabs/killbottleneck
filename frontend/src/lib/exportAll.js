@@ -1,5 +1,5 @@
 import { pb } from '@/api/pb';
-import { saveBlob } from '@/lib/saveFile';
+import { saveBlob, dateStamp } from '@/lib/saveFile';
 
 // „Stáhnout všechna moje data" — GET /api/kb/export (session) → jeden JSON
 // killbottleneck.export/1 → uložit jako soubor. Token jde v hlavičce, ne
@@ -16,7 +16,7 @@ export async function downloadAllMyData() {
   }
   const cd = res.headers.get('content-disposition') || '';
   const m = /filename="?([^";]+)"?/.exec(cd);
-  const den = new Date().toISOString().slice(0, 10);
+  const den = dateStamp(); // místní den (dřív UTC → po 22:00 SELČ včerejšek)
   const name = (m && m[1]) || `killbottleneck-export-${den}.json`;
   await saveBlob(await res.blob(), name);
   return name;

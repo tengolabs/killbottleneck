@@ -5,8 +5,10 @@ import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { remapRuleIds } from '@/lib/ruleRemap';
 import { rulesApi } from '@/components/rules/rulesApi';
 
-// Jediné místo, kde vzniká projekt (= mapa s vrcholovým uzlem).
-// Volá ho Home i stránka Úkoly — obě cesty vedou k identické struktuře.
+// Jediné místo, kde vzniká projekt (= mapa s vrcholovým uzlem): createProjectRecord.
+// Volají ho všechny cesty — prázdný projekt, šablona z dialogu, AI náhled
+// (hooks/useMapCreation), „Použít šablonu" z náhledu v editoru (analýza kódu
+// 27. 8. 2026, F5-05: GoalMap.create se skládal na pěti místech, každé jinak).
 
 export function buildApexNode(title, ts, icon = '') {
   return {
@@ -29,10 +31,34 @@ export function buildApexNode(title, ts, icon = '') {
   };
 }
 
+// emoji → ikona vrcholového uzlu (JEDEN zdroj ikony; název projektu zůstává čistý)
+export function applyEmojiToApex(nodes, emoji) {
+  if (!emoji) return nodes;
+  const apex = nodes.find((n) => n.type === 'apexNode' || n.data?.nodeType === 'apex') || nodes[0];
+  if (apex) apex.data = { ...apex.data, icon: emoji };
+  return nodes;
+}
+
+// Záznam projektu. `owners` = komu se nasdílí jako SPOLUPRACOVNÍKŮM (work) —
+// řešitelé ze šablony (rozhodnutí Richarda 7. 8. 2026, nález S5-03); prázdný
+// seznam = nesdílí se nikomu (prázdný i AI projekt), klíče se pak neposílají,
+// aby cesta zůstala 1:1 s dřívějškem. `series` = id šablony s číslovanou řadou:
+// pořadové číslo a finální název složí server (goalmaps create hook).
+export function createProjectRecord({ title, nodes, edges, color = '', client = '', owners = [], series = '', emoji = '' }) {
+  return base44.entities.GoalMap.create({
+    title,
+    description: '',
+    nodes: applyEmojiToApex(nodes, emoji),
+    edges,
+    ...(color || client ? { color, client_id: client } : {}),
+    ...(owners.length ? { shared_with: owners, shared_with_work: owners } : {}),
+    ...(series ? { series } : {}),
+  });
+}
+
 export async function createEmptyProject(title, { emoji = '', color = '', client = '' } = {}) {
-  // JEDEN zdroj ikony: emoji jde do vrcholového (apex) uzlu; název projektu je čistý.
   const apex = buildApexNode(title, Date.now(), emoji);
-  return base44.entities.GoalMap.create({ title, description: '', nodes: [apex], edges: [], color, client_id: client });
+  return createProjectRecord({ title, nodes: [apex], edges: [], color, client });
 }
 
 // Komu se projekt ze šablony nasdílí: lidem přiřazeným na uzlech (kromě mě).
@@ -57,28 +83,10 @@ export function ownersFromNodes(nodes) {
 export async function createProjectFromTemplate(tpl, titleOverride, startDate, { emoji = '', color = '', client = '', onRulesResult } = {}) {
   const title = (titleOverride || '').trim() || tpl.title || i18next.t('home:newMap.newProject');
   const { nodes, edges, idMap } = templateToMap(tpl, { startDate });
-  // emoji → ikona vrcholového uzlu (jeden zdroj), ne do názvu
-  if (emoji) {
-    const apex = nodes.find((n) => n.type === 'apexNode' || n.data?.nodeType === 'apex') || nodes[0];
-    if (apex) apex.data = { ...apex.data, icon: emoji };
-  }
-  const owners = ownersFromNodes(nodes);
-  const map = await base44.entities.GoalMap.create({
-    title,
-    description: '',
-    nodes,
-    edges,
-    color,
-    client_id: client,
-    // řešitelé ze šablony = SPOLUPRACOVNÍCI (work), ne editoři: rozhodnutí
-    // Richarda 7. 8. 2026 (999d50f, server 1ee70a8); tenhle dialog posílal
-    // `shared_with_edit` od 16. 7., kdy úroveň work ještě neexistovala →
-    // projekt z UI dával jiná práva než tentýž projekt z cronu (nález S5-03).
-    shared_with: owners,
-    shared_with_work: owners,
-    // číslovaná série: posílá se jen id šablony — pořadové číslo a finální
-    // název složí server (goalmaps create hook), vrácený záznam už je má
-    ...(tpl.number_format && tpl.id ? { series: tpl.id } : {}),
+  const map = await createProjectRecord({
+    title, nodes, edges, color, client, emoji,
+    owners: ownersFromNodes(nodes),
+    series: tpl.number_format && tpl.id ? tpl.id : '',
   });
   // vestavěná pravidla šablony (kanban varianty) — název dle jazyka UI,
   // odkazy na uzly se přemapují přes idMap a založí normální cestou /rules/save

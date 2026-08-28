@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { pb } from '@/api/pb';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 
 // Hlídání nových verzí pro SELF-HOST.
 //
@@ -50,7 +50,7 @@ export default function useVersionCheck() {
 
   useEffect(() => {
     let zivy = true;
-    pb.send('/api/kb/config', { method: 'GET' })
+    loadKbConfig()
       .then((c) => {
         if (!zivy) return null;
         const version = c.version || '';

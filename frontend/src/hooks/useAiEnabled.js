@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { pb } from '@/api/pb';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 
 // Stav AI zástrčky ze serveru (/api/kb/config).
 // ai_modes = tarifní gating per funkce (questions/generate/expand/chat/from_text/transcribe);
@@ -24,11 +24,12 @@ function publish(next) {
   // Dokud je služba dole, tiše se doptáváme — až se vrátí, tlačítka naskočí
   // sama, bez reloadu stránky. Zdravý stav se nepolluje.
   clearTimeout(recheckTimer);
-  if (next.configured && !next.healthy) recheckTimer = setTimeout(load, 120000);
+  if (next.configured && !next.healthy) recheckTimer = setTimeout(() => load(true), 120000);
 }
 
-function load() {
-  pb.send('/api/kb/config', { method: 'GET' })
+// fresh=true obejde sdílenou cache (ruční obnova, doptávání při výpadku)
+function load(fresh = false) {
+  loadKbConfig({ fresh })
     .then((cfg) => {
       const configured = (cfg.ai_provider || 'none') !== 'none';
       const healthy = cfg.ai_healthy !== false;
@@ -47,7 +48,7 @@ function load() {
 // ruční obnova (po uložení nastavení AI v administraci) — překreslí všechna
 // AI tlačítka bez reloadu stránky
 export function refreshAiModes() {
-  load();
+  load(true);
 }
 
 export function useAiModes() {

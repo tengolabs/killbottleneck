@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAiModes } from '@/hooks/useAiEnabled';
 import { useAuth } from '@/lib/AuthContext';
-import { advisor } from '@/functions/advisor';
+import { advisor } from '@/api/kb';
 import { statusConfig } from '@/lib/statusMeta';
 import ChangesSection from '@/components/goal-map/ChangesSection';
 import { saveDashboardPdf } from '@/lib/dashboardPdf';
@@ -93,14 +93,14 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
           (taskLines ? `\n\n${t('dashboard.aiPromptTasks')}\n${taskLines}` : `\n\n${t('dashboard.aiPromptNoTasks')}`),
         map: { nodes: compactNodes, edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })) },
       });
-      const data = result.data;
+      const data = result;
       if (data?.error || !data?.reply) {
         setSummary(`⚠️ ${data?.error || t('dashboard.aiNoSummary')}`);
       } else {
         setSummary(data.reply);
       }
     } catch (err) {
-      setSummary(`⚠️ ${err.response?.data?.error || err.message || t('editor:aiChat.connectionError')}`);
+      setSummary(`⚠️ ${err.response?.error || err.message || t('editor:aiChat.connectionError')}`);
     } finally {
       setSummarizing(false);
     }

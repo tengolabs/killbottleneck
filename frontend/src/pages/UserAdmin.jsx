@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '@/lib/clipboard';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
+import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -62,7 +63,7 @@ export default function UserAdmin() {
   const [hosted, setHosted] = useState(null);
   const [billingComplete, setBillingComplete] = useState(false);
   useEffect(() => {
-    pb.send('/api/kb/config', { method: 'GET' })
+    loadKbConfig()
       .then((cfg) => setHosted(!!(cfg && cfg.hosted)))
       .catch(() => setHosted(false));
   }, []);
@@ -162,6 +163,7 @@ export default function UserAdmin() {
     try {
       const res = await base44.users.inviteUser(inviteEmail.trim(), inviteRole);
       await loadUsers();
+      invalidateKbConfig(); // user_count/over_user_limit v configu
       // dialog zůstane otevřený a ukáže výsledek (dočasné heslo je kopírovatelné,
       // ne v nativním window.alert, který nejde označit)
       setInviteResult(res);
@@ -263,6 +265,7 @@ export default function UserAdmin() {
     try {
       await base44.entities.User.delete(userId);
       setUsers((prev) => prev.filter((u) => u.id !== userId));
+      invalidateKbConfig(); // user_count v configu
     } catch (e) {
       console.error(e);
     }
@@ -354,6 +357,7 @@ export default function UserAdmin() {
                 const purpose = e.target.value;
                 try {
                   await pb.send('/api/kb/purpose', { method: 'POST', body: { purpose } });
+                  invalidateKbConfig();
                   base44.org.forget();
                   setOrg((o) => ({ ...(o || {}), purpose }));
                 } catch (err) { console.error(err); }
