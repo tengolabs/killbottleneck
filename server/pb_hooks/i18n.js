@@ -902,6 +902,54 @@ const STRINGS = {
     cs: "Neplatné datum — použijte formát RRRR-MM-DD.",
     en: "Invalid date — use YYYY-MM-DD format.",
   },
+  // v1/MCP: neznámá pole = chyba s výčtem, ne tiché ignorování (28. 8. 2026 —
+  // agent poslal `priority`, dostal 200 a ohlásil „hotovo" nad nezměněnou mapou)
+  "err.unknownFields": {
+    cs: "Neznámá pole: {fields}. Povolená pole: {allowed}.{hint}",
+    en: "Unknown fields: {fields}. Allowed fields: {allowed}.{hint}",
+  },
+  "err.unknownItemFields": {
+    cs: "Položka „{item}“ má neznámá pole: {fields}. Povolená pole: {allowed}.{hint}",
+    en: "Item \"{item}\" has unknown fields: {fields}. Allowed fields: {allowed}.{hint}",
+  },
+  // plán („kdy to chci řešit") přes API — priorita po killBottlenecku
+  "err.badPlan": {
+    cs: "Neplatný plán (planned_on) — datum RRRR-MM-DD od dneška nejvýš 7 dní dopředu; prázdný řetězec plán ruší. Plán říká, KDY na tom chcete pracovat; termín (deadline) se tím nemění.",
+    en: "Invalid plan (planned_on) — a YYYY-MM-DD date from today up to 7 days ahead; an empty string clears the plan. The plan says WHEN you intend to work on it; the deadline stays as it is.",
+  },
+  "err.badPlanItem": {
+    cs: "Položka „{id}“ má neplatný plán (planned_on) — použijte RRRR-MM-DD.",
+    en: "Item \"{id}\" has an invalid plan (planned_on) — use YYYY-MM-DD.",
+  },
+  // nápovědy k cizím pojmům (Jira/Asana/Todoist), které agenti předpokládají
+  "hint.priority": {
+    cs: "Pole „{key}“ v killBottlenecku není — prioritu vyjadřuje plán planned_on (KDY na tom chcete pracovat, dnes až +7 dní). Termín (deadline) je dohoda, kvůli prioritě ho neposouvejte.",
+    en: "There is no \"{key}\" in killBottleneck — priority is expressed by the plan planned_on (WHEN you intend to work on it, today to +7 days). The deadline is an agreement; do not move it to express priority.",
+  },
+  "hint.tags": {
+    cs: "Štítky („{key}“) killBottleneck nemá — členění dělá struktura mapy (poduzly) a barva color.",
+    en: "killBottleneck has no tags or labels (\"{key}\") — structure the map (sub-nodes) or use color.",
+  },
+  "hint.reminder": {
+    cs: "Připomínka („{key}“) je automatizační pravidlo: create_rule s trigger deadline_approaching a akcí notify.",
+    en: "A reminder (\"{key}\") is an automation rule: create_rule with trigger deadline_approaching and a notify action.",
+  },
+  "hint.deadline": {
+    cs: "Termín se jmenuje deadline (RRRR-MM-DD), ne „{key}“.",
+    en: "The due date field is called deadline (YYYY-MM-DD), not \"{key}\".",
+  },
+  "hint.owner": {
+    cs: "Řešitel se jmenuje owner (e-mail člena, viz list_people / GET /v1/members), ne „{key}“.",
+    en: "The assignee field is called owner (member e-mail, see list_people / GET /v1/members), not \"{key}\".",
+  },
+  "hint.estimate": {
+    cs: "Odhady pracnosti („{key}“) killBottleneck nevede — hlídá termín a to, jestli se práce hýbe.",
+    en: "killBottleneck keeps no effort estimates (\"{key}\") — it watches the deadline and whether work is moving.",
+  },
+  "hint.snakeCase": {
+    cs: "Pole se jmenuje {field}, ne {key}.",
+    en: "The field is called {field}, not {key}.",
+  },
   "err.itemsRequired": { cs: "Chybí položky k přidání.", en: "No items to add." },
   "err.tooManyKeys": {
     cs: "Příliš mnoho API klíčů — zrušte nejdřív některý starý (max 20).",

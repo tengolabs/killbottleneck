@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.51-beta": {
+    cs: [
+      "AI asistenti a integrace přes API: neznámé pole už server tiše nezahodí — odmítne ho, vyjmenuje povolená a poradí náš ekvivalent (např. „priorita“ = plán planned_on).",
+      "Plán „kdy to řeším“ jde nastavit i přes API a MCP — asistent naplánuje cíl na dnes a objeví se vám v Můj den; termín se kvůli tomu neposouvá.",
+      "MCP balíček killbottleneck-mcp 0.51.0: stejná přísnost a planned_on i pro Claude Desktop a Claude Code.",
+    ],
+    en: [
+      "AI assistants and API integrations: the server no longer silently drops an unknown field — it rejects it, lists the allowed ones and suggests our equivalent (e.g. “priority” = the planned_on plan).",
+      "The “when I plan to work on it” plan can now be set via the API and MCP — an assistant plans a goal for today and it shows up in your My day; the deadline is not moved because of it.",
+      "MCP package killbottleneck-mcp 0.51.0: the same strictness and planned_on for Claude Desktop and Claude Code.",
+    ],
+  },
   "v0.50-beta": {
     cs: [
       "Zpět v editoru po „Opravit strom“ už nezahodí uzly, které jste mezitím přidali — vrací se přesně poslední stav.",

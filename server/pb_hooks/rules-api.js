@@ -62,7 +62,7 @@ function saveRule(app, map, rec, info, ctx) {
     app.save(rec);
     return { status: 200, body: { rule: ruleDto(rec) } };
   }
-  const v = validateRuleInput(app, map, info);
+  const v = validateRuleInput(app, map, info, { strict: !!ctx.strict });
   if (v.error) return { status: 400, body: { error: t(lang, "err.ruleInvalid", { reason: v.error }) } };
   if (!rec) {
     // strukturální limit à la Asana (50/mapa) je v pořádku; měsíční metr NIKDY
@@ -140,7 +140,7 @@ function saveRuleTemplate(app, info, ctx) {
     if (f.error) return f.error;
     rec = f.rec;
   }
-  const v = validateRuleInput(app, null, info); // null = šablonový režim (bez mapy/scope)
+  const v = validateRuleInput(app, null, info, { strict: !!ctx.strict }); // null = šablonový režim (bez mapy/scope)
   if (v.error) return { status: 400, body: { error: t(ctx.lang, "err.ruleInvalid", { reason: v.error }) } };
   if (!rec) {
     let mine = 0;

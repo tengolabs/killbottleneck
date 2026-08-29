@@ -6,12 +6,12 @@
     "url": "https://github.com/tengolabs/killbottleneck",
     "source": "github"
   },
-  "version": "0.46.0",
+  "version": "0.51.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "killbottleneck-mcp",
-      "version": "0.46.0",
+      "version": "0.51.0",
       "transport": {
         "type": "stdio"
       },

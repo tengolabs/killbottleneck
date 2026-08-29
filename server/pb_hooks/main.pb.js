@@ -4464,6 +4464,13 @@ kbRoute("POST", "/v1/maps", (e) => {
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
+  // neznámá pole = 400 s výčtem povolených (ne tiché ignorování) — helpers.js V1_BODY_FIELDS
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.createMap, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const badItem = H.unknownTreeItemsError(info.tree, a.lang);
+  if (badItem) return e.json(400, { error: badItem });
+  if (H.checkTreePlans(info.tree)) return e.json(400, { error: t(a.lang, "err.badPlan") });
   const title = String(info.title || "").trim().slice(0, 200);
   if (!title) return e.json(400, { error: t(a.lang, "err.titleRequired") });
   // řešitel musí být člen nebo viditelný externí kontakt (nález P6-01)
@@ -4528,6 +4535,13 @@ kbRoute("POST", "/v1/maps/{id}/nodes", (e) => {
   const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
   if (w.error) return e.json(w.status, { error: w.error });
   const map = w.map;
+  // neznámá pole = 400 s výčtem povolených (ne tiché ignorování) — helpers.js V1_BODY_FIELDS
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.addNodes, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const badItem = H.unknownTreeItemsError(info.items, a.lang);
+  if (badItem) return e.json(400, { error: badItem });
+  if (H.checkTreePlans(info.items)) return e.json(400, { error: t(a.lang, "err.badPlan") });
   // base_updated je POVINNÉ: klient musí mapu nejdřív načíst (rozhodnutí 2026-07-25)
   // — tvrdá ochrana proti přepsání beze čtení. Neshoda verze = 409.
   const baseUpdated = String(info.base_updated || "");
@@ -4616,8 +4630,21 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
       return e.json(403, { error: t(a.lang, "err.nodeStatusOwnOnly") });
     }
   }
+  // editor: neznámá pole = 400 s výčtem povolených + nápovědou pro cizí pojmy
+  // (`priority` → planned_on …), ne tiché ignorování — helpers.js V1_BODY_FIELDS
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.updateNode, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
   if (info.status !== undefined && !["todo", "in_progress", "done"].includes(String(info.status))) {
     return e.json(400, { error: t(a.lang, "err.badStatus") });
+  }
+  // plán („kdy to chci řešit") — TENTÝŽ rozsah jako lišta v aplikaci (≤ 7 dní);
+  // mimo rozsah CHYBA, ne tiché přijetí, které by se v přehledu neprojevilo
+  let plannedOn = null;
+  if (info.planned_on !== undefined) {
+    const p = H.validatePlannedOn(info.planned_on);
+    if (p.error) return e.json(400, { error: t(a.lang, "err.badPlan") });
+    plannedOn = p.value;
   }
   if (info.deadline !== undefined && String(info.deadline || "") !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(String(info.deadline))) {
     return e.json(400, { error: t(a.lang, "err.badDate") });
@@ -4634,6 +4661,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   if (info.status !== undefined) d.status = String(info.status);
   if (info.description !== undefined) d.description = String(info.description || "");
   if (info.deadline !== undefined) d.deadline = String(info.deadline || "");
+  if (plannedOn !== null) { d.plannedOn = plannedOn; delete d.pinnedOn; } // pinnedOn = starší název plánu
   if (info.owner !== undefined) {
     // řešitel = člen nebo viditelný externí kontakt; jinak 400 s nápovědou (P6-01);
     // uloží se KANONICKÝ e-mail, jinak by ho Můj den ani notifikace nenašly
@@ -4711,7 +4739,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   const sd = stored.data || {};
   return e.json(200, { updated: map.getString("updated"), shared: shared,
     node: { id: stored.id, title: stored.type === "apexNode" ? (sd.apexText || sd.title) : sd.title,
-      status: sd.status, deadline: sd.deadline, owner: sd.owner,
+      status: sd.status, deadline: sd.deadline, planned_on: sd.plannedOn || sd.pinnedOn || "", owner: sd.owner,
       executor_kind: sd.executorKind || "human", executor_name: sd.executorName || "",
       automation_wanted: !!sd.automationWanted } });
 });
@@ -4727,6 +4755,9 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/delete", (e) => {
   const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
   if (w.error) return e.json(w.status, { error: w.error });
   const map = w.map;
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.deleteNode, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
   // base_updated je POVINNÉ: klient musí mapu nejdřív načíst (rozhodnutí 2026-07-25)
   // — tvrdá ochrana proti přepsání beze čtení. Neshoda verze = 409.
   const baseUpdated = String(info.base_updated || "");
@@ -4793,7 +4824,11 @@ kbRoute("POST", "/v1/maps/{id}/rules", (e) => {
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
   const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
   if (w.error) return e.json(w.status, { error: w.error });
-  const r = R.saveRule($app, w.map, null, info, { lang: a.lang, userEmail: a.user.getString("email") });
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.rule, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  // strict: neznámé klíče i uvnitř trigger/conditions/actions (UI zůstává tolerantní)
+  const r = R.saveRule($app, w.map, null, info, { lang: a.lang, userEmail: a.user.getString("email"), strict: true });
   return e.json(r.status, r.body);
 });
 
@@ -4808,9 +4843,12 @@ kbRoute("POST", "/v1/maps/{id}/rules/{ruleId}", (e) => {
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
   const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
   if (w.error) return e.json(w.status, { error: w.error });
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.rule, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
   const f = R.findRule($app, w.map, e.request.pathValue("ruleId"), a.lang);
   if (f.error) return e.json(f.error.status, f.error.body);
-  const r = R.saveRule($app, w.map, f.rec, info, { lang: a.lang, userEmail: a.user.getString("email") });
+  const r = R.saveRule($app, w.map, f.rec, info, { lang: a.lang, userEmail: a.user.getString("email"), strict: true });
   return e.json(r.status, r.body);
 });
 
@@ -4862,7 +4900,10 @@ kbRoute("POST", "/v1/rule-templates", (e) => {
   if (a.error) return e.json(a.status, { error: a.error });
   const info = e.requestInfo().body || {};
   if (JSON.stringify(info).length > 2 * 1024 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
-  const r = R.saveRuleTemplate($app, info, { lang: a.lang, userEmail: a.user.getString("email"), isAdmin: jeAdmin(a.user) });
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.ruleTemplate, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const r = R.saveRuleTemplate($app, info, { lang: a.lang, userEmail: a.user.getString("email"), isAdmin: jeAdmin(a.user), strict: true });
   return e.json(r.status, r.body);
 });
 

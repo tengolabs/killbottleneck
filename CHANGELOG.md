@@ -9,6 +9,36 @@ below before you jump several versions.
 
 ---
 
+## v0.51-beta — 2026-08-29
+
+**API and MCP: unknown fields are rejected, and assistants get the plan (`planned_on`)**
+
+- **Behaviour change (breaking for sloppy integrations):** every v1 write endpoint and every MCP
+  tool now answers **400 / -32602** to a field it does not know — top-level, inside `tree`/`items`
+  (recursively), inside rule `trigger`/`conditions`/`actions` — and the message lists the allowed
+  fields. Until now an unknown key was silently dropped and the call returned 200: an AI assistant
+  asked to "set priority high" reported success over an unchanged map. Common names from other
+  tools get a hint: `priority` → `planned_on`, `due_date` → `deadline`, `assignee` → `owner`,
+  `tags`/`labels` → map structure or `color`, `reminder` → a `deadline_approaching` rule,
+  `estimate` → not kept; camelCase → the snake_case name.
+- **`planned_on` in the API and MCP** (`POST …/nodes/{nodeId}`, `tree`/`items`, `update_node`,
+  every read): *when the key owner plans to work on it*, today to 7 days ahead, empty string
+  clears — the same choice the app's row bar offers. This is how killBottleneck expresses
+  priority (no priority field, on purpose; the deadline is an agreement and stays put). A node
+  planned via the API lands in **My day** exactly like one planned in the app. A date outside the
+  window is a 400, not a silently ignored value. Only editors can set it through a key; readers
+  with their own work keep status-only.
+- MCP: `additionalProperties: false` on all 17 tools in both servers (HTTP `/mcp` and the npm
+  stdio package — the stdio package used to *advertise* it while dropping the keys at runtime);
+  `get_map` shows `plan: YYYY-MM-DD` next to the deadline.
+- Rules over v1/MCP: unknown keys inside `trigger`, `conditions[]`, `actions[]` and
+  `create_subnodes.items` are rejected; the rule builder in the app is unchanged.
+- Tests: new `api-neznama-pole` suite (v1, MCP HTTP, MCP stdio, My day); `mcp-http` parity now
+  also checks `additionalProperties`.
+
+**Upgrade notes:** no migration. If an integration of yours sent fields the API never
+documented, it will now get a 400 with the list of allowed ones — fix the field name. The npm
+package `killbottleneck-mcp` needs the matching release for `planned_on` and strict arguments.
 ## v0.50-beta — 2026-08-28
 
 **Fourth wave from the code review — frontend structure (part 2): the map editor split into domains**

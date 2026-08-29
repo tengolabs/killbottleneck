@@ -11,6 +11,7 @@ const TREE_ITEM = {
     title: { type: "string", description: "Node title (required)" },
     description: { type: "string" },
     deadline: { type: "string", description: "YYYY-MM-DD" },
+    planned_on: { type: "string", description: "YYYY-MM-DD, today to +7 days, empty string clears. WHEN the key owner plans to work on it — this is how killBottleneck expresses priority; never move the deadline to express priority." },
     owner: { type: "string", description: "Accountable PERSON: e-mail of an instance member (see list_people). Stays a human even when the step is performed by an automation — this is who gets notified. Unknown e-mails are rejected." },
     status: { type: "string", enum: ["todo", "in_progress", "done"] },
     wait_for_children: { type: "boolean", description: "Node waits until its whole subtree is done" },
@@ -22,6 +23,7 @@ const TREE_ITEM = {
     children: { type: "array", items: { $ref: "#/$defs/treeItem" } },
   },
   required: ["title"],
+  additionalProperties: false,
 };
 
 // automatizační pravidla — schémata sdílená create_rule/update_rule; zrcadlí
@@ -38,6 +40,7 @@ const RULE_TRIGGER = {
     hour: { type: "integer", description: "schedule only: hour 0-23 local server time (default = instance auto hour)" },
   },
   required: ["type"],
+  additionalProperties: false,
 };
 const RULE_CONDITION = {
   type: "object",
@@ -47,6 +50,7 @@ const RULE_CONDITION = {
     value: { type: "string" },
   },
   required: ["field", "op"],
+  additionalProperties: false,
 };
 const RULE_ACTION = {
   type: "object",
@@ -65,6 +69,7 @@ const RULE_ACTION = {
     agent_name: { type: "string", description: "run_agent only: name of an agent from the AI agent registry; the run is queued and dispatched within a minute" },
   },
   required: ["type"],
+  additionalProperties: false,
 };
 
 // scope: read = stačí klíč read; write = klíč musí mít read_write (vynucuje v1 API)
@@ -72,12 +77,12 @@ const TOOLS = [
   {
     name: "list_maps",
     description: "List goal maps the key owner can see — own, team and shared maps (id, title, node count, last update, access: owner/edit/work/read). Use archived=true to list archived maps instead.",
-    inputSchema: { type: "object", properties: { archived: { type: "boolean" } }, required: [] },
+    inputSchema: { type: "object", properties: { archived: { type: "boolean" } }, required: [], additionalProperties: false },
   },
   {
     name: "get_map",
     description: "Read one map as an indented tree with node ids, statuses ([✓] done, [~] in progress, [ ] todo), deadlines and owners. The header shows the key's access level (owner/edit = full write; work and read = only the status of the key owner's own nodes, like ticking off in the app). Always call this before modifying a map you have not read yet.",
-    inputSchema: { type: "object", properties: { map_id: { type: "string" } }, required: ["map_id"] },
+    inputSchema: { type: "object", properties: { map_id: { type: "string" } }, required: ["map_id"], additionalProperties: false },
   },
   {
     name: "create_map",
@@ -92,6 +97,7 @@ const TOOLS = [
         apex_text: { type: "string", description: "Root goal statement, defaults to title" },
       },
       required: ["title", "outline"],
+      additionalProperties: false,
     },
   },
   {
@@ -106,11 +112,12 @@ const TOOLS = [
         items: { type: "array", items: { $ref: "#/$defs/treeItem" } },
       },
       required: ["map_id", "items"],
+      additionalProperties: false,
     },
   },
   {
     name: "update_node",
-    description: "Update fields of one node: title, status (todo/in_progress/done), description, deadline (YYYY-MM-DD, empty string clears), owner (e-mail, empty string clears), wait_for_children, colour, who performs it (executor_kind / executor_name) and the automation wish (automation_wanted / automation_note). Marking status done may unblock waiting nodes, notify their owners and trigger automations on them.",
+    description: "Update fields of one node: title, status (todo/in_progress/done), description, deadline (YYYY-MM-DD, empty string clears), planned_on (YYYY-MM-DD, today to +7 days, empty string clears — WHEN the key owner plans to work on it; this is how killBottleneck expresses priority, never by moving the deadline), owner (e-mail, empty string clears), wait_for_children, colour, who performs it (executor_kind / executor_name) and the automation wish (automation_wanted / automation_note). Unknown fields are rejected with the list of allowed ones. Marking status done may unblock waiting nodes, notify their owners and trigger automations on them.",
     inputSchema: {
       type: "object",
       properties: {
@@ -120,6 +127,7 @@ const TOOLS = [
         status: { type: "string", enum: ["todo", "in_progress", "done"] },
         description: { type: "string" },
         deadline: { type: "string" },
+        planned_on: { type: "string", description: "YYYY-MM-DD, today to +7 days, empty string clears. WHEN the key owner plans to work on it — this is how killBottleneck expresses priority; never move the deadline to express priority." },
         owner: { type: "string", description: "Accountable PERSON (e-mail of an instance member, see list_people). Stays a human even for AI/cron steps — this is who gets notified. Empty string clears. Unknown e-mails are rejected." },
         wait_for_children: { type: "boolean" },
         executor_kind: { type: "string", enum: ["human", "automation"], description: "Who performs the step. Default \"human\"." },
@@ -129,12 +137,13 @@ const TOOLS = [
         color: { type: "string", description: "Node colour as #rrggbb, empty string clears" },
       },
       required: ["map_id", "node_id"],
+      additionalProperties: false,
     },
   },
   {
     name: "delete_node",
     description: "Delete a node INCLUDING its whole subtree. The apex (root) cannot be deleted and whole maps cannot be deleted via the API. Irreversible — read the map first and double-check the node id.",
-    inputSchema: { type: "object", properties: { map_id: { type: "string" }, node_id: { type: "string" } }, required: ["map_id", "node_id"] },
+    inputSchema: { type: "object", properties: { map_id: { type: "string" }, node_id: { type: "string" } }, required: ["map_id", "node_id"], additionalProperties: false },
   },
   {
     name: "create_rule",
@@ -152,12 +161,13 @@ const TOOLS = [
         enabled: { type: "boolean", description: "Default true" },
       },
       required: ["map_id", "name", "trigger", "actions"],
+      additionalProperties: false,
     },
   },
   {
     name: "list_rules",
     description: "List automation rules of a map: id, name, enabled, scope node, trigger, conditions, actions, last_fired and last_error (a non-empty last_error means the rule is misconfigured and its owner was notified).",
-    inputSchema: { type: "object", properties: { map_id: { type: "string" } }, required: ["map_id"] },
+    inputSchema: { type: "object", properties: { map_id: { type: "string" } }, required: ["map_id"], additionalProperties: false },
   },
   {
     name: "update_rule",
@@ -176,22 +186,23 @@ const TOOLS = [
         enabled: { type: "boolean" },
       },
       required: ["map_id", "rule_id"],
+      additionalProperties: false,
     },
   },
   {
     name: "delete_rule",
     description: "Delete an automation rule. Its run log stays (with the rule name snapshot). Irreversible.",
-    inputSchema: { type: "object", properties: { map_id: { type: "string" }, rule_id: { type: "string" } }, required: ["map_id", "rule_id"] },
+    inputSchema: { type: "object", properties: { map_id: { type: "string" }, rule_id: { type: "string" } }, required: ["map_id", "rule_id"], additionalProperties: false },
   },
   {
     name: "list_rule_runs",
     description: "Read the run log of a map's automation rules (newest first, max 100): what fired, on which node, ok/failed/skipped and what the actions did. skipped = a safety stop (rule chain depth or per-save cap), detail says which.",
-    inputSchema: { type: "object", properties: { map_id: { type: "string" }, rule_id: { type: "string", description: "Optional: only runs of this rule" } }, required: ["map_id"] },
+    inputSchema: { type: "object", properties: { map_id: { type: "string" }, rule_id: { type: "string", description: "Optional: only runs of this rule" } }, required: ["map_id"], additionalProperties: false },
   },
   {
     name: "list_rule_templates",
     description: "List the instance-wide library of rule templates (shape of a rule without a map or node scope). To use one, read it and call create_rule on the target map with its trigger/conditions/actions — the created rule is an independent copy.",
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
   },
   {
     name: "save_rule_template",
@@ -207,27 +218,28 @@ const TOOLS = [
         actions: { type: "array", items: RULE_ACTION },
       },
       required: ["name", "trigger", "actions"],
+      additionalProperties: false,
     },
   },
   {
     name: "delete_rule_template",
     description: "Delete a rule template from the library (author or admin only). Rules already created from it are independent copies and stay untouched.",
-    inputSchema: { type: "object", properties: { template_id: { type: "string" } }, required: ["template_id"] },
+    inputSchema: { type: "object", properties: { template_id: { type: "string" } }, required: ["template_id"], additionalProperties: false },
   },
   {
     name: "get_org_structure",
     description: "Read the organization structure (the org map): positions and functions with node ids, holders and deputies. Use the node ids as dynamic rule targets \"position:<nodeId>\" / \"deputy_of_position:<nodeId>\". Read-only — holders and deputies are appointed by an admin in the app.",
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
   },
   {
     name: "list_people",
     description: "List the people work can be assigned to: instance members (e-mail, display name, role) and external contacts visible to the key owner (their owner_email is a pseudo e-mail usable as owner). Use these e-mails as `owner` in create_map/add_nodes/update_node and in set_owner rules — an unknown e-mail is rejected. Read-only.",
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
   },
   {
     name: "get_portfolio",
     description: "Read the portfolio overview across all team and shared maps the key owner can read (private maps are excluded, exactly like the Organization page): per-project completion, overdue and stuck items, people with overdue work and a 7-day change summary. Optional today=YYYY-MM-DD. Read-only.",
-    inputSchema: { type: "object", properties: { today: { type: "string", description: "YYYY-MM-DD, defaults to the server date" } }, required: [] },
+    inputSchema: { type: "object", properties: { today: { type: "string", description: "YYYY-MM-DD, defaults to the server date" } }, required: [], additionalProperties: false },
   },
 ];
 
@@ -251,6 +263,7 @@ function renderNode(n, depth) {
   const bits = [`${ind}${STATUS_MARK[n.status] || "[ ]"} ${n.title || "(untitled)"}`];
   const meta = [`id: ${n.id}`];
   if (n.deadline) meta.push(`deadline: ${n.deadline}`);
+  if (n.planned_on) meta.push(`plan: ${n.planned_on}`);
   if (n.owner) meta.push(`@${n.owner}`);
   if (n.executor_kind === "automation") {
     meta.push(`automated${n.executor_name ? `: ${n.executor_name}` : ""}`);
@@ -387,9 +400,10 @@ const EXEC = {
     return text(`Added ${r.added_ids.length} node(s).\n\n${renderMap({ id: a.map_id, title: "", updated: r.updated, tree: r.tree, notes: [] })}`);
   }),
   update_node: (auth, a) => mapWrite(auth, a.map_id, (base) => {
+    // pole podle katalogu (žádná další kopie seznamu); neznámé už odmítl validátor
     const fields = {};
-    for (const k of ["title", "status", "description", "deadline", "owner", "wait_for_children", "executor_kind", "executor_name", "automation_wanted", "automation_note", "color"]) {
-      if (a[k] !== undefined) fields[k] = a[k];
+    for (const k of Object.keys(TOOLS.find((t) => t.name === "update_node").inputSchema.properties)) {
+      if (k !== "map_id" && k !== "node_id" && a[k] !== undefined) fields[k] = a[k];
     }
     const r = vcall(auth, "POST", `/api/kb/v1/maps/${enc(a.map_id)}/nodes/${enc(a.node_id)}`, Object.assign(fields, { base_updated: base }));
     const exec = r.node.executor_kind === "automation"
@@ -412,8 +426,8 @@ const EXEC = {
   },
   update_rule: (auth, a) => {
     const fields = {};
-    for (const k of ["name", "node_id", "trigger", "conditions", "actions", "enabled"]) {
-      if (a[k] !== undefined) fields[k] = a[k];
+    for (const k of Object.keys(TOOLS.find((t) => t.name === "update_rule").inputSchema.properties)) {
+      if (k !== "map_id" && k !== "rule_id" && a[k] !== undefined) fields[k] = a[k];
     }
     const r = vcall(auth, "POST", `/api/kb/v1/maps/${enc(a.map_id)}/rules/${enc(a.rule_id)}`, fields);
     return text(`Rule updated: ${renderRule(r.rule)}`);
@@ -556,9 +570,11 @@ function zpracujMcpPost(e) {
     for (const req of tool.inputSchema.required || []) {
       if (args[req] === undefined) return e.json(200, rpcErr(msg.id, -32602, `Missing required argument: ${req}`));
     }
-    // typy a enumy — stdio (zod) odmítá `archived:"false"`, HTTP ho dřív
-    // koercoval na true (nález S9-03); parita chování obou transportů
-    const chybaTypu = validujArgumenty(tool.inputSchema, args);
+    // typy, enumy a NEZNÁMÉ klíče (i uvnitř items[]/trigger/actions) — stdio (zod
+    // strict) odmítá `archived:"false"` i `priority`, HTTP dřív koercoval (S9-03)
+    // a neznámé klíče tiše přeskakoval (28. 8. 2026: agent „nastavil prioritu",
+    // server vrátil 200); parita chování obou transportů
+    const chybaTypu = validujArgumenty(tool.inputSchema, args, tool.name);
     if (chybaTypu) return e.json(200, rpcErr(msg.id, -32602, chybaTypu));
     try {
       return e.json(200, rpcOk(msg.id, EXEC[tool.name](authHeader, args)));
@@ -570,26 +586,54 @@ function zpracujMcpPost(e) {
   return e.json(200, rpcErr(msg.id, -32601, `Method not found: ${String(msg.method).slice(0, 60)}`));
 }
 
-// Mělká validace podle JSON Schema nástroje: typ a enum vlastností první úrovně
-// + typ prvků pole. Bez knihovny (Goja nemá npm), stačí na to, co zod odmítá.
-function validujArgumenty(schema, args) {
-  const props = (schema && schema.properties) || {};
+// Validace podle JSON Schema nástroje bez knihovny (Goja nemá npm): typ, enum,
+// NEZNÁMÉ KLÍČE (additionalProperties: false → chyba s výčtem povolených polí a
+// nápovědou pro cizí pojmy jako `priority` → planned_on) a totéž rekurzivně
+// v objektech a polích ($ref → $defs). Hláška nese cestu (items[0].children[1]).
+// Anglicky — API/MCP vrstva EN; totéž hlásí v1 routa v jazyce vlastníka klíče.
+function validujArgumenty(schema, args, toolName) {
+  const defs = (schema && schema.$defs) || {};
+  const resolve = (s) => (s && s.$ref ? (defs[String(s.$ref).replace("#/$defs/", "")] || {}) : (s || {}));
   const nazevTypu = (v) => (Array.isArray(v) ? "array" : v === null ? "null" : typeof v);
   const sedi = (t, v) => (t === "integer" ? (typeof v === "number" && Number.isInteger(v))
     : t === "number" ? typeof v === "number"
     : t === "array" ? Array.isArray(v)
     : t === "object" ? (v !== null && typeof v === "object" && !Array.isArray(v))
     : typeof v === t);
-  for (const k of Object.keys(args || {})) {
-    const p = props[k];
-    const v = args[k];
-    if (!p || v === undefined) continue;
-    const typy = Array.isArray(p.type) ? p.type : (p.type ? [p.type] : []);
-    if (typy.length && !typy.some((t) => sedi(t, v))) return `Invalid type for "${k}": expected ${typy.join("|")}, got ${nazevTypu(v)}`;
-    if (Array.isArray(p.enum) && !p.enum.includes(v)) return `Invalid value for "${k}": expected one of ${p.enum.join(", ")}`;
-    if (Array.isArray(v) && p.items && typeof p.items.type === "string" && v.some((x) => !sedi(p.items.type, x))) return `Invalid item type in "${k}": expected ${p.items.type}`;
-  }
-  return "";
+  const napoveda = (keys, allowed) => {
+    try { return require(`${__hooks}/helpers.js`).hintsFor(keys, allowed, "en"); } catch (err) { return ""; }
+  };
+  const cesta = (p, k) => (p ? `${p}.${k}` : k);
+  const walk = (sch, val, path, depth) => {
+    if (depth > 50) return `Too deeply nested at "${path}"`;
+    const s = resolve(sch);
+    const typy = Array.isArray(s.type) ? s.type : (s.type ? [s.type] : []);
+    if (typy.length && !typy.some((t) => sedi(t, val))) return `Invalid type for "${path}": expected ${typy.join("|")}, got ${nazevTypu(val)}`;
+    if (Array.isArray(s.enum) && !s.enum.includes(val)) return `Invalid value for "${path}": expected one of ${s.enum.join(", ")}`;
+    if (Array.isArray(val) && s.items) {
+      for (let i = 0; i < val.length; i++) {
+        const err = walk(s.items, val[i], `${path}[${i}]`, depth + 1);
+        if (err) return err;
+      }
+    }
+    if (val && typeof val === "object" && !Array.isArray(val) && s.properties) {
+      const allowed = Object.keys(s.properties);
+      const unknown = Object.keys(val).filter((k) => !s.properties[k]);
+      if (unknown.length && s.additionalProperties === false) {
+        return `Unknown argument${unknown.length > 1 ? "s" : ""} ${unknown.map((k) => `"${cesta(path, k)}"`).join(", ")} for ${toolName}. Allowed: ${allowed.join(", ")}.${napoveda(unknown, allowed)}`;
+      }
+      for (const req of s.required || []) {
+        if (val[req] === undefined) return `Missing required argument: ${cesta(path, req)}`;
+      }
+      for (const k of Object.keys(val)) {
+        if (val[k] === undefined || !s.properties[k]) continue;
+        const err = walk(s.properties[k], val[k], cesta(path, k), depth + 1);
+        if (err) return err;
+      }
+    }
+    return "";
+  };
+  return walk(schema, args || {}, "", 0);
 }
 
 module.exports = { TOOLS, zpracujMcpPost };

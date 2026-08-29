@@ -1184,17 +1184,25 @@ function treeItemsToNodes(items, idPrefix, lang) {
   const MAX_TREE_NODES = 200, MAX_TREE_DEPTH = 50;
   const ts = idPrefix || String(new Date().getTime());
   let counter = 0;
-  let badDeadline = null, overLimit = false;
+  let badDeadline = null, badPlan = null, overLimit = false;
   const nodes = [], edges = [], rootIds = [];
   const walk = (list, parentId, depth) => {
-    if (!Array.isArray(list) || badDeadline || overLimit) return;
+    if (!Array.isArray(list) || badDeadline || badPlan || overLimit) return;
     if (depth > MAX_TREE_DEPTH) { overLimit = true; return; }
     list.forEach((item, idx) => {
-      if (!item || typeof item !== "object" || badDeadline || overLimit) return;
+      if (!item || typeof item !== "object" || badDeadline || badPlan || overLimit) return;
       if (counter >= MAX_TREE_NODES) { overLimit = true; return; }
       const deadline = String(item.deadline || "");
       if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
         badDeadline = String(item.title || "?");
+        return;
+      }
+      // plán („kdy to chci řešit") — formát jako termín; rozsah dnes…+7 dní
+      // hlídají v1 routy (checkTreePlans), tady jen tvar, aby exekutor pravidel
+      // nad ULOŽENOU šablonkou nepadal na plánu, který mezitím propadl
+      const plannedOn = String(item.planned_on || "");
+      if (plannedOn && !/^\d{4}-\d{2}-\d{2}$/.test(plannedOn)) {
+        badPlan = String(item.title || "?");
         return;
       }
       const id = `node-${ts}-${++counter}`;
@@ -1217,6 +1225,7 @@ function treeItemsToNodes(items, idPrefix, lang) {
           apexText: "",
           deadline: deadline,
           owner: String(item.owner || ""),
+          plannedOn: plannedOn,
           waitForChildren: !!item.wait_for_children,
           executorKind: normalizeExecutorKind(item.executor_kind),
           executorName: String(item.executor_name || "").slice(0, 100),
@@ -1235,8 +1244,145 @@ function treeItemsToNodes(items, idPrefix, lang) {
   };
   walk(items, null, 0);
   if (badDeadline) return { error: t(lang, "err.badDeadline", { id: badDeadline }) };
+  if (badPlan) return { error: t(lang, "err.badPlanItem", { id: badPlan }) };
   if (overLimit) return { error: t(lang, "err.tooManyItems", { max: MAX_TREE_NODES }) };
   return { nodes: nodes, edges: edges, rootIds: rootIds, count: counter };
+}
+
+// ---------- v1/MCP: povolená pole a odmítání neznámých klíčů ----------
+// JEDEN zdroj pravdy o tom, co v1 API přijímá (routy v main.pb.js; MCP katalog
+// v mcp-tools.js a zod v mcp/index.js ho zrcadlí, hlídá mcp-http.js). Neznámý
+// klíč = CHYBA s výčtem povolených polí, ne tiché ignorování: 28. 8. 2026 agent
+// (Hermes) poslal `priority`, server vrátil 200 a klíč zahodil → agent ohlásil
+// „hotovo" nad nezměněnou mapou. Stejná přísnost jako u `scope` klíčů (P6-05).
+const V1_NODE_FIELDS = ["title", "status", "description", "deadline", "planned_on", "owner", "color",
+  "wait_for_children", "executor_kind", "executor_name", "automation_wanted", "automation_note"];
+const V1_TREE_ITEM_FIELDS = V1_NODE_FIELDS.concat(["children"]);
+const V1_BODY_FIELDS = {
+  createMap: ["title", "tree", "description", "apex_text"],
+  addNodes: ["parent_id", "items", "base_updated"],
+  updateNode: V1_NODE_FIELDS.concat(["base_updated"]),
+  deleteNode: ["base_updated"],
+  rule: ["name", "node_id", "trigger", "conditions", "actions", "enabled"],
+  ruleTemplate: ["id", "name", "trigger", "conditions", "actions"],
+};
+// tvar pravidla — zrcadlo RULE_TRIGGER / RULE_CONDITION / RULE_ACTION v mcp-tools.js
+const RULE_TRIGGER_FIELDS = ["type", "status", "when", "days", "freq", "weekday", "hour"];
+const RULE_CONDITION_KEYS = ["field", "op", "value"];
+const RULE_ACTION_FIELDS = ["type", "status", "target", "owner", "date", "relative_days", "advance", "parent", "items", "to", "message", "agent_name"];
+
+// Cizí pojmy, které agenti (naučení na Jiře/Asaně/Todoistu) předpokládají —
+// místo holého „neznámé pole" dostanou náš ekvivalent a opraví se sami
+// (Richard 28. 8. 2026). Klíče malými písmeny; porovnává se lowercase.
+const FOREIGN_FIELD_HINTS = {
+  priority: "hint.priority", priorita: "hint.priority", importance: "hint.priority", urgency: "hint.priority", urgent: "hint.priority", priority_level: "hint.priority",
+  tags: "hint.tags", tag: "hint.tags", labels: "hint.tags", label: "hint.tags", stitky: "hint.tags", category: "hint.tags", categories: "hint.tags",
+  reminder: "hint.reminder", reminders: "hint.reminder", remind_at: "hint.reminder", remind: "hint.reminder", notify_at: "hint.reminder", alert: "hint.reminder",
+  due_date: "hint.deadline", due: "hint.deadline", due_on: "hint.deadline", due_at: "hint.deadline", termin: "hint.deadline", end_date: "hint.deadline",
+  assignee: "hint.owner", assigned_to: "hint.owner", assignee_email: "hint.owner", resitel: "hint.owner", responsible: "hint.owner",
+  estimate: "hint.estimate", estimated_hours: "hint.estimate", estimate_hours: "hint.estimate", effort: "hint.estimate", story_points: "hint.estimate", points: "hint.estimate", odhad: "hint.estimate",
+};
+const snakeOf = (k) => String(k).replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
+// klíče objektu mimo allowlist (v pořadí, jak přišly); ne-objekt = nic
+function unknownKeys(obj, allowed) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return [];
+  return Object.keys(obj).filter((k) => allowed.indexOf(k) < 0);
+}
+// nápověda k neznámým klíčům: cizí pojem → náš ekvivalent; camelCase → snake_case
+function hintsFor(keys, allowed, lang) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const out = [];
+  for (const k of keys || []) {
+    const lk = String(k).toLowerCase();
+    const sk = snakeOf(k);
+    if (FOREIGN_FIELD_HINTS[lk]) out.push(t(lang, FOREIGN_FIELD_HINTS[lk], { key: k }));
+    else if (sk !== String(k) && (allowed || []).indexOf(sk) >= 0) out.push(t(lang, "hint.snakeCase", { key: k, field: sk }));
+  }
+  return out.length ? " " + out.join(" ") : "";
+}
+// hotová i18n hláška pro tělo požadavku ("" = v pořádku)
+function unknownFieldsError(info, allowed, lang) {
+  const bad = unknownKeys(info, allowed);
+  if (!bad.length) return "";
+  const { t } = require(`${__hooks}/i18n.js`);
+  return t(lang, "err.unknownFields", { fields: bad.join(", "), allowed: allowed.join(", "), hint: hintsFor(bad, allowed, lang) });
+}
+// položky stromu (tree/items) rekurzivně přes children; první nález vyhrává.
+// Strop hloubky jako treeItemsToNodes — nepřetéct zásobník dřív než limit.
+function unknownTreeItemKeys(items, depth) {
+  const d = depth || 0;
+  if (!Array.isArray(items) || d > 50) return null;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (!it || typeof it !== "object" || Array.isArray(it)) continue;
+    const bad = unknownKeys(it, V1_TREE_ITEM_FIELDS);
+    if (bad.length) return { item: String(it.title || ("#" + (i + 1))).slice(0, 60), keys: bad };
+    const deeper = unknownTreeItemKeys(it.children, d + 1);
+    if (deeper) return deeper;
+  }
+  return null;
+}
+function unknownTreeItemsError(items, lang) {
+  const hit = unknownTreeItemKeys(items, 0);
+  if (!hit) return "";
+  const { t } = require(`${__hooks}/i18n.js`);
+  return t(lang, "err.unknownItemFields", { item: hit.item, fields: hit.keys.join(", "), allowed: V1_TREE_ITEM_FIELDS.join(", "), hint: hintsFor(hit.keys, V1_TREE_ITEM_FIELDS, lang) });
+}
+// přísný tvar pravidla pro v1/MCP (UI RuleBuilder zůstává tolerantní):
+// neznámé klíče v trigger / conditions[] / actions[] / actions[].items = chyba
+// s výčtem (anglicky — balí ji err.ruleInvalid jako {reason})
+function strictRuleShapeError(b) {
+  const list = (kde, bad, allowed) => `${kde} has unknown fields: ${bad.join(", ")} (allowed: ${allowed.join(", ")})${hintsFor(bad, allowed, "en")}`;
+  if (b.trigger && typeof b.trigger === "object") {
+    const bad = unknownKeys(b.trigger, RULE_TRIGGER_FIELDS);
+    if (bad.length) return list("trigger", bad, RULE_TRIGGER_FIELDS);
+  }
+  const conds = Array.isArray(b.conditions) ? b.conditions : [];
+  for (let i = 0; i < conds.length; i++) {
+    const bad = unknownKeys(conds[i], RULE_CONDITION_KEYS);
+    if (bad.length) return list(`conditions[${i}]`, bad, RULE_CONDITION_KEYS);
+  }
+  const acts = Array.isArray(b.actions) ? b.actions : [];
+  for (let i = 0; i < acts.length; i++) {
+    const bad = unknownKeys(acts[i], RULE_ACTION_FIELDS);
+    if (bad.length) return list(`actions[${i}]`, bad, RULE_ACTION_FIELDS);
+    const hit = acts[i] && unknownTreeItemKeys(acts[i].items, 0);
+    if (hit) return list(`actions[${i}].items item "${hit.item}"`, hit.keys, V1_TREE_ITEM_FIELDS);
+  }
+  return "";
+}
+
+// ---------- plán přes API (planned_on) ----------
+// „Kdy to chci řešit" = priorita po killBottlenecku (model §3: pole priorita
+// zamítnuto 27. 7. 2026, nahrazeno plánem; agentům zpřístupněno 28. 8. 2026).
+// Lišta v aplikaci nabízí jen dnes / zítra / nejbližší pondělí (≤ 7 dní) — API
+// dostává TENTÝŽ rozsah: plán dál než týden termín nezastíní (dayMath.horizonOf),
+// takže by se tiše nepromítl, a „přijmout a ignorovat" je přesně vzor, který
+// tahle vrstva ruší. Server žije v UTC, klient v místním čase → ±1 den tolerance.
+function validatePlannedOn(v) {
+  const s = String(v === null || v === undefined ? "" : v);
+  if (s === "") return { value: "" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { error: true };
+  const dt = new Date(s + "T00:00:00Z");
+  if (isNaN(dt.getTime()) || dt.toISOString().slice(0, 10) !== s) return { error: true };
+  const today0 = new Date(nowUtcString().slice(0, 10) + "T00:00:00Z");
+  const diff = Math.round((dt - today0) / 86400000);
+  if (diff < -1 || diff > 8) return { error: true };
+  return { value: s };
+}
+// rozsah plánu u položek stromu (tvar hlídá treeItemsToNodes); vrací název
+// první špatné položky nebo null
+function checkTreePlans(items, depth) {
+  const d = depth || 0;
+  if (!Array.isArray(items) || d > 50) return null;
+  for (const it of items) {
+    if (!it || typeof it !== "object") continue;
+    if (it.planned_on !== undefined && it.planned_on !== null && validatePlannedOn(it.planned_on).error) return String(it.title || "?");
+    const deeper = checkTreePlans(it.children, d + 1);
+    if (deeper) return deeper;
+  }
+  return null;
 }
 
 // MCP/v1: inverze pro čtení — nodes/edges → vnořený strom bez pozic (pro LLM).
@@ -1263,6 +1409,8 @@ function mapToTree(nodes, edges) {
       description: d.description || "",
       deadline: d.deadline || "",
       owner: d.owner || "", // garant = ČLOVĚK odpovědný za krok (i u ai/cron uzlu)
+      // „kdy to chci řešit" — priorita po killBottlenecku (starší mapy: pinnedOn)
+      planned_on: d.plannedOn || d.pinnedOn || "",
       wait_for_children: !!d.waitForChildren,
       executor_kind: normalizeExecutorKind(d.executorKind),
       executor_name: d.executorName || "",
@@ -4611,8 +4759,14 @@ function validatePositionRef(app, spec) {
 // Šablona nesmí mít scope uzel ani odkazovat na konkrétní uzly mapy
 // (create_subnodes jen s parent=trigger_node) — načtením do mapy z ní
 // vzniká obyčejné pravidlo, scope si člověk vybere až tam.
-function validateRuleInput(app, map, body) {
+function validateRuleInput(app, map, body, opts) {
   const b = body || {};
+  // v1/MCP (opts.strict): neznámé klíče uvnitř trigger/conditions/actions jsou
+  // chyba s výčtem, ne tiché zahození; UI (RuleBuilder) zůstává tolerantní
+  if (opts && opts.strict) {
+    const sErr = strictRuleShapeError(b);
+    if (sErr) return { error: sErr };
+  }
   const name = String(b.name || "").trim().slice(0, 120);
   if (!name) return { error: "name is required" };
 
@@ -6701,7 +6855,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 }
 
 module.exports = {
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

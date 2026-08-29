@@ -104,10 +104,13 @@ let mcp = null;
     const podle = (arr) => Object.fromEntries(arr.map((t) => [t.name, t]));
     const S = podle(stdioTools), H = podle(httpTools);
     expect(JSON.stringify(Object.keys(S).sort()) === JSON.stringify(Object.keys(H).sort()), 'stejná JMÉNA nástrojů');
-    let popisyOk = true, propsOk = true, reqOk = true;
+    let popisyOk = true, propsOk = true, reqOk = true, apOk = true;
     for (const n of Object.keys(S)) {
       if (!H[n]) continue;
       if (S[n].description !== H[n].description) { popisyOk = false; console.log(`    drift popisu: ${n}`); }
+      // additionalProperties:false musí být na OBOU stranách — schéma, které říká
+      // „nic navíc", zatímco runtime klíč tiše zahodí, lhalo (28. 8. 2026)
+      if ((S[n].inputSchema || {}).additionalProperties !== false || (H[n].inputSchema || {}).additionalProperties !== false) { apOk = false; console.log(`    additionalProperties chybí: ${n}`); }
       const sp = Object.keys((S[n].inputSchema || {}).properties || {}).sort();
       const hp = Object.keys((H[n].inputSchema || {}).properties || {}).sort();
       if (JSON.stringify(sp) !== JSON.stringify(hp)) { propsOk = false; console.log(`    drift properties: ${n} stdio=[${sp}] http=[${hp}]`); }
@@ -118,6 +121,7 @@ let mcp = null;
     expect(popisyOk, 'stejné POPISY nástrojů (1:1 se stdio)');
     expect(propsOk, 'stejné properties vstupů');
     expect(reqOk, 'stejná required pole');
+    expect(apOk, 'additionalProperties:false na obou stranách (neznámý argument = chyba, ne tiché zahození)');
 
     console.log('== round-trip naostro ==');
     const cm = await mcpPost(keyRW, 'tools/call', { name: 'create_map', arguments: { title: 'HTTP mapa', outline: [{ title: 'Krok 1', children: [{ title: 'Krok 1a' }] }, { title: 'Krok 2' }] } });

@@ -82,6 +82,7 @@ function renderNode(n, depth) {
   const bits = [`${ind}${STATUS_MARK[n.status] || '[ ]'} ${n.title || '(untitled)'}`];
   const meta = [`id: ${n.id}`];
   if (n.deadline) meta.push(`deadline: ${n.deadline}`);
+  if (n.planned_on) meta.push(`plan: ${n.planned_on}`);
   if (n.owner) meta.push(`@${n.owner}`);
   if (n.executor_kind === 'automation') {
     meta.push(`automated${n.executor_name ? `: ${n.executor_name}` : ''}`);
@@ -169,11 +170,19 @@ async function mapWrite(mapId, fn) {
   }
 }
 
+// ⚠️ .strict() všude: neznámý argument (`priority`, `tags`…) = chyba -32602, ne
+// tiché zahození (zod „strip" dřív klíč vyhodil a nástroj hlásil úspěch — agent
+// pak 28. 8. 2026 tvrdil „priorita nastavena" nad nezměněnou mapou). JSON schéma
+// z toho už dřív inzerovalo additionalProperties:false; teď to platí i za běhu.
+// Server (v1) hlásí totéž s nápovědou (priority → planned_on) — HTTP /mcp taky.
+const strict = (shape) => z.object(shape).strict();
+
 // rekurzivní schéma položky stromu (outline) pro create_map/add_nodes
 const treeItem = z.lazy(() => z.object({
   title: z.string().describe('Node title (required)'),
   description: z.string().optional(),
   deadline: z.string().optional().describe('YYYY-MM-DD'),
+  planned_on: z.string().optional().describe('YYYY-MM-DD, today to +7 days, empty string clears. WHEN the key owner plans to work on it — this is how killBottleneck expresses priority; never move the deadline to express priority.'),
   owner: z.string().optional().describe('Accountable PERSON: e-mail of an instance member (see list_people). Stays a human even when the step is performed by an automation — this is who gets notified. Unknown e-mails are rejected.'),
   status: z.enum(['todo', 'in_progress', 'done']).optional(),
   wait_for_children: z.boolean().optional().describe('Node waits until its whole subtree is done'),
@@ -183,7 +192,7 @@ const treeItem = z.lazy(() => z.object({
   automation_note: z.string().optional().describe('Optional one-line context for the automation wish (why it hurts today).'),
   color: z.string().optional().describe('Node colour as #rrggbb'),
   children: z.array(treeItem).optional(),
-}));
+}).strict());
 
 // ⚠️ Verzi hlásit z package.json, ne natvrdo. Klienti i katalogy (Glama, registr
 // MCP) ukazují právě tuhle hodnotu — natvrdo psaná „0.1.0" tvrdila lidem, že jde
@@ -197,7 +206,7 @@ const server = new McpServer({ name: 'killbottleneck', version: VERZE });
 
 server.registerTool('list_maps', {
   description: 'List goal maps the key owner can see — own, team and shared maps (id, title, node count, last update, access: owner/edit/work/read). Use archived=true to list archived maps instead.',
-  inputSchema: { archived: z.boolean().optional() },
+  inputSchema: strict({ archived: z.boolean().optional() }),
 }, async ({ archived }) => {
   try {
     const r = await call('GET', `/api/kb/v1/maps${archived ? '?archived=1' : ''}`);
@@ -209,7 +218,7 @@ server.registerTool('list_maps', {
 
 server.registerTool('get_map', {
   description: 'Read one map as an indented tree with node ids, statuses ([✓] done, [~] in progress, [ ] todo), deadlines and owners. The header shows the key\'s access level (owner/edit = full write; work and read = only the status of the key owner\'s own nodes, like ticking off in the app). Always call this before modifying a map you have not read yet.',
-  inputSchema: { map_id: z.string() },
+  inputSchema: strict({ map_id: z.string() }),
 }, async ({ map_id }) => {
   try {
     return text(renderMap(await freshMap(map_id)));
@@ -218,12 +227,12 @@ server.registerTool('get_map', {
 
 server.registerTool('create_map', {
   description: 'Create a new goal map from an outline. The map gets an apex (root goal) from `title`/`apex_text`; `outline` items become nested nodes. Layout is computed automatically. Max 200 nodes per call. Returns the created tree with node ids.',
-  inputSchema: {
+  inputSchema: strict({
     title: z.string().describe('Map/project title'),
     outline: z.array(treeItem).describe('Top-level items under the apex, each may have children'),
     description: z.string().optional().describe('Map description'),
     apex_text: z.string().optional().describe('Root goal statement, defaults to title'),
-  },
+  }),
 }, async ({ title, outline, description, apex_text }) => {
   try {
     const r = await call('POST', '/api/kb/v1/maps', { title, tree: outline, description, apex_text });
@@ -234,11 +243,11 @@ server.registerTool('create_map', {
 
 server.registerTool('add_nodes', {
   description: 'Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). A node is a goal; a node with an assignee (owner) OR a deadline IS a task — that is the only kind of task in killBottleneck (there is no separate task record; new work = new node). NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.',
-  inputSchema: {
+  inputSchema: strict({
     map_id: z.string(),
     parent_id: z.string().optional().describe('Existing node id to attach under; omit for apex'),
     items: z.array(treeItem),
-  },
+  }),
 }, async ({ map_id, parent_id, items }) => mapWrite(map_id, async (base) => {
   const r = await call('POST', `/api/kb/v1/maps/${enc(map_id)}/nodes`, { parent_id, items, base_updated: base });
   lastUpdated.set(map_id, r.updated);
@@ -246,14 +255,15 @@ server.registerTool('add_nodes', {
 }));
 
 server.registerTool('update_node', {
-  description: 'Update fields of one node: title, status (todo/in_progress/done), description, deadline (YYYY-MM-DD, empty string clears), owner (e-mail, empty string clears), wait_for_children, colour, who performs it (executor_kind / executor_name) and the automation wish (automation_wanted / automation_note). Marking status done may unblock waiting nodes, notify their owners and trigger automations on them.',
-  inputSchema: {
+  description: 'Update fields of one node: title, status (todo/in_progress/done), description, deadline (YYYY-MM-DD, empty string clears), planned_on (YYYY-MM-DD, today to +7 days, empty string clears — WHEN the key owner plans to work on it; this is how killBottleneck expresses priority, never by moving the deadline), owner (e-mail, empty string clears), wait_for_children, colour, who performs it (executor_kind / executor_name) and the automation wish (automation_wanted / automation_note). Unknown fields are rejected with the list of allowed ones. Marking status done may unblock waiting nodes, notify their owners and trigger automations on them.',
+  inputSchema: strict({
     map_id: z.string(),
     node_id: z.string(),
     title: z.string().optional(),
     status: z.enum(['todo', 'in_progress', 'done']).optional(),
     description: z.string().optional(),
     deadline: z.string().optional(),
+    planned_on: z.string().optional().describe('YYYY-MM-DD, today to +7 days, empty string clears. WHEN the key owner plans to work on it — this is how killBottleneck expresses priority; never move the deadline to express priority.'),
     owner: z.string().optional().describe('Accountable PERSON (e-mail of an instance member, see list_people). Stays a human even for AI/cron steps — this is who gets notified. Empty string clears. Unknown e-mails are rejected.'),
     wait_for_children: z.boolean().optional(),
     executor_kind: z.enum(['human', 'automation']).optional().describe('Who performs the step. Default "human".'),
@@ -261,7 +271,7 @@ server.registerTool('update_node', {
     automation_wanted: z.boolean().optional().describe('Wish that this step were automated; notifies the AI agent managers.'),
     automation_note: z.string().optional().describe('Optional context for the automation wish. Empty string clears.'),
     color: z.string().optional().describe('Node colour as #rrggbb, empty string clears'),
-  },
+  }),
 }, async ({ map_id, node_id, ...fields }) => mapWrite(map_id, async (base) => {
   const r = await call('POST', `/api/kb/v1/maps/${enc(map_id)}/nodes/${enc(node_id)}`, { ...fields, base_updated: base });
   lastUpdated.set(map_id, r.updated);
@@ -272,7 +282,7 @@ server.registerTool('update_node', {
 
 server.registerTool('delete_node', {
   description: 'Delete a node INCLUDING its whole subtree. The apex (root) cannot be deleted and whole maps cannot be deleted via the API. Irreversible — read the map first and double-check the node id.',
-  inputSchema: { map_id: z.string(), node_id: z.string() },
+  inputSchema: strict({ map_id: z.string(), node_id: z.string() }),
 }, async ({ map_id, node_id }) => mapWrite(map_id, async (base) => {
   const r = await call('POST', `/api/kb/v1/maps/${enc(map_id)}/nodes/${enc(node_id)}/delete`, { base_updated: base });
   lastUpdated.set(map_id, r.updated);
@@ -290,12 +300,12 @@ const ruleTrigger = z.object({
   freq: z.enum(['daily', 'weekly']).optional().describe('schedule only (required there)'),
   weekday: z.number().int().optional().describe('schedule weekly only: 1 = Monday … 7 = Sunday'),
   hour: z.number().int().optional().describe('schedule only: hour 0-23 local server time (default = instance auto hour)'),
-});
+}).strict();
 const ruleCondition = z.object({
   field: z.enum(['status', 'owner', 'deadline', 'executor_kind', 'parent']).describe('Field of the trigger node the condition checks. `parent` = id of the node\'s parent (kanban lanes: "card under column D1"); supports only eq/ne and the value must be an existing node id of the map'),
   op: z.enum(['eq', 'ne', 'empty', 'not_empty', 'before', 'after']).describe('before/after work only with field=deadline and value YYYY-MM-DD; field=parent supports only eq/ne'),
   value: z.string().optional(),
-});
+}).strict();
 const ruleAction = z.object({
   type: z.enum(['set_status', 'set_owner', 'set_deadline', 'move_node', 'create_subnodes', 'notify', 'run_agent'])
     .describe('What to do. run_agent and move_node target the trigger node; set_status/set_owner/set_deadline target the trigger node by default but accept `target` (a schedule rule needs node_id unless `target` is an explicit node id).'),
@@ -310,7 +320,7 @@ const ruleAction = z.object({
   to: z.string().optional().describe('notify: "node_owner", "deputy_of_node_owner", "position:<nodeId>", "deputy_of_position:<nodeId>" (resolved at run time), "map_owner" or an e-mail. move_node (kanban): id of the new parent node the trigger node moves under — appended at the end of the new siblings row; moving the apex, a vanished target or a move creating a cycle is logged as a skipped action'),
   message: z.string().optional().describe('notify only: message text (max 500 chars)'),
   agent_name: z.string().optional().describe('run_agent only: name of an agent from the AI agent registry; the run is queued and dispatched within a minute'),
-});
+}).strict();
 
 // kompaktní řádek pravidla pro LLM výstupy — držet 1:1 s renderRule v mcp-tools.js
 function renderRule(r) {
@@ -327,7 +337,7 @@ function renderRule(r) {
 
 server.registerTool('create_rule', {
   description: 'Create an automation rule on a map: WHEN trigger fires (and optional AND conditions match) DO the actions in order. Rules run for changes made in the UI, via API and by agents alike. Structural limits: 50 rules per map, 10 actions, 20 conditions — there is NO monthly run quota. A rule applies only to future events, never retroactively. node_id scopes the rule to one node (required for schedule rules whose actions target a node).',
-  inputSchema: {
+  inputSchema: strict({
     map_id: z.string(),
     name: z.string().describe('Human-readable rule name (max 120 chars)'),
     node_id: z.string().optional().describe('Optional: scope the rule to one node of the map'),
@@ -335,7 +345,7 @@ server.registerTool('create_rule', {
     conditions: z.array(ruleCondition).optional().describe('Optional AND chain checked on the trigger node'),
     actions: z.array(ruleAction).describe('1-10 actions, executed in order'),
     enabled: z.boolean().optional().describe('Default true'),
-  },
+  }),
 }, async ({ map_id, name, node_id, trigger, conditions, actions, enabled }) => {
   try {
     const r = await call('POST', `/api/kb/v1/maps/${enc(map_id)}/rules`, { name, node_id, trigger, conditions, actions, enabled });
@@ -345,7 +355,7 @@ server.registerTool('create_rule', {
 
 server.registerTool('list_rules', {
   description: 'List automation rules of a map: id, name, enabled, scope node, trigger, conditions, actions, last_fired and last_error (a non-empty last_error means the rule is misconfigured and its owner was notified).',
-  inputSchema: { map_id: z.string() },
+  inputSchema: strict({ map_id: z.string() }),
 }, async ({ map_id }) => {
   try {
     const r = await call('GET', `/api/kb/v1/maps/${enc(map_id)}/rules`);
@@ -356,7 +366,7 @@ server.registerTool('list_rules', {
 
 server.registerTool('update_rule', {
   description: 'Update an automation rule. Pass only `enabled` to toggle it on/off; otherwise pass the FULL new shape (name, trigger, actions, optional conditions/node_id) — partial field edits are not merged. Edits apply to future events only and clear the rule\'s error state.',
-  inputSchema: {
+  inputSchema: strict({
     map_id: z.string(),
     rule_id: z.string(),
     name: z.string().optional(),
@@ -365,7 +375,7 @@ server.registerTool('update_rule', {
     conditions: z.array(ruleCondition).optional(),
     actions: z.array(ruleAction).optional(),
     enabled: z.boolean().optional(),
-  },
+  }),
 }, async ({ map_id, rule_id, ...fields }) => {
   try {
     const body = {};
@@ -379,7 +389,7 @@ server.registerTool('update_rule', {
 
 server.registerTool('delete_rule', {
   description: 'Delete an automation rule. Its run log stays (with the rule name snapshot). Irreversible.',
-  inputSchema: { map_id: z.string(), rule_id: z.string() },
+  inputSchema: strict({ map_id: z.string(), rule_id: z.string() }),
 }, async ({ map_id, rule_id }) => {
   try {
     await call('POST', `/api/kb/v1/maps/${enc(map_id)}/rules/${enc(rule_id)}/delete`, {});
@@ -389,7 +399,7 @@ server.registerTool('delete_rule', {
 
 server.registerTool('list_rule_runs', {
   description: 'Read the run log of a map\'s automation rules (newest first, max 100): what fired, on which node, ok/failed/skipped and what the actions did. skipped = a safety stop (rule chain depth or per-save cap), detail says which.',
-  inputSchema: { map_id: z.string(), rule_id: z.string().optional().describe('Optional: only runs of this rule') },
+  inputSchema: strict({ map_id: z.string(), rule_id: z.string().optional().describe('Optional: only runs of this rule') }),
 }, async ({ map_id, rule_id }) => {
   try {
     const r = await call('GET', `/api/kb/v1/maps/${enc(map_id)}/rule-runs${rule_id ? `?rule=${enc(rule_id)}` : ''}`);
@@ -403,7 +413,7 @@ server.registerTool('list_rule_runs', {
 
 server.registerTool('list_rule_templates', {
   description: 'List the instance-wide library of rule templates (shape of a rule without a map or node scope). To use one, read it and call create_rule on the target map with its trigger/conditions/actions — the created rule is an independent copy.',
-  inputSchema: {},
+  inputSchema: strict({}),
 }, async () => {
   try {
     const r = await call('GET', '/api/kb/v1/rule-templates');
@@ -414,13 +424,13 @@ server.registerTool('list_rule_templates', {
 
 server.registerTool('save_rule_template', {
   description: 'Save a rule shape into the instance-wide template library (create, or update with template_id — only the author or an admin may update). Templates carry no map and no node scope; create_subnodes may only use parent=trigger_node. Template names are unique.',
-  inputSchema: {
+  inputSchema: strict({
     template_id: z.string().optional().describe('Update an existing template (author or admin only); omit to create'),
     name: z.string().describe('Unique template name (max 120 chars)'),
     trigger: ruleTrigger,
     conditions: z.array(ruleCondition).optional(),
     actions: z.array(ruleAction),
-  },
+  }),
 }, async ({ template_id, name, trigger, conditions, actions }) => {
   try {
     const r = await call('POST', '/api/kb/v1/rule-templates', { id: template_id, name, trigger, conditions, actions });
@@ -430,7 +440,7 @@ server.registerTool('save_rule_template', {
 
 server.registerTool('delete_rule_template', {
   description: 'Delete a rule template from the library (author or admin only). Rules already created from it are independent copies and stay untouched.',
-  inputSchema: { template_id: z.string() },
+  inputSchema: strict({ template_id: z.string() }),
 }, async ({ template_id }) => {
   try {
     await call('POST', `/api/kb/v1/rule-templates/${enc(template_id)}/delete`, {});
@@ -440,7 +450,7 @@ server.registerTool('delete_rule_template', {
 
 server.registerTool('get_org_structure', {
   description: 'Read the organization structure (the org map): positions and functions with node ids, holders and deputies. Use the node ids as dynamic rule targets "position:<nodeId>" / "deputy_of_position:<nodeId>". Read-only — holders and deputies are appointed by an admin in the app.',
-  inputSchema: {},
+  inputSchema: strict({}),
 }, async () => {
   try {
     const r = await call('GET', '/api/kb/v1/org-structure');
@@ -455,7 +465,7 @@ server.registerTool('get_org_structure', {
 // (nález P6-02, 20. 8. 2026). Jen čtení; stejná pole jako /members v aplikaci.
 server.registerTool('list_people', {
   description: 'List the people work can be assigned to: instance members (e-mail, display name, role) and external contacts visible to the key owner (their owner_email is a pseudo e-mail usable as owner). Use these e-mails as `owner` in create_map/add_nodes/update_node and in set_owner rules — an unknown e-mail is rejected. Read-only.',
-  inputSchema: {},
+  inputSchema: strict({}),
 }, async () => {
   try {
     const r = await call('GET', '/api/kb/v1/members');
@@ -471,7 +481,7 @@ server.registerTool('list_people', {
 // vlastník klíče vidí; role se nečte (krok 4c, 26. 8. 2026).
 server.registerTool('get_portfolio', {
   description: 'Read the portfolio overview across all team and shared maps the key owner can read (private maps are excluded, exactly like the Organization page): per-project completion, overdue and stuck items, people with overdue work and a 7-day change summary. Optional today=YYYY-MM-DD. Read-only.',
-  inputSchema: { today: z.string().optional().describe('YYYY-MM-DD, defaults to the server date') },
+  inputSchema: strict({ today: z.string().optional().describe('YYYY-MM-DD, defaults to the server date') }),
 }, async ({ today }) => {
   try {
     const q = today ? `?today=${enc(String(today))}` : '';
