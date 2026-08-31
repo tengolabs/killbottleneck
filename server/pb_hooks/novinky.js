@@ -10,6 +10,16 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.52-beta": {
+    cs: [
+      "Ukládání mapy má hlídací metr: měříme, kolik požadavků editor pošle za typické sezení — a drží se to na třech.",
+      "Pod kapotou: dokončený úklid editoru mapy (3 717 → 1 517 řádků) — ukládání a lišta jsou teď samostatné, přehledné díly; chování 1:1, ověřeno dvěma plnými prokliky a regresemi.",
+    ],
+    en: [
+      "Map saving now has a watchdog metric: we measure how many requests the editor sends in a typical session — and it stays at three.",
+      "Under the hood: the map editor clean-up is complete (3,717 → 1,517 lines) — saving and the toolbar are now separate, readable parts; behaviour 1:1, verified by two full click-tests and regressions.",
+    ],
+  },
   "v0.51-beta": {
     cs: [
       "AI asistenti a integrace přes API: neznámé pole už server tiše nezahodí — odmítne ho, vyjmenuje povolená a poradí náš ekvivalent (např. „priorita“ = plán planned_on).",

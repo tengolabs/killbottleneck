@@ -16,18 +16,10 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { base44 } from '@/api/base44Client';
-import OrgLogo from '@/components/shared/OrgLogo';
 import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, Target, Trash2, Download, Search, X, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, Filter, BarChart3, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, Lock, Unlock, Sun, Moon, FileJson, ChevronDown, Map as MapIcon, Palette, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3, SlidersHorizontal } from 'lucide-react';
-import ShareDialog from '@/components/goal-map/ShareDialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ArrowLeft, Plus, Loader2, Target, Trash2, Lock, Unlock, Sun, Moon, ChevronDown, Map as MapIcon, Palette, SlidersHorizontal } from 'lucide-react';
 import GoalNode from '@/components/goal-map/GoalNode';
 import { MembersContext } from '@/lib/memberLabel';
 import { useMembersWithContacts } from '@/lib/externalContacts';
@@ -36,26 +28,13 @@ import ApexGoalNode from '@/components/goal-map/ApexGoalNode';
 import StickyNoteNode from '@/components/goal-map/StickyNoteNode';
 import PersonalRootNode from '@/components/goal-map/PersonalRootNode';
 import DeletableEdge from '@/components/goal-map/DeletableEdge';
-import NodeEditDialog from '@/components/shared/NodeEditDialog';
-import RecurrenceSwitch from '@/components/node-dialog/sections/RecurrenceSwitch';
-import RulesDialog from '@/components/rules/RulesDialog';
-import NodeRulesPanel from '@/components/rules/NodeRulesPanel';
-import UnblockRulesHint from '@/components/rules/UnblockRulesHint';
-import { rulesApi } from '@/components/rules/rulesApi';
-import SkinDialog from '@/components/shared/SkinDialog';
-import UserMenu from '@/components/shared/UserMenu';
-import AdvisorDialog from '@/components/goal-map/AdvisorDialog';
-import AIChatPanel from '@/components/goal-map/AIChatPanel';
-import BufferPanel, { useBufferNodes } from '@/components/goal-map/BufferPanel';
-import TimeLogPanel from '@/components/time/TimeLogPanel';
+import { useBufferNodes } from '@/components/goal-map/BufferPanel';
 import ProgressDashboard from '@/components/goal-map/ProgressDashboard';
-import ReportRailButton from '@/components/shared/ReportRailButton';
 import { shareMap, getPublicMap } from '@/api/kb';
 import { layoutTree, findFreeChildSpot } from '@/lib/treeLayout';
 import { isApexNode as isApexNodeShared } from '@/lib/mapNodes';
 import { spojeniPovoleno, poskozeneHrany } from '@/lib/mapStructure';
 import { cleanMapData as cleanMap } from '@/lib/cleanMap';
-import { trojcestnyMerge, stableJson } from '@/lib/mergeMap';
 import GoalMapContext from '@/components/goal-map/GoalMapContext';
 import { useToast } from '@/components/ui/use-toast';
 import i18next from 'i18next';
@@ -63,12 +42,9 @@ import { ensureNs } from '@/i18n/lazyNs';
 import { ToastAction } from '@/components/ui/toast';
 import { useAiModes } from '@/hooks/useAiEnabled';
 import { effectiveTheme, setTheme } from '@/lib/theme';
-import NotificationBell from '@/components/shared/NotificationBell';
 import { statusConfig, cycleStatus } from '@/lib/statusMeta';
 import { getDeadlineStatus } from '@/lib/nodeMeta';
-import NodeTasksDialog from '@/components/tasks/NodeTasksDialog';
 import BulkEditDialog from '@/components/goal-map/BulkEditDialog';
-import SaveTemplateDialog from '@/components/shared/SaveTemplateDialog';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { ALIGN_OPTS, stylNoveMapy } from '@/lib/alignStyles';
 import { createRulesFromTemplate, ownersFromNodes, createProjectRecord } from '@/lib/createProject';
@@ -84,8 +60,16 @@ import { useMapLayoutRefs } from '@/hooks/useMapLayoutRefs';
 import { useMapLayout } from '@/hooks/useMapLayout';
 import { useBufferInsert } from '@/hooks/useBufferInsert';
 import { usePersonalMapView } from '@/hooks/usePersonalMapView';
+import { useMapAutosave } from '@/hooks/useMapAutosave';
 import { buildChildrenMap, descendantCounts, hiddenByCollapse, computeProgressMap } from '@/lib/mapProgress';
 import { jeZadavatelNeboVlastnik, mojePracovniUzlyZ } from '@/lib/nodePermissions';
+// prezentační sekce JSX editoru (F1-07) — jen renderují, stav zůstává tady
+import ConflictBanners from '@/components/goal-map/editor/ConflictBanners';
+import EditorToolbar from '@/components/goal-map/editor/EditorToolbar';
+import { DelegatedGroupingBar } from '@/components/goal-map/editor/PersonalTabs';
+import TitleStrip from '@/components/goal-map/editor/TitleStrip';
+import LeftRail from '@/components/goal-map/editor/LeftRail';
+import EditorDialogs from '@/components/goal-map/editor/EditorDialogs';
 
 const nodeTypes = { goalNode: GoalNode, apexNode: ApexGoalNode, note: StickyNoteNode, personalRoot: PersonalRootNode };
 const edgeTypes = { deletable: DeletableEdge };
@@ -95,31 +79,6 @@ const defaultEdgeOptions = {
   animated: true,
   style: { stroke: 'hsl(var(--canvas-edge))', strokeWidth: 2 },
 };
-
-// ikonky orientace mapy: obdélník na výšku / na šířku
-const IconPortrait = (props) => (
-  <svg width="14" height="16" viewBox="0 0 14 16" fill="none" {...props}>
-    <rect x="2.75" y="1.75" width="8.5" height="12.5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-  </svg>
-);
-const IconLandscape = (props) => (
-  <svg width="16" height="14" viewBox="0 0 16 14" fill="none" {...props}>
-    <rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-  </svg>
-);
-
-// Tři styly Zarovnat (cyklus jedním tlačítkem): klasika (do šířky) → kompakt
-// (střídavá 2 patra) → sevřít (patra + těsnější sloty a kroky — karty blíž
-// k sobě, mapa se vejde na stránku). Tři patra NEpomáhala: tidy tree je pakuje
-// stejně široko jako dvě (změřeno layout-parity), úspora přišla až z rozestupů.
-// ALIGN_STYLES/ALIGN_OPTS žijí v lib/alignStyles.js — sdílí je i zakládání
-// nové mapy (templateConvert), aby nevznikala mapa v jiném stylu, než jaký
-// nabízí tlačítko
-// ikony stylů na tlačítku Zarovnat (vzhled tlačítka = indikátor, žádné toasty)
-const ALIGN_ICONS = { classic: StretchHorizontal, compact: Shrink, bands: LayoutGrid };
-// ikony stupňů na tlačítku Čitelnost — stejná logika jako u Zarovnat:
-// tlačítko ukazuje stupeň, který PRÁVĚ platí, stisk přepne na další.
-const CITELNOST_ICONS = { normal: ALargeSmall, large: Type, titleOnly: Heading };
 
 function EditorContent({ mapId, personalMap = false }) {
   const navigate = useNavigate();
@@ -136,25 +95,6 @@ function EditorContent({ mapId, personalMap = false }) {
   const toggleTheme = () => { const next = theme === 'dark' ? 'light' : 'dark'; setTheme(next); setThemeState(next); };
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [conflict, setConflict] = useState(false); // B3: mapa změněna z jiného místa
-  // Hlídání na pozadí zjistilo cizí změnu DŘÍV, než uživatel začal psát.
-  // Ukazuje se jako nenásilný pruh, ne dialog — nic se ještě nerozbilo.
-  const [remoteChanged, setRemoteChanged] = useState(false);
-  // Mapa tak, jak ji naposledy znal server = ZÁKLADNA tříčestného merge
-  // (lib/mergeMap.js). Proti ní se pozná, co změnil server a co já — a tedy
-  // jestli jde cizí zásah slít tiše, nebo se opravdu potkaly dvě ruce na jedné
-  // věci a musí se zeptat člověk. Čtyři refy drží pohromadě: kdo posune jeden,
-  // musí posunout všechny, jinak základna lže.
-  const serverNodes = useRef([]);
-  const serverEdges = useRef([]);
-  const serverTitle = useRef('');
-  const serverColor = useRef('');
-  const hlavickaNow = useRef({ title: '', color: '' });
-  // otisk toho, co už v databázi JE — aby autosave neposílal prázdné uložení
-  // (viz „PRÁZDNÉ ULOŽENÍ SE NEPOSÍLÁ" u saveTimer). `null` = zatím nevíme,
-  // pak se porovnání nikdy netrefí a chová se to jako dřív.
-  const ulozenyOtisk = useRef(null);
-  const [saveStatus, setSaveStatus] = useState('idle');
   const [editNodeId, setEditNodeId] = useState(null);
   // minimapa jde schovat — překrývá malůvku skinu a na malých mapách zavazí
   const [miniMapOpen, setMiniMapOpen] = useState(() => nactiKlic('kb-minimap-open') !== '0');
@@ -218,43 +158,11 @@ function EditorContent({ mapId, personalMap = false }) {
   const highlightDone = useRef(false);
 
   const skipNextSave = useRef(true);
-  const pendingSave = useRef(null); // rozpracované uložení k odeslání při odchodu z mapy (F1-04)
-  const mapIdNow = useRef(mapId); // mapa, kterou editor PRÁVĚ má — odpověď opožděného flush-PATCHe se pozná
-  mapIdNow.current = mapId;
   // „latest ref" aktuálních uzlů/hran: callbacky s dlouhým životem (letící
   // autosave) potřebují vidět SOUČASNÝ stav, ne uzávěr z doby naplánování
   const nodesNow = useRef([]);
   const edgesNow = useRef([]);
   const mapRulesNow = useRef([]);
-  const baseUpdated = useRef(null); // B3: poslední známé updated_date pro detekci konfliktu
-  // Jediné místo, kudy se posouvá základna merge. ⚠️ `base_updated` se smí
-  // posunout VÝHRADNĚ při skutečném převzetí serverového stavu (panel 15. 8.:
-  // posun v jiné větvi vypnul 409 ochranu a autosave pak tiše přepisoval cizí
-  // práci) — proto je verze samostatný přepínač a vypíná se jen tam, kde
-  // volající serverovou podobu NEpřebírá.
-  const zapamatujServer = (m) => {
-    if (m.updated_date) baseUpdated.current = m.updated_date;
-    serverNodes.current = m.nodes || [];
-    serverEdges.current = m.edges || [];
-    serverTitle.current = m.title || '';
-    serverColor.current = m.color || '';
-    ulozenyOtisk.current = stableJson({
-      title: m.title || '', color: m.color || '', nodes: m.nodes || [], edges: m.edges || [],
-    });
-  };
-  // Stav uzlu mění SERVER vlastní routou (/api/kb/node-status) a klient si ho
-  // jen zrcadlí. ⚠️ Musí se zrcadlit i do ZÁKLADNY — jinak by základna tvrdila
-  // starý stav, merge by viděl tři různé hodnoty (základna × plátno × server)
-  // a buď by hlásil kolizi, nebo by mi vracel můj vlastní stav zpátky a točil
-  // autosave dokola.
-  const zrcadliStavDoZakladny = (nodeId, stav) => {
-    serverNodes.current = (serverNodes.current || []).map((n) => (
-      n.id === nodeId ? { ...n, data: { ...(n.data || {}), status: stav } } : n
-    ));
-  };
-  // PATCH mapy právě letí — hlídání na pozadí musí mlčet, jinak GET verze
-  // předběhne odpověď vlastního uložení a vyrobí falešný poplach.
-  const saveInFlight = useRef(false);
   // Rozložení mapy — raná část (směr, zámek posunu, refy směru/pozic, závora
   // deep-linku, centerOnNode, cleanMapData) — hooks/useMapLayoutRefs.js (F1-07).
   // Refy čtou už loadPersonalMap, load mapy a autosave níž, proto vzniká tady.
@@ -266,7 +174,6 @@ function EditorContent({ mapId, personalMap = false }) {
   // VZOROVÁ (needitovaná) podoba šablony — projekt vzniká z ní, ne z rozklikaného náhledu
   const sablonaCistaRef = useRef(null);
   const templateSeedsRef = useRef(null); // {idMap, rules} z náhledu šablony — pravidla se založí až s mapou
-  const saveTimer = useRef(null);
   // Zpět + Vrátit AI změny — hooks/useMapHistory.js (F1-07)
   const {
     canUndo, pushHistory, handleUndo, aiSnapshotRef, canUndoAi, setCanUndoAi, handleUndoAi,
@@ -657,379 +564,21 @@ function EditorContent({ mapId, personalMap = false }) {
     setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === highlightId })));
   }, [loading, rfInstance, nodes, location.search, setNodes, narrow, centerOnNode]);
 
-  // latest-ref vzor: přiřazení při KAŽDÉM renderu, ať refy nikdy nezaostávají
-  nodesNow.current = nodes;
-  edgesNow.current = edges;
-  // Hlavička taky přes ref: slévání cizích změn visí v závislostech hlídače na
-  // pozadí, a kdyby si drželo `title` z uzávěru, každé písmeno v názvu mapy by
-  // restartovalo 45s interval — hlídač by při psaní nikdy nedoběhl.
-  hlavickaNow.current = { title, color };
-
-  // Debounced auto-save
-  useEffect(() => {
-    if (skipNextSave.current) {
-      skipNextSave.current = false;
-      return;
-    }
-    if (!canEdit || isPublicView || isTemplatePreview) return;
-
-    // Draft mode: create the map only when there's actual content
-    if (isDraft) {
-      const hasContent = nodes.length > 0 || title.trim().length > 0;
-      if (!hasContent) return;
-      setSaveStatus('saving');
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(async () => {
-        try {
-          const { cleanNodes, cleanEdges } = cleanMapData();
-          const newMap = await createProjectRecord({ title: title.trim() || t('defaults.newMapTitle'), nodes: cleanNodes, edges: cleanEdges, color });
-          setActiveMapId(newMap.id);
-          // B3 — základna patří NOVÉ mapě; nechat v ní uzly té předchozí by
-          // z prvního zásahu pravidla udělalo falešnou kolizi
-          zapamatujServer({ ...newMap, title, color, nodes: newMap.nodes || cleanNodes, edges: newMap.edges || cleanEdges });
-          skipNextSave.current = true;
-          window.history.replaceState(null, '', `/map/${newMap.id}`);
-          setSaveStatus('saved');
-          setTimeout(() => setSaveStatus('idle'), 2000);
-        } catch (e) {
-          console.error(e);
-          setSaveStatus('idle');
-        }
-      }, 1200);
-      return () => {
-        if (saveTimer.current) clearTimeout(saveTimer.current);
-      };
-    }
-
-    if (!activeMapId) return;
-    // ⚠️ „Ukládání…" se rozsvítí AŽ když se opravdu bude ukládat. Dřív se
-    // nastavovalo hned tady, takže po stisku Čitelnosti lišta blikla
-    // „Ukládání…" a zhasla — a tooltip i návod přitom slibují, že se do mapy
-    // nic nezapisuje. Uživatel viděl opak toho, co mu říkáme (panel 13. 8.).
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    const odesli = async () => {
-      try {
-        const { cleanNodes, cleanEdges } = cleanMapData();
-        // PRÁZDNÉ ULOŽENÍ SE NEPOSÍLÁ (panel /checkup 13. 8. 2026).
-        // Autosave visí na referenci `nodes`, jenže tu vyrobí i změna, která
-        // s obsahem mapy nemá nic společného — ReactFlow posílá `dimensions`
-        // change, kdykoli se změní NAMĚŘENÉ rozměry karty. Stačilo tedy
-        // přepnout velikost písma (tlačítko Čitelnost) a odešel PATCH
-        // s daty shodnými s databází; jediné, co se změnilo, bylo `updated`.
-        // Následky: mapa přeskočí v řazení „naposledy upravené" a kolegovi,
-        // který ji má otevřenou, se rozjede `base_updated` → konflikt 409.
-        // Porovnává se kanonický tvar (`stableJson` srovnává pořadí klíčů
-        // i prázdné hodnoty), takže se zahodí JEN opravdu prázdný zápis.
-        const otisk = stableJson({ title, color, nodes: cleanNodes, edges: cleanEdges });
-        if (otisk === ulozenyOtisk.current) return;   // nic se nemění → ani indikátor
-        setSaveStatus('saving');
-        saveInFlight.current = true;
-        const updated = await base44.entities.GoalMap.update(activeMapId, {
-          title,
-          color,
-          nodes: cleanNodes,
-          edges: cleanEdges,
-          base_updated: baseUpdated.current, // B3: verze, ze které vycházíme
-        });
-        // Flush při přechodu na JINOU mapu: odpověď dorazí, až když editor drží
-        // novou mapu — základnu merge ani otisk té nové nesmí přepsat (jinak
-        // první autosave nové mapy skončil 409; panel 27. 8.). Uloženo je, hotovo.
-        if (mapIdNow.current !== mapId) return;
-        // B3: posunout základnu na verzi, kterou jsme právě zapsali
-        zapamatujServer({
-          updated_date: updated.updated_date,
-          title, color, nodes: updated.nodes || cleanNodes, edges: updated.edges || cleanEdges,
-        });
-        // otisk drží to, co jsme ODESLALI — kdyby se serverová normalizace
-        // o vlásek lišila od naší, porovnání „nic se nemění" by se nikdy
-        // netrefilo a autosave by se točil dokola
-        ulozenyOtisk.current = otisk;
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 2000);
-        // AUTOMATIZAČNÍ PRAVIDLA běží UVNITŘ PATCHe, ale AŽ PO uložení — jejich
-        // mutace (set_owner, stav, pod-uzly…) v HTTP odpovědi NENÍ a base_updated
-        // z odpovědi je hned zastaralé. Bez dorovnání uživatel změnu neuvidí
-        // a příští autosave skončí 409/konfliktem. (Richardův klik-test 15. 8.:
-        // „změnil jsem na Probíhá a nic se nerozjelo" — set_owner přitom
-        // na serveru proběhl, jen zůstal neviditelný.) Levná kontrola verze
-        // se dělá JEN když má mapa zapnutá pravidla.
-        if ((mapRulesNow.current || []).some((rl) => rl && rl.enabled)) {
-          const ver = await base44.entities.GoalMap.get(activeMapId, { fields: 'updated' });
-          if (ver?.updated_date && ver.updated_date !== updated.updated_date) {
-            const fresh = (await base44.entities.GoalMap.filter({ id: activeMapId }))?.[0];
-            if (fresh) {
-              // ⚠️ TADY PADAL RICHARDŮV PŘÍPAD. Dřív se převzetí dělalo jen
-              // tehdy, když uživatel od odeslání PATCHe NIC nenapsal — a na
-              // cloudu (stovky ms) je při návratu odpovědi rozepsaný skoro
-              // vždycky, takže kanban vždycky skončil pruhem. Rozhoduje tedy
-              // latence, ne kód; lokální klik-testy to proto nikdy nechytily.
-              // Nově se zkusí tříčestný merge: co server změnil a já ne, se
-              // převezme; moje rozepsaná změna zůstane. Pruh zbývá na skutečné
-              // kolize (obě strany na téže věci) a na cizí LIDSKÉ úpravy.
-              if (!(await slitCiziZmenu(fresh))) setRemoteChanged(true);
-            }
-          }
-        }
-      } catch (e) {
-        if (mapIdNow.current !== mapId) { console.error(e); return; } // odpověď staré mapy po přechodu — nic nad novou neřešit
-        // B3: cizí klient mezitím mapu změnil → nabídnout přenačtení místo přepsání
-        if (e?.status === 409) {
-          // Automatizace doběhla a označila uzel za hotový → mapa se posunula pod
-          // rukama. Tvrdý dotaz „načíst znovu?" by tady znamenal ztrátu rozepsané
-          // změny, a to zrovna ve scénáři, kvůli kterému se automatizace zavádějí.
-          // Když se cizí zásah s mojí prací nepotkal, slijeme ho tiše.
-          if (await slitCiziZmenu()) {
-            // Rozepsanou práci odešle autosave, který slití samo vyvolá. Když
-            // ale nezůstalo nic k odeslání, nikdo už lištu nepřepne a zůstala by
-            // svítit na „Ukládání…".
-            if (skipNextSave.current) {
-              setSaveStatus('saved');
-              setTimeout(() => setSaveStatus('idle'), 2000);
-            }
-            return;
-          }
-          setConflict(true);
-          setSaveStatus('idle');
-          return;
-        }
-        console.error(e);
-        setSaveStatus('idle');
-      } finally {
-        saveInFlight.current = false;
-      }
-    };
-    pendingSave.current = odesli;
-    saveTimer.current = setTimeout(() => { pendingSave.current = null; odesli(); }, 1200);
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, [nodes, edges, title, color, isDraft, activeMapId, canEdit, isPublicView, isTemplatePreview]);
-
-  // Nasazení sloučeného stavu na plátno.
-  // ⚠️ SLÉVAT, ne vyměnit vše: velkoplošná výměna objektů brala uzlům interní
-  // stav React Flow (measured…) a plátno pak umělo PŘESTAT KRESLIT hrany, dokud
-  // se mapa nezavřela a neotevřela (Richardův nález 15. 8. při kanbanu:
-  // „zmizely všechny čáry", data v DB přitom zdravá; vzácný souběh — chycen
-  // 1× ze ~40 kol). Nezměněný uzel/hrana si proto drží PŮVODNÍ objekt (identita
-  // = žádné překreslení), změněné přebírají measured ze starého.
-  const nasadNaPlatno = useCallback((noveNodes, noveEdges) => {
-    setNodes((prev) => {
-      const stare = new Map(prev.map((n) => [n.id, n]));
-      return (noveNodes || []).map((n) => {
-        const s = stare.get(n.id);
-        const novy = {
-          ...n,
-          type: n.type === 'note' ? 'note' : (isApexNodeShared(n) ? 'apexNode' : 'goalNode'),
-          data: { ...n.data, collapsed: n.data?.collapsed || false },
-        };
-        if (s && stableJson({ p: s.position, d: s.data, t: s.type }) === stableJson({ p: novy.position, d: novy.data, t: novy.type })) return s;
-        return s?.measured ? { ...novy, measured: s.measured } : novy;
-      });
-    });
-    setEdges((prev) => {
-      const stare = new Map(prev.map((e2) => [e2.id, e2]));
-      return (noveEdges || []).map((ed) => {
-        const s = stare.get(ed.id);
-        if (s && s.source === ed.source && s.target === ed.target) return s;
-        return { ...ed, type: 'deletable' };
-      });
-    });
-  }, [setNodes, setEdges]);
-
-  // Doklad, že za cizí změnou stojí AUTOMATIZACE — a to zrovna u TĚCH uzlů,
-  // které se chystáme převzít. Nestačí „nějaké pravidlo mezitím běželo": na
-  // kanbanové mapě běží pravidla pořád, takže by se pod jejich hlavičkou tiše
-  // protáhla i ruční úprava kolegy. Běh se s uzlem páruje přes `node_id`
-  // (u pod-uzlů založených pravidlem přes jejich rodiče).
-  // POCTIVĚ: pravidlo s mapovým/časovým triggerem `node_id` nemá, takže se
-  // nedoloží a skončí pruhem — bezpečná strana.
-  const uzlyBehlychPravidel = useCallback(async (od, doVerze) => {
-    if (!od) return new Set();
-    // mapa bez zapnutých pravidel se ptát nemusí — žádný běh tam vzniknout nemohl
-    if (!(mapRulesNow.current || []).some((rl) => rl && rl.enabled)) return new Set();
-    try {
-      const runs = await rulesApi.runs(activeMapId);
-      // `>=`, ne `>`: běh vzniká UVNITŘ téhož požadavku, kterým se posunula
-      // verze, takže obě razítka padnou do stejné milisekundy častěji, než by
-      // se čekalo. S `>` by se doklad občas nenašel a pruh by se vracel náhodně.
-      // Okno musí být omezené z OBOU stran. Zdola základnou, shora verzí, kterou
-      // právě přebíráme: běh pravidla vzniká UVNITŘ téhož požadavku, který verzi
-      // posunul, takže smí být nanejvýš pár vteřin před ní. Bez horní meze by
-      // u dlouho otevřeného editoru posloužil jako doklad i běh starý hodiny —
-      // a pod jeho hlavičkou by se tiše protáhla ruční úprava kolegy.
-      const ms = (v) => { const d = new Date(String(v).replace(' ', 'T')); return Number.isNaN(d.getTime()) ? null : d.getTime(); };
-      const strop = ms(doVerze);
-      const cerstve = (runs || []).filter((r) => {
-        if (!r || r.status !== 'ok' || !r.created) return false;
-        if (String(r.created) < String(od)) return false;
-        const cas = ms(r.created);   // NE `t` — to je překladová funkce (no-shadow)
-        if (strop === null || cas === null) return false; // nečitelné razítko → bezpečná strana
-        return cas <= strop + 5000 && cas >= strop - 60000;
-      });
-      return new Set(cerstve.map((r) => r.node_id).filter(Boolean));
-    } catch {
-      return new Set(); // nevím → bezpečná strana, tedy pruh
-    }
-  }, [activeMapId]);
-
-  // Pokrývají běhy pravidel VŠECHNY uzly, které se chystáme převzít?
-  // Pod-uzel založený pravidlem svoje vlastní `node_id` v logu nemá — doloží ho
-  // rodič, pod kterým na serveru visí.
-  // POCTIVĚ: tohle není bezpečnostní hranice. Kdo smí mapu měnit, ten si umí
-  // běh pravidla i vyrobit — brána jen odděluje „změnu udělal stroj" od
-  // „změnu udělal člověk", aby o kolegově práci šel pruh. Zápisová práva hlídá
-  // server (RLS + base_updated), ne tohle.
-  const pokrytoPravidly = (ids, uzlyPravidel, srv) => {
-    if (!ids.length || !uzlyPravidel.size) return false;
-    const rodic = new Map((srv.edges || []).map((e) => [e.target, e.source]));
-    return ids.every((id) => uzlyPravidel.has(id) || uzlyPravidel.has(rodic.get(id)));
-  };
-
-  // Tiché slití cizí změny do rozepsané práce. Vrací true, když se to povedlo a
-  // uživateli se nemá nic ukazovat. Základna merge = poslední známý stav serveru
-  // (serverNodes/serverEdges/serverTitle/serverColor), „moje" = plátno teď.
-  // Když merge narazí na skutečnou kolizi, vrací false a volající sáhne po
-  // pruhu/dialogu — tichý merge NIKDY nesmí vzít rozepsanou změnu.
-  const slitCiziZmenu = useCallback(async (znamy) => {
-    try {
-      const srv = znamy || (await base44.entities.GoalMap.filter({ id: activeMapId }))?.[0];
-      if (!srv) return false;
-      // ⚠️ VŠECHNY TŘI vstupy musí projít kanonickým tvarem. Základna i serverová
-      // mapa chodí syrové z databáze a starší záznam nemusí mít klíč, který do
-      // `canonicalNodeData` přibyl později — chybějící klíč se přitom NEROVNÁ
-      // prázdné hodnotě, takže by nedotčený uzel vypadal jako změněný a tichý
-      // merge by na starších mapách mlčky přestal fungovat.
-      const kanon = (m) => {
-        const { cleanNodes, cleanEdges } = cleanMap(m.nodes || [], m.edges || []);
-        return { title: m.title || '', color: m.color || '', nodes: cleanNodes, edges: cleanEdges };
-      };
-      // Otisk plátna: potřebujeme ho dvakrát — jednou jako vstup do merge,
-      // podruhé jako kontrolu, že se pod rukama nic nezměnilo (viz níž).
-      const platno = () => {
-        const { cleanNodes, cleanEdges } = cleanMapData();
-        const { title: tt, color: cc } = hlavickaNow.current;
-        return { title: tt, color: cc, nodes: cleanNodes, edges: cleanEdges };
-      };
-      const zakladna = kanon({ title: serverTitle.current, color: serverColor.current, nodes: serverNodes.current, edges: serverEdges.current });
-      const serverKanon = kanon(srv);
-      // ⚠️ MEZI SNÍMKEM PLÁTNA A JEHO NASAZENÍM PROBĚHNOU SÍŤOVÁ KOLA (dotaz na
-      // mapu, dotaz na běhy pravidel — na cloudu stovky ms). Kdybychom nasadili
-      // snímek pořízený před nimi, ZTRATILA by se práce, kterou uživatel mezitím
-      // udělal. Řešením není couvnout do pruhu (to je přesně ten scénář, kde
-      // člověk mezi uloženími píše — vrátili bychom Richardovu vadu), ale merge
-      // PŘEPOČÍTAT z čerstvého plátna. Merge je čistá funkce bez sítě, takže
-      // kolo navíc nic nestojí; doklad pravidel se tahá jen jednou.
-      let pred; let r; let uzlyPravidel = null;
-      for (let pokus = 0; pokus < 3; pokus++) {
-        pred = platno();
-        r = trojcestnyMerge(zakladna, pred, serverKanon);
-        if (!r.ok) return false;
-        // Pouhý posun stavů se slévá od v0.27 bez dalších podmínek — to zůstává.
-        // ŠIRŠÍ převzetí (přesun karty, pod-uzly od pravidla) je nové a dělá se
-        // JEN tam, kde ho doloží běh pravidla: cizí LIDSKÁ úprava má dál
-        // vyskočit pruhem, aby o kolegově práci člověk věděl.
-        // Přejmenování mapy / změna barvy nikdy nepochází od pravidla → člověk → pruh
-        if (r.hlavickaPrevzata) return false;
-        if (r.prevzato > 0 && !r.jenStavy) {
-          if (!uzlyPravidel) {
-            uzlyPravidel = await uzlyBehlychPravidel(baseUpdated.current, srv.updated_date);
-            if (stableJson(platno()) !== stableJson(pred)) continue; // psal mi pod rukama → přepočítat
-          }
-          if (!pokrytoPravidly(r.prevzateUzly, uzlyPravidel, srv)) return false;
-        }
-        break;
-      }
-      // po posledním kole už se nic nečekalo; když se plátno přesto hnulo, radši pruh
-      if (!r || !r.ok || stableJson(platno()) !== stableJson(pred)) return false;
-      if (r.title !== pred.title) setTitle(r.title);
-      if (r.color !== pred.color) setColor(r.color);
-      nasadNaPlatno(r.nodes, r.edges);
-      // Mám-li nad rámec serveru vlastní rozepsanou práci, autosave ji MUSÍ
-      // odeslat; jinak by převzetí spustilo jen prázdné kolo ukládání.
-      // (Efekty běží až po tomhle bloku, takže pořadí sedí.)
-      skipNextSave.current = !r.mojeNavic;
-      // Základna se posouvá AŽ NAKONEC, když je převzetí opravdu hotové.
-      // ⚠️ Kdyby se posunula dřív a něco nad ní spadlo, `base_updated` by
-      // ukazoval na verzi, kterou plátno nemá — a příští autosave by prošel
-      // 409 ochranou a zásah automatizace tiše přepsal.
-      zapamatujServer(srv);
-      if (r.prevzato > 0 || r.prebitoMnou > 0) {
-        toast({ title: t(r.jenStavy || r.prevzato === 0 ? 'toasts.mapMergedStatus' : 'toasts.mapMergedRule') });
-      }
-      return true;
-    } catch (err) {
-      // mlčet by znamenalo neviditelnou vadu; celý objekt ale nelogovat —
-      // odpověď z API nese i obsah mapy a konzole je na sdíleném stroji vidět
-      console.error('tiché slití selhalo', err?.status, err?.message);
-      return false;
-    }
-    // cleanMapData čte refy, ne uzávěr — proto do závislostí nepatří (a nesmí,
-    // jinak by se hlídač na pozadí restartoval při každé změně plátna)
-     
-  }, [activeMapId, nasadNaPlatno, uzlyBehlychPravidel, toast, t]);
-
-  // „Ponechat moje změny" v dialogu konfliktu: převezme čerstvou verzi jako
-  // základnu a VĚDOMĚ uloží můj rozepsaný stav přes cizí úpravy. Server dál
-  // drží autoritu (base_updated) — tohle není tiché přepsání, ale volba
-  // uživatele s vysvětleným následkem. Když mezi GET verze a PATCH uloží
-  // někdo další (409), dialog zůstává a jde to zkusit znovu — záměrně žádná
-  // automatická smyčka, každý pokus = nové vědomé rozhodnutí.
-  const handleKeepMine = async () => {
-    try {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      setSaveStatus('saving');
-      saveInFlight.current = true;
-      const fresh = await base44.entities.GoalMap.get(activeMapId, { fields: 'updated' });
-      const { cleanNodes, cleanEdges } = cleanMapData();
-      const updated = await base44.entities.GoalMap.update(activeMapId, {
-        title,
-        color,
-        nodes: cleanNodes,
-        edges: cleanEdges,
-        base_updated: fresh.updated_date,
-      });
-      zapamatujServer({ updated_date: updated.updated_date, title, color, nodes: cleanNodes, edges: cleanEdges });
-      setConflict(false);
-      setRemoteChanged(false);
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-      toast({ title: t('conflict.keptSaved') });
-    } catch {
-      setSaveStatus('idle');
-      toast({ title: t('conflict.keepFailed'), variant: 'destructive' });
-    } finally {
-      saveInFlight.current = false;
-    }
-  };
-
-  // Levné hlídání na pozadí: do 13. 8. se aplikace serveru ptala jen dík vadě
-  // (autosave posílal i prázdná uložení). Po její opravě by se cizí změna
-  // poznala až u první vlastní úpravy — tedy nejdřív 409, pak dialog. Tenhle
-  // tick se periodicky zeptá JEN na `updated` (ne celou mapu) a při rozdílu
-  // ukáže nenásilný pruh dřív, než uživatel začne psát. Co by 409 větev slila
-  // tiše, slije tiše i tady — obě cesty se musí chovat stejně, jinak by pruh
-  // vyskočil z hlídače chvíli po tom, co ho merge jinde právě potlačil. `kb-native-resume` kryje probuzení mobilu (timery ve WebView
-  // po zamčení umírají) a testům dává páku, jak kontrolu vynutit hned.
-  useEffect(() => {
-    if (!activeMapId || isDraft || isPublicView || isTemplatePreview || !canEdit) return undefined;
-    let busy = false;
-    const tick = async () => {
-      if (busy || document.visibilityState !== 'visible') return;
-      if (saveInFlight.current || conflict || remoteChanged) return;
-      busy = true;
-      try {
-        const fresh = await base44.entities.GoalMap.get(activeMapId, { fields: 'updated' });
-        if (fresh.updated_date && baseUpdated.current
-            && fresh.updated_date !== baseUpdated.current && !saveInFlight.current) {
-          if (!(await slitCiziZmenu())) setRemoteChanged(true);
-        }
-      } catch { /* výpadek sítě/práv ohlásí až skutečné uložení; pruh-spam je horší */ }
-      busy = false;
-    };
-    const iv = setInterval(tick, 45000);
-    window.addEventListener('kb-native-resume', tick);
-    return () => { clearInterval(iv); window.removeEventListener('kb-native-resume', tick); };
-  }, [activeMapId, isDraft, isPublicView, isTemplatePreview, canEdit, conflict, remoteChanged, slitCiziZmenu]);
+  // Ukládání mapy (konflikt/pruh cizí změny, základna merge + zapamatujServer,
+  // saveStatus, debounced autosave vč. návrhu, nasadNaPlatno, tiché slití,
+  // Ponechat moje změny, hlídač na pozadí) — hooks/useMapAutosave.js (F1-07).
+  // Volá se TADY, na místě původního efektu autosave: deep-link nad tím,
+  // efekt směru (useMapLayout) pod tím — pořadí efektů beze změny. Load-efekt
+  // výš volá zapamatujServer a v cleanupu čte saveTimer/pendingSave (flush
+  // při odchodu) — obojí hook vrací.
+  const {
+    conflict, remoteChanged, saveStatus, baseUpdated, zapamatujServer, zrcadliStavDoZakladny,
+    saveTimer, pendingSave, nasadNaPlatno, handleKeepMine,
+  } = useMapAutosave({
+    mapId, activeMapId, setActiveMapId, isDraft, canEdit, isPublicView, isTemplatePreview,
+    nodes, edges, title, color, setNodes, setEdges, setTitle, setColor,
+    nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t,
+  });
 
   // Rozložení mapy (efekt směru, layoutAllForView, Zarovnat + zámek stylu,
   // Čitelnost) — hooks/useMapLayout.js (F1-07). Volá se TADY, na místě
@@ -1679,473 +1228,44 @@ function EditorContent({ mapId, personalMap = false }) {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {conflict && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl shadow-lg max-w-md w-full p-5 space-y-3">
-            <h3 className="font-heading font-semibold text-lg">{t('conflict.title')}</h3>
-            <p className="text-sm text-muted-foreground">
-              {t('conflict.body')}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {t('conflict.keepMineHint')} {t('conflict.reloadHint')}
-            </p>
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-              <Button variant="ghost" size="sm" className="mr-auto" disabled={exporting} onClick={() => handleExportJson(true)}>
-                {t('conflict.download')}
-              </Button>
-              <Button variant="outline" disabled={saveStatus === 'saving'} onClick={handleKeepMine}>
-                {t('conflict.keepMine')}
-              </Button>
-              <Button onClick={() => window.location.reload()}>{t('conflict.reload')}</Button>
-            </div>
-          </div>
-        </div>
-      )}
-      {isPublicView && (
-        <div className="h-9 bg-amber-50 border-b border-amber-200 dark:bg-amber-950/40 dark:border-amber-900 flex items-center justify-center gap-3 px-4 text-sm shrink-0">
-          <span className="text-amber-800 dark:text-amber-300 font-medium">{t('banner.publicMap')}</span>
-          <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => navigate('/login')}>{t('banner.login')}</Button>
-        </div>
-      )}
-      {archived && (
-        <div className="h-9 bg-secondary border-b flex items-center justify-center gap-3 px-4 text-sm shrink-0">
-          <span className="text-muted-foreground font-medium flex items-center gap-1.5">
-            <Archive className="w-3.5 h-3.5" /> {t('banner.archivedProject')}
-          </span>
-          {isMapOwner && (
-            <Button size="sm" variant="outline" className="h-6 text-xs" onClick={handleToggleArchive}>
-              <ArchiveRestore className="w-3 h-3" /> {t('banner.restore')}
-            </Button>
-          )}
-        </div>
-      )}
-      {isTemplatePreview && (
-        <div className="h-9 bg-indigo-50 border-b border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-900 flex items-center justify-center gap-3 px-4 text-sm shrink-0">
-          <span className="text-indigo-800 dark:text-indigo-300 font-medium">{t('banner.templatePreview')}</span>
-          <Button size="sm" className="h-6 text-xs" disabled={savingTemplate} onClick={handleSaveTemplate}>
-            {savingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-            {t('banner.useTemplate')}
-          </Button>
-        </div>
-      )}
-      {remoteChanged && !conflict && (
-        <div className="h-9 bg-amber-50 border-b border-amber-200 dark:bg-amber-950/40 dark:border-amber-900 flex items-center justify-center gap-3 px-4 text-sm shrink-0">
-          <span className="text-amber-800 dark:text-amber-300 font-medium">{t('banner.mapChanged')}</span>
-          <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => window.location.reload()}>
-            {t('conflict.reload')}
-          </Button>
-        </div>
-      )}
-      <header className="min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
-        <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
-          {/* Značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
-              U názvu projektu být nesmí — dvě loga vedle sebe by si konkurovala,
-              proto tady stojí BUĎ logo firmy, NEBO naše, nikdy obojí.
-              18. 8. 2026: přednost dostalo logo organizace (stejně jako
-              v hlavičce plné verze) — kdo si ho nahraje, čeká ho všude.
-              Na mobilu jen kolečko s hadem, jinak by v úzké liště nezbylo
-              místo na název. */}
-          {/* Logo = zkratka na úvod (klik odkudkoli vede na Home, Richard 7. 8. 2026).
-              Obrázky zůstávají dekorativní, přístupnost nese button. */}
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            title={t('toolbar.homeLink')}
-            aria-label={t('toolbar.homeLink')}
-            className="flex items-center shrink-0 rounded-md outline-none hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <OrgLogo org={org} compact />
-          </button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              // zpět tam, odkud uživatel přišel (např. tabulka úkolů); bez historie na titulku
-              if (window.history.state && window.history.state.idx > 0) navigate(-1);
-              else navigate('/');
-            }}
-            className="shrink-0 h-11 w-11 sm:h-9 sm:w-9" // mobil: 44px dotyková plocha (u horní hrany se 36px špatně trefuje)
-            title={t('toolbar.back')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          {/* Název projektu se 18. 8. 2026 přestěhoval z lišty POD ni (Richard:
-              „název mapy je málo viditelný a když je dlouhý, schová se").
-              V liště se tísnil mezi ikonami a přebytek ořízl doprostřed slova. */}
-        </div>
-        <div className="flex items-center gap-1.5 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-          {/* Vyhledávání a filtr Moje úkoly se přestěhovaly do LEVÉ lišty pod
-              zásobník a časovač (Richard 11. 8.: „vyhledávání dej ikonku pod
-              zásobník a časovač… moje úkoly taky, je to jen filtr") — horní
-              liště se ulevilo. */}
-          {/* Rozložení mapy: na výšku (svisle) / na šířku (vodorovně) / auto dle displeje */}
-          <div className="flex items-center rounded-md border border-input overflow-hidden shrink-0 divide-x divide-input" role="group" aria-label={t('toolbar.directionGroup')}>
-            {/* Ikonka = orientace DISPLEJE: na výšku (portrét) → strom se větví do šířky
-                (doprava); na šířku (landscape) → strom dolů. Předvybere se dle displeje;
-                klik i vycentruje. (Auto tlačítko zbytečné — default je stejně dle zařízení.) */}
-            {[
-              ['horizontal', t('toolbar.directionPortrait'), <IconPortrait key="p" className="w-4 h-[18px]" />],
-              ['vertical', t('toolbar.directionLandscape'), <IconLandscape key="l" className="w-[18px] h-4" />],
-            ].map(([v, label, ic]) => (
-              <button
-                key={v}
-                type="button"
-                data-dir={v}
-                onClick={() => { if (v === direction) recenterMap(); setDirMode(v); }}
-                title={v === direction ? t('toolbar.directionCenter', { label }) : label}
-                aria-pressed={direction === v}
-                className={`h-9 min-w-[48px] px-3 flex items-center justify-center gap-1 text-xs font-medium transition-colors ${
-                  direction === v ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground active:bg-muted'
-                }`}
-              >
-                {ic}
-                <span className="hidden md:inline">{label}</span>
-              </button>
-            ))}
-          </div>
-          {(canEdit || personalMap) && (() => {
-            if (kanbanAktivni && kanbanNsReady) {
-              return (
-                <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex opacity-80" disabled
-                  title={t('rules:rules.toolbarKanbanTitle')} data-testid="toolbar-kanban-mode">
-                  <Columns3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('rules:rules.toolbarKanban')}</span>
-                </Button>
-              );
-            }
-            const AlignIcon = ALIGN_ICONS[alignStyle] || AlignCenter;
-            return (
-              <Button
-                variant={alignLock ? 'default' : 'outline'}
-                size="sm"
-                className={`hidden min-[1850px]:inline-flex${alignLock ? ' ring-2 ring-primary/40 shadow-inner' : ''}`}
-                onClick={handleAlign}
-                onPointerDown={alignPressStart}
-                onPointerUp={alignPressEnd}
-                onPointerLeave={alignPressEnd}
-                onPointerCancel={alignPressEnd}
-                onContextMenu={(e) => e.preventDefault()}
-                title={alignLock ? t('toolbar.alignLockedTitle', { styl: t(`toolbar.alignShort_${alignLock}`) }) : t('toolbar.alignTitle')}
-                data-align-lock={alignLock || 'off'}
-              >
-                {/* Ikona zůstává VŽDY ikonou stylu — Richard 12. 8.: „ať je
-                    ikonka pořád stejná, jen při zamčení změní barvu nebo je
-                    jakoby zmáčknutá". Zámek jako vlastní ikona bral informaci
-                    o tom, KTERÝ styl je zamčený. */}
-                <AlignIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">{alignStyle ? `${t('toolbar.align')} · ${t(`toolbar.alignShort_${alignStyle}`)}` : t('toolbar.align')}</span>
-              </Button>
-            );
-          })()}
-          {/* Čitelnost je ZÁMĚRNĚ mimo `canEdit` — na rozdíl od Zarovnat nesahá
-              na mapu, jen na sazbu písma. Kdo mapu jen prohlíží (veřejná,
-              sdílená jen ke čtení), musí si ji taky umět zvětšit. */}
-          {(() => {
-            const CitIcon = CITELNOST_ICONS[citelnost] || ALargeSmall;
-            return (
-              <Button
-                variant="outline"
-                size="sm"
-                data-citelnost={citelnost}
-                className="hidden min-[1850px]:inline-flex"
-                onClick={handleCitelnost}
-                title={t('toolbar.readabilityTitle')}
-              >
-                <CitIcon className="w-4 h-4" /> <span className="hidden sm:inline">{`${t('toolbar.readability')} · ${t(`toolbar.readabilityShort_${citelnost}`)}`}</span>
-              </Button>
-            );
-          })()}
-          {/* kostička (fit) i na velké liště — hned vedle Zarovnat */}
-          <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex px-2" onClick={recenterMap} title={t('toolbar.fitViewTitle')}>
-            <Maximize className="w-4 h-4" />
-          </Button>
-          {/* Dashboard se přestěhoval do levé lišty pod filtr Moje úkoly
-              (Richard 11. 8.: „tlačítko dashboard doleva a dolů pod filtr") */}
-          {user && activeMapId && !isPublicView && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden min-[1850px]:inline-flex"
-              onClick={() => navigate(`/tasks?map=${activeMapId}`)}
-              title={t('toolbar.tasksTitle')}
-            >
-              <CheckSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('toolbar.tasks')}{mapTaskCount > 0 ? ` (${mapTaskCount})` : ''}</span>
-            </Button>
-          )}
-          {saveStatus === 'saving' && (
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" /> {t('saveState.saving')}
-            </span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-green-600">
-              <Check className="w-3 h-3" /> {t('saveState.saved')}
-            </span>
-          )}
-          {sharedCount > 0 && (
-            <button
-              onClick={() => canShare && setShareOpen(true)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary hover:bg-accent transition-colors"
-              title={t('share.sharedWith', { count: sharedCount })}
-            >
-              <Users className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">{sharedCount}</span>
-            </button>
-          )}
-          {!canEdit && (
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 rounded-md bg-secondary">
-              <Eye className="w-3.5 h-3.5" /> {canWork ? t('share.workBadge') : t('share.readOnly')}
-            </span>
-          )}
-          {canEdit && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={handleUndo} disabled={!canUndo} title={t('toolbar.undoTitle')}>
-              <Undo2 className="w-4 h-4" /> {t('toolbar.undoShort')}
-            </Button>
-          )}
-          {canShare && user && !isDraft && !isTemplatePreview && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={() => setShareOpen(true)}>
-              <Share2 className="w-4 h-4" /> {t('toolbar.share')}
-            </Button>
-          )}
-          {/* Automatizační pravidla mapy — jen editor; pod 1850 px žije v ⋮ menu
-              (lišta je plná a její finální podoba je otevřené rozhodnutí) */}
-          {canEdit && user && activeMapId && !isPublicView && !isTemplatePreview && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={() => { setRulesDefaults({}); setRulesOpen(true); }} data-testid="toolbar-rules">
-              <Zap className="w-4 h-4" /> {t('toolbar.rules')}{mapRules.length > 0 ? ` (${mapRules.length})` : ''}
-            </Button>
-          )}
-          {canEdit && ai.has('generate') && user && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={() => setAdvisorOpen(true)}>
-              <Sparkles className="w-4 h-4" /> {t('toolbar.suggestAi')}
-            </Button>
-          )}
-          {canEdit && ai.has('chat') && user && (
-            <Button
-              variant={chatOpen ? 'default' : 'outline'}
-              size="sm"
-              className="hidden min-[1850px]:inline-flex"
-              onClick={() => setChatOpen((v) => !v)}
-              title={t('toolbar.aiChat')}
-            >
-              <MessageSquare className="w-4 h-4" /> {t('toolbar.aiChat')}
-            </Button>
-          )}
-          {canEdit && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={handleAddNote} title={t('toolbar.addNoteTitle')}>
-              <StickyNote className="w-4 h-4" /> {t('toolbar.note')}
-            </Button>
-          )}
-          {/* Zarovnat i na malých obrazovkách (Richard 11. 8.: „na mobilu chci
-              nahoře tlačítko zarovnat… blíže k přepínání zobrazení") — ikonové,
-              ikona = aktuální styl; „+" je naopak vpravo u zvonečku.
-              Velká lišta (≥1850) má plné tlačítko s názvem stylu. */}
-          {(canEdit || personalMap) && (() => {
-            if (kanbanAktivni && kanbanNsReady) {
-              return (
-                <Button variant="outline" size="icon" className="min-[1850px]:hidden h-9 w-9 shrink-0 opacity-80" disabled
-                  title={t('rules:rules.toolbarKanbanTitle')} data-testid="toolbar-kanban-mode-narrow">
-                  <Columns3 className="w-4 h-4" />
-                </Button>
-              );
-            }
-            const AlignIcon = ALIGN_ICONS[alignStyle] || AlignCenter;
-            return (
-              <Button
-                variant={alignLock ? 'default' : 'outline'}
-                size="icon"
-                className={`min-[1850px]:hidden h-9 w-9 shrink-0${alignLock ? ' ring-2 ring-primary/40 shadow-inner' : ''}`}
-                onClick={handleAlign}
-                onPointerDown={alignPressStart}
-                onPointerUp={alignPressEnd}
-                onPointerLeave={alignPressEnd}
-                onPointerCancel={alignPressEnd}
-                onContextMenu={(e) => e.preventDefault()}
-                title={alignLock ? t('toolbar.alignLockedTitle', { styl: t(`toolbar.alignShort_${alignLock}`) }) : t('toolbar.alignTitle')}
-                data-align-lock={alignLock || 'off'}
-              >
-                {/* i na úzké liště zůstává ikona stylu, zámek dělá jen vzhled */}
-                <AlignIcon className="w-4 h-4" />
-              </Button>
-            );
-          })()}
-          {/* Čitelnost — právě na mobilu je nejpotřebnější, proto v liště
-              vždycky (a i v mapě jen ke čtení, viz velká lišta výš) */}
-          {(() => {
-            const CitIcon = CITELNOST_ICONS[citelnost] || ALargeSmall;
-            return (
-              <Button variant="outline" size="icon" data-citelnost={citelnost} className="min-[1850px]:hidden h-9 w-9 shrink-0" onClick={handleCitelnost} title={t('toolbar.readabilityTitle')}>
-                <CitIcon className="w-4 h-4" />
-              </Button>
-            );
-          })()}
-          {/* „kostička" = oddálit na celou mapu (Richard 11. 8.) — táž akce jako
-              fit ve spodních ovládacích prvcích plátna, jen po ruce v liště;
-              mr-auto uzavírá levou skupinu [směr | zarovnat | čitelnost | kostička] */}
-          <Button variant="outline" size="icon" className="min-[1850px]:hidden h-9 w-9 shrink-0 mr-auto" onClick={recenterMap} title={t('toolbar.fitViewTitle')}>
-            <Maximize className="w-4 h-4" />
-          </Button>
-          {/* „Moje mapa": přepínač pohledu patří do lišty (na místo „+", které tu
-              read-only mapa nemá) — plátno zůstává celé mapě */}
-          {personalMap && (
-            <div className="flex rounded-lg border overflow-hidden shrink-0">
-              {[['mine', t('myday:myMap.tabMine')], ['delegated', t('myday:myMap.tabDelegated')]].map(([v, label]) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => {
-                    if (personalView === v) return;
-                    setPersonalView(v);
-                    navigate(v === 'delegated' ? '/my-map?view=delegated' : '/my-map', { replace: true });
-                    // dofit dělá efekt přestavby (recenter tady by fitnul starý obsah)
-                  }}
-                  aria-pressed={personalView === v}
-                  className={`h-9 px-3 text-xs sm:text-sm font-medium transition-colors ${
-                    personalView === v ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" disabled={exporting || visibleNodes.length === 0}>
-                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                {t('toolbar.export')}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('png')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPng')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPdf')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportJson(true)}>
-                <FileJson className="w-4 h-4" /> {t('toolbar.exportJson')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportJson(false)}>
-                <FileJson className="w-4 h-4" /> {t('toolbar.exportJsonNoPeople')}
-              </DropdownMenuItem>
-              {user && !isPublicView && !isTemplatePreview && !personalMap && (
-                <DropdownMenuItem onClick={() => setSaveTplOpen(true)}>
-                  <LayoutGrid className="w-4 h-4" /> {t('toolbar.saveAsTemplate')}
-                </DropdownMenuItem>
-              )}
-              {user && activeMapId && !isPublicView && isMapOwner && (
-                <DropdownMenuItem onClick={handleToggleArchive}>
-                  {archived
-                    ? <><ArchiveRestore className="w-4 h-4" /> {t('toolbar.restoreFromArchive')}</>
-                    : <><Archive className="w-4 h-4" /> {t('toolbar.archiveProject')}</>}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {canEdit && (
-            <Button onClick={handleAddGoal} size="sm">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t('toolbar.addGoal')}</span>
-            </Button>
-          )}
-          <NotificationBell />
-          {/* Panáček jako všude jinde v aplikaci (reklamace z bety 12. 8. 2026):
-              mapa byla jediné místo bez hlavičky, takže tu nabídka pod jménem
-              chyběla a návod „vpravo nahoře najdete Vzhled" v mapě neplatil.
-              ⋮ vedle zůstává na MAPOVÉ akce (export, archivace, šablona). */}
-          {user && !isPublicView && <UserMenu />}
-          {/* mobil: sekundární akce v jednom ⋮ menu (desktop je má rozbalené) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="min-[1850px]:hidden h-8 w-8" title={t('toolbar.moreActions')}>
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {/* Dashboard má vlastní ikonu v levé liště — v ⋮ menu by byl dvakrát */}
-              {user && activeMapId && !isPublicView && (
-                <DropdownMenuItem onClick={() => navigate(`/tasks?map=${activeMapId}`)}>
-                  <CheckSquare className="w-4 h-4" /> {t('toolbar.tasks')}{mapTaskCount > 0 ? ` (${mapTaskCount})` : ''}
-                </DropdownMenuItem>
-              )}
-              {canEdit && (
-                <DropdownMenuItem disabled={!canUndo} onClick={handleUndo}>
-                  <Undo2 className="w-4 h-4" /> {t('toolbar.undoTitle')}
-                </DropdownMenuItem>
-              )}
-              {/* Zarovnat má vlastní ikonu v liště na všech velikostech — v ⋮ menu by bylo dvakrát */}
-              {canShare && user && !isDraft && !isTemplatePreview && (
-                <DropdownMenuItem onClick={() => setShareOpen(true)}>
-                  <Share2 className="w-4 h-4" /> {t('toolbar.share')}
-                </DropdownMenuItem>
-              )}
-              {canEdit && user && activeMapId && !isPublicView && !isTemplatePreview && (
-                <DropdownMenuItem onClick={() => { setRulesDefaults({}); setRulesOpen(true); }}>
-                  <Zap className="w-4 h-4" /> {t('toolbar.rules')}{mapRules.length > 0 ? ` (${mapRules.length})` : ''}
-                </DropdownMenuItem>
-              )}
-              {canEdit && ai.has('generate') && user && (
-                <DropdownMenuItem onClick={() => setAdvisorOpen(true)}>
-                  <Sparkles className="w-4 h-4" /> {t('toolbar.suggestAi')}
-                </DropdownMenuItem>
-              )}
-              {canEdit && ai.has('chat') && user && (
-                <DropdownMenuItem onClick={() => setChatOpen((v) => !v)}>
-                  <MessageSquare className="w-4 h-4" /> {t('toolbar.aiChat')}
-                </DropdownMenuItem>
-              )}
-              {canEdit && (
-                <DropdownMenuItem onClick={handleAddNote}>
-                  <StickyNote className="w-4 h-4" /> {t('toolbar.note')}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem disabled={exporting || visibleNodes.length === 0} onClick={() => handleExport('png')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPngShort')}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={exporting || visibleNodes.length === 0} onClick={() => handleExport('pdf')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPdfShort')}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={exporting} onClick={() => handleExportJson(true)}>
-                <FileJson className="w-4 h-4" /> {t('toolbar.exportJsonShort')}
-              </DropdownMenuItem>
-              {user && !isPublicView && !isTemplatePreview && !personalMap && (
-                <DropdownMenuItem onClick={() => setSaveTplOpen(true)}>
-                  <LayoutGrid className="w-4 h-4" /> {t('toolbar.saveAsTemplate')}
-                </DropdownMenuItem>
-              )}
-              {user && activeMapId && !isPublicView && isMapOwner && (
-                <DropdownMenuItem onClick={handleToggleArchive}>
-                  {archived
-                    ? <><ArchiveRestore className="w-4 h-4" /> {t('toolbar.restoreFromArchive')}</>
-                    : <><Archive className="w-4 h-4" /> {t('toolbar.archiveProject')}</>}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
-      {/* „Zadal jsem": pruh seskupení V TOKU stránky (ne plovoucí přes plátno) —
-          fitView o překryvu nevěděl a strom se schovával pod panel */}
-      {personalMap && personalView === 'delegated' && (
-        <div className="flex justify-center border-b bg-card py-1.5 shrink-0">
-          <div className="flex rounded-lg border overflow-hidden">
-            {[['flat', t('myday:myMap.groupFlat')], ['people', t('myday:myMap.groupPeople')], ['projects', t('myday:myMap.groupProjects')]].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => {
-                  setDelegatedGrouping(key);
-                  ulozKlic('kb-delegated-grouping', key);
-                  // dofit dělá efekt přestavby (recenter tady by fitnul starý obsah)
-                }}
-                className={`px-3 py-1 text-xs font-medium transition-colors ${delegatedGrouping === key ? 'bg-secondary text-foreground' : 'bg-background hover:bg-secondary/60 text-muted-foreground'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <ConflictBanners
+        conflict={conflict}
+        exporting={exporting}
+        handleExportJson={handleExportJson}
+        saveStatus={saveStatus}
+        handleKeepMine={handleKeepMine}
+        isPublicView={isPublicView}
+        navigate={navigate}
+        archived={archived}
+        isMapOwner={isMapOwner}
+        handleToggleArchive={handleToggleArchive}
+        isTemplatePreview={isTemplatePreview}
+        savingTemplate={savingTemplate}
+        handleSaveTemplate={handleSaveTemplate}
+        remoteChanged={remoteChanged}
+      />
+      <EditorToolbar
+        nav={{ navigate, org }}
+        layout={{
+          direction, setDirMode, recenterMap, kanbanAktivni, kanbanNsReady,
+          alignStyle, alignLock, handleAlign, alignPressStart, alignPressEnd,
+          citelnost, handleCitelnost,
+        }}
+        access={{
+          user, canEdit, canShare, canWork, isPublicView, isDraft, isTemplatePreview,
+          isMapOwner, personalMap, archived, activeMapId, ai,
+        }}
+        state={{
+          saveStatus, sharedCount, mapTaskCount, mapRules, chatOpen, exporting,
+          visibleNodes, canUndo, personalView,
+        }}
+        actions={{
+          setShareOpen, handleUndo, setRulesDefaults, setRulesOpen, setAdvisorOpen,
+          setChatOpen, handleAddNote, setPersonalView, handleExport, handleExportJson,
+          setSaveTplOpen, handleToggleArchive, handleAddGoal,
+        }}
+      />
+      <DelegatedGroupingBar personalMap={personalMap} personalView={personalView} delegatedGrouping={delegatedGrouping} setDelegatedGrouping={setDelegatedGrouping} />
       <div
         className="flex-1 relative bg-background"
         style={color ? { borderWidth: 3, borderStyle: 'solid', borderColor: color } : undefined}
@@ -2160,48 +1280,15 @@ function EditorContent({ mapId, personalMap = false }) {
             position={`absolute inset-x-0 bottom-0 ${miniMapOpen && !narrow && !personalMap ? 'pr-56' : ''}`}
           />
         )}
-        {/* NÁZEV PROJEKTU — volný pruh nad levou lištou ikon (ta začíná na top-16).
-            Vlastní řádek unese i dlouhý název, na který se v liště nedostávalo.
-            Odsazení zleva kopíruje lištu ikon, ať název neschová vysunutý
-            zásobník ani časovač. Nad dashboardem ne — ten si název píše sám. */}
-        {!dashboardOpen && (
-          <div
-            style={{ left: railLeft + 8 }}
-            className="absolute top-2 z-30 max-w-[min(80vw,60rem)]"
-          >
-            {/* ⚠️ V KLIDU JE TO TEXT, NE POLE. Široké průhledné `input` přes plátno
-                vypadalo stejně, ale polykalo myš: v pruhu 960 × 38 px nešlo chytit
-                uzel ani táhnout plátnem, a nic to neprozrazovalo (nález panelu
-                /checkup 18. 8. 2026, změřeno — tažení nepohnulo plátnem vůbec).
-                Tlačítko se smrskne na šířku textu, takže mrtvá zóna je přesně
-                velikost názvu — a tam klik stejně patří, otevírá přejmenování. */}
-            {nazevEditace && canEdit ? (
-              <input
-                autoFocus
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => setNazevEditace(false)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
-                aria-label={t('toolbar.titlePlaceholder')}
-                placeholder={t('toolbar.titlePlaceholder')}
-                className="w-[min(80vw,60rem)] max-w-full bg-card rounded-lg px-2 py-1 outline-none
-                  font-heading text-lg sm:text-xl font-bold tracking-tight border border-input"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => canEdit && setNazevEditace(true)}
-                title={title}
-                className={`block max-w-full truncate rounded-lg px-2 py-1 text-left
-                  font-heading text-lg sm:text-xl font-bold tracking-tight
-                  border border-transparent transition-colors
-                  ${canEdit ? 'hover:bg-card/80 hover:border-border' : 'cursor-default'}`}
-              >
-                {title || t('toolbar.titlePlaceholder')}
-              </button>
-            )}
-          </div>
-        )}
+        <TitleStrip
+          dashboardOpen={dashboardOpen}
+          railLeft={railLeft}
+          nazevEditace={nazevEditace}
+          canEdit={canEdit}
+          title={title}
+          setTitle={setTitle}
+          setNazevEditace={setNazevEditace}
+        />
         {dashboardOpen ? (
           <ProgressDashboard nodes={nodes} edges={edges} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} />
         ) : (
@@ -2358,97 +1445,30 @@ function EditorContent({ mapId, personalMap = false }) {
         </MembersContext.Provider>
         </GoalMapContext.Provider>
         )}
-        {bufferEnabled && !dashboardOpen && (
-          <BufferPanel
-            buffer={buffer}
-            canEdit={canEdit}
-            onInsert={insertBufferItem}
-            // Jednoklikový „převod na úkol" z editoru ODEBRÁN (Richard 7. 8.
-            // 2026 v noci): tiše zakládal úkolový záznam na vrcholu — nikde
-            // nebyl vidět a model říká „zakládáme uzly". Návrat do mapy dělá
-            // vložení (šipka). Vědomý převod s výběrem projektu zůstává na
-            // stránce Úkoly (otevírá plný dialog).
-            open={bufferOpen}
-            onToggle={toggleBuffer}
-            leftOffset={timeLogOpen ? 320 : 0}
-          />
-        )}
-        {user && !isPublicView && !dashboardOpen && (
-          <TimeLogPanel mapId={activeMapId || mapId} nodes={nodes} open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />
-        )}
-        {/* Levá lišta pod zásobníkem (top-16) a časovačem (top-28): LUPA
-            rozbalí vyhledávání, FILTR přepíná Moje úkoly (Richard 11. 8. —
-            z horní lišty pryč, „je to jen filtr"). Aktivní stav je vidět na
-            ikoně, panely lištu odsouvají stejně jako ouška. */}
-        {!dashboardOpen && (() => {
-          const railCls = railLeft ? '' : 'border-l-0';
-          return (
-            <>
-              {searchOpen ? (
-                <div style={{ left: railLeft }} className={`absolute top-40 z-30 flex items-center gap-1 rounded-r-lg border ${railCls} bg-card pl-1 pr-1 py-1.5 shadow-md`}>
-                  {/* lupa je přepínač: druhý klik pole zavře (dotaz zůstává platný
-                      a zavřená lupa ho ukazuje podbarvením); křížek maže a zavírá */}
-                  <button
-                    onClick={() => setSearchOpen(false)}
-                    className="p-1 shrink-0 text-primary hover:text-foreground"
-                    title={t('toolbar.searchPlaceholder')}
-                  >
-                    <Search className="w-4 h-4" />
-                  </button>
-                  <input
-                    autoFocus
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Escape') { setSearchQuery(''); setSearchOpen(false); } }}
-                    placeholder={t('toolbar.searchPlaceholder')}
-                    className="h-7 w-44 bg-transparent text-sm outline-none"
-                  />
-                  <button
-                    onClick={() => { setSearchQuery(''); setSearchOpen(false); }}
-                    className="p-1 text-muted-foreground hover:text-foreground"
-                    title={t('common:actions.close')}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setSearchOpen(true)}
-                  style={{ left: railLeft }}
-                  title={t('toolbar.searchPlaceholder')}
-                  className={`absolute top-40 z-30 flex items-center rounded-r-lg border ${railCls} bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all`}
-                >
-                  <Search className={`w-4 h-4 ${searchQuery ? 'text-primary' : 'text-muted-foreground'}`} />
-                </button>
-              )}
-              {user && (
-                <button
-                  onClick={() => setMyTasksOnly((v) => !v)}
-                  style={{ left: railLeft }}
-                  title={t('toolbar.myTasksTitle')}
-                  className={`absolute top-52 z-30 flex items-center rounded-r-lg border ${railCls} px-2 py-2.5 shadow-md transition-all ${myTasksOnly ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-secondary'}`}
-                >
-                  <Filter className="w-4 h-4" />
-                </button>
-              )}
-            </>
-          );
-        })()}
-        {/* Dashboard v levé liště POD filtrem (Richard 11. 8.) — vědomě MIMO
-            guard !dashboardOpen: při otevřeném dashboardu zůstává viditelný
-            (podbarvený) a druhým klikem ho zavřeš. Panely jsou v tu chvíli
-            schované, takže lišta sedí u kraje. */}
-        <button
-          onClick={() => setDashboardOpen((v) => !v)}
-          style={{ left: dashboardOpen ? 0 : railLeft }}
-          title={t('toolbar.dashboardTitle')}
-          className={`absolute top-64 z-30 flex items-center rounded-r-lg border px-2 py-2.5 shadow-md transition-all ${dashboardOpen ? 'bg-primary text-primary-foreground border-l-0' : `bg-card text-muted-foreground hover:bg-secondary ${(bufferOpen || timeLogOpen) ? '' : 'border-l-0'}`}`}
-        >
-          <BarChart3 className="w-4 h-4" />
-        </button>
-        {/* Nahlásit chybu rovnou z mapy — pod dashboardem (Richard 18. 8. 2026).
-            Stránku si aplikace vezme sama, takže hlášení odsud nese mapu. */}
-        {user && <ReportRailButton top="top-[19rem]" leftOffset={railLeft} />}
+        <LeftRail
+          bufferEnabled={bufferEnabled}
+          dashboardOpen={dashboardOpen}
+          buffer={buffer}
+          canEdit={canEdit}
+          insertBufferItem={insertBufferItem}
+          bufferOpen={bufferOpen}
+          toggleBuffer={toggleBuffer}
+          timeLogOpen={timeLogOpen}
+          user={user}
+          isPublicView={isPublicView}
+          activeMapId={activeMapId}
+          mapId={mapId}
+          nodes={nodes}
+          toggleTimeLog={toggleTimeLog}
+          railLeft={railLeft}
+          searchOpen={searchOpen}
+          setSearchOpen={setSearchOpen}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          myTasksOnly={myTasksOnly}
+          setMyTasksOnly={setMyTasksOnly}
+          setDashboardOpen={setDashboardOpen}
+        />
         {canEdit && nodes.length === 0 && !dashboardOpen && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-center pointer-events-auto">
@@ -2465,101 +1485,23 @@ function EditorContent({ mapId, personalMap = false }) {
           </div>
         )}
       </div>
-      <NodeEditDialog
-        variant={canEdit ? 'full' : 'work'}
-        orgMap={mapKind === 'org'}
-        node={editNode}
-        mapId={activeMapId || mapId}
-        onSave={handleSaveNode}
-        onClose={() => setEditNodeId(null)}
-        mapAccess={effectiveMapAccess}
-        // žádost o jiný termín: spolupracovník kdekoli, čtenář jen u své práce
-        // (dialog se mu jinde ani neotevře — tužku má jen u svých kroků)
-        canRequestDeadline={canWork || ctenarSPraci}
-        members={members}
-        onShareAdd={user && activeMapId ? handleShareAdd : undefined}
-        onStash={bufferEnabled && canEdit ? handleStashNode : undefined}
-        map={user && activeMapId && !isPublicView ? { id: activeMapId, title, nodes } : undefined}
-        emailOptions={ownerOptions}
-        onTasksChanged={() => setTaskStatsVersion((v) => v + 1)}
-        onContactsChanged={reloadMembers}
-        onWorkStatusSaved={(nodeId, next, updated) => {
-          // zrcadlo handleCycleStatusWork: lokální stav + verze pro base_updated
-          setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, status: next } } : n)));
-          zrcadliStavDoZakladny(nodeId, next);
-          if (updated) baseUpdated.current = updated;
+      <EditorDialogs
+        mapa={{
+          activeMapId, mapId, mapKind, title, nodes, edges, members, effectiveMapAccess,
+          ownerOptions, isMapOwner, mapRules,
         }}
-        extraExecutorContent={canEdit && editNode && editNode.type !== 'apexNode' ? (
-          <NodeRulesPanel rules={mapRules} nodeId={editNode.id} onOpenRules={openRulesFromNode} />
-        ) : undefined}
-        extraAssignmentContent={canEdit && user && activeMapId && !isPublicView && mapKind !== 'org' && editNode && editNode.type !== 'apexNode' ? (
-          <RecurrenceSwitch
-            mapId={activeMapId}
-            nodeId={editNode.id}
-            nodeTitle={editNode.data?.title || ''}
-            rules={mapRules}
-            onRulesChanged={setMapRules}
-          />
-        ) : undefined}
-        extraBehaviorContent={canEdit && editNode && editNode.type !== 'apexNode' ? (
-          <UnblockRulesHint rules={mapRules} nodeId={editNode.id} onOpenRules={openRulesFromNode} />
-        ) : undefined}
-      />
-      {canEdit && user && activeMapId && !isPublicView && (
-        <RulesDialog
-          open={rulesOpen}
-          mapId={activeMapId}
-          nodes={nodes}
-          edges={edges}
-          members={members}
-          mapAccess={effectiveMapAccess}
-          onShareAdd={user && activeMapId ? handleShareAdd : undefined}
-          onContactsChanged={reloadMembers}
-          defaults={rulesDefaults}
-          onClose={() => setRulesOpen(false)}
-          onRulesChanged={setMapRules}
-          onEnableWaiting={handleEnableWaiting}
-        />
-      )}
-      {taskNodeId && activeMapId && (
-        <NodeTasksDialog
-          map={{ id: activeMapId, title, nodes }}
-          nodeId={taskNodeId}
-          canEdit={canEdit}
-          members={members}
-          onClose={() => setTaskNodeId(null)}
-          onChanged={() => setTaskStatsVersion((v) => v + 1)}
-        />
-      )}
-      <SaveTemplateDialog
-        open={saveTplOpen}
-        mapTitle={title}
-        nodes={nodes}
-        edges={edges}
-        onClose={() => setSaveTplOpen(false)}
-      />
-      <SkinDialog open={skinOpen} onClose={() => setSkinOpen(false)} />
-      <ShareDialog
-        open={shareOpen}
-        mapId={mapId}
-        isOwner={isMapOwner}
-        onClose={() => setShareOpen(false)}
-        onMapBumped={(u) => { baseUpdated.current = u; }}
-      />
-      <AdvisorDialog
-        open={advisorOpen}
-        onClose={() => setAdvisorOpen(false)}
-        onAccept={handleAcceptAdvisor}
-      />
-      <AIChatPanel
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-        mapTitle={title}
-        nodes={nodes}
-        edges={edges}
-        onApplyOperations={handleApplyOperations}
-        onUndoAi={handleUndoAi}
-        canUndoAi={canUndoAi}
+        access={{ user, canEdit, canWork, ctenarSPraci, isPublicView, bufferEnabled }}
+        node={{
+          editNode, handleSaveNode, setEditNodeId, handleShareAdd, handleStashNode,
+          setTaskStatsVersion, reloadMembers, setNodes, zrcadliStavDoZakladny, baseUpdated,
+          openRulesFromNode, setMapRules,
+        }}
+        dialogs={{
+          rulesOpen, rulesDefaults, setRulesOpen, handleEnableWaiting,
+          taskNodeId, setTaskNodeId, saveTplOpen, setSaveTplOpen, skinOpen, setSkinOpen,
+          shareOpen, setShareOpen, advisorOpen, setAdvisorOpen, handleAcceptAdvisor,
+        }}
+        ai={{ chatOpen, setChatOpen, handleApplyOperations, handleUndoAi, canUndoAi }}
       />
     </div>
   );

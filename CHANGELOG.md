@@ -9,6 +9,29 @@ below before you jump several versions.
 
 ---
 
+## v0.52-beta — 2026-08-29
+
+**Fourth wave from the code review — frontend structure (part 3): editor split complete**
+
+- **`useMapAutosave`** (F1-07 step 13): the autosave effect (incl. the draft branch), merge base
+  (`zapamatujServer`, `zrcadliStavDoZakladny`), conflict/remote-change handling, `nasadNaPlatno`,
+  `slitCiziZmenu`, `handleKeepMine` and the background watcher moved verbatim (427 = 427 lines);
+  `skipNextSave`, `nodesNow/edgesNow`, `mapRulesNow`, the load effect and `handleSaveTemplate` stay
+  in the editor. Effect order unchanged.
+- **Network anchor** in `ui-autosave-odchod.js`: a deterministic editor session (add sub-goal →
+  rename → autosave → Undo) must stay at ≤ 3 `PATCH` and 0 extra `GET`/`POST` — measured twice
+  before and after the move.
+- **JSX sections** in `components/goal-map/editor/` (ConflictBanners, EditorToolbar, PersonalTabs,
+  TitleStrip, LeftRail, EditorDialogs) — presentational only, 897 JSX lines byte-identical after
+  re-inlining; `<ReactFlow>`, the selection bar and `BulkEditDialog` stay in the editor (context
+  providers). `GoalMapEditor.jsx` is now **1,517 lines** (was 3,717 before the wave).
+- Gates: full click-test 60/60 and full regression 165/165 on the clean tree, twice (after step 13
+  and after the JSX split); per-step domain suites along the way.
+- **Cloud admin:** the revenue prediction now uses the LOCAL clock like the rest of the overview
+  (`predikce_obratu` had drifted to UTC — between 00:00 and 02:00 CEST on a month boundary it
+  targeted the wrong month; caught by the nightly regression on 1 Sep).
+
+
 ## v0.51-beta — 2026-08-29
 
 **API and MCP: unknown fields are rejected, and assistants get the plan (`planned_on`)**

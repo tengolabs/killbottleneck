@@ -140,6 +140,70 @@ const cizihoPuvodu = (m) => /fonts\.g|favicon|ERR_NETWORK_CHANGED/.test(m.text()
     const poZpet = await poziceZApi();
     const vraceno = ['n1', 'n2'].every((id) => Math.abs(poZpet[id].x - predZarovnanim[id].x) < 2 && Math.abs(poZpet[id].y - predZarovnanim[id].y) < 2);
     expect(vraceno, `Zpět se ULOŽILO — DB drží stav před zarovnáním (n1 ${JSON.stringify(poZpet.n1)} vs ${JSON.stringify(predZarovnanim.n1)})`);
+
+    console.log('== síťový rozpočet editoru: přidat uzel (+ na kartě, dialog) → přejmenovat mapu → autosave → Zpět ==');
+    // KOTVA: počty požadavků na mapu během jednoho deterministického scénáře.
+    // Naměřeno 28. 8. 2026 před rozkladem autosave (F1-07 krok 13); růst =
+    // regrese (autosave/hlídač/merge by posílal víc, než posílal). Počítá se
+    // AŽ od otevřené a usazené mapy, ať do toho nepadá načtení. Uzel se přidává
+    // tlačítkem + na kartě (plní historii Zpět; „Přidat cíl" v liště ji neplní)
+    // a pojmenuje se v dialogu.
+    const sit = { PATCH: 0, GET: 0, POST: 0, on: false };
+    page.on('request', (req) => {
+      if (!sit.on) return;
+      const u = req.url();
+      const m = req.method();
+      if (/\/api\/collections\/goalmaps\/records\//.test(u)) {
+        if (m === 'PATCH') sit.PATCH++;
+        else if (m === 'GET') sit.GET++;
+      } else if (m === 'POST' && /\/api\/kb\//.test(u)) sit.POST++;
+    });
+    await page.goto(`${BASE}/map/${map.id}`, { waitUntil: 'networkidle2' });
+    await page.waitForSelector('.react-flow__node[data-id="n2"]', { timeout: 45000 });
+    await sleep(2500);
+    sit.on = true;
+    expect(await page.evaluate(() => {
+      const karta = document.querySelector('.react-flow__node[data-id="n1"]');
+      const b = karta && [...karta.querySelectorAll('button')].find((x) => (x.getAttribute('title') || '') === 'Přidat podcíl');
+      if (!b) return false; b.click(); return true;
+    }), 'klik na + (Přidat podcíl) na kartě Alfa');
+    await sleep(800);
+    expect(await dblclickNa('Nový podcíl'), 'dialog nového uzlu otevřen dvojklikem');
+    await page.waitForSelector('[role="dialog"] #title', { timeout: 8000 });
+    await page.click('[role="dialog"] #title', { clickCount: 3 });
+    await page.keyboard.type('Delta ze site');
+    expect(await page.evaluate(() => {
+      const b = [...document.querySelectorAll('[role="dialog"] button')].find((x) => /^Uložit/.test((x.innerText || '').trim()) && !x.disabled);
+      if (!b) return false; b.click(); return true;
+    }), 'klik na Uložit v dialogu nového uzlu');
+    await sleep(600); // dialog zavře; autosave má časovač 1,2 s — přejmenování ho posune
+    const nazevPole = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => (x.textContent || '') === 'Autosave odchod');
+      if (!b) return false;
+      b.click();
+      return true;
+    });
+    expect(nazevPole, 'klik na název mapy otevřel přejmenování');
+    await sleep(600);
+    expect(await page.evaluate(() => {
+      const el = [...document.querySelectorAll('input')].find((i) => i.value === 'Autosave odchod');
+      if (!el) return false; el.focus(); el.setSelectionRange(0, el.value.length); return true;
+    }), 'pole názvu je vybrané');
+    await page.keyboard.type('Autosave sit');
+    await page.keyboard.press('Enter');
+    await sleep(2000); // autosave (1,2 s)
+    expect(await klik('Vrátit zpět'), 'Zpět je aktivní');
+    await sleep(2000); // autosave po Zpět
+    sit.on = false;
+    console.log(`   síť: PATCH ${sit.PATCH}, GET ${sit.GET}, POST ${sit.POST}`);
+    // horní meze = max ze dvou běhů na obrazu kb-analyza-d10 (28. 8. 2026):
+    // 2× PATCH 3 / GET 0 / POST 0 (přidání+dialog, přejmenování, Zpět)
+    expect(sit.PATCH <= 3, `PATCH mapy ≤ 3 (kotva; ${sit.PATCH})`);
+    expect(sit.GET <= 0, `GET mapy ≤ 0 (kotva; ${sit.GET})`);
+    expect(sit.POST <= 0, `POST /api/kb ≤ 0 (kotva; ${sit.POST})`);
+    const poSiti = (await api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
+    expect(poSiti.title === 'Autosave sit' && !(poSiti.nodes || []).some((n) => n.data?.title === 'Delta ze site'),
+      `DB po Zpět: název přejmenovaný, přidaný uzel vrácený („${poSiti.title}", uzlů ${(poSiti.nodes || []).length})`);
     expect(errs.length === 0, `konzole bez chyb (${errs.slice(0, 2).join(' | ') || 'čistá'})`);
   } catch (err) {
     fail++; console.log('  ❌ výjimka', err.message);
