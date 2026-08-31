@@ -20,7 +20,7 @@ import { isExternalOwner, useMembersWithContacts } from '@/lib/externalContacts'
 import { shareMap } from '@/api/kb';
 import { cycleStatus } from '@/lib/statusMeta';
 import { patchNodeData } from '@/lib/taskActions';
-import { addNodeToMap as addNodeToMapShared } from '@/lib/mapNodes';
+import { addNodeToMap as addNodeToMapShared, ulozDoMapy } from '@/lib/mapNodes';
 import { computeWaitingSet } from '@/lib/waitStatus';
 import AppHeader from '@/components/shared/AppHeader';
 import { Button } from '@/components/ui/button';
@@ -478,13 +478,22 @@ export default function Tasks() {
 
   // odstranění uzlu z mapy (hrany na něj napojené padají s ním, potomci se odpojí)
   const removeMapNode = async (mapId, nodeId) => {
-    const fresh = (await base44.entities.GoalMap.filter({ id: mapId }))[0];
-    if (!fresh) throw new Error(t('tasksPage.mapNotFound'));
-    const blocked = nodeRemovalBlockedBy(fresh, (fresh.nodes || []).find((n) => n.id === nodeId));
-    if (blocked) throw new Error(t('tasksPage.nodeRemoveAssignerOnly', { email: blocked }));
-    const nodes = (fresh.nodes || []).filter((n) => n.id !== nodeId);
-    const edges = (fresh.edges || []).filter((e) => e.source !== nodeId && e.target !== nodeId);
-    await base44.entities.GoalMap.update(mapId, { nodes, edges });
+    // se zámkem base_updated (ulozDoMapy) — dřív bez něj a souběh s editorem přepsal cizí práci
+    let vysl;
+    try {
+      vysl = await ulozDoMapy(mapId, (fresh) => {
+        const blocked = nodeRemovalBlockedBy(fresh, (fresh.nodes || []).find((n) => n.id === nodeId));
+        if (blocked) throw new Error(t('tasksPage.nodeRemoveAssignerOnly', { email: blocked }));
+        return {
+          nodes: (fresh.nodes || []).filter((n) => n.id !== nodeId),
+          edges: (fresh.edges || []).filter((e) => e.source !== nodeId && e.target !== nodeId),
+        };
+      });
+    } catch (e) {
+      if (e?.message === 'mapNotFound') throw new Error(t('tasksPage.mapNotFound'));
+      throw e;
+    }
+    const { nodes, edges } = vysl;
     setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, nodes, edges } : m)));
   };
 
@@ -661,22 +670,24 @@ export default function Tasks() {
     const item = placeIdea;
     if (!item) return;
     try {
-      // čerstvá mapa — seznam na stránce může být starý a přepsal by cizí práci
-      const fresh = (await base44.entities.GoalMap.filter({ id: mapMeta.id }))[0];
-      const nodes = Array.isArray(fresh.nodes) ? [...fresh.nodes] : [];
-      const edges = Array.isArray(fresh.edges) ? [...fresh.edges] : [];
-      const apex = nodes.find((n) => n.type === 'apexNode');
-      if (!apex) throw new Error('mapa bez vrcholu');
-      const id = `node-${Date.now()}`;
-      const sourozenci = edges.filter((e) => e.source === apex.id).length;
-      nodes.push({
-        id, type: 'goalNode',
-        position: { x: (apex.position?.x || 0) + 40 + sourozenci * 40, y: (apex.position?.y || 0) + 260 },
-        data: { title: item.title, status: 'todo', description: item.description || '',
-          color: item.color || '', deadline: item.deadline || '', nodeType: 'normal', goalType: '', apexText: '' },
+      // čerstvá mapa + zámek base_updated (ulozDoMapy) — seznam na stránce může být
+      // starý a bez zámku by zápis přepsal cizí práci
+      const { fresh } = await ulozDoMapy(mapMeta.id, (cerstva) => {
+        const nodes = Array.isArray(cerstva.nodes) ? [...cerstva.nodes] : [];
+        const edges = Array.isArray(cerstva.edges) ? [...cerstva.edges] : [];
+        const apex = nodes.find((n) => n.type === 'apexNode');
+        if (!apex) throw new Error('mapa bez vrcholu');
+        const id = `node-${Date.now()}`;
+        const sourozenci = edges.filter((e) => e.source === apex.id).length;
+        nodes.push({
+          id, type: 'goalNode',
+          position: { x: (apex.position?.x || 0) + 40 + sourozenci * 40, y: (apex.position?.y || 0) + 260 },
+          data: { title: item.title, status: 'todo', description: item.description || '',
+            color: item.color || '', deadline: item.deadline || '', nodeType: 'normal', goalType: '', apexText: '' },
+        });
+        edges.push({ id: `edge-${Date.now()}`, source: apex.id, target: id });
+        return { nodes, edges };
       });
-      edges.push({ id: `edge-${Date.now()}`, source: apex.id, target: id });
-      await base44.entities.GoalMap.update(fresh.id, { nodes, edges });
       try { await buffer.remove(item.id); } catch { /* nápad zůstane, smaže se ručně */ }
       setPlaceIdea(null);
       toast({ title: t('tasksPage.ideaPlaced'), description: t('tasksPage.ideaPlacedDesc', { title: item.title, project: fresh.title || '' }) });

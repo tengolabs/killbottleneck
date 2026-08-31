@@ -14,6 +14,7 @@
 
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
+import { ulozDoMapy } from '@/lib/mapNodes';
 
 // 'en-CA' = datový klíč YYYY-MM-DD v LOKÁLNÍ zóně (formát DB), NE zobrazení —
 // neměnit podle jazyka (stejná konvence jako v MyDaySection).
@@ -76,22 +77,19 @@ export function toTarget(item) {
   return { kind: 'task', id: item.id, mapId, nodeId: item.node_id || '' };
 }
 
-// Zápis do uzlu mapy: čerstvé načtení těsně před zápisem zmenšuje okno pro
-// kolizi s auto-save otevřeného editoru (stejný postup jako dosud na stránce
-// Úkoly). base_updated se ZÁMĚRNĚ neposílá — řádková akce mění jediné pole
-// jediného uzlu a 409 uprostřed odbavování seznamu by uživateli nic neřekl.
+// Zápis do uzlu mapy s optimistickým zámkem (ulozDoMapy: čerstvé načtení + base_updated,
+// při 409 jedno opakování nad čerstvým stavem). Do 27. 8. 2026 se base_updated ZÁMĚRNĚ
+// neposílal („řádková akce mění jediné pole"), jenže celé `nodes` bez zámku při souběhu
+// s otevřeným editorem tiše přepsalo kolegovu změnu (nález S6-04; rozhodnutí Richarda).
 // nodePatch = volitelná pole SAMOTNÉHO uzlu (dnes jen `type`). Je tu schválně:
 // volající, který mění typ i data, musí uložit JEDNOU. Dvojí uložení za sebou
 // znamená dvojí okno pro kolizi s auto-savem otevřeného editoru a dva řádky
 // v záznamníku změn za jednu akci uživatele.
 export async function patchNodeData(mapId, nodeId, patch, nodePatch) {
-  const fresh = (await base44.entities.GoalMap.filter({ id: mapId }))[0];
-  if (!fresh) throw new Error('mapNotFound');
-  const nodes = (fresh.nodes || []).map((n) =>
-    n.id === nodeId ? { ...n, ...(nodePatch || {}), data: { ...n.data, ...patch } } : n
-  );
+  const mutace = (fresh) => ({ nodes: (fresh.nodes || []).map((n) =>
+    n.id === nodeId ? { ...n, ...(nodePatch || {}), data: { ...n.data, ...patch } } : n) });
   try {
-    await base44.entities.GoalMap.update(mapId, { nodes });
+    return (await ulozDoMapy(mapId, mutace)).nodes;
   } catch (e) {
     // Spolupracovník (work) nemá RLS právo na PATCH mapy — čistou změnu STAVU
     // pustí cílená routa /node-status (jeho jediná zapisovací cesta). Bez tohohle
@@ -99,8 +97,9 @@ export async function patchNodeData(mapId, nodeId, patch, nodePatch) {
     const statusOnly = !nodePatch && Object.keys(patch || {}).every((k) => k === 'status');
     if (!statusOnly || !(e?.status === 403 || e?.status === 404)) throw e;
     await pb.send('/api/kb/node-status', { method: 'POST', body: { mapId, nodeId, status: patch.status } });
+    const fresh = (await base44.entities.GoalMap.filter({ id: mapId }))[0];
+    return fresh ? (fresh.nodes || []) : [];
   }
-  return nodes;
 }
 
 // Každá akce vrací { target, patch, nodes? } — volající si podle toho posune

@@ -19,51 +19,74 @@ export const isApexNode = (n) => !!n && (n.type === 'apexNode' || n.data?.nodeTy
 // parentNodeId: id rodiče, nebo 'auto' = pověsit pod vrcholový (apex) uzel.
 // data: volitelná pole uzlu navíc (owner, deadline…).
 // Vrací { nodeId, nodes, edges } — volající si podle toho posune vlastní stav.
-export async function addNodeToMap(mapId, parentNodeId, title, data = {}) {
-  const fresh = (await base44.entities.GoalMap.filter({ id: mapId }))[0];
-  if (!fresh) throw new Error('mapNotFound');
-
-  let parentId = parentNodeId;
-  if (parentId === 'auto') {
-    const targets = new Set((fresh.edges || []).map((e) => e.target));
-    const roots = (fresh.nodes || []).filter((n) => n.type !== 'note' && !targets.has(n.id));
-    parentId = (roots.find((r) => r.type === 'apexNode') || roots[0])?.id || null;
+// Zápis do mapy s optimistickým zámkem (Richard 27. 8. 2026, nález S6-04 analýzy kódu):
+// řádkové akce (Úkoly, Můj den, zásobník) dřív zapisovaly celé `nodes` BEZ `base_updated`,
+// takže při souběhu s otevřeným editorem tiše přepsaly kolegovu změnu. `mutace(fresh)`
+// vrátí { nodes, edges? } (nebo null = nic); při 409 se mapa načte znovu a mutace se
+// zopakuje JEDNOU — řádková akce mění jediný uzel, do čerstvého stavu se vejde;
+// druhé 409 už propadne volajícímu (dialog konfliktu má editor, tady stačí hláška).
+export async function ulozDoMapy(mapId, mutace) {
+  for (let pokus = 0; pokus < 2; pokus++) {
+    const fresh = (await base44.entities.GoalMap.filter({ id: mapId }))[0];
+    if (!fresh) throw new Error('mapNotFound');
+    const zmena = mutace(fresh);
+    if (!zmena) return { fresh, nodes: fresh.nodes || [], edges: fresh.edges || [] };
+    try {
+      await base44.entities.GoalMap.update(mapId, { ...zmena, base_updated: fresh.updated_date });
+      return { fresh, nodes: zmena.nodes || fresh.nodes || [], edges: zmena.edges || fresh.edges || [] };
+    } catch (e) {
+      if (e?.status !== 409 || pokus === 1) throw e;
+    }
   }
-  const parent = parentId ? (fresh.nodes || []).find((n) => n.id === parentId) : null;
+  return null;
+}
 
-  const ts = Date.now();
-  const newId = `node-${ts}`;
-  const newNode = {
-    id: newId,
-    type: 'goalNode',
-    position: { x: 0, y: 0 },
-    data: {
-      title,
-      status: 'todo',
-      description: '',
-      collapsed: false,
-      color: parent?.data?.color || '',
-      nodeType: 'normal',
-      goalType: '',
-      apexText: '',
-      deadline: '',
-      owner: '',
-      ...data,
-    },
-  };
+export async function addNodeToMap(mapId, parentNodeId, title, data = {}) {
+  let newId = null;
+  const vysl = await ulozDoMapy(mapId, (fresh) => {
 
-  let nodes = [...(fresh.nodes || []), newNode];
-  const edges = parentId
-    ? [...(fresh.edges || []), { id: `edge-${ts}`, source: parentId, target: newId, type: 'deletable' }]
-    : (fresh.edges || []);
-  // stejný styl jako u mapy ze šablony — jinak vzniká mapa klasicky,
-  // popisek tlačítka hlásí něco jiného a první stisk „nic neudělá"
-  // (Richard 12. 8.: „u nové mapy musím 2× zmáčknout")
-  const positions = layoutTree(nodes, edges, 'vertical', optsNoveMapy());
-  nodes = nodes.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n));
+    let parentId = parentNodeId;
+    if (parentId === 'auto') {
+      const targets = new Set((fresh.edges || []).map((e) => e.target));
+      const roots = (fresh.nodes || []).filter((n) => n.type !== 'note' && !targets.has(n.id));
+      parentId = (roots.find((r) => r.type === 'apexNode') || roots[0])?.id || null;
+    }
+    const parent = parentId ? (fresh.nodes || []).find((n) => n.id === parentId) : null;
 
-  await base44.entities.GoalMap.update(mapId, { nodes, edges });
-  return { nodeId: newId, nodes, edges };
+    const ts = Date.now();
+    newId = `node-${ts}`;
+    const newNode = {
+      id: newId,
+      type: 'goalNode',
+      position: { x: 0, y: 0 },
+      data: {
+        title,
+        status: 'todo',
+        description: '',
+        collapsed: false,
+        color: parent?.data?.color || '',
+        nodeType: 'normal',
+        goalType: '',
+        apexText: '',
+        deadline: '',
+        owner: '',
+        ...data,
+      },
+    };
+
+    let nodes = [...(fresh.nodes || []), newNode];
+    const edges = parentId
+      ? [...(fresh.edges || []), { id: `edge-${ts}`, source: parentId, target: newId, type: 'deletable' }]
+      : (fresh.edges || []);
+    // stejný styl jako u mapy ze šablony — jinak vzniká mapa klasicky,
+    // popisek tlačítka hlásí něco jiného a první stisk „nic neudělá"
+    // (Richard 12. 8.: „u nové mapy musím 2× zmáčknout")
+    const positions = layoutTree(nodes, edges, 'vertical', optsNoveMapy());
+    nodes = nodes.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n));
+
+    return { nodes, edges };
+  });
+  return { nodeId: newId, nodes: vysl.nodes, edges: vysl.edges };
 }
 
 // AI náhled (Navrhnout s AI / Mapa z textu) → uzly a hrany mapy. JEDNO místo

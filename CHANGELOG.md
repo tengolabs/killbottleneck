@@ -9,6 +9,25 @@ below before you jump several versions.
 
 ---
 
+## v0.53-beta — 2026-09-01
+
+**Lowercase e-mails + optimistic-lock row actions (debt 1+2 after v0.46; S4-01, S6-02, S3-04, S4-02)**
+
+- **Server:** the users create hook lowercases the e-mail (API and OAuth registration). PocketBase's
+  unique index and all sharing/rights/My-day matching are exact — an account `Jan.Novak@…` never
+  saw a project shared to the lowercase address, and login was case-sensitive.
+- **Migration `users_email_lowercase`:** rewrites `users.email` and every reference (owner_email,
+  created_by, deputy, assignee_email, triggered_by, invited_by, `map_shares.email`/`email_edit`,
+  author/actor fields, JSON `shared_with*` and `nodes[].data.owner` in maps) — schema-driven;
+  `clients`/`externi_kontakty` untouched. Twins (`Dup@` vs `dup@`) are NOT changed, only logged —
+  instance boot never fails on customer data. Idempotent.
+- **Frontend:** login/reset/registration send lowercase; `lib/mapNodes.ulozDoMapy()` = fresh read +
+  `base_updated` + one retry on 409, used by add-to-map, task status patch and Tasks-page row
+  actions (server-side enforcement of `base_updated` stays planned for v1.0).
+- New suite `emaily-lowercase.js` (15 checks incl. an upgrade over a volume from a pre-fix image;
+  red 5/6 against the old code). ⚠️ Two silent Goja pitfalls found by the upgrade test:
+  `field.type` is a method, JSON fields must be read via `record.getString()`.
+
 ## v0.52-beta — 2026-08-29
 
 **Fourth wave from the code review — frontend structure (part 3): editor split complete**

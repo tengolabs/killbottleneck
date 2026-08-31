@@ -335,7 +335,7 @@ export const base44 = {
     },
     async loginViaEmailPassword(email, password) {
       try {
-        const res = await pb.collection('users').authWithPassword(email, password);
+        const res = await pb.collection('users').authWithPassword(String(email || '').trim().toLowerCase(), password);
         await clearOfflineData();
         return toDto('User', res.record);
       } catch (err) {
@@ -371,6 +371,8 @@ export const base44 = {
       }
     },
     async register({ email, password, setupCode }) {
+      // e-mail malými písmeny — server (hook users) ho tak ukládá, PocketBase hledá přesně
+      email = String(email || '').trim().toLowerCase();
       try {
         await pb.collection('users').create({
           email, password, passwordConfirm: password,
@@ -380,7 +382,7 @@ export const base44 = {
           language: i18next.language === 'en' ? 'en' : 'cs',
           ...(setupCode ? { setup_code: setupCode } : {}), // registrační klíč instance (cloud)
         });
-        await pb.collection('users').authWithPassword(email, password);
+        await pb.collection('users').authWithPassword(String(email || '').trim().toLowerCase(), password);
         await clearOfflineData();
       } catch (err) {
         const data = err?.response?.data || {};
@@ -389,7 +391,7 @@ export const base44 = {
       }
     },
     async resetPasswordRequest(email) {
-      await pb.collection('users').requestPasswordReset(email);
+      await pb.collection('users').requestPasswordReset(String(email || '').trim().toLowerCase());
     },
     async resetPassword({ resetToken, newPassword }) {
       await pb.collection('users').confirmPasswordReset(resetToken, newPassword, newPassword);

@@ -117,6 +117,13 @@ onRecordCreateRequest((e) => {
   // users — druhá (routa /invite přes $app.save) má týž guard u sebe.
   {
     const { isExternalOwner, jeAdmin } = require(`${__hooks}/helpers.js`);
+    // E-mail VŽDY malými písmeny (Richard 27. 8. 2026, dluh 1 po v0.46): PocketBase
+    // unikát je case-sensitive, takže `Dup@x.cz` a `dup@x.cz` byly dva účty, sdílení
+    // (ukládané lowercase) mixed-case účtu nikdy nedoručilo. Platí pro registraci
+    // i Google OAuth (týž hook); /invite lowercasuje už od dřív. Existující účty
+    // srovnává migrace users_email_lowercase (vč. všech míst, kde je e-mail uložený).
+    const mailLower = e.record.getString("email").trim().toLowerCase();
+    if (mailLower && mailLower !== e.record.getString("email")) e.record.set("email", mailLower);
     if (isExternalOwner(e.record.getString("email"))) {
       const { t, userLang } = require(`${__hooks}/i18n.js`);
       throw new BadRequestError(t(userLang(null), "err.extEmailReserved"));

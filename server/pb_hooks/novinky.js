@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.53-beta": {
+    cs: [
+      "E-maily účtů jsou malými písmeny: kdo se registroval jako Jan.Novak@…, konečně vidí projekty a úkoly, které mu kolegové nasdíleli malými písmeny — a přihlásí se s jakoukoliv velikostí písmen.",
+      "Existující účty a všechny odkazy na ně (sdílení, řešitelé v mapách) se při aktualizaci převedou samy; případná „dvojčata“ lišící se jen velikostí písmen se nemění a vypíší do logu.",
+      "Rychlé akce v Úkolech a Můj dni (přepnout stav, přidat do mapy, umístit nápad) si hlídají verzi mapy — souběžná změna kolegy se už nedá omylem přepsat.",
+    ],
+    en: [
+      "Account e-mails are lowercase: whoever registered as Jan.Novak@… finally sees projects and tasks shared to the lowercase address — and can log in with any letter case.",
+      "Existing accounts and all references to them (sharing, assignees in maps) convert automatically on update; “twins” differing only in case are left untouched and listed in the log.",
+      "Quick actions in Tasks and My day (toggle status, add to map, place an idea) now check the map version — a colleague's concurrent change can no longer be overwritten by accident.",
+    ],
+  },
   "v0.52-beta": {
     cs: [
       "Ukládání mapy má hlídací metr: měříme, kolik požadavků editor pošle za typické sezení — a drží se to na třech.",
