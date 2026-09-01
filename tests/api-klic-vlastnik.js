@@ -285,22 +285,19 @@ const findNode = (tree, title) => {
     r = await v1(V, `/maps/${org.id}/nodes`, { items: [{ title: 'pozice' }], base_updated: r.json.updated });
     expect(r.status === 403, `zápis do org mapy přes klíč → 403 (${r.status})`);
 
-    console.log('== jiná velikost písmen = JINÝ účet (nález bezpečnostního panelu) ==');
-    // PocketBase e-maily nenormalizuje: `Editor@E2E.CZ` je samostatný účet a NESMÍ dostat práva editora
-    const Efake = await register('Editor@E2E.CZ');
-    r = await v1(Efake, `/maps/${M1}`);
-    expect(Efake.klic && r.status === 404, `účet Editor@E2E.CZ mapu sdílenou editor@e2e.cz nevidí — 404 (${r.status})`);
-    const lF = await listOf(Efake);
-    expect(!lF.SDILENA, `…ani v seznamu (${JSON.stringify(lF)})`);
-    r = await api('/api/kb/node-status', { token: Efake.token, body: { mapId: M1, nodeId: N.E, status: 'done' } });
-    expect(r.status === 403, `…ani přes /node-status v aplikaci — 403 (${r.status})`);
-    // přiřazení „editor@e2e.cz" je teď NEJEDNOZNAČNÉ (dva účty lišící se velikostí písmen) → 400, žádné auto-sdílení dvojčeti
+    console.log('== jiná velikost písmen: dvojče už nejde založit (v0.53) ==');
+    // Od v0.53 hook registrace ukládá e-mail lowercase → `Editor@E2E.CZ` koliduje s editor@e2e.cz
+    // a unikát ho odmítne. (Do v0.52 tu sekce hlídala opak: dvojče jako samostatný účet bez práv;
+    // celá třída problémů zmizela s migrací users_email_lowercase.)
+    r = await api('/api/collections/users/records', { body: { email: 'Editor@E2E.CZ', password: PW, passwordConfirm: PW } });
+    expect(r.status !== 200, `registrace dvojčete Editor@E2E.CZ neprojde (${r.status})`);
+    // mixed-case zápis řešitele se vstřícně přeloží na JEDINÝ existující účet
+    // (resolveOwner: přesná shoda → bez ohledu na velikost písmen, 1 kandidát = přijmout)
     base = await ver(V, M1);
     r = await v1(V, `/maps/${M1}/nodes/${N.TASK}`, { owner: 'EDITOR@e2e.cz', base_updated: base });
-    expect(r.status === 400 && /nejednoznač|ambiguous/i.test(r.json.error || ''), `řešitel s nejednoznačnou velikostí písmen → 400 (${r.status}: ${(r.json.error || '').slice(0, 60)})`);
-    r = await v1(V, `/maps/${M1}/nodes/${N.TASK}`, { owner: 'Editor@E2E.CZ', base_updated: base });
     sh = await shares(M1);
-    expect(r.status === 200 && sh['Editor@E2E.CZ'] === 'work' && sh[E.email] === 'edit', `přesný e-mail dvojčete → sdílení PŘESNĚ jemu (work), editor@e2e.cz zůstal edit (${JSON.stringify(sh)})`);
+    expect(r.status === 200 && sh[E.email] === 'edit' && !sh['EDITOR@e2e.cz'] && !sh['Editor@E2E.CZ'],
+      `řešitel EDITOR@e2e.cz padne na editor@e2e.cz — edit zůstává, žádný mixed-case řádek (${r.status}: ${JSON.stringify(sh)})`);
 
     console.log('== nepřihlášený a neplatný klíč beze změny ==');
     r = await api(`/api/kb/v1/maps/${M1}`);

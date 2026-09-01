@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useTasks } from '@/hooks/useTasks';
 import TaskTable from '@/components/tasks/TaskTable';
@@ -16,12 +15,7 @@ import BufferPanel, { useBufferNodes, BufferEditDialog } from '@/components/goal
 import NodeEditDialog from '@/components/shared/NodeEditDialog';
 import NewMapActions from '@/components/shared/NewMapActions';
 import { useMapCreation } from '@/hooks/useMapCreation';
-import { isExternalOwner, useMembersWithContacts } from '@/lib/externalContacts';
-import { shareMap } from '@/api/kb';
-import { cycleStatus } from '@/lib/statusMeta';
-import { patchNodeData } from '@/lib/taskActions';
-import { addNodeToMap as addNodeToMapShared, ulozDoMapy } from '@/lib/mapNodes';
-import { computeWaitingSet } from '@/lib/waitStatus';
+import { ulozDoMapy } from '@/lib/mapNodes';
 import AppHeader from '@/components/shared/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,29 +44,12 @@ import { Plus, Loader2, CheckSquare, Search, X, LayoutList, Columns3, CalendarDa
 import { exportTasksCsv, exportMarkdownReport } from '@/lib/taskExport';
 import { useToast } from '@/components/ui/use-toast';
 import { STATUSES } from '@/lib/statusMeta';
-import { getDeadlineStatus } from '@/lib/nodeMeta';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { useSidePanels } from '@/hooks/useSidePanels';
-import { popisJakoText } from '@/lib/popisFormat';
-
-// Popis bez značek pro hledání. ⚠️ S pamětí: predikát filtru se volá pro každou
-// položku při KAŽDÉM stisku klávesy ve vyhledávání, takže rozebírat popis znovu
-// a znovu se u delších textů projeví (nález panelu 19. 8. 2026).
-const hledaciCache = new Map();
-function hledaciText(popis) {
-  const klic = popis || '';
-  if (!klic) return '';
-  let v = hledaciCache.get(klic);
-  if (v === undefined) {
-    v = popisJakoText(klic).toLowerCase();
-    if (hledaciCache.size > 2000) hledaciCache.clear();   // ať paměť neroste bez konce
-    hledaciCache.set(klic, v);
-  }
-  return v;
-}
-
-const ALL = '__all__';
-const NONE = '__none__'; // „Bez mapy" / „Nepřiřazené" (Radix Select neumí prázdný string)
+import { useTaskFilters, ALL, NONE } from '@/hooks/useTaskFilters';
+import { useTasksPageData } from '@/hooks/useTasksPageData';
+import { useTaskTrees } from '@/hooks/useTaskTrees';
+import { useMapNodeActions } from '@/hooks/useMapNodeActions';
 
 export default function Tasks() {
   const navigate = useNavigate();
@@ -83,16 +60,7 @@ export default function Tasks() {
   const tasksApi = useTasks(user);
   const { items, loading, byParent } = tasksApi;
 
-  const [maps, setMaps] = useState([]);
   const [view, setView] = useState(() => nactiKlic('kb-tasks-view') || 'table');
-  const [mapFilter, setMapFilter] = useState(searchParams.get('map') || ALL);
-  const [nodeFilter, setNodeFilter] = useState(searchParams.get('node') || '');
-  const [assigneeFilter, setAssigneeFilter] = useState(ALL);
-  // ownerFilter: ALL | 'delegated' (úkoly, které jsem zadal někomu jinému)
-  const [ownerFilter, setOwnerFilter] = useState(ALL);
-  const [statusFilter, setStatusFilter] = useState(ALL);
-  const [deadlineFilter, setDeadlineFilter] = useState(ALL);
-  const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newNodeOpen, setNewNodeOpen] = useState(false);
   const [editTask, setEditTask] = useState(null);
@@ -103,9 +71,6 @@ export default function Tasks() {
   // sdílené localStorage klíče; otevřený panel obsah ODSOUVÁ doprava a naráz
   // je otevřený nejvýš jeden (jinak by se překrývaly).
   const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
-  // členové + externí kontakty (external:true) — viz useMembersWithContacts
-  const [members, reloadMembers] = useMembersWithContacts(user);
-  const [org, setOrg] = useState(null);
   const [editNodeItem, setEditNodeItem] = useState(null);
   // Globální „create mapy" akce v hlavičce sdílené s Home (Nový projekt / Navrhnout s AI / Mapa z textu).
   const { ai, creating, openCreate: openNewProject, openAi, dialogs: mapCreationDialogs } = useMapCreation();
@@ -114,81 +79,26 @@ export default function Tasks() {
     if (!isLoadingAuth && !user) navigate('/login');
   }, [isLoadingAuth, user, navigate]);
 
-  // Načtení map je i mimo první render: řádková akce v „Můj den" může sáhnout
-  // na uzel mapy, a pak je potřeba znovu natáhnout stromy, ne jen úkoly.
-  const loadMaps = useCallback(async () => {
-    try {
-      // org struktura (kind='org') do tabulky úkolů NEPATŘÍ — popisuje kdo je
-      // kdo, ne práci; server na ní úkoly stejně odmítá (nález Richardova
-      // klik-testu 15. 8.: organizace se tu ukazovala jako projekt)
-      const bezOrg = (list) => list.filter((m) => m.kind !== 'org');
-      // fáze 1: metadata bez JSON blobů — okamžitý render hlaviček/filtrů
-      const meta = await base44.entities.GoalMap.list('-updated_date', 200, {
-        fields: 'id,title,owner,owner_email,shared_with,shared_with_edit,shared_with_work,is_public,team_access,color,archived,kind,created,updated',
-      });
-      setMaps((prev) => (prev.length ? prev : bezOrg(meta)));
-      // fáze 2: plné mapy (stromy uzlů) na pozadí
-      setMaps(bezOrg(await base44.entities.GoalMap.list('-updated_date', 200)));
-    } catch {
-      // mapy jen obohacují zobrazení
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    loadMaps();
-    base44.org.get().then(setOrg).catch(() => {});
-  }, [user, loadMaps]);
+  // data stránky: mapy (loadMaps), organizace, členové, počty komentářů,
+  // e-maily pro našeptávače — viz useTasksPageData (F3-10)
+  const { maps, setMaps, loadMaps, org, members, reloadMembers, commentCounts, emailOptions } =
+    useTasksPageData({ user, items, dialogOpen });
 
   const changeView = (v) => {
     setView(v);
     ulozKlic('kb-tasks-view', v);
   };
 
-  // předfiltr z titulní strany: /tasks?assignee=me zapne „Moje úkoly"
-  // (user může doběhnout až po mountu, proto effect a ne init state).
-  // /tasks?assignee=<e-mail> = konkrétní člověk (odkaz z přehledu Organizace).
-  useEffect(() => {
-    const wanted = searchParams.get('assignee');
-    if (!wanted || !user?.email) return;
-    if (wanted !== 'me' && !wanted.includes('@')) return;
-    setAssigneeFilter(wanted === 'me' ? user.email : wanted.toLowerCase());
-    setOwnerFilter(ALL);
-    searchParams.delete('assignee');
-    setSearchParams(searchParams, { replace: true });
-     
-  }, [user, searchParams]);
-
-  // předfiltr /tasks?owner=delegated zapne „Zadal jsem"
-  useEffect(() => {
-    if (searchParams.get('owner') !== 'delegated') return;
-    setOwnerFilter('delegated');
-    setAssigneeFilter(ALL);
-    searchParams.delete('owner');
-    setSearchParams(searchParams, { replace: true });
-     
-  }, [searchParams]);
-
-  // deep-link termínu z panelu „Můj den" na Home: /tasks?deadline=overdue|today|week
-  useEffect(() => {
-    const dl = searchParams.get('deadline');
-    if (!['overdue', 'today', 'week'].includes(dl)) return;
-    setDeadlineFilter(dl);
-    searchParams.delete('deadline');
-    setSearchParams(searchParams, { replace: true });
-     
-  }, [searchParams]);
-
-  // deep-link z Home: /tasks?status=done ukáže odbavenou práci — odpověď na
-  // otázku „kam se mi ten úkol poděl, když jsem klikl na hotovo"
-  useEffect(() => {
-    const st = searchParams.get('status');
-    if (!['todo', 'in_progress', 'done'].includes(st)) return;
-    setStatusFilter(st);
-    searchParams.delete('status');
-    setSearchParams(searchParams, { replace: true });
-     
-  }, [searchParams]);
+  // filtry + URL předfiltry (?assignee/?owner/?deadline/?status) — viz
+  // useTaskFilters (F3-10). Deep-linky ?convert= a ?task= otevírají DIALOGY,
+  // proto zůstávají tady POD voláním hooku — relativní pořadí efektů nad
+  // searchParams se nemění.
+  const {
+    mapFilter, setMapFilter, nodeFilter, assigneeFilter, setAssigneeFilter,
+    ownerFilter, setOwnerFilter, statusFilter, setStatusFilter,
+    deadlineFilter, setDeadlineFilter, search, setSearch,
+    matchesFilters, bufferVisible, clearNodeFilter, nodeFilterLabel,
+  } = useTaskFilters({ user, searchParams, setSearchParams, maps, t });
 
   // deep-link z Home: /tasks?convert=<id nápadu> otevře převod nápadu na úkol
   // (Home nemá dialog úkolu — převod se dokončí tady výběrem projektu)
@@ -199,7 +109,7 @@ export default function Tasks() {
     searchParams.delete('convert'); // param uklidit i když nápad mezitím zmizel
     setSearchParams(searchParams, { replace: true });
     if (item) handleConvertBuffer(item);
-     
+
   }, [searchParams, buffer.items, buffer.loaded]);
 
   // deep-link z notifikace: /tasks?task=<id> otevře rovnou dialog úkolu.
@@ -219,175 +129,26 @@ export default function Tasks() {
       deepLinkRefreshRef.current = taskId;
       tasksApi.refresh();
     }
-     
+
   }, [items, searchParams]);
 
-  // počty komentářů úkolů pro badge v tabulce/kanbanu; přenačítá se po zavření dialogu
-  const [commentCounts, setCommentCounts] = useState({});
-  useEffect(() => {
-    if (!user || dialogOpen) return;
-    base44.entities.TaskComment.list('-created_date', 1000)
-      .then((list) => {
-        const counts = {};
-        for (const c of list || []) counts[c.task_id] = (counts[c.task_id] || 0) + 1;
-        setCommentCounts(counts);
-      })
-      .catch(() => {});
-  }, [user, dialogOpen]);
-
-  // e-maily pro našeptávač/filtr: členové týmu + sdílení map + assignees úkolů
-  // (BEZ pseudo-e-mailů externích kontaktů — do e-mailových našeptávačů nepatří)
-  const emailOptions = useMemo(() => {
-    const set = new Set();
-    if (user?.email) set.add(user.email);
-    for (const m of members) if (!m.external) set.add(m.email);
-    for (const m of maps) {
-      if (m.created_by) set.add(m.created_by);
-      for (const em of m.shared_with || []) set.add(em);
-    }
-    for (const task of items) if (task.assignee_email && !isExternalOwner(task.assignee_email)) set.add(task.assignee_email);
-    return [...set].sort();
-  }, [maps, items, user, members]);
-
-  const matchesFilters = (it) => {
-    if (mapFilter === NONE && it.map_id) return false;
-    if (mapFilter !== ALL && mapFilter !== NONE && it.map_id !== mapFilter) return false;
-    if (nodeFilter && it.node_id !== nodeFilter) return false;
-    if (assigneeFilter === NONE && it.assignee_email) return false;
-    // e-maily bez ohledu na velikost písmen — server (Organizace, v1 API) je posílá malými
-    if (assigneeFilter !== ALL && assigneeFilter !== NONE && String(it.assignee_email || '').toLowerCase() !== String(assigneeFilter).toLowerCase()) return false;
-    // „Zadal jsem": já autor (u úkolu created_by = owner_email; u uzlu = vlastník
-    // mapy, tj. kdo uzel přiřadil), řešitel někdo jiný. Delegace v killBottlenecku je
-    // hlavně přes uzly (vlastník mapy přiřadí uzel osobě), proto e-mail, ne id.
-    if (ownerFilter === 'delegated' && !(it.created_by === user?.email && it.assignee_email && it.assignee_email !== user?.email)) return false;
-    if (statusFilter !== ALL && it.status !== statusFilter) return false;
-    if (deadlineFilter === 'overdue' && getDeadlineStatus(it.deadline, it.status) !== 'overdue') return false;
-    if (deadlineFilter === 'today') {
-      if (!it.deadline || it.status === 'done') return false;
-      const days = Math.round((new Date(it.deadline + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
-      if (days !== 0) return false;
-    }
-    if (deadlineFilter === 'week') {
-      if (!it.deadline || it.status === 'done') return false;
-      const st = getDeadlineStatus(it.deadline, it.status);
-      const days = Math.round((new Date(it.deadline + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
-      if (st === 'overdue' || days > 7) return false;
-    }
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      if (!(it.title || '').toLowerCase().includes(q) && !hledaciText(it.description).includes(q)) return false;
-    }
-    return true;
-  };
-
-  // archivované projekty v úkolech nefigurují (žijí na /archive) — filtruje se
-  // mapa i úkoly na ni navěšené. Stejně jako Home ukazujeme jen projekty, kde
-  // mám roli: moje / sdílené se mnou / mám v nich cíl-uzel či úkol / organizační.
-  // (RLS vrací i cizí VEŘEJNÉ mapy — ty by tu byly navíc oproti Home.)
-  const activeMaps = useMemo(() => {
-    const email = user?.email;
-    const relevant = (m) =>
-      m.created_by_id === user?.id
-      || (m.shared_with || []).includes(email)
-      || (m.nodes || []).some((n) => n.type !== 'note' && n.data?.owner === email)
-      || items.some((task) => task.map_id === m.id && task.assignee_email === email)
-      || !!m.team_access;
-    return maps.filter((m) => !m.archived && relevant(m));
-  }, [maps, items, user]);
-  const archivedMapIds = useMemo(
-    () => new Set(maps.filter((m) => m.archived).map((m) => m.id)),
-    [maps]
-  );
-
-  // úkol nejvyšší úrovně projde, když odpovídá sám, nebo některý jeho podúkol
-  const topLevel = useMemo(
-    () => items.filter((task) => !task.parent_id && !archivedMapIds.has(task.map_id) && (matchesFilters(task) || (byParent[task.id] || []).some(matchesFilters))),
-    [items, byParent, archivedMapIds, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search]
-  );
-
-  // Celý strom uzlů každé mapy (mapa = projekt, uzly = jeho cíle) — odvozeno
-  // z JSON mapy, filtry prořezávají větve (uzel zůstane, když odpovídá sám
-  // nebo některý potomek). Mapa zůstává zdrojem pravdy.
-  const nodeTrees = useMemo(() => {
-    const prune = (list) => list
-      .map((n) => {
-        const children = prune(n.children);
-        if (matchesFilters(n) || children.length > 0) return { ...n, children };
-        return null;
-      })
-      .filter(Boolean);
-
-    const res = {};
-    for (const m of activeMaps) {
-      const mapWaiting = computeWaitingSet(m.nodes || [], m.edges || []);
-      const byId = {};
-      for (const n of m.nodes || []) {
-        if (n.type === 'note') continue;
-        const d = n.data || {};
-        byId[n.id] = {
-          waiting: mapWaiting.has(n.id),
-          id: `node-item-${m.id}-${n.id}`,
-          isNode: true,
-          isApex: n.type === 'apexNode' || d.nodeType === 'apex',
-          icon: d.icon || '',
-          title: d.title || (d.apexText || '').slice(0, 60) || t('common:misc.untitled'),
-          status: d.status || 'todo',
-          deadline: d.deadline || '',
-          plannedOn: d.plannedOn || d.pinnedOn || '',
-          assignee_email: d.owner || '',
-          // „kdo zadal" uzel = vlastník mapy (uzly nemají vlastní pole autora);
-          // umožní filtr „Zadal jsem" a zobrazení zadavatele v tabulce
-          created_by: m.created_by || '',
-          map_id: m.id,
-          node_id: n.id,
-          children: [],
-        };
-      }
-      const hasParent = new Set();
-      for (const e of m.edges || []) {
-        if (byId[e.source] && byId[e.target] && !hasParent.has(e.target)) {
-          byId[e.source].children.push(byId[e.target]);
-          hasParent.add(e.target);
-        }
-      }
-      const roots = Object.values(byId).filter((n) => !hasParent.has(n.node_id));
-      const pruned = prune(roots);
-      if (pruned.length > 0) res[m.id] = pruned;
-    }
-    return res;
-  }, [activeMaps, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, t]);
-
-  // kanban zůstává jen o rozpracovanosti — z uzlů ukazuje dál jen ty s termínem
-  const boardNodeItems = useMemo(() => {
-    const out = [];
-    const walk = (list) => list.forEach((n) => { if (n.deadline && matchesFilters(n)) out.push(n); walk(n.children); });
-    for (const roots of Object.values(nodeTrees)) walk(roots);
-    return out;
-  }, [nodeTrees]);
-
-  // C3 kalendář: úkoly (i podúkoly) a uzly map s termínem, sjednocené na jeden seznam
-  const calendarItems = useMemo(() => {
-    const out = [];
-    const pushTask = (task) => {
-      if (task.deadline) out.push({ key: `t-${task.id}`, title: task.title, deadline: task.deadline, status: task.status, kind: 'task', raw: task });
-    };
-    topLevel.forEach((task) => { pushTask(task); (byParent[task.id] || []).forEach(pushTask); });
-    boardNodeItems.forEach((n) => out.push({ key: n.id, title: n.title, deadline: n.deadline, status: n.status, kind: 'node', raw: n }));
-    return out;
-  }, [topLevel, byParent, boardNodeItems]);
+  // odvozené stromy a seznamy (activeMaps, topLevel, nodeTrees, kanban,
+  // kalendář, zásobník) — viz useTaskTrees (F3-10)
+  const { activeMaps, topLevel, nodeTrees, boardNodeItems, calendarItems, bufferItems } = useTaskTrees({
+    items, byParent, maps, user, buffer, matchesFilters, bufferVisible,
+    mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, t,
+  });
 
   const openNodeInMap = (item) => navigate(`/map/${item.map_id}?node=${item.node_id}`);
 
-  // Úprava vzhledu projektu z hlavičky v tabulce (barva / emoji v názvu).
-  // Zapisuje jen skalární pole (color/title) bez base_updated → hook 409 přeskočí.
-  const handleEditAppearance = async (map, patch) => {
-    try {
-      const updated = await base44.entities.GoalMap.update(map.id, patch);
-      setMaps((prev) => prev.map((m) => (m.id === map.id ? { ...m, ...patch, updated_date: updated.updated_date } : m)));
-    } catch (e) {
-      toast({ title: t('tasksPage.appearanceFailed'), description: e?.message, variant: 'destructive' });
-    }
-  };
+  // akce nad uzly map (zápis, mazání, sdílení, stash, ikony) — viz
+  // useMapNodeActions (F3-10)
+  const {
+    updateMapNode, shareMapWith, handleEditAppearance, handleSetNodeIcon,
+    handleSetProjectIcon, handleStashNodeItem, handleCycleNodeItem,
+    handleAssignNodeItem, handleStashNodeFromTable, handleDeleteNodeFromTable,
+    addNodeToMap,
+  } = useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editNodeItem, setEditNodeItem });
 
   // Tužka na hlavičce projektu → plná editace hlavního cíle (vrcholového uzlu).
   const handleEditProject = (map) => {
@@ -409,201 +170,12 @@ export default function Tasks() {
     });
   };
 
-  // Rychlá paleta ikony uzlu (emoji) z tabulky → zápis do mapy.
-  const handleSetNodeIcon = (item, emoji) => {
-    updateMapNode(item, { icon: emoji }).catch(() => {});
-  };
-
-  // Ikona projektu = ikona vrcholového (apex) uzlu (jeden zdroj) → zápis do apexu.
-  const handleSetProjectIcon = (map, emoji) => {
-    const nodes = map.nodes || [];
-    const apex = nodes.find((n) => n.type === 'apexNode' || n.data?.nodeType === 'apex') || nodes[0];
-    if (!apex) return;
-    updateMapNode({ map_id: map.id, node_id: apex.id }, { icon: emoji }).catch(() => {});
-  };
-
-  // Odložení cíle-uzlu do zásobníku přímo z řádku tabulky (bez otevírání
-  // dialogu). Čerstvý fetch mapy vytáhne i popis/barvu uzlu — jinak by se
-  // odložením ztratily (řádek nese jen titulek a termín).
-  const handleStashNodeItem = async (item) => {
-    if (!window.confirm(t('tasksPage.confirmStashNode', { title: item.title }))) return;
-    try {
-      const fresh = (await base44.entities.GoalMap.filter({ id: item.map_id }))[0];
-      const raw = (fresh?.nodes || []).find((n) => n.id === item.node_id);
-      // kontrola PŘED zápisem do zásobníku — jinak by se nápad zduplikoval
-      const blocked = nodeRemovalBlockedBy(fresh, raw);
-      if (blocked) {
-        toast({ title: t('tasksPage.stashFailed'), description: t('tasksPage.nodeRemoveAssignerOnly', { email: blocked }), variant: 'destructive' });
-        return;
-      }
-      await buffer.add({
-        title: item.title,
-        description: raw?.data?.description || '',
-        color: raw?.data?.color || '',
-        deadline: item.deadline || '',
-      });
-      await removeMapNode(item.map_id, item.node_id);
-      toast({ title: t('tasksPage.stashedToBuffer'), description: item.title });
-    } catch (e) {
-      toast({ title: t('tasksPage.stashFailed'), description: e?.message, variant: 'destructive' });
-    }
-  };
-
-  // Zápis do uzlu mapy ze stránky Úkoly. Vlastní zápis dělá sdílený primitiv
-  // lib/taskActions.js:patchNodeData (čerstvé načtení mapy těsně před zápisem
-  // zmenšuje okno pro kolizi s auto-save otevřeného editoru) — tady zůstává jen
-  // to, co je stránce vlastní: volitelná změna typu uzlu, lokální stav a hláška.
-  const updateMapNode = async (item, patch, nodeType) => {
-    try {
-      // typ i data JEDNÍM uložením — dřív to byly dva zápisy za sebou
-      const nodes = await patchNodeData(item.map_id, item.node_id, patch,
-        nodeType ? { type: nodeType } : null);
-      setMaps((prev) => prev.map((m) => (m.id === item.map_id ? { ...m, nodes } : m)));
-    } catch (e) {
-      const msg = e?.message === 'mapNotFound' ? t('tasksPage.mapNotFound') : e?.message;
-      toast({ title: t('tasksPage.saveToMapFailed'), description: msg, variant: 'destructive' });
-      throw e;
-    }
-  };
-
-  // Uzel se zadaným úkolem (termínem) odstraní jen zadavatel (assignedBy,
-  // legacy fallback vlastník mapy) nebo vlastník — server to vynucuje na PATCH,
-  // tady kvůli pořadí u stashe (nápad se nesmí zduplikovat do zásobníku).
-  const nodeRemovalBlockedBy = (map, rawNode) => {
-    if (!rawNode?.data?.deadline) return null;
-    const assigner = rawNode.data.assignedBy || map?.created_by || '';
-    if (user?.email === map?.created_by || user?.email === assigner) return null;
-    return assigner;
-  };
-
-  // odstranění uzlu z mapy (hrany na něj napojené padají s ním, potomci se odpojí)
-  const removeMapNode = async (mapId, nodeId) => {
-    // se zámkem base_updated (ulozDoMapy) — dřív bez něj a souběh s editorem přepsal cizí práci
-    let vysl;
-    try {
-      vysl = await ulozDoMapy(mapId, (fresh) => {
-        const blocked = nodeRemovalBlockedBy(fresh, (fresh.nodes || []).find((n) => n.id === nodeId));
-        if (blocked) throw new Error(t('tasksPage.nodeRemoveAssignerOnly', { email: blocked }));
-        return {
-          nodes: (fresh.nodes || []).filter((n) => n.id !== nodeId),
-          edges: (fresh.edges || []).filter((e) => e.source !== nodeId && e.target !== nodeId),
-        };
-      });
-    } catch (e) {
-      if (e?.message === 'mapNotFound') throw new Error(t('tasksPage.mapNotFound'));
-      throw e;
-    }
-    const { nodes, edges } = vysl;
-    setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, nodes, edges } : m)));
-  };
-
-  // přisdílení mapy (spolupracovník) při přiřazení člena bez přístupu — smí jen vlastník
-  const shareMapWith = async (mapId, email) => {
-    try {
-      // quiet: součást zadání práce — adresát dostane notifikaci o přidělené
-      // práci, druhá o sdílení by byla duplikát (Richard 21. 8.)
-      const res = await shareMap({ action: 'share', mapId, email, permission: 'work', quiet: true });
-      if (res?.error) {
-        toast({ title: t('tasksPage.shareFailed'), description: res.error, variant: 'destructive' });
-        return false;
-      }
-      setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, shared_with: [...(m.shared_with || []), email] } : m)));
-      toast({ title: t('tasksPage.mapShared'), description: t('tasksPage.mapSharedDesc', { email }) });
-      return true;
-    } catch (e) {
-      toast({ title: t('tasksPage.shareFailed'), description: e.response?.error || t('tasksPage.shareOwnerOnly'), variant: 'destructive' });
-      return false;
-    }
-  };
-
-  // „Vidí mapu" NESTAČÍ — rozhoduje PRACOVNÍ úroveň (Richard 20. 8. 2026: kdo
-  // dostane úkol, musí ho umět vyřešit, a nebo se zadavateli musí nabídnout, ať
-  // mu dá jiná práva). Čtenář svůj krok odškrtne i tak (server ho pustí), ale
-  // zadavatel by netušil, že ten člověk má mapu jen ke čtení.
-  const nodeHasWorkAccess = (map, email) => {
-    if (!email || !map) return true;
-    if (map.team_access === 'edit') return true;
-    return map.created_by === email
-      || (map.shared_with_work || []).includes(email)
-      || (map.shared_with_edit || []).includes(email);
-  };
-  const nodeIsShared = (map, email) => !!map && ((map.shared_with || []).includes(email) || !!map.team_access);
-
-  const handleCycleNodeItem = (item) => {
-    if (item.status === 'todo' && item.waiting) {
-      if (!window.confirm(t('tasksPage.confirmStartWaiting'))) return;
-    }
-    updateMapNode(item, { status: cycleStatus(item.status) }).catch(() => {});
-  };
-
-  const handleAssignNodeItem = async (item, email) => {
-    const map = maps.find((m) => m.id === item.map_id);
-    if (email && !nodeHasWorkAccess(map, email)) {
-      const jenCte = nodeIsShared(map, email);
-      const otazka = jenCte ? 'tasksPage.confirmUpgradeAssign' : 'tasksPage.confirmShareAssign';
-      if (!window.confirm(t(otazka, { email, title: map?.title }))) {
-        // odmítnutí povýšení přiřazení NERUŠÍ — práci na svém kroku dokončí i čtenář
-        if (!jenCte) return;
-      } else {
-        const ok = await shareMapWith(item.map_id, email);
-        if (!ok && !jenCte) return;
-      }
-    }
-    updateMapNode(item, { owner: email }).catch(() => {});
-  };
-
   // adaptér pro sjednocený NodeEditDialog (stejný jako na plátně)
   const handleSaveNodeFull = async (nodeId, newData, nodeType) => {
     try {
       await updateMapNode({ map_id: editNodeItem.map_id, node_id: nodeId }, newData, nodeType);
       setEditNodeItem(null);
     } catch { /* toast řeší updateMapNode */ }
-  };
-
-  const handleStashNodeFromTable = async (nodeId, override) => {
-    const item = editNodeItem;
-    const nodeTitle = (override?.title || item?.title || '').trim();
-    if (!nodeTitle) return;
-    const freshMap = (await base44.entities.GoalMap.filter({ id: item.map_id }))[0];
-    const blocked = nodeRemovalBlockedBy(freshMap, (freshMap?.nodes || []).find((n) => n.id === nodeId));
-    if (blocked) {
-      toast({ title: t('tasksPage.stashFailed'), description: t('tasksPage.nodeRemoveAssignerOnly', { email: blocked }), variant: 'destructive' });
-      return;
-    }
-    try {
-      await buffer.add({
-        title: nodeTitle,
-        description: override?.description ?? '',
-        color: override?.color ?? '',
-        deadline: override?.deadline ?? '',
-      });
-      await removeMapNode(item.map_id, nodeId);
-      setEditNodeItem(null);
-      toast({ title: t('tasksPage.stashedToBuffer'), description: nodeTitle });
-    } catch (e) {
-      toast({ title: t('tasksPage.stashFailed'), description: e?.message, variant: 'destructive' });
-    }
-  };
-
-  const handleDeleteNodeFromTable = async (nodeId) => {
-    const item = editNodeItem;
-    if (!window.confirm(t('tasksPage.confirmDeleteNode', { title: item?.title }))) return;
-    try {
-      await removeMapNode(item.map_id, nodeId);
-      setEditNodeItem(null);
-      toast({ title: t('tasksPage.nodeDeletedToast'), description: item?.title });
-    } catch (e) {
-      toast({ title: t('tasksPage.deleteFailed'), description: e?.message, variant: 'destructive' });
-    }
-  };
-
-  // Nový uzel do mapy ze seznamu. parentNodeId: id uzlu / 'auto' (pod vrchol) / null (kořen).
-  // Založení uzlu drží sdílený primitiv lib/mapNodes.js — používá ho i rychlé
-  // přidání v lite režimu, ať nevzniknou dvě různá chování téhož.
-  const addNodeToMap = async (mapId, parentNodeId, title) => {
-    const { nodeId, nodes, edges } = await addNodeToMapShared(mapId, parentNodeId, title);
-    setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, nodes, edges } : m)));
-    return nodeId;
   };
 
   const handleQuickAddNode = async (mapId, title) => {
@@ -632,32 +204,6 @@ export default function Tasks() {
       toast({ title: t('tasksPage.addSubgoalFailed'), description: e?.message, variant: 'destructive' });
     }
   };
-
-  // Zásobník: sekce se ukazuje, jen když nescopuju na mapu/cizí osobu/stav
-  // (nápady nemají mapu, přiřazení ani stav — filtr by lhal). Filtr „Moje
-  // úkoly" zásobník NEschovává — nápady jsou vždy moje (chipy v panelu Můj den
-  // ho nastavují často a zásobník pak „mizel"). Hledání a termín platí.
-  // „Zadal jsem" (delegace jiným) zásobník SCHOVÁVÁ — moje nápady nejsou delegované.
-  const bufferVisible = mapFilter === ALL && statusFilter === ALL && !nodeFilter
-    && ownerFilter === ALL
-    && (assigneeFilter === ALL || assigneeFilter === user?.email);
-  const bufferItems = useMemo(() => {
-    if (!bufferVisible) return [];
-    return buffer.items.filter((b) => {
-      if (deadlineFilter === 'overdue' && getDeadlineStatus(b.deadline, 'todo') !== 'overdue') return false;
-      if (deadlineFilter === 'week') {
-        if (!b.deadline) return false;
-        const st = getDeadlineStatus(b.deadline, 'todo');
-        const days = Math.round((new Date(b.deadline + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
-        if (st === 'overdue' || days > 7) return false;
-      }
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        if (!(b.title || '').toLowerCase().includes(q) && !hledaciText(b.description).includes(q)) return false;
-      }
-      return true;
-    });
-  }, [buffer.items, bufferVisible, deadlineFilter, search]);
 
   // Nápad opouští zásobník JAKO UZEL pod hlavním cílem vybraného projektu —
   // model 27. 7.: „uzel je úkol; když nemáš kam dát, čeká v zásobníku."
@@ -779,21 +325,6 @@ export default function Tasks() {
     if (!window.confirm(msg)) return;
     tasksApi.remove(task.id).catch(() => toast({ title: t('tasksPage.deleteFailed'), variant: 'destructive' }));
   };
-
-  const clearNodeFilter = () => {
-    setNodeFilter('');
-    searchParams.delete('node');
-    setSearchParams(searchParams, { replace: true });
-  };
-
-  const nodeFilterLabel = useMemo(() => {
-    if (!nodeFilter) return '';
-    for (const m of maps) {
-      const node = (m.nodes || []).find((n) => n.id === nodeFilter);
-      if (node) return node.data?.title || node.data?.apexText || t('tasksPage.nodeFallback');
-    }
-    return t('tasksPage.nodeFallback');
-  }, [nodeFilter, maps, t]);
 
   if (isLoadingAuth || !user) {
     return (

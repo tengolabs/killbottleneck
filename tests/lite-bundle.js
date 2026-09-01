@@ -46,7 +46,12 @@ const SRC = path.join(__dirname, '../frontend/src');
 // a zbytek nechat spadnout na index.css. Ušetřilo by to ~0,7 kB, tedy pořád
 // přes strop — a rozbilo by to jednotnost („skin buď barvy má, nebo ne").
 // Strop opět jen +5 kB, ať tlak na dietu zůstává.
-const MAX_KB = Number(process.env.LITE_MAX_KB || 500);
+// 1. 9. 2026: 500 → 505. v0.53 přidal do rychlých akcí zámek verze (ulozDoMapy v lib/mapNodes
+// + taskActions) — a lite ho POUŽÍVÁ (LiteQuickAdd → addNodeToMap), takže +1 kB je funkce, ne
+// balast (naměřeno 501; ušlo pozornosti, protože cílená sada lowercase lite-bundle neobsahovala —
+// příště: každá změna v lib/, které se lite dotýká, = lite-bundle do cílené sady).
+// Strop opět jen +5 kB, ať tlak na dietu zůstává.
+const MAX_KB = Number(process.env.LITE_MAX_KB || 505);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.

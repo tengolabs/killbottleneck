@@ -9,6 +9,26 @@ below before you jump several versions.
 
 ---
 
+## v0.54-beta — 2026-09-01
+
+**Autosave correctness (F1-01, F1-03) + Tasks page split into hooks (F3-10)**
+
+- **F1-01:** the autosave effect now serialises its own PATCHes — while one is in flight the next
+  round is rescheduled (max one waiting) and sends the CURRENT state after it lands. Before, a save
+  slower than the 1.2 s debounce made the editor conflict with itself (409 → "map changed elsewhere",
+  "Reload" dropped the last edit); the draft branch could create two projects. The draft create no
+  longer sets `skipNextSave` — text typed during the flying create goes out with the next round.
+- **F1-03:** the fingerprint stored on load is canonical (`cleanMap`), so an older record with fewer
+  node-data keys no longer triggers an empty PATCH on the first dimensions change. The merge base
+  stays raw — three-way merge unchanged.
+- New suite `ui-autosave-serializace.js` (CDP-delayed PATCH response; raw record written straight to
+  SQLite): red 7/6 on the previous build, green 13/0 after; the PATCH ≤ 3 network anchor holds.
+- **Tasks page (F3-10):** `Tasks.jsx` 1,148 → 679 lines, four hooks (`useTaskFilters`,
+  `useTaskTrees`, `useMapNodeActions` with real `useCallback` deps, `useTasksPageData`).
+  **Declared change:** `nodeTrees` = `rawTrees` (deps: maps) + prune (deps: filters) —
+  `computeWaitingSet` and tree building no longer rerun on every search keystroke; result identity
+  proven on 14 scenarios against the old implementation.
+
 ## v0.53-beta — 2026-09-01
 
 **Lowercase e-mails + optimistic-lock row actions (debt 1+2 after v0.46; S4-01, S6-02, S3-04, S4-02)**

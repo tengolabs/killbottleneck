@@ -60,9 +60,19 @@ export function useMapAutosave({
     serverEdges.current = m.edges || [];
     serverTitle.current = m.title || '';
     serverColor.current = m.color || '';
-    ulozenyOtisk.current = stableJson({
-      title: m.title || '', color: m.color || '', nodes: m.nodes || [], edges: m.edges || [],
-    });
+    // F1-03 (vada z panelu 13. 8. u otisku): otisk KANONICKY, stejně jako ho
+    // počítá autosave z cleanMapData — syrový starší/API záznam má v `data`
+    // méně klíčů, otisky by se NIKDY nerovnaly a první `dimensions` změna by
+    // poslala PATCH shodný s DB. Základna merge (serverNodes/Edges výš) zůstává
+    // SYROVÁ — merge porovnává proti skutečné podobě v DB (kanonizuje si ji sám).
+    try {
+      const { cleanNodes, cleanEdges } = cleanMap(m.nodes || [], m.edges || []);
+      ulozenyOtisk.current = stableJson({
+        title: m.title || '', color: m.color || '', nodes: cleanNodes, edges: cleanEdges,
+      });
+    } catch {
+      ulozenyOtisk.current = null; // syrový záznam neprošel kanonizací → „zatím nevíme", dorovná první PATCH
+    }
   };
   // Stav uzlu mění SERVER vlastní routou (/api/kb/node-status) a klient si ho
   // jen zrcadlí. ⚠️ Musí se zrcadlit i do ZÁKLADNY — jinak by základna tvrdila
@@ -102,6 +112,11 @@ export function useMapAutosave({
       setSaveStatus('saving');
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
+        // F1-01: create už letí → druhé kolo by založilo DRUHÝ projekt. Stačí
+        // neodesílat: doběhnutí create posune activeMapId, efekt běží znovu
+        // a rozdíl dopsaný během letu odešle běžný PATCH níž (rozhodne otisk).
+        if (saveInFlight.current) return;
+        saveInFlight.current = true;
         try {
           const { cleanNodes, cleanEdges } = cleanMapData();
           const newMap = await createProjectRecord({ title: title.trim() || t('defaults.newMapTitle'), nodes: cleanNodes, edges: cleanEdges, color });
@@ -109,13 +124,17 @@ export function useMapAutosave({
           // B3 — základna patří NOVÉ mapě; nechat v ní uzly té předchozí by
           // z prvního zásahu pravidla udělalo falešnou kolizi
           zapamatujServer({ ...newMap, title, color, nodes: newMap.nodes || cleanNodes, edges: newMap.edges || cleanEdges });
-          skipNextSave.current = true;
+          // F1-01: žádné skipNextSave — kolo po create MUSÍ proběhnout, aby se
+          // odeslalo, co uživatel dopsal BĚHEM letícího create; prázdné kolo
+          // zahodí porovnání otisku (po F1-03 je ulozenyOtisk kanonický).
           window.history.replaceState(null, '', `/map/${newMap.id}`);
           setSaveStatus('saved');
           setTimeout(() => setSaveStatus('idle'), 2000);
         } catch (e) {
           console.error(e);
           setSaveStatus('idle');
+        } finally {
+          saveInFlight.current = false;
         }
       }, 1200);
       return () => {
@@ -130,6 +149,15 @@ export function useMapAutosave({
     // nic nezapisuje. Uživatel viděl opak toho, co mu říkáme (panel 13. 8.).
     if (saveTimer.current) clearTimeout(saveTimer.current);
     const odesli = async () => {
+      // F1-01: vlastní PATCH ještě letí — druhé kolo se STARÝM base_updated by
+      // skončilo 409 a dialogem konfliktu kvůli MÉMU uložení. Přeplánovat na
+      // chvíli po doběhnutí; odešle se AKTUÁLNÍ stav (cleanMapData čte refy)
+      // a čeká vždy jen jedno kolo (timer se přepisuje, fronta neroste).
+      if (saveInFlight.current) {
+        pendingSave.current = odesli;
+        saveTimer.current = setTimeout(() => { pendingSave.current = null; odesli(); }, 300);
+        return;
+      }
       try {
         const { cleanNodes, cleanEdges } = cleanMapData();
         // PRÁZDNÉ ULOŽENÍ SE NEPOSÍLÁ (panel /checkup 13. 8. 2026).

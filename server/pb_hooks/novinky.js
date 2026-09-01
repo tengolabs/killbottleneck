@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.54-beta": {
+    cs: [
+      "Pomalá síť už nevyvolá falešné hlášení „mapa změněna z jiného místa“: editor svá uložení řadí za sebe a nikdy nezahodí, co jste dopsali během ukládání.",
+      "Starší mapy po otevření neposílají zbytečné prázdné uložení při první změně zobrazení.",
+      "Stránka Úkoly reaguje svižněji při psaní ve vyhledávání — stromy úkolů se přepočítávají, jen když se změní data, ne při každé klávese.",
+    ],
+    en: [
+      "A slow network no longer triggers a false “map changed elsewhere” dialog: the editor queues its own saves and never drops what you typed while saving.",
+      "Older maps no longer send a pointless empty save on the first view change after opening.",
+      "The Tasks page feels snappier while typing in search — task trees recompute only when data changes, not on every keystroke.",
+    ],
+  },
   "v0.53-beta": {
     cs: [
       "E-maily účtů jsou malými písmeny: kdo se registroval jako Jan.Novak@…, konečně vidí projekty a úkoly, které mu kolegové nasdíleli malými písmeny — a přihlásí se s jakoukoliv velikostí písmen.",
