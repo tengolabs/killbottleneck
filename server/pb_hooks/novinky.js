@@ -10,6 +10,16 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.56-beta": {
+    cs: [
+      "Stránka Úkoly u velkých organizací: načte se prvních 500 úkolů a tabulka poctivě řekne „Zobrazeno 500 z N“ s tlačítkem Načíst vše — dřív se úkoly nad strop tiše ztrácely ze seznamu.",
+      "„Exportovat JSON (bez jmen)“ je nově i v menu editoru na užších oknech — anonymní export už nezávisí na šířce obrazovky.",
+    ],
+    en: [
+      "The Tasks page in large organisations loads the first 500 tasks and honestly says “Showing 500 of N” with a Load-all button — tasks over the cap used to silently disappear from the list.",
+      "“Export JSON (no names)” is now also in the editor menu on narrower windows — anonymous export no longer depends on screen width.",
+    ],
+  },
   "v0.55-beta": {
     cs: [
       "Odchod z mapy v nevhodnou chvíli (během pomalého ukládání) už nikdy neztratí poslední úpravu — editor počká, až uložení doběhne, a pošle i ji.",

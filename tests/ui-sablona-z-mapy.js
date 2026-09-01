@@ -48,7 +48,8 @@ const api = async (method, path, { token, body } = {}) => {
       title: 'Mapa na šablonu',
       nodes: [
         { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Nábor', title: 'Nábor', status: 'todo' } },
-        { id: 'k1', type: 'goalNode', position: { x: 0, y: 160 }, data: { title: 'Inzerát', status: 'todo' } },
+        // owner na uzlu — kotva pro sekci „JSON (bez jmen)": v exportu MUSÍ zmizet
+        { id: 'k1', type: 'goalNode', position: { x: 0, y: 160 }, data: { title: 'Inzerát', status: 'todo', owner: UCET } },
         { id: 'k2', type: 'goalNode', position: { x: 260, y: 160 }, data: { title: 'Pohovory', status: 'todo' } },
       ],
       edges: [{ id: 'e1', source: 'root', target: 'k1' }, { id: 'e2', source: 'root', target: 'k2' }],
@@ -192,6 +193,45 @@ const api = async (method, path, { token, body } = {}) => {
     ok(await klikPodleTextu('button', /^\s*Všechny\s*$/), 'jde se vrátit na „Všechny"');
     await sleep(800);
     ok(/Nábor — šablona z prokliku/.test(await naStrance()), 'po návratu na „Všechny" je šablona zase vidět');
+
+    // ── ⋮ menu (úzká lišta): „JSON (bez jmen)" ─────────────────────────────
+    // Rozhodnutí vlastníka 1. 9. 2026: „Exportovat JSON (bez jmen)" už NENÍ
+    // jen v široké liště (`jen: 'lista'`) — pod 1850 px je i v ⋮ menu.
+    // MUTAČNÍ DŮKAZ: na image z main položka v ⋮ menu chybí → sekce červená.
+    console.log('== ⋮ menu (úzká lišta): „JSON (bez jmen)" stáhne soubor ==');
+    const fs = require('fs');
+    const DL = '/tmp/kb-e2e-sablona-z-mapy-dl';
+    fs.rmSync(DL, { recursive: true, force: true });
+    await page.setViewport({ width: 1400, height: 900 }); // < 1850 → akce žijí v ⋮
+    await page.goto(`${BASE}/map/${map.id}`, { waitUntil: 'networkidle2' });
+    await page.waitForSelector('.react-flow__node', { timeout: 45000 });
+    await sleep(2000);
+    const cdp = await page.target().createCDPSession();
+    await cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: DL });
+
+    ok(!!(await page.$('button[title="Další akce"]')), 'úzká lišta má ⋮ („Další akce")');
+    await page.click('button[title="Další akce"]');
+    await page.waitForSelector('[role="menuitem"]', { timeout: 8000 }).catch(() => {});
+    const polozky = await page.evaluate(() => [...document.querySelectorAll('[role="menuitem"]')].map((x) => (x.textContent || '').trim()));
+    ok(polozky.some((p) => p === 'JSON (bez jmen)'), `⋮ menu nese „JSON (bez jmen)" (${polozky.join(' · ') || 'prázdné'})`);
+    ok(polozky.some((p) => p === 'JSON'), 'vedle něj zůstal plný export „JSON" (se jmény)');
+
+    ok(await klikPodleTextu('[role="menuitem"]', /^\s*JSON \(bez jmen\)\s*$/), 'kliknuto na „JSON (bez jmen)"');
+    let soubor = null;
+    for (let i = 0; i < 40; i++) {
+      try { soubor = fs.readdirSync(DL).find((f) => f.endsWith('.kb.json')); } catch { /* složka ještě není */ }
+      if (soubor) break;
+      await sleep(250);
+    }
+    ok(!!soubor, `soubor se skutečně stáhl (${soubor || 'nic'})`);
+    if (soubor) {
+      const j = JSON.parse(fs.readFileSync(`${DL}/${soubor}`, 'utf8'));
+      ok(j.format === 'killbottleneck.map/1', `stažený soubor je platný export mapy (${j.format})`);
+      const k1 = (j.map?.nodes || []).find((n) => n.id === 'k1');
+      ok(!!k1 && k1.data?.owner === '' && j.exported_by === '',
+        `export je BEZ JMEN — owner uzlu („${k1 && k1.data ? k1.data.owner : '?'}") i exported_by („${j.exported_by}") prázdné`);
+    }
+    fs.rmSync(DL, { recursive: true, force: true });
 
     ok(errs.length === 0, `konzole bez chyb (${errs.length}${errs.length ? ': ' + errs[0].slice(0, 160) : ''})`);
   } catch (err) {

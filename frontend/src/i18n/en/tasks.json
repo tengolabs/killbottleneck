@@ -25,6 +25,8 @@
     "clearNodeFilterTitle": "Clear node filter",
     "nodeFallback": "node",
     "newTask": "New task",
+    "stropZobrazeno": "Showing {{shown}} of {{total}} tasks",
+    "nacistVse": "Load all",
     "emptyTitle": "You have no tasks yet",
     "emptyDesc": "Tasks break map goals down into concrete steps — or they can stand on their own.",
     "createFirstTask": "Create your first task",

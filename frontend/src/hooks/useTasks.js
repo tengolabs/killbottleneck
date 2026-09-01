@@ -1,26 +1,67 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 
+// Strop stránky úkolů (rozhodnutí vlastníka 1. 9. 2026): místo tichého
+// stropu 1000 (org s víc úkoly NEVIDĚLA nejstarší a nic to neřeklo) se
+// načte prvních 500 a přes listPage() se ví, kolik jich je CELKEM —
+// stránka může ukázat pruh „Zobrazeno X z Y" s tlačítkem Načíst vše.
+const STRANKA = 500;
+
 // Úkoly — vzor useBufferNodes: lokální stav + optimistické CRUD.
-// mapId omezí načtení na jednu mapu (NodeTasksDialog, editor).
+// mapId omezí načtení na jednu mapu (NodeTasksDialog, editor) — per-mapa
+// dotaz zůstává beze změny (jedna mapa se do stropu vejde vždy).
 export function useTasks(user, { mapId } = {}) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [castecne, setCastecne] = useState(false);
+  // „Načíst vše" drží i přes další refresh() (deep-linky a řádkové akce
+  // refreshují často — pruh se nesmí po každé akci vracet)
+  const vseRef = useRef(false);
+
+  // stránkovaný dotaz: první stránka vždy, zbylé jen když vse=true.
+  // Řazení nese tiebreak `id` — úkoly založené ve stejné ms by jinak mohly
+  // mezi stránkami přeskakovat (duplicitní/chybějící řádky); dedupe navrch.
+  const nactiStranky = useCallback(async (vse) => {
+    const prvni = await base44.entities.Task.listPage('-created_date,id', 1, STRANKA);
+    let list = prvni.items;
+    if (vse && prvni.totalPages > 1) {
+      const videne = new Set(list.map((i) => i.id));
+      for (let p = 2; p <= prvni.totalPages; p++) {
+        const dalsi = await base44.entities.Task.listPage('-created_date,id', p, STRANKA);
+        list = list.concat(dalsi.items.filter((i) => !videne.has(i.id) && videne.add(i.id)));
+      }
+    }
+    return { list, totalItems: prvni.totalItems };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const list = mapId
-        ? await base44.entities.Task.filter({ map_id: mapId }, '-created_date', 1000)
-        : await base44.entities.Task.list('-created_date', 1000);
-      setItems(list);
+      if (mapId) {
+        const list = await base44.entities.Task.filter({ map_id: mapId }, '-created_date', 1000);
+        setItems(list);
+        setTotal(list.length);
+        setCastecne(false);
+      } else {
+        const { list, totalItems } = await nactiStranky(vseRef.current);
+        setItems(list);
+        setTotal(totalItems);
+        setCastecne(totalItems > list.length);
+      }
     } catch {
       // seznam není kritický — při chybě zůstane prázdný
     } finally {
       setLoading(false);
     }
-  }, [user, mapId]);
+  }, [user, mapId, nactiStranky]);
+
+  // klik na „Načíst vše" v pruhu — dotáhne zbylé stránky a pruh zmizí
+  const nacistVse = useCallback(async () => {
+    vseRef.current = true;
+    await refresh();
+  }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -57,5 +98,5 @@ export function useTasks(user, { mapId } = {}) {
     return m;
   }, [items]);
 
-  return { items, loading, update, remove, refresh, byParent };
+  return { items, loading, total, castecne, nacistVse, update, remove, refresh, byParent };
 }

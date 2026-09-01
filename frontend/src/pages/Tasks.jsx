@@ -530,6 +530,29 @@ export default function Tasks() {
           </Button>
         </div>
 
+        {/* Strop 500 úkolů s viditelným dotažením (rozhodnutí vlastníka 1. 9.
+            2026): org nad 500 úkolů dřív TIŠE neviděla nejstarší. Decentní pruh
+            po vzoru TrialBanneru; po „Načíst vše" se dotáhnou zbylé stránky
+            a pruh zmizí. */}
+        {tasksApi.castecne && (
+          <div
+            role="status"
+            data-testid="tasks-strop"
+            className="flex flex-wrap items-center justify-center gap-2 px-4 py-1.5 mb-4 text-xs rounded-md border bg-muted/40 text-muted-foreground"
+          >
+            <span>{t('tasksPage.stropZobrazeno', { shown: items.length, total: tasksApi.total })}</span>
+            <button
+              type="button"
+              data-testid="tasks-strop-nacist"
+              onClick={() => tasksApi.nacistVse()}
+              disabled={loading}
+              className="underline underline-offset-2 whitespace-nowrap font-medium"
+            >
+              {t('tasksPage.nacistVse')}
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />

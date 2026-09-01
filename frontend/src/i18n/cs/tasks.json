@@ -25,6 +25,8 @@
     "clearNodeFilterTitle": "Zrušit filtr uzlu",
     "nodeFallback": "uzel",
     "newTask": "Nový úkol",
+    "stropZobrazeno": "Zobrazeno {{shown}} z {{total}} úkolů",
+    "nacistVse": "Načíst vše",
     "emptyTitle": "Zatím nemáte žádné úkoly",
     "emptyDesc": "Úkoly rozpracují cíle z map do konkrétních kroků — nebo mohou stát samy o sobě.",
     "createFirstTask": "Vytvořit první úkol",

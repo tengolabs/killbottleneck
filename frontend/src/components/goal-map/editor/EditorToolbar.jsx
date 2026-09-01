@@ -40,9 +40,10 @@ const CITELNOST_ICONS = { normal: ALargeSmall, large: Type, titleOnly: Heading }
 // Horní lišta editoru: široká varianta (≥1850 px) i ⋮ menu pro užší displeje.
 // Akce, které nesou OBĚ varianty, žijí v jednom seznamu `akce` (F1-10) a obě
 // větve se z něj jen mapují — podmínky viditelnosti a handlery tak existují
-// jednou. Historické rozdíly mezi větvemi (jiné texty, disabled jen v menu,
-// „JSON bez jmen" jen v liště) jsou v seznamu vyznačené poli popisekListy/
-// popisekMenu/disabledMenu/jen — vědomě zachované 1:1, nerozhodnuté.
+// jednou. Historické rozdíly mezi větvemi (jiné texty, disabled jen v menu)
+// jsou v seznamu vyznačené poli popisekListy/popisekMenu/disabledMenu/jen —
+// vědomě zachované 1:1, nerozhodnuté. („JSON bez jmen" jen v liště padlo
+// rozhodnutím vlastníka 1. 9. 2026 — položka je i v ⋮ menu.)
 // Čistě prezentační — vstupy jdou v pojmenovaných balících:
 //   nav     … navigace + organizace (logo)
 //   layout  … směr, zarovnání, čitelnost, kanban
@@ -79,7 +80,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   //   popisekListy/popisekMenu … Zpět a exporty mají v liště jiné texty než v menu
   //   disabledMenu … exporty zamyká v liště celé tlačítko Export (trigger),
   //                  v ⋮ menu má disabled každá položka zvlášť
-  //   jen: 'lista' … „Exportovat JSON (bez jmen)" v ⋮ menu chybí
+  //   jen: 'lista' … akce se kreslí jen v liště, v ⋮ menu chybí (dnes nevyužité)
   //   titulekListy/testIdListy/varianta/popisekVeSpanu … title, data-testid,
   //                  zvýraznění otevřeného AI chatu a responzivní <span> nese jen lišta
   const akce = [
@@ -183,12 +184,14 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
       onClick: () => handleExportJson(true),
     },
     {
+      // rozhodnutí vlastníka 1. 9. 2026: i v ⋮ menu (dřív `jen: 'lista'`)
       klic: 'exportJsonBezJmen',
-      jen: 'lista', // v ⋮ menu tahle položka dnes není
       sekceListy: 'export',
       viditelna: true,
       Ikona: FileJson,
       popisekListy: t('toolbar.exportJsonNoPeople'),
+      popisekMenu: t('toolbar.exportJsonNoPeopleShort'),
+      disabledMenu: exporting,
       onClick: () => handleExportJson(false),
     },
     {

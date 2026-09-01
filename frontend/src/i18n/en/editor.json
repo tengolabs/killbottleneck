@@ -61,6 +61,7 @@
     "exportJson": "Export JSON (with names)",
     "exportJsonNoPeople": "Export JSON (without names)",
     "exportJsonShort": "JSON",
+    "exportJsonNoPeopleShort": "JSON (no names)",
     "homeLink": "Back to home",
     "alignShort_classic": "wide",
     "alignShort_compact": "compact",

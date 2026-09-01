@@ -61,6 +61,7 @@
     "exportJson": "Exportovat JSON (se jmény)",
     "exportJsonNoPeople": "Exportovat JSON (bez jmen)",
     "exportJsonShort": "JSON",
+    "exportJsonNoPeopleShort": "JSON (bez jmen)",
     "homeLink": "Zpět na úvodní stránku",
     "alignShort_classic": "do šířky",
     "alignShort_compact": "kompaktně",

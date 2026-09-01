@@ -9,6 +9,18 @@ below before you jump several versions.
 
 ---
 
+## v0.56-beta — 2026-09-01
+
+**Task cap decision (owner, 1 Sep): 500 with visible completion; anonymous export in the menu**
+
+- **Tasks page:** loads the first 500 tasks via `listPage` (`-created_date,id` tiebreak) and, when
+  more exist, shows "Showing 500 of N tasks" with a Load-all button (pages of 500). Tasks over the
+  old 1000 cap used to vanish silently. Per-map queries unchanged; note: the shared hook means the
+  Home page also loads the first 500 (My day itself is computed server-side).
+- **Editor:** "Export JSON (no names)" also in the ⋮ menu — it existed only in the wide toolbar.
+- New suite `ui-strop-ukolu.js` (520 tasks; red on the previous build — no banner, silent cap) and
+  an extended `ui-sablona-z-mapy.js` (menu item + no-names download, red on the previous build).
+
 ## v0.55-beta — 2026-09-01
 
 **Post-marathon polish: review-panel fixes, sharing guard, one toolbar definition**
