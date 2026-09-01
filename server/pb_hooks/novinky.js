@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.57-beta": {
+    cs: [
+      "Na stránce Úkoly přibyl pohled „Časová osa“ — projekty a jejich cíle jako pruhy na ose s milníky, značkou Dnes a červeným zvýrazněním všeho po termínu.",
+      "Osa umí tři měřítka (Dny, Týdny s čísly týdnů, Měsíce s kvartály), krokování −1/Dnes/+1, skok na projekt a tažení myší i prstem; na mobilu má úsporné rozložení.",
+      "Filtr map v Úkolech už nenabízí „Bez mapy“ — každý úkol patří do projektu, volba vždy ukázala prázdný seznam.",
+    ],
+    en: [
+      "The Tasks page gains a “Timeline” view — projects and their goals as bars on an axis with milestones, a Today marker and everything overdue highlighted in red.",
+      "The timeline offers three scales (Days, Weeks with ISO numbers, Months with quarters), −1/Today/+1 stepping, a jump-to-project picker and drag-to-pan with mouse or touch; narrow screens get a compact layout.",
+      "The map filter on Tasks no longer offers “No map” — every task belongs to a project, so the option only ever showed an empty list.",
+    ],
+  },
   "v0.56-beta": {
     cs: [
       "Stránka Úkoly u velkých organizací: načte se prvních 500 úkolů a tabulka poctivě řekne „Zobrazeno 500 z N“ s tlačítkem Načíst vše — dřív se úkoly nad strop tiše ztrácely ze seznamu.",

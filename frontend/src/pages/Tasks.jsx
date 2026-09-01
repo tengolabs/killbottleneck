@@ -9,6 +9,7 @@ import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ReportRailButton from '@/components/shared/ReportRailButton';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskCalendar from '@/components/tasks/TaskCalendar';
+import TaskTimeline from '@/components/tasks/TaskTimeline';
 import TaskDialog from '@/components/tasks/TaskDialog';
 import NewNodeDialog from '@/components/tasks/NewNodeDialog';
 import BufferPanel, { useBufferNodes, BufferEditDialog } from '@/components/goal-map/BufferPanel';
@@ -40,7 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Loader2, CheckSquare, Search, X, LayoutList, Columns3, CalendarDays, Download, CircleUser, Send } from 'lucide-react';
+import { Plus, Loader2, CheckSquare, Search, X, LayoutList, Columns3, CalendarDays, CalendarRange, Download, CircleUser, Send } from 'lucide-react';
 import { exportTasksCsv, exportMarkdownReport } from '@/lib/taskExport';
 import { useToast } from '@/components/ui/use-toast';
 import { STATUSES } from '@/lib/statusMeta';
@@ -397,6 +398,9 @@ export default function Tasks() {
               <TabsTrigger value="table" className="gap-1.5">
                 <LayoutList className="w-3.5 h-3.5" /> {t('tasksPage.viewTable')}
               </TabsTrigger>
+              <TabsTrigger value="timeline" className="gap-1.5">
+                <CalendarRange className="w-3.5 h-3.5" /> {t('tasksPage.viewTimeline')}
+              </TabsTrigger>
               <TabsTrigger value="board" className="gap-1.5">
                 <Columns3 className="w-3.5 h-3.5" /> {t('tasksPage.viewBoard')}
               </TabsTrigger>
@@ -450,7 +454,6 @@ export default function Tasks() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>{t('tasksPage.filterAllMaps')}</SelectItem>
-              <SelectItem value={NONE}>{t('tasksPage.filterNoMap')}</SelectItem>
               {activeMaps.map((m) => (
                 <SelectItem key={m.id} value={m.id}>{m.title || t('common:misc.untitled')}</SelectItem>
               ))}
@@ -570,6 +573,18 @@ export default function Tasks() {
               <Plus className="w-4 h-4" /> {t('tasksPage.createFirstTask')}
             </Button>
           </div>
+        ) : view === 'timeline' ? (
+          <TaskTimeline
+            tasks={topLevel}
+            byParent={byParent}
+            maps={activeMaps}
+            nodeTrees={nodeTrees}
+            search={search}
+            statusFilter={statusFilter}
+            assigneeFilter={assigneeFilter}
+            onEdit={openEdit}
+            onOpenNode={setEditNodeItem}
+          />
         ) : view === 'calendar' ? (
           <TaskCalendar
             items={calendarItems}

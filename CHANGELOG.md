@@ -9,6 +9,24 @@ below before you jump several versions.
 
 ---
 
+## v0.57-beta — 2026-09-02
+
+**Timeline (Gantt) view on the Tasks page**
+
+- **New “Timeline” view** (second tab: Table | Timeline | Board | Calendar): a horizontal
+  Gantt-style axis grouped by project — goals and tasks as bars, milestones as ◇, overdue
+  items with a red ring and a “Today” marker line.
+- **Three scales** — Days / Weeks (ISO week numbers with date ranges) / Months (quarter +
+  month header) — plus −1/Today/+1 stepping, a jump-to-project picker, a scroller strip and
+  drag-to-pan (mouse and touch); a compact mobile layout for narrow screens.
+- The map filter on the Tasks page no longer offers “No map” — every task lives in a project,
+  so the option only ever produced an empty list.
+- The chosen view is remembered per browser (as before with Table/Board/Calendar).
+- New test suite `ui-casova-osa.js` (red on the previous build — the tab does not exist).
+
+Feature contributed via the Antigravity agent (reviewed, re-based onto the current
+architecture and localised before merging).
+
 ## v0.56-beta — 2026-09-01
 
 **Task cap decision (owner, 1 Sep): 500 with visible completion; anonymous export in the menu**
