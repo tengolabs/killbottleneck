@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.55-beta": {
+    cs: [
+      "Odchod z mapy v nevhodnou chvíli (během pomalého ukládání) už nikdy neztratí poslední úpravu — editor počká, až uložení doběhne, a pošle i ji.",
+      "Doúklid malých písmen v e-mailech: převedou se i razítka „kdo zadal“, držitelé pozic a zástupci uvnitř map; e-mail zůstane malými písmeny i po jeho změně v nastavení.",
+      "Sdílení projektů je odolnější: překlepy a technické adresy externích kontaktů se do sdílení tiše nedostanou (zapíší se do provozního logu).",
+      "Zpět v editoru funguje i po „Přidat cíl“; lišta a menu editoru jsou definované na jednom místě, takže se už nemohou rozejít.",
+    ],
+    en: [
+      "Leaving a map at the wrong moment (during a slow save) never loses the last edit any more — the editor waits for the in-flight save and sends it too.",
+      "Lowercase e-mail follow-up: “assigned by” stamps, position holders and deputies inside maps convert as well; an e-mail stays lowercase even after changing it in settings.",
+      "Project sharing is more robust: typos and technical external-contact addresses are silently kept out of shares (logged operationally).",
+      "Undo in the editor also works after “Add goal”; the editor toolbar and menu are defined in one place, so they can no longer drift apart.",
+    ],
+  },
   "v0.54-beta": {
     cs: [
       "Pomalá síť už nevyvolá falešné hlášení „mapa změněna z jiného místa“: editor svá uložení řadí za sebe a nikdy nezahodí, co jste dopsali během ukládání.",

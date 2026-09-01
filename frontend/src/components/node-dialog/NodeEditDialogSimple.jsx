@@ -15,7 +15,7 @@ import DatePicker from '@/components/DatePicker';
 import CommentThread from '@/components/shared/CommentThread';
 import NodeTaskComments from '@/components/shared/NodeTaskComments';
 import { STATUSES as statuses } from '@/lib/statusMeta';
-import { pb } from '@/api/pb';
+import { nodeStatus } from '@/api/kb';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useNodeEditState } from './useNodeEditState';
@@ -43,7 +43,7 @@ export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, 
     if (savingStatus || next === s.status) return;
     setSavingStatus(true);
     try {
-      const res = await pb.send('/api/kb/node-status', { method: 'POST', body: { mapId, nodeId: node.id, status: next } });
+      const res = await nodeStatus(mapId, node.id, next);
       s.setStatus(next);
       onWorkStatusSaved?.(node.id, next, res?.updated);
     } catch (err) {

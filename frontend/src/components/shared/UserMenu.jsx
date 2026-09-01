@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { pb } from '@/api/pb';
+import { getOrgStructure, createOrgMap } from '@/api/kb';
 import { useAuth } from '@/lib/AuthContext';
 import InviteDialog from '@/components/tasks/InviteDialog';
 import AboutDialog from '@/components/shared/AboutDialog';
@@ -70,7 +70,7 @@ export default function UserMenu({ onInvited }) {
   const [zakladamStrukturu, setZakladamStrukturu] = useState(false);
   useEffect(() => {
     if (!user) return;
-    pb.send('/api/kb/org-structure', { method: 'GET' })
+    getOrgStructure()
       .then((res) => setOrgMapId(res.exists ? res.map_id : ''))
       .catch(() => setOrgMapId(''));
   }, [user]);
@@ -82,7 +82,7 @@ export default function UserMenu({ onInvited }) {
     if (zakladamStrukturu) return;
     setZakladamStrukturu(true);
     try {
-      const res = await pb.send('/api/kb/org-map', { method: 'POST' });
+      const res = await createOrgMap();
       const id = res?.map?.id;
       if (id) { setOrgMapId(id); navigate(`/map/${id}`); }
     } catch (e) {

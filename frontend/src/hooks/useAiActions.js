@@ -78,7 +78,7 @@ export function useAiActions({
       setExpandingNodeId(nodeId);
       try {
         const isRewrite = action === 'rewrite';
-        const result = await advisor({
+        const data = await advisor({
           goal: rootText,
           mode: 'expand',
           action,
@@ -90,7 +90,6 @@ export function useAiActions({
           },
           count: isRewrite ? 1 : 3,
         });
-        const data = result;
         if (data?.error) {
           toast({ title: t('toasts.aiError'), description: data.error, variant: 'destructive' });
           return;

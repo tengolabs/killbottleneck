@@ -86,14 +86,13 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
           const st = d.status || 'todo';
           return `- ${d.title || d.apexText || ''} [${statusConfig[st]?.label || st}]${d.owner ? ` @${d.owner}` : ''}${d.deadline ? ` ${t('common:export.deadlineNote', { date: d.deadline })}` : ''}`;
         }).join('\n');
-      const result = await advisor({
+      const data = await advisor({
         mode: 'chat',
         message:
           t('dashboard.aiPrompt', { title: mapTitle }) +
           (taskLines ? `\n\n${t('dashboard.aiPromptTasks')}\n${taskLines}` : `\n\n${t('dashboard.aiPromptNoTasks')}`),
         map: { nodes: compactNodes, edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })) },
       });
-      const data = result;
       if (data?.error || !data?.reply) {
         setSummary(`⚠️ ${data?.error || t('dashboard.aiNoSummary')}`);
       } else {

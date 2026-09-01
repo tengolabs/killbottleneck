@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { pb } from '@/api/pb';
+import { savePurpose } from '@/api/kb';
 import { invalidateKbConfig } from '@/hooks/useKbConfig';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -35,7 +35,7 @@ export default function PurposeDialog() {
   // replace:true = jen z tohoto dialogu smí server nahradit nedotčené úvodní
   // projekty variantou pro účel (select ve Správě organizace ho neposílá)
   const save = (purpose) => f.run(async () => {
-    const r = await pb.send('/api/kb/purpose', { method: 'POST', body: { purpose, replace: true } });
+    const r = await savePurpose(purpose, { replace: true });
     base44.org.forget();
     invalidateKbConfig(); // účel je i v /api/kb/config (PurposeGate, dotazník)
     setOpen(false);

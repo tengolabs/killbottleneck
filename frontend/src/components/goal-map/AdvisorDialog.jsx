@@ -86,8 +86,7 @@ export function AdvisorFlow({ onAccept, onCancel, initialGoal = '', initialScope
     setLoading(true);
     setError('');
     try {
-      const result = await advisor({ goal: goalText, mode: 'questions', scope });
-      const data = result;
+      const data = await advisor({ goal: goalText, mode: 'questions', scope });
       if (data?.error) {
         setError(data.error);
         setStep('goal');
@@ -125,8 +124,7 @@ export function AdvisorFlow({ onAccept, onCancel, initialGoal = '', initialScope
     setLoading(true);
     setError('');
     try {
-      const result = await advisor({ goal, mode: 'generate', answers, scope });
-      const data = result;
+      const data = await advisor({ goal, mode: 'generate', answers, scope });
       if (data?.error) {
         setError(data.error);
       } else if (data?.nodes && Array.isArray(data.nodes)) {

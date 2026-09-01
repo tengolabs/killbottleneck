@@ -13,7 +13,7 @@
 // Volající proto nepracuje s kolekcemi, ale s cílem (`target`) z toTarget().
 
 import { base44 } from '@/api/base44Client';
-import { pb } from '@/api/pb';
+import { nodeStatus } from '@/api/kb';
 import { ulozDoMapy } from '@/lib/mapNodes';
 
 // 'en-CA' = datový klíč YYYY-MM-DD v LOKÁLNÍ zóně (formát DB), NE zobrazení —
@@ -86,8 +86,12 @@ export function toTarget(item) {
 // znamená dvojí okno pro kolizi s auto-savem otevřeného editoru a dva řádky
 // v záznamníku změn za jednu akci uživatele.
 export async function patchNodeData(mapId, nodeId, patch, nodePatch) {
-  const mutace = (fresh) => ({ nodes: (fresh.nodes || []).map((n) =>
-    n.id === nodeId ? { ...n, ...(nodePatch || {}), data: { ...n.data, ...patch } } : n) });
+  let posledniZname = null; // uzly z posledního čtení mapy — záchrana pro fallback níž
+  const mutace = (fresh) => {
+    posledniZname = fresh.nodes || [];
+    return { nodes: (fresh.nodes || []).map((n) =>
+      n.id === nodeId ? { ...n, ...(nodePatch || {}), data: { ...n.data, ...patch } } : n) };
+  };
   try {
     return (await ulozDoMapy(mapId, mutace)).nodes;
   } catch (e) {
@@ -96,9 +100,17 @@ export async function patchNodeData(mapId, nodeId, patch, nodePatch) {
     // by mu odškrtnutí z Mého dne / stránky Úkoly / mobilu spadlo na 403/404.
     const statusOnly = !nodePatch && Object.keys(patch || {}).every((k) => k === 'status');
     if (!statusOnly || !(e?.status === 403 || e?.status === 404)) throw e;
-    await pb.send('/api/kb/node-status', { method: 'POST', body: { mapId, nodeId, status: patch.status } });
-    const fresh = (await base44.entities.GoalMap.filter({ id: mapId }))[0];
-    return fresh ? (fresh.nodes || []) : [];
+    await nodeStatus(mapId, nodeId, patch.status);
+    // Čtení po nodeStatus je jen osvěžení pro volajícího — když selže nebo vrátí
+    // prázdno, NEVRACET []: volající si návratem přepisuje stav a mapa by mu
+    // v UI „zmizela" (panel 31. 8. 2026). Místo toho poslední známé uzly
+    // s promítnutým stavem (ten server přes /node-status právě zapsal).
+    try {
+      const fresh = (await base44.entities.GoalMap.filter({ id: mapId }))[0];
+      if (fresh && (fresh.nodes || []).length) return fresh.nodes;
+    } catch { /* fallback níž */ }
+    return (posledniZname || []).map((n) => (
+      n.id === nodeId ? { ...n, data: { ...(n.data || {}), ...patch } } : n));
   }
 }
 

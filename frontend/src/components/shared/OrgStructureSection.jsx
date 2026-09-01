@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { pb } from '@/api/pb';
+import { getOrgStructure, createOrgMap, orgAssign, orgAdd, orgRemove } from '@/api/kb';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Network, Loader2, ExternalLink, Plus, Check, Trash2 } from 'lucide-react';
@@ -30,7 +30,7 @@ export default function OrgStructureSection() {
 
   const load = async () => {
     try {
-      const res = await pb.send('/api/kb/org-structure', { method: 'GET' });
+      const res = await getOrgStructure();
       setExists(!!res.exists);
       setMapIdOrg(res.map_id || '');
       setRows(res.positions || []);
@@ -45,7 +45,7 @@ export default function OrgStructureSection() {
   const openMap = async () => {
     setBusy(true);
     try {
-      const res = await pb.send('/api/kb/org-map', { method: 'POST' });
+      const res = await createOrgMap();
       navigate(`/map/${res.map.id}`);
     } catch (e) {
       setErr(e?.response?.error || e?.message || '');
@@ -60,7 +60,7 @@ export default function OrgStructureSection() {
   const assign = async (nodeId, field, value) => {
     setErr('');
     try {
-      const res = await pb.send('/api/kb/org-structure/assign', { method: 'POST', body: { node_id: nodeId, [field]: value } });
+      const res = await orgAssign(nodeId, field, value);
       setRows((prev) => prev.map((r) => (r.node_id === nodeId ? { ...res.position, depth: r.depth } : r)));
       setSavedRow(nodeId);
       if (savedTimer.current) clearTimeout(savedTimer.current); // dvě rychlá uložení: ✓ nezhasne předčasně
@@ -75,7 +75,7 @@ export default function OrgStructureSection() {
   const addPosition = async (parentNodeId) => {
     setErr('');
     try {
-      await pb.send('/api/kb/org-structure/add', { method: 'POST', body: { parent_node_id: parentNodeId || '' } });
+      await orgAdd(parentNodeId);
       await load(); // hierarchie (depth) se přepočítává na serveru
     } catch (e) {
       setErr(e?.response?.error || e?.message || '');
@@ -87,7 +87,7 @@ export default function OrgStructureSection() {
     if (!window.confirm(t('orgStructure.confirmRemove', { title: r.title }))) return;
     setErr('');
     try {
-      await pb.send('/api/kb/org-structure/remove', { method: 'POST', body: { node_id: r.node_id } });
+      await orgRemove(r.node_id);
       await load();
     } catch (e) {
       setErr(e?.response?.error || e?.message || '');

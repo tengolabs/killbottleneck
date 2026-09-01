@@ -38,7 +38,11 @@ export async function ulozDoMapy(mapId, mutace) {
       if (e?.status !== 409 || pokus === 1) throw e;
     }
   }
-  return null;
+  // Sem se dojít nedá: druhé kolo buď vrátí výsledek, nebo hodí (409 při
+  // pokus === 1 se výš přehazuje). Dřívější `return null` byl mrtvý kód, a
+  // kdyby smyčku někdo přepsal, volající (`(await ulozDoMapy(...)).nodes`)
+  // by padli na nicneříkající TypeError — radši nahlas (panel 31. 8. 2026).
+  throw new Error('mapConflict');
 }
 
 export async function addNodeToMap(mapId, parentNodeId, title, data = {}) {

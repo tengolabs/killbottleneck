@@ -48,7 +48,7 @@ export default function InviteDialog({ open, currentRole, onClose, onInvited }) 
   const f = useDialogForm({
     open,
     onClose: () => { reset(); onClose(); },
-    submit: handleInvite,
+    submit: () => handleInvite(),
     onError: (e) => setError(e?.message || t('inviteDialog.inviteFailed')),
   });
 

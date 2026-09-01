@@ -58,7 +58,7 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
     });
   };
   // chybu hlásí volající (onCreate v Tasks.jsx toastuje a znovu vyhodí) — tady jen odemknout tlačítko
-  const f = useDialogForm({ open, onClose, submit: handleCreate, onError: () => {} });
+  const f = useDialogForm({ open, onClose, submit: () => handleCreate(), onError: () => {} });
 
   return (
     <Dialog open={open} onOpenChange={f.onOpenChange}>

@@ -9,9 +9,13 @@
 // email_edit — podle živého schématu, ne podle seznamu natvrdo) a v JSON mapy
 // (shared_with*, nodes[].data.owner). Přeskočí kolekce clients a externi_kontakty
 // (nejsou to účty).
-// DVOJČATA (existuje jiný účet, který se liší jen velikostí písmen): ten účet se
-// NEMĚNÍ, jen se hlasitě zaloguje — instance nesmí spadnout při startu kvůli datům
-// zákazníka; rozhodne člověk (sloučit/smazat). Idempotentní.
+// DVOJČATA (existuje jiný účet, který se liší jen velikostí písmen): kolidující
+// účet se NEMĚNÍ, jen se hlasitě zaloguje — instance nesmí spadnout při startu
+// kvůli datům zákazníka; rozhodne člověk (sloučit/smazat). ⚠️ Poctivě: u páru
+// Jan@ + JAN@ BEZ existujícího jan@ převezme malou adresu STARŠÍ z páru (jde
+// první, kolizi nevidí) a teprve mladší se zaloguje jako dvojče — deterministické
+// a většinou správně (dvojče vzniká později překlepem), potvrzeno panelem 1. 9.
+// a rozhodnutím vlastníka. Idempotentní.
 const POLE_TEXT = ["owner_email", "created_by", "deputy", "assignee_email", "triggered_by", "invited_by", "email", "email_edit", "author_email", "actor_email", "actor"];
 const PRESKOCIT = ["clients", "externi_kontakty", "_superusers", "_authOrigins", "_externalAuths", "_mfas", "_otps"];
 const POLE_JSON_SEZNAM = ["shared_with", "shared_with_edit", "shared_with_work"];
@@ -68,7 +72,7 @@ migrate((app) => {
     try { dvojce = app.findFirstRecordByFilter("users", "email = {:e} && id != {:id}", { e: novy, id: u.id }); } catch (err) { dvojce = null; }
     if (dvojce) {
       dvojcat++;
-      console.log("users_email_lowercase: ⚠️ DVOJČE — účet " + stary + " (" + u.id + ") a " + novy + " (" + dvojce.id + ") se liší jen velikostí písmen; NEMĚNÍM, sloučit/smazat ručně");
+      console.log("users_email_lowercase: ⚠️ DVOJČE — účet " + stary + " (" + u.id + ") ponechán beze změny; adresu " + novy + " drží účet " + dvojce.id + " (starší z páru ji převzal, nebo existovala) — sloučit/smazat ručně");
       continue;
     }
     const zmen = prepisVsude(app, stary, novy);

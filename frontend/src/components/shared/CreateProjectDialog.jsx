@@ -56,7 +56,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
   const [clientId, setClientId] = useState('');
   const [clients, setClients] = useState([]);
   // 402 (zkušebka), 409 (strop účtů), 503, síť — mlčet se nesmí (nález F4-02)
-  const f = useDialogForm({ open, onClose, submit: handleCreate, onError: (e) => toast({ title: tr('createProject.createFailed'), description: e?.response?.error || e?.message, variant: 'destructive' }) });
+  const f = useDialogForm({ open, onClose, submit: () => handleCreate(), onError: (e) => toast({ title: tr('createProject.createFailed'), description: e?.response?.error || e?.message, variant: 'destructive' }) });
 
   useEffect(() => {
     if (!open) return;

@@ -43,7 +43,7 @@ export default function ApiKeysDialog({ open, onClose }) {
     setLabel('');
     load();
   });
-  const f = useDialogForm({ open, onClose, submit: create, onError: () => toast({ title: t('apiKeys.createFailed'), variant: 'destructive' }) });
+  const f = useDialogForm({ open, onClose, submit: () => create(), onError: () => toast({ title: t('apiKeys.createFailed'), variant: 'destructive' }) });
 
   const rotate = async (id) => {
     try {

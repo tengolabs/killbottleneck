@@ -38,8 +38,11 @@ const ALIGN_ICONS = { classic: StretchHorizontal, compact: Shrink, bands: Layout
 const CITELNOST_ICONS = { normal: ALargeSmall, large: Type, titleOnly: Heading };
 
 // Horní lišta editoru: široká varianta (≥1850 px) i ⋮ menu pro užší displeje.
-// Obě varianty jsou tu vedle sebe 1:1 tak, jak byly v GoalMapEditor (F1-07);
-// sjednocení do jednoho seznamu akcí je samostatný nález F1-10.
+// Akce, které nesou OBĚ varianty, žijí v jednom seznamu `akce` (F1-10) a obě
+// větve se z něj jen mapují — podmínky viditelnosti a handlery tak existují
+// jednou. Historické rozdíly mezi větvemi (jiné texty, disabled jen v menu,
+// „JSON bez jmen" jen v liště) jsou v seznamu vyznačené poli popisekListy/
+// popisekMenu/disabledMenu/jen — vědomě zachované 1:1, nerozhodnuté.
 // Čistě prezentační — vstupy jdou v pojmenovaných balících:
 //   nav     … navigace + organizace (logo)
 //   layout  … směr, zarovnání, čitelnost, kanban
@@ -67,6 +70,175 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
     setChatOpen, handleAddNote, setPersonalView, handleExport, handleExportJson,
     setSaveTplOpen, handleToggleArchive, handleAddGoal,
   } = actions;
+
+  // Jediný zdroj pravdy pro akce kreslené dvakrát: širokou lištou (≥1850 px)
+  // a ⋮ menu pro užší displeje (F1-10). Pořadí seznamu = pořadí v ⋮ menu;
+  // v liště určuje místo `sekceListy` ('akce1' před stavem ukládání, 'akce2'
+  // za odznaky, 'export' uvnitř nabídky Export).
+  // Rozdíly větví (dřívější rozejití, zachováno 1:1 — NEROZHODNUTO):
+  //   popisekListy/popisekMenu … Zpět a exporty mají v liště jiné texty než v menu
+  //   disabledMenu … exporty zamyká v liště celé tlačítko Export (trigger),
+  //                  v ⋮ menu má disabled každá položka zvlášť
+  //   jen: 'lista' … „Exportovat JSON (bez jmen)" v ⋮ menu chybí
+  //   titulekListy/testIdListy/varianta/popisekVeSpanu … title, data-testid,
+  //                  zvýraznění otevřeného AI chatu a responzivní <span> nese jen lišta
+  const akce = [
+    {
+      // Dashboard má vlastní ikonu v levé liště — tady jsou jen Úkoly
+      klic: 'ukoly',
+      sekceListy: 'akce1',
+      viditelna: user && activeMapId && !isPublicView,
+      Ikona: CheckSquare,
+      popisek: `${t('toolbar.tasks')}${mapTaskCount > 0 ? ` (${mapTaskCount})` : ''}`,
+      titulekListy: t('toolbar.tasksTitle'),
+      popisekVeSpanu: true, // lišta: text v <span class="hidden sm:inline">
+      onClick: () => navigate(`/tasks?map=${activeMapId}`),
+    },
+    {
+      klic: 'zpet',
+      sekceListy: 'akce2',
+      viditelna: canEdit,
+      Ikona: Undo2,
+      popisekListy: t('toolbar.undoShort'),
+      popisekMenu: t('toolbar.undoTitle'),
+      titulekListy: t('toolbar.undoTitle'),
+      disabled: !canUndo,
+      onClick: handleUndo,
+    },
+    {
+      // Zarovnat má vlastní ikonu v liště na všech velikostech — v ⋮ menu by bylo dvakrát
+      klic: 'sdilet',
+      sekceListy: 'akce2',
+      viditelna: canShare && user && !isDraft && !isTemplatePreview,
+      Ikona: Share2,
+      popisek: t('toolbar.share'),
+      onClick: () => setShareOpen(true),
+    },
+    {
+      // Automatizační pravidla mapy — jen editor; pod 1850 px žijí v ⋮ menu
+      // (lišta je plná a její finální podoba je otevřené rozhodnutí)
+      klic: 'pravidla',
+      sekceListy: 'akce2',
+      viditelna: canEdit && user && activeMapId && !isPublicView && !isTemplatePreview,
+      Ikona: Zap,
+      popisek: `${t('toolbar.rules')}${mapRules.length > 0 ? ` (${mapRules.length})` : ''}`,
+      testIdListy: 'toolbar-rules',
+      onClick: () => { setRulesDefaults({}); setRulesOpen(true); },
+    },
+    {
+      klic: 'ai',
+      sekceListy: 'akce2',
+      viditelna: canEdit && ai.has('generate') && user,
+      Ikona: Sparkles,
+      popisek: t('toolbar.suggestAi'),
+      onClick: () => setAdvisorOpen(true),
+    },
+    {
+      klic: 'chat',
+      sekceListy: 'akce2',
+      viditelna: canEdit && ai.has('chat') && user,
+      Ikona: MessageSquare,
+      popisek: t('toolbar.aiChat'),
+      titulekListy: t('toolbar.aiChat'),
+      varianta: chatOpen ? 'default' : 'outline',
+      onClick: () => setChatOpen((v) => !v),
+    },
+    {
+      klic: 'poznamka',
+      sekceListy: 'akce2',
+      viditelna: canEdit,
+      Ikona: StickyNote,
+      popisek: t('toolbar.note'),
+      titulekListy: t('toolbar.addNoteTitle'),
+      onClick: handleAddNote,
+    },
+    {
+      klic: 'exportPng',
+      sekceListy: 'export',
+      viditelna: true,
+      Ikona: Download,
+      popisekListy: t('toolbar.exportPng'),
+      popisekMenu: t('toolbar.exportPngShort'),
+      disabledMenu: exporting || visibleNodes.length === 0,
+      onClick: () => handleExport('png'),
+    },
+    {
+      klic: 'exportPdf',
+      sekceListy: 'export',
+      viditelna: true,
+      Ikona: Download,
+      popisekListy: t('toolbar.exportPdf'),
+      popisekMenu: t('toolbar.exportPdfShort'),
+      disabledMenu: exporting || visibleNodes.length === 0,
+      onClick: () => handleExport('pdf'),
+    },
+    {
+      klic: 'exportJson',
+      sekceListy: 'export',
+      viditelna: true,
+      Ikona: FileJson,
+      popisekListy: t('toolbar.exportJson'),
+      popisekMenu: t('toolbar.exportJsonShort'),
+      disabledMenu: exporting,
+      onClick: () => handleExportJson(true),
+    },
+    {
+      klic: 'exportJsonBezJmen',
+      jen: 'lista', // v ⋮ menu tahle položka dnes není
+      sekceListy: 'export',
+      viditelna: true,
+      Ikona: FileJson,
+      popisekListy: t('toolbar.exportJsonNoPeople'),
+      onClick: () => handleExportJson(false),
+    },
+    {
+      klic: 'sablona',
+      sekceListy: 'export',
+      viditelna: user && !isPublicView && !isTemplatePreview && !personalMap,
+      Ikona: LayoutGrid,
+      popisek: t('toolbar.saveAsTemplate'),
+      onClick: () => setSaveTplOpen(true),
+    },
+    {
+      klic: 'archiv',
+      sekceListy: 'export',
+      viditelna: user && activeMapId && !isPublicView && isMapOwner,
+      Ikona: archived ? ArchiveRestore : Archive,
+      popisek: archived ? t('toolbar.restoreFromArchive') : t('toolbar.archiveProject'),
+      onClick: handleToggleArchive,
+    },
+  ];
+  // jedna akce → tlačítko široké lišty (≥1850 px)
+  const tlacitkoListy = (a) => (
+    <Button
+      key={a.klic}
+      variant={a.varianta || 'outline'}
+      size="sm"
+      className="hidden min-[1850px]:inline-flex"
+      onClick={a.onClick}
+      disabled={a.disabled}
+      title={a.titulekListy}
+      data-testid={a.testIdListy}
+    >
+      <a.Ikona className="w-4 h-4" />
+      {a.popisekVeSpanu
+        ? <span className="hidden sm:inline">{a.popisekListy ?? a.popisek}</span>
+        : ` ${a.popisekListy ?? a.popisek}`}
+    </Button>
+  );
+  // jedna akce → položka rozbalovací nabídky: ⋮ menu (s disabled a kratšími
+  // texty), nebo nabídky Export v liště (bez disabled — zamyká celý trigger)
+  const polozkaMenu = (a, vListe) => (
+    <DropdownMenuItem
+      key={a.klic}
+      disabled={vListe ? undefined : (a.disabledMenu ?? a.disabled)}
+      onClick={a.onClick}
+    >
+      <a.Ikona className="w-4 h-4" /> {vListe ? (a.popisekListy ?? a.popisek) : (a.popisekMenu ?? a.popisek)}
+    </DropdownMenuItem>
+  );
+  const akceListy = (sekce) => akce.filter((a) => a.sekceListy === sekce && a.viditelna).map(tlacitkoListy);
+
   return (
       <header className="min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
         <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
@@ -193,18 +365,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
           </Button>
           {/* Dashboard se přestěhoval do levé lišty pod filtr Moje úkoly
               (Richard 11. 8.: „tlačítko dashboard doleva a dolů pod filtr") */}
-          {user && activeMapId && !isPublicView && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden min-[1850px]:inline-flex"
-              onClick={() => navigate(`/tasks?map=${activeMapId}`)}
-              title={t('toolbar.tasksTitle')}
-            >
-              <CheckSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('toolbar.tasks')}{mapTaskCount > 0 ? ` (${mapTaskCount})` : ''}</span>
-            </Button>
-          )}
+          {akceListy('akce1')}
           {saveStatus === 'saving' && (
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="w-3 h-3 animate-spin" /> {t('saveState.saving')}
@@ -230,44 +391,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               <Eye className="w-3.5 h-3.5" /> {canWork ? t('share.workBadge') : t('share.readOnly')}
             </span>
           )}
-          {canEdit && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={handleUndo} disabled={!canUndo} title={t('toolbar.undoTitle')}>
-              <Undo2 className="w-4 h-4" /> {t('toolbar.undoShort')}
-            </Button>
-          )}
-          {canShare && user && !isDraft && !isTemplatePreview && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={() => setShareOpen(true)}>
-              <Share2 className="w-4 h-4" /> {t('toolbar.share')}
-            </Button>
-          )}
-          {/* Automatizační pravidla mapy — jen editor; pod 1850 px žije v ⋮ menu
-              (lišta je plná a její finální podoba je otevřené rozhodnutí) */}
-          {canEdit && user && activeMapId && !isPublicView && !isTemplatePreview && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={() => { setRulesDefaults({}); setRulesOpen(true); }} data-testid="toolbar-rules">
-              <Zap className="w-4 h-4" /> {t('toolbar.rules')}{mapRules.length > 0 ? ` (${mapRules.length})` : ''}
-            </Button>
-          )}
-          {canEdit && ai.has('generate') && user && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={() => setAdvisorOpen(true)}>
-              <Sparkles className="w-4 h-4" /> {t('toolbar.suggestAi')}
-            </Button>
-          )}
-          {canEdit && ai.has('chat') && user && (
-            <Button
-              variant={chatOpen ? 'default' : 'outline'}
-              size="sm"
-              className="hidden min-[1850px]:inline-flex"
-              onClick={() => setChatOpen((v) => !v)}
-              title={t('toolbar.aiChat')}
-            >
-              <MessageSquare className="w-4 h-4" /> {t('toolbar.aiChat')}
-            </Button>
-          )}
-          {canEdit && (
-            <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex" onClick={handleAddNote} title={t('toolbar.addNoteTitle')}>
-              <StickyNote className="w-4 h-4" /> {t('toolbar.note')}
-            </Button>
-          )}
+          {akceListy('akce2')}
           {/* Zarovnat i na malých obrazovkách (Richard 11. 8.: „na mobilu chci
               nahoře tlačítko zarovnat… blíže k přepínání zobrazení") — ikonové,
               ikona = aktuální styl; „+" je naopak vpravo u zvonečku.
@@ -326,30 +450,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('png')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPng')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPdf')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportJson(true)}>
-                <FileJson className="w-4 h-4" /> {t('toolbar.exportJson')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportJson(false)}>
-                <FileJson className="w-4 h-4" /> {t('toolbar.exportJsonNoPeople')}
-              </DropdownMenuItem>
-              {user && !isPublicView && !isTemplatePreview && !personalMap && (
-                <DropdownMenuItem onClick={() => setSaveTplOpen(true)}>
-                  <LayoutGrid className="w-4 h-4" /> {t('toolbar.saveAsTemplate')}
-                </DropdownMenuItem>
-              )}
-              {user && activeMapId && !isPublicView && isMapOwner && (
-                <DropdownMenuItem onClick={handleToggleArchive}>
-                  {archived
-                    ? <><ArchiveRestore className="w-4 h-4" /> {t('toolbar.restoreFromArchive')}</>
-                    : <><Archive className="w-4 h-4" /> {t('toolbar.archiveProject')}</>}
-                </DropdownMenuItem>
-              )}
+              {akce.filter((a) => a.sekceListy === 'export' && a.viditelna).map((a) => polozkaMenu(a, true))}
             </DropdownMenuContent>
           </DropdownMenu>
           {canEdit && (
@@ -371,64 +472,9 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {/* Dashboard má vlastní ikonu v levé liště — v ⋮ menu by byl dvakrát */}
-              {user && activeMapId && !isPublicView && (
-                <DropdownMenuItem onClick={() => navigate(`/tasks?map=${activeMapId}`)}>
-                  <CheckSquare className="w-4 h-4" /> {t('toolbar.tasks')}{mapTaskCount > 0 ? ` (${mapTaskCount})` : ''}
-                </DropdownMenuItem>
-              )}
-              {canEdit && (
-                <DropdownMenuItem disabled={!canUndo} onClick={handleUndo}>
-                  <Undo2 className="w-4 h-4" /> {t('toolbar.undoTitle')}
-                </DropdownMenuItem>
-              )}
-              {/* Zarovnat má vlastní ikonu v liště na všech velikostech — v ⋮ menu by bylo dvakrát */}
-              {canShare && user && !isDraft && !isTemplatePreview && (
-                <DropdownMenuItem onClick={() => setShareOpen(true)}>
-                  <Share2 className="w-4 h-4" /> {t('toolbar.share')}
-                </DropdownMenuItem>
-              )}
-              {canEdit && user && activeMapId && !isPublicView && !isTemplatePreview && (
-                <DropdownMenuItem onClick={() => { setRulesDefaults({}); setRulesOpen(true); }}>
-                  <Zap className="w-4 h-4" /> {t('toolbar.rules')}{mapRules.length > 0 ? ` (${mapRules.length})` : ''}
-                </DropdownMenuItem>
-              )}
-              {canEdit && ai.has('generate') && user && (
-                <DropdownMenuItem onClick={() => setAdvisorOpen(true)}>
-                  <Sparkles className="w-4 h-4" /> {t('toolbar.suggestAi')}
-                </DropdownMenuItem>
-              )}
-              {canEdit && ai.has('chat') && user && (
-                <DropdownMenuItem onClick={() => setChatOpen((v) => !v)}>
-                  <MessageSquare className="w-4 h-4" /> {t('toolbar.aiChat')}
-                </DropdownMenuItem>
-              )}
-              {canEdit && (
-                <DropdownMenuItem onClick={handleAddNote}>
-                  <StickyNote className="w-4 h-4" /> {t('toolbar.note')}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem disabled={exporting || visibleNodes.length === 0} onClick={() => handleExport('png')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPngShort')}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={exporting || visibleNodes.length === 0} onClick={() => handleExport('pdf')}>
-                <Download className="w-4 h-4" /> {t('toolbar.exportPdfShort')}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={exporting} onClick={() => handleExportJson(true)}>
-                <FileJson className="w-4 h-4" /> {t('toolbar.exportJsonShort')}
-              </DropdownMenuItem>
-              {user && !isPublicView && !isTemplatePreview && !personalMap && (
-                <DropdownMenuItem onClick={() => setSaveTplOpen(true)}>
-                  <LayoutGrid className="w-4 h-4" /> {t('toolbar.saveAsTemplate')}
-                </DropdownMenuItem>
-              )}
-              {user && activeMapId && !isPublicView && isMapOwner && (
-                <DropdownMenuItem onClick={handleToggleArchive}>
-                  {archived
-                    ? <><ArchiveRestore className="w-4 h-4" /> {t('toolbar.restoreFromArchive')}</>
-                    : <><Archive className="w-4 h-4" /> {t('toolbar.archiveProject')}</>}
-                </DropdownMenuItem>
-              )}
+              {/* Dashboard má vlastní ikonu v levé liště a Zarovnat v liště na
+                  všech velikostech — v ⋮ menu by byly dvakrát, proto tu nejsou */}
+              {akce.filter((a) => a.viditelna && a.jen !== 'lista').map((a) => polozkaMenu(a, false))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

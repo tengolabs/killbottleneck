@@ -9,7 +9,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown, Zap, Loader2 } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import OwnerSelect from '@/components/OwnerSelect';
 import { base44 } from '@/api/base44Client';
-import { pb } from '@/api/pb';
+import { getOrgStructure } from '@/api/kb';
 import { useToast } from '@/components/ui/use-toast';
 import { rulesApi, parseOutline, outlineToText } from './rulesApi';
 
@@ -57,7 +57,7 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
   // pozice org struktury pro dynamické cíle (prázdné = struktura neexistuje)
   const [orgPositions, setOrgPositions] = useState([]);
   useEffect(() => {
-    pb.send('/api/kb/org-structure', { method: 'GET' })
+    getOrgStructure()
       .then((res) => setOrgPositions(res.positions || []))
       .catch(() => setOrgPositions([]));
   }, []);

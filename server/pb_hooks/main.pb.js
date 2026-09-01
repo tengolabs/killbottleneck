@@ -218,6 +218,22 @@ onRecordCreateRequest((e) => {
   }
 }, "users");
 
+// E-mail malými písmeny i při KAŽDÉ ZMĚNĚ účtu (kontrolní panel 31. 8. 2026):
+// registrace lowercasuje v create hooku výš, ale změna e-mailu ho obcházela —
+// hlavně PocketBase flow „potvrzení změny e-mailu": confirm-email-change routa
+// zapisuje `record.setEmail(newEmail)` + `app.save(record)` (apis/
+// record_auth_email_change_confirm.go, e-mail v tokenu nese velikost písmen,
+// jak ji uživatel napsal do žádosti). App.save prochází modelovým hookem
+// onRecordUpdate, stejně jako PATCH users (superuser i vlastní účet) — jedno
+// místo tedy chytá obě cesty. Normalizace běží PŘED validací v e.next(), takže
+// kolize s existujícím účtem (liší se jen velikostí písmen) skončí standardní
+// PB chybou unikátu, ne druhým účtem-dvojčetem.
+onRecordUpdate((e) => {
+  const mailLower = e.record.getString("email").trim().toLowerCase();
+  if (mailLower && mailLower !== e.record.getString("email")) e.record.set("email", mailLower);
+  e.next();
+}, "users");
+
 // roli smí měnit jen admin
 onRecordUpdateRequest((e) => {
   const { NOTIFY_TYPES, NOTIFY_ALWAYS, jeAdmin } = require(`${__hooks}/helpers.js`);

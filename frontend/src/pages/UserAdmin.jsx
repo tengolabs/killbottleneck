@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '@/lib/clipboard';
 import { base44 } from '@/api/base44Client';
-import { pb } from '@/api/pb';
+import { getMembers, resetUserPassword, memberDeputy, savePurpose } from '@/api/kb';
 import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAuth } from '@/lib/AuthContext';
@@ -100,7 +100,7 @@ export default function UserAdmin() {
   // z /members — a sloupce, které se z ní naplnit nedají, se mu neukazují.
   const loadMembers = async () => {
     try {
-      const res = await pb.send('/api/kb/members', { method: 'GET' });
+      const res = await getMembers();
       setUsers((res.members || []).map((m) => ({
         id: m.id, email: m.email, full_name: m.full_name || m.name || '',
         role: m.role, deputy: m.deputy || '',
@@ -231,7 +231,7 @@ export default function UserAdmin() {
   const handleResetPassword = async (email) => {
     if (!window.confirm(t('userAdmin.confirmResetPassword', { email }))) return;
     try {
-      const res = await pb.send('/api/kb/reset-user-password', { method: 'POST', body: { email } });
+      const res = await resetUserPassword(email);
       setInviteResult({ mode: 'reset', email, temp_password: res?.temp_password, sent_via_email: !!res?.sent_via_email });
       setInviteOpen(true);
     } catch (e) {
@@ -249,7 +249,7 @@ export default function UserAdmin() {
   // i cizí e-mail (= převzetí identity, když navíc smí měnit hesla).
   const handleDeputyChange = async (userId, deputy) => {
     try {
-      await pb.send('/api/kb/member-deputy', { method: 'POST', body: { id: userId, deputy } });
+      await memberDeputy(userId, deputy);
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, deputy } : u)));
     } catch (e) {
       // ⚠️ Naše routy vracejí důvod v poli `error`; `message` je obecný text
@@ -356,7 +356,7 @@ export default function UserAdmin() {
               onChange={async (e) => {
                 const purpose = e.target.value;
                 try {
-                  await pb.send('/api/kb/purpose', { method: 'POST', body: { purpose } });
+                  await savePurpose(purpose);
                   invalidateKbConfig();
                   base44.org.forget();
                   setOrg((o) => ({ ...(o || {}), purpose }));

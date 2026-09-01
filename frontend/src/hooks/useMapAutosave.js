@@ -87,6 +87,13 @@ export function useMapAutosave({
   // PATCH mapy právě letí — hlídání na pozadí musí mlčet, jinak GET verze
   // předběhne odpověď vlastního uložení a vyrobí falešný poplach.
   const saveInFlight = useRef(false);
+  // Letící zápis jako promise (kontrolní panel 31. 8. 2026): flush při odchodu
+  // z mapy na něj musí umět POČKAT — přeplánovaný saveTimer by cleanup autosave
+  // efektu při unmountu vždy smazal a druhá úprava by se tiše ztratila.
+  // Invariant: saveInFlight === true ⇒ inFlightPromise je promise právě letícího
+  // zápisu; resolve nese `updated_date` úspěšného PATCHe (jinak null) — správný
+  // základ base_updated pro navazující flush i po přepnutí na jinou mapu.
+  const inFlightPromise = useRef(null);
   const saveTimer = useRef(null);
 
   // latest-ref vzor: přiřazení při KAŽDÉM renderu, ať refy nikdy nezaostávají
@@ -117,6 +124,7 @@ export function useMapAutosave({
         // a rozdíl dopsaný během letu odešle běžný PATCH níž (rozhodne otisk).
         if (saveInFlight.current) return;
         saveInFlight.current = true;
+        let dolet; inFlightPromise.current = new Promise((res) => { dolet = res; });
         try {
           const { cleanNodes, cleanEdges } = cleanMapData();
           const newMap = await createProjectRecord({ title: title.trim() || t('defaults.newMapTitle'), nodes: cleanNodes, edges: cleanEdges, color });
@@ -135,6 +143,7 @@ export function useMapAutosave({
           setSaveStatus('idle');
         } finally {
           saveInFlight.current = false;
+          dolet(null); // create nenese base_updated pro navazující PATCH
         }
       }, 1200);
       return () => {
@@ -148,16 +157,65 @@ export function useMapAutosave({
     // „Ukládání…" a zhasla — a tooltip i návod přitom slibují, že se do mapy
     // nic nezapisuje. Uživatel viděl opak toho, co mu říkáme (panel 13. 8.).
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    const odesli = async () => {
+    const odesli = async (flush = false) => {
       // F1-01: vlastní PATCH ještě letí — druhé kolo se STARÝM base_updated by
       // skončilo 409 a dialogem konfliktu kvůli MÉMU uložení. Přeplánovat na
       // chvíli po doběhnutí; odešle se AKTUÁLNÍ stav (cleanMapData čte refy)
       // a čeká vždy jen jedno kolo (timer se přepisuje, fronta neroste).
+      // ⚠️ To ale NEPLATÍ pro flush při odchodu z mapy (volá ho cleanup
+      // load-efektu přes pendingSave): přeplánovaný saveTimer smaže cleanup
+      // autosave efektu při unmountu VŽDY, takže by se druhá úprava tiše
+      // ztratila (kontrolní panel 31. 8. 2026). Flush proto na letící PATCH
+      // POČKÁ (inFlightPromise) a pošle stav hned po jeho doběhnutí.
       if (saveInFlight.current) {
-        pendingSave.current = odesli;
-        saveTimer.current = setTimeout(() => { pendingSave.current = null; odesli(); }, 300);
+        if (!flush) {
+          pendingSave.current = odesli;
+          saveTimer.current = setTimeout(() => { pendingSave.current = null; odesli(); }, 300);
+          return;
+        }
+        // Snímek stavu TEĎ, PŘED čekáním: cleanup běží ještě s uzly staré mapy,
+        // ale po await už refy můžou držet NOVOU mapu (přechod A→B odkazem
+        // uvnitř editoru) — poslat je do staré mapy by ji přepsalo cizím obsahem.
+        const snimek = (() => {
+          const { cleanNodes, cleanEdges } = cleanMapData();
+          return { title, color, nodes: cleanNodes, edges: cleanEdges };
+        })();
+        let dobehlo = null;
+        try { dobehlo = await inFlightPromise.current; } catch { /* chybu ohlásilo letící kolo */ }
+        if (saveInFlight.current) return; // letí další zápis (nemělo by nastat) — jako dřív: vzdát
+        const otisk = stableJson(snimek);
+        if (otisk === ulozenyOtisk.current) return; // letící kolo už uložilo totéž
+        try {
+          setSaveStatus('saving');
+          saveInFlight.current = true;
+          const updated = await base44.entities.GoalMap.update(activeMapId, {
+            ...snimek,
+            // Po přechodu na jinou mapu už baseUpdated patří TÉ NOVÉ (load-efekt
+            // volá zapamatujServer) — správný základ nese odpověď právě
+            // doběhlého PATCHe. Když nedoběhl úspěšně, zbývá baseUpdated.
+            base_updated: dobehlo || baseUpdated.current,
+          });
+          if (mapIdNow.current !== mapId) return; // pozdní odpověď po přepnutí mapy — základnu nové mapy nepřepisovat
+          zapamatujServer({
+            updated_date: updated.updated_date,
+            title: snimek.title, color: snimek.color,
+            nodes: updated.nodes || snimek.nodes, edges: updated.edges || snimek.edges,
+          });
+          ulozenyOtisk.current = otisk;
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 2000);
+        } catch (e) {
+          // Odchod z mapy: dialog konfliktu ani merge nad plátnem už nedávají
+          // smysl (plátno patří jiné mapě / nikomu). Jen ohlásit — dřív se tahle
+          // úprava ztrácela VŽDY a potichu.
+          console.error('flush při odchodu selhal', e?.status, e?.message);
+          if (mapIdNow.current === mapId) setSaveStatus('idle');
+        } finally {
+          saveInFlight.current = false;
+        }
         return;
       }
+      let dolet = null; let doletBase = null;
       try {
         const { cleanNodes, cleanEdges } = cleanMapData();
         // PRÁZDNÉ ULOŽENÍ SE NEPOSÍLÁ (panel /checkup 13. 8. 2026).
@@ -174,6 +232,7 @@ export function useMapAutosave({
         if (otisk === ulozenyOtisk.current) return;   // nic se nemění → ani indikátor
         setSaveStatus('saving');
         saveInFlight.current = true;
+        inFlightPromise.current = new Promise((res) => { dolet = res; });
         const updated = await base44.entities.GoalMap.update(activeMapId, {
           title,
           color,
@@ -181,6 +240,9 @@ export function useMapAutosave({
           edges: cleanEdges,
           base_updated: baseUpdated.current, // B3: verze, ze které vycházíme
         });
+        // razítko pro navazující flush — MUSÍ se vzít před guardem níž, právě
+        // kvůli přechodu na jinou mapu (flush pak nemá jiný správný základ)
+        doletBase = updated.updated_date || null;
         // Flush při přechodu na JINOU mapu: odpověď dorazí, až když editor drží
         // novou mapu — základnu merge ani otisk té nové nesmí přepsat (jinak
         // první autosave nové mapy skončil 409; panel 27. 8.). Uloženo je, hotovo.
@@ -246,6 +308,7 @@ export function useMapAutosave({
         setSaveStatus('idle');
       } finally {
         saveInFlight.current = false;
+        if (dolet) dolet(doletBase); // čekající flush smí vyrazit (s razítkem úspěšného zápisu)
       }
     };
     pendingSave.current = odesli;
@@ -425,10 +488,12 @@ export function useMapAutosave({
   // někdo další (409), dialog zůstává a jde to zkusit znovu — záměrně žádná
   // automatická smyčka, každý pokus = nové vědomé rozhodnutí.
   const handleKeepMine = async () => {
+    let dolet = null; let doletBase = null;
     try {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       setSaveStatus('saving');
       saveInFlight.current = true;
+      inFlightPromise.current = new Promise((res) => { dolet = res; });
       const fresh = await base44.entities.GoalMap.get(activeMapId, { fields: 'updated' });
       const { cleanNodes, cleanEdges } = cleanMapData();
       const updated = await base44.entities.GoalMap.update(activeMapId, {
@@ -438,6 +503,7 @@ export function useMapAutosave({
         edges: cleanEdges,
         base_updated: fresh.updated_date,
       });
+      doletBase = updated.updated_date || null;
       zapamatujServer({ updated_date: updated.updated_date, title, color, nodes: cleanNodes, edges: cleanEdges });
       setConflict(false);
       setRemoteChanged(false);
@@ -449,6 +515,7 @@ export function useMapAutosave({
       toast({ title: t('conflict.keepFailed'), variant: 'destructive' });
     } finally {
       saveInFlight.current = false;
+      if (dolet) dolet(doletBase);
     }
   };
 

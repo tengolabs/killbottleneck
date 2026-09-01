@@ -9,6 +9,27 @@ below before you jump several versions.
 
 ---
 
+## v0.55-beta — 2026-09-01
+
+**Post-marathon polish: review-panel fixes, sharing guard, one toolbar definition**
+
+- **Autosave:** leaving a map while a slow save is in flight no longer loses the follow-up edit —
+  the flush awaits the in-flight PATCH (promise ref, not the effect-owned timer) and sends the
+  current state with the returned `base_updated`. Proven red on the previous build.
+- **Lowercase follow-up:** migration `users_email_lowercase_2` also rewrites `assignedBy`,
+  `holder`, `deputy`, `automationRequestedBy`, `deadlineChangeRequestedBy` inside map nodes
+  (paged, logged); a users update hook keeps the e-mail lowercase even through PocketBase's
+  confirm-email-change; the twins log now states truthfully that the older of a pair takes the
+  lowercase address (behaviour unchanged, owner-approved).
+- **Sharing guard (server):** `syncShares` silently skips invalid share values (no `@`,
+  whitespace, `ext-…@kontakt.invalid` pseudo-addresses) with a warn log — a malformed value used
+  to abort the whole share sync, and an external-contact pseudo-address could gain a `work` row.
+- **Editor:** Undo works after "Add goal"; the toolbar and ⋮ menu render from ONE action list
+  (byte-identical DOM; the list documents their historical asymmetries instead of hiding them).
+- **API boundary:** `nodeStatus`, org-structure and member-admin calls go through `api/kb.js`.
+- **Cloud:** one Stripe client (`stripe_klient.py`, url-encoded params), one SMTP sender with
+  PDF attachments and a CRLF guard; revenue prediction already fixed to local clock in v0.54's wave.
+
 ## v0.54-beta — 2026-09-01
 
 **Autosave correctness (F1-01, F1-03) + Tasks page split into hooks (F3-10)**

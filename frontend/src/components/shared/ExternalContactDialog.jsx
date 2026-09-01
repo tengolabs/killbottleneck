@@ -35,7 +35,7 @@ export default function ExternalContactDialog({ open, onClose, onCreated }) {
   const [isPrivate, setIsPrivate] = useState(false);
   const [editId, setEditId] = useState(null);
   const [edit, setEdit] = useState({ name: '', email: '', note: '', private: false });
-  const f = useDialogForm({ open, onClose, submit: create, onError: (e) => toast({ title: t('externalContacts.saveFailed'), description: e?.message, variant: 'destructive' }) });
+  const f = useDialogForm({ open, onClose, submit: () => create(), onError: (e) => toast({ title: t('externalContacts.saveFailed'), description: e?.message, variant: 'destructive' }) });
 
   const load = () => {
     setLoading(true);

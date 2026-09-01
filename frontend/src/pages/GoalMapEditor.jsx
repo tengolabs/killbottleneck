@@ -16,7 +16,6 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { base44 } from '@/api/base44Client';
-import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Loader2, Target, Trash2, Lock, Unlock, Sun, Moon, ChevronDown, Map as MapIcon, Palette, SlidersHorizontal } from 'lucide-react';
@@ -30,7 +29,7 @@ import PersonalRootNode from '@/components/goal-map/PersonalRootNode';
 import DeletableEdge from '@/components/goal-map/DeletableEdge';
 import { useBufferNodes } from '@/components/goal-map/BufferPanel';
 import ProgressDashboard from '@/components/goal-map/ProgressDashboard';
-import { shareMap, getPublicMap } from '@/api/kb';
+import { shareMap, getPublicMap, nodeStatus } from '@/api/kb';
 import { layoutTree, findFreeChildSpot } from '@/lib/treeLayout';
 import { isApexNode as isApexNodeShared } from '@/lib/mapNodes';
 import { spojeniPovoleno, poskozeneHrany } from '@/lib/mapStructure';
@@ -500,7 +499,11 @@ function EditorContent({ mapId, personalMap = false }) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const fn = pendingSave.current;
       pendingSave.current = null;
-      if (fn) fn();
+      // `true` = flush: když PATCH právě letí, odesli NESMÍ jen přeplánovat
+      // saveTimer (cleanup autosave efektu ho při unmountu vždy smaže a úprava
+      // by se tiše ztratila) — počká na letící zápis a pošle stav hned
+      // (kontrolní panel 31. 8. 2026; detaily v hooks/useMapAutosave.js).
+      if (fn) fn(true);
     };
   }, [mapId, personalMap]);
 
@@ -832,6 +835,7 @@ function EditorContent({ mapId, personalMap = false }) {
 
   const handleAddGoal = useCallback(() => {
     const newId = `node-${Date.now()}`;
+    pushHistory(); // přidání musí jít Vrátit zpět (stejně jako v handleAddChild)
     let position = { x: 250, y: 150 };
     if (rfInstance) {
       const center = rfInstance.screenToFlowPosition({
@@ -850,7 +854,7 @@ function EditorContent({ mapId, personalMap = false }) {
       },
     ]);
     setEditNodeId(newId);
-  }, [rfInstance, setNodes, setEditNodeId]);
+  }, [rfInstance, setNodes, setEditNodeId, pushHistory]);
 
   const handleAddNote = useCallback(() => {
     const newId = `note-${Date.now()}`;
@@ -1006,7 +1010,7 @@ function EditorContent({ mapId, personalMap = false }) {
       }
       const next = cycleStatus(current);
       try {
-        const res = await pb.send('/api/kb/node-status', { method: 'POST', body: { mapId: activeMapId, nodeId, status: next } });
+        const res = await nodeStatus(activeMapId, nodeId, next);
         setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, status: next } } : n)));
         zrcadliStavDoZakladny(nodeId, next);
         if (res?.updated) baseUpdated.current = res.updated;

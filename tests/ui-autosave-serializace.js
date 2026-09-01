@@ -100,6 +100,35 @@ H.beh(async () => {
   expect((poA.nodes || []).length === 3, `uzly mapy zůstaly netknuté (${(poA.nodes || []).length})`);
   await cdp.send('Fetch.disable');
 
+  // ======================= letící PATCH + odchod (panel 31. 8. 2026) =======================
+  // PATCH 1 letí (odpověď držená 4 s), uživatel mezitím udělá druhou úpravu a
+  // HNED odejde z mapy. Flush z cleanupu load-efektu dřív jen přeplánoval
+  // saveTimer na 300 ms — a ten cleanup autosave efektu při unmountu VŽDY
+  // smazal → druhá úprava se tiše ztratila. Po opravě flush na letící PATCH
+  // počká (inFlightPromise) a pošle aktuální stav; v DB jsou OBĚ úpravy.
+  console.log('== letící PATCH + odchod z mapy → obě úpravy v DB ==');
+  const mapC = await zalozMapu('Odchod');
+  await page.goto(`${inst.base}/map/${mapC.id}`, { waitUntil: 'networkidle2' });
+  await page.waitForSelector('.react-flow__node[data-id="n1"]', { timeout: 45000 });
+  await sleep(4000); // usadit (viz F1-01)
+  zdrzenychPatchu = 0;
+  await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/collections/goalmaps/records/*', requestStage: 'Response' }] });
+  zdrzujeme = true;
+  expect(await prejmenujMapu('Odchod', 'Odchod A'), 'přejmenování 1 („Odchod A")');
+  await H.waitFor(() => zdrzenychPatchu === 1, { timeout: 8000, popis: 'PATCH 1 odeslán (odpověď držíme 4 s)' });
+  expect(await prejmenujMapu('Odchod A', 'Odchod AB'), 'přejmenování 2 („Odchod AB") BĚHEM letícího PATCHe');
+  // okamžitý odchod z mapy uvnitř aplikace (Home) — editor nemá horní lištu,
+  // proto přechod routeru jako při kliku na logo (pushState + popstate)
+  await page.evaluate(() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); });
+  await sleep(300);
+  expect(await page.evaluate(() => location.pathname === '/' && !document.querySelector('.react-flow__node')), 'odchod z mapy hned po druhé úpravě');
+  await sleep(5000); // držená odpověď 4 s + flush PATCH + rezerva
+  zdrzujeme = false;
+  await cdp.send('Fetch.disable');
+  const poC = (await inst.api('GET', `/api/collections/goalmaps/records/${mapC.id}`, { token: A })).json;
+  expect(poC.title === 'Odchod AB', `v DB jsou OBĚ úpravy — druhá se při odchodu neztratila („${poC.title}")`);
+  expect((poC.nodes || []).length === 3, `uzly mapy zůstaly netknuté (${(poC.nodes || []).length})`);
+
   // ======================= F1-03: kanonický otisk při načtení =======================
   console.log('== F1-03: starý záznam (syrové minimální data) + stisk Čitelnosti → žádný zápis ==');
   const mapB = await zalozMapu('Otisk');

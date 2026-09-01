@@ -146,7 +146,7 @@ const cizihoPuvodu = (m) => /fonts\.g|favicon|ERR_NETWORK_CHANGED/.test(m.text()
     // Naměřeno 28. 8. 2026 před rozkladem autosave (F1-07 krok 13); růst =
     // regrese (autosave/hlídač/merge by posílal víc, než posílal). Počítá se
     // AŽ od otevřené a usazené mapy, ať do toho nepadá načtení. Uzel se přidává
-    // tlačítkem + na kartě (plní historii Zpět; „Přidat cíl" v liště ji neplní)
+    // tlačítkem + na kartě (plní historii Zpět — od 1. 9. 2026 ji plní i „Přidat cíl" v liště)
     // a pojmenuje se v dialogu.
     const sit = { PATCH: 0, GET: 0, POST: 0, on: false };
     page.on('request', (req) => {

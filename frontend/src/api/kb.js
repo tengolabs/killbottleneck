@@ -36,3 +36,25 @@ export const getPublicMap = (payload) => kbSend('/api/kb/public-maps', { body: p
 
 export const shareMap = (payload) => kbSend('/api/kb/share', { body: payload });
 
+// Změna stavu uzlu cílenou routou (kdo smí, rozhoduje server: garant nebo
+// řešitel úkolu na uzlu) — do 1. 9. 2026 opsané na třech místech (editor,
+// zjednodušený dialog uzlu, fallback řádkových akcí v taskActions).
+export const nodeStatus = (mapId, nodeId, status) => kbSend('/api/kb/node-status', { body: { mapId, nodeId, status } });
+
+// Organizační struktura (tabulka ve Správě organizace je pohled nad org mapou;
+// zápisy jdou do týchž uzlů, které kreslí editor) + idempotentní založení
+// org mapy. Volají Správa organizace, panáček (UserMenu) a RuleBuilder.
+export const getOrgStructure = () => kbSend('/api/kb/org-structure', { method: 'GET' });
+export const orgAssign = (nodeId, field, value) => kbSend('/api/kb/org-structure/assign', { body: { node_id: nodeId, [field]: value } });
+export const orgAdd = (parentNodeId) => kbSend('/api/kb/org-structure/add', { body: { parent_node_id: parentNodeId || '' } });
+export const orgRemove = (nodeId) => kbSend('/api/kb/org-structure/remove', { body: { node_id: nodeId } });
+export const createOrgMap = () => kbSend('/api/kb/org-map');
+
+// Personální agenda (Správa uživatelů) — bezpečná podmnožina členů, obnova
+// hesla rukou správce, osobní zástupce a účel organizace (dotazník účelu
+// posílá replace:true = server smí nahradit nedotčenou úvodní mapu).
+export const getMembers = () => kbSend('/api/kb/members', { method: 'GET' });
+export const resetUserPassword = (email) => kbSend('/api/kb/reset-user-password', { body: { email } });
+export const memberDeputy = (id, deputy) => kbSend('/api/kb/member-deputy', { body: { id, deputy } });
+export const savePurpose = (purpose, { replace } = {}) => kbSend('/api/kb/purpose', { body: { purpose, ...(replace ? { replace: true } : {}) } });
+

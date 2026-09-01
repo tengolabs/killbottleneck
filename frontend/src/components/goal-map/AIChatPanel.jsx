@@ -54,12 +54,11 @@ export default function AIChatPanel({ open, onClose, mapTitle, nodes, edges, onA
     setLoading(true);
 
     try {
-      const result = await advisor({
+      const data = await advisor({
         mode: 'chat',
         message: text,
         map: serializeMap(),
       });
-      const data = result;
       if (data?.error) {
         setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${data.error}` }]);
       } else {

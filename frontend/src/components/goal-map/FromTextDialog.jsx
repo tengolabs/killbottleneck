@@ -66,8 +66,7 @@ export function FromTextFlow({ onAccept, onCancel, onShortText, initialText = ''
         reader.onerror = () => reject(new Error(t('fromText.fileReadError')));
         reader.readAsDataURL(file);
       });
-      const result = await advisor({ mode: 'transcribe', audio_base64: audioBase64, filename: file.name });
-      const data = result;
+      const data = await advisor({ mode: 'transcribe', audio_base64: audioBase64, filename: file.name });
       if (data?.error) {
         setError(data.error);
       } else {
@@ -94,8 +93,7 @@ export function FromTextFlow({ onAccept, onCancel, onShortText, initialText = ''
     setLoading(true);
     setError('');
     try {
-      const result = await advisor({ mode: 'from_text', text, scope });
-      const data = result;
+      const data = await advisor({ mode: 'from_text', text, scope });
       if (data?.error) {
         setError(data.error);
       } else if (data?.nodes && Array.isArray(data.nodes)) {

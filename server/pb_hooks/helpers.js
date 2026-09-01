@@ -243,6 +243,20 @@ function syncShares(app, map) {
   const sharedWork = jsonList(map, "shared_with_work");
   const col = app.findCollectionByNameOrId("map_shares");
   for (const email of sharedWith) {
+    // Serverová stráž (bezpečnostní panel 28. 8. 2026): FE býval jediný filtr —
+    // řešitelé ze šablon (instantiateTemplate) i duplikace mapy sem donesou,
+    // co je v datech. Neplatný sdílecí e-mail (bez @, s bílým znakem) a
+    // pseudo-adresa externího kontaktu (ext-…@kontakt.invalid — v nodes[].data.owner
+    // legitimní, ve sdílení ne; autoShareAssignees je přeskakuje už dnes) se
+    // TIŠE zahodí s logem. Výjimka nesmí: create hook volá syncShares až PO
+    // e.next() a chyby polyká (nález S6-03) — mapa by vznikla bez sdílení a bez
+    // informace. ŽÁDNÁ kanonizace (lowercase/trim) — přesná porovnání jsou záměr;
+    // JSON zrcadlo na mapě se NEupravuje (historická „duchová" data nesmí shodit
+    // sdílení kopie mapy), filtr platí jen pro map_shares řádky.
+    if (typeof email !== "string" || email.indexOf("@") === -1 || /\s/.test(email) || isExternalOwner(email)) {
+      try { app.logger().warn(`syncShares: přeskočeno "${String(email).slice(0, 120)}" (mapa ${map.id})`); } catch (e2) { /* log je bonus */ }
+      continue;
+    }
     const isEdit = sharedEdit.includes(email);
     const isWork = !isEdit && sharedWork.includes(email);
     const rec = new Record(col);

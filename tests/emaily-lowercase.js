@@ -37,6 +37,24 @@ H.beh(async () => {
   r = await api('GET', '/api/kb/my-day', { token: VP });
   expect(r.status === 200 && JSON.stringify(r.json).includes('Úkol'), 'a má úkol v Můj den');
 
+  // ZMĚNA e-mailu obcházela lowercase (panel 31. 8. 2026): create hook normalizuje
+  // jen registraci; PB confirm-email-change zapisuje record.setEmail + app.save →
+  // modelový hook onRecordUpdate (users) — TÝŽ hook chytá i PATCH users. Testuje
+  // se PATCH (e2e confirm flow s mailem netřeba — zápisová cesta je společná).
+  console.log('== změna e-mailu účtu (update) → lowercase ==');
+  const SUP = await inst.superuser();
+  r = await api('GET', `/api/collections/users/records?filter=${encodeURIComponent('email = "velky.pismeno@example.com"')}`, { token: SUP });
+  const uid = r.json && r.json.items && r.json.items[0] && r.json.items[0].id;
+  expect(!!uid, 'účet velky.pismeno nalezen');
+  r = await api('PATCH', `/api/collections/users/records/${uid}`, { token: SUP, body: { email: 'Zmeneny.Mail@Example.com' } });
+  expect(r.status === 200 && r.json.email === 'zmeneny.mail@example.com', `změna e-mailu se uloží malými písmeny (${r.status}, ${r.json && r.json.email})`);
+  r = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'zmeneny.mail@example.com', password: PW } });
+  expect(r.status === 200, `účet se po změně přihlásí malými písmeny (${r.status})`);
+  // kolize: nová adresa se od JINÉHO účtu liší jen velikostí písmen → po
+  // normalizaci narazí na unikát (standardní PB chyba), žádné tiché dvojče
+  r = await api('PATCH', `/api/collections/users/records/${uid}`, { token: SUP, body: { email: 'VLASTNIK@example.com' } });
+  expect(r.status === 400, `změna na adresu existujícího účtu (jinou velikostí) skončí chybou unikátu (${r.status})`);
+
   if (!STARY) { console.log('== upgrade test přeskočen (KB_STARY_IMAGE není) =='); return; }
   console.log('== migrace: data z image bez opravy → nový image ==');
   // ⚠️ harness stop() maže volume → upgrade test používá vlastní pojmenovaný volume a kontejner ruší přímo
@@ -52,10 +70,24 @@ H.beh(async () => {
     { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { title: 'Cíl', status: 'todo' } },
     { id: 'n1', type: 'goalNode', position: { x: 0, y: 200 }, data: { title: 'Pro MC', status: 'todo', owner: 'Mixed.Case@Example.com' } },
   ], edges: [{ id: 'e1', source: 'root', target: 'n1' }] } })).json;
+  // E-mailová pole UVNITŘ node.data pro migraci 2 (panel 31. 8. 2026): assignedBy
+  // vzniká VÝHRADNĚ serverovým razítkem (stampAssignedBy z e-mailu aktéra) — ve
+  // starém image je aktér Mixed.Case@Example.com, takže PRVNÍ nastavení termínu
+  // vyrazítkuje mixed-case (přesný vznik dat v terénu). holder/deputy jsou
+  // kanonická pole a na běžné (ne-org) mapě se zapisují přímo; deputy dostane
+  // adresu BEZ účtu — kontrola, že migrace 2 přepisuje jen hodnoty kotvené na users.
+  const mcMapa = (await old2.api('GET', `/api/collections/goalmaps/records/${mm.id}`, { token: MC2 })).json;
+  const rPatch = await old2.api('PATCH', `/api/collections/goalmaps/records/${mm.id}`, { token: MC2, body: { nodes: (mcMapa.nodes || []).map((n) => (n.id === 'n1'
+    ? { ...n, data: { ...n.data, deadline: '2026-12-31', holder: 'Mixed.Case@Example.com', deputy: 'Externista@Nikde.cz' } }
+    : n)) } });
+  expect(rPatch.status === 200, `MC nastavil termín (razítko assignedBy) + holder/deputy (${rPatch.status})`);
   // předpoklad PŘED migrací (superuser): mapa má shared_with s velkými písmeny a řádek map_shares
   const SU2 = await old2.superuser();
   const pred = (await old2.api('GET', `/api/collections/goalmaps/records/${mm.id}`, { token: SU2 })).json;
   expect((pred.shared_with || []).includes('Mixed.Case@Example.com'), `PŘED: shared_with nese velká písmena (${JSON.stringify(pred.shared_with)})`);
+  const n1Pred = (((pred.nodes || []).find((n) => n.id === 'n1') || {}).data) || {};
+  expect(n1Pred.assignedBy === 'Mixed.Case@Example.com' && n1Pred.holder === 'Mixed.Case@Example.com',
+    `PŘED: assignedBy (serverové razítko) i holder nesou velká písmena (${n1Pred.assignedBy} / ${n1Pred.holder})`);
   const shPred = (await old2.api('GET', `/api/collections/map_shares/records?filter=${encodeURIComponent(`map="${mm.id}"`)}`, { token: SU2 })).json;
   expect(shPred.items && shPred.items.some((s) => s.email === 'Mixed.Case@Example.com'), `PŘED: map_shares má řádek s velkými písmeny (${JSON.stringify((shPred.items || []).map((s) => s.email))})`);
   execSync(`docker rm -f ${old2.name}`, { stdio: 'ignore' }); // jen kontejner, volume zůstává
@@ -76,6 +108,12 @@ H.beh(async () => {
   expect(mapa && mapa.id === mm.id, `migrovaný účet vidí sdílenou mapu (${mapa && mapa.id ? 'ano' : JSON.stringify(mapa).slice(0, 60)})`);
   expect(mapa && (mapa.shared_with || []).includes('mixed.case@example.com') && (mapa.nodes || []).some((n) => n.data && n.data.owner === 'mixed.case@example.com'),
     'shared_with i data.owner v mapě přepsány na lowercase');
+  // migrace 2 (users_email_lowercase_2): další e-mailová pole node.data
+  const n1Po = (((po.nodes || []).find((n) => n.id === 'n1') || {}).data) || {};
+  expect(n1Po.assignedBy === 'mixed.case@example.com' && n1Po.holder === 'mixed.case@example.com',
+    `migrace 2: assignedBy i holder v uzlech přepsány na lowercase (${n1Po.assignedBy} / ${n1Po.holder})`);
+  expect(n1Po.deputy === 'Externista@Nikde.cz', `hodnota bez odpovídajícího účtu se NEMĚNÍ (deputy: ${n1Po.deputy})`);
+  expect(/users_email_lowercase_2:.*přepsáno polí/.test(logy), 'migrace 2 zalogovala počty');
   const sh = (await nov.api('GET', `/api/collections/map_shares/records?filter=${encodeURIComponent(`map="${mm.id}"`)}`, { token: ST })).json;
   expect(sh.items.some((s) => s.email === 'mixed.case@example.com'), 'map_shares.email přepsán');
   execSync(`docker rm -f ${nov.name}; docker volume rm -f ${V}`, { stdio: 'ignore' });

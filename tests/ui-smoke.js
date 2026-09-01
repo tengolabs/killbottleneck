@@ -93,6 +93,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       expect(/\/map\//.test(page.url()), `karta projektu otevře editor (${page.url().replace(BASE, '')})`);
     }
 
+    console.log('== Přidat cíl → Zpět (handleAddGoal plní historii) ==');
+    // regrese z analýzy kódu: handleAddGoal nevolal pushHistory() → po
+    // „Přidat cíl" bylo tlačítko Zpět šedé a uzel nešel vzít zpět
+    await page.setViewport({ width: 1920, height: 1000 }); // široká lišta: Zpět je tlačítko, ne ⋮ menu
+    await sleep(800);
+    const pocetUzlu = () => page.evaluate(() => document.querySelectorAll('.react-flow__node').length);
+    const predPridanim = await pocetUzlu();
+    const klikZpet = () => page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) =>
+        (x.getAttribute('title') || '') === 'Vrátit zpět' && !x.disabled && x.offsetParent !== null);
+      if (!b) return false; b.click(); return true;
+    });
+    expect(await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) =>
+        /Přidat cíl/.test(x.textContent) && !x.disabled && x.offsetParent !== null);
+      if (!b) return false; b.click(); return true;
+    }), 'kliknuto na „Přidat cíl" v liště');
+    await sleep(1000);
+    await page.keyboard.press('Escape'); // dialog nového uzlu zavřít bez uložení
+    await sleep(600);
+    const poPridani = await pocetUzlu();
+    expect(poPridani === predPridanim + 1, `uzel přibyl (${predPridanim} → ${poPridani})`);
+    expect(await klikZpet(), 'tlačítko Zpět je po „Přidat cíl" aktivní a kliknuto');
+    await sleep(800);
+    const poZpet = await pocetUzlu();
+    expect(poZpet === predPridanim, `Zpět přidaný uzel odebralo (${poPridani} → ${poZpet})`);
+
     console.log('== stránka úkolů ==');
     await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle2' });
     await sleep(1200);
