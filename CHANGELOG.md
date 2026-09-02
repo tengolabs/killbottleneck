@@ -9,6 +9,36 @@ below before you jump several versions.
 
 ---
 
+## v0.58-beta — 2026-09-02
+
+**Bottlenecks — honest edition: map badges, "Where it stalls most", My day warning; PDF reports**
+
+- **Bottlenecks in the map editor**: goals that are overdue — or stalled for 14+ days while
+  holding up other unfinished steps — get a red "Bottleneck" badge that is always visible.
+  A new 🔥 toolbar toggle additionally highlights *potential* bottlenecks (a goal with ≥2
+  unfinished downstream steps, orange) and traces a dashed critical path to the real ones.
+  Facts only — days overdue, steps held, days without movement; no invented scores.
+  Stalling uses the same single definition as "Not moving" (the change log, 14 days).
+- **Organization page**: new "Where it stalls most" section — real bottlenecks across team
+  and shared projects with a jump-to-map link; section order is now Projects by % → Where
+  it stalls most → Overdue → the rest. Included in the Report export (MD/CSV).
+- **My day**: your own overdue goal that holds up other steps carries a discreet
+  "bottleneck · holding N steps" tag — the person who *is* the bottleneck learns it first.
+- **Report → PDF**: two new export options — "PDF (to share)" (always light on white) and
+  "PDF (as I see it)" (your skin and dark mode). Fixes exports that came out dark-on-white
+  unreadable, half-recoloured cards, and white bands over dark page edges; the project
+  dashboard PDF benefits from the same fix.
+- **Align button**: Compact and Bands styles now also take effect on maps whose categories
+  have just two sub-goals — previously all three styles produced identical layouts there
+  and the button appeared to do nothing.
+- New endpoint `GET /api/kb/map-activity` (per-map stall stamps; same visibility rules as
+  map history — not available on public map views). New suites: `ui-hrdla-mapa`,
+  `ui-organizace-hrdla`, `zarovnani-dvojice`.
+
+Upgrade notes: no migration, no configuration change. Do **not** set `KB_STUCK_DAYS`
+in production — it silently changes the stall definition for the whole instance
+(it exists for e2e tests only).
+
 ## v0.57-beta — 2026-09-02
 
 **Timeline (Gantt) view on the Tasks page**

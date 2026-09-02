@@ -49,6 +49,8 @@
     "note": "Poznámka",
     "addNoteTitle": "Přidat poznámku",
     "addGoal": "Přidat cíl",
+    "bottlenecks": "Úzká hrdla",
+    "bottlenecksTitle": "Zvýraznit úzká hrdla a blokující kroky",
     "moreActions": "Další akce",
     "export": "Export",
     "exportPng": "Exportovat jako PNG",
@@ -381,6 +383,8 @@
   },
   "node": {
     "projectBadge": "Projekt",
+    "bottleneckBadge": "Úzké hrdlo",
+    "potentialBottleneckBadge": "Potenciální hrdlo",
     "blockingBadge": "! blokuje",
     "blockingTitle": "Blokuje: {{node}}",
     "aiActions": {

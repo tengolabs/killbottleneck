@@ -33,7 +33,12 @@
     "focusBadge": {
       "today": "most important today",
       "tomorrow": "most important tomorrow"
-    }
+    },
+    "bottleneckBadge_one": "bottleneck · holding 1 step",
+    "bottleneckBadge_few": "bottleneck · holding {{count}} steps",
+    "bottleneckBadge_many": "bottleneck · holding {{count}} steps",
+    "bottleneckBadge_other": "bottleneck · holding {{count}} steps",
+    "bottleneckTitle": "This overdue goal is holding up further unfinished steps — until it moves, others wait."
   },
   "sections": {
     "overdue": "Overdue",

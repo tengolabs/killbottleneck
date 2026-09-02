@@ -1,7 +1,7 @@
 import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
 import i18next from 'i18next';
-import { withDefaultLook } from '@/lib/theme';
+import { withDefaultLook, withFrozenMotion } from '@/lib/theme';
 import { savePdf, safeFilename, dateStamp, afterRepaint } from '@/lib/saveFile';
 
 // Uložení dashboardu projektu do PDF — „stav projektu, který můžu poslat".
@@ -21,14 +21,17 @@ import { savePdf, safeFilename, dateStamp, afterRepaint } from '@/lib/saveFile';
 const A4 = { portrait: { w: 210, h: 297 }, landscape: { w: 297, h: 210 } };
 const MARGIN = 8; // menší okraje = víc obsahu na stránce, pořád tisknutelné
 
-export async function saveDashboardPdf(el, mapTitle) {
+export async function saveDashboardPdf(el, mapTitle, { look = 'print' } = {}) {
   if (!el) return;
-  // PDF vždy ve výchozím světlém vzhledu (bez skinu i tmavého režimu) — sdílený
-  // helper withDefaultLook nahradil dřívější ruční sundávání třídy `dark` tady.
-  return withDefaultLook(() => saveDashboardPdfInner(el, mapTitle));
+  // look 'print' (výchozí): VŽDY světlý výchozí vzhled — sdílený artefakt musí
+  // být čitelný u příjemce (rozhodnutí 31. 7. 2026). look 'screen': „jak to
+  // vidím" — skin i tmavý režim zůstávají (přání vlastníka 2. 9. 2026, druhá
+  // položka menu); mrazí se jen pohyb, jinak transition-colors fotí napůl.
+  if (look === 'screen') return withFrozenMotion(() => saveDashboardPdfInner(el, mapTitle, 'screen'));
+  return withDefaultLook(() => saveDashboardPdfInner(el, mapTitle, 'print'));
 }
 
-async function saveDashboardPdfInner(el, mapTitle) {
+async function saveDashboardPdfInner(el, mapTitle, look) {
   // Element se scrolluje — pro snímek potřebujeme jeho CELOU výšku, ne jen
   // to, co je vidět v okně.
   const prevOverflow = el.style.overflow;
@@ -57,8 +60,13 @@ async function saveDashboardPdfInner(el, mapTitle) {
     // JPEG, ne PNG: dashboard je vysoká stránka a v PNG vycházel soubor přes
     // 20 MB — takový „stav k poslání" se nedá poslat. V JPEG je to jednotky MB
     // při stejné čitelnosti textu (pixelRatio 2 = ostré písmo).
+    // 'screen': podklad snímku i stránek PDF = skutečné pozadí aplikace
+    // (u tmavého skinu by bílé okraje kolem tmavého obsahu tahaly za oči)
+    const pageBg = look === 'screen'
+      ? (getComputedStyle(document.body).backgroundColor || '#ffffff')
+      : '#ffffff';
     const dataUrl = await toJpeg(el, {
-      width, height, pixelRatio: 2, quality: 0.92, backgroundColor: '#ffffff',
+      width, height, pixelRatio: 2, quality: 0.92, backgroundColor: pageBg,
       filter: (node) => !(node.classList && node.classList.contains('export-ignore')),
     });
 
@@ -68,13 +76,22 @@ async function saveDashboardPdfInner(el, mapTitle) {
     const availH = page.h - MARGIN * 2;
     const imgH = (height * availW) / width; // výška po zmenšení na šířku stránky
 
+    // barva stránky pod obrázkem (okraje) — u 'screen' v barvě aplikace
+    const rgb = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(pageBg);
     let offset = 0;
     let pageNo = 0;
     while (offset < imgH - 0.5) { // 0.5 mm tolerance na zaokrouhlení
       if (pageNo > 0) pdf.addPage();
+      if (look === 'screen' && rgb) {
+        pdf.setFillColor(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
+        pdf.rect(0, 0, page.w, page.h, 'F');
+      }
       pdf.addImage(dataUrl, 'JPEG', MARGIN, MARGIN - offset, availW, imgH);
-      // bílé pruhy nahoře a dole, ať přetékající obrázek nepřeleze okraje
-      pdf.setFillColor(255, 255, 255);
+      // krycí pruhy nahoře a dole, ať přetékající obrázek nepřeleze okraje —
+      // v barvě STRÁNKY: u „v mém vzhledu" byly natvrdo bílé a řezaly tmavé
+      // okraje bílými pásy (nález panelu 2. 9. 2026)
+      if (look === 'screen' && rgb) pdf.setFillColor(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
+      else pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, page.w, MARGIN, 'F');
       pdf.rect(0, page.h - MARGIN, page.w, MARGIN, 'F');
       offset += availH;

@@ -53,6 +53,13 @@ const LOADERS = {
     cs: () => import('./cs/historie.json'),
     en: () => import('./en/historie.json'),
   },
+  // texty detekce úzkých hrdel (Bottleneck Analytics, Antigravity 9/2026) —
+  // jen plný editor mapy, /tasks a /organizace; do common.json NEPATŘÍ,
+  // ten se veze do lite a rozpočet je přesně na prahu (lite-bundle 1. 9. 2026)
+  bottleneck: {
+    cs: () => import('./cs/bottleneck.json'),
+    en: () => import('./en/bottleneck.json'),
+  },
   // přehled Organizace (admin + manager) — plná stránka na počítači, v lite
   // není (rozhodnutí 25. 8. 2026), takže do jazykového balíku nepatří
   organizace: {

@@ -1611,6 +1611,35 @@ kbRoute("GET", "/my-day", (e) => {
 //
 // Okno se NEPOSOUVÁ tím, že se podíváš (to by po druhém otevření ukázalo prázdno) —
 // je to vždy „posledních N dní od teď". range: 7 | 30 | all.
+// Stagnace uzlů JEDNÉ mapy pro editor (odznak „Úzké hrdlo") — jen obal nad
+// helpers.js:mapStagnantNodes, TÝŽ předpis jako sekce „Nehýbe se". Viditelnost
+// jako /map-changes: userSeesMap BEZ includePublic (veřejný náhled mapy odznaky
+// stagnace nedostane — je to provozní pohled, ne prezentace).
+kbRoute("GET", "/map-activity", (e) => {
+  const { userSeesMap, mapStagnantNodes, minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const q = e.request.url.query();
+  const mapId = String(q.get("map") || "");
+  if (!mapId) return e.json(400, { error: t(L, "err.mapNotFound") });
+  if (minuteLimitHit($app.store(), "marl:" + e.auth.id, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+
+  let map;
+  try {
+    map = e.app.findFirstRecordByFilter("goalmaps", "id = {:id}", { id: mapId });
+  } catch (err) {
+    return e.json(404, { error: t(L, "err.mapNotFound") });
+  }
+  if (!userSeesMap(e.app, map, e.auth.id, e.auth.email())) {
+    return e.json(404, { error: t(L, "err.mapNotFound") });
+  }
+
+  const data = mapStagnantNodes(e.app, map, { today: q.get("today") || "" });
+  e.response.header().set("Cache-Control", "private, no-store");
+  e.response.header().add("Vary", "Authorization");
+  return e.json(200, data);
+}, $apis.requireAuth());
+
 kbRoute("GET", "/map-changes", (e) => {
   const { userSeesMap } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);

@@ -1,0 +1,22 @@
+{
+  "poTerminu_one": "Overdue by {{count}} day",
+  "poTerminu_few": "Overdue by {{count}} days",
+  "poTerminu_many": "Overdue by {{count}} days",
+  "poTerminu_other": "Overdue by {{count}} days",
+  "blokujeKroky_one": "Blocking 1 downstream step",
+  "blokujeKroky_few": "Blocking {{count}} downstream steps",
+  "blokujeKroky_many": "Blocking {{count}} downstream steps",
+  "blokujeKroky_other": "Blocking {{count}} downstream steps",
+  "stagnujeBlokuje_one": "No movement for {{days}} • Blocking 1 step",
+  "stagnujeBlokuje_few": "No movement for {{days}} • Blocking {{count}} steps",
+  "stagnujeBlokuje_many": "No movement for {{days}} • Blocking {{count}} steps",
+  "stagnujeBlokuje_other": "No movement for {{days}} • Blocking {{count}} steps",
+  "vetveni_one": "1 unfinished step converges here",
+  "vetveni_few": "{{count}} unfinished steps converge here",
+  "vetveni_many": "{{count}} unfinished steps converge here",
+  "vetveni_other": "{{count}} unfinished steps converge here",
+  "dnu_one": "1 day",
+  "dnu_few": "{{count}} days",
+  "dnu_many": "{{count}} days",
+  "dnu_other": "{{count}} days"
+}

@@ -6,12 +6,12 @@
 // JEN z týmových a sdílených projektů — soukromé ani do součtů; tahle stránka
 // jen kreslí. Člen (role user) položku v liště nemá a tady dostane „bez oprávnění".
 // V lite režimu stránka není („kdo dělá, vidí seznam").
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Flame, PauseCircle, Folder, Users, Download, ChevronDown, Map as MapIcon, Target, CheckSquare,
-  Building2, Share2, History, Shield, ArrowLeft, Loader2, UserPlus, Lock,
+  Building2, Share2, History, Shield, ArrowLeft, Loader2, UserPlus, Lock, AlertTriangle,
 } from 'lucide-react';
 import AppHeader from '@/components/shared/AppHeader';
 import SkinPattern from '@/components/shared/SkinPattern';
@@ -24,6 +24,8 @@ import { useLazyNs } from '@/i18n/lazyNs';
 import { labelForEmail } from '@/lib/memberLabel';
 import { getInitials, formatDeadline } from '@/lib/nodeMeta';
 import { fmtDate } from '@/lib/locale';
+import { saveDashboardPdf } from '@/lib/dashboardPdf';
+import { useToast } from '@/components/ui/use-toast';
 import { exportPortfolioMarkdown, exportPortfolioCsv, changeValue, actorLabel, whenLabel, accessLabel, excludedLabel } from '@/lib/portfolioExport';
 
 const MAX_ROWS = 10;
@@ -44,6 +46,24 @@ export default function Organizace() {
   const [failed, setFailed] = useState(false);
   const [members, setMembers] = useState([]);
   const [org, setOrg] = useState(null);
+  // Report → PDF: stejná cesta jako dashboard projektu (lib/dashboardPdf:
+  // DOM → obrázek → jsPDF, světlý vzhled) — „stav organizace, který můžu
+  // poslat" (požadavek vlastníka 2. 9. 2026: MD/CSV nejsou pro lidi)
+  const pdfRef = useRef(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const { toast } = useToast();
+  const handlePdf = async (look) => {
+    if (pdfBusy || !pdfRef.current) return;
+    setPdfBusy(true);
+    try {
+      await new Promise((r) => setTimeout(r, 80)); // nechat zavřít menu
+      await saveDashboardPdf(pdfRef.current, t('title'), { look });
+    } catch (e) {
+      toast({ title: t('pdfFailed'), description: e?.message, variant: 'destructive' });
+    } finally {
+      setPdfBusy(false);
+    }
+  };
   const canSee = user?.role === 'admin' || user?.role === 'manager';
 
   useEffect(() => {
@@ -108,7 +128,7 @@ export default function Organizace() {
     <div className="min-h-screen bg-background relative">
       <SkinPattern />
       <AppHeader active="organizace" org={org} />
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8" data-testid="organizace-page">
+      <div ref={pdfRef} className="max-w-6xl mx-auto px-4 py-6 sm:py-8" data-testid="organizace-page">
         {failed && <div className="rounded-lg bg-destructive/10 text-destructive px-3 py-2 text-sm mb-4">{t('loadFailed')}</div>}
         {!data && !failed && <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}
 
@@ -136,6 +156,8 @@ export default function Organizace() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => exportPortfolioMarkdown({ data, nameOf, orgName: org?.name })}>{t('reportMd')}</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => exportPortfolioCsv({ data, nameOf })}>{t('reportCsv')}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePdf('print')} disabled={pdfBusy} data-testid="organizace-report-pdf">{t('reportPdf')}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePdf('screen')} disabled={pdfBusy} data-testid="organizace-report-pdf-skin">{t('reportPdfSkin')}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -159,32 +181,9 @@ export default function Organizace() {
                   ))}
                 </div>
 
-                <section className="rounded-xl border bg-card p-4 mb-4" id="s-overdue" data-testid="organizace-overdue">
-                  <h2 className="flex items-center gap-2 text-sm font-heading font-semibold text-red-600 dark:text-red-400 mb-3">
-                    <Flame className="w-4 h-4" /> {t('sections.overdue')}
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-secondary text-foreground">{c.overdue}</span>
-                  </h2>
-                  {c.overdue === 0 ? <p className="text-sm text-muted-foreground">{t('emptyOverdue')}</p> : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead><tr><th className={th}>{t('cols.what')}</th><th className={`${th} hidden md:table-cell`}>{t('cols.project')}</th><th className={th}>{t('cols.who')}</th><th className={th}>{t('cols.deadline')}</th><th className={th}>{t('cols.overdue')}</th></tr></thead>
-                        <tbody>
-                          {s.overdue.slice(0, MAX_ROWS).map((o) => (
-                            <tr key={`${o.kind}-${o.id}`} className="hover:bg-secondary/50">
-                              <td className={td}><Link to={itemHref(o)} data-testid="organizace-item" className="inline-flex items-center gap-1.5 font-medium hover:underline">{o.kind === 'task' ? <CheckSquare className="w-3.5 h-3.5 text-muted-foreground" /> : <Target className="w-3.5 h-3.5 text-primary" />}{o.title}</Link></td>
-                              <td className={`${td} hidden md:table-cell`}>{mapLink(o)}</td>
-                              <td className={td}>{who(o)}</td>
-                              <td className={`${td} whitespace-nowrap text-red-600 dark:text-red-400`}>{formatDeadline(o.deadline)}</td>
-                              <td className={`${td} whitespace-nowrap text-red-600 dark:text-red-400 font-semibold`}>{days(o.daysOver)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {s.overdue.length > MAX_ROWS && <Link to="/tasks?deadline=overdue" className="inline-block mt-2 text-xs font-medium text-primary hover:underline">{t('more', { count: s.overdue.length - MAX_ROWS })}</Link>}
-                    </div>
-                  )}
-                </section>
-
+                {/* Pořadí sekcí = rozhodnutí Richarda 2. 9. 2026 (staging):
+                    1. Projekty podle % hotovo, 2. Kde to nejvíc stojí, 3. Po termínu,
+                    dál beze změny. Hlídá ui-organizace-hrdla.js. */}
                 <section className="rounded-xl border bg-card p-4 mb-4" id="s-projects" data-testid="organizace-projects">
                   <h2 className="flex items-center gap-2 text-sm font-heading font-semibold mb-3">
                     <Folder className="w-4 h-4" /> {t('sections.projects')} <span className="text-xs font-normal text-muted-foreground">{t('sections.projectsSort')}</span>
@@ -212,6 +211,69 @@ export default function Organizace() {
                       </Link>
                     ))}
                   </div>
+                </section>
+
+                {/* ÚZKÁ HRDLA v2 (9/2026, schváleno stagingem): reálná hrdla
+                    napříč projekty — hned pod Projekty
+                    (pořadí viz komentář výš). Uzel po termínu NEBO zaseknutý (14 dní bez
+                    skutečného pohybu), který drží ≥1 nehotový navazující krok.
+                    Data: buildPortfolio.sections.bottlenecks (týž JSON jako
+                    zbytek stránky, stejné uzly kreslí editor jako červený
+                    odznak). Jen fakta — dny a počty, žádné skóre. Čistě
+                    propadlé listy zůstávají jen v sekci Po termínu výš. */}
+                <section className="rounded-xl border bg-card p-4 mb-4" id="s-bottlenecks" data-testid="organizace-bottlenecks">
+                  <h2 className="flex flex-wrap items-center gap-2 text-sm font-heading font-semibold text-rose-600 dark:text-rose-400 mb-3">
+                    <AlertTriangle className="w-4 h-4" /> {t('sections.bottlenecks')}
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-secondary text-foreground">{c.bottlenecks || 0}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{t('sections.bottlenecksSub')}</span>
+                  </h2>
+                  {!(c.bottlenecks > 0) ? <p className="text-sm text-muted-foreground">{t('emptyBottlenecks')}</p> : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr><th className={th}>{t('cols.what')}</th><th className={`${th} hidden md:table-cell`}>{t('cols.project')}</th><th className={th}>{t('cols.who')}</th><th className={th}>{t('cols.blocked')}</th><th className={th}>{t('cols.why')}</th></tr></thead>
+                        <tbody>
+                          {(s.bottlenecks || []).slice(0, MAX_ROWS).map((o) => (
+                            <tr key={`${o.mapId}-${o.nodeId}`} className="hover:bg-secondary/50">
+                              <td className={td}><Link to={itemHref(o)} data-testid="organizace-bottleneck-item" className="inline-flex items-center gap-1.5 font-medium hover:underline"><Target className="w-3.5 h-3.5 text-primary" />{o.title}</Link></td>
+                              <td className={`${td} hidden md:table-cell`}>{mapLink(o)}</td>
+                              <td className={td}>{who(o)}</td>
+                              <td className={`${td} whitespace-nowrap font-semibold`}>{t('blockedSteps', { count: o.blocked })}</td>
+                              <td className={`${td} whitespace-nowrap ${o.daysOver > 0 ? 'text-red-600 dark:text-red-400 font-semibold' : 'font-semibold'}`}>
+                                {o.daysOver > 0 ? t('whyOverdue', { days: days(o.daysOver) }) : t('idle', { days: days(o.daysIdle) })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {(s.bottlenecks || []).length > MAX_ROWS && <span className="inline-block mt-2 text-xs text-muted-foreground">{t('more', { count: (s.bottlenecks || []).length - MAX_ROWS })}</span>}
+                    </div>
+                  )}
+                </section>
+
+                <section className="rounded-xl border bg-card p-4 mb-4" id="s-overdue" data-testid="organizace-overdue">
+                  <h2 className="flex items-center gap-2 text-sm font-heading font-semibold text-red-600 dark:text-red-400 mb-3">
+                    <Flame className="w-4 h-4" /> {t('sections.overdue')}
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-secondary text-foreground">{c.overdue}</span>
+                  </h2>
+                  {c.overdue === 0 ? <p className="text-sm text-muted-foreground">{t('emptyOverdue')}</p> : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr><th className={th}>{t('cols.what')}</th><th className={`${th} hidden md:table-cell`}>{t('cols.project')}</th><th className={th}>{t('cols.who')}</th><th className={th}>{t('cols.deadline')}</th><th className={th}>{t('cols.overdue')}</th></tr></thead>
+                        <tbody>
+                          {s.overdue.slice(0, MAX_ROWS).map((o) => (
+                            <tr key={`${o.kind}-${o.id}`} className="hover:bg-secondary/50">
+                              <td className={td}><Link to={itemHref(o)} data-testid="organizace-item" className="inline-flex items-center gap-1.5 font-medium hover:underline">{o.kind === 'task' ? <CheckSquare className="w-3.5 h-3.5 text-muted-foreground" /> : <Target className="w-3.5 h-3.5 text-primary" />}{o.title}</Link></td>
+                              <td className={`${td} hidden md:table-cell`}>{mapLink(o)}</td>
+                              <td className={td}>{who(o)}</td>
+                              <td className={`${td} whitespace-nowrap text-red-600 dark:text-red-400`}>{formatDeadline(o.deadline)}</td>
+                              <td className={`${td} whitespace-nowrap text-red-600 dark:text-red-400 font-semibold`}>{days(o.daysOver)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {s.overdue.length > MAX_ROWS && <Link to="/tasks?deadline=overdue" className="inline-block mt-2 text-xs font-medium text-primary hover:underline">{t('more', { count: s.overdue.length - MAX_ROWS })}</Link>}
+                    </div>
+                  )}
                 </section>
 
                 <section className="rounded-xl border bg-card p-4 mb-4" id="s-stuck" data-testid="organizace-stuck">

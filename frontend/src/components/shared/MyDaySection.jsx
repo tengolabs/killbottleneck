@@ -354,6 +354,20 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
                         {t('panel.ideaBadge')}
                       </span>
                     )}
+                    {/* Jsem úzké hrdlo: MŮJ propadlý cíl drží další kroky — nositel
+                        se to dozvídá první, u sebe (rozhodnutí vlastníka 2. 9. 2026;
+                        štítek s faktem, žádný pranýř). Data: buildMyDay item.blocked,
+                        týž předpis jako „Kde to nejvíc stojí" na Organizaci. */}
+                    {item.kind === 'node' && item.blocked > 0 && item.deadline
+                      && getDeadlineStatus(item.deadline, item.status) === 'overdue' && (
+                      <span
+                        data-testid="myday-hrdlo"
+                        title={t('panel.bottleneckTitle')}
+                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 shrink-0"
+                      >
+                        🔥 {t('panel.bottleneckBadge', { count: item.blocked })}
+                      </span>
+                    )}
                     {item.kind === 'delegated' && item.assignee && (() => {
                       // externí kontakt jménem z adresáře (server posílá assignee_label);
                       // bez něj anonymně — pseudo-e-mail se neukazuje nikdy

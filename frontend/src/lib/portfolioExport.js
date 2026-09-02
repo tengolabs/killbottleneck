@@ -51,14 +51,19 @@ export function exportPortfolioMarkdown({ data, nameOf, orgName }) {
   let md = `# ${t('export.title')}${orgName ? ` — ${orgName}` : ''}\n\n*${t('export.generated', { date: fmtDate(`${data.today}T00:00:00`) })}*\n\n`;
   md += `${t('projects', { count: data.counts.projects })} (${t('team', { count: data.scope.team })}, ${t('shared', { count: data.scope.shared })}). ${t('privateNote')}\n`;
 
-  md += `\n## ${t('sections.overdue')} (${data.counts.overdue})\n`;
-  if (!s.overdue.length) md += `${t('emptyOverdue')}\n`;
-  for (const o of s.overdue) md += `- ${esc(o.title)} — ${esc(who(o.owner, o))} (${esc(o.mapTitle)}) — ${t('cols.deadline').toLowerCase()} ${o.deadline}, **${days(o.daysOver)}**\n`;
-
+  // Úzká hrdla (v2): jen fakta — kolik kroků drží a proč (dny), žádné skóre
   md += `\n## ${t('sections.projects')}\n`;
   for (const p of s.projects) {
     md += `- **${esc(p.title)}** [${accessLabel(p)}] ${p.pct} % (${t('projMeta', { done: p.done, total: p.total })}) · ${t('projOverdue', { count: p.overdue })} · ${t('projStuck', { count: p.stuck })} · ${t('projOpen', { count: p.open })}\n`;
   }
+
+  md += `\n## ${t('sections.bottlenecks')} (${data.counts.bottlenecks || 0})\n`;
+  if (!(s.bottlenecks || []).length) md += `${t('emptyBottlenecks')}\n`;
+  for (const o of (s.bottlenecks || [])) md += `- ${esc(o.title)} — ${esc(who(o.owner, o))} (${esc(o.mapTitle)}) — ${t('cols.blocked').toLowerCase()} ${t('blockedSteps', { count: o.blocked })}, **${o.daysOver > 0 ? t('whyOverdue', { days: days(o.daysOver) }) : t('idle', { days: days(o.daysIdle) })}**\n`;
+
+  md += `\n## ${t('sections.overdue')} (${data.counts.overdue})\n`;
+  if (!s.overdue.length) md += `${t('emptyOverdue')}\n`;
+  for (const o of s.overdue) md += `- ${esc(o.title)} — ${esc(who(o.owner, o))} (${esc(o.mapTitle)}) — ${t('cols.deadline').toLowerCase()} ${o.deadline}, **${days(o.daysOver)}**\n`;
 
   md += `\n## ${t('sections.stuck')} (${data.counts.stuck})\n`;
   if (!s.stuck.length) md += `${t('emptyStuck')}\n`;
@@ -81,12 +86,13 @@ export function exportPortfolioCsv({ data, nameOf }) {
   const s = data.sections;
   const who = (email, row) => (email ? nameOf(email, row) : t('unassigned'));
   const rows = [];
-  rows.push([t('export.colSection'), t('cols.what'), t('cols.project'), t('cols.who'), t('cols.deadline'), t('cols.overdue'), t('cols.idle')]);
-  for (const o of s.overdue) rows.push([t('sections.overdue'), o.title, o.mapTitle, who(o.owner, o), o.deadline, o.daysOver, '']);
-  for (const o of s.stuck) rows.push([t('sections.stuck'), o.title, o.mapTitle, who(o.owner, o), o.deadline, '', o.daysIdle]);
-  rows.push([]);
   rows.push([t('export.colSection'), t('cols.project'), t('export.colAccess'), t('export.colPct'), t('export.colDone'), t('cols.overdue'), t('cols.stuck'), t('cols.open')]);
   for (const p of s.projects) rows.push([t('sections.projects'), p.title, accessLabel(p), p.pct, `${p.done}/${p.total}`, p.overdue, p.stuck, p.open]);
+  rows.push([]);
+  rows.push([t('export.colSection'), t('cols.what'), t('cols.project'), t('cols.who'), t('cols.deadline'), t('cols.overdue'), t('cols.idle'), t('cols.blocked')]);
+  for (const o of s.overdue) rows.push([t('sections.overdue'), o.title, o.mapTitle, who(o.owner, o), o.deadline, o.daysOver, '', '']);
+  for (const o of s.stuck) rows.push([t('sections.stuck'), o.title, o.mapTitle, who(o.owner, o), o.deadline, '', o.daysIdle, '']);
+  for (const o of (s.bottlenecks || [])) rows.push([t('sections.bottlenecks'), o.title, o.mapTitle, who(o.owner, o), o.deadline, o.daysOver || '', o.daysIdle || '', o.blocked]);
   rows.push([]);
   rows.push([t('export.colSection'), t('cols.who'), t('cols.overdue'), t('cols.stuck'), t('cols.open'), t('cols.projects')]);
   for (const p of s.people) rows.push([t('sections.people'), who(p.email, { owner_label: p.owner_label }), p.overdue, p.stuck, p.open, p.maps]);

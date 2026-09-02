@@ -49,6 +49,8 @@
     "note": "Note",
     "addNoteTitle": "Add a note",
     "addGoal": "Add goal",
+    "bottlenecks": "Bottlenecks",
+    "bottlenecksTitle": "Highlight bottlenecks and blocking goals",
     "moreActions": "More actions",
     "export": "Export",
     "exportPng": "Export as PNG",
@@ -381,6 +383,8 @@
   },
   "node": {
     "projectBadge": "Project",
+    "bottleneckBadge": "Bottleneck",
+    "potentialBottleneckBadge": "Potential bottleneck",
     "blockingBadge": "! blocks",
     "blockingTitle": "Blocks: {{node}}",
     "aiActions": {

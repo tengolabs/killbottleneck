@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, Download, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3 } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Check, Download, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3, Flame } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,16 +60,16 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   } = layout;
   const {
     user, canEdit, canShare, canWork, isPublicView, isDraft, isTemplatePreview,
-    isMapOwner, personalMap, archived, activeMapId, ai,
+    isMapOwner, personalMap, archived, activeMapId, ai, mapKind,
   } = access;
   const {
     saveStatus, sharedCount, mapTaskCount, mapRules, chatOpen, exporting,
-    visibleNodes, canUndo, personalView,
+    visibleNodes, canUndo, personalView, showBottlenecks, bottleneckAnalysis,
   } = state;
   const {
     setShareOpen, handleUndo, setRulesDefaults, setRulesOpen, setAdvisorOpen,
     setChatOpen, handleAddNote, setPersonalView, handleExport, handleExportJson,
-    setSaveTplOpen, handleToggleArchive, handleAddGoal,
+    setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
   } = actions;
 
   // Jediný zdroj pravdy pro akce kreslené dvakrát: širokou lištou (≥1850 px)
@@ -459,6 +459,35 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
           {canEdit && (
             <Button onClick={handleAddGoal} size="sm">
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t('toolbar.addGoal')}</span>
+            </Button>
+          )}
+          {/* Úzká hrdla: přepínač zvýraznění. Viditelný vždy (i pod 1850 px) —
+              počítadlo je alarm, nesmí se schovat do ⋮. Počítadlo = jen REÁLNÁ
+              hrdla. Stavy tlačítka: zapnuto = plné (default, jako jiné aktivní
+              přepínače); vypnuto s hrdly = výstražný obrys; jinak obyčejný
+              obrys. (Odrazový koncept měl podsvícení obráceně — po načtení
+              vypadal přepínač zapnutě, nález revize 1. 9. 2026.) */}
+          {user && !isPublicView && mapKind !== 'org' && (
+            <Button
+              variant={showBottlenecks ? 'default' : 'outline'}
+              size="sm"
+              className={`h-9 gap-1.5 text-xs font-semibold ${
+                bottleneckAnalysis.totalBottlenecks > 0 && !showBottlenecks
+                  ? 'border-rose-400/60 text-rose-600 dark:border-rose-800 dark:text-rose-400'
+                  : ''
+              }`}
+              onClick={() => setShowBottlenecks((prev) => !prev)}
+              title={t('toolbar.bottlenecksTitle')}
+              data-testid="toolbar-bottlenecks"
+              data-zapnuto={showBottlenecks ? '1' : '0'}
+            >
+              <Flame className={`w-4 h-4 ${!showBottlenecks && bottleneckAnalysis.totalBottlenecks > 0 ? 'text-amber-400 fill-amber-400' : ''}`} />
+              <span className="hidden sm:inline">{t('toolbar.bottlenecks')}</span>
+              {bottleneckAnalysis.totalBottlenecks > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                  {bottleneckAnalysis.totalBottlenecks}
+                </span>
+              )}
             </Button>
           )}
           <NotificationBell />

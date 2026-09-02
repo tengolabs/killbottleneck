@@ -37,7 +37,9 @@
       "stuck": "What is not moving",
       "stuckSub": "no near deadline, last movement more than 14 days ago",
       "people": "People with the most backlog",
-      "changes": "What changed in the last 7 days across projects"
+      "changes": "What changed in the last 7 days across projects",
+      "bottlenecks": "Where it stalls most",
+      "bottlenecksSub": "bottlenecks — holding up further unfinished steps"
     },
     "cols": {
       "what": "What",
@@ -50,7 +52,9 @@
       "open": "Open",
       "projects": "Projects",
       "when": "When",
-      "change": "Change"
+      "change": "Change",
+      "blocked": "Blocking",
+      "why": "Why it stalls"
     },
     "days_one": "{{count}} day",
     "days_few": "{{count}} days",
@@ -99,6 +103,15 @@
       "colDone": "Done/total"
     },
     "system": "system",
-    "excludedMore": "… and {{count}} more"
+    "excludedMore": "… and {{count}} more",
+    "emptyBottlenecks": "Nothing is stalling — no overdue or stuck goal is holding up other work.",
+    "blockedSteps_one": "1 step",
+    "blockedSteps_few": "{{count}} steps",
+    "blockedSteps_many": "{{count}} steps",
+    "blockedSteps_other": "{{count}} steps",
+    "whyOverdue": "overdue by {{days}}",
+    "reportPdf": "PDF (to share)",
+    "pdfFailed": "Could not create the PDF",
+    "reportPdfSkin": "PDF (as I see it)"
   }
 }

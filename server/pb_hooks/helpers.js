@@ -2515,7 +2515,7 @@ function layoutTreeServer(nodes, edges, opts) {
     const groups = kids
       .filter((c) => { const g = (childrenMap[c] || []).filter((x) => lookup[x]); return g.length >= 2 && g.every(isLeafId); })
       .sort((a, b) => crossOf(a) - crossOf(b));
-    if (groups.length < 3) continue;
+    if (groups.length < 2) continue;
     groups.forEach((g) => { resenoVzperami[g] = true; });
     // kompakt: první dolů (u lichého počtu i poslední); kategorie: první
     // nahoře — nová kategorie pokračuje v rytmu (detail u FE dvojčete)
@@ -2699,7 +2699,7 @@ function layoutTreeServer(nodes, edges, opts) {
     for (const n of layoutNodes) {
       if (resenoVzperami[n.id]) continue;
       const kids = (childrenMap[n.id] || []).filter((c) => lookup[c] && positions[c]);
-      if (kids.length < 3 || !kids.every(isLeafId)) continue;
+      if (kids.length < 2 || !kids.every(isLeafId)) continue;
       const radaOd = kids.slice().sort((a, b) => positions[a].x - positions[b].x);
       const stred = (positions[radaOd[0]].x + positions[radaOd[radaOd.length - 1]].x) / 2;
       // karty v téže řadě jsou od sebe 2×krok — musí se vejít vedle sebe (sync s FE)
@@ -5476,6 +5476,19 @@ function dgOf(lang) { return lang === "en" ? DG.en : DG.cs; }
 // „Nehýbe se" v Můj den i v přehledu Organizace (stejná definice na obou místech,
 // rozhodnutí Richarda 25. 8. 2026). Vrací { "mapId:nodeId": created } jen pro
 // uzly z `candidates` (kind "node"); uzel bez řádku v mapě chybí = „nevím".
+// Práh „nehýbe se" ve dnech: opts > KB_STUCK_DAYS (env, hlavně e2e testy —
+// ⚠️ V PRODUKCI NENASTAVOVAT: mění definici stagnace pro CELOU instanci
+// (Nehýbe se, Kde to nejvíc stojí, odznaky v mapě) bez jediné stopy v UI
+// (nález bezpečnostního panelu 2. 9. 2026). Záporná hodnota je jen pro testy.
+// autodate v map_changes nejde zpětně datovat, test proto SNÍŽÍ práh místo
+// falšování razítek) > výchozích 14. Hodnota 0 je platná (= cokoli před dneškem).
+function stuckDaysOf(o) {
+  if (o && o.stuckDays !== undefined) return o.stuckDays;
+  const raw = env("STUCK_DAYS");
+  if (raw !== "" && raw !== null && raw !== undefined && !isNaN(Number(raw))) return Number(raw);
+  return 14;
+}
+
 function nodeLastMoved(app, candidates) {
   const nodeMoved = {}; // "mapId:nodeId" -> poslední známý pohyb
   const nodeMaps = {};
@@ -5508,6 +5521,41 @@ function nodeLastMoved(app, candidates) {
     } catch (err) { /* bez záznamníku se uzly prostě nevyhodnocují */ }
   }
   return nodeMoved;
+}
+
+// Stagnace uzlů JEDNÉ mapy — editor ji kreslí jako součást odznaku „Úzké
+// hrdlo". TENTÝŽ předpis jako sekce „Nehýbe se" (buildMyDay/buildPortfolio):
+// kandidát = otevřená vrstva práce (owner nebo termín) bez blízkého
+// termínu/plánu (horizonOf > 7 dní nebo žádný), razítko z nodeLastMoved (jen
+// skutečný pohyb), práh stuckDaysOf. Bez razítka = „nevím" = NEstagnuje.
+// ⚠️ Druhý předpis stagnace NEZAVÁDĚT — přesně na tom pohořel odrazový koncept
+// (počítal z pole `updated`, které resetne i posun uzlu myší).
+function mapStagnantNodes(app, mapRec, opts) {
+  const o = opts || {};
+  const stuckDays = stuckDaysOf(o);
+  const dm = dayMath(o.today);
+  const nodes = jsonVal(mapRec, "nodes", []);
+  const candidates = [];
+  for (const n of (Array.isArray(nodes) ? nodes : [])) {
+    if (!n || n.type === "note") continue;
+    const d = n.data || {};
+    if (!d.owner && !d.deadline) continue; // vrstva práce (jako dashboard projektu)
+    if ((d.status || "todo") === "done") continue;
+    const h = dm.horizonOf(d.plannedOn || d.pinnedOn || "", d.deadline || "");
+    if (h !== null && h <= 7) continue; // blízký termín/plán řeší termínové sekce
+    candidates.push({ kind: "node", id: n.id, mapId: mapRec.id });
+  }
+  const nodeMoved = nodeLastMoved(app, candidates);
+  const stuckBefore = new Date(dm.today0.getTime() - stuckDays * 86400000);
+  const stagnant = {}; // nodeId -> dnů bez skutečného pohybu
+  for (const it of candidates) {
+    const stampRaw = nodeMoved[it.mapId + ":" + it.id];
+    if (!stampRaw) continue;
+    const u = parsePbDate(stampRaw);
+    if (!u || !(u < stuckBefore)) continue;
+    stagnant[it.id] = Math.floor((dm.today0 - u) / 86400000);
+  }
+  return { stagnant: stagnant, stuckDays: stuckDays, today: dm.today };
 }
 
 // Datumová aritmetika přehledů: `today` je datum PODLE UŽIVATELE (klient ho
@@ -5978,7 +6026,7 @@ function buildMyDay(app, userId, email, opts) {
   // „nehýbe se" = beze změny tolik dní. Pozor: dá se poctivě spočítat JEN
   // u úkolů — uzly nemají vlastní razítko (žijí v JSON blobu mapy), takže by
   // jediné uložení mapy „oživilo" všechny její uzly naráz.
-  const stuckDays = o.stuckDays || 14;
+  const stuckDays = stuckDaysOf(o);
   const dm = dayMath(o.today);
   const today = dm.today, today0 = dm.today0, diffOf = dm.diffOf;
   // Plán = „kdy to chci řešit". NENÍ to termín: termín je dohoda s někým jiným,
@@ -6076,7 +6124,38 @@ function buildMyDay(app, userId, email, opts) {
     if (m.getBool("archived")) continue;
     const iOwnMap = m.getString("owner_email") === email;
     const nodes = jsonVal(m, "nodes", []);
-    const blocking = findBlockingForOwnerServer(nodes, jsonVal(m, "edges", []), email);
+    const edges = jsonVal(m, "edges", []);
+    const blocking = findBlockingForOwnerServer(nodes, edges, email);
+    // Kolik nehotových kroků můj uzel drží — TENTÝŽ předpis jako sekce
+    // „Kde to nejvíc stojí" (buildPortfolio): propadlý uzel s drženými kroky
+    // = úzké hrdlo a jeho nositel se to má dozvědět PRVNÍ, u sebe v Můj den
+    // (rozhodnutí vlastníka 2. 9. 2026 — štítek na řádku, žádný pranýř).
+    const mdDone = {};
+    const mdChildren = {};
+    for (const n of nodes) {
+      if (!n || n.type === "note") continue;
+      mdDone[n.id] = ((n.data || {}).status || "todo") === "done";
+    }
+    for (const ed of (Array.isArray(edges) ? edges : [])) {
+      if (!ed || mdDone[ed.source] === undefined || mdDone[ed.target] === undefined) continue;
+      (mdChildren[ed.source] = mdChildren[ed.source] || []).push(ed.target);
+    }
+    const mdDrzi = (nodeId) => {
+      let cnt = 0;
+      const seen = {};
+      const stackArr = [nodeId];
+      seen[nodeId] = true;
+      while (stackArr.length) {
+        const cur = stackArr.pop();
+        for (const ch of (mdChildren[cur] || [])) {
+          if (seen[ch]) continue;
+          seen[ch] = true;
+          if (mdDone[ch] === false) cnt++;
+          stackArr.push(ch);
+        }
+      }
+      return cnt;
+    };
     for (const n of nodes) {
       if (n.type === "note") continue;
       const d = n.data || {};
@@ -6088,6 +6167,7 @@ function buildMyDay(app, userId, email, opts) {
           title: title, deadline: d.deadline || "", status: d.status || "todo",
           mapTitle: m.getString("title"), planned: d.plannedOn || d.pinnedOn || "",
           updated: "", blocks: blocking[n.id] || "", tour: d.tour === true,
+          blocked: mdDrzi(n.id),
         });
       } else if (iOwnMap && d.owner && (d.status || "todo") !== "done") {
         delegated.push({
@@ -6364,7 +6444,7 @@ function buildMyDay(app, userId, email, opts) {
 function buildPortfolio(app, userId, email, opts) {
   const o = opts || {};
   const untitled = o.untitled || "Bez názvu";
-  const stuckDays = o.stuckDays || 14;
+  const stuckDays = stuckDaysOf(o);
   const dm = dayMath(o.today);
   const today = dm.today, today0 = dm.today0, diffOf = dm.diffOf, planOf = dm.planOf;
 
@@ -6427,6 +6507,9 @@ function buildPortfolio(app, userId, email, opts) {
   const projectById = {};
   const titleByMap = {};
   const nodeByKey = {};
+  // Graf každé mapy (potomci + hotovost) pro „Kde to nejvíc stojí": kolik
+  // nehotových kroků uzel drží. Jen pozorovatelný počet, žádné skóre.
+  const mapGraph = {};
   // e-maily porovnáváme bez ohledu na velikost písmen (jinde na serveru `eqi`) —
   // jinak by „Eva@X.cz" a „eva@x.cz" byly dva lidé a úkol by se nesložil do uzlu
   const lc = (v) => String(v || "").trim().toLowerCase();
@@ -6435,6 +6518,17 @@ function buildPortfolio(app, userId, email, opts) {
     const nodes = jsonVal(m, "nodes", []);
     const edges = jsonVal(m, "edges", []);
     titleByMap[m.id] = m.getString("title") || untitled;
+    const g = { children: {}, doneById: {}, apexIds: {} };
+    for (const n of nodes) {
+      if (!n || n.type === "note") continue;
+      g.doneById[n.id] = ((n.data || {}).status || "todo") === "done";
+      if (n.type === "apexNode" || (n.data || {}).nodeType === "apex") g.apexIds[n.id] = true;
+    }
+    for (const ed of (Array.isArray(edges) ? edges : [])) {
+      if (!ed || g.doneById[ed.source] === undefined || g.doneById[ed.target] === undefined) continue;
+      (g.children[ed.source] = g.children[ed.source] || []).push(ed.target);
+    }
+    mapGraph[m.id] = g;
     const c = mapCompletion(nodes, edges);
     let open = 0;
     for (const n of nodes) {
@@ -6514,9 +6608,59 @@ function buildPortfolio(app, userId, email, opts) {
     if (!stampRaw) continue;
     const u = parsePbDate(stampRaw);
     if (!u || !(u < stuckBefore)) continue;
-    stuck.push(Object.assign({}, it, { movedAt: stampRaw, daysIdle: Math.floor((today0 - u) / 86400000) }));
+    stuck.push(Object.assign({}, it, { movedAt: stampRaw, daysIdle: Math.max(0, Math.floor((today0 - u) / 86400000)) }));
   }
   stuck.sort((a, b) => (b.daysIdle - a.daysIdle) || byTitle(a, b));
+
+  // „Kde to nejvíc stojí" — reálná ÚZKÁ HRDLA: uzel po termínu NEBO ze sekce
+  // „nehýbe se", který přitom drží ≥1 nehotový navazující krok. Množiny overdue
+  // a stuck se nepřekrývají (kandidáti stuck mají horizont > 7 dní), přesto se
+  // skládá přes klíč — kdyby se předpisy někdy sblížily, položka nebude dvakrát.
+  // Jen fakta (dny po termínu, počet blokovaných, dny stagnace) — žádné skóre;
+  // stejné uzly kreslí editor mapy jako červený odznak (jedna definice).
+  const openDescendants = (mapId, nodeId) => {
+    const g = mapGraph[mapId];
+    if (!g) return 0;
+    let cnt = 0;
+    const seen = {};
+    seen[nodeId] = true; // start nezapočítat ani přes cyklus — jako klient a Můj den
+    const stackArr = [nodeId];
+    while (stackArr.length) {
+      const cur = stackArr.pop();
+      for (const ch of (g.children[cur] || [])) {
+        if (seen[ch]) continue;
+        seen[ch] = true;
+        if (g.doneById[ch] === false) cnt++;
+        stackArr.push(ch);
+      }
+    }
+    return cnt;
+  };
+  const bottleneckByKey = {};
+  // apex se nehodnotí (jako v editoru — bottlenecks.js): termín na vrcholu jde
+  // nastavit přes API a bez stráže by se objevil v sekci, kterou mapa nikdy
+  // nečervení (nález panelu 2. 9. 2026)
+  const jeApex = (it) => {
+    const g = mapGraph[it.mapId];
+    return !!(g && g.apexIds && g.apexIds[it.nodeId]);
+  };
+  for (const it of overdue) {
+    if (it.kind !== "node" || jeApex(it)) continue;
+    const blocked = openDescendants(it.mapId, it.nodeId);
+    if (blocked < 1) continue; // čistě propadlý list patří jen do sekce Po termínu
+    bottleneckByKey[it.mapId + ":" + it.nodeId] = Object.assign({}, it, { blocked: blocked, daysIdle: 0 });
+  }
+  for (const it of stuck) {
+    if (it.kind !== "node" || jeApex(it)) continue;
+    const key = it.mapId + ":" + it.nodeId;
+    const blocked = openDescendants(it.mapId, it.nodeId);
+    if (blocked < 1) continue;
+    if (bottleneckByKey[key]) { bottleneckByKey[key].daysIdle = it.daysIdle; continue; }
+    bottleneckByKey[key] = Object.assign({}, it, { blocked: blocked, daysOver: 0 });
+  }
+  const bottlenecks = Object.keys(bottleneckByKey).map((k) => bottleneckByKey[k]);
+  bottlenecks.sort((a, b) => ((b.daysOver || 0) - (a.daysOver || 0)) || (b.blocked - a.blocked)
+    || ((b.daysIdle || 0) - (a.daysIdle || 0)) || byTitle(a, b));
 
   for (const p of projects) {
     p.overdue = overdue.filter((x) => x.mapId === p.id).length;
@@ -6612,8 +6756,9 @@ function buildPortfolio(app, userId, email, opts) {
       people: peopleWithOverdue,
       open: items.length,
       changes: changes.length,
+      bottlenecks: bottlenecks.length,
     },
-    sections: { overdue: overdue, projects: projects, stuck: stuck, people: people, changes: changes },
+    sections: { overdue: overdue, projects: projects, stuck: stuck, bottlenecks: bottlenecks, people: people, changes: changes },
   };
 }
 
@@ -6870,7 +7015,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 
 module.exports = {
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, buildExport, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

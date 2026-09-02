@@ -37,7 +37,9 @@
       "stuck": "Co se nehýbe",
       "stuckSub": "bez blízkého termínu, poslední pohyb před více než 14 dny",
       "people": "Lidé s nejvíc resty",
-      "changes": "Co se změnilo za 7 dní napříč projekty"
+      "changes": "Co se změnilo za 7 dní napříč projekty",
+      "bottlenecks": "Kde to nejvíc stojí",
+      "bottlenecksSub": "úzká hrdla — drží další nehotové kroky"
     },
     "cols": {
       "what": "Co",
@@ -50,7 +52,9 @@
       "open": "Otevřeno",
       "projects": "Projektů",
       "when": "Kdy",
-      "change": "Změna"
+      "change": "Změna",
+      "blocked": "Blokuje",
+      "why": "Proč stojí"
     },
     "days_one": "{{count}} den",
     "days_few": "{{count}} dny",
@@ -99,6 +103,15 @@
       "colDone": "Hotovo/celkem"
     },
     "system": "systém",
-    "excludedMore": "… a dalších {{count}}"
+    "excludedMore": "… a dalších {{count}}",
+    "emptyBottlenecks": "Nic tu nestojí — žádný propadlý ani zaseknutý cíl nedrží další práci.",
+    "blockedSteps_one": "1 krok",
+    "blockedSteps_few": "{{count}} kroky",
+    "blockedSteps_many": "{{count}} kroků",
+    "blockedSteps_other": "{{count}} kroků",
+    "whyOverdue": "po termínu {{days}}",
+    "reportPdf": "PDF (k poslání)",
+    "pdfFailed": "PDF se nepodařilo vytvořit",
+    "reportPdfSkin": "PDF (v mém vzhledu)"
   }
 }

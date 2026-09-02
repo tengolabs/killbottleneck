@@ -291,6 +291,68 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
             </Button>
           </div>
         )}
+        {/* Deadline lists — NAHOŘE mezi „Co se změnilo" a dlaždicemi % (rozhodnutí
+            vlastníka 2. 9. 2026: z Organizace se sem chodí kvůli PO TERMÍNU, a to
+            nesmí být schované až pod grafy — „na první pohled OK projekt" klamal). */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/30 p-4 space-y-2">
+            <h3 className="flex items-center gap-2 text-sm font-heading font-semibold text-red-700 dark:text-red-300">
+              <AlertTriangle className="w-4 h-4" /> {t('dashboard.overdueHeading', { count: stats.overdue.length })}
+            </h3>
+            {stats.overdue.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">{t('dashboard.noOverdue')}</p>
+            ) : (
+              <div className="space-y-1.5">
+                {stats.overdue.map((item) => (
+                  <div key={`${item.kind}-${item.id}`} className="flex items-center gap-2 p-2 rounded-lg bg-card border border-red-100 dark:border-red-900/60">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {item.title}
+                        {item.kind === 'task' && <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{t('dashboard.taskBadge')}</span>}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {item.owner && <span className="flex items-center gap-1">
+                          <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[8px] font-bold flex items-center justify-center">{getInitials(item.owner)}</span>
+                          {item.owner}
+                        </span>}
+                        <span className="text-red-600 dark:text-red-400 font-medium">{formatDeadline(item.deadline)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="rounded-xl border border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/30 p-4 space-y-2">
+            <h3 className="flex items-center gap-2 text-sm font-heading font-semibold text-orange-700 dark:text-orange-300">
+              <Clock className="w-4 h-4" /> {t('dashboard.upcomingHeading', { count: stats.upcoming.length })}
+            </h3>
+            {stats.upcoming.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">{t('dashboard.noUpcoming')}</p>
+            ) : (
+              <div className="space-y-1.5">
+                {stats.upcoming.map((item) => (
+                  <div key={`${item.kind}-${item.id}`} className="flex items-center gap-2 p-2 rounded-lg bg-card border border-orange-100 dark:border-orange-900/60">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {item.title}
+                        {item.kind === 'task' && <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{t('dashboard.taskBadge')}</span>}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {item.owner && <span className="flex items-center gap-1">
+                          <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[8px] font-bold flex items-center justify-center">{getInitials(item.owner)}</span>
+                          {item.owner}
+                        </span>}
+                        <span className="text-orange-600 font-medium">{formatDeadline(item.deadline)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Overall + status counts */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-xl border bg-card p-4 space-y-3">
@@ -389,65 +451,6 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
           </div>
         )}
 
-        {/* Deadline lists */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/30 p-4 space-y-2">
-            <h3 className="flex items-center gap-2 text-sm font-heading font-semibold text-red-700 dark:text-red-300">
-              <AlertTriangle className="w-4 h-4" /> {t('dashboard.overdueHeading', { count: stats.overdue.length })}
-            </h3>
-            {stats.overdue.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">{t('dashboard.noOverdue')}</p>
-            ) : (
-              <div className="space-y-1.5">
-                {stats.overdue.map((item) => (
-                  <div key={`${item.kind}-${item.id}`} className="flex items-center gap-2 p-2 rounded-lg bg-card border border-red-100 dark:border-red-900/60">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {item.title}
-                        {item.kind === 'task' && <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{t('dashboard.taskBadge')}</span>}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {item.owner && <span className="flex items-center gap-1">
-                          <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[8px] font-bold flex items-center justify-center">{getInitials(item.owner)}</span>
-                          {item.owner}
-                        </span>}
-                        <span className="text-red-600 dark:text-red-400 font-medium">{formatDeadline(item.deadline)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="rounded-xl border border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/30 p-4 space-y-2">
-            <h3 className="flex items-center gap-2 text-sm font-heading font-semibold text-orange-700 dark:text-orange-300">
-              <Clock className="w-4 h-4" /> {t('dashboard.upcomingHeading', { count: stats.upcoming.length })}
-            </h3>
-            {stats.upcoming.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">{t('dashboard.noUpcoming')}</p>
-            ) : (
-              <div className="space-y-1.5">
-                {stats.upcoming.map((item) => (
-                  <div key={`${item.kind}-${item.id}`} className="flex items-center gap-2 p-2 rounded-lg bg-card border border-orange-100 dark:border-orange-900/60">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {item.title}
-                        {item.kind === 'task' && <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{t('dashboard.taskBadge')}</span>}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {item.owner && <span className="flex items-center gap-1">
-                          <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[8px] font-bold flex items-center justify-center">{getInitials(item.owner)}</span>
-                          {item.owner}
-                        </span>}
-                        <span className="text-orange-600 font-medium">{formatDeadline(item.deadline)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
       <Dialog open={summary !== null} onOpenChange={(v) => !v && setSummary(null)}>
         <DialogContent className="sm:max-w-lg">

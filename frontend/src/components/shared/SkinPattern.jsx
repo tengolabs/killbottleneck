@@ -196,7 +196,7 @@ export default function SkinPattern({ position = 'fixed inset-x-0 bottom-0' }) {
     <div
       aria-hidden
       data-skin-pattern={pattern}
-      className={`pointer-events-none ${position} ${className}`}
+      className={`pointer-events-none export-ignore ${position} ${className}`}
       style={{ color: 'hsl(var(--primary))' }}
     >
       <Art />

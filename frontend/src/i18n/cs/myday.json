@@ -33,7 +33,12 @@
     "focusBadge": {
       "today": "nejdůležitější dnes",
       "tomorrow": "nejdůležitější zítra"
-    }
+    },
+    "bottleneckBadge_one": "úzké hrdlo · drží 1 krok",
+    "bottleneckBadge_few": "úzké hrdlo · drží {{count}} kroky",
+    "bottleneckBadge_many": "úzké hrdlo · drží {{count}} kroků",
+    "bottleneckBadge_other": "úzké hrdlo · drží {{count}} kroků",
+    "bottleneckTitle": "Tenhle propadlý cíl drží další nehotové kroky — dokud se nepohne, stojí i ostatní."
   },
   "sections": {
     "overdue": "Po termínu",

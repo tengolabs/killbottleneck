@@ -157,15 +157,45 @@ export const syncSkin = async (user = null) => {
 // Exporty (PNG/PDF) jsou VŽDY ve výchozím vzhledu na bílé — sdílený artefakt
 // musí být čitelný u příjemce bez ohledu na vkus odesílatele (rozhodnutí 31. 7.).
 // Na dobu snímku se odpojí skin (<style disabled>) i tmavý režim a hned se vrátí.
+// Jen ZMRAZENÍ pohybu na dobu snímku (transition/animation) — vzhled se
+// nemění. Pro „PDF v mém vzhledu": bez toho se prvky s transition-colors
+// fotí napůl přebarvené (stejný nález jako u světlého tisku, 2. 9. 2026).
+export const withFrozenMotion = async (fn) => {
+  const klid = document.createElement('style');
+  klid.id = 'kb-freeze-motion';
+  klid.textContent = '* { transition: none !important; animation: none !important; }';
+  document.head.appendChild(klid);
+  try {
+    return await fn();
+  } finally {
+    klid.remove();
+  }
+};
+
 export const withDefaultLook = async (fn) => {
   const el = document.getElementById('kb-skin');
   const root = document.documentElement;
   const wasDark = root.classList.contains('dark');
+  // ⚠️ Pouhé vypnutí skinu už NEznamená světlý podklad: od skinové vlny je
+  // výchozí vzhled „Půlnoc" a :root tokeny jsou s ním 1:1 (tmavě modré).
+  // Export tak vycházel tmavý s bledým nadpisem na bílém papíře — nečitelný
+  // (nález vlastníka 2. 9. 2026 u PDF reportu Organizace, dashboard projektu
+  // měl totéž). Na dobu snímku se proto NAVÍC přiloží vestavěný SVĚTLÝ skin
+  // (Indigo, světlá varianta) — sdílený artefakt zůstává na bílé a čitelný.
+  const tisk = document.createElement('style');
+  tisk.id = 'kb-print-look';
+  // ⚠️ Bez vypnutí přechodů se snímek fotí UPROSTŘED transition-colors (150 ms):
+  // dlaždice a karty s přechodem vyšly tmavé, sekce bez něj světlé — „napůl
+  // obarvené" PDF (nález vlastníka 2. 9. 2026). Animace pryč i kvůli pulzům.
+  tisk.textContent = skinToCss(getBuiltinSkin('indigo'))
+    + '\n* { transition: none !important; animation: none !important; }';
   if (el) el.disabled = true;
   if (wasDark) root.classList.remove('dark');
+  document.head.appendChild(tisk);
   try {
     return await fn();
   } finally {
+    tisk.remove();
     if (el) el.disabled = false;
     if (wasDark) root.classList.add('dark');
   }

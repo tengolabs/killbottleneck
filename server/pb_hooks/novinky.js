@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.58-beta": {
+    cs: [
+      "Mapa nově ukazuje úzká hrdla: propadlý nebo dlouho stojící cíl, který drží další kroky, dostane červený odznak — a tlačítkem 🔥 si zvýrazníte i potenciální hrdla a kritickou cestu k těm skutečným.",
+      "Na stránce Organizace přibyla sekce „Kde to nejvíc stojí“ s proklikem rovnou do mapy; pořadí sekcí teď vede Projekty podle % hotovo.",
+      "Kdo je sám úzkým hrdlem, dozví se to první — jeho propadlý cíl nese v Můj den štítek „úzké hrdlo · drží N kroků“.",
+      "Report jde nově uložit i jako PDF — světlé „k poslání“, nebo „v mém vzhledu“ včetně skinu a tmavého režimu.",
+      "Tlačítko Zarovnat už viditelně funguje i na mapách s kategoriemi po dvou podcílech — styly Kompakt a Pásy se tam dřív tvářily úplně stejně.",
+    ],
+    en: [
+      "The map now shows bottlenecks: an overdue or long-stalled goal that holds up other steps gets a red badge — and the 🔥 toggle highlights potential bottlenecks plus a critical path to the real ones.",
+      "The Organization page gains a “Where it stalls most” section with a jump straight into the map; sections are now led by Projects by % done.",
+      "Whoever is the bottleneck learns it first — their overdue goal carries a “bottleneck · holding N steps” tag in My day.",
+      "Reports can now be saved as PDF — a light “to share” version, or “as I see it” with your skin and dark mode.",
+      "The Align button now visibly works on maps whose categories have two sub-goals — Compact and Bands used to look identical there.",
+    ],
+  },
   "v0.57-beta": {
     cs: [
       "Na stránce Úkoly přibyl pohled „Časová osa“ — projekty a jejich cíle jako pruhy na ose s milníky, značkou Dnes a červeným zvýrazněním všeho po termínu.",

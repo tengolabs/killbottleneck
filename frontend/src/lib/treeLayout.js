@@ -220,7 +220,10 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
     // dvouřadé balení níž, ne pásy.
     // Samotné karty bez podcílů vzpěry taky neřeší (vzpěra by jim držela slot
     // a neušetřila nic) — ty zabalí rovněž DVOUŘADÉ BALENÍ.
-    if (cile.length < 3) continue;
+    // ⚠️ Práh 2, ne 3 (2. 9. 2026): běžné mapy mají skupiny po dvou a s prahem 3
+    // všechny tři styly vycházely IDENTICKY — „Zarovnat nic nedělá" (nález
+    // vlastníka). Dvojice se střídá nahoru/dolů úplně stejně dobře.
+    if (cile.length < 2) continue;
     const skupinovyKompakt = stagger >= 2;
     // Parita střídání (Richard 11. 8. večer):
     //  · KOMPAKT (listy do pater): první skupina dolů a střídat — u lichého
@@ -490,7 +493,7 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
       const kids = (childrenMap[n.id] || []).filter((c) => lookup[c] && positions[c]);
       // jen ucelená řada listů — kdyby mezi nimi byla větev, zabalením by se
       // karty dostaly nad její podstrom
-      if (kids.length < 3 || !kids.every(isLeafId)) continue;
+      if (kids.length < 2 || !kids.every(isLeafId)) continue;
       const radaOd = kids.slice().sort((a, b) => pricnaOsa(a) - pricnaOsa(b));
       const kroky = radaOd.map(pricnaOsa);
       const stred = (kroky[0] + kroky[kroky.length - 1]) / 2;

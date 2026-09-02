@@ -1,0 +1,22 @@
+{
+  "poTerminu_one": "Po termínu o {{count}} den",
+  "poTerminu_few": "Po termínu o {{count}} dny",
+  "poTerminu_many": "Po termínu o {{count}} dní",
+  "poTerminu_other": "Po termínu o {{count}} dní",
+  "blokujeKroky_one": "Blokuje 1 navazující krok",
+  "blokujeKroky_few": "Blokuje {{count}} navazující kroky",
+  "blokujeKroky_many": "Blokuje {{count}} navazujících kroků",
+  "blokujeKroky_other": "Blokuje {{count}} navazujících kroků",
+  "stagnujeBlokuje_one": "Bez pohybu {{days}} • Blokuje 1 krok",
+  "stagnujeBlokuje_few": "Bez pohybu {{days}} • Blokuje {{count}} kroky",
+  "stagnujeBlokuje_many": "Bez pohybu {{days}} • Blokuje {{count}} kroků",
+  "stagnujeBlokuje_other": "Bez pohybu {{days}} • Blokuje {{count}} kroků",
+  "vetveni_one": "Sbíhá se tu 1 nehotový krok",
+  "vetveni_few": "Sbíhají se tu {{count}} nehotové kroky",
+  "vetveni_many": "Sbíhá se tu {{count}} nehotových kroků",
+  "vetveni_other": "Sbíhá se tu {{count}} nehotových kroků",
+  "dnu_one": "1 den",
+  "dnu_few": "{{count}} dny",
+  "dnu_many": "{{count}} dní",
+  "dnu_other": "{{count}} dní"
+}

@@ -1,9 +1,10 @@
 import { memo, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLazyNs } from '@/i18n/lazyNs';
 import { MembersContext, labelForEmail } from '@/lib/memberLabel';
 import { isExternalOwner } from '@/lib/externalContacts';
 import { Handle, Position } from '@xyflow/react';
-import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip, Handshake } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip, Handshake, Flame } from 'lucide-react';
 import { useGoalMap } from './GoalMapContext';
 import { useTimer } from '@/lib/TimerContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -29,7 +30,8 @@ const aiMenuItems = [
 
 function GoalNode({ id, data, selected }) {
   const { t } = useTranslation('editor');
-  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, statusCycleNodeIds, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, fileCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap } = useGoalMap();
+  useLazyNs('bottleneck'); // texty důvodů hrdel (tooltip) — líný ns, ať se neveze do lite
+  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, statusCycleNodeIds, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, fileCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap, showBottlenecks, bottleneckNodeIds, bottleneckAnalysisMap } = useGoalMap();
   // směr stromu: 'horizontal' = strom doprava (mobil) → konektory vlevo/vpravo, jinak nahoře/dole
   const isH = direction === 'horizontal';
   // velikost písma v uzlu (tlačítko Čitelnost v liště) — šířka karty se NEMĚNÍ,
@@ -167,15 +169,46 @@ function GoalNode({ id, data, selected }) {
     );
   }
 
+  const isBottleneck = bottleneckNodeIds?.has(id);
+  const bottleneckInfo = bottleneckAnalysisMap?.[id];
+  const isPotential = bottleneckInfo?.bottleneckType === 'potential';
+
   return (
     <div
       className={`relative w-[220px] rounded-xl border-2 bg-card shadow-md transition-all overflow-visible ${
         customColor ? '' : status.border
       } ${selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''} ${
         isSearching && !isMatch ? 'opacity-30' : isSearching && isMatch ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-background' : ''
-      } ${myTasksOnly && !isMyTask ? 'opacity-30' : ''} ${compactNode ? 'cursor-pointer hover:ring-2 hover:ring-primary/50' : ''}`}
+      } ${myTasksOnly && !isMyTask ? 'opacity-30' : ''} ${compactNode ? 'cursor-pointer hover:ring-2 hover:ring-primary/50' : ''} ${
+        isBottleneck && (showBottlenecks || bottleneckInfo?.isCritical)
+          ? isPotential
+            ? 'ring-2 ring-amber-500/80 ring-offset-2 shadow-amber-500/15 shadow-md'
+            : 'ring-2 ring-rose-500 ring-offset-2 animate-pulse shadow-rose-500/20 shadow-lg'
+          : ''
+      }`}
       style={nodeStyle}
     >
+      {isBottleneck && (showBottlenecks || bottleneckInfo?.isCritical) && (
+        <div
+          className={`absolute -top-3 -right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full text-white text-[9px] font-bold shadow-md ${
+            isPotential ? 'bg-amber-600' : 'bg-rose-600 animate-bounce'
+          }`}
+          title={(bottleneckInfo?.reasons || [])
+            .map((r) => (typeof r === 'string' ? r : t(`bottleneck:${r.key}`, r.days !== undefined ? { ...r, days: t('bottleneck:dnu', { count: r.days }) } : r)))
+            .join(' • ') || t('node.bottleneckBadge')}
+        >
+          {isPotential ? (
+            <AlertTriangle className="w-3 h-3 text-amber-200" />
+          ) : (
+            <Flame className="w-3 h-3 text-amber-300 fill-amber-300" />
+          )}
+          <span>
+            {isPotential
+              ? t('node.potentialBottleneckBadge')
+              : t('node.bottleneckBadge')}
+          </span>
+        </div>
+      )}
       <Handle type="target" position={isH ? Position.Left : Position.Top} className="!w-2.5 !h-2.5 !bg-primary !border-2 !border-background" />
 
       <div className={`px-3 py-2 flex items-center justify-between ${status.headerBg}`}>

@@ -16,9 +16,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { base44 } from '@/api/base44Client';
+import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Loader2, Target, Trash2, Lock, Unlock, Sun, Moon, ChevronDown, Map as MapIcon, Palette, SlidersHorizontal } from 'lucide-react';
+import { detectBottlenecks } from '@/lib/bottlenecks';
 import GoalNode from '@/components/goal-map/GoalNode';
 import { MembersContext } from '@/lib/memberLabel';
 import { useMembersWithContacts } from '@/lib/externalContacts';
@@ -32,6 +34,7 @@ import ProgressDashboard from '@/components/goal-map/ProgressDashboard';
 import { shareMap, getPublicMap, nodeStatus } from '@/api/kb';
 import { layoutTree, findFreeChildSpot } from '@/lib/treeLayout';
 import { isApexNode as isApexNodeShared } from '@/lib/mapNodes';
+import { todayKey } from '@/lib/taskActions';
 import { spojeniPovoleno, poskozeneHrany } from '@/lib/mapStructure';
 import { cleanMapData as cleanMap } from '@/lib/cleanMap';
 import GoalMapContext from '@/components/goal-map/GoalMapContext';
@@ -144,6 +147,7 @@ function EditorContent({ mapId, personalMap = false }) {
     commentCounts, fileCounts, taskStats, mapTasks, mapTaskCount, setTaskStatsVersion, runningAgentNodes,
   } = useMapCounts({ activeMapId, isPublicView, user, editNodeId });
   const [taskNodeId, setTaskNodeId] = useState(null);
+  const [showBottlenecks, setShowBottlenecks] = useState(false);
   // členové + externí kontakty v jednom (kontakty s external:true); reloadMembers
   // po změně adresáře kontaktů (onContactsChanged z OwnerSelect)
   const [members, reloadMembers] = useMembersWithContacts(user);
@@ -272,6 +276,32 @@ function EditorContent({ mapId, personalMap = false }) {
   // Build children map from edges
   const childrenMap = useMemo(() => buildChildrenMap(edges), [edges]);
 
+  // Stagnace uzlů ze serveru (jediný předpis „nehýbe se" — mapStagnantNodes);
+  // načítá se při otevření mapy. Dokud nedorazí, hrdla se hodnotí jen podle
+  // termínů a větvení — stagnace se NIKDY nepočítá z ničeho lokálního.
+  const [stagnantNodes, setStagnantNodes] = useState({});
+  useEffect(() => {
+    setStagnantNodes({});
+    // org mapa hrdla nehodnotí (org větev GoalNode odznaky nekreslí, tlačítko
+    // je schované) — fetch by byl jen zbytečný dotaz navíc. Veřejný náhled:
+    // stagnace jde ze záznamníku, který anonymům nepatří; po-termínová hrdla
+    // se ve veřejném náhledu UKAZUJÍ ZÁMĚRNĚ (rozhodnutí vlastníka 2. 9. 2026:
+    // plynou z termínů a struktury, které vývěska stejně ukazuje).
+    if (!activeMapId || isPublicView || mapKind === 'org') return;
+    let zivy = true;
+    // today jako u Můj den/Organizace: server běží v UTC a po půlnoci SELČ by
+    // se editor rozešel s Organizací o den (nález panelu 2. 9. 2026)
+    pb.send(`/api/kb/map-activity?map=${encodeURIComponent(activeMapId)}&today=${todayKey()}`, { method: 'GET' })
+      .then((r) => { if (zivy) setStagnantNodes(r?.stagnant || {}); })
+      .catch(() => {}); // bez dat prostě nehlásíme stagnaci
+    return () => { zivy = false; };
+  }, [activeMapId, isPublicView, mapKind]);
+
+  const bottleneckAnalysis = useMemo(
+    () => detectBottlenecks(nodes, edges, childrenMap, stagnantNodes),
+    [nodes, edges, childrenMap, stagnantNodes]
+  );
+
   // Compute visible nodes/edges based on collapsed state
   const { visibleNodes, visibleEdges, hiddenCounts } = useMemo(() => {
     const hidden = hiddenByCollapse(nodes, childrenMap);
@@ -299,23 +329,32 @@ function EditorContent({ mapId, personalMap = false }) {
         const stav = d.status === 'done'
           ? 'done'
           : (getDeadlineStatus(d.deadline, d.status) === 'overdue' ? 'late' : 'normal');
+        // kritická cesta se kreslí jen k REÁLNÝM hrdlům — oranžová (potenciální)
+        // jsou hypotéza a červené trasování by z ní dělalo jistotu
+        const isBottleneckEdge = showBottlenecks
+          && (bottleneckAnalysis?.nodeAnalysisMap?.[e.source]?.isCritical
+            || bottleneckAnalysis?.nodeAnalysisMap?.[e.target]?.isCritical);
         const barva = stav === 'done' ? 'var(--canvas-edge-done)'
           : stav === 'late' ? 'var(--canvas-edge-late)'
           : 'var(--canvas-edge)';
         return {
           ...e,
           // hotové se přestane hýbat (práce doběhla), propadlé zrychlí (index.css)
-          animated: stav !== 'done',
-          className: stav === 'late' ? 'kb-hrana-late' : undefined,
+          animated: isBottleneckEdge || stav !== 'done',
+          className: isBottleneckEdge ? 'kb-hrana-bottleneck' : (stav === 'late' ? 'kb-hrana-late' : undefined),
           // ⚠️ xyflow slučuje s defaultEdgeOptions MĚLCE — vlastní style nahradí
           // celý výchozí objekt, takže strokeWidth tu musí být taky
-          style: { stroke: `hsl(${barva})`, strokeWidth: 2 },
-          domAttributes: { 'data-stav-hrany': stav },
+          style: {
+            stroke: isBottleneckEdge ? '#f43f5e' : `hsl(${barva})`,
+            strokeWidth: isBottleneckEdge ? 3.5 : 2,
+            strokeDasharray: isBottleneckEdge ? '6,4' : undefined,
+          },
+          domAttributes: { 'data-stav-hrany': isBottleneckEdge ? 'bottleneck' : stav },
         };
       });
 
     return { visibleNodes: vNodes, visibleEdges: vEdges, hiddenCounts: counts };
-  }, [nodes, edges, childrenMap]);
+  }, [nodes, edges, childrenMap, showBottlenecks, bottleneckAnalysis]);
 
   // „Moje mapa": záložka, seskupení, cíle uzlů a (pře)načtení agregace —
   // hooks/usePersonalMapView.js (F1-07). Volá se tady, protože loadPersonalMap
@@ -1207,8 +1246,12 @@ function EditorContent({ mapId, personalMap = false }) {
       compactNode: personalMap, // „Moje mapa": název 1 řádek + bez progress baru → jednotná výška
       citelnost, // stupeň velikosti písma v uzlu (tlačítko Čitelnost)
       orgMap: mapKind === 'org', // organizační struktura: uzel = pozice/funkce (jiná karta)
+      showBottlenecks,
+      bottleneckNodeIds: bottleneckAnalysis.bottleneckNodeIds,
+      bottleneckAnalysisMap: bottleneckAnalysis.nodeAnalysisMap,
+      totalBottlenecks: bottleneckAnalysis.totalBottlenecks,
     }),
-    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, ctenarSPraci, mojePracovniUzly, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, fileCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind]
+    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, ctenarSPraci, mojePracovniUzly, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, fileCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind, showBottlenecks, bottleneckAnalysis]
   );
 
   if (loading) {
@@ -1257,16 +1300,16 @@ function EditorContent({ mapId, personalMap = false }) {
         }}
         access={{
           user, canEdit, canShare, canWork, isPublicView, isDraft, isTemplatePreview,
-          isMapOwner, personalMap, archived, activeMapId, ai,
+          isMapOwner, personalMap, archived, activeMapId, ai, mapKind,
         }}
         state={{
           saveStatus, sharedCount, mapTaskCount, mapRules, chatOpen, exporting,
-          visibleNodes, canUndo, personalView,
+          visibleNodes, canUndo, personalView, showBottlenecks, bottleneckAnalysis,
         }}
         actions={{
           setShareOpen, handleUndo, setRulesDefaults, setRulesOpen, setAdvisorOpen,
           setChatOpen, handleAddNote, setPersonalView, handleExport, handleExportJson,
-          setSaveTplOpen, handleToggleArchive, handleAddGoal,
+          setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
         }}
       />
       <DelegatedGroupingBar personalMap={personalMap} personalView={personalView} delegatedGrouping={delegatedGrouping} setDelegatedGrouping={setDelegatedGrouping} />
