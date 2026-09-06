@@ -8,6 +8,7 @@ import { labelForEmail } from './memberLabel.js';
 import { isExternalOwner } from './externalContacts.js';
 import { ALIGN_OPTS, platnyStyl } from './alignStyles.js';
 import { nactiKlic } from './storageKeys.js';
+import { nejblizsiVPodstromu, porovnejDatum } from './nodeOrder.js';
 
 // těsnější rozestupy pro „Moje mapu" (plochá struktura pod „Já" → jinak velké mezery).
 // Slot musí být ≥ velikost uzlu (uzly s popisem jsou vysoké) — jinak se překrývají:
@@ -135,23 +136,18 @@ export function buildPersonalMap(maps, tasks, email, rootLabel) {
     });
   }
   // řazení dle NEJBLIŽŠÍHO termínu v celém PODSTROMU — větev se posune podle
-  // nejdřívějšího potomka (uzel bez termínu, ale s brzkým potomkem, jde dopředu)
-  const childrenOf = {};
-  const deadlineOf = {};
+  // nejdřívějšího potomka (uzel bez termínu, ale s brzkým potomkem, jde dopředu).
+  // Tutéž logiku používá „Uspořádat podle termínu" v editoru (lib/nodeOrder.js) —
+  // jedna definice, ať se Moje mapa a mapa projektu nerozejdou.
+  // Object.create(null) jako v nodeOrder.js — id „__proto__" nesmí trefit prototyp
+  const childrenOf = Object.create(null);
+  const terminyById = Object.create(null);
   for (const it of items) {
-    deadlineOf[it.node.id] = it.deadline || '9999-99-99';
+    terminyById[it.node.id] = { data: { deadline: it.deadline || '' } };
     (childrenOf[it.edge.source] = childrenOf[it.edge.source] || []).push(it.node.id);
   }
-  const subMinCache = {};
-  const subMin = (vid) => {
-    if (subMinCache[vid] !== undefined) return subMinCache[vid];
-    subMinCache[vid] = '…'; // ochrana proti cyklu
-    let m = deadlineOf[vid] || '9999-99-99';
-    for (const c of (childrenOf[vid] || [])) { const cm = subMin(c); if (cm < m) m = cm; }
-    subMinCache[vid] = m;
-    return m;
-  };
-  items.sort((a, b) => subMin(a.node.id).localeCompare(subMin(b.node.id)));
+  const subMin = nejblizsiVPodstromu(terminyById, childrenOf, 'deadline');
+  items.sort((a, b) => porovnejDatum(subMin.get(a.node.id), subMin.get(b.node.id)));
   const nodes = [{ id: 'me', type: 'personalRoot', position: { x: 0, y: 0 }, data: { title: rootLabel } }];
   const edges = [];
   items.forEach((it, i) => {

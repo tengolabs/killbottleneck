@@ -1,0 +1,13 @@
+{
+  "label": "Sort",
+  "title": "Sort sub-goals under each parent by the chosen key. The map structure stays the same and Undo works.",
+  "podle": "Sort by",
+  "deadline": "Deadline",
+  "deadlineHint": "earliest in the whole branch, no deadline last",
+  "plannedOn": "Plan (when I want to work on it)",
+  "plannedOnHint": "deadline is not changed, no plan last",
+  "owner": "Assignee",
+  "ownerHint": "by name, unassigned last",
+  "status": "Status",
+  "statusHint": "in progress, not started, done last"
+}

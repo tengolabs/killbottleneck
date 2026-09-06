@@ -388,8 +388,9 @@ tells you how many.
 
 ![Choosing a skin](assets/skiny-dialog-en.jpg)
 
-In the avatar menu → **Appearance** everyone picks a skin: Indigo (default),
-High contrast, Terminal or Paper. The choice is saved to the account, so it
+In the avatar menu → **Appearance** everyone picks one of twelve built-in skins —
+Indigo (default), High contrast, Terminal, Paper, Ocean, Forest, Midnight, Plum,
+Peach, Graphite, Ruby or Rose. The choice is saved to the account, so it
 applies on every device, in both light and dark mode, and in the simplified
 lite view too (the picker there sits in the footer).
 

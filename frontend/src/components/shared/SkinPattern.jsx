@@ -169,6 +169,35 @@ const Scope = () => (
 // Průhlednost per malůvka (světlý / tmavý — v tmavém je potřeba víc, primary
 // na tmavém pozadí zaniká; Richardův screenshot 30. 7.). Kontrast a Grafit
 // drží nízko — jsou to skiny na čitelnost, dekorace nesmí překážet.
+// Růže: pohled z boku na rostlinu — stonek s trny, dva listy, poupě
+// s kalichem (Richard 6. 9. 2026: „chci pohled z boku na rostlinu s trny
+// a květem"; okvětní lístky shora mu k Růži neseděly). Jednobarevné jako
+// ostatní malůvky — zadní lístky poupěte jen s nižší průhledností.
+const Rose = () => (
+  <svg viewBox="0 0 420 320" className="w-64 h-56 ml-auto block">
+    <path d="M270,108 C262,160 300,220 296,320" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
+    <g fill="currentColor">
+      <path d="M273,152 L250,140 L270,138 Z" />
+      <path d="M280,180 L304,169 L282,167 Z" />
+      <path d="M285,214 L262,203 L283,201 Z" />
+      <path d="M292,248 L316,237 L294,235 Z" />
+      <path d="M296,284 L274,272 L294,270 Z" />
+    </g>
+    <g fill="currentColor">
+      <path d="M282,192 C252,180 222,186 206,208 C234,220 266,212 282,192 Z" />
+      <path d="M293,242 C322,232 352,240 366,262 C338,272 308,264 293,242 Z" />
+    </g>
+    <g fill="currentColor">
+      <path d="M240,98 C226,72 232,44 252,30 C262,52 262,80 240,98 Z" opacity="0.55" />
+      <path d="M300,98 C314,72 308,44 288,30 C278,52 278,80 300,98 Z" opacity="0.55" />
+      <path d="M270,92 C256,66 258,36 270,22 C282,36 284,66 270,92 Z" opacity="0.75" />
+      <path d="M236,100 C232,80 244,62 256,58 C262,66 266,68 270,60 C274,68 278,66 284,58 C296,62 308,80 304,100 C292,110 248,110 236,100 Z" />
+      <path d="M238,100 C228,96 216,100 210,110 C224,112 234,108 238,100 Z" />
+      <path d="M302,100 C312,96 324,100 330,110 C316,112 306,108 302,100 Z" />
+    </g>
+  </svg>
+);
+
 const ART = {
   wave: { Art: Wave, className: 'opacity-[0.10] dark:opacity-[0.20]' },
   leaves: { Art: Leaves, className: 'opacity-[0.08] dark:opacity-[0.14]' },
@@ -181,6 +210,7 @@ const ART = {
   arcs: { Art: Arcs, className: 'opacity-[0.10] dark:opacity-[0.16]' },
   grid: { Art: Grid, className: 'opacity-[0.06] dark:opacity-[0.10]' },
   scope: { Art: Scope, className: 'opacity-[0.12] dark:opacity-[0.20]' },
+  rose: { Art: Rose, className: 'opacity-[0.09] dark:opacity-[0.15]' },
 };
 
 // Motivy i pro jiná místa než pozadí (hlavní uzel mapy si z aktivního skinu

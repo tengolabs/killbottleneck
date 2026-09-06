@@ -1,12 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, Download, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3, Flame } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Check, Download, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useLazyNs } from '@/i18n/lazyNs';
+import { KRITERIA } from '@/lib/nodeOrder';
 import OrgLogo from '@/components/shared/OrgLogo';
 import UserMenu from '@/components/shared/UserMenu';
 import NotificationBell from '@/components/shared/NotificationBell';
@@ -36,6 +41,9 @@ const ALIGN_ICONS = { classic: StretchHorizontal, compact: Shrink, bands: Layout
 // ikony stupňů na tlačítku Čitelnost — stejná logika jako u Zarovnat:
 // tlačítko ukazuje stupeň, který PRÁVĚ platí, stisk přepne na další.
 const CITELNOST_ICONS = { normal: ALargeSmall, large: Type, titleOnly: Heading };
+// ikony kritérií nabídky „Uspořádat podle…" — na tlačítku je ikona ZVOLENÉHO
+// kritéria (stejný idiom jako Zarovnat a Čitelnost: tlačítko = indikátor)
+const USPORADAT_ICONS = { deadline: CalendarClock, plannedOn: CalendarCheck, owner: UserRound, status: CircleDot };
 
 // Horní lišta editoru: široká varianta (≥1850 px) i ⋮ menu pro užší displeje.
 // Akce, které nesou OBĚ varianty, žijí v jednom seznamu `akce` (F1-10) a obě
@@ -56,7 +64,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   const {
     direction, setDirMode, recenterMap, kanbanAktivni, kanbanNsReady,
     alignStyle, alignLock, handleAlign, alignPressStart, alignPressEnd,
-    citelnost, handleCitelnost,
+    citelnost, handleCitelnost, usporadani, handleUsporadat,
   } = layout;
   const {
     user, canEdit, canShare, canWork, isPublicView, isDraft, isTemplatePreview,
@@ -71,6 +79,61 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
     setChatOpen, handleAddNote, setPersonalView, handleExport, handleExportJson,
     setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
   } = actions;
+
+  // „Uspořádat podle…" (Richard 5. 9. 2026): rozbalovací nabídka VEDLE Zarovnat
+  // — termín / plán / řešitel / stav; klik na položku mapu rovnou přerovná
+  // (zápis + Zpět, viz useMapLayout.handleUsporadat). Je stavová (radio +
+  // vlastní trigger), takže do seznamu `akce` nepatří — kreslí se dvakrát
+  // stejně jako Zarovnat: široká lišta s textem, úzká jen ikona; do ⋮ menu ne.
+  // Nezobrazuje se: v Mojí mapě (má vlastní pruh seskupení a řadí se sama dle
+  // termínu), bez práva editace, ve veřejném náhledu a v kanbanu (rozložení
+  // tam drží pravidla posunu — indikátor Kanban už za Zarovnat stojí).
+  // Texty žijí v LAZY namespace `usporadat` (lite dieta); než se donačte,
+  // tlačítko se nekreslí (bliknutí klíčů je horší než frame čekání).
+  const usporadatNsReady = useLazyNs('usporadat');
+  const zobrazUsporadat = canEdit && !personalMap && !isPublicView && usporadatNsReady && !(kanbanAktivni && kanbanNsReady);
+  const nabidkaUsporadat = (siroka) => {
+    if (!zobrazUsporadat) return null;
+    const Ikona = USPORADAT_ICONS[usporadani] || ArrowDownWideNarrow;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size={siroka ? 'sm' : 'icon'}
+            className={siroka ? 'hidden min-[1850px]:inline-flex' : 'min-[1850px]:hidden h-9 w-9 shrink-0'}
+            title={t('usporadat:title')}
+            data-testid={siroka ? 'toolbar-usporadat' : 'toolbar-usporadat-narrow'}
+            data-usporadani={usporadani || 'none'}
+          >
+            <Ikona className="w-4 h-4" />
+            {siroka && (
+              <span className="hidden sm:inline">
+                {usporadani ? `${t('usporadat:label')} · ${t(`usporadat:${usporadani}`)}` : t('usporadat:label')}
+              </span>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel>{t('usporadat:podle')}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={usporadani}>
+            {KRITERIA.map((k) => {
+              const IkonaK = USPORADAT_ICONS[k];
+              return (
+                <DropdownMenuRadioItem key={k} value={k} data-kriterium={k} onSelect={() => handleUsporadat(k)} className="items-start">
+                  <IkonaK className="w-4 h-4 mr-2 mt-0.5 shrink-0 text-muted-foreground" />
+                  <span className="flex flex-col">
+                    <span>{t(`usporadat:${k}`)}</span>
+                    <span className="text-[11px] leading-tight text-muted-foreground">{t(`usporadat:${k}Hint`)}</span>
+                  </span>
+                </DropdownMenuRadioItem>
+              );
+            })}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
   // Jediný zdroj pravdy pro akce kreslené dvakrát: širokou lištou (≥1850 px)
   // a ⋮ menu pro užší displeje (F1-10). Pořadí seznamu = pořadí v ⋮ menu;
@@ -344,6 +407,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               </Button>
             );
           })()}
+          {nabidkaUsporadat(true)}
           {/* Čitelnost je ZÁMĚRNĚ mimo `canEdit` — na rozdíl od Zarovnat nesahá
               na mapu, jen na sazbu písma. Kdo mapu jen prohlíží (veřejná,
               sdílená jen ke čtení), musí si ji taky umět zvětšit. */}
@@ -428,6 +492,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               </Button>
             );
           })()}
+          {nabidkaUsporadat(false)}
           {/* Čitelnost — právě na mobilu je nejpotřebnější, proto v liště
               vždycky (a i v mapě jen ke čtení, viz velká lišta výš) */}
           {(() => {
@@ -484,9 +549,24 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               <Flame className={`w-4 h-4 ${!showBottlenecks && bottleneckAnalysis.totalBottlenecks > 0 ? 'text-amber-400 fill-amber-400' : ''}`} />
               <span className="hidden sm:inline">{t('toolbar.bottlenecks')}</span>
               {bottleneckAnalysis.totalBottlenecks > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold" data-pocet="realna">
                   {bottleneckAnalysis.totalBottlenecks}
                 </span>
+              )}
+              {/* Po zapnutí se na plátně rozsvítí i POTENCIÁLNÍ (oranžová) hrdla —
+                  tlačítko ale jen změnilo barvu a kolik jich je, se muselo počítat
+                  na plátně (Richard 6. 9. 2026: „dal bych tam taky počet").
+                  Oranžové počítadlo se ukazuje JEN se zapnutým přepínačem, stejně
+                  jako oranžové uzly; vypnuté tlačítko dál hlásí jen reálná. */}
+              {showBottlenecks && bottleneckAnalysis.potentialCount > 0 && (
+                <>
+                  {/* „1 + 3": plus mezi počítadly (Richard 6. 9. 2026) — dvě
+                      barevné bublinky vedle sebe se četly jako jedno číslo */}
+                  {bottleneckAnalysis.totalBottlenecks > 0 && <span className="text-[10px] font-bold opacity-80" aria-hidden="true">+</span>}
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold" data-pocet="potencialni">
+                    {bottleneckAnalysis.potentialCount}
+                  </span>
+                </>
               )}
             </Button>
           )}

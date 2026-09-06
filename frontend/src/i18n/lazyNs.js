@@ -60,6 +60,13 @@ const LOADERS = {
     cs: () => import('./cs/bottleneck.json'),
     en: () => import('./en/bottleneck.json'),
   },
+  // „Uspořádat podle…" (řazení podcílů v mapě, 5. 9. 2026) — jen plný editor
+  // mapy (lite plátno nemá), takže do editor.json nepatří: ten se veze do lite
+  // celý a rezerva do stropu je ~1 kB (lite-bundle.js)
+  usporadat: {
+    cs: () => import('./cs/usporadat.json'),
+    en: () => import('./en/usporadat.json'),
+  },
   // přehled Organizace (admin + manager) — plná stránka na počítači, v lite
   // není (rozhodnutí 25. 8. 2026), takže do jazykového balíku nepatří
   organizace: {

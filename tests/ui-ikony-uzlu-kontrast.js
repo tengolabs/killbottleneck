@@ -7,7 +7,7 @@
 const puppeteer = require('puppeteer-core');
 const { execSync } = require('child_process');
 const NAME = 'kb-e2e-ikony-kontrast', PORT = 20599, BASE = `http://127.0.0.1:${PORT}`, PW = 'testheslo123';
-const SKINY = ['indigo', 'contrast', 'terminal', 'sepia', 'ocean', 'les', 'pulnoc', 'svestka', 'broskev', 'grafit', 'rubin'];
+const SKINY = ['indigo', 'contrast', 'terminal', 'sepia', 'ocean', 'les', 'pulnoc', 'svestka', 'broskev', 'grafit', 'rubin', 'ruze'];
 const MIN = 3;   // WCAG 1.4.11 pro ovládací prvky
 let pass = 0, fail = 0;
 const ok = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));

@@ -630,11 +630,12 @@ function EditorContent({ mapId, personalMap = false }) {
   const {
     layoutAllForView, alignStyle, setAlignStyle, alignStyleRef, alignLock,
     alignPressStart, alignPressEnd, handleAlign, citelnost, handleCitelnost,
+    usporadani, handleUsporadat,
   } = useMapLayout({
     nodes, edges, setNodes, loading, personalMap, activeMapId, isPublicView, canEdit, isMapOwner,
     user, patchUser, toast, t, pushHistory, rfInstance, skipNextSave,
     direction, updateNodeInternals, recenterMap, directionRef, appliedDirRef, canonicalPosRef,
-    alignMapKeyRef, citelnostRef, pendingDeepLink,
+    alignMapKeyRef, citelnostRef, pendingDeepLink, members,
   });
 
   const handleSaveTemplate = useCallback(async () => {
@@ -1296,7 +1297,7 @@ function EditorContent({ mapId, personalMap = false }) {
         layout={{
           direction, setDirMode, recenterMap, kanbanAktivni, kanbanNsReady,
           alignStyle, alignLock, handleAlign, alignPressStart, alignPressEnd,
-          citelnost, handleCitelnost,
+          citelnost, handleCitelnost, usporadani, handleUsporadat,
         }}
         access={{
           user, canEdit, canShare, canWork, isPublicView, isDraft, isTemplatePreview,

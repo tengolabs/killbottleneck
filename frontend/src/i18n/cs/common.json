@@ -143,7 +143,8 @@
     "svestka": "Švestka",
     "broskev": "Broskev",
     "grafit": "Grafit",
-    "rubin": "Rubín"
+    "rubin": "Rubín",
+    "ruze": "Růže"
   },
   "skinDesc": {
     "indigo": "Výchozí vzhled aplikace.",
@@ -156,7 +157,8 @@
     "svestka": "Sytá fialová — hravá, ale ne křiklavá.",
     "broskev": "Teplá broskvová — měkké rohy, přátelský tón.",
     "grafit": "Černobílý minimalismus — žádné barvy, jen obsah.",
-    "rubin": "Červená na černé — šetří noční vidění (hvězdárny, staré palubovky)."
+    "rubin": "Červená na černé — šetří noční vidění (hvězdárny, staré palubovky).",
+    "ruze": "Růžová s vínovou — jemná, ale rozhodná."
   },
   "trial": {
     "remaining_one": "Zkušební verze — zbývá poslední den",

@@ -51,7 +51,14 @@ const SRC = path.join(__dirname, '../frontend/src');
 // balast (naměřeno 501; ušlo pozornosti, protože cílená sada lowercase lite-bundle neobsahovala —
 // příště: každá změna v lib/, které se lite dotýká, = lite-bundle do cílené sady).
 // Strop opět jen +5 kB, ať tlak na dietu zůstává.
-const MAX_KB = Number(process.env.LITE_MAX_KB || 505);
+// 6. 9. 2026: 505 → 510. Dvanáctý vestavěný skin „Růže" (Richard) = jedna položka
+// v skins.js (~1,7 kB holých dat: 2 × 37 tokenů + fonty) + 2 řádky v common.json
+// + NOVÁ malůvka `rose` (~1,3 kB SVG v components/shared/SkinPattern.jsx, který
+// lite importuje). Naměřeno: 504 před skinem → 507 se skinem → 508 s malůvkou.
+// Žádná knihovna, žádné texty funkcí. Rozhodnutí Richarda 6. 9.: další vestavěný
+// skin už nebude — při případném dalším NEzvedat strop, ale načítat skiny líně.
+// Strop opět jen +5 kB, ať tlak na dietu zůstává.
+const MAX_KB = Number(process.env.LITE_MAX_KB || 510);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.

@@ -5,6 +5,9 @@ import { ALIGN_STYLES, ALIGN_OPTS, KLIC_ZAMEK, zamcenyStyl, platnyStyl } from '@
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { KLIC_CITELNOST, nactiStupen, dalsiStupen } from '@/lib/citelnost';
 import { PERSONAL_LAYOUT } from '@/lib/personalMap';
+import { KLIC_USPORADANI, platneKriterium, poradiSourozencu, sPoradimVPricneOse } from '@/lib/nodeOrder';
+import { labelForEmail } from '@/lib/memberLabel';
+import { compareLocale } from '@/lib/locale';
 
 // Rozložení mapy — POZDNÍ část (F1-07, krok 12, doména LAYOUT): efekt přepnutí
 // směru (view-only přerovnání), plný přelayout (layoutAllForView), styl
@@ -19,7 +22,7 @@ export function useMapLayout({
   nodes, edges, setNodes, loading, personalMap, activeMapId, isPublicView, canEdit, isMapOwner,
   user, patchUser, toast, t, pushHistory, rfInstance, skipNextSave,
   direction, updateNodeInternals, recenterMap, directionRef, appliedDirRef, canonicalPosRef,
-  alignMapKeyRef, citelnostRef, pendingDeepLink,
+  alignMapKeyRef, citelnostRef, pendingDeepLink, members = [],
 }) {
   // Přepnutí směru (na výšku ↔ na šířku) = VIEW-ONLY přerovnání. Pozice se
   // nepersistují (cleanMapData ukládá kanonické svislé); konektory uzlů se
@@ -255,6 +258,49 @@ export function useMapLayout({
     recenterMap();
   }, [nodes, edges, setNodes, layoutAllForView, alignStyle, recenterMap, alignMapKey, alignLock, toast, t, pushHistory, ulozZamek]);
 
+  // „Uspořádat podle…" (Richard 5. 9. 2026): seřadí SOUROZENCE pod každým
+  // rodičem podle termínu / plánu / řešitele / stavu, strukturu (hrany) nemění
+  // a přelayoutuje mapu ve stylu, který PRÁVĚ má. Zapisuje se jako Zarovnat:
+  // autosave uloží, pushHistory → jde vzít Zpět. Řazení samo je čistý pre-pass
+  // (lib/nodeOrder.js): pořadí se zapíše do příčné souřadnice a layoutTree ho
+  // pak drží — proto ani další cyklení Zarovnat pořadí nerozhází.
+  // Zvolené kritérium si mapa pamatuje JEN pro zvýraznění položky v nabídce;
+  // při otevření se nic nepřerovnává (zámek výš ukázal, kam vede zápis do
+  // cizí mapy jen tím, že se na ni někdo podíval).
+  const [usporadani, setUsporadani] = useState('');
+  useEffect(() => {
+    if (!alignMapKey) return;
+    setUsporadani(platneKriterium(nactiKlic(KLIC_USPORADANI + alignMapKey)));
+  }, [alignMapKey]);
+  const handleUsporadat = useCallback((kriterium) => {
+    if (!platneKriterium(kriterium)) return;
+    pushHistory();
+    // příčná osa = X svisle, Y vodorovně — stejná konvence jako layoutAllForView,
+    // který si osy pro svislý kanon prohodí sám; tady se jen zapíše pořadí
+    const horiz = directionRef.current === 'horizontal';
+    const poradi = poradiSourozencu(nodes, edges, kriterium, {
+      pricna: (n) => (horiz ? n?.position?.y : n?.position?.x) ?? 0,
+      labelOf: (e) => labelForEmail(members, e),   // karta ukazuje jméno → řadí se jméno
+      compare: compareLocale,
+    });
+    const vstup = sPoradimVPricneOse(nodes, poradi, horiz);
+    // mapa „ještě nezarovnaná" (prázdný styl) dostane klasiku a popisek Zarovnat
+    // se s plátnem srovná — jinak by první stisk Zarovnat vypadal, že nic nedělá
+    const styl = alignStyle || 'classic';
+    const positions = layoutAllForView(vstup, edges, ALIGN_OPTS[styl] || {});
+    // přes `prev`, ne přes `vstup` — umělé pořadové souřadnice se nikam nepropíšou
+    setNodes((prev) => prev.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n)));
+    if (!alignStyle) {
+      setAlignStyle(styl);
+      // jen klíč TÉHLE mapy (popisek) — globální `kb-zarovnat-styl` pro AI
+      // přelayouty zůstává na poslední VOLBĚ uživatele v Zarovnat; tady nic nevolil
+      if (alignMapKey) ulozKlic('kb-zarovnat-styl:' + alignMapKey, styl);
+    }
+    if (alignMapKey) ulozKlic(KLIC_USPORADANI + alignMapKey, kriterium);
+    setUsporadani(kriterium);
+    recenterMap();
+  }, [nodes, edges, setNodes, layoutAllForView, alignStyle, recenterMap, alignMapKey, pushHistory, members, directionRef]);
+
   // Čitelnost STŘÍDÁ tři stupně velikosti písma v uzlu, stejným pohybem jako
   // Zarovnat (Richard 12. 8. 2026: „mačkám a mění se styl"). Na rozdíl od
   // Zarovnat se NIC NEPŘEPOČÍTÁVÁ — uzly zůstávají na svých pozicích, mění se
@@ -281,5 +327,6 @@ export function useMapLayout({
   return {
     layoutAllForView, alignStyle, setAlignStyle, alignStyleRef, alignLock,
     alignPressStart, alignPressEnd, handleAlign, citelnost, handleCitelnost,
+    usporadani, handleUsporadat,
   };
 }

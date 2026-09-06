@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.59-beta": {
+    cs: [
+      "V mapě přibylo tlačítko Uspořádat: podcíle pod každým rodičem seřadíte podle termínu, plánu, řešitele nebo stavu — struktura zůstává, jde to vzít Zpět a Zarovnat pak pořadí drží.",
+      "Tlačítko Úzká hrdla po zapnutí ukazuje „1 + 3“ — červeně skutečná hrdla, oranžově potenciální, které se právě rozsvítila na plátně.",
+      "Nový vzhled Růže: růžová s vínovou, tmavý režim jako hluboké víno, a vlastní malůvka — růže z boku s trny a poupětem.",
+    ],
+    en: [
+      "The map gains a Sort button: sort the sub-goals under each parent by deadline, plan, assignee or status — the structure stays, Undo works, and Arrange (align) keeps the order afterwards.",
+      "The Bottlenecks button now reads “1 + 3” when switched on — real bottlenecks in red, potential ones (just lit up on the canvas) in orange.",
+      "New Rose skin: rose pink with wine, a deep-wine dark mode, and its own drawing — a rose seen from the side with thorns and a bud.",
+    ],
+  },
   "v0.58-beta": {
     cs: [
       "Mapa nově ukazuje úzká hrdla: propadlý nebo dlouho stojící cíl, který drží další kroky, dostane červený odznak — a tlačítkem 🔥 si zvýrazníte i potenciální hrdla a kritickou cestu k těm skutečným.",

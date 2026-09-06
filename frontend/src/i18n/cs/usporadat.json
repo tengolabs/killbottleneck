@@ -1,0 +1,13 @@
+{
+  "label": "Uspořádat",
+  "title": "Seřadit podcíle pod každým rodičem podle zvoleného hlediska. Struktura mapy se nemění a jde to vzít Zpět.",
+  "podle": "Seřadit podle",
+  "deadline": "Termín",
+  "deadlineHint": "nejbližší v celé větvi, bez termínu na konec",
+  "plannedOn": "Plán (kdy to chci řešit)",
+  "plannedOnHint": "termín se nemění, bez plánu na konec",
+  "owner": "Řešitel",
+  "ownerHint": "podle jména, nepřiřazené na konec",
+  "status": "Stav",
+  "statusHint": "rozpracované, nezačaté, hotové na konec"
+}

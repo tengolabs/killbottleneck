@@ -379,8 +379,9 @@ na e-maily, které v téhle instanci neexistují, se zahodí a import to spočí
 
 ![Výběr skinu](assets/skiny-dialog.jpg)
 
-V menu pod avatarem → **Vzhled** si každý vybere skin: Indigo (výchozí),
-Vysoký kontrast, Terminál nebo Papír. Volba se ukládá k účtu, takže platí na
+V menu pod avatarem → **Vzhled** si každý vybere jeden z dvanácti vestavěných skinů —
+Indigo (výchozí), Vysoký kontrast, Terminál, Papír, Oceán, Les, Půlnoc, Švestka,
+Broskev, Grafit, Rubín nebo Růže. Volba se ukládá k účtu, takže platí na
 všech zařízeních, ve světlém i tmavém režimu a i ve zjednodušeném lite zobrazení
 (tam je výběr v patičce).
 

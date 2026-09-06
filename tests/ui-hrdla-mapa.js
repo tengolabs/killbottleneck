@@ -73,6 +73,7 @@ H.beh(async () => {
     return {
       zapnuto: btn ? btn.dataset.zapnuto : null,
       pocitadlo: btn ? (btn.textContent || '').replace(/\D+/g, '') : '',
+      oranzove: btn ? btn.querySelector('[data-pocet="potencialni"]') !== null : false,
       realBadge: (text.match(/Úzké hrdlo/g) || []).length,
       potBadge: (text.match(/Potenciální hrdlo/g) || []).length,
       kritHrany: document.querySelectorAll('[data-stav-hrany="bottleneck"]').length,
@@ -80,6 +81,7 @@ H.beh(async () => {
   });
   expect(stav0.zapnuto === '0', `tlačítko po načtení NENÍ zapnuté (data-zapnuto=${stav0.zapnuto})`);
   expect(stav0.pocitadlo === '1', `počítadlo = 1 reálné hrdlo (${stav0.pocitadlo})`);
+  expect(!stav0.oranzove, 'oranžové počítadlo se před zapnutím neukazuje (vypnuté tlačítko hlásí jen reálná)');
   expect(stav0.realBadge >= 1, `červený odznak „Úzké hrdlo" svítí bez přepínače (${stav0.realBadge}×)`);
   expect(stav0.potBadge === 0, `oranžové odznaky před zapnutím NEsvítí (${stav0.potBadge}×)`);
   expect(stav0.kritHrany === 0, `kritická cesta se před zapnutím nekreslí (${stav0.kritHrany} hran)`);
@@ -96,9 +98,16 @@ H.beh(async () => {
       potBadge: (text.match(/Potenciální hrdlo/g) || []).length,
       kritHrany: document.querySelectorAll('[data-stav-hrany="bottleneck"]').length,
       hotovyOznacen: /HOTOVY UZEL/.test(text),
+      realna: b?.querySelector('[data-pocet="realna"]')?.textContent || '',
+      potencialni: b?.querySelector('[data-pocet="potencialni"]')?.textContent || '',
+      plus: /1\s*\+\s*1/.test((b?.textContent || '').replace(/\s+/g, ' ')),
     };
   });
   expect(stav1.zapnuto === '1', `tlačítko po kliknutí zapnuté (data-zapnuto=${stav1.zapnuto})`);
+  // Richard 6. 9. 2026: po zapnutí se rozsvítí i oranžová hrdla, ale tlačítko jen
+  // změnilo barvu — počet oranžových má být na tlačítku vedle červeného
+  expect(stav1.realna === '1' && stav1.potencialni === '1', `zapnuté tlačítko ukazuje obě počítadla: červené ${stav1.realna}, oranžové ${stav1.potencialni} (čeká se 1 a 1)`);
+  expect(stav1.plus, 'mezi počítadly je plus („1 + 1")');
   expect(stav1.potBadge === 1, `právě 1 potenciální hrdlo — větvení ≥2 (${stav1.potBadge}×)`);
   // hrany apex→real1, real1→r1a, real1→r1b se dotýkají reálného hrdla = 3;
   // k potenciálnímu (pot1) se kritická cesta NEkreslí

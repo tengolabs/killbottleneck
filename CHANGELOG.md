@@ -9,6 +9,33 @@ below before you jump several versions.
 
 ---
 
+## v0.59-beta — 2026-09-06
+
+**Arrange by deadline / plan / assignee / status; bottleneck counter "1 + 3"; Rose skin**
+
+- **Sort (map editor)**: a new dropdown next to Arrange (align) sorts the *siblings* under every
+  parent by deadline, plan (`plannedOn`), assignee or status. Deadline and plan use the
+  earliest date in the whole branch (a category with an urgent sub-goal moves first),
+  empty values go last, assignees sort by display name, status runs in progress → not
+  started → done. Edges never change; the layout is recomputed in the map's current Align
+  style, saved like Arrange, and Undo restores the previous placement. Arrange keeps the
+  chosen order afterwards. The last key is remembered per map only to highlight the menu
+  item — opening a map never rearranges it. Not shown in My map, for readers, in public
+  views or in kanban mode (rules-driven layout).
+- **Bottlenecks button**: when switched on it shows "1 + 3" — real bottlenecks in red and
+  the potential (orange) ones that just lit up on the canvas. Switched off it keeps
+  reporting real ones only.
+- **Rose skin** (12th built-in): rose pink with a wine primary, dark mode as deep wine,
+  destructive shifted to orange-red so it never blends with the primary. New `rose`
+  background pattern — a rose plant seen from the side (stem, thorns, leaves, bud) —
+  added to the pattern enum (validator, gallery and skin editor in sync).
+- New suites: `usporadani-uzlu` (pure unit), `ui-usporadani`; `ui-hrdla-mapa` and
+  `ui-ikony-uzlu-kontrast` extended. Lite bundle cap 505 → 510 kB (skin data + pattern SVG only).
+
+Upgrade notes: one migration (`1788721920_ruze_skin.js`) extends the `skin_id` /
+`builtin_id` enums — additive, no data rewrite. No configuration change. Custom skins that
+use the new `rose` pattern will not validate on instances older than this version.
+
 ## v0.58-beta — 2026-09-02
 
 **Bottlenecks — honest edition: map badges, "Where it stalls most", My day warning; PDF reports**
