@@ -73,9 +73,11 @@ const api = async (method, path, { token, body } = {}) => {
     }
     expect(!!calTab, 'záložka Kalendář je na /tasks');
     if (calTab) await calTab.click();
+    await page.waitForSelector('.gcal-wrapper', { timeout: 10000 }).catch(() => {});
     await sleep(1200);
+    // kalendář v2 (v0.60-beta) má hlavičku dnů velkými písmeny (CSS uppercase → innerText) → bez ohledu na velikost
     const body = await page.evaluate(() => document.body.innerText);
-    expect(/Po.*Út.*St.*Čt.*Pá.*So.*Ne/s.test(body), 'kalendář ukazuje mřížku dnů v týdnu');
+    expect(/Po.*Út.*St.*Čt.*Pá.*So.*Ne/si.test(body), 'kalendář ukazuje mřížku dnů v týdnu');
     expect(/Dnes/.test(body), 'kalendář má tlačítko Dnes');
   } catch (e) {
     fail++; console.log('  ❌ výjimka:', e.message.slice(0, 160));

@@ -1,0 +1,77 @@
+{
+  "chip": {
+    "nacita": "Project is still loading"
+  },
+  "dialog": {
+    "zmenaTitulek": "Change the deadline from {{from}} to {{to}}?",
+    "zmenaPozn": "A deadline is an agreement — the change is written to the project and everyone sharing it will see it.",
+    "zmenaPotvrdit": "Change deadline",
+    "zadostTitulek": "Propose {{to}} as the deadline?",
+    "zadostTelo": "Only the assigner ({{assigner}}) can change the deadline of \"{{title}}\". Send them a proposal for a new date.",
+    "zadostOdeslat": "Send request",
+    "ciziZadost": "A deadline request from {{who}} is already pending on this goal — resolve it in the detail.",
+    "ukolJenZadavatel": "Only the assigner ({{assigner}}) or the project owner can change this task's deadline.",
+    "otevritDetail": "Open detail"
+  },
+  "toast": {
+    "terminZmenen": "Deadline changed to {{to}}",
+    "terminVracen": "Deadline restored to {{from}}",
+    "terminMezitim": "Someone else changed the deadline to {{now}} in the meantime",
+    "zmenaSelhala": "The deadline could not be changed",
+    "zadostZrusena": "Request cancelled",
+    "hotovoNepresouvat": "A done item cannot be moved."
+  },
+  "v2": {
+    "title": "Calendar",
+    "liveData": "Your projects and tasks",
+    "navigation": "Calendar navigation",
+    "miniPrev": "Previous month in mini calendar",
+    "miniNext": "Next month in mini calendar",
+    "noProject": "No project",
+    "showStatuses": "Show in calendar",
+    "itemCount": "Deadlines in this view: {{total}}",
+    "viewLabel": "Calendar view",
+    "views": {
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "agenda": "Agenda"
+    },
+    "previous": {
+      "month": "Previous month",
+      "week": "Previous week",
+      "day": "Previous day",
+      "agenda": "Previous month"
+    },
+    "next": {
+      "month": "Next month",
+      "week": "Next week",
+      "day": "Next day",
+      "agenda": "Next month"
+    },
+    "addOn": "Add task on {{date}}",
+    "overdue": "Overdue",
+    "freeDay": "No deadlines",
+    "add": "Add",
+    "emptyTitle": "Room for your next step",
+    "emptyDescription": "There are no deadlines for this period and the selected filters.",
+    "dayDetail": "Selected day details",
+    "addTask": "Add task",
+    "emptyDay": "There are no deadlines for this day in the selected view.",
+    "searchPlaceholder": "Search calendar...",
+    "filterProjects": "Projects & maps",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "yesterday": "Yesterday",
+    "quickStats": "Period statistics",
+    "overdueCount": "{{count}} overdue",
+    "completedCount": "{{count}} completed",
+    "totalDeadlines": "{{count}} scheduled",
+    "toggleSidebar": "Toggle sidebar",
+    "close": "Close",
+    "noMatchingItems": "No tasks match your search or filters.",
+    "createButton": "Create",
+    "projectsNone": "None",
+    "projectsAll": "All"
+  }
+}

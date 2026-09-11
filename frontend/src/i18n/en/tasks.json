@@ -191,9 +191,6 @@
       "6": "Sun"
     },
     "todayButton": "Today",
-    "prevMonth": "Previous month",
-    "nextMonth": "Next month",
-    "nodeSuffix": " (map node)",
     "more": "+{{moreCount}} more"
   },
   "timeline": {

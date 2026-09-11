@@ -8,7 +8,7 @@ import MyDaySection from '@/components/shared/MyDaySection';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ReportRailButton from '@/components/shared/ReportRailButton';
 import TaskBoard from '@/components/tasks/TaskBoard';
-import TaskCalendar from '@/components/tasks/TaskCalendar';
+import KalendarSPresunem from '@/components/tasks/kalendar/KalendarSPresunem';
 import TaskTimeline from '@/components/tasks/TaskTimeline';
 import TaskDialog from '@/components/tasks/TaskDialog';
 import NewNodeDialog from '@/components/tasks/NewNodeDialog';
@@ -61,9 +61,13 @@ export default function Tasks() {
   const tasksApi = useTasks(user);
   const { items, loading, byParent } = tasksApi;
 
-  const [view, setView] = useState(() => nactiKlic('kb-tasks-view') || 'table');
+  const [view, setView] = useState(() => {
+    const requested = searchParams.get('view');
+    return ['table', 'timeline', 'board', 'calendar'].includes(requested) ? requested : nactiKlic('kb-tasks-view') || 'table';
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newNodeOpen, setNewNodeOpen] = useState(false);
+  const [calendarDeadline, setCalendarDeadline] = useState('');
   const [editTask, setEditTask] = useState(null);
   const buffer = useBufferNodes(user);
   const [editBufferItem, setEditBufferItem] = useState(null);
@@ -100,6 +104,17 @@ export default function Tasks() {
     deadlineFilter, setDeadlineFilter, search, setSearch,
     matchesFilters, bufferVisible, clearNodeFilter, nodeFilterLabel,
   } = useTaskFilters({ user, searchParams, setSearchParams, maps, t });
+
+  // /tasks?view=calendar je jednorázový deep-link: pohled z něj se uloží jako
+  // zvolený (reload ho drží) a param se uklidí — jinak by po přepnutí pohledu
+  // a reloadu zase vyhrál nad uloženou volbou
+  useEffect(() => {
+    if (!searchParams.has('view')) return;
+    ulozKlic('kb-tasks-view', view);
+    searchParams.delete('view');
+    setSearchParams(searchParams, { replace: true });
+
+  }, []);
 
   // deep-link z Home: /tasks?convert=<id nápadu> otevře převod nápadu na úkol
   // (Home nemá dialog úkolu — převod se dokončí tady výběrem projektu)
@@ -275,17 +290,18 @@ export default function Tasks() {
 
   // „Nový úkol" zakládá UZEL (rozhodnutí Richarda 17. 8. 2026) — pod hlavní
   // cíl, nebo pod vybraný uzel; řešitel/termín hned v dalším kroku (dialog uzlu).
-  const openCreate = () => setNewNodeOpen(true);
+  const openCreate = () => { setCalendarDeadline(''); setNewNodeOpen(true); };
+  const openCalendarCreate = (deadline) => { setCalendarDeadline(deadline); setNewNodeOpen(true); };
 
-  const handleCreateNode = async (mapId, parentId, title) => {
+  const handleCreateNode = async (mapId, parentId, title, deadline = '') => {
     try {
-      const newId = await addNodeToMap(mapId, parentId, title);
+      const newId = await addNodeToMap(mapId, parentId, title, deadline ? { deadline } : {});
       setEditNodeItem({
         id: `node-item-${mapId}-${newId}`,
         isNode: true,
         title,
         status: 'todo',
-        deadline: '',
+        deadline,
         assignee_email: '',
         map_id: mapId,
         node_id: newId,
@@ -356,7 +372,7 @@ export default function Tasks() {
       <TimeLogPanel fixed open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />
       <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />
 
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className={`${view === 'calendar' ? 'max-w-[1600px] sm:px-6 lg:px-10' : 'max-w-6xl'} mx-auto px-4 py-6`}>
         <MyDaySection
           user={user}
           ideas={buffer.items}
@@ -393,8 +409,10 @@ export default function Tasks() {
         />
 
         <div className="flex flex-wrap items-center gap-2 mb-5">
-          <Tabs value={view} onValueChange={changeView}>
-            <TabsList>
+          <Tabs value={view} onValueChange={changeView} className="max-w-full">
+            {/* na telefonu se čtyři pohledy zalomí — jinak lišta (441 px) roztáhne
+                stránku a vše „fixed“ (dialogy, detail dne v kalendáři) se centruje mimo displej */}
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="table" className="gap-1.5">
                 <LayoutList className="w-3.5 h-3.5" /> {t('tasksPage.viewTable')}
               </TabsTrigger>
@@ -560,7 +578,7 @@ export default function Tasks() {
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : items.length === 0 && Object.keys(nodeTrees).length === 0 && bufferItems.length === 0 ? (
+        ) : view !== 'calendar' && items.length === 0 && Object.keys(nodeTrees).length === 0 && bufferItems.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4">
               <CheckSquare className="w-8 h-8 text-muted-foreground" />
@@ -586,8 +604,15 @@ export default function Tasks() {
             onOpenNode={setEditNodeItem}
           />
         ) : view === 'calendar' ? (
-          <TaskCalendar
+          <KalendarSPresunem
             items={calendarItems}
+            maps={activeMaps}
+            members={members}
+            user={user}
+            tasksApi={tasksApi}
+            loadMaps={loadMaps}
+            setMaps={setMaps}
+            onCreate={openCalendarCreate}
             onOpen={(it) => (it.kind === 'node' ? setEditNodeItem(it.raw) : openEdit(it.raw))}
           />
         ) : view === 'board' ? (
@@ -643,6 +668,7 @@ export default function Tasks() {
       </div>
 
       <NewNodeDialog
+        defaultDeadline={calendarDeadline}
         open={newNodeOpen}
         maps={activeMaps}
         defaultMapId={mapFilter !== ALL && mapFilter !== NONE ? mapFilter : ''}

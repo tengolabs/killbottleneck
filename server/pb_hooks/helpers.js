@@ -6168,12 +6168,14 @@ function buildMyDay(app, userId, email, opts) {
           mapTitle: m.getString("title"), planned: d.plannedOn || d.pinnedOn || "",
           updated: "", blocks: blocking[n.id] || "", tour: d.tour === true,
           blocked: mdDrzi(n.id),
+          icon: d.icon || "", // ikona uzlu (emoji) — panel ji kreslí místo obecného terčíku (Richard 11. 9. 2026)
         });
       } else if (iOwnMap && d.owner && (d.status || "todo") !== "done") {
         delegated.push({
           kind: "delegated", isNode: true, id: n.id, mapId: m.id, nodeId: n.id,
           title: title, deadline: d.deadline || "", status: d.status || "todo",
           mapTitle: m.getString("title"), assignee: d.owner, planned: "", blocks: "",
+          icon: d.icon || "",
         });
       }
     }

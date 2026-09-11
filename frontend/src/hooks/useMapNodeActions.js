@@ -206,8 +206,8 @@ export function useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editN
   // Nový uzel do mapy ze seznamu. parentNodeId: id uzlu / 'auto' (pod vrchol) / null (kořen).
   // Založení uzlu drží sdílený primitiv lib/mapNodes.js — používá ho i rychlé
   // přidání v lite režimu, ať nevzniknou dvě různá chování téhož.
-  const addNodeToMap = useCallback(async (mapId, parentNodeId, title) => {
-    const { nodeId, nodes, edges } = await addNodeToMapShared(mapId, parentNodeId, title);
+  const addNodeToMap = useCallback(async (mapId, parentNodeId, title, data = {}) => {
+    const { nodeId, nodes, edges } = await addNodeToMapShared(mapId, parentNodeId, title, data);
     setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, nodes, edges } : m)));
     return nodeId;
   }, [setMaps]);

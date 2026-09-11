@@ -46,7 +46,7 @@ const rozbalDen = async (p) => {
           title: 'Klik mapa',
           nodes: [
             { id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Klik mapa', title: 'Klik mapa', status: 'todo' } },
-            { id: 'n1', type: 'goalNode', position: { x: 0, y: 300 }, data: { title: 'PRESLY-CIL-XYZ', status: 'todo', owner: 'admin@e2e.cz', deadline: '2026-07-01' } },
+            { id: 'n1', type: 'goalNode', position: { x: 0, y: 300 }, data: { title: 'PRESLY-CIL-XYZ', status: 'todo', owner: 'admin@e2e.cz', deadline: '2026-07-01', icon: '🚀' } },
             // dočasný neutrální uzel — jen k LEGÁLNÍMU vyrobení osiřelého úkolu
             // (server nový úkol na neexistujícím uzlu odmítá 400); hned po
             // založení úkolu se z mapy zase smaže → úkol osiří
@@ -97,6 +97,7 @@ const rozbalDen = async (p) => {
       return h ? h.closest('.rounded-xl').innerText : '';
     });
     expect(panelText.includes('PRESLY-CIL-XYZ'), 'uzel je v panelu Můj den');
+    expect(panelText.includes('🚀'), 'nastavená ikona uzlu je v panelu vidět (11. 9. 2026: server ji neposílal)');
     expect(!panelText.includes('FOLDNUTY-UKOL-XYZ'), 'úkol na uzlu se v panelu NEukazuje podruhé (fold do uzlu)');
     expect(panelText.includes('OSIRELY-UKOL-XYZ'), 'úkol s osiřelým node_id se počítá samostatně');
     // hlavička sekce má CSS uppercase → innerText je „PO TERMÍNU (2)"

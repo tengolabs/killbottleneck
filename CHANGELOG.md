@@ -9,6 +9,37 @@ below before you jump several versions.
 
 ---
 
+## v0.60-beta — 2026-09-11
+
+**New calendar on Tasks: Month / Week / Day / Agenda, drag a deadline with confirmation, phone layout; goal icons in My day**
+
+- **Calendar (Tasks page)**: rebuilt from scratch. Four views — Month, Week, Day and Agenda —
+  a side panel with a mini calendar, project and status filters, search, a "+" on every day to
+  create a goal with that deadline, and a day detail listing everything due. `/tasks?view=calendar`
+  opens it directly. Overdue items carry a red dot, done ones are struck through; colours follow
+  the skin, projects use their map colour.
+- **Drag a deadline**: drag a chip to another day (Month) or column (Week). The app asks
+  *"Change the deadline from X to Y?"*, writes the new date only after confirmation — with a
+  compare-and-set guard so a colleague's concurrent change is never overwritten — and the toast
+  offers **Undo**. Done items don't drag. Someone who may not change the deadline (not the
+  assigner or map owner) gets a *deadline request* dialog instead; the request goes to the
+  assigner and can be withdrawn from the toast. Permissions are enforced on the server as before;
+  the client only avoids letting you drag into an error.
+- **Phone (< 640 px)**: the Month fits the screen with status dots, tapping a day opens its detail;
+  the Week becomes a vertical list of days with a header per day; the day detail fits the display.
+  The Tasks view switcher now wraps on narrow screens (it used to push the page wider than the
+  screen, so fixed dialogs were centred off-screen).
+- **My day**: goals show their icon (emoji) instead of the generic target when one is set.
+- Keyboard: `t` today, `m`/`w`/`d`/`a` views — ignored while typing, in dialogs and during a drag;
+  Escape closes the day detail. Collapsing the side panel keeps the grid (it used to hide the whole
+  calendar).
+- New suites: `ui-kalendar` (57 checks incl. phone), `calendar-dates` (129, three time zones, DST,
+  end-of-month clamping), `kalendar-data` (30, the move matrix and permissions); `my-day-api` and
+  `ui-myday-node` extended for icons. Lite bundle 504 → 508 kB (cap 510).
+
+Upgrade notes: no migration, no configuration change. The old `calendar.*` texts moved to a lazily
+loaded namespace; instances with a custom translation overlay should re-check the Tasks page.
+
 ## v0.59-beta — 2026-09-06
 
 **Arrange by deadline / plan / assignee / status; bottleneck counter "1 + 3"; Rose skin**

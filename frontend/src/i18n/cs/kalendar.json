@@ -1,0 +1,77 @@
+{
+  "chip": {
+    "nacita": "Projekt se ještě načítá"
+  },
+  "dialog": {
+    "zmenaTitulek": "Změnit termín z {{from}} na {{to}}?",
+    "zmenaPozn": "Termín je dohoda — změna se zapíše do projektu a uvidí ji všichni, kdo ho sdílejí.",
+    "zmenaPotvrdit": "Změnit termín",
+    "zadostTitulek": "Navrhnout termín {{to}}?",
+    "zadostTelo": "Termín „{{title}}“ smí změnit jen zadavatel ({{assigner}}). Pošlete mu návrh nového termínu.",
+    "zadostOdeslat": "Odeslat žádost",
+    "ciziZadost": "Na tomto cíli už běží žádost o jiný termín ({{who}}) — vyřiďte ji v detailu.",
+    "ukolJenZadavatel": "Termín tohoto úkolu smí změnit jen zadavatel ({{assigner}}) nebo vlastník projektu.",
+    "otevritDetail": "Otevřít detail"
+  },
+  "toast": {
+    "terminZmenen": "Termín změněn na {{to}}",
+    "terminVracen": "Termín vrácen na {{from}}",
+    "terminMezitim": "Termín mezitím změnil někdo jiný na {{now}}",
+    "zmenaSelhala": "Termín se nepodařilo změnit",
+    "zadostZrusena": "Žádost zrušena",
+    "hotovoNepresouvat": "Hotová položka se nepřesouvá."
+  },
+  "v2": {
+    "title": "Kalendář",
+    "liveData": "Vaše projekty a úkoly",
+    "navigation": "Navigace kalendáře",
+    "miniPrev": "Předchozí měsíc v mini kalendáři",
+    "miniNext": "Další měsíc v mini kalendáři",
+    "noProject": "Bez projektu",
+    "showStatuses": "Zobrazit v kalendáři",
+    "itemCount": "Termíny v přehledu: {{total}}",
+    "viewLabel": "Zobrazení kalendáře",
+    "views": {
+      "month": "Měsíc",
+      "week": "Týden",
+      "day": "Den",
+      "agenda": "Agenda"
+    },
+    "previous": {
+      "month": "Předchozí měsíc",
+      "week": "Předchozí týden",
+      "day": "Předchozí den",
+      "agenda": "Předchozí měsíc"
+    },
+    "next": {
+      "month": "Další měsíc",
+      "week": "Další týden",
+      "day": "Další den",
+      "agenda": "Další měsíc"
+    },
+    "addOn": "Přidat úkol na {{date}}",
+    "overdue": "Po termínu",
+    "freeDay": "Bez termínů",
+    "add": "Přidat",
+    "emptyTitle": "Prostor pro další krok",
+    "emptyDescription": "Pro toto období a vybrané filtry tu nejsou žádné termíny.",
+    "dayDetail": "Detail vybraného dne",
+    "addTask": "Přidat úkol",
+    "emptyDay": "Na tento den nemáte ve vybraném přehledu žádné termíny.",
+    "searchPlaceholder": "Hledat v kalendáři...",
+    "filterProjects": "Projekty a mapy",
+    "today": "Dnes",
+    "tomorrow": "Zítra",
+    "yesterday": "Včera",
+    "quickStats": "Statistika období",
+    "overdueCount": "{{count}} po termínu",
+    "completedCount": "{{count}} splněno",
+    "totalDeadlines": "{{count}} v přehledu",
+    "toggleSidebar": "Postranní panel",
+    "close": "Zavřít",
+    "noMatchingItems": "Žádné úkoly neodpovídají hledání ani filtrům.",
+    "createButton": "Vytvořit",
+    "projectsNone": "Žádný",
+    "projectsAll": "Vše"
+  }
+}

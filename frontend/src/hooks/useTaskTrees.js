@@ -64,6 +64,11 @@ export function useTaskTrees({
           deadline: d.deadline || '',
           plannedOn: d.plannedOn || d.pinnedOn || '',
           assignee_email: d.owner || '',
+          // zadavatel a běžící žádost o termín — kalendář podle nich rozhoduje,
+          // zda přetažení termín změní, nebo pošle žádost (lib/kalendar.js)
+          assignedBy: d.assignedBy || '',
+          deadlineChangeWanted: d.deadlineChangeWanted || '',
+          deadlineChangeRequestedBy: d.deadlineChangeRequestedBy || '',
           // „kdo zadal" uzel = vlastník mapy (uzly nemají vlastní pole autora);
           // umožní filtr „Zadal jsem" a zobrazení zadavatele v tabulce
           created_by: m.created_by || '',
@@ -114,12 +119,24 @@ export function useTaskTrees({
   const calendarItems = useMemo(() => {
     const out = [];
     const pushTask = (task) => {
-      if (task.deadline) out.push({ key: `t-${task.id}`, title: task.title, deadline: task.deadline, status: task.status, kind: 'task', raw: task });
+      // The tree keeps parents when a child matches; the calendar displays each
+      // dated item independently, so a matching sibling cannot bypass filters.
+      // Tvar položky = vstup lib/kalendar.js (slozStitky, smiMenitTermin, vyhodnotPresun):
+      // map_id/node_id pro zápis, created_by/assignedBy/žádost pro rozhodnutí termín × žádost.
+      if (task.deadline && matchesFilters(task)) out.push({
+        key: `t-${task.id}`, title: task.title, deadline: task.deadline, status: task.status, kind: 'task',
+        map_id: task.map_id || '', node_id: task.node_id || '', created_by: task.created_by || '',
+        assignedBy: '', deadlineChangeWanted: '', deadlineChangeRequestedBy: '', raw: task,
+      });
     };
     topLevel.forEach((task) => { pushTask(task); (byParent[task.id] || []).forEach(pushTask); });
-    boardNodeItems.forEach((n) => out.push({ key: n.id, title: n.title, deadline: n.deadline, status: n.status, kind: 'node', raw: n }));
+    boardNodeItems.forEach((n) => out.push({
+      key: n.id, title: n.title, deadline: n.deadline, status: n.status, kind: 'node',
+      map_id: n.map_id, node_id: n.node_id, created_by: n.created_by, assignedBy: n.assignedBy,
+      deadlineChangeWanted: n.deadlineChangeWanted, deadlineChangeRequestedBy: n.deadlineChangeRequestedBy, raw: n,
+    }));
     return out;
-  }, [topLevel, byParent, boardNodeItems]);
+  }, [topLevel, byParent, boardNodeItems, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, user]);
 
   const bufferItems = useMemo(() => {
     if (!bufferVisible) return [];

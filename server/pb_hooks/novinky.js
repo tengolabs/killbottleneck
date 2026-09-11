@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.60-beta": {
+    cs: [
+      "Kalendář na stránce Úkoly je nový: Měsíc, Týden, Den a Agenda, postranní panel s mini kalendářem, filtr projektů a stavů a hledání — termíny cílů i úkolů na jednom místě.",
+      "Termín přesunete tažením štítku na jiný den; aplikace se zeptá „Změnit termín z X na Y?“ a změnu jde jedním klikem z hlášky vrátit. Kdo termín měnit nesmí, pošle stejným tažením žádost zadavateli.",
+      "Na telefonu se Měsíc vejde na displej (tečky podle stavu, klepnutí na den otevře jeho detail) a Týden je seznam dnů pod sebou.",
+      "Panel Můj den ukazuje u cílů jejich ikonu, když je nastavená.",
+    ],
+    en: [
+      "The calendar on the Tasks page is new: Month, Week, Day and Agenda views, a side panel with a mini calendar, project and status filters and search — goal and task deadlines in one place.",
+      "Move a deadline by dragging its chip to another day; the app asks “Change the deadline from X to Y?” and the change can be undone with one click from the toast. Anyone not allowed to change it sends a request to the assigner with the same drag.",
+      "On a phone the Month fits the screen (dots by status, tap a day for its detail) and the Week is a vertical list of days.",
+      "The My day panel shows each goal's icon when one is set.",
+    ],
+  },
   "v0.59-beta": {
     cs: [
       "V mapě přibylo tlačítko Uspořádat: podcíle pod každým rodičem seřadíte podle termínu, plánu, řešitele nebo stavu — struktura zůstává, jde to vzít Zpět a Zarovnat pak pořadí drží.",

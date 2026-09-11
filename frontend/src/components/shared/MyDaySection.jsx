@@ -333,7 +333,9 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
                     className="flex-1 min-w-0 flex items-center gap-3 px-3 py-2 text-left"
                   >
                     {item.kind === 'node'
-                      ? <Target className="w-4 h-4 text-primary shrink-0" />
+                      ? (item.icon
+                        ? <span className="text-sm leading-none shrink-0 w-4 text-center" data-testid="myday-ikona">{item.icon}</span>
+                        : <Target className="w-4 h-4 text-primary shrink-0" />)
                       : item.kind === 'delegated'
                         ? <Send className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
                         : item.kind === 'idea'
@@ -540,7 +542,9 @@ const ExportCard = forwardRef(function ExportCard({ counts, done, sections, summ
               return (
                 <div key={`${item.kind}-${item.id}`} className="flex items-center gap-2">
                   {item.kind === 'node'
-                    ? <Target className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                    ? (item.icon
+                      ? <span className="text-xs leading-none shrink-0 w-3.5 text-center">{item.icon}</span>
+                      : <Target className="w-3.5 h-3.5 text-sky-600 shrink-0" />)
                     : item.kind === 'idea'
                       ? <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                       : <CheckSquare className="w-3.5 h-3.5 text-slate-400 shrink-0" />}

@@ -64,7 +64,7 @@ const titlesIn = (list) => (list || []).map((i) => i.title);
         title: 'Můj projekt',
         nodes: [
           { id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Můj projekt', title: 'Můj projekt', status: 'todo' } },
-          { id: 'n1', type: 'goalNode', position: { x: 0, y: 300 }, data: { title: 'UZEL-MUJ', status: 'todo', owner: me.email, deadline: today } },
+          { id: 'n1', type: 'goalNode', position: { x: 0, y: 300 }, data: { title: 'UZEL-MUJ', status: 'todo', owner: me.email, deadline: today, icon: '🚀' } },
           { id: 'n2', type: 'goalNode', position: { x: 200, y: 300 }, data: { title: 'UZEL-KOLEGOVI', status: 'todo', owner: kolega.email, deadline: day(3) } },
           // n0 = neutrální uzel pro úkoly (bez garanta/termínu nic nepřidá do
           // sekcí ani nesloží úkoly do uzlu) — úkol musí viset na NE-vrcholu
@@ -90,6 +90,7 @@ const titlesIn = (list) => (list || []).map((i) => i.title);
     expect(d.today === today, `dnešek podle klienta (${d.today} vs ${today})`);
     expect(titlesIn(d.sections.overdue).includes('UKOL-PO-TERMINU'), `sekce Po termínu (${titlesIn(d.sections.overdue)})`);
     expect(titlesIn(d.sections.today).includes('UZEL-MUJ'), `sekce Dnes obsahuje můj uzel (${titlesIn(d.sections.today)})`);
+    expect((d.sections.today.find((i) => i.title === 'UZEL-MUJ') || {}).icon === '🚀', 'položka uzlu nese ikonu uzlu (emoji), panel ji kreslí místo terčíku');
     expect(titlesIn(d.sections.week).includes('UKOL-PRISTI-TYDEN'), `sekce Tento týden (${titlesIn(d.sections.week)})`);
     // „hotovo" = CO JSEM DNES ODBAVIL, ne kolik mám hotové práce celkem.
     // Dřív se počítala všechna hotová práce, takže hlavička tvrdila „hotovo: 47"

@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import BusyIcon from '@/components/shared/BusyIcon';
+import DatePicker from '@/components/DatePicker';
 import { useDialogForm } from '@/hooks/useDialogForm';
 
 // „Nový úkol" z tabulky Úkoly (rozhodnutí Richarda 17. 8. 2026): zakládá UZEL
@@ -23,11 +24,12 @@ import { useDialogForm } from '@/hooks/useDialogForm';
 // v dalším kroku (volající otevře dialog uzlu). Žádné položky mimo mapu.
 const APEX = '__apex__';
 
-export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defaultParentId = '', onCreate, onClose }) {
+export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defaultParentId = '', defaultDeadline = '', onCreate, onClose }) {
   const { t } = useTranslation('tasks');
   const [mapId, setMapId] = useState('');
   const [parentId, setParentId] = useState(APEX);
   const [title, setTitle] = useState('');
+  const [deadline, setDeadline] = useState('');
 
   // reset JEN při otevření — refresh map za otevřeného dialogu (dvoufázový load,
   // onChanged) nesmí smazat rozepsaný název ani výběr (nález panelu 17. 8.)
@@ -40,7 +42,7 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
     const parentOk = defaultParentId && (map?.nodes || []).some((n) => n.id === defaultParentId && n.type !== 'note' && !isApexNode(n));
     setParentId(parentOk ? defaultParentId : APEX);
     setTitle('');
-     
+    setDeadline(defaultDeadline);
   }, [open]);
 
   const parentOptions = useMemo(() => {
@@ -53,7 +55,7 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
   const handleCreate = () => {
     if (!mapId || !title.trim()) return;
     return f.run(async () => {
-      await onCreate(mapId, parentId === APEX ? 'auto' : parentId, title.trim());
+      await onCreate(mapId, parentId === APEX ? 'auto' : parentId, title.trim(), deadline);
       onClose();
     });
   };
@@ -106,6 +108,12 @@ export default function NewNodeDialog({ open, maps = [], defaultMapId = '', defa
                 autoFocus
               />
             </div>
+            {defaultDeadline && (
+              <div className="space-y-1.5">
+                <Label htmlFor="new-node-deadline">{t('taskDialog.labelDeadline')}</Label>
+                <DatePicker id="new-node-deadline" value={deadline} onChange={setDeadline} />
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">{t('newNode.hint')}</p>
           </div>
         )}

@@ -191,9 +191,6 @@
       "6": "Ne"
     },
     "todayButton": "Dnes",
-    "prevMonth": "Předchozí měsíc",
-    "nextMonth": "Další měsíc",
-    "nodeSuffix": " (uzel mapy)",
     "more": "+{{moreCount}} další"
   },
   "timeline": {

@@ -85,10 +85,28 @@ export function toTarget(item) {
 // volající, který mění typ i data, musí uložit JEDNOU. Dvojí uložení za sebou
 // znamená dvojí okno pro kolizi s auto-savem otevřeného editoru a dva řádky
 // v záznamníku změn za jednu akci uživatele.
-export async function patchNodeData(mapId, nodeId, patch, nodePatch) {
+// volby.ocekavane = { pole: hodnota } — compare-and-set JEDNOHO uzlu: zapíše se jen
+// tehdy, když čerstvě načtený uzel nese očekávané hodnoty (kalendář: termín
+// v potvrzovacím dialogu musí být ten, který se doopravdy mění). Neshoda →
+// Error('kalendarZmenaMezitim') s .pole a .aktualni; zámek base_updated chrání
+// celou mapu, tohle chrání jedno pole před tichým přepsáním kolegovy změny.
+export async function patchNodeData(mapId, nodeId, patch, nodePatch, volby) {
+  const ocekavane = volby && volby.ocekavane;
   let posledniZname = null; // uzly z posledního čtení mapy — záchrana pro fallback níž
   const mutace = (fresh) => {
     posledniZname = fresh.nodes || [];
+    if (ocekavane) {
+      const cil = posledniZname.find((n) => n.id === nodeId);
+      for (const k of Object.keys(ocekavane)) {
+        const ted = (cil && cil.data && cil.data[k]) || '';
+        if (ted !== (ocekavane[k] || '')) {
+          const e = new Error('kalendarZmenaMezitim');
+          e.pole = k;
+          e.aktualni = ted;
+          throw e;
+        }
+      }
+    }
     return { nodes: (fresh.nodes || []).map((n) =>
       n.id === nodeId ? { ...n, ...(nodePatch || {}), data: { ...n.data, ...patch } } : n) };
   };
@@ -132,8 +150,10 @@ const applyIdea = async (target, patch) => {
 };
 
 // Úkol i uzel nesou tutéž vlastnost pod jiným názvem — mapa polí na jednom místě.
-// `deadline` tu zůstává jako dokumentace modelu, ale ŽÁDNÁ řádková akce ho
-// nemění: termín je dohoda s někým jiným a mění se výhradně v detailu úkolu.
+// `deadline` tu zůstává jako dokumentace modelu — ŽÁDNÁ řádková akce ho nemění:
+// termín je dohoda s někým jiným a mění se jen VĚDOMĚ, tj. v detailu úkolu, nebo
+// přetažením v kalendáři PO VÝSLOVNÉM POTVRZENÍ (Richard 7. 9. 2026,
+// hooks/useKalendarZapis.js přes patchNodeData s compare-and-set).
 const FIELD = {
   task: { status: 'status', deadline: 'deadline', planned: 'planned_on', assignee: 'assignee_email' },
   node: { status: 'status', deadline: 'deadline', planned: 'plannedOn', assignee: 'owner' },
@@ -159,8 +179,9 @@ export const setStatus = (target, status) => apply(target, fieldPatch(target, 's
 
 // ⚠️ PLÁNOVÁNÍ SE NEDOTÝKÁ TERMÍNU. Dřív „odložit na zítra" přepsalo termín,
 // což tichým kliknutím v seznamu měnilo dohodu s někým jiným. Termín se mění
-// výhradně vědomě přes kalendář v detailu (rozhodnutí Richarda 27. 7. 2026:
-// „termín je termín"). Tohle je jen MŮJ plán, kdy se tomu chci věnovat.
+// výhradně vědomě: kalendářem v detailu (Richard 27. 7. 2026: „termín je termín")
+// nebo přetažením v kalendáři Úkolů s potvrzovacím dialogem (Richard 7. 9. 2026).
+// Tohle je jen MŮJ plán, kdy se tomu chci věnovat.
 export const plan = (target, when) => apply(target, fieldPatch(target, 'planned', planDate(when)));
 export const unplan = (target) => apply(target, fieldPatch(target, 'planned', ''));
 

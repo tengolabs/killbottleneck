@@ -73,6 +73,13 @@ const LOADERS = {
     cs: () => import('./cs/organizace.json'),
     en: () => import('./en/organizace.json'),
   },
+  // kalendář na stránce Úkoly (Měsíc/Týden/Agenda, přetažení termínu s
+  // potvrzením, 7. 9. 2026) — jen plná stránka /tasks, lite ho nemá; do
+  // tasks.json nepatří, ten se veze do lite celý (strop 510 kB)
+  kalendar: {
+    cs: () => import('./cs/kalendar.json'),
+    en: () => import('./en/kalendar.json'),
+  },
 };
 const nactene = new Set();
 
@@ -91,7 +98,9 @@ export function useLazyNs(ns) {
   const [ready, setReady] = useState(nactene.has(ns));
   useEffect(() => {
     let zivy = true;
-    ensureNs(ns).then(() => { if (zivy) setReady(true); });
+    // padlý chunk (starý index.html po nasazení) → komponenta se přesto ukáže
+    // (klíče místo textů); trvale prázdná stránka je horší
+    ensureNs(ns).then(() => { if (zivy) setReady(true); }, (e) => { console.warn('lazyNs', ns, e); if (zivy) setReady(true); });
     return () => { zivy = false; };
   }, [ns]);
   return ready;
