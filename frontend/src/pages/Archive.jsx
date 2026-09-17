@@ -9,6 +9,7 @@ import AppHeader from '@/components/shared/AppHeader';
 import MapCard from '@/components/home/MapCard';
 import { useToast } from '@/components/ui/use-toast';
 import { compareLocale, fmtDateShort } from '@/lib/locale';
+import { PAGE_CONTAINER } from '@/lib/layout';
 
 // Archiv dokončených projektů. Mapy z číslované šablony se seskupují do sérií
 // (Nabídka 1, 2, 3…) podle pole `series`; nadpis skupiny drží snapshot
@@ -103,7 +104,7 @@ export default function Archive() {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader backTo="/" />
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+      <div className={`${PAGE_CONTAINER} py-6 sm:py-8`}>
         <div className="flex items-center gap-2.5 mb-8">
           <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
             <ArchiveIcon className="w-5 h-5 text-muted-foreground" />

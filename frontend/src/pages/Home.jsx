@@ -20,6 +20,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { useSidePanels } from '@/hooks/useSidePanels';
 import SkinPattern from '@/components/shared/SkinPattern';
+import { PAGE_CONTAINER } from '@/lib/layout';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -150,7 +151,7 @@ export default function Home() {
       <BufferPanel buffer={buffer} canEdit={false} onConvert={(item) => navigate(`/tasks?convert=${item.id}`)} open={bufferOpen} onToggle={toggleBuffer} fixed leftOffset={timeLogOpen ? 320 : 0} />
       {user && <TimeLogPanel fixed open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />}
       {user && <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />}
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+      <div className={`${PAGE_CONTAINER} py-6 sm:py-8`}>
         {view === 'templates' ? (
           <TemplatesSection />
         ) : loading ? (

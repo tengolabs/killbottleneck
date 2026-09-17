@@ -27,6 +27,7 @@ import { fmtDate } from '@/lib/locale';
 import { saveDashboardPdf } from '@/lib/dashboardPdf';
 import { useToast } from '@/components/ui/use-toast';
 import { exportPortfolioMarkdown, exportPortfolioCsv, changeValue, actorLabel, whenLabel, accessLabel, excludedLabel } from '@/lib/portfolioExport';
+import { PAGE_CONTAINER } from '@/lib/layout';
 
 const MAX_ROWS = 10;
 
@@ -128,7 +129,7 @@ export default function Organizace() {
     <div className="min-h-screen bg-background relative">
       <SkinPattern />
       <AppHeader active="organizace" org={org} />
-      <div ref={pdfRef} className="max-w-6xl mx-auto px-4 py-6 sm:py-8" data-testid="organizace-page">
+      <div ref={pdfRef} className={`${PAGE_CONTAINER} py-6 sm:py-8`} data-testid="organizace-page">
         {failed && <div className="rounded-lg bg-destructive/10 text-destructive px-3 py-2 text-sm mb-4">{t('loadFailed')}</div>}
         {!data && !failed && <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}
 

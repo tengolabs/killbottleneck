@@ -12,6 +12,7 @@ import NotificationBell from '@/components/shared/NotificationBell';
 import TimerWidget from '@/components/shared/TimerWidget';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Smartphone } from 'lucide-react';
+import { PAGE_CONTAINER } from '@/lib/layout';
 
 // Jednotná hlavička přihlášené aplikace (Home i Úkoly) — stejné logo, navigace
 // a uživatelské menu všude, ať přepínání stránek nepůsobí jako „přeneslo mě to jinam".
@@ -50,7 +51,7 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
         s AppHeaderem — jinak by se musel opakovat na pěti místech. */}
     <TrialBanner />
     <header className="border-b bg-card">
-      <div className="max-w-6xl mx-auto px-4 min-h-14 sm:h-14 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 py-1.5 sm:py-0">
+      <div className={`${PAGE_CONTAINER} min-h-14 sm:h-14 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 py-1.5 sm:py-0`}>
         <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
           {backTo && (
             <Button variant="ghost" size="icon" onClick={() => navigate(backTo)} className="shrink-0">

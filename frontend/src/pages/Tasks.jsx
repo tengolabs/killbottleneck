@@ -51,6 +51,7 @@ import { useTaskFilters, ALL, NONE } from '@/hooks/useTaskFilters';
 import { useTasksPageData } from '@/hooks/useTasksPageData';
 import { useTaskTrees } from '@/hooks/useTaskTrees';
 import { useMapNodeActions } from '@/hooks/useMapNodeActions';
+import { PAGE_CONTAINER } from '@/lib/layout';
 
 export default function Tasks() {
   const navigate = useNavigate();
@@ -372,7 +373,7 @@ export default function Tasks() {
       <TimeLogPanel fixed open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />
       <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />
 
-      <div className={`${view === 'calendar' ? 'max-w-[1600px] sm:px-6 lg:px-10' : 'max-w-6xl'} mx-auto px-4 py-6`}>
+      <div className={`${PAGE_CONTAINER} py-6`}>
         <MyDaySection
           user={user}
           ideas={buffer.items}

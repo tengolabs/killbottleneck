@@ -10,6 +10,14 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.60.1-beta": {
+    cs: [
+      "Stránky Projekty, Šablony, Úkoly, Organizace a Archiv jsou na širokém monitoru širší — stejně jako kalendář — a horní lišta s nimi lícuje.",
+    ],
+    en: [
+      "On a wide monitor the Projects, Templates, Tasks, Organization and Archive pages are wider — matching the calendar — and the top bar lines up with them.",
+    ],
+  },
   "v0.60-beta": {
     cs: [
       "Kalendář na stránce Úkoly je nový: Měsíc, Týden, Den a Agenda, postranní panel s mini kalendářem, filtr projektů a stavů a hledání — termíny cílů i úkolů na jednom místě.",
