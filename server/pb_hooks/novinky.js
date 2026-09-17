@@ -10,6 +10,38 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.61-beta": {
+    cs: [
+      "Nový AI asistent v panelu vpravo: vidí do vašich projektů, Můj den, zásobníku nápadů a pravidel, ptá se krátkými otázkami s připravenými odpověďmi a změny v projektech a pravidlech provede až po vašem potvrzení na kartě.",
+      "Asistent založí projekt od nuly (název, cíl a prvních 5–8 kroků), rozepíše vybraný krok, nastaví nebo změní termín a vytvoří připomínku — vždy přes kartu k potvrzení; u kroků s termínem se zeptá, jestli je řešíte vy, ať je vidíte v Můj den.",
+      "Do asistenta jde vložit obrázek (Ctrl+V, přetažení nebo tlačítko) — třeba fotku poznámek nebo e-mail — a z přepisu udělá nápady do zásobníku nebo nový projekt; samotný obrázek se neukládá.",
+      "Ve Správě organizace je sekce AI kredity se spotřebou asistenta za organizaci i po lidech; v mapě je u úkolu vidět Plán — den, kdy ho chcete řešit; na Úkolech je Kalendář hned za Tabulkou.",
+      "Sdílení projektu na adresu, která ještě nemá účet, jí teď pošle e-mailovou pozvánku s odkazem na registraci.",
+    ],
+    en: [
+      "New AI assistant in a panel on the right: it sees your projects, My day, the idea buffer and rules, asks short questions with prepared answers and changes projects and rules only after you confirm it on a card.",
+      "The assistant can start a project from scratch (title, goal and the first 5–8 steps), break down the selected step, set or change a deadline and create a reminder — always through a confirmation card; for steps with a deadline it asks whether you handle them, so they show up in My day.",
+      "You can paste an image into the assistant (Ctrl+V, drag and drop or the button) — a photo of notes or an e-mail, say — and it turns the transcript into ideas in the buffer or a new project; the image itself is not stored.",
+      "Organization admin has an AI credits section with assistant usage for the organization and per person; a task in the map shows its Plan — the day you want to work on it; on Tasks the Calendar now comes right after the Table.",
+      "Sharing a project with an address that has no account yet now sends it an e-mail invitation with a registration link.",
+    ],
+  },
+  "v0.61-beta-ai1": {
+    cs: [
+      "AI asistent umí založit nový projekt od nuly: řeknete, o co jde, a on navrhne název, cíl a prvních 5–8 kroků na jednu kartu k potvrzení — vlastníkem jste vždy vy.",
+      "Když popíšete cíl nebo problém, asistent nabídne i „Poradit, jak na to“ a po založení projektu sám navrhne podklady (finanční rozvaha, dodavatelé, plán týdne).",
+      "Ve Správě organizace je nová sekce AI kredity: spotřeba asistenta za organizaci i po lidech, týdenní kvóta a podíl pro správce a ostatní.",
+      "V mapě je u úkolu vidět „Plán“ — den, kdy ho chcete řešit; asistent v editoru zná vybraný uzel, takže „rozepiš tenhle krok“ stačí.",
+      "Zásobník nápadů se po zásahu asistenta obnoví sám a hlášky už nezakrývají políčko chatu.",
+    ],
+    en: [
+      "The AI assistant can start a new project from scratch: say what it is about and it proposes the title, the goal and the first 5–8 steps on one confirmation card — you are always the owner.",
+      "When you describe a goal or a problem, the assistant also offers “Advise me how to do it” and, after creating a project, proposes preparations itself (financial overview, suppliers, first-week plan).",
+      "Organization admin has a new AI credits section: assistant usage for the organization and per person, a weekly quota and the split between administrators and other members.",
+      "A task in the map shows its “Plan” — the day you want to work on it; in the editor the assistant knows the selected node, so “break this step down” is enough.",
+      "The idea buffer refreshes itself after the assistant touches it, and notifications no longer cover the chat input.",
+    ],
+  },
   "v0.60.1-beta": {
     cs: [
       "Stránky Projekty, Šablony, Úkoly, Organizace a Archiv jsou na širokém monitoru širší — stejně jako kalendář — a horní lišta s nimi lícuje.",

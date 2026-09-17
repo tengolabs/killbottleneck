@@ -2,17 +2,19 @@ import { useTranslation } from 'react-i18next';
 
 // Pruh s názvem projektu nad levou lištou ikon (text; klikem přejmenování).
 // Čistě prezentační: JSX přesunuto 1:1 z GoalMapEditor (F1-07).
-export default function TitleStrip({ dashboardOpen, railLeft, nazevEditace, canEdit, title, setTitle, setNazevEditace }) {
+export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevEditace, canEdit, title, setTitle, setNazevEditace }) {
   const { t } = useTranslation('editor');
   return (
     <>
         {/* NÁZEV PROJEKTU — volný pruh nad levou lištou ikon (ta začíná na top-16).
             Vlastní řádek unese i dlouhý název, na který se v liště nedostávalo.
             Odsazení zleva kopíruje lištu ikon, ať název neschová vysunutý
-            zásobník ani časovač. Nad dashboardem ne — ten si název píše sám. */}
+            zásobník ani časovač. Od 15. 9. 2026 sedí na stejné výšce LUPA
+            (top-4) — pruh jí uhýbá o šířku tlačítka, a když je rozbalené
+            hledání, o šířku celého pole. Nad dashboardem ne — ten si název píše sám. */}
         {!dashboardOpen && (
           <div
-            style={{ left: railLeft + 8 }}
+            style={{ left: railLeft + (searchOpen ? 264 : 48) }}
             className="absolute top-2 z-30 max-w-[min(80vw,60rem)]"
           >
             {/* ⚠️ V KLIDU JE TO TEXT, NE POLE. Široké průhledné `input` přes plátno

@@ -9,7 +9,8 @@
     "kdo": {
       "system": "system",
       "pravidlo": "rule",
-      "agent": "agent"
+      "agent": "agent",
+      "asistent": "AI assistant"
     },
     "udalost": {
       "created": "Goal created",

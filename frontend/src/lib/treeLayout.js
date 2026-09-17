@@ -249,6 +249,71 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
       shodOPatra(g, 2);   // pásy: řetěz dvou vzpěr mezi rodičem a kategorií
     });
   }
+  // ---- DVOUŘADÉ BALENÍ UVNITŘ STROMU (Richard 15. 9. 2026) ----
+  // Do 15. 9. se řada listů balila až PO výpočtu stromu (každá druhá karta
+  // o patro, poloviční krok) — a řada s větví se nesměla balit vůbec, protože
+  // spadlá karta by přistála na dětech větve (mapa od asistenta „Šrouby":
+  // horní řada se nikdy nehnula). Teď se balí uvnitř Walkerova algoritmu:
+  // spadlý list dostane vzpěru (o patro níž) a PROMĚNNÝ ROZESTUP — k sousedům
+  // v řadě jen poloviční krok (sedí v mezeře jako dřív), k dětem cizí větve
+  // plný SLOT přes kontury. Strom navíc už při skládání ví, že zabalená
+  // větev je poloviční, a řadu kolem ní stáhne. Řady zpracované vzpěrami
+  // skupin (resenoVzperami) zůstávají, jak je 11. 8. schváleno.
+  // ⚠️ Sync se serverem (helpers.js:layoutTreeServer) hlídá layout-parity.
+  const spadly = Object.create(null);   // id listu → { krok, patro }
+  const spadlyPh = Object.create(null); // id vzpěry → id listu
+  const spadleVetve = Object.create(null); // id větve → patro (smíšená řada)
+  // Které karty v řadě spadnou. Čistá řada listů: KOMPAKT nechává první
+  // nahoře, PÁSY shazují první (jako dřív). SMÍŠENÁ řada (listy i větve):
+  // první pokusy (15. 9.) shazovaly listy vedle větve — spadlý list pak
+  // přistál ve VÝŠCE DĚTÍ sousední větve a četl se jako jejich sourozenec
+  // (Richard: „Specifikace zakázky je na divném místě / hozená stranou").
+  // Proto ve smíšené řadě spadnou o patro VŠECHNY větve i s podstromem a listy
+  // se střídají jako v čisté řadě: spodní patro pak drží jen skutečné
+  // sourozence a děti větví jsou až o dvě patra níž. Řada se balí, jen když
+  // listů není míň než větví (jinak by nahoře zůstal jeden osamělý list);
+  // větve už řešené vzpěrami skupin (resenoVzperami) se nechávají být.
+  const spadneVRade = (rada) => {
+    const listy = rada.filter(isLeafId);
+    const vetve = rada.filter((c) => !isLeafId(c));
+    if (listy.length < 2 || listy.length < vetve.length || vetve.some((v) => resenoVzperami.has(v))) return { listy: [], vetve: [] };
+    return {
+      listy: listy.filter((_, k) => (bands >= 2 ? k % 2 === 0 : k % 2 === 1)),
+      vetve: vetve,
+    };
+  };
+  if (stagger >= 2 || bands >= 2) for (const n of layoutNodes) {
+    if (resenoVzperami.has(n.id)) continue;
+    const rada = (childrenMap[n.id] || []).filter((c) => lookup[c]).sort((a, b) => crossOf(a) - crossOf(b));
+    const listy = rada.filter(isLeafId);
+    if (listy.length < 2) continue;
+    // karty v TÉŽE řadě jsou od sebe 2×krok — musí se vejít vedle sebe („Moje
+    // mapa" má slot 120, SLOT/2 by je pokládal přes sebe)
+    const nejsirsi = Math.max(...listy.map(crossSizeOf), 0);
+    const krok = Math.max(SLOT, nejsirsi + 50) / 2;
+    // spodní řada blíž než celé patro, ale nikdy míň, než je karta vysoká
+    const nejvyssiKarta = Math.max(...listy.map(hlavniSizeOf), 0);
+    const patro = Math.max((horizontal ? H_NODE_STEP : STEP) - 40, nejvyssiKarta + 40);
+    const spad = spadneVRade(rada);
+    for (const l of spad.listy) {
+      const ph = '::patro::' + l;
+      reprOf[ph] = l; nahradniDeti[ph] = [l]; swapChild[l] = ph; phantoms.push(ph);
+      spadly[l] = { krok: krok, patro: patro }; spadlyPh[ph] = l;
+    }
+    // větev i s podstromem o patro níž (vzpěra); karta větve sedí ve výšce
+    // spadlých listů (patro), její děti o plný krok pod ní
+    for (const v of spad.vetve) { shodOPatra(v, 1); spadleVetve[v] = patro; }
+  }
+  // rozestup dvou uzlů v téže hloubce: vzpěra spadlého listu ↔ sourozenec = půl
+  // kroku (list sedí v mezeře), jinak plný SLOT (kontury cizích podstromů)
+  const sep = (a, b) => {
+    if (a.parent && a.parent === b.parent) {
+      const la = spadlyPh[a.id], lb = spadlyPh[b.id];
+      if (la) return spadly[la].krok;
+      if (lb) return spadly[lb].krok;
+    }
+    return SLOT;
+  };
   const kidsOf = (id) => {
     const base = nahradniDeti[id] ? nahradniDeti[id] : (childrenMap[id] || []).filter((c) => lookup[c]);
     // výměnu skupiny za řetěz vzpěr dělá jen SKUTEČNÝ rodič — vzpěra v řetězu
@@ -329,7 +394,7 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
       vom = nextLeft(vom);
       vop = nextRight(vop);
       vop.ancestor = v;
-      const shift = (vim.prelim + sim) - (vip.prelim + sip) + distance;
+      const shift = (vim.prelim + sim) - (vip.prelim + sip) + sep(vim, vip);
       if (shift > 0) {
         moveSubtree(ancestorFn(vim, v, defaultAncestor), v, shift);
         sip += shift;
@@ -357,7 +422,7 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
     v._fw = true;
     if (v.children.length === 0) {
       const w = leftSibling(v);
-      v.prelim = w ? w.prelim + distance : 0;
+      v.prelim = w ? w.prelim + sep(w, v) : 0;
     } else {
       let defaultAncestor = v.children[0];
       for (const w of v.children) {
@@ -375,7 +440,7 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
         : (v.children[k / 2 - 1].prelim + v.children[k / 2].prelim) / 2;
       const w = leftSibling(v);
       if (w) {
-        v.prelim = w.prelim + distance;
+        v.prelim = w.prelim + sep(w, v);
         v.mod = v.prelim - midpoint;
       } else {
         v.prelim = midpoint;
@@ -398,6 +463,13 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
   if (roots.length) {
     firstWalk(VROOT, SLOT);
     secondWalk(VROOT, -VROOT.prelim, -1);
+  }
+  // spadlý list (i karta spadlé větve) sedí o `patro` níž, ne o celý krok
+  // úrovně, jak by dal strom
+  for (const l of Object.keys(spadly).concat(Object.keys(spadleVetve))) {
+    if (!positions[l]) continue;
+    const zpet = (horizontal ? H_NODE_STEP : STEP) - (spadly[l] ? spadly[l].patro : spadleVetve[l]);
+    if (horizontal) positions[l].x -= zpet; else positions[l].y -= zpet;
   }
 
   // ---- DVOUŘADÉ BALENÍ ŘADY KARET ----
@@ -485,46 +557,5 @@ export function layoutTree(nodes, edges, direction = 'vertical', opts = {}) {
     }
   }
 
-  if (stagger >= 2 || bands >= 2) {
-    const hlavniOsa = (id) => (horizontal ? positions[id].x : positions[id].y);
-    const pricnaOsa = (id) => (horizontal ? positions[id].y : positions[id].x);
-    for (const n of layoutNodes) {
-      if (resenoVzperami.has(n.id)) continue; // schválené rozložení nepřepisovat
-      const kids = (childrenMap[n.id] || []).filter((c) => lookup[c] && positions[c]);
-      // jen ucelená řada listů — kdyby mezi nimi byla větev, zabalením by se
-      // karty dostaly nad její podstrom
-      if (kids.length < 2 || !kids.every(isLeafId)) continue;
-      const radaOd = kids.slice().sort((a, b) => pricnaOsa(a) - pricnaOsa(b));
-      const kroky = radaOd.map(pricnaOsa);
-      const stred = (kroky[0] + kroky[kroky.length - 1]) / 2;
-      // Karty v TÉŽE řadě jsou od sebe 2×krok — musí se vejít vedle sebe.
-      // `SLOT` je rozestup pro JEDNU řadu; v „Moje mapě" je 120, takže
-      // SLOT/2 = 60 pokládalo karty přes sebe (panel /checkup 12. 8.).
-      const nejsirsi = Math.max(...radaOd.map((c) => crossSizeOf(c)), 0);
-      const krok = Math.max(SLOT, nejsirsi + 50) / 2;
-      const start = stred - ((radaOd.length - 1) * krok) / 2;
-      // Spodní řada jde blíž než celý krok úrovně (Richard 11. 8. v noci:
-      // „maličko zmenšit mezeru mezi 2. a 3. řadou"). Míň už ne — sousední
-      // karty z obou řad se vodorovně překrývají o půl kroku, takže svislá
-      // mezera je jediné, co je drží čitelné.
-      // ⚠️ A NIKDY MÍŇ, NEŽ JE KARTA VYSOKÁ. Pevných 240 stačilo jen na běžné
-      // karty; karta s dlouhým názvem, termínem, garantem a pruhem pokroku
-      // přes 240 přeleze a řady se překryjí (nález panelu 12. 8. 2026).
-      // Rezerva u pevného kroku byla jen 13 px proti reálně nejvyšší kartě
-      // (227 px, změřeno v sadě čitelnosti), takže to bylo blíž, než se zdálo.
-      const nejvyssiKarta = Math.max(...radaOd.map(hlavniSizeOf), 0);
-      const patro = Math.max((horizontal ? H_NODE_STEP : STEP) - 40, nejvyssiKarta + 40);
-      radaOd.forEach((c, i) => {
-        // Parita jde po sémantice stylů: KOMPAKT nechává první kartu nahoře
-        // (Richardův obrázek), PÁSY shazují první dolů. Bez toho rozdílu vyšly
-        // oba styly na hluboké mapě IDENTICKY a druhý stisk zase „nic nedělal"
-        // — chytila to sada „žádný styl nesmí mlčet".
-        const posun = (bands >= 2 ? i % 2 === 0 : i % 2 === 1) ? patro : 0;
-        const cross = start + i * krok;
-        const main = hlavniOsa(c) + posun;
-        positions[c] = horizontal ? { x: main, y: cross } : { x: cross, y: main };
-      });
-    }
-  }
   return positions;
 }

@@ -58,7 +58,13 @@ const SRC = path.join(__dirname, '../frontend/src');
 // Žádná knihovna, žádné texty funkcí. Rozhodnutí Richarda 6. 9.: další vestavěný
 // skin už nebude — při případném dalším NEzvedat strop, ale načítat skiny líně.
 // Strop opět jen +5 kB, ať tlak na dietu zůstává.
-const MAX_KB = Number(process.env.LITE_MAX_KB || 510);
+// 14. 9. 2026: 510 → 515. Naměřeno 510 → 511 (~0,5 kB). Dvě funkce ve sdílených modulech, které
+// lite veze, ale nepoužívá: AsistentContext drží vybraný uzel editoru (pro AI chat „tenhle krok“)
+// a toast.jsx čte CSS proměnnou, aby toasty nezakrývaly políčko chatu vedle otevřeného panelu.
+// Žádná knihovna, žádné texty. Kandidát na dietu při příštím tlaku: vytáhnout AsistentContext
+// z lite stromu úplně (lite chat nemá).
+// Strop opět jen +5 kB, ať tlak na dietu zůstává.
+const MAX_KB = Number(process.env.LITE_MAX_KB || 515);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.

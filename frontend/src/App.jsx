@@ -20,6 +20,8 @@ import ResetPassword from './pages/ResetPassword';
 import NativeOnboarding from './components/NativeOnboarding';
 import { isNativeShell } from '@/lib/nativeShell';
 import { getServerUrl } from '@/lib/serverUrl';
+import { AsistentProvider, useAsistent } from '@/lib/AsistentContext';
+import { useLocation } from 'react-router-dom';
 
 // Stránky se načítají AŽ KDYŽ jsou potřeba. Bez toho by si telefon
 // v zjednodušeném (lite) režimu stáhl i mapový editor s ReactFlow a všechny
@@ -34,6 +36,8 @@ const UserAdmin = lazy(() => import('./pages/UserAdmin'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Organizace = lazy(() => import('./pages/Organizace'));
 const LiteApp = lazy(() => import('./lite/LiteApp'));
+// AI chat na boku — líně: do hlavního balíku nepatří a v lite není vůbec
+const AsistentPanel = lazy(() => import('./components/asistent/AsistentPanel'));
 
 const Spinner = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -49,6 +53,26 @@ const HomeOrLite = () => {
   const { user } = useAuth();
   if (user && shouldUseLite()) return <Navigate to="/lite" replace />;
   return <Home />;
+};
+
+// AI chat na boku (13. 9. 2026): trvalý panel vpravo přes všechny stránky plné
+// aplikace; v lite a na přihlašovacích stránkách není. Obsah stránek se
+// odsune o šířku otevřeného panelu (na telefonu panel překryje celou šířku).
+// Zda server chat vůbec nabízí (mód chat_panel) zjišťuje až líný panel — do
+// hlavního balíku (ten se veze i do lite) tak nepřibývá nic než tenhle obal.
+const AsistentHost = ({ children }) => {
+  const { user } = useAuth();
+  const A = useAsistent();
+  const location = useLocation();
+  const lite = location.pathname.startsWith('/lite') || location.pathname.startsWith('/light');
+  const zobrazit = !!user && !lite;
+  const odsun = zobrazit && A.dostupny && A.open && typeof window !== 'undefined' && window.innerWidth >= 640 ? A.width : 0;
+  return (
+    <>
+      <div style={odsun ? { paddingRight: odsun } : undefined} className="transition-[padding]">{children}</div>
+      {zobrazit && <Suspense fallback={null}><AsistentPanel /></Suspense>}
+    </>
+  );
 };
 
 const AuthenticatedApp = () => {
@@ -67,6 +91,7 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<Spinner />}>
       {/* dotazník účelu — jednou, prvnímu adminovi; líně (viz PurposeGate) */}
       <PurposeGate />
+      <AsistentHost>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -91,6 +116,7 @@ const AuthenticatedApp = () => {
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
+      </AsistentHost>
     </Suspense>
   );
 };
@@ -120,12 +146,14 @@ function App() {
   return (
     <AuthProvider>
       <TimerProvider>
-        <Router key={i18n.language}>
-          <ScrollToTop />
-          <DocumentTitle />
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
+        <AsistentProvider>
+          <Router key={i18n.language}>
+            <ScrollToTop />
+            <DocumentTitle />
+            <AuthenticatedApp />
+          </Router>
+          <Toaster />
+        </AsistentProvider>
       </TimerProvider>
     </AuthProvider>
   )

@@ -203,6 +203,12 @@ function build(pairs) {
         ['K1a1', 'K1a'], ['K1a2', 'K1a'], ['K1a3', 'K1a'],
         ['K3a1', 'K3a'], ['K3a2', 'K3a'], ['K3a3', 'K3a']],
     };
+    // Richard 15. 9. 2026 (mapa od asistenta „Šrouby"): řada 6 listů + 1 větev
+    // s 5 listy — do té doby se horní řada nikdy nehnula (vzpěry chtějí ≥2
+    // skupiny, dvouřadé balení samé listy). Teď volné listy střídavě o patro.
+    TVARY['smíšená řada (6 listů + větev s 5 listy)'] = [['R', null],
+      ['a', 'R'], ['b', 'R'], ['c', 'R'], ['d', 'R'], ['e', 'R'], ['f', 'R'], ['V', 'R'],
+      ['V1', 'V'], ['V2', 'V'], ['V3', 'V'], ['V4', 'V'], ['V5', 'V']];
     const sirkaP = (p) => { const xs = Object.values(p).map((v) => v.x); return Math.max(...xs) - Math.min(...xs); };
     for (const [jmeno, pairs] of Object.entries(TVARY)) {
       const { nodes, edges } = build(pairs);
@@ -223,6 +229,33 @@ function build(pairs) {
           if (!a || !b || Math.abs(a.x - b.x) > 0.001 || Math.abs(a.y - b.y) > 0.001) { bad = n.id; break; }
         }
         ok(!bad, `${jmeno}: parita FE↔server (${styl})${bad ? ' — ' + bad : ''}`);
+      }
+    }
+    // Smíšená řada: volné listy se musí hnout (o patro), větev zůstat v řadě,
+    // a nic se nesmí překrýt s podstromem větve (ověřeno i na skutečné mapě
+    // z DUVE 15. 9.: šířka klasika 1620 → kompakt 2430, tvar jiný, bez překryvu)
+    {
+      const { nodes, edges } = build(TVARY['smíšená řada (6 listů + větev s 5 listy)']);
+      const klas = layoutTree(nodes, edges, 'vertical', {});
+      // řada a…f + větev V: větev i s podstromem o patro níž (v OBOU stylech),
+      // listy střídavě jako v čisté řadě — kompakt b, d, f dolů; pásy a, c, e
+      // dítě větve, které v daném stylu zůstává nahoře: kompakt V1 (padá V2, V4), pásy V2 (padá V1, V3, V5)
+      for (const [styl, o, prvniDolu, dole0, diteNahore] of [['kompakt', { stagger: 2 }, false, 'b,d,f', 'V1'], ['pásy', { bands: 2 }, true, 'a,c,e', 'V2']]) {
+        const p = layoutTree(nodes, edges, 'vertical', o);
+        const listy = ['a', 'b', 'c', 'd', 'e', 'f'];
+        const dole = listy.filter((k) => p[k].y > klas[k].y);
+        ok(dole.join(',') === dole0, `smíšená řada (${styl}): dolů jdou ${dole0} (${dole.join(',')})`);
+        ok(dole.every((k) => p[k].y === klas[k].y + 240), `smíšená řada (${styl}): spadlé listy o patro (240 = jako dvouřadé balení)`);
+        ok(p.V.y === klas.V.y + 240 && p[diteNahore].y === klas[diteNahore].y + 280, `smíšená řada (${styl}): větev ve výšce spadlých listů, její děti o plný krok níž`);
+        ok((p.a.y > klas.a.y) === prvniDolu, `smíšená řada (${styl}): parita jako čistá řada (první list ${prvniDolu ? 'dolů' : 'nahoře'})`);
+        // nic se nepřekrývá: karta 220 široká, řada = stejná y
+        let prekryv = null;
+        const ids = Object.keys(p);
+        for (let i = 0; i < ids.length && !prekryv; i++) for (let j = i + 1; j < ids.length; j++) {
+          const A = p[ids[i]], B = p[ids[j]];
+          if (A.y === B.y && Math.abs(A.x - B.x) < 220) { prekryv = ids[i] + '×' + ids[j]; break; }
+        }
+        ok(!prekryv, `smíšená řada (${styl}): žádné dvě karty v téže řadě se nepřekrývají${prekryv ? ' — ' + prekryv : ''}`);
       }
     }
     // Čerstvá mapa: kompakt ji musí opravdu ZÚŽIT, ne jen přeskládat

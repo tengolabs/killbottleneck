@@ -32,6 +32,10 @@ export const advisor = (payload) => kbSend('/api/kb/advisor', {
 // „Aktualizovat" na dashboardu /tasks). Vrací { summary | note | error }.
 export const refreshMySummary = () => kbSend('/api/kb/my-summary/refresh');
 
+// AI chat na boku: volání jsou v api/asistentApi.js (hlavní balík je importuje
+// přímo, aby se sem nevázal); odsud jen re-export pro plnou appku
+export { chat, chatPotvrdit, chatSeznam, chatDetail, chatSmazat, chatPamet, chatPametUloz, chatModely } from '@/api/asistentApi';
+
 export const getPublicMap = (payload) => kbSend('/api/kb/public-maps', { body: payload });
 
 export const shareMap = (payload) => kbSend('/api/kb/share', { body: payload });

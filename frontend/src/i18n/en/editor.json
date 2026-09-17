@@ -44,10 +44,6 @@
     "align": "Arrange",
     "alignTitle": "Arrange the map — the button shows the style currently on the map; click switches to the next one (wide → compact → around center). Press and hold to lock the style for every map.",
     "share": "Share",
-    "suggestAi": "Suggest with AI",
-    "aiChat": "AI chat",
-    "note": "Note",
-    "addNoteTitle": "Add a note",
     "addGoal": "Add goal",
     "bottlenecks": "Bottlenecks",
     "bottlenecksTitle": "Highlight bottlenecks and blocking goals",
@@ -75,7 +71,9 @@
     "readabilityShort_normal": "normal",
     "readabilityShort_large": "larger",
     "readabilityShort_titleOnly": "title only",
-    "rules": "Rules"
+    "rules": "Rules",
+    "suggestAi": "Suggest with AI",
+    "asistent": "Assistant"
   },
   "saveState": {
     "saving": "Saving...",
@@ -355,7 +353,7 @@
   },
   "shareDialog": {
     "title": "Share map",
-    "description": "Access is tied to the e-mail — your colleague will see the map after registering with the same address.",
+    "description": "Access is tied to the e-mail. People without an account get an invitation and see the map after signing up with the same address.",
     "emailPlaceholder": "email@example.com",
     "permRead": "View",
     "permWork": "Collaborate",
@@ -379,7 +377,20 @@
     "permissionFailed": "Couldn't change the permission.",
     "removeFailed": "Couldn't remove the user.",
     "teamFailed": "Couldn't change organization sharing.",
-    "publicFailed": "Couldn't change the public link."
+    "publicFailed": "Couldn't change the public link.",
+    "noAccountBadge": "no account yet",
+    "noAccountBadgeTitle": "They will see the map once they sign up with this address.",
+    "invite": {
+      "sent": "{{email}} has no account yet — we sent an invitation explaining how to open the project.",
+      "already_sent": "{{email}} has no account yet. An invitation to this project was already sent earlier and is not sent again.",
+      "no_smtp": "{{email}} has no account yet and no invitation was sent — this instance has no mail server set up. Let them know another way.",
+      "limit": "{{email}} has no account yet and no invitation was sent — today's invitation limit is used up. Let them know another way.",
+      "failed": "{{email}} has no account yet and the invitation could not be sent. Let them know another way."
+    },
+    "inviteClosedCanInvite": "They cannot sign up here on their own — an admin has to create the account. You can invite them right away.",
+    "inviteClosedAskAdmin": "They cannot sign up here on their own — ask your organization admin to invite them.",
+    "inviteToOrg": "Invite to organization",
+    "copyRegisterLink": "Copy sign-up link"
   },
   "node": {
     "projectBadge": "Project",
@@ -434,21 +445,9 @@
     "orgAddSub": "Add subordinate",
     "orgBadge": "Organization",
     "orgNewPosition": "New position",
-    "recurrenceBadgeHint": "This goal repeats — when completed it returns with the deadline advanced"
-  },
-  "aiChat": {
-    "undoTitle": "Undo the last AI change",
-    "emptyTitle": "Ask about your goal map.",
-    "emptyHint": "The AI suggests changes you can confirm.",
-    "emptyReply": "Empty reply",
-    "connectionError": "Could not reach the AI.",
-    "applied": "✓ Changes applied",
-    "discarded": "Changes discarded",
-    "quickSuggest": "Suggest improvements",
-    "quickMissing": "What am I missing?",
-    "quickSimplify": "Simplify the map",
-    "thinking": "AI is thinking...",
-    "inputPlaceholder": "Type a message..."
+    "recurrenceBadgeHint": "This goal repeats — when completed it returns with the deadline advanced",
+    "plannedBadge": "Plan",
+    "plannedHint": "When I want to work on it"
   },
   "operations": {
     "heading": "Suggested changes ({{count}})",

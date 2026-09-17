@@ -4,7 +4,7 @@ import { useLazyNs } from '@/i18n/lazyNs';
 import { MembersContext, labelForEmail } from '@/lib/memberLabel';
 import { isExternalOwner } from '@/lib/externalContacts';
 import { Handle, Position } from '@xyflow/react';
-import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip, Handshake, Flame } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, CalendarCheck, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip, Handshake, Flame } from 'lucide-react';
 import { useGoalMap } from './GoalMapContext';
 import { useTimer } from '@/lib/TimerContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -82,6 +82,7 @@ function GoalNode({ id, data, selected }) {
   const members = useContext(MembersContext);
   const ownerLabel = labelForEmail(members, data.owner);
   const deadlineStatus = getDeadlineStatus(data.deadline, data.status);
+  const planovano = !!data.plannedOn && data.status !== 'done';
   const deadlineBadgeClass = deadlineStatus === 'overdue' ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300' : deadlineStatus === 'upcoming' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
 
   const nodeStyle = customColor
@@ -325,12 +326,21 @@ function GoalNode({ id, data, selected }) {
         ))}
       </div>
 
-      {(deadlineStatus || waitingSet?.has(id) || data.owner || data.blocks || isAutomated || wantsAutomation) && (
+      {(deadlineStatus || planovano || waitingSet?.has(id) || data.owner || data.blocks || isAutomated || wantsAutomation) && (
         <div className="px-3 pb-1 flex items-center gap-1.5 flex-wrap">
           {deadlineStatus && (
             <span title={`${t('tasks:taskDialog.labelDeadline')}: ${formatDeadline(data.deadline)}`} className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${deadlineBadgeClass}`}>
               <Calendar className="w-2.5 h-2.5" />
               {formatDeadline(data.deadline)}
+            </span>
+          )}
+          {/* „Kdy to budu řešit" (plán z Mého dne / asistenta) — v mapě dřív nebylo vidět
+              (Richard 14. 9. 2026). Jiná ikona a barva než termín: plán je moje volba,
+              termín je závazek. Hotový uzel plán neukazuje. */}
+          {planovano && (
+            <span title={`${t('node.plannedHint')}: ${formatDeadline(data.plannedOn)}`} className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary" data-testid="node-planned">
+              <CalendarCheck className="w-2.5 h-2.5" />
+              {t('node.plannedBadge')} {formatDeadline(data.plannedOn)}
             </span>
           )}
           {/* iniciály GARANTA — u ai/cron uzlu zůstávají, jen se vedle nich objeví

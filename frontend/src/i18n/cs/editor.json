@@ -44,10 +44,6 @@
     "align": "Zarovnat",
     "alignTitle": "Zarovnat mapu — tlačítko ukazuje styl, který na mapě právě je; stisknutím přepnete na další (do šířky → kompaktně → kolem středu). Podržením styl zamknete pro všechny mapy.",
     "share": "Sdílet",
-    "suggestAi": "Navrhnout s AI",
-    "aiChat": "AI chat",
-    "note": "Poznámka",
-    "addNoteTitle": "Přidat poznámku",
     "addGoal": "Přidat cíl",
     "bottlenecks": "Úzká hrdla",
     "bottlenecksTitle": "Zvýraznit úzká hrdla a blokující kroky",
@@ -75,7 +71,9 @@
     "readabilityShort_normal": "normální",
     "readabilityShort_large": "větší",
     "readabilityShort_titleOnly": "jen název",
-    "rules": "Pravidla"
+    "rules": "Pravidla",
+    "suggestAi": "Navrhnout s AI",
+    "asistent": "Asistent"
   },
   "saveState": {
     "saving": "Ukládání...",
@@ -355,7 +353,7 @@
   },
   "shareDialog": {
     "title": "Sdílet mapu",
-    "description": "Přístup se váže na e-mail — kolega mapu uvidí po registraci se stejnou adresou.",
+    "description": "Přístup se váže na e-mail. Kdo ještě nemá účet, dostane pozvánku a mapu uvidí po registraci se stejnou adresou.",
     "emailPlaceholder": "email@example.com",
     "permRead": "Číst",
     "permWork": "Spolupracovat",
@@ -379,7 +377,20 @@
     "permissionFailed": "Nepodařilo se změnit oprávnění.",
     "removeFailed": "Nepodařilo se odebrat uživatele.",
     "teamFailed": "Nepodařilo se změnit sdílení s organizací.",
-    "publicFailed": "Nepodařilo se změnit veřejný odkaz."
+    "publicFailed": "Nepodařilo se změnit veřejný odkaz.",
+    "noAccountBadge": "zatím bez účtu",
+    "noAccountBadgeTitle": "Mapu uvidí, až se zaregistruje s touto adresou.",
+    "invite": {
+      "sent": "{{email}} zatím nemá účet — poslali jsme pozvánku s návodem, jak projekt otevřít.",
+      "already_sent": "{{email}} zatím nemá účet. Pozvánka k tomuto projektu už odešla dřív, znovu se neposílá.",
+      "no_smtp": "{{email}} zatím nemá účet a pozvánka neodešla — instance nemá nastavenou mailovou bránu. Dejte mu vědět jinak.",
+      "limit": "{{email}} zatím nemá účet a pozvánka neodešla — dnešní limit pozvánek je vyčerpaný. Dejte mu vědět jinak.",
+      "failed": "{{email}} zatím nemá účet a pozvánku se nepodařilo odeslat. Dejte mu vědět jinak."
+    },
+    "inviteClosedCanInvite": "Sám se tu zaregistrovat nemůže — účet mu musí založit správce. Můžete ho pozvat rovnou.",
+    "inviteClosedAskAdmin": "Sám se tu zaregistrovat nemůže — požádejte správce organizace, ať ho pozve.",
+    "inviteToOrg": "Pozvat do organizace",
+    "copyRegisterLink": "Kopírovat odkaz na registraci"
   },
   "node": {
     "projectBadge": "Projekt",
@@ -434,21 +445,9 @@
     "orgAddSub": "Podřízená pozice",
     "orgBadge": "Organizace",
     "orgNewPosition": "Nová pozice",
-    "recurrenceBadgeHint": "Cíl se opakuje — po dokončení se sám vrátí s posunutým termínem"
-  },
-  "aiChat": {
-    "undoTitle": "Vrátit poslední AI změnu",
-    "emptyTitle": "Ptejte se na vaši mapu cílů.",
-    "emptyHint": "AI navrhne změny, které můžete potvrdit.",
-    "emptyReply": "Prázdná odpověď",
-    "connectionError": "Chyba spojení s AI.",
-    "applied": "✓ Změny aplikovány",
-    "discarded": "Změny zahozeny",
-    "quickSuggest": "Navrhnout úpravy",
-    "quickMissing": "Co mi chybí?",
-    "quickSimplify": "Zjednodušit mapu",
-    "thinking": "AI přemýšlí...",
-    "inputPlaceholder": "Napište zprávu..."
+    "recurrenceBadgeHint": "Cíl se opakuje — po dokončení se sám vrátí s posunutým termínem",
+    "plannedBadge": "Plán",
+    "plannedHint": "Kdy to chci řešit"
   },
   "operations": {
     "heading": "Navrhované změny ({{count}})",

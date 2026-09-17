@@ -800,6 +800,13 @@ function aiConfig(app) {
     token: env("AI_TOKEN") || "",
     transcribeUrl: env("AI_TRANSCRIBE_URL") || "",
     transcribeModel: env("AI_TRANSCRIBE_MODEL") || "",
+    // KB_AI_OPENAI_EXTRA: JSON objekt navíc do těla openai volání (např.
+    // {"reasoning_effort":"none"} pro DeepSeek@AKI) — stejný vzor jako
+    // KB_CHAT_OPENAI_EXTRA v chat.js
+    extra: (function (v) {
+      if (!v) return null;
+      try { const o = JSON.parse(String(v)); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch (err) { return null; }
+    })(env("AI_OPENAI_EXTRA")),
   };
 }
 
@@ -1041,7 +1048,10 @@ function apiKeyAuth(app, e, need) {
       store.set(accKey, 0);
     } catch (err) { /* best-effort audit */ }
   }
-  return { user: user, key: key, lang: L };
+  // via pro životopis uzlu: zápis dočasným klíčem AI chatu na boku se do historie
+  // přizná jako „AI asistent (jménem uživatele)", ne jako klik člověka (Richard 13. 9. 2026)
+  const via = key.getString("label") === "ai-asistent" ? "asistent:" + user.getString("email") : "";
+  return { user: user, key: key, lang: L, via: via };
 }
 
 // MCP/v1: serverové zrcadlo lib/cleanMap.js (kanonický ukládaný tvar mapy) +
@@ -2541,6 +2551,56 @@ function layoutTreeServer(nodes, edges, opts) {
       phantoms.push(ph);
     });
   }
+  // DVOUŘADÉ BALENÍ UVNITŘ STROMU (15. 9. 2026): spadlý list = vzpěra + poloviční
+  // rozestup k sourozencům, plný SLOT k cizím podstromům (detail u FE dvojčete)
+  const sirkaKarty = (id) => (lookup[id] && lookup[id].type === "apexNode" ? 260 : lookup[id] && lookup[id].type === "personalRoot" ? 120 : 220);
+  const vyskaKarty = (id) => (lookup[id] && lookup[id].type === "apexNode" ? 260 : lookup[id] && lookup[id].type === "personalRoot" ? 120 : 170);
+  const spadly = Object.create(null);
+  const spadlyPh = Object.create(null);
+  const spadleVetve = Object.create(null);
+  // které listy spadnou: čistá řada střídá (kompakt první nahoře, pásy první
+  // dolů); smíšená řada po úsecích mezi větvemi, soused větve zůstává nahoře,
+  // kompakt střídá od větve ven, pásy od kraje dovnitř (sync s FE)
+  // smíšená řada: VŠECHNY větve i s podstromem o patro níž, listy střídavě
+  // jako v čisté řadě (kompakt první nahoře, pásy první dolů); balí se jen
+  // když listů není míň než větví a žádná větev není řešená vzpěrami skupin
+  // (sync s FE, vysvětlení tam)
+  const spadneVRade = (rada) => {
+    const listy = rada.filter(isLeafId);
+    const vetve = rada.filter((c) => !isLeafId(c));
+    if (listy.length < 2 || listy.length < vetve.length || vetve.some((v) => resenoVzperami[v])) return { listy: [], vetve: [] };
+    return { listy: listy.filter((_, k) => (bands >= 2 ? k % 2 === 0 : k % 2 === 1)), vetve: vetve };
+  };
+  if (stagger >= 2 || bands >= 2) for (const n of layoutNodes) {
+    if (resenoVzperami[n.id]) continue;
+    const rada = (childrenMap[n.id] || []).filter((c) => lookup[c]).sort((a, b) => crossOf(a) - crossOf(b));
+    const listy = rada.filter(isLeafId);
+    if (listy.length < 2) continue;
+    const nejsirsi = Math.max.apply(null, listy.map(sirkaKarty).concat([0]));
+    const krok = Math.max(SLOT, nejsirsi + 50) / 2;
+    const nejvyssiKarta = Math.max.apply(null, listy.map(vyskaKarty).concat([0]));
+    const patro = Math.max(STEP - 40, nejvyssiKarta + 40);
+    const spad = spadneVRade(rada);
+    spad.listy.forEach((l) => {
+      const ph = "::patro::" + l;
+      reprOf[ph] = l; nahradniDeti[ph] = [l]; swapChild[l] = ph; phantoms.push(ph);
+      spadly[l] = { krok: krok, patro: patro }; spadlyPh[ph] = l;
+    });
+    // větev smíšené řady i s podstromem o patro níž (1 vzpěra; sync s FE shodOPatra(v, 1)), karta ve výšce patra
+    spad.vetve.forEach((v) => {
+      const ph = "::pas::" + v + "::0";
+      swapChild[v] = ph; reprOf[ph] = v; nahradniDeti[ph] = [v]; phantoms.push(ph);
+      spadleVetve[v] = patro;
+    });
+  }
+  const sep = (a, b) => {
+    if (a.parent && a.parent === b.parent) {
+      const la = spadlyPh[a.id], lb = spadlyPh[b.id];
+      if (la) return spadly[la].krok;
+      if (lb) return spadly[lb].krok;
+    }
+    return SLOT;
+  };
   const kidsOf = (id) => {
     const base = nahradniDeti[id] ? nahradniDeti[id] : (childrenMap[id] || []).filter((c) => lookup[c]);
     return reprOf[id] ? base : base.map((c) => swapChild[c] || c);
@@ -2600,7 +2660,7 @@ function layoutTreeServer(nodes, edges, opts) {
       if (++kroku > STROP) break;
       vim = nextRight(vim); vip = nextLeft(vip); vom = nextLeft(vom); vop = nextRight(vop);
       vop.ancestor = v;
-      const shift = (vim.prelim + sim) - (vip.prelim + sip) + distance;
+      const shift = (vim.prelim + sim) - (vip.prelim + sip) + sep(vim, vip);
       if (shift > 0) { moveSubtree(ancestorFn(vim, v, defaultAncestor), v, shift); sip += shift; sop += shift; }
       sim += vim.mod; sip += vip.mod; som += vom.mod; sop += vop.mod;
     }
@@ -2613,7 +2673,7 @@ function layoutTreeServer(nodes, edges, opts) {
     v._fw = true;
     if (v.children.length === 0) {
       const w = leftSibling(v);
-      v.prelim = w ? w.prelim + distance : 0;
+      v.prelim = w ? w.prelim + sep(w, v) : 0;
     } else {
       let da = v.children[0];
       for (let i = 0; i < v.children.length; i++) { firstWalk(v.children[i], distance); da = apportion(v.children[i], da, distance); }
@@ -2624,7 +2684,7 @@ function layoutTreeServer(nodes, edges, opts) {
         ? v.children[(kk - 1) / 2].prelim
         : (v.children[kk / 2 - 1].prelim + v.children[kk / 2].prelim) / 2;
       const w = leftSibling(v);
-      if (w) { v.prelim = w.prelim + distance; v.mod = v.prelim - midpoint; } else { v.prelim = midpoint; }
+      if (w) { v.prelim = w.prelim + sep(w, v); v.mod = v.prelim - midpoint; } else { v.prelim = midpoint; }
     }
   };
   const positions = Object.create(null);
@@ -2644,6 +2704,9 @@ function layoutTreeServer(nodes, edges, opts) {
     for (let i = 0; i < v.children.length; i++) secondWalk(v.children[i], m + v.mod, depth + 1);
   };
   if (roots.length) { firstWalk(VROOT, SLOT); secondWalk(VROOT, -VROOT.prelim, -1); }
+  // spadlý list o `patro` níž, ne o celý STEP (sync s FE)
+  for (const l of Object.keys(spadly)) { if (positions[l]) positions[l].y -= STEP - spadly[l].patro; }
+  for (const v of Object.keys(spadleVetve)) { if (positions[v]) positions[v].y -= STEP - spadleVetve[v]; }
 
   // KOLEM VRCHOLU — „po kategoriích" na mapě o jedné řadě karet (Richardův
   // obrázek 11. 8. v noci; 14. 8. pravý sloupec otočen SHORA DOLŮ — číslované
@@ -2692,35 +2755,6 @@ function layoutTreeServer(nodes, edges, opts) {
     }
   }
 
-  // DVOUŘADÉ BALENÍ ŘADY KARET — řada karet bez podcílů se zabalí do dvou
-  // pater s polovičním krokem (vzpěry tu neušetří nic, drží slot v horní
-  // řadě). Detail u FE dvojčete; sync hlídá layout-parity.
-  if (stagger >= 2 || bands >= 2) {
-    for (const n of layoutNodes) {
-      if (resenoVzperami[n.id]) continue;
-      const kids = (childrenMap[n.id] || []).filter((c) => lookup[c] && positions[c]);
-      if (kids.length < 2 || !kids.every(isLeafId)) continue;
-      const radaOd = kids.slice().sort((a, b) => positions[a].x - positions[b].x);
-      const stred = (positions[radaOd[0]].x + positions[radaOd[radaOd.length - 1]].x) / 2;
-      // karty v téže řadě jsou od sebe 2×krok — musí se vejít vedle sebe (sync s FE)
-      const sirkaKarty = (id) => (lookup[id] && lookup[id].type === "apexNode" ? 260 : lookup[id] && lookup[id].type === "personalRoot" ? 120 : 220);
-      const nejsirsi = Math.max.apply(null, radaOd.map(sirkaKarty).concat([0]));
-      const krok = Math.max(SLOT, nejsirsi + 50) / 2;
-      const start = stred - ((radaOd.length - 1) * krok) / 2;
-      // kompakt nechává první kartu nahoře, pásy shazují první dolů — jinak
-      // vyjdou oba styly na hluboké mapě identicky (sync s FE)
-      // Spodní řada jde blíž než celý krok úrovně, ale NIKDY míň, než je karta
-      // vysoká — jinak se řady překryjí (sync s FE; server měřené rozměry nemá,
-      // proto výchozí 170 / 260 / 120 podle typu uzlu).
-      const vyskaOf2 = (id) => (lookup[id] && lookup[id].type === "apexNode" ? 260 : lookup[id] && lookup[id].type === "personalRoot" ? 120 : 170);
-      const nejvyssiKarta = Math.max.apply(null, radaOd.map(vyskaOf2).concat([0]));
-      const patro = Math.max(STEP - 40, nejvyssiKarta + 40);
-      radaOd.forEach((c, i) => {
-        const dolu = bands >= 2 ? i % 2 === 0 : i % 2 === 1;
-        positions[c] = { x: start + i * krok, y: positions[c].y + (dolu ? patro : 0) };
-      });
-    }
-  }
   return positions;
 }
 
@@ -6853,7 +6887,7 @@ function generateDailySummary(app, userId, email, cfg, lang) {
     // num_predict kryje i reasoning tokeny thinking modelů (gpt-oss) — proto
     // víc, než by 2 věty potřebovaly
     text = advisorText(system, userMsg, {
-      provider: cfg.provider, url: cfg.url, model: cfg.model, token: cfg.token,
+      provider: cfg.provider, url: cfg.url, model: cfg.model, token: cfg.token, extra: cfg.extra || null, // extra = KB_*_OPENAI_EXTRA (reasoning_effort); bez něj DeepSeek@AKI promyslí celý strop a vrátí 500
     }, { numPredict: 1000, lang: (lang === "en" ? "en" : "cs") });
   } else {
     // api/custom — stejný kontrakt jako advisor routa (mode chat), serverový token;
@@ -7016,6 +7050,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 }
 
 module.exports = {
+  fmtDateLocal, addDaysStr,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,

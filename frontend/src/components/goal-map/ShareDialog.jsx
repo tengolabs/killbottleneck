@@ -15,10 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, UserPlus, Trash2, Mail, Users, Eye, Pencil, UserCheck, Globe, Copy, Check, Building2 } from 'lucide-react';
+import { Loader2, UserPlus, Trash2, Mail, Users, Eye, Pencil, UserCheck, Globe, Copy, Check, Building2, MailCheck, MailWarning } from 'lucide-react';
 import BusyIcon from '@/components/shared/BusyIcon';
 import { useDialogForm } from '@/hooks/useDialogForm';
 import { serverOrigin } from '@/lib/serverUrl';
+import { useAuth } from '@/lib/AuthContext';
+import InviteDialog from '@/components/tasks/InviteDialog';
 
 // isOwner: spolusprávce (jmenované „Upravovat") spravuje jen jmenovitý seznam —
 // týmový přístup a zveřejnění vidí a mění jen vlastník (server je stejně odmítne).
@@ -37,6 +39,13 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
   // týmový přístup) — bez nich seznam u týmové mapy říkal míň, než je pravda
   const [teamWorkers, setTeamWorkers] = useState([]);
   const [copied, setCopied] = useState(false);
+  // Výsledek sdílení s adresou BEZ ÚČTU (server: invite / registration_open /
+  // can_invite_to_org). Dřív tu byla jen šedá věta v popisku a sdílející
+  // nepoznal, že se adresát nic nedozví (nález z bety 16. 9. 2026).
+  const [pozvanka, setPozvanka] = useState(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const { user } = useAuth();
   // jeden `busy` pro všech pět mutací (jako dřív jeden `submitting`); texty chyb
   // se liší akci od akce, proto je hlásí každá sama přes f.setError
   const f = useDialogForm({ open, onClose, submit: () => handleShare() });
@@ -66,6 +75,8 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
       setError('');
       setNewPermission('read');
       setCopied(false);
+      setPozvanka(null);
+      setLinkCopied(false);
     }
   }, [open, mapId, loadMembers]);
 
@@ -73,6 +84,8 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
     if (!email.trim()) return;
     return f.run(async () => {
       try {
+        setPozvanka(null);
+        setLinkCopied(false);
         const res = await shareMap({ action: 'share', mapId, email: email.trim(), permission: newPermission });
         if (res?.error) {
           setError(res.error);
@@ -86,6 +99,14 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
               ? { ...m, permission: res.member.permission }
               : m))
             : [...prev, res.member]));
+          if (res.member?.registered === false && res.invite && res.invite !== 'external') {
+            setPozvanka({
+              email: res.member.email,
+              invite: res.invite,
+              registrationOpen: !!res.registration_open,
+              canInviteToOrg: !!res.can_invite_to_org,
+            });
+          }
           setEmail('');
         }
       } catch (e) {
@@ -152,6 +173,15 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
       setError(t('shareDialog.publicFailed'));
     }
   });
+
+  const handleCopyRegisterLink = async () => {
+    if (!pozvanka) return;
+    const url = `${serverOrigin()}/register?email=${encodeURIComponent(pozvanka.email)}`;
+    if (await copyToClipboard(url)) {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
 
   const handleCopyLink = async () => {
     const url = `${serverOrigin()}/map/${mapId}`;
@@ -231,6 +261,44 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
             <p className="text-sm text-destructive">{f.error}</p>
           )}
 
+          {pozvanka && (
+            <div
+              data-testid="share-invite-notice"
+              data-invite={pozvanka.invite}
+              className={`rounded-lg border p-3 text-sm space-y-2 ${
+                ['sent', 'already_sent'].includes(pozvanka.invite)
+                  ? 'border-primary/30 bg-primary/5'
+                  : 'border-amber-500/40 bg-amber-500/10'
+              }`}
+            >
+              <div className="flex gap-2">
+                {['sent', 'already_sent'].includes(pozvanka.invite)
+                  ? <MailCheck className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
+                  : <MailWarning className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />}
+                <div className="space-y-1">
+                  <p>{t(`shareDialog.invite.${pozvanka.invite}`, { email: pozvanka.email })}</p>
+                  {!pozvanka.registrationOpen && (
+                    <p className="text-muted-foreground">
+                      {pozvanka.canInviteToOrg ? t('shareDialog.inviteClosedCanInvite') : t('shareDialog.inviteClosedAskAdmin')}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {!pozvanka.registrationOpen && pozvanka.canInviteToOrg && (
+                <Button size="sm" variant="outline" className="w-full" onClick={() => setInviteOpen(true)}>
+                  <UserPlus className="w-4 h-4" />
+                  {t('shareDialog.inviteToOrg')}
+                </Button>
+              )}
+              {pozvanka.registrationOpen && !['sent', 'already_sent'].includes(pozvanka.invite) && (
+                <Button size="sm" variant="outline" className="w-full" onClick={handleCopyRegisterLink}>
+                  {linkCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  {linkCopied ? t('tasks:inviteDialog.copied') : t('shareDialog.copyRegisterLink')}
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <p className="text-sm font-medium text-muted-foreground">
               {t('shareDialog.sharedWithCount', { count: members.length })}
@@ -260,6 +328,15 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                         </p>
                         {m.full_name && (
                           <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                        )}
+                        {m.registered === false && (
+                          <p
+                            className="text-xs text-amber-600 dark:text-amber-500 truncate"
+                            data-testid="share-no-account"
+                            title={t('shareDialog.noAccountBadgeTitle')}
+                          >
+                            {t('shareDialog.noAccountBadge')}
+                          </p>
                         )}
                         {m.permission === 'read' && m.has_work && (
                           <p
@@ -418,6 +495,12 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
           </Button>
         </DialogFooter>
       </DialogContent>
+      <InviteDialog
+        open={inviteOpen}
+        currentRole={user?.role}
+        initialEmail={pozvanka?.email}
+        onClose={() => setInviteOpen(false)}
+      />
     </Dialog>
   );
 }

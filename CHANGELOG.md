@@ -9,6 +9,147 @@ below before you jump several versions.
 
 ---
 
+## v0.61-beta — 2026-09-17
+
+**AI assistant on the side (with images and deadlines); share invitations for addresses without an account**
+
+This is the first public release of the AI assistant. It was built and tested in two private
+builds (`v0.61-beta-ai1`, `v0.61-beta-ai2`); everything from them is listed below.
+
+**Sharing: invitation e-mail for an address without an account**
+
+- Sharing a project with an address that has no account yet now sends an **invitation e-mail**
+  (subject names the person sharing, Reply-To goes to them, button leads to registration with the
+  address pre-filled). Where self-registration is not possible (registration key, hosted instance,
+  seat cap) the e-mail advises asking for an account. Previously nothing was sent at all.
+- Anti-spam: one invitation per address and project, a daily cap per sender
+  (`KB_SHARE_INVITE_DAILY_CAP`, default 20) and per instance (`KB_SHARE_INVITE_INSTANCE_CAP`, default 50).
+- The share dialog shows the invitation state, marks members "no account yet", offers a copyable
+  registration link when e-mail is not configured, and lets administrators/managers invite the
+  person into the organization directly.
+
+**AI assistant: images, deadlines and safer rules**
+
+- **Assignee for steps with a deadline**: before the assistant writes new steps with a deadline
+  that you would handle (or that have no assignee), it asks *"Do you want to be the assignee of the
+  steps with a deadline? Then you will see them in My day."* — enforced by the server, not only
+  by the prompt. "No" leaves them unassigned; steps for someone else need no question. The card
+  for adding nodes to an existing project now lists the assignees too.
+- The assistant panel header has a labelled **+ New** button right next to the conversation title.
+- Tasks page: the views are now ordered **Table, Calendar, Timeline, Kanban**.
+- **Images in the assistant**: paste a screenshot (Ctrl+V), drop it on the input or use the
+  image button — e.g. a photo of handwritten notes, a phone task list or an e-mail. A vision
+  model transcribes it; the assistant then offers to put the items into the idea buffer, into
+  an existing project, or to create a new project (that option is always offered). The original
+  image is **not stored**: the conversation keeps the transcript and a small thumbnail (the last
+  3 per conversation). Several items go into the idea buffer on **one** confirmation card that
+  lists all of them. Configuration: `KB_VISION_*` (see `.env.example`); without it images are
+  refused. Text read from an image is treated as data: memory changes from such a turn need a card.
+- **Deadlines through the assistant**: the assistant may now **set, change or remove a deadline**
+  (when a date agreed with someone follows from the conversation or a pasted e-mail) — always on
+  a confirmation card showing the old and new date. This replaces the v0.61-beta-ai1 note that
+  deadlines can never be changed by the assistant. Existing permission checks still apply.
+- **Reminders that would never fire are not created**: a "deadline approaching" rule on a node
+  without a deadline, with a reminder day already in the past, or notifying the owner of a node
+  that has none, is rejected before the card with an explanation. Rule shape is validated before
+  the card too, so you no longer confirm a rule that then fails. After creating a rule the
+  assistant states exactly when the notification arrives.
+- **Assistant behaviour**: no duplicated final answers, no running commentary between reading
+  steps, a project from pasted items is created directly (no detour through the idea buffer),
+  an "Open project" button under the answer, "what next" chips stay clickable.
+- **Limits**: the chat route rejects bodies over ~2 MB before reading them; an image turn uses 3
+  turns of the hourly limit (`KB_AI_IMG_VAHA`), counted atomically and only for valid images.
+
+**AI chat on the side: an assistant that sees your projects, asks short questions and proposes changes you confirm**
+
+- **Assistant panel** (right edge, full height, collapsible to a tab, resizable 320–640 px): chat
+  with a model that can read your maps, My day, the idea buffer, rules and the organization
+  overview. Reading happens immediately; **every change (put an idea into a project, create a
+  project from several ideas, add or update nodes, create or toggle a rule) is shown as a card
+  and executed only after you press Yes**. Small personal actions (a single idea into the buffer,
+  a memory note, switching the look, a text draft) happen without a card — unless the turn
+  contained an image.
+- **Short questions with prepared answers**: when the request is ambiguous the assistant asks
+  1–3 questions with 2–4 options each (plus a free-text answer).
+- **Look switching**: "switch my look to sepia" changes the skin (with Revert); light/dark too.
+- **Memory**: the assistant keeps markdown notes about you (preferences, context) — visible and
+  editable in the panel; you can clear it any time.
+- **Configuration**: `KB_CHAT_PROVIDER/URL/MODEL/TOKEN` (own model for the chat), otherwise
+  `KB_SUMMARY_*`, otherwise the general AI settings. Needs a model with tool calling (ollama:
+  gemma4, qwen3.x, gpt-oss; OpenAI: gpt-4o-mini…). Usage is logged per model
+  (`GET /api/kb/chat/spotreba`).
+- Writes go through the product's own v1 API with a temporary key of the user ("a key acts as
+  its owner"), so validation, rights and notifications are the same as for MCP and the app.
+- Not in the phone (lite) layout in this version.
+- The idea buffer panel (Home, Tasks, map editor) reloads itself as soon as the assistant adds an
+  idea or moves one into a project — previously the new idea appeared only after a page reload,
+  so "saved to the buffer" looked like a false claim.
+
+- In the map editor the assistant also knows which node you have **selected**: "break this
+  step down" means the selected node. The client sends only the node id; the server looks the
+  title up in the map and appends it at the very end of the system prompt, so clicking through
+  nodes does not invalidate the cached prompt prefix.
+- **Map shows "when I want to work on it"**: a node planned from My day (or by the assistant)
+  carries a small *Plan 14 Sep* badge next to the deadline badge, so the plan is visible in
+  the map too. Done nodes do not show it. The deadline badge is unchanged (a plan never moves
+  the deadline).
+- When you state a goal or a problem ("I'd like to work with fewer interruptions"), the
+  assistant no longer only schedules: among the options it always offers **"Advise me how to do
+  it"** and, when chosen, gives 3–5 concrete steps tied to your map and offers to write them in
+  as sub-steps.
+- Notifications (toasts) no longer cover the chat input while the assistant panel is open on
+  desktop — they shift left of the panel.
+- **Cheaper prompts**: the system message now holds only what does not change between turns
+  (rules → date → mode → project notes → memory → map titles). Where you are and the selected
+  node travel as a short bracket in front of your own message and are stored with it, so the
+  history never changes retroactively; steps already offered are visible to the model in its
+  earlier `suggest_next` calls instead of a growing list. Measured on the real model: a state
+  change (task done, new suggestion) used to drop the cached prompt prefix to ~4k tokens and
+  recompute the whole history; now the prefix survives. The log records cached prompt tokens
+  (`ai_chat_log.tokens_cached`, from `usage.prompt_tokens_details.cached_tokens` or llama-server
+  `timings.cache_n`); the usage endpoint and the AI credits section count cached input at the
+  cache price. The map list no longer carries open-node counts (the model reads them with tools).
+- **New project from scratch**: "I'd like a new map for a hot-dog stand" now makes the assistant
+  propose the title, the goal and 5–8 first steps itself and offer them on one confirmation card
+  (tool `create_project`). You are always the owner — it no longer asks for an owner e-mail —
+  and right after creation it offers fitting preparations (financial overview, suppliers…).
+- The confirmation card for "add nodes" now shows the total count when the assistant proposes
+  more than four nodes (including nested ones), so you know what you are approving.
+
+**AI credits in Organization admin**
+
+- New section **AI credits** (administrators): this week's assistant usage in credits for the
+  whole organization and per person, split into *administrators* and *other members*, plus the
+  previous weeks. 1 credit ≈ one morning briefing (2 410 input + 454 output tokens, about
+  CZK 0.08 at the reference price); counted from the assistant chat log.
+- **Weekly quota**: credits per week (0 = no limit) and the administrators' share in % (default
+  30 %); the rest is shared by the other members. Runs Monday to Sunday (UTC), no carry-over.
+  When a group's share is used up, the assistant answers with a clear message instead of a
+  reply. Hosting can cap the quota with `KB_AI_KVOTA_TYDEN`; the value saved in the app can
+  only lower that cap, never raise it. The check runs before a turn and usage is logged after
+  it, so the last turn may overshoot slightly (soft cap). Endpoints `GET /api/kb/ai-kredity`, `POST /api/kb/ai-kredity/nastaveni`.
+- Not counted yet: the older AI features inside the map (they do not log tokens).
+
+**Upgrade notes**: new collections `ai_chats`, `ai_memory`, `ai_chat_log` (server-written only);
+new JSON field `instance_settings.ai_kredity`.
+The panel appears only when the chat model is configured; nothing changes otherwise.
+Images additionally need `KB_VISION_*` (see `.env.example`); sharing invitations need a configured
+e-mail gateway. No other configuration change.
+
+---
+
+## v0.60.1-beta — 2026-09-15
+
+**Wider pages on a large monitor (matching the calendar), top bar aligned with content**
+
+- On a wide monitor the Projects, Templates, Tasks, Organization and Archive pages are wider —
+  matching the calendar — and the top bar lines up with them. Nothing changes on smaller windows
+  or on a phone.
+
+Upgrade notes: no migration, no configuration change.
+
+---
+
 ## v0.60-beta — 2026-09-11
 
 **New calendar on Tasks: Month / Week / Day / Agenda, drag a deadline with confirmation, phone layout; goal icons in My day**

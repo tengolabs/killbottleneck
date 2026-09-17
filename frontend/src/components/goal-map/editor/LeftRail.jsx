@@ -1,16 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import { Search, X, Filter, BarChart3 } from 'lucide-react';
+import { Search, X, Filter, Zap, BarChart3 } from 'lucide-react';
 import BufferPanel from '@/components/goal-map/BufferPanel';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ReportRailButton from '@/components/shared/ReportRailButton';
 
-// Levá lišta plátna: zásobník, časovač, lupa, filtr Moje úkoly, dashboard,
-// nahlásit chybu. Čistě prezentační: JSX přesunuto 1:1 z GoalMapEditor (F1-07).
+// Levá lišta plátna shora: lupa (top-4), zásobník (top-16), časovač (top-28),
+// filtr Moje úkoly (top-40), pravidla (top-52), dashboard (top-64), nahlásit
+// chybu (19rem). Čistě prezentační: JSX přesunuto 1:1 z GoalMapEditor (F1-07).
+// 15. 9. 2026 (Richard): lupa nahoru NAD zásobník; Pravidla z horní lišty sem,
+// mezi filtr a dashboard — horní lišta se uvolnila (logo bylo vytlačené).
 export default function LeftRail({
   bufferEnabled, dashboardOpen, buffer, canEdit, insertBufferItem, bufferOpen, toggleBuffer,
-  timeLogOpen, user, isPublicView, activeMapId, mapId, nodes, toggleTimeLog,
+  timeLogOpen, user, isPublicView, isTemplatePreview, activeMapId, mapId, nodes, toggleTimeLog,
   railLeft, searchOpen, setSearchOpen, searchQuery, setSearchQuery,
-  myTasksOnly, setMyTasksOnly, setDashboardOpen,
+  myTasksOnly, setMyTasksOnly, mapRules, setRulesDefaults, setRulesOpen, setDashboardOpen,
 }) {
   const { t } = useTranslation('editor');
   return (
@@ -33,16 +36,16 @@ export default function LeftRail({
         {user && !isPublicView && !dashboardOpen && (
           <TimeLogPanel mapId={activeMapId || mapId} nodes={nodes} open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />
         )}
-        {/* Levá lišta pod zásobníkem (top-16) a časovačem (top-28): LUPA
-            rozbalí vyhledávání, FILTR přepíná Moje úkoly (Richard 11. 8. —
-            z horní lišty pryč, „je to jen filtr"). Aktivní stav je vidět na
-            ikoně, panely lištu odsouvají stejně jako ouška. */}
+        {/* LUPA nad zásobníkem (top-4; pruh s názvem projektu jí uhýbá doprava)
+            rozbalí vyhledávání, FILTR pod časovačem přepíná Moje úkoly (Richard
+            11. 8. — z horní lišty pryč, „je to jen filtr"), PRAVIDLA pod ním.
+            Aktivní stav je vidět na ikoně, panely lištu odsouvají stejně jako ouška. */}
         {!dashboardOpen && (() => {
           const railCls = railLeft ? '' : 'border-l-0';
           return (
             <>
               {searchOpen ? (
-                <div style={{ left: railLeft }} className={`absolute top-40 z-30 flex items-center gap-1 rounded-r-lg border ${railCls} bg-card pl-1 pr-1 py-1.5 shadow-md`}>
+                <div style={{ left: railLeft }} className={`absolute top-4 z-30 flex items-center gap-1 rounded-r-lg border ${railCls} bg-card pl-1 pr-1 py-1.5 shadow-md`}>
                   {/* lupa je přepínač: druhý klik pole zavře (dotaz zůstává platný
                       a zavřená lupa ho ukazuje podbarvením); křížek maže a zavírá */}
                   <button
@@ -73,7 +76,7 @@ export default function LeftRail({
                   onClick={() => setSearchOpen(true)}
                   style={{ left: railLeft }}
                   title={t('toolbar.searchPlaceholder')}
-                  className={`absolute top-40 z-30 flex items-center rounded-r-lg border ${railCls} bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all`}
+                  className={`absolute top-4 z-30 flex items-center rounded-r-lg border ${railCls} bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all`}
                 >
                   <Search className={`w-4 h-4 ${searchQuery ? 'text-primary' : 'text-muted-foreground'}`} />
                 </button>
@@ -83,9 +86,28 @@ export default function LeftRail({
                   onClick={() => setMyTasksOnly((v) => !v)}
                   style={{ left: railLeft }}
                   title={t('toolbar.myTasksTitle')}
-                  className={`absolute top-52 z-30 flex items-center rounded-r-lg border ${railCls} px-2 py-2.5 shadow-md transition-all ${myTasksOnly ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-secondary'}`}
+                  className={`absolute top-40 z-30 flex items-center rounded-r-lg border ${railCls} px-2 py-2.5 shadow-md transition-all ${myTasksOnly ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-secondary'}`}
                 >
                   <Filter className="w-4 h-4" />
+                </button>
+              )}
+              {/* Automatizační pravidla mapy — jen editor. Do 15. 9. 2026 na horní
+                  liště (a pod 1850 px v ⋮ menu); testid `toolbar-rules` zůstává,
+                  klik-testy (ui-rules, ui-kanban, ui-zastupce…) ho hledají. */}
+              {canEdit && user && activeMapId && !isPublicView && !isTemplatePreview && (
+                <button
+                  onClick={() => { setRulesDefaults({}); setRulesOpen(true); }}
+                  style={{ left: railLeft }}
+                  title={`${t('toolbar.rules')}${mapRules.length > 0 ? ` (${mapRules.length})` : ''}`}
+                  data-testid="toolbar-rules"
+                  className={`absolute top-52 z-30 flex items-center rounded-r-lg border ${railCls} bg-card px-2 py-2.5 shadow-md text-muted-foreground hover:bg-secondary transition-all`}
+                >
+                  <Zap className="w-4 h-4" />
+                  {mapRules.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-[1.1rem] text-center font-semibold">
+                      {mapRules.length}
+                    </span>
+                  )}
                 </button>
               )}
             </>

@@ -92,6 +92,51 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await zarovnat();
     ok((await poradi(false)) === pred, 'a drží i po dalším zarovnání ve svislém view');
 
+    // Richard 15. 9. 2026: po sevřeném stylu (část karet o patro níž) přepnutí
+    // Na šířku poslalo spadlé karty na KONEC řady a zpět už se to nevrátilo.
+    // ⚠️ Sekce úvodní mapy jsou SKUPINY (v řadě zůstávají, padají jen jejich
+    // listy) — hlídat se musí řada LISTŮ: vlastní mapa vrchol + 6 karet.
+    console.log('== řada listů: kompakt + přepnutí směru tam a zpět drží pořadí ==');
+    const listMapa = await (await fetch(`${BASE}/api/collections/goalmaps/records`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: auth.token },
+      body: JSON.stringify({ title: 'SMER-LISTY', nodes: [
+        { id: 'apex', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Vrchol', title: 'Vrchol', status: 'todo' } },
+        ...['L1', 'L2', 'L3', 'L4', 'L5', 'L6'].map((t, i) => ({ id: t, type: 'goalNode', position: { x: -700 + i * 270, y: 380 }, data: { title: `Karta ${t}`, status: 'todo' } })),
+      ], edges: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'].map((t) => ({ id: 'e' + t, source: 'apex', target: t })) }),
+    })).json();
+    await page.goto(`${BASE}/map/${listMapa.id}`, { waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length >= 7, { timeout: 30000 }).catch(() => {});
+    await sleep(1500);
+    const poradiListu = (horiz) => page.evaluate((horiz) => {
+      const found = [];
+      for (const el of document.querySelectorAll('.react-flow__node')) {
+        const m = (el.textContent || '').match(/Karta (L\d)/);
+        if (!m) continue;
+        const r = el.getBoundingClientRect();
+        found.push({ s: m[1], k: horiz ? r.top : r.left });
+      }
+      return found.sort((a, b) => a.k - b.k).map((f) => f.s).join(' ');
+    }, horiz);
+    for (let i = 0; i < 3; i++) {
+      if (/kompakt/i.test(await page.evaluate(() => document.querySelector('button[data-align-lock]')?.textContent || ''))) break;
+      await zarovnat();
+    }
+    ok(/kompakt/i.test(await page.evaluate(() => document.querySelector('button[data-align-lock]')?.textContent || '')), 'svisle nastaven styl kompaktně');
+    const vysky = await page.evaluate(() => new Set([...document.querySelectorAll('.react-flow__node')].filter((el) => /Karta L/.test(el.textContent || '')).map((el) => Math.round(el.getBoundingClientRect().top / 10))).size);
+    ok(vysky === 2, `kompakt dal 6 karet do dvou pater (${vysky})`);
+    const predSmer = await poradiListu(false);
+    ok(predSmer === 'L1 L2 L3 L4 L5 L6', `svisle čtení zleva L1…L6 (${predSmer})`);
+    await page.evaluate(() => document.querySelector('button[data-dir="horizontal"]')?.click());
+    await sleep(1500);
+    ok((await poradiListu(true)) === predSmer, `Na šířku drží pořadí karet (${await poradiListu(true)})`);
+    await page.evaluate(() => document.querySelector('button[data-dir="vertical"]')?.click());
+    await sleep(1500);
+    ok((await poradiListu(false)) === predSmer, `Na výšku zpět drží pořadí karet (${await poradiListu(false)})`);
+    // zpět na úvodní mapu pro další sekce sady
+    await page.goto(`${BASE}/map/${mapy.items[0].id}`, { waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length >= 20, { timeout: 45000 }).catch(() => {});
+    await sleep(1500);
+
     // ---- POPISEK PATŘÍ MAPĚ, NE PROHLÍŽEČI (Richard 11. 8. 2026 v noci) ----
     // „U mapy, kterou otevírám poprvé, mám nahoře stav zarovnat…, ale je to
     // ten první stav. Pak zmáčknu tlačítko a mapa je pořád stejná, jen se to

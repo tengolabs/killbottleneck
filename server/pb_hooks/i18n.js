@@ -164,6 +164,35 @@ const STRINGS = {
     cs: "Pokud pozvánku nečekáte, můžete tento e-mail v klidu ignorovat — bez nastavení hesla se nic nestane.",
     en: "If you were not expecting this invitation, feel free to ignore this e-mail — nothing happens until a password is set.",
   },
+  // ── pozvánka ke SDÍLENÉMU PROJEKTU pro adresu bez účtu (pozvankaSdileni.js) ──
+  // Nález z bety 16. 9. 2026: sdílení na neregistrovanou adresu neposlalo nic.
+  // Předmět nese adresu sdílejícího (ne „killBottleneck") ze stejného důvodu jako
+  // pozvánka do organizace — od noreply to vypadá jako reklama.
+  "sharemail.subject": {
+    cs: "{actor} s vámi sdílí projekt „{project}“",
+    en: "{actor} shared the project “{project}” with you",
+  },
+  "sharemail.heading": { cs: "Někdo s vámi sdílí projekt", en: "A project was shared with you" },
+  "sharemail.body": {
+    cs: "{actor} s vámi v killBottlenecku sdílí projekt „{project}“ — mapu cílů, kroků a toho, kdo na čem pracuje.",
+    en: "{actor} shared the project “{project}” with you in killBottleneck — a map of goals, steps and who is working on what.",
+  },
+  "sharemail.howOpen": {
+    cs: "Abyste projekt viděli, zaregistrujte se touto e-mailovou adresou: {email}. Přístup se k ní naváže sám, hned po přihlášení ho najdete mezi projekty.",
+    en: "To see the project, sign up with this e-mail address: {email}. Access is tied to it and the project shows up among your projects right after you sign in.",
+  },
+  "sharemail.howClosed": {
+    cs: "Na této instanci si účet nezaložíte sami — zakládá ho správce organizace. Odpovězte na tento e-mail a {actorEmail} vám pozvánku zařídí. Jakmile budete mít účet s adresou {email}, projekt uvidíte.",
+    en: "You cannot create an account on this instance yourself — accounts are set up by the organization admin. Reply to this e-mail and {actorEmail} will arrange an invitation. Once you have an account with the address {email}, you will see the project.",
+  },
+  "sharemail.button": { cs: "Zaregistrovat se", en: "Sign up" },
+  "sharemail.ignore": {
+    cs: "Pokud nikoho takového neznáte, e-mail v klidu ignorujte — bez registrace se nic nestane.",
+    en: "If you do not know the sender, feel free to ignore this e-mail — nothing happens without signing up.",
+  },
+  "sharemail.boxTitle": { cs: "Sdílený projekt", en: "Shared project" },
+  "sharemail.boxProject": { cs: "Projekt:", en: "Project:" },
+  "sharemail.boxEmail": { cs: "Registrujte se e-mailem:", en: "Sign up with:" },
   // ── uvítací mail po PRVNÍM VSTUPU pozvaného ──────────────────────
   // Nález z ostrého provozu: pozvaný si nastavil heslo, prošel aplikací, zavřel
   // prohlížeč — a druhý den nevěděl ani jméno organizace, ani adresu. Pozvánkový
@@ -740,6 +769,18 @@ const STRINGS = {
     cs: "Ollama běží. Doplňte název modelu.",
     en: "Ollama is running. Add the model name.",
   },
+  "err.aiKvotaAdmin": {
+    cs: "Týdenní kvóta AI kreditů pro správce je vyčerpána ({pouzito} z {kvota}). Obnoví se v pondělí; správce může kvótu nebo podíl upravit ve Správě organizace.",
+    en: "The weekly AI credit quota for administrators is used up ({pouzito} of {kvota}). It resets on Monday; an administrator can change the quota or the split in Organization admin.",
+  },
+  "err.aiKvotaOstatni": {
+    cs: "Týdenní kvóta AI kreditů pro členy týmu je vyčerpána ({pouzito} z {kvota}). Obnoví se v pondělí; správce může kvótu nebo podíl upravit ve Správě organizace.",
+    en: "The weekly AI credit quota for team members is used up ({pouzito} of {kvota}). It resets on Monday; an administrator can change the quota or the split in Organization admin.",
+  },
+  "err.aiKvotaNeplatna": {
+    cs: "Kvóta musí být celé číslo 0–1 000 000 kreditů a podíl správců 0–100 %.",
+    en: "The quota must be a whole number 0–1,000,000 credits and the administrators' share 0–100 %.",
+  },
   "err.aiRateLimited": {
     cs: "Vyčerpali jste hodinový strop AI operací ({limit}). Zkuste to za chvíli — strop chrání kredit u vašeho poskytovatele.",
     en: "You have used up the hourly cap of AI operations ({limit}). Try again shortly — the cap protects your provider credit.",
@@ -802,6 +843,15 @@ const STRINGS = {
     en: "Invalid expiry — use a future date in YYYY-MM-DD format.",
   },
   "err.adminOnly": { cs: "Tohle smí jen administrátor.", en: "Administrators only." },
+  // AI chat na boku (13. 9. 2026)
+  "err.chatFailed": { cs: "Asistent neodpověděl: {msg}", en: "The assistant did not respond: {msg}" },
+  "err.chatNoMessage": { cs: "Napište zprávu.", en: "Write a message." },
+  "err.chatImageType": { cs: "Obrázek musí být PNG, JPEG nebo WebP.", en: "The image must be PNG, JPEG or WebP." },
+  "err.chatImageTooBig": { cs: "Obrázek je větší než {mb} MB.", en: "The image is larger than {mb} MB." },
+  "err.chatVisionOff": { cs: "Čtení obrázků není na téhle instanci zapnuté — řekněte to prosím správci.", en: "Reading images is not enabled on this instance — please tell your administrator." },
+  "err.chatNotFound": { cs: "Rozhovor nenalezen.", en: "Conversation not found." },
+  "err.chatActionNotFound": { cs: "Akce už nečeká na potvrzení.", en: "This action is no longer waiting for confirmation." },
+  "err.chatMemoryTooLong": { cs: "Paměť je příliš dlouhá (max {max} znaků).", en: "The memory is too long (max {max} characters)." },
   "err.badPurpose": {
     cs: "Neplatný účel — povolené hodnoty: team, family, solo.",
     en: "Invalid purpose — allowed values: team, family, solo.",

@@ -59,17 +59,44 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const hranyPoDelete = await page.evaluate(() => document.querySelectorAll('.react-flow__edge').length);
     expect(hranyPoDelete === 1, `hrana vrchol→dítě Delete přežila (${hranyPoDelete}/1)`);
 
-    console.log('== běžný uzel Delete smaže dál ==');
+    console.log('== Delete s OTEVŘENÝM dialogem uzlu nesmaže (Richard 15. 9. 2026) ==');
+    await page.click('.react-flow__node.react-flow__node-goalNode');
+    await sleep(400);
     await page.evaluate(() => {
       const n = [...document.querySelectorAll('.react-flow__node')].find((x) => (x.innerText || '').includes('Podřízený'));
-      n?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const tuzka = [...n.querySelectorAll('button')].find((b) => b.querySelector('.lucide-pencil'));
+      tuzka?.click();
     });
+    await sleep(800);
+    expect(!!(await page.$('[role="dialog"][data-state="open"]')), 'dialog uzlu je otevřený (uzel pod ním zůstal vybraný)');
+    // fokus je v dialogu, ale NE v textovém poli — přesně scénář z hlášení
+    await page.evaluate(() => document.querySelector('[role="dialog"] button')?.focus());
+    await page.keyboard.press('Delete');
+    await sleep(800);
+    txt = await page.evaluate(() => document.body.innerText);
+    expect(txt.includes('Podřízený') && (await page.evaluate(() => document.querySelectorAll('.react-flow__node').length)) === 2, 'uzel pod otevřeným dialogem Delete přežil');
+    await page.keyboard.press('Escape');
+    await sleep(500);
+    expect(!(await page.$('[role="dialog"][data-state="open"]')), 'dialog zavřen');
+
+    console.log('== běžný uzel Delete smaže dál + jde vzít Zpět ==');
     await page.click('.react-flow__node.react-flow__node-goalNode');
     await sleep(400);
     await page.keyboard.press('Delete');
     await sleep(800);
     txt = await page.evaluate(() => document.body.innerText);
     expect(!txt.includes('Podřízený'), 'běžný uzel jde smazat jako dřív');
+    const zpet = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('header button')].find((x) => (x.getAttribute('title') || '') === 'Vrátit zpět');
+      if (!b || b.disabled) return { nasel: !!b, disabled: b?.disabled };
+      b.click(); return { nasel: true, disabled: false };
+    });
+    expect(zpet.nasel && !zpet.disabled, `tlačítko Zpět je po klávesovém smazání aktivní (${JSON.stringify(zpet)})`);
+    await sleep(800);
+    txt = await page.evaluate(() => document.body.innerText);
+    expect(txt.includes('Podřízený'), 'Zpět vrátilo uzel smazaný klávesou');
+    const hranyPoZpet = await page.evaluate(() => document.querySelectorAll('.react-flow__edge').length);
+    expect(hranyPoZpet === 1, `i hrana k němu se vrátila (${hranyPoZpet}/1)`);
 
     console.log('== přejmenování vrcholu funguje ==');
     await page.evaluate(() => {

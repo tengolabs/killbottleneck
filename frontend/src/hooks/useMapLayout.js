@@ -37,16 +37,23 @@ export function useMapLayout({
     // Dřív se tu layoutovalo bez stylu, takže přepnutí směru zarovnání zahodilo.
     const stylOpts = ALIGN_OPTS[alignStyleRef.current] || {};
     const smerOpts = (dir) => (personalMap ? { ...PERSONAL_LAYOUT(dir, citelnostRef.current), ...stylOpts } : stylOpts);
+    // ⚠️ Layout v NOVÉM směru dostává pozice ze STARÉHO směru — a pořadí
+    // sourozenců čte z příčné osy nového směru, tj. z HLOUBKY starého. Dokud
+    // měla řada jednu hloubku, stabilní sort to zakryl; jakmile sevřené styly
+    // shodily část karet o patro, přepnutí Na šířku poslalo spadlé karty na
+    // konec řady a zpět už se to nevrátilo (Richard 15. 9. 2026: „úplně se to
+    // zamíchá"). Proto se osy prohodí — stejně jako v layoutAllForView.
+    const prohozene = nodes.map((n) => (n.type === 'note' || !n.position ? n : { ...n, position: { x: n.position.y, y: n.position.x } }));
     if (direction === 'horizontal') {
       const snap = new Map();
       nodes.forEach((n) => { if (n.type !== 'note') snap.set(n.id, n.position); });
       canonicalPosRef.current = snap;
-      const pos = layoutTree(nodes, edges, 'horizontal', smerOpts('horizontal'));
+      const pos = layoutTree(prohozene, edges, 'horizontal', smerOpts('horizontal'));
       skipNextSave.current = true;
       setNodes((prev) => prev.map((n) => (pos[n.id] ? { ...n, position: pos[n.id] } : n)));
     } else {
       const canon = canonicalPosRef.current;
-      const vlay = layoutTree(nodes, edges, 'vertical', smerOpts('vertical'));
+      const vlay = layoutTree(prohozene, edges, 'vertical', smerOpts('vertical'));
       skipNextSave.current = true;
       setNodes((prev) => prev.map((n) => {
         if (n.type === 'note') return n;

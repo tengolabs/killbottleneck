@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
 import { useTranslation } from 'react-i18next';
 import { useLazyNs } from '@/i18n/lazyNs';
+import { zmensiObrazek as zmensiSnimek, doBase64 } from '@/lib/obrazek';
 
 // Nahlásit chybu nebo nápad provozovateli (Richard 18. 8. 2026).
 //
@@ -30,35 +31,6 @@ function nazevStranky(cesta, t) {
   const znamy = t(`report.stranky.${c}`, { defaultValue: '' });
   return znamy || t('report.stranky.jina');
 }
-
-// Snímek se zmenšuje UŽ v prohlížeči (max hrana 1600 px, JPEG): 4K screenshot
-// má klidně 6 MB a limit routy jsou 2 MB — po převodu zbývá ~250 kB.
-const zmensiSnimek = (soubor) => new Promise((resolve, reject) => {
-  const url = URL.createObjectURL(soubor);
-  const img = new Image();
-  img.onload = () => {
-    URL.revokeObjectURL(url);
-    const pomer = Math.min(1, 1600 / Math.max(img.width, img.height, 1));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(img.width * pomer));
-    canvas.height = Math.max(1, Math.round(img.height * pomer));
-    const ctx = canvas.getContext('2d');
-    // JPEG průhlednost neumí — bez podkladu by alfa z PNG skončila černá
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob'))), 'image/jpeg', 0.82);
-  };
-  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
-  img.src = url;
-});
-
-const doBase64 = (blob) => new Promise((resolve, reject) => {
-  const r = new FileReader();
-  r.onload = () => resolve(String(r.result).split(',', 2)[1] || '');
-  r.onerror = () => reject(new Error('read'));
-  r.readAsDataURL(blob);
-});
 
 export default function ReportDialog({ open, onClose, userEmail, version }) {
   const { t } = useTranslation('popis');

@@ -42,6 +42,17 @@ export function useBufferNodes(user) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Zásobník změnil někdo mimo tento hook (AI asistent přidal nápad nebo ho
+  // přesunul do projektu) → znovu načíst hned, ne až po reloadu stránky.
+  // Bez toho asistent řekl „nápad je v zásobníku“, záznam v DB byl, ale panel
+  // ho neukázal (13. 9. 2026, tengo).
+  useEffect(() => {
+    if (!user) return undefined;
+    const tick = () => { refresh(); };
+    window.addEventListener('kb-buffer-changed', tick);
+    return () => window.removeEventListener('kb-buffer-changed', tick);
+  }, [user, refresh]);
+
   const add = useCallback(async ({ title, description = '', color = '', deadline = '' }) => {
     const item = await base44.entities.BufferNode.create({ title, description, color, deadline });
     setItems((prev) => [item, ...prev]);
@@ -181,6 +192,7 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
     return (
       <button
         onClick={toggle}
+        data-testid="buffer-toggle"
         title={t('tasks:taskTable.bufferSection')}
         style={{ left: leftOffset }}
         className={`${pos} top-16 z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all ${leftOffset ? '' : 'border-l-0'}`}
@@ -196,7 +208,7 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
   }
 
   return (
-    <div className={`${pos} left-0 top-0 bottom-0 w-full sm:w-72 bg-card border-r shadow-xl flex flex-col z-20`}>
+    <div data-testid="buffer-panel" className={`${pos} left-0 top-0 bottom-0 w-full sm:w-72 bg-card border-r shadow-xl flex flex-col z-20`}>
       <div className="h-12 border-b flex items-center justify-between px-4 shrink-0">
         {/* klik na ikonku/název zavírá stejně jako křížek — jedním klikem tam i zpět */}
         <button onClick={toggle} title={t('buffer.closeTitle')} className="flex items-center gap-2 hover:opacity-70 transition-opacity">
@@ -242,6 +254,7 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
         {items.map((item) => (
           <div
             key={item.id}
+            data-testid="buffer-item"
             draggable={canEdit}
             onDragStart={(e) => {
               e.dataTransfer.setData(BUFFER_DRAG_MIME, JSON.stringify(item));

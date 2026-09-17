@@ -24,7 +24,8 @@
     "tasks": "Úkoly",
     "templates": "Šablony",
     "myMap": "Moje mapa",
-    "organizace": "Organizace"
+    "organizace": "Organizace",
+    "aiChat": "AI asistent"
   },
   "notFound": {
     "title": "Stránka nenalezena",

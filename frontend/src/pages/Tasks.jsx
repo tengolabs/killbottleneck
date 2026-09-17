@@ -417,14 +417,15 @@ export default function Tasks() {
               <TabsTrigger value="table" className="gap-1.5">
                 <LayoutList className="w-3.5 h-3.5" /> {t('tasksPage.viewTable')}
               </TabsTrigger>
+              {/* pořadí Richard 17. 9. 2026: Tabulka, Kalendář, Časová osa, Kanban */}
+              <TabsTrigger value="calendar" className="gap-1.5">
+                <CalendarDays className="w-3.5 h-3.5" /> {t('tasksPage.viewCalendar')}
+              </TabsTrigger>
               <TabsTrigger value="timeline" className="gap-1.5">
                 <CalendarRange className="w-3.5 h-3.5" /> {t('tasksPage.viewTimeline')}
               </TabsTrigger>
               <TabsTrigger value="board" className="gap-1.5">
                 <Columns3 className="w-3.5 h-3.5" /> {t('tasksPage.viewBoard')}
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-1.5">
-                <CalendarDays className="w-3.5 h-3.5" /> {t('tasksPage.viewCalendar')}
               </TabsTrigger>
             </TabsList>
           </Tabs>

@@ -7,11 +7,9 @@ import { useState, useCallback, useRef } from 'react';
 // toast „Opravit strom" držel opravitStrom z doby načtení a Zpět po opravě vracel
 // mapu bez mezitím přidaných uzlů. Vedlejší zisk: pushHistory je stabilní →
 // vypadne z deps ~10 handlerů (handleAddChild, insertBufferItem, handleAlign…).
-export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges, toast, t }) {
+export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
   const historyRef = useRef([]);
   const [canUndo, setCanUndo] = useState(false);
-  const aiSnapshotRef = useRef(null);
-  const [canUndoAi, setCanUndoAi] = useState(false);
 
   const pushHistory = useCallback(() => {
     historyRef.current.push({ nodes: nodesNow.current, edges: edgesNow.current });
@@ -30,16 +28,5 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges, toast, t
     setCanUndo(historyRef.current.length > 0);
   }, [setNodes, setEdges]);
 
-  const handleUndoAi = useCallback(() => {
-    const snapshot = aiSnapshotRef.current;
-    if (!snapshot) return;
-    // bez skipNextSave — stejný důvod jako u handleUndo (nález F1-02)
-    setNodes(snapshot.nodes.map((n) => ({ ...n })));
-    setEdges(snapshot.edges.map((e) => ({ ...e })));
-    aiSnapshotRef.current = null;
-    setCanUndoAi(false);
-    toast({ title: t('toasts.aiUndone'), description: t('toasts.aiUndoneDesc') });
-  }, [setNodes, setEdges, toast]);
-
-  return { historyRef, canUndo, pushHistory, handleUndo, aiSnapshotRef, canUndoAi, setCanUndoAi, handleUndoAi };
+  return { historyRef, canUndo, pushHistory, handleUndo };
 }

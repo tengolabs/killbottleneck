@@ -68,7 +68,7 @@ const api = async (method, path, { token, body } = {}) => {
       b.click();
       return true;
     });
-    ok(bleskJe, 'blesk „Pravidla" je na velké liště');
+    ok(bleskJe, 'blesk „Pravidla" je v levé liště (od 15. 9. 2026 pod filtrem Moje úkoly)');
     await sleep(800);
     ok(await page.evaluate(() => (document.querySelector('[role="dialog"]')?.innerText || '').includes('Automatizační pravidla')),
       'otevřel se přehled pravidel mapy');

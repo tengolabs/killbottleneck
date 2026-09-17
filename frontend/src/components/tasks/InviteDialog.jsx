@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,9 +19,11 @@ import { useDialogForm } from '@/hooks/useDialogForm';
 
 // Pozvání kolegy do týmu — admin volí roli, manažer zve jen členy
 // (server to vynucuje tak jako tak). Bez SMTP: ukážeme dočasné heslo k předání.
-export default function InviteDialog({ open, currentRole, onClose, onInvited }) {
+// initialEmail: předvyplněná adresa (dialog sdílení nabízí pozvat člověka bez účtu).
+export default function InviteDialog({ open, currentRole, initialEmail, onClose, onInvited }) {
   const { t } = useTranslation('tasks');
   const [email, setEmail] = useState('');
+  useEffect(() => { if (open && initialEmail) setEmail(initialEmail); }, [open, initialEmail]);
   const [role, setRole] = useState('user');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');

@@ -403,7 +403,10 @@ export function useMapAutosave({
   // (serverNodes/serverEdges/serverTitle/serverColor), „moje" = plátno teď.
   // Když merge narazí na skutečnou kolizi, vrací false a volající sáhne po
   // pruhu/dialogu — tichý merge NIKDY nesmí vzít rozepsanou změnu.
-  const slitCiziZmenu = useCallback(async (znamy) => {
+  // opts.duvera: cizí změna je VLASTNÍ akce uživatele potvrzená v AI chatu na
+  // boku (13. 9. 2026) — slije se i bez dokladu běhů pravidel; skutečný střet
+  // dvou rukou na jednom uzlu dál hlídá trojcestnyMerge (r.ok).
+  const slitCiziZmenu = useCallback(async (znamy, opts) => {
     try {
       const srv = znamy || (await base44.entities.GoalMap.filter({ id: activeMapId }))?.[0];
       if (!srv) return false;
@@ -448,7 +451,7 @@ export function useMapAutosave({
             uzlyPravidel = await uzlyBehlychPravidel(baseUpdated.current, srv.updated_date);
             if (stableJson(platno()) !== stableJson(pred)) continue; // psal mi pod rukama → přepočítat
           }
-          if (!pokrytoPravidly(r.prevzateUzly, uzlyPravidel, srv)) return false;
+          if (!(opts && opts.duvera) && !pokrytoPravidly(r.prevzateUzly, uzlyPravidel, srv)) return false;
         }
         break;
       }
@@ -530,22 +533,27 @@ export function useMapAutosave({
   useEffect(() => {
     if (!activeMapId || isDraft || isPublicView || isTemplatePreview || !canEdit) return undefined;
     let busy = false;
-    const tick = async () => {
+    const tick = async (ev) => {
       if (busy || document.visibilityState !== 'visible') return;
       if (saveInFlight.current || conflict || remoteChanged) return;
       busy = true;
+      // změna z AI chatu = vlastní potvrzená akce → slít i bez dokladu pravidel
+      const duvera = !!(ev && ev.type === 'kb-map-changed');
       try {
         const fresh = await base44.entities.GoalMap.get(activeMapId, { fields: 'updated' });
         if (fresh.updated_date && baseUpdated.current
             && fresh.updated_date !== baseUpdated.current && !saveInFlight.current) {
-          if (!(await slitCiziZmenu())) setRemoteChanged(true);
+          if (!(await slitCiziZmenu(null, { duvera }))) setRemoteChanged(true);
         }
       } catch { /* výpadek sítě/práv ohlásí až skutečné uložení; pruh-spam je horší */ }
       busy = false;
     };
     const iv = setInterval(tick, 45000);
     window.addEventListener('kb-native-resume', tick);
-    return () => { clearInterval(iv); window.removeEventListener('kb-native-resume', tick); };
+    // AI chat na boku změnil mapu (potvrzená akce) → slít hned, ne až za 45 s
+    // (Richard 13. 9. 2026: „v mapě se to nezměnilo, musel jsem aktualizovat")
+    window.addEventListener('kb-map-changed', tick);
+    return () => { clearInterval(iv); window.removeEventListener('kb-native-resume', tick); window.removeEventListener('kb-map-changed', tick); };
   }, [activeMapId, isDraft, isPublicView, isTemplatePreview, canEdit, conflict, remoteChanged, slitCiziZmenu]);
 
   return {

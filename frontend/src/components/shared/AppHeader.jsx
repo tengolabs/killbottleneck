@@ -11,7 +11,9 @@ import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/shared/NotificationBell';
 import TimerWidget from '@/components/shared/TimerWidget';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Smartphone } from 'lucide-react';
+import { ArrowLeft, Smartphone, Bot } from 'lucide-react';
+import { useAsistent } from '@/lib/AsistentContext';
+import { useAiModes } from '@/hooks/useAiEnabled';
 import { PAGE_CONTAINER } from '@/lib/layout';
 
 // Jednotná hlavička přihlášené aplikace (Home i Úkoly) — stejné logo, navigace
@@ -27,6 +29,8 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
   const { t: tLite } = useTranslation('lite');
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const asistent = useAsistent();
+  const ai = useAiModes();
   const NAV = [
     { key: 'projects', label: t('nav.projects'), to: '/' },
     { key: 'tasks', label: t('nav.tasks'), to: '/tasks' },
@@ -99,6 +103,19 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
         <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
           {actions}
           <TimerWidget />
+          {/* AI chat na boku — přepínač; panel sám žije v App.jsx přes všechny stránky */}
+          {user && ai.has('chat_panel') && (
+            <Button
+              variant={asistent.open ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => asistent.setOpen((v) => !v)}
+              title={t('nav.aiChat')}
+              aria-label={t('nav.aiChat')}
+              data-testid="chat-toggle"
+            >
+              <Bot className="w-4 h-4" />
+            </Button>
+          )}
           <NotificationBell />
           <ThemeToggle />
           {/* CESTA ZPĚT DO LITE REŽIMU, vidět bez otevírání menu.

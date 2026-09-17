@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
+import { useAsistent } from '@/lib/AsistentContext';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Loader2, Target, Trash2, Lock, Unlock, Sun, Moon, ChevronDown, Map as MapIcon, Palette, SlidersHorizontal } from 'lucide-react';
 import { detectBottlenecks } from '@/lib/bottlenecks';
@@ -158,7 +159,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // spolupracovník (work): mapa read-only, ale smí cyklovat stav SVÝCH uzlů routou /node-status
   const [canWork, setCanWork] = useState(false);
   const archiveOfferShown = useRef(false); // auto-nabídka archivace max 1× za otevření mapy
-  const highlightDone = useRef(false);
+  const highlightDone = useRef(''); // id uzlu, na který se už najelo — nový ?node= (z chatu při otevřené mapě) najede znovu
 
   const skipNextSave = useRef(true);
   // „latest ref" aktuálních uzlů/hran: callbacky s dlouhým životem (letící
@@ -177,10 +178,10 @@ function EditorContent({ mapId, personalMap = false }) {
   // VZOROVÁ (needitovaná) podoba šablony — projekt vzniká z ní, ne z rozklikaného náhledu
   const sablonaCistaRef = useRef(null);
   const templateSeedsRef = useRef(null); // {idMap, rules} z náhledu šablony — pravidla se založí až s mapou
-  // Zpět + Vrátit AI změny — hooks/useMapHistory.js (F1-07)
+  // Zpět — hooks/useMapHistory.js (F1-07)
   const {
-    canUndo, pushHistory, handleUndo, aiSnapshotRef, canUndoAi, setCanUndoAi, handleUndoAi,
-  } = useMapHistory({ nodesNow, edgesNow, setNodes, setEdges, toast, t });
+    canUndo, pushHistory, handleUndo,
+  } = useMapHistory({ nodesNow, edgesNow, setNodes, setEdges });
   const buffer = useBufferNodes(user);
   const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
 
@@ -272,6 +273,16 @@ function EditorContent({ mapId, personalMap = false }) {
       return false;
     }
   }, [activeMapId, toast]);
+  // vybraný uzel → AI asistent („tenhle krok“ = vybraný uzel; Richard 14. 9. 2026).
+  // Jen id + název (ne poloha), ať se kontext nemění při tažení uzlu.
+  const { setUzel: hlasUzelAsistentovi } = useAsistent();
+  const vybranyUzelId = useMemo(() => { const n = nodes.find((x) => x.selected); return n ? n.id : ''; }, [nodes]);
+  const vybranyUzelNazev = useMemo(() => { const n = vybranyUzelId ? nodes.find((x) => x.id === vybranyUzelId) : null; return n ? String((n.data && (n.data.title || n.data.apexText)) || '') : ''; }, [nodes, vybranyUzelId]);
+  useEffect(() => {
+    hlasUzelAsistentovi(vybranyUzelId && activeMapId ? { map_id: activeMapId, node_id: vybranyUzelId, title: vybranyUzelNazev } : null);
+  }, [hlasUzelAsistentovi, vybranyUzelId, vybranyUzelNazev, activeMapId]);
+  useEffect(() => () => hlasUzelAsistentovi(null), [hlasUzelAsistentovi]);
+
   const isDraft = mapId === 'new' && !activeMapId;
   // Build children map from edges
   const childrenMap = useMemo(() => buildChildrenMap(edges), [edges]);
@@ -587,17 +598,18 @@ function EditorContent({ mapId, personalMap = false }) {
 
   // Deep-link /map/:id?node=<id> — najet na uzel a zvýraznit ho (výběr = ring)
   useEffect(() => {
-    if (highlightDone.current || loading || !rfInstance) return;
+    if (loading || !rfInstance) return;
     const highlightId = new URLSearchParams(location.search).get('node');
-    if (!highlightId) return;
+    if (!highlightId || highlightDone.current === highlightId) return;
     const node = nodes.find((n) => n.id === highlightId);
     if (!node) {
-      // uzel v mapě není (smazaný / špatné id) — závoru zvednout, ať se aspoň
-      // ukáže celá mapa místo zamrzlého výřezu
-      if (nodes.length > 0) { highlightDone.current = true; pendingDeepLink.current = false; }
+      // uzel v mapě (zatím) není — závoru zvednout, ať se ukáže celá mapa místo
+      // zamrzlého výřezu; ale NEoznačit za hotové: uzel právě přidaný z AI chatu
+      // dorazí tichým slitím o chvíli později a pak se na něj najede
+      if (nodes.length > 0) pendingDeepLink.current = false;
       return;
     }
-    highlightDone.current = true;
+    highlightDone.current = highlightId;
     // vycentrovat cíl a nechat vidět SOUSEDY (ne maximální přiblížení na jeden uzel)
     centerOnNode(highlightId);
     // závoru držet, dokud animace nedoběhne (delay 60 + duration 500)
@@ -819,12 +831,20 @@ function EditorContent({ mapId, personalMap = false }) {
   // Vrchol má deletable:false, takže ho xyflow (VČETNĚ jeho hran) z mazání
   // vynechá už při výpočtu — sem se dostane až očištěný výběr. Tady jen
   // vysvětlíme uživateli, proč se po Delete nad vrcholem „nic nestalo".
+  // ⚠️ Richard 15. 9. 2026: otevřel dialog uzlu, stiskl Delete dřív, než klikl
+  // do pole — xyflow poslouchá klávesy globálně, vybraný uzel POD dialogem
+  // zmizel a Zpět ho neuměl vrátit (klávesové mazání nešlo přes pushHistory).
+  // → s otevřeným dialogem se klávesou nemaže vůbec; jinak se před smazáním
+  // uloží krok do historie, aby Zpět fungovalo stejně jako u koše.
   const handleBeforeDelete = useCallback(
     ({ nodes: delNodes, edges: delEdges }) => {
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return false;
       if (nodes.some((n) => n.selected && isApexNodeShared(n))) apexDeleteRefused();
-      return delNodes.length > 0 || delEdges.length > 0;
+      const smazat = delNodes.length > 0 || delEdges.length > 0;
+      if (smazat) pushHistory();
+      return smazat;
     },
-    [nodes, apexDeleteRefused]
+    [nodes, apexDeleteRefused, pushHistory]
   );
 
   const handleEdgesChange = useCallback(
@@ -895,30 +915,6 @@ function EditorContent({ mapId, personalMap = false }) {
     ]);
     setEditNodeId(newId);
   }, [rfInstance, setNodes, setEditNodeId, pushHistory]);
-
-  const handleAddNote = useCallback(() => {
-    const newId = `note-${Date.now()}`;
-    let position = { x: 100, y: 100 };
-    if (rfInstance) {
-      const center = rfInstance.screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-      position = { x: center.x - 110, y: center.y - 90 };
-    }
-    setNodes((prev) => [
-      ...prev,
-      {
-        id: newId,
-        type: 'note',
-        position,
-        width: 220,
-        height: 180,
-        zIndex: 0,
-        data: { text: '', color: '#fef9c3', width: 220, height: 180 },
-      },
-    ]);
-  }, [rfInstance, setNodes]);
 
   const handleUpdateNote = useCallback(
     (nodeId, patch) => {
@@ -1106,17 +1102,12 @@ function EditorContent({ mapId, personalMap = false }) {
     [setNodes, nodes]
   );
 
-  // AI: Poradce, chat s AI, rozpad/přepis uzlu — hooks/useAiActions.js (F1-07).
+  // AI: rozpad/přepis uzlu z jeho menu — hooks/useAiActions.js (F1-07).
   // Volá se až tady (ne u ostatních useState nahoře): layoutAllForView a
   // centerOnNode vznikají výš v tomhle pořadí, žádný podmíněný return nad tím
-  // není a výstupy (expandingNodeId, advisorOpen, chatOpen, handlery) čte
-  // teprve contextValue a JSX pod ním.
-  const {
-    advisorOpen, setAdvisorOpen, chatOpen, setChatOpen, expandingNodeId,
-    handleAcceptAdvisor, handleExpandNode, handleApplyOperations,
-  } = useAiActions({
-    nodes, edges, setNodes, setEdges, pushHistory, aiSnapshotRef, setCanUndoAi,
-    layoutAllForView, centerOnNode, directionRef, canonicalPosRef, toast, t,
+  // není a výstupy (expandingNodeId, handler) čte teprve contextValue a JSX pod ním.
+  const { expandingNodeId, handleExpandNode } = useAiActions({
+    nodes, edges, setNodes, setEdges, pushHistory, layoutAllForView, centerOnNode, toast, t,
   });
 
   const handleDeleteSelected = useCallback(() => {
@@ -1304,12 +1295,12 @@ function EditorContent({ mapId, personalMap = false }) {
           isMapOwner, personalMap, archived, activeMapId, ai, mapKind,
         }}
         state={{
-          saveStatus, sharedCount, mapTaskCount, mapRules, chatOpen, exporting,
+          saveStatus, sharedCount, mapTaskCount, exporting,
           visibleNodes, canUndo, personalView, showBottlenecks, bottleneckAnalysis,
         }}
         actions={{
-          setShareOpen, handleUndo, setRulesDefaults, setRulesOpen, setAdvisorOpen,
-          setChatOpen, handleAddNote, setPersonalView, handleExport, handleExportJson,
+          setShareOpen, handleUndo,
+          setPersonalView, handleExport, handleExportJson,
           setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
         }}
       />
@@ -1331,6 +1322,7 @@ function EditorContent({ mapId, personalMap = false }) {
         <TitleStrip
           dashboardOpen={dashboardOpen}
           railLeft={railLeft}
+          searchOpen={searchOpen}
           nazevEditace={nazevEditace}
           canEdit={canEdit}
           title={title}
@@ -1504,6 +1496,7 @@ function EditorContent({ mapId, personalMap = false }) {
           timeLogOpen={timeLogOpen}
           user={user}
           isPublicView={isPublicView}
+          isTemplatePreview={isTemplatePreview}
           activeMapId={activeMapId}
           mapId={mapId}
           nodes={nodes}
@@ -1515,6 +1508,9 @@ function EditorContent({ mapId, personalMap = false }) {
           setSearchQuery={setSearchQuery}
           myTasksOnly={myTasksOnly}
           setMyTasksOnly={setMyTasksOnly}
+          mapRules={mapRules}
+          setRulesDefaults={setRulesDefaults}
+          setRulesOpen={setRulesOpen}
           setDashboardOpen={setDashboardOpen}
         />
         {canEdit && nodes.length === 0 && !dashboardOpen && (
@@ -1547,9 +1543,8 @@ function EditorContent({ mapId, personalMap = false }) {
         dialogs={{
           rulesOpen, rulesDefaults, setRulesOpen, handleEnableWaiting,
           taskNodeId, setTaskNodeId, saveTplOpen, setSaveTplOpen, skinOpen, setSkinOpen,
-          shareOpen, setShareOpen, advisorOpen, setAdvisorOpen, handleAcceptAdvisor,
+          shareOpen, setShareOpen,
         }}
-        ai={{ chatOpen, setChatOpen, handleApplyOperations, handleUndoAi, canUndoAi }}
       />
     </div>
   );

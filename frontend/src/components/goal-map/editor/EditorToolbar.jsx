@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, Download, Sparkles, Share2, Eye, Users, Undo2, MessageSquare, StickyNote, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Zap, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Check, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot } from 'lucide-react';
+import { useAsistent } from '@/lib/AsistentContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +61,7 @@ const USPORADAT_ICONS = { deadline: CalendarClock, plannedOn: CalendarCheck, own
 //   actions … handlery tlačítek
 export default function EditorToolbar({ nav, layout, access, state, actions }) {
   const { t } = useTranslation('editor');
+  const asistent = useAsistent();
   const { navigate, org } = nav;
   const {
     direction, setDirMode, recenterMap, kanbanAktivni, kanbanNsReady,
@@ -71,12 +73,12 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
     isMapOwner, personalMap, archived, activeMapId, ai, mapKind,
   } = access;
   const {
-    saveStatus, sharedCount, mapTaskCount, mapRules, chatOpen, exporting,
+    saveStatus, sharedCount, mapTaskCount, exporting,
     visibleNodes, canUndo, personalView, showBottlenecks, bottleneckAnalysis,
   } = state;
   const {
-    setShareOpen, handleUndo, setRulesDefaults, setRulesOpen, setAdvisorOpen,
-    setChatOpen, handleAddNote, setPersonalView, handleExport, handleExportJson,
+    setShareOpen, handleUndo,
+    setPersonalView, handleExport, handleExportJson,
     setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
   } = actions;
 
@@ -179,42 +181,18 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
       onClick: () => setShareOpen(true),
     },
     {
-      // Automatizační pravidla mapy — jen editor; pod 1850 px žijí v ⋮ menu
-      // (lišta je plná a její finální podoba je otevřené rozhodnutí)
-      klic: 'pravidla',
+      // AI chat na boku (asistent přes všechny stránky) — panel žije v App.jsx.
+      // 15. 9. 2026 (Richard): z lišty pryč „Navrhnout s AI“, starý „AI chat“ nad
+      // mapou i „Poznámka“ — lišta byla tak plná, že vytlačila logo vlevo.
+      klic: 'asistent',
       sekceListy: 'akce2',
-      viditelna: canEdit && user && activeMapId && !isPublicView && !isTemplatePreview,
-      Ikona: Zap,
-      popisek: `${t('toolbar.rules')}${mapRules.length > 0 ? ` (${mapRules.length})` : ''}`,
-      testIdListy: 'toolbar-rules',
-      onClick: () => { setRulesDefaults({}); setRulesOpen(true); },
-    },
-    {
-      klic: 'ai',
-      sekceListy: 'akce2',
-      viditelna: canEdit && ai.has('generate') && user,
-      Ikona: Sparkles,
-      popisek: t('toolbar.suggestAi'),
-      onClick: () => setAdvisorOpen(true),
-    },
-    {
-      klic: 'chat',
-      sekceListy: 'akce2',
-      viditelna: canEdit && ai.has('chat') && user,
-      Ikona: MessageSquare,
-      popisek: t('toolbar.aiChat'),
-      titulekListy: t('toolbar.aiChat'),
-      varianta: chatOpen ? 'default' : 'outline',
-      onClick: () => setChatOpen((v) => !v),
-    },
-    {
-      klic: 'poznamka',
-      sekceListy: 'akce2',
-      viditelna: canEdit,
-      Ikona: StickyNote,
-      popisek: t('toolbar.note'),
-      titulekListy: t('toolbar.addNoteTitle'),
-      onClick: handleAddNote,
+      viditelna: ai.has('chat_panel') && user,
+      Ikona: Bot,
+      popisek: t('toolbar.asistent'),
+      titulekListy: t('toolbar.asistent'),
+      testIdListy: 'toolbar-asistent',
+      varianta: asistent.open ? 'default' : 'outline',
+      onClick: () => asistent.setOpen((v) => !v),
     },
     {
       klic: 'exportPng',

@@ -96,15 +96,22 @@ const api = async (method, path, { token, body } = {}) => {
     // ⚠️ Práh `y > 100` dřív vynechal NEJBLIŽŠÍHO souseda — ouško zásobníku sedí
     // na top-16, tedy 64 px. A `prvniIkona === null || …` byla vždy-zelená větev:
     // kdyby lišta ikon zmizela úplně, kontrola by prošla. Obojí z /checkup.
-    const prvniIkona = await page.evaluate((spodekListy) => {
+    // Od 15. 9. 2026 (Richard) sedí lupa nahoře na top-4 a pruh s názvem jí
+    // uhýbá DOPRAVA, ne dolů — hlídá se proto skutečný průnik obdélníků,
+    // ne jen „název končí nad první ikonou".
+    const lista = await page.evaluate((spodekListy, t) => {
+      const nazev = [...document.querySelectorAll('button, input')]
+        .find((i) => (i.tagName === 'INPUT' ? i.value : i.textContent) === t);
+      const n = nazev && nazev.getBoundingClientRect();
       const b = [...document.querySelectorAll('button')]
         .map((x) => x.getBoundingClientRect())
         .filter((r) => r.x < 60 && r.y > spodekListy && r.width < 60);
-      return b.length ? Math.round(Math.min(...b.map((r) => r.y))) : null;
-    }, listaSpodek);
-    ok(prvniIkona !== null, `levá lišta ikon je na svém místě (první ikona ${prvniIkona} px)`);
-    ok(prvniIkona !== null && p && p.spodek <= prvniIkona,
-      `nepřekrývá levou lištu ikon (název končí ${p && p.spodek} px, ikony začínají ${prvniIkona} px)`);
+      const prekryv = n ? b.filter((r) => r.x < n.right && r.right > n.x && r.y < n.bottom && r.bottom > n.y).length : null;
+      return { prvniIkona: b.length ? Math.round(Math.min(...b.map((r) => r.y))) : null, pocet: b.length, prekryv, nazevX: n ? Math.round(n.x) : null };
+    }, listaSpodek, DLOUHY);
+    ok(lista.prvniIkona !== null, `levá lišta ikon je na svém místě (první ikona ${lista.prvniIkona} px, ${lista.pocet} tlačítek)`);
+    ok(lista.prvniIkona !== null && lista.prekryv === 0,
+      `nepřekrývá levou lištu ikon (název začíná x ${lista.nazevX} px, překrytých ikon ${lista.prekryv})`);
 
     console.log('== plátno pod proužkem NENÍ mrtvé (regrese 18. 8. 2026) ==');
     const posun = () => page.evaluate(() => document.querySelector('.react-flow__viewport').style.transform);
@@ -164,7 +171,9 @@ const api = async (method, path, { token, body } = {}) => {
       const r = nadpis.getBoundingClientRect();
       const ikony = [...document.querySelectorAll('button')].map((b) => b.getBoundingClientRect())
         .filter((b) => b.x < 60 && b.y > h.bottom && b.width < 60);
+      const prekryv = ikony.filter((b) => b.x < r.right && b.right > r.x && b.y < r.bottom && b.bottom > r.y).length;
       return {
+        prekryv, nazevX: Math.round(r.x),
         y: Math.round(r.y), spodek: Math.round(r.y + r.height), sirka: Math.round(r.width),
         listaSpodek: Math.round(h.bottom),
         prvniIkona: ikony.length ? Math.round(Math.min(...ikony.map((i) => i.y))) : null,
@@ -174,8 +183,8 @@ const api = async (method, path, { token, body } = {}) => {
     ok(!!t, 'název je vidět i na telefonu');
     ok(t && t.y >= t.listaSpodek, `na telefonu je pod (dvouřádkovou) lištou (název ${t && t.y}, lišta končí ${t && t.listaSpodek})`);
     ok(t && t.sirka <= t.prectec, `nepřetéká z displeje (${t && t.sirka} px na ${t && t.prectec} px širokém)`);
-    ok(t && t.prvniIkona !== null && t.spodek <= t.prvniIkona,
-      `nepřekrývá ikony ani na telefonu (končí ${t && t.spodek}, ikony ${t && t.prvniIkona})`);
+    ok(t && t.prvniIkona !== null && t.prekryv === 0,
+      `nepřekrývá ikony ani na telefonu (název x ${t && t.nazevX}, první ikona y ${t && t.prvniIkona}, překrytých ${t && t.prekryv})`);
 
     ok(errs.length === 0, `konzole bez chyb (${errs.length}${errs.length ? ': ' + errs[0].slice(0, 160) : ''})`);
   } catch (err) {

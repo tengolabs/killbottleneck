@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PasswordInput from "@/components/shared/PasswordInput";
 import { base44 } from "@/api/base44Client";
@@ -13,7 +13,10 @@ import GoogleAuthButton from "@/components/GoogleAuthButton";
 
 export default function Register() {
   const { t } = useTranslation("auth");
-  const [email, setEmail] = useState("");
+  // ?email= předvyplní adresu — vede sem tlačítko z pozvánky ke sdílenému
+  // projektu, a přístup se váže PŘESNĚ na tu adresu (pozvankaSdileni.js)
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(() => searchParams.get("email") || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");

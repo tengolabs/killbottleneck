@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.60.1-beta}
+        KB_VERSION: ${KB_VERSION:-v0.61-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -64,6 +64,10 @@ services:
       # Backwards compatibility: an instance where e-mails already arrive keeps
       # them by setting this to 1, even after per-user notification preferences.
       KB_NOTIFY_EMAIL_DEFAULT: ${KB_NOTIFY_EMAIL_DEFAULT:-${FLOWMAP_NOTIFY_EMAIL_DEFAULT:-}}
+      # Invitation e-mails when sharing with an address without an account — daily caps
+      # per sharing user and per instance (empty = 20 / 50).
+      KB_SHARE_INVITE_DAILY_CAP: ${KB_SHARE_INVITE_DAILY_CAP:-}
+      KB_SHARE_INVITE_INSTANCE_CAP: ${KB_SHARE_INVITE_INSTANCE_CAP:-}
       # Hour of deadline notices (0–23, local TZ), default 7.
       KB_DEADLINE_HOUR: ${KB_DEADLINE_HOUR:-${FLOWMAP_DEADLINE_HOUR:-7}}
       # Hour of the daily e-mail digest (0–23, local TZ), default 8.
@@ -102,6 +106,48 @@ services:
       KB_SUMMARY_URL: ${KB_SUMMARY_URL:-${FLOWMAP_SUMMARY_URL:-}}
       KB_SUMMARY_MODEL: ${KB_SUMMARY_MODEL:-${FLOWMAP_SUMMARY_MODEL:-}}
       KB_SUMMARY_TOKEN: ${KB_SUMMARY_TOKEN:-${FLOWMAP_SUMMARY_TOKEN:-}}
+      # AI chat on the side (assistant): own model, else falls back to KB_SUMMARY_*,
+      # then to the general AI settings. Compose passes ONLY listed variables.
+      KB_CHAT_PROVIDER: ${KB_CHAT_PROVIDER:-}
+      KB_CHAT_URL: ${KB_CHAT_URL:-}
+      KB_CHAT_MODEL: ${KB_CHAT_MODEL:-}
+      # týdenní kvóta AI kreditů organizace (hosting/tarif); správce ji v aplikaci přepíše, prázdné = bez stropu
+      KB_AI_KVOTA_TYDEN: ${KB_AI_KVOTA_TYDEN:-}
+      KB_CHAT_TOKEN: ${KB_CHAT_TOKEN:-}
+      KB_CHAT_THINK: ${KB_CHAT_THINK:-}
+      KB_CHAT_NUM_CTX: ${KB_CHAT_NUM_CTX:-}
+      KB_CHAT_OPENAI_EXTRA: ${KB_CHAT_OPENAI_EXTRA:-}
+      # hybrid: lehký model na čtení/porady, hlavní na zápisy (KB_CHAT_HYBRID=rezim,klasifikator,predani)
+      KB_CHAT_HYBRID: ${KB_CHAT_HYBRID:-}
+      KB_CHAT_LIGHT_PROVIDER: ${KB_CHAT_LIGHT_PROVIDER:-}
+      KB_CHAT_LIGHT_URL: ${KB_CHAT_LIGHT_URL:-}
+      KB_CHAT_LIGHT_MODEL: ${KB_CHAT_LIGHT_MODEL:-}
+      KB_CHAT_LIGHT_TOKEN: ${KB_CHAT_LIGHT_TOKEN:-}
+      KB_CHAT_LIGHT_THINK: ${KB_CHAT_LIGHT_THINK:-}
+      KB_CHAT_LIGHT_NUM_CTX: ${KB_CHAT_LIGHT_NUM_CTX:-}
+      KB_CHAT_LIGHT_OPENAI_EXTRA: ${KB_CHAT_LIGHT_OPENAI_EXTRA:-}
+      # obrázek do asistenta (Ctrl+V): přepis na vlastním modelu, který obrázky VIDÍ
+      # (gpt-oss ani qwen 3bit ne). Bez KB_VISION_PROVIDER se obrázky nepřijímají.
+      # Změřeno a schváleno 16. 9. 2026: gemma4:26b (hustý text i poznámky z telefonu).
+      KB_VISION_PROVIDER: ${KB_VISION_PROVIDER:-}
+      KB_VISION_URL: ${KB_VISION_URL:-}
+      KB_VISION_MODEL: ${KB_VISION_MODEL:-}
+      KB_VISION_TOKEN: ${KB_VISION_TOKEN:-}
+      KB_VISION_NUM_CTX: ${KB_VISION_NUM_CTX:-}
+      KB_VISION_OPENAI_EXTRA: ${KB_VISION_OPENAI_EXTRA:-}
+      # záloha, když naše karta nestíhá (OpenAI-kompatibilní; DeepSeek@AKI obrázky ODMÍTÁ)
+      KB_VISION_ZALOHA_PROVIDER: ${KB_VISION_ZALOHA_PROVIDER:-}
+      KB_VISION_ZALOHA_URL: ${KB_VISION_ZALOHA_URL:-}
+      KB_VISION_ZALOHA_MODEL: ${KB_VISION_ZALOHA_MODEL:-}
+      KB_VISION_ZALOHA_TOKEN: ${KB_VISION_ZALOHA_TOKEN:-}
+      KB_VISION_ZALOHA_OPENAI_EXTRA: ${KB_VISION_ZALOHA_OPENAI_EXTRA:-}
+      # s na jeden pokus (výchozí 45) · opakování na prvním modelu (výchozí 0) · strop obrázku v MB (1.2)
+      KB_VISION_TIMEOUT: ${KB_VISION_TIMEOUT:-}
+      KB_VISION_POKUSY: ${KB_VISION_POKUSY:-}
+      KB_CHAT_MAX_IMG_MB: ${KB_CHAT_MAX_IMG_MB:-}
+      # kolik náhledů obrázků drží historie (3) · kolik tahů z hodinového stropu ubere obrázek (3)
+      KB_CHAT_NAHLEDU: ${KB_CHAT_NAHLEDU:-}
+      KB_AI_IMG_VAHA: ${KB_AI_IMG_VAHA:-}
       # Where "Report a bug or idea" (under the person icon) sends to. EMPTY BY
       # DEFAULT — with no address the route returns 404 and the item is not even
       # shown, so a self-hosted instance never sends anything out on its own.

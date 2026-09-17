@@ -7,8 +7,6 @@ import NodeTasksDialog from '@/components/tasks/NodeTasksDialog';
 import SaveTemplateDialog from '@/components/shared/SaveTemplateDialog';
 import SkinDialog from '@/components/shared/SkinDialog';
 import ShareDialog from '@/components/goal-map/ShareDialog';
-import AdvisorDialog from '@/components/goal-map/AdvisorDialog';
-import AIChatPanel from '@/components/goal-map/AIChatPanel';
 
 // Dialogy editoru na konci stromu (úprava uzlu, pravidla, úkoly uzlu, šablona,
 // vzhled, sdílení, AI poradce, AI chat). Čistě prezentační: JSX přesunuto 1:1
@@ -17,8 +15,7 @@ import AIChatPanel from '@/components/goal-map/AIChatPanel';
 //   access  … uživatel a oprávnění
 //   node    … upravovaný uzel + handlery dialogu uzlu
 //   dialogs … otevřeno/zavřeno jednotlivých dialogů + jejich handlery
-//   ai      … AI chat
-export default function EditorDialogs({ mapa, access, node, dialogs, ai }) {
+export default function EditorDialogs({ mapa, access, node, dialogs }) {
   const {
     activeMapId, mapId, mapKind, title, nodes, edges, members, effectiveMapAccess,
     ownerOptions, isMapOwner, mapRules,
@@ -32,9 +29,8 @@ export default function EditorDialogs({ mapa, access, node, dialogs, ai }) {
   const {
     rulesOpen, rulesDefaults, setRulesOpen, handleEnableWaiting,
     taskNodeId, setTaskNodeId, saveTplOpen, setSaveTplOpen, skinOpen, setSkinOpen,
-    shareOpen, setShareOpen, advisorOpen, setAdvisorOpen, handleAcceptAdvisor,
+    shareOpen, setShareOpen,
   } = dialogs;
-  const { chatOpen, setChatOpen, handleApplyOperations, handleUndoAi, canUndoAi } = ai;
   return (
     <>
       <NodeEditDialog
@@ -117,21 +113,6 @@ export default function EditorDialogs({ mapa, access, node, dialogs, ai }) {
         isOwner={isMapOwner}
         onClose={() => setShareOpen(false)}
         onMapBumped={(u) => { baseUpdated.current = u; }}
-      />
-      <AdvisorDialog
-        open={advisorOpen}
-        onClose={() => setAdvisorOpen(false)}
-        onAccept={handleAcceptAdvisor}
-      />
-      <AIChatPanel
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-        mapTitle={title}
-        nodes={nodes}
-        edges={edges}
-        onApplyOperations={handleApplyOperations}
-        onUndoAi={handleUndoAi}
-        canUndoAi={canUndoAi}
       />
     </>
   );

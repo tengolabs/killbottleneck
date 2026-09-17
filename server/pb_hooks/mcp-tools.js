@@ -636,4 +636,5 @@ function validujArgumenty(schema, args, toolName) {
   return walk(schema, args || {}, "", 0);
 }
 
-module.exports = { TOOLS, zpracujMcpPost };
+// renderery a validátor sdílí i chat na boku (chat.js) — jedna podoba mapy pro LLM
+module.exports = { TOOLS, zpracujMcpPost, renderMap, renderRule, renderPortfolio, validujArgumenty, DATA_FENCE };

@@ -28,6 +28,7 @@ import { ArrowLeft, Shield, UserPlus, Trash2, KeyRound, Loader2, ChevronDown, Ma
 import AiSettingsSection from '@/components/shared/AiSettingsSection';
 import OrgStructureSection from '@/components/shared/OrgStructureSection';
 import InstanceSkinSection from '@/components/shared/InstanceSkinSection';
+import AiKredityKarta from '@/components/shared/AiKredityKarta';
 import BillingSection from '@/components/shared/BillingSection';
 import MembershipSection from '@/components/shared/MembershipSection';
 import { fmtDateShort, fmtDateTimeShort } from '@/lib/locale';
@@ -61,10 +62,11 @@ export default function UserAdmin() {
   // (Richard 6. 8. 2026). Než /config dorazí, sekci NEukazujeme — bliknutí
   // konfigurace, která zákazníkovi nepatří, je horší než chvilka bez ní.
   const [hosted, setHosted] = useState(null);
+  const [chatPanel, setChatPanel] = useState(false);   // AI asistent nakonfigurovaný → sekce AI kredity dává smysl
   const [billingComplete, setBillingComplete] = useState(false);
   useEffect(() => {
     loadKbConfig()
-      .then((cfg) => setHosted(!!(cfg && cfg.hosted)))
+      .then((cfg) => { setHosted(!!(cfg && cfg.hosted)); setChatPanel(!!(cfg && Array.isArray(cfg.ai_modes) && cfg.ai_modes.includes('chat_panel'))); })
       .catch(() => setHosted(false));
   }, []);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -585,6 +587,9 @@ export default function UserAdmin() {
         {!jenStruktura && <MembershipSection billingComplete={billingComplete} />}
 
         {!jenStruktura && hosted === false && <AiSettingsSection />}
+
+        {/* AI kredity: spotřeba i kvóta se týkají zákazníka i na hostingu (tarif); bez asistenta by ukázala jen nuly */}
+        {!jenStruktura && chatPanel && <AiKredityKarta />}
 
         {!jenStruktura && <InstanceSkinSection />}
       </div>

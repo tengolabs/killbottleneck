@@ -80,6 +80,12 @@ const LOADERS = {
     cs: () => import('./cs/kalendar.json'),
     en: () => import('./en/kalendar.json'),
   },
+  // AI chat na boku (13. 9. 2026) — jen plná aplikace na počítači, lite ho
+  // nemá; texty mimo jazykový balík kvůli rozpočtu lite (lite-bundle.js)
+  asistent: {
+    cs: () => import('./cs/asistent.json'),
+    en: () => import('./en/asistent.json'),
+  },
 };
 const nactene = new Set();
 

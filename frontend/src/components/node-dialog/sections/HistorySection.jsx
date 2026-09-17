@@ -72,6 +72,8 @@ export default function HistorySection({ mapId, nodeId }) {
   const kdoLabel = (it) => {
     if (it.via && it.via.indexOf('rule:') === 0) return t('historie.kdo.pravidlo');
     if (it.via && it.via.indexOf('agent:') === 0) return `${t('historie.kdo.agent')} ${it.via.slice(6)}`;
+    // AI chat na boku píše jménem uživatele — do historie se přizná, ať se chyba dá dohledat
+    if (it.via && it.via.indexOf('asistent:') === 0) return `${t('historie.kdo.asistent')} (${it.via.slice(9) || it.actor})`;
     return it.actor || t('historie.kdo.system');
   };
 

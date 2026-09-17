@@ -1467,14 +1467,9 @@ cronAdd("auto_stop_timers", "5 * * * *", () => {
 // aktualizace utnula běžící agentní běhy (mají uloženou starou `callback_url`),
 // MCP servery i skripty zákazníků na API klíč. Stará podoba se odstraní jedním
 // řezem až s vydáním po zveřejnění repa — hledat „PŘECHOD".
-function kbRoute(method, cesta, handler, middleware) {
-  if (middleware === undefined) {
-    routerAdd(method, "/api/kb" + cesta, handler);
-    routerAdd(method, "/api/flowmap" + cesta, handler);
-  } else {
-    routerAdd(method, "/api/kb" + cesta, handler, middleware);
-    routerAdd(method, "/api/flowmap" + cesta, handler, middleware);
-  }
+function kbRoute(method, cesta, handler, ...middleware) {
+  routerAdd(method, "/api/kb" + cesta, handler, ...middleware);
+  routerAdd(method, "/api/flowmap" + cesta, handler, ...middleware);
 }
 
 kbRoute("POST", "/run-auto-templates", (e) => {
@@ -1947,6 +1942,179 @@ kbRoute("POST", "/my-summary/refresh", (e) => {
   }
 }, $apis.requireAuth());
 
+// ---------- AI chat na boku (13. 9. 2026) — jádro v pb_hooks/chat.js ----------
+// Konfigurace modelu: KB_CHAT_* → KB_SUMMARY_* → obecná AI. Model z požadavku
+// smí zvolit JEN správce (zkoušení modelů na stagingu), jinak 403 — člen by si
+// mohl na sdílené GPU pustit největší model. Hodinová brzda na uživatele jako u
+// ostatních AI rout (KB_AI_MAX_PER_HOUR, výchozí 60).
+// pomocné funkce (brzda, konfigurace, chyba) žijí v chat.js — handlery se serializují
+// a nevidí closure tohoto souboru (reference-pocketbase-handler-serializace)
+
+// Strop těla PŘED parsováním (checkup 16. 9.): bez něj se celé mnohamegabajtové tělo načetlo do paměti,
+// než chatRun zkontroloval obrázek. Obrázek max KB_CHAT_MAX_IMG_MB (výchozí 1,2) → base64 ×4/3 + náhled a text.
+const CHAT_BODY_LIMIT = Math.max(2 * 1024 * 1024, Math.round((Number($os.getenv("KB_CHAT_MAX_IMG_MB")) || 1.2) * 1048576 * 4 / 3) + 256 * 1024);
+kbRoute("POST", "/chat", (e) => {
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const { chatRun, chatCfg, chatBrzda, chatChyba, zkontrolujObrazek } = require(`${__hooks}/chat.js`);
+  const L = userLang(e.auth);
+  const body = e.requestInfo().body || {};
+  const c = chatCfg(e, body, L);
+  if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
+  // vadný obrázek / vypnuté čtení obrázků → 400 DŘÍV, než brzda ubere hodinový strop
+  if (body.image_base64 && !body.mode) {
+    try { zkontrolujObrazek(body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
+  }
+  const b = chatBrzda(e, L, body);
+  if (b) return e.json(b.status, b.body);
+  let vysledek;
+  try {
+    vysledek = chatRun($app, e.auth, body, c.cfg, L);
+  } catch (err) {
+    const ch = chatChyba(e, err, L);
+    return e.json(ch.status, ch.body);
+  }
+  return e.json(200, { chat: vysledek });
+}, $apis.requireAuth(), $apis.bodyLimit(CHAT_BODY_LIMIT));
+
+kbRoute("POST", "/chat/potvrdit", (e) => {
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const { chatPotvrdit, chatCfg, chatBrzda, chatChyba } = require(`${__hooks}/chat.js`);
+  const L = userLang(e.auth);
+  const body = e.requestInfo().body || {};
+  const c = chatCfg(e, body, L);
+  if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
+  const b = chatBrzda(e, L);
+  if (b) return e.json(b.status, b.body);
+  let vysledek;
+  try {
+    vysledek = chatPotvrdit($app, e.auth, body, c.cfg, L);
+  } catch (err) {
+    const ch = chatChyba(e, err, L);
+    return e.json(ch.status, ch.body);
+  }
+  return e.json(200, { chat: vysledek });
+}, $apis.requireAuth(), $apis.bodyLimit(64 * 1024));
+
+kbRoute("GET", "/chat/seznam", (e) => {
+  const { seznamChatu } = require(`${__hooks}/chat.js`);
+  return e.json(200, { chats: seznamChatu($app, e.auth) });
+}, $apis.requireAuth());
+
+kbRoute("GET", "/chat/detail/{id}", (e) => {
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { nactiChat, chatDto } = require(`${__hooks}/chat.js`);
+  const rec = nactiChat($app, e.auth, e.request.pathValue("id"));
+  if (!rec) return e.json(404, { error: t(userLang(e.auth), "err.chatNotFound") });
+  return e.json(200, { chat: chatDto(rec) });
+}, $apis.requireAuth());
+
+kbRoute("POST", "/chat/smazat", (e) => {
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { nactiChat } = require(`${__hooks}/chat.js`);
+  const body = e.requestInfo().body || {};
+  const rec = nactiChat($app, e.auth, body.chat_id);
+  if (!rec) return e.json(404, { error: t(userLang(e.auth), "err.chatNotFound") });
+  $app.delete(rec);
+  return e.json(200, { success: true });
+}, $apis.requireAuth());
+
+// paměť asistenta o uživateli — uživatel ji vidí a smí přepsat/smazat
+kbRoute("GET", "/chat/pamet", (e) => {
+  const { pametText, pametProjektu } = require(`${__hooks}/chat.js`);
+  return e.json(200, { text: pametText($app, e.auth.id, ""), projekty: pametProjektu($app, e.auth) });
+}, $apis.requireAuth());
+
+// {text, map_id?}: bez map_id paměť o uživateli, s map_id poznámky k projektu
+// (jen mapa, kterou uživatel vidí); prázdný text = smazat
+kbRoute("POST", "/chat/pamet", (e) => {
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { ulozPamet, mapaId, MAX_PAMET } = require(`${__hooks}/chat.js`);
+  const body = e.requestInfo().body || {};
+  const text = String(body.text || "");
+  if (text.length > MAX_PAMET) return e.json(400, { error: t(userLang(e.auth), "err.chatMemoryTooLong", { max: MAX_PAMET }) });
+  let mid = "";
+  if (body.map_id) {
+    mid = mapaId($app, e.auth, String(body.map_id));
+    if (!mid) return e.json(404, { error: t(userLang(e.auth), "err.mapNotFound") });
+  }
+  const rec = ulozPamet($app, e.auth.id, text, mid);
+  return e.json(200, { text: rec.getString("text"), map_id: mid });
+}, $apis.requireAuth());
+
+// koncept z karty (e-mail / body k telefonátu) → do poznámek projektu jednou akcí
+kbRoute("POST", "/chat/koncept-uloz", (e) => {
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { pripojKoncept, mapaId } = require(`${__hooks}/chat.js`);
+  const body = e.requestInfo().body || {};
+  const L = userLang(e.auth);
+  const text = String(body.text || "").slice(0, 8000);
+  if (!text.trim()) return e.json(400, { error: t(L, "err.chatNoMessage") });
+  const mid = mapaId($app, e.auth, String(body.map_id || ""));
+  if (!mid) return e.json(404, { error: t(L, "err.mapNotFound") });
+  const rec = pripojKoncept($app, e.auth.id, mid, String(body.kind || "other"), String(body.title || "").slice(0, 80), text);
+  return e.json(200, { map_id: mid, text: rec.getString("text") });
+}, $apis.requireAuth());
+
+// modely k vyzkoušení (jen správce; u ollamy seznam z /api/tags)
+kbRoute("GET", "/chat/modely", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { chatAiConfig } = require(`${__hooks}/chat.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(userLang(e.auth), "err.adminOnly") });
+  const cfg = chatAiConfig($app, "");
+  let models = [];
+  if (cfg.provider === "ollama") {
+    try {
+      const hl = cfg.token ? { Authorization: "Bearer " + cfg.token } : {};
+      const res = $http.send({ url: String(cfg.url || "").replace(/\/+$/, "") + "/api/tags", method: "GET", headers: hl, timeout: 5 });
+      models = ((res.json && res.json.models) || []).map((m) => m.name).filter(Boolean).sort();
+    } catch (err) { models = []; }
+  }
+  return e.json(200, { provider: cfg.provider, model: cfg.model || "", models: models });
+}, $apis.requireAuth());
+
+// spotřeba chatu (správce): součty podle modelu za posledních N dní
+kbRoute("GET", "/chat/spotreba", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(userLang(e.auth), "err.adminOnly") });
+  const dni = Math.min(90, Math.max(1, parseInt((e.requestInfo().query || {})["dni"], 10) || 7));
+  const od = new Date(Date.now() - dni * 86400000).toISOString().replace("T", " ").slice(0, 19);
+  const rows = arrayOf(new DynamicModel({ model: "", n: 0, tokens_in: 0, tokens_out: 0, tokens_cached: 0, ms: 0, calls: 0 }));
+  try {
+    $app.db().newQuery("SELECT model, COUNT(*) AS n, COALESCE(SUM(tokens_in),0) AS tokens_in, COALESCE(SUM(tokens_out),0) AS tokens_out, COALESCE(SUM(tokens_cached),0) AS tokens_cached, COALESCE(SUM(ms),0) AS ms, COALESCE(SUM(calls),0) AS calls FROM ai_chat_log WHERE created >= {:od} GROUP BY model ORDER BY n DESC")
+      .bind({ od: od }).all(rows);
+  } catch (err) { /* prázdno */ }
+  return e.json(200, { dni: dni, radky: rows.map((r) => ({ model: r.model, n: r.n, tokens_in: r.tokens_in, tokens_out: r.tokens_out, tokens_cached: r.tokens_cached, ms: r.ms, calls: r.calls })) });
+}, $apis.requireAuth());
+
+// ---------- AI kredity organizace (Richard 14. 9. 2026) ----------
+// Spotřeba chatu asistenta v kreditech za organizaci a po lidech + týdenní kvóta
+// dělená správci × ostatní. Jen admin (sekce ve Správě organizace). Logika v kredity.js.
+kbRoute("GET", "/ai-kredity", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(userLang(e.auth), "err.adminOnly") });
+  const { proApi } = require(`${__hooks}/kredity.js`);
+  const tydnu = parseInt((e.requestInfo().query || {})["tydnu"], 10) || 4;
+  return e.json(200, proApi($app, tydnu));
+}, $apis.requireAuth());
+
+kbRoute("POST", "/ai-kredity/nastaveni", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.adminOnly") });
+  const body = e.requestInfo().body || {};
+  const kvota = Number(body.kvota_tyden), podil = Number(body.podil_admin);
+  if (!Number.isInteger(kvota) || kvota < 0 || kvota > 1000000 || !Number.isInteger(podil) || podil < 0 || podil > 100) {
+    return e.json(400, { error: t(L, "err.aiKvotaNeplatna") });
+  }
+  const { ulozNastaveni, proApi } = require(`${__hooks}/kredity.js`);
+  ulozNastaveni($app, kvota, podil);
+  return e.json(200, Object.assign({ success: true }, proApi($app, 4)));
+}, $apis.requireAuth());
+
 // ---------- konec zkušební doby: instance jede dál, ale JEN PRO ČTENÍ ----------
 //
 // Zavedeno 6. 8. 2026 s registračním trychtýřem (zkušebka 30 dní). Zámek je
@@ -2064,7 +2232,7 @@ kbRoute("GET", "/config", (e) => {
   const { aiConfig, env } = require(`${__hooks}/helpers.js`);
   const cfg = aiConfig($app);
   const provider = cfg.provider;
-  const ALL_MODES = ["questions", "generate", "expand", "chat", "from_text", "transcribe"];
+  const ALL_MODES = ["questions", "generate", "expand", "chat", "from_text", "transcribe", "chat_panel"];
   let modes = [];
   // Zdraví AI služby. V hostovaném provozu běží AI u nás doma a appka na pronajatém
   // boxu — když domácí strana vypadne, NENÍ to chyba zákazníka: frontend podle
@@ -2080,7 +2248,7 @@ kbRoute("GET", "/config", (e) => {
   if (provider === "custom") {
     modes = ALL_MODES; // vlastní endpoint zákazníka: kontrakt neznáme, neprobujeme
   } else if (provider === "ollama") {
-    modes = ["questions", "generate", "expand", "chat", "from_text"];
+    modes = ["questions", "generate", "expand", "chat", "from_text", "chat_panel"];
     if (cfg.transcribeUrl) modes.push("transcribe");
     if (fresh) {
       healthy = cached.healthy;
@@ -2094,7 +2262,7 @@ kbRoute("GET", "/config", (e) => {
       store.set("aiModesCache", { at: now, modes: modes, healthy: healthy, provider: provider });
     }
   } else if (provider === "openai") {
-    modes = ["questions", "generate", "expand", "chat", "from_text"];
+    modes = ["questions", "generate", "expand", "chat", "from_text", "chat_panel"];
     if (fresh) {
       modes = cached.modes;
       healthy = cached.healthy;
@@ -2170,6 +2338,14 @@ kbRoute("GET", "/config", (e) => {
     const rawSkin = skinRec.getString("skin");
     if (rawSkin) instanceSkin = JSON.parse(rawSkin);
   } catch (err) { /* žádný záznam = žádný default */ }
+    // chat na boku má vlastní model (KB_CHAT_*) — může běžet, i když obecná AI
+  // nastavená není; brána (api) nástroje zatím neumí, proto jen ollama/openai
+  try {
+    const { chatAiConfig } = require(`${__hooks}/chat.js`);
+    const ccfg = chatAiConfig($app, "");
+    if (["ollama", "openai"].includes(ccfg.provider) && !modes.includes("chat_panel")) modes = modes.concat(["chat_panel"]);
+    if (ccfg.provider !== "ollama" && ccfg.provider !== "openai") modes = modes.filter((m) => m !== "chat_panel");
+  } catch (err) { /* bez chatu */ }
   return e.json(200, {
     skin: instanceSkin,
     ai_enabled: modes.length > 0,
@@ -2491,6 +2667,33 @@ kbRoute("POST", "/share", (e) => {
   // vlož znovu) nechalo zrcadlo „sdíleno" a řádky prázdné (nález S7-04).
   const ulozSeSdilenim = (m) => $app.runInTransaction((tx) => { tx.save(m); syncShares(tx, m); });
 
+  // Adresát BEZ ÚČTU se o sdílení dřív nedozvěděl vůbec — notify() neregistrovaného
+  // tiše přeskočí, takže nepřišlo nic ani s mailovou bránou (nález z bety 16. 9. 2026).
+  // Posílá se i při `quiet` (zadání práce): souhrnná notifikace o práci, kvůli
+  // které quiet existuje, člověku bez účtu taky nepřijde. Vrací pole pro dialog:
+  //   invite               stav pozvánky (pozvankaSdileni.js; "external" = kontakt bez adresy)
+  //   registration_open    smí se adresát zaregistrovat sám (jinak mu účet musí založit správce)
+  //   can_invite_to_org    smí sdílející rovnou pozvat do organizace (/invite)
+  const pozvatBezUctu = (adresa) => {
+    const { posliPozvankuKeSdileni, registraceOtevrena } = require(`${__hooks}/pozvankaSdileni.js`);
+    const { isExternalOwner, smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
+    const role = e.auth.getString("role");
+    let stav = "external";
+    if (!isExternalOwner(adresa)) {
+      try {
+        stav = posliPozvankuKeSdileni($app, { komu: adresa, odesilatel: e.auth, mapa: map, lang: L });
+      } catch (err) {
+        stav = "failed";
+        try { $app.logger().warn("share: pozvánka neregistrovanému selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+      }
+    }
+    return {
+      invite: stav,
+      registration_open: registraceOtevrena($app),
+      can_invite_to_org: role === "admin" || role === "manager" || smiEditovatOrgStrukturu(e.auth),
+    };
+  };
+
   if (action === "list") {
     // `has_work`: člen má na mapě SVOU práci (garant uzlu / řešitel legacy
     // úkolu) — tedy i s úrovní „Číst" si svůj krok odškrtne (právo z práce,
@@ -2509,13 +2712,16 @@ kbRoute("POST", "/share", (e) => {
     } catch (err) { /* legacy úkoly nemusí existovat */ }
     const members = sharedWith.map((emailVal) => {
       let fullName = null;
+      let registered = false;
       try {
         const u = $app.findFirstRecordByFilter("users", "email = {:email}", { email: emailVal });
         fullName = u.getString("full_name") || null;
+        registered = true;
       } catch (err) { /* neregistrovaný — jen e-mail */ }
       return {
         email: emailVal,
         full_name: fullName,
+        registered: registered,
         permission: permOf(emailVal),
         has_work: !!workEmails[String(emailVal).toLowerCase()],
       };
@@ -2582,8 +2788,10 @@ kbRoute("POST", "/share", (e) => {
       setPermLists(email, perm);
       ulozSeSdilenim(map);
       let jmeno = null;
+      let registrovan = false;
       try {
         jmeno = $app.findFirstRecordByFilter("users", "email = {:email}", { email: email }).getString("full_name") || null;
+        registrovan = true;
       } catch (err) { /* neregistrovaný */ }
       // Povýšení z dialogu sdílení adresáta informuje (Richard 21. 8.) —
       // dřív mlčelo a člověk se o širším přístupu neměl jak dozvědět.
@@ -2603,20 +2811,22 @@ kbRoute("POST", "/share", (e) => {
       }
       // stejný tvar `member` jako u zakládání — klient řádek jen přepíše a nesmí
       // přitom přijít o jméno (nález panelu 20. 8. 2026)
-      return e.json(200, {
+      return e.json(200, Object.assign({
         success: true, upgraded: true, updated: map.getString("updated"),
-        member: { email: email, full_name: jmeno, permission: perm },
-      });
+        member: { email: email, full_name: jmeno, permission: perm, registered: registrovan },
+      }, registrovan ? {} : pozvatBezUctu(email)));
     }
-    // Pozn.: Base44 posílal e-mailovou pozvánku neregistrovaným; lokální verze
-    // přístup naváže na e-mail — uživatel ho získá, jakmile se s ním zaregistruje.
+    // Přístup se váže na e-mail — adresát bez účtu ho získá, jakmile se s ním
+    // zaregistruje. O sdílení se dozví pozvánkou e-mailem (pozvatBezUctu výš).
     map.set("shared_with", sharedWith.concat([email]));
     setPermLists(email, perm);
     ulozSeSdilenim(map);
     let fullName = null;
+    let registrovan = false;
     try {
       const u = $app.findFirstRecordByFilter("users", "email = {:email}", { email: email });
       fullName = u.getString("full_name") || null;
+      registrovan = true;
     } catch (err) { /* neregistrovaný */ }
     // adresát se dosud o nasdíleném projektu nedozvěděl nijak. Jen akce `share` —
     // set_team_access/update_permission jsou hromadné a jejich oznamování je šum.
@@ -2637,7 +2847,10 @@ kbRoute("POST", "/share", (e) => {
     }
     // `updated` vracíme, aby si editor mohl posunout base_updated a další uložení
     // mapy (owner+termín uzlu) nespadlo na 409 „mapa změněna" po tomto sdílení
-    return e.json(200, { success: true, updated: map.getString("updated"), member: { email: email, full_name: fullName, permission: perm } });
+    return e.json(200, Object.assign(
+      { success: true, updated: map.getString("updated"), member: { email: email, full_name: fullName, permission: perm, registered: registrovan } },
+      registrovan ? {} : pozvatBezUctu(email)
+    ));
   }
 
   if (action === "update_permission") {
@@ -4556,7 +4769,7 @@ kbRoute("POST", "/v1/maps", (e) => {
   rec.set("series_title", "");
   rec.set("series_year", 0);
   rec.set("kind", ""); // org mapu zakládá jen /api/kb/org-map
-  const saved = v1SaveMapData($app, rec, nodes, edges, a.lang, true, a.user.email(), { isOwner: true });
+  const saved = v1SaveMapData($app, rec, nodes, edges, a.lang, true, a.user.email(), { isOwner: true, via: a.via });
   if (saved.error) return e.json(saved.status, { error: saved.error });
   // řešitelé dostanou mapu nasdílenou jako spolupracovníci (work) — jinak by
   // dostali zprávu o práci, kterou v Můj den nevidí; PŘED notifikací, ať odkaz vede
@@ -4624,7 +4837,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes", (e) => {
   // žadatele o automatizaci plní VÝHRADNĚ server (zrcadlo goalmaps hooků) — bez
   // toho zůstalo pole prázdné a splněné přání se nemělo komu oznámit
   const stampedNodes = stampAutomationRequesters(nodes, nodes.concat(conv.nodes), a.user.getString("email"));
-  const saved = v1SaveMapData($app, map, stampedNodes, edges.concat(conv.edges, newEdges), a.lang, true, a.user.email(), { isOwner: w.isOwner });
+  const saved = v1SaveMapData($app, map, stampedNodes, edges.concat(conv.edges, newEdges), a.lang, true, a.user.email(), { isOwner: w.isOwner, via: a.via });
   if (saved.error) return e.json(saved.status, { error: saved.error });
   const onlyIds = {};
   conv.nodes.forEach((n) => { onlyIds[n.id] = true; });
@@ -4748,7 +4961,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   } catch (err) {
     try { $app.logger().warn("v1 update_node: srovnání požadavků na automatizaci selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
-  const saved = v1SaveMapData($app, map, finalNodes, origEdges, a.lang, false, a.user.email(), { isOwner: w.isOwner });
+  const saved = v1SaveMapData($app, map, finalNodes, origEdges, a.lang, false, a.user.email(), { isOwner: w.isOwner, via: a.via });
   if (saved.error) return e.json(saved.status, { error: saved.error });
   // nový řešitel → spolupracovník mapy (work), PŘED notifikací o přiřazení
   let shared = [];
@@ -4835,7 +5048,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/delete", (e) => {
   }
   const keptNodes = nodes.filter((n) => !toDelete[n.id]);
   const keptEdges = edges.filter((ed) => !toDelete[ed.source] && !toDelete[ed.target]);
-  const saved = v1SaveMapData($app, map, keptNodes, keptEdges, a.lang, false, a.user.email(), { isOwner: w.isOwner });
+  const saved = v1SaveMapData($app, map, keptNodes, keptEdges, a.lang, false, a.user.email(), { isOwner: w.isOwner, via: a.via });
   if (saved.error) return e.json(saved.status, { error: saved.error });
   // smazání posledního nehotového podstromu může odblokovat čekající uzel —
   // stejná notifikace jako z UI (update hook)
