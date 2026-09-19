@@ -32,6 +32,23 @@ const shareNative = async (base64, filename) => {
   }
 };
 
+// Víc souborů najednou (rozdělené PDF): na webu postupně (prohlížeč se jednou zeptá na
+// povolení víc stažení), v nativním obalu JEDEN dialog Sdílet se všemi — druhé Share.share
+// při otevřeném dialogu padá.
+export async function saveBlobs(polozky) {
+  if (isNativeShell()) {
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([import('@capacitor/filesystem'), import('@capacitor/share')]);
+    const files = [];
+    for (const { blob, filename } of polozky) files.push((await Filesystem.writeFile({ path: filename, data: await blobToBase64(blob), directory: Directory.Cache })).uri);
+    try { await Share.share({ files }); } catch (err) { if (!/cancel/i.test(String(err?.message))) throw err; }
+    return;
+  }
+  for (let i = 0; i < polozky.length; i++) {
+    await saveBlob(polozky[i].blob, polozky[i].filename);
+    if (i < polozky.length - 1) await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
 export async function saveBlob(blob, filename) {
   if (isNativeShell()) {
     await shareNative(await blobToBase64(blob), filename);

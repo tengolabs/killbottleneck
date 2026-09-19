@@ -84,6 +84,11 @@ node scripts/gen-third-party-licenses.mjs
 - License: SIL Open Font License 1.1
 - Source: https://github.com/rsms/inter
 
+### Liberation Sans / Liberation Serif (\`frontend/public/fonts/pdf/\`, subset to Latin — used only when the assistant corrects text in a PDF in the browser)
+
+- License: SIL Open Font License 1.1 (copyright notice in \`frontend/public/fonts/pdf/LICENSE-Liberation.txt\`)
+- Source: https://github.com/liberationfonts/liberation-fonts
+
 ## npm packages (production dependencies of \`frontend/\` and \`mcp/\`)
 
 | Package | License | Repository |
@@ -108,4 +113,4 @@ for (const [id, info] of sorted) {
 }
 
 writeFileSync(OUT, md);
-console.log(`✅ ${OUT}: ${sorted.length} npm balíčků + PocketBase + Inter`);
+console.log(`✅ ${OUT}: ${sorted.length} npm balíčků + PocketBase + Inter + Liberation`);

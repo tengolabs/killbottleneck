@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Check, Copy, ExternalLink, Loader2, Mail, Phone, ScrollText, Undo2, Users, X } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, FileText, Loader2, Mail, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { saveBlob, safeFilename } from '@/lib/saveFile';
 
 // Jedna zpráva chatu + její karty (otázky s volbami, akce k potvrzení, skin,
 // paměť, nápad, „nahlédl do"). Zprávy nástrojů (role tool) se nekreslí —
@@ -80,9 +81,10 @@ const STAV_STYL = {
 
 // Akce čekající na potvrzení (zapisovací nástroj). Ano → server ji vykoná
 // vlastním v1 API; Ne → model dostane „zamítnuto" a hledá jinou cestu.
-function KartaAkce({ karta, onPotvrd, loading, onOdkaz }) {
+function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy }) {
   const { t } = useTranslation('asistent');
   const stav = karta.stav || 'ceka';
+  if (karta.klient === 'pdf_nahrada') return <KartaPdfOprava karta={karta} onPotvrd={onPotvrd} loading={loading} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />;
   const popisek = { ceka: t('actionWaiting'), hotovo: t('actionDone'), zamitnuto: t('actionDeclined'), chyba: t('actionError') }[stav];
   return (
     <div className={`mt-2 rounded-lg border p-2.5 text-sm ${STAV_STYL[stav] || STAV_STYL.ceka}`} data-testid="chat-akce" data-stav={stav}>
@@ -104,6 +106,127 @@ function KartaAkce({ karta, onPotvrd, loading, onOdkaz }) {
             <Link to={`/map/${karta.odkaz.map_id}${karta.odkaz.node_id ? `?node=${encodeURIComponent(karta.odkaz.node_id)}` : ''}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
               {karta.odkaz.node_id ? t('actionOpenNode') : t('actionOpen')} <ExternalLink className="w-3 h-3" />
             </Link>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Oprava PDF (nástroj pdf_replace_text, kind client): server soubor nemá — po potvrzení
+// ho opraví PROHLÍŽEČ (lib/pdf.nahradText, přelepka), ukáže náhled dotčené strany a
+// nabídne stažení; výsledek (co se povedlo / nenašlo) pošle serveru v /chat/potvrdit,
+// aby model dopověděl pravdu. Po reloadu bajty PDF nejsou → karta si soubor vyžádá znovu.
+function KartaPdfOprava({ karta, onPotvrd, loading, najdiPdf, ulozPdf, drivejsiOpravy }) {
+  const { t } = useTranslation('asistent');
+  const stav = karta.stav || 'ceka';
+  const nahrady = (karta.args && karta.args.replacements) || [];
+  const jmeno = (karta.pdf && karta.pdf.name) || (karta.args && karta.args.file) || '';
+  const stran = (karta.pdf && karta.pdf.pages) || 0;
+  const [vybrane, setVybrane] = useState(() => nahrady.map(() => true));
+  const [bezi, setBezi] = useState(false);
+  const [vysledek, setVysledek] = useState(null);   // { blob, provedeno, nenalezeno, nahled, page }
+  const [chyba, setChyba] = useState('');
+  const [maSoubor, setMaSoubor] = useState(() => !!(najdiPdf && najdiPdf(jmeno, stran)));
+  const inputRef = useRef(null);
+  const zivy = useRef(true);
+  useEffect(() => () => { zivy.current = false; }, []);
+  const vk = karta.vysledek_klienta;
+  const nahraj = async (f) => {
+    if (!f) return;
+    try {
+      const P = await import('@/lib/pdf');
+      const b = await P.bajty(f);
+      // po reloadu: musí to být TEN soubor (stejný počet stran), jinak by náhrady sedly jinam
+      if (stran && await P.pocetStran(b) !== stran) { setChyba('jinySoubor'); return; }
+      if (ulozPdf) ulozPdf(jmeno, stran, b);
+      setMaSoubor(true); setChyba('');
+    } catch (e) { setChyba(e && e.kod ? e.kod : 'poskozeno'); }
+  };
+  const proved = async () => {
+    const rec = najdiPdf ? najdiPdf(jmeno, stran) : null;
+    if (!rec) { setMaSoubor(false); return; }
+    setBezi(true); setChyba('');
+    // výsledek jde serveru VŽDY (i když se karta mezitím odmontovala — jinak by čekala navěky)
+    let hlaseni = null;
+    try {
+      const P = await import('@/lib/pdf');
+      const vyber = nahrady.filter((_, i) => vybrane[i]);
+      const preskoceno = nahrady.filter((_, i) => !vybrane[i]);
+      // na originál se aplikují i opravy z dřívějších karet (z rozhovoru na serveru) → druhá
+      // oprava neztratí první, a to i po obnovení stránky
+      const drive = (drivejsiOpravy ? drivejsiOpravy(karta.id, jmeno, stran) : []).map((x) => ({ ...x, klic: 'drive' }));
+      const v = await P.nahradText(rec.bytes, drive.concat(vyber));
+      const provedeno = v.provedeno.filter((x) => x.klic !== 'drive').map(({ klic: _k, ...x }) => x);
+      const nenalezeno = v.nenalezeno.filter((x) => x.klic !== 'drive').map(({ klic: _k, ...x }) => x);
+      const page = (v.strany.length ? provedeno[0] && provedeno[0].page : 0) || v.strany[0] || (vyber[0] && vyber[0].page) || 1;
+      let nahled = '';
+      try { nahled = await P.nahledStrany(v.bytes, page); } catch { /* náhled je bonus */ }
+      hlaseni = { provedeno, nenalezeno, preskoceno: preskoceno.length };
+      if (zivy.current) setVysledek({ blob: v.blob, provedeno, nenalezeno, nahled, page, celkem: drive.length });
+    } catch (e) {
+      const kod = e && e.kod ? e.kod : 'poskozeno';
+      if (zivy.current) setChyba(kod);
+      hlaseni = { provedeno: [], nenalezeno: [], chyba: kod };
+    } finally {
+      if (zivy.current) setBezi(false);
+    }
+    // model dostane pravdu: co se povedlo, co ne a co uživatel odškrtl
+    onPotvrd(karta.id, true, hlaseni);
+  };
+  const stahni = () => { if (vysledek) saveBlob(vysledek.blob, safeFilename(jmeno.replace(/\.pdf$/i, ''), 'dokument') + '-opraveno.pdf'); };
+  const popisek = { ceka: t('actionWaiting'), hotovo: t('pdf.cardDone'), zamitnuto: t('actionDeclined'), chyba: t('actionError') }[stav];
+  return (
+    <div className={`mt-2 rounded-lg border p-2.5 text-sm ${STAV_STYL[stav] || STAV_STYL.ceka}`} data-testid="chat-akce" data-stav={stav} data-klient="pdf_nahrada">
+      <p className="font-medium leading-snug inline-flex items-center gap-1.5"><FileText className="w-4 h-4 text-primary shrink-0" />{karta.popis}</p>
+      <ul className="mt-1.5 space-y-1 text-xs" data-testid="chat-pdf-nahrady">
+        {nahrady.map((n, i) => (
+          <li key={i} className="flex items-start gap-1.5">
+            {stav === 'ceka' && <input type="checkbox" className="mt-0.5" checked={!!vybrane[i]} onChange={(e) => setVybrane((v) => v.map((x, j) => (j === i ? e.target.checked : x)))} data-testid="chat-pdf-nahrada-vyber" />}
+            <span className="min-w-0"><span className="text-muted-foreground">{t('pdf.page', { n: n.page })}</span> „{n.find}“ → <span className="font-medium">„{n.replace}“</span></span>
+          </li>
+        ))}
+      </ul>
+      {stav === 'ceka' && (
+        <div className="mt-2 space-y-1.5">
+          {!maSoubor && (
+            <div className="rounded-md border border-dashed border-border p-2 text-xs" data-testid="chat-pdf-znovu">
+              <p className="text-muted-foreground">{t('pdf.needFile', { name: jmeno })}</p>
+              <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { nahraj(e.target.files?.[0]); e.target.value = ''; }} data-testid="chat-pdf-znovu-input" />
+              <Button size="sm" variant="outline" className="h-7 text-xs mt-1" onClick={() => inputRef.current?.click()}><Upload className="w-3.5 h-3.5 mr-1" />{t('pdf.chooseFile')}</Button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button size="sm" disabled={loading || bezi || !maSoubor || !vybrane.some(Boolean)} onClick={proved} data-testid="chat-akce-ano">
+              {bezi ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1" />}{t('pdf.apply')}
+            </Button>
+            <Button size="sm" variant="outline" disabled={loading || bezi} onClick={() => onPotvrd(karta.id, false)} data-testid="chat-akce-ne">
+              <X className="w-3.5 h-3.5 mr-1" />{t('actionNo')}
+            </Button>
+          </div>
+        </div>
+      )}
+      {chyba && <p className="mt-1.5 text-xs text-destructive" data-testid="chat-pdf-karta-chyba">{t(`pdf.chyba.${chyba}`, { defaultValue: t('pdf.chyba.poskozeno') })}</p>}
+      {stav !== 'ceka' && (
+        <div className="mt-1.5 text-xs text-muted-foreground" data-testid="chat-pdf-vysledek">
+          <span>{popisek}</span>
+          {vk && (vk.provedeno || []).length > 0 && <span> — {t('pdf.replaced', { done: vk.provedeno.length, total: (vk.provedeno || []).length + (vk.nenalezeno || []).length })}</span>}
+          {vk && (vk.nenalezeno || []).length > 0 && (
+            <ul className="mt-1 list-disc pl-4" data-testid="chat-pdf-nenalezeno">
+              {vk.nenalezeno.map((n, i) => <li key={i}>{t('pdf.page', { n: n.page })} „{n.find}“ — {t(`pdf.chyba.${n.kod || 'nenalezeno'}`, { defaultValue: t('pdf.chyba.nenalezeno') })}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+      {vysledek && (
+        <div className="mt-2 space-y-1.5" data-testid="chat-pdf-hotovo">
+          {vysledek.nahled && <div className="max-h-[26rem] overflow-y-auto rounded border bg-white"><img src={vysledek.nahled} alt="" className="w-full" data-testid="chat-pdf-nahled-strany" /></div>}
+          {vysledek.provedeno.length > 0 && (
+            <>
+              <Button size="sm" className="w-full" onClick={stahni} data-testid="chat-pdf-stahnout"><Download className="w-3.5 h-3.5 mr-1" />{t('pdf.download')}</Button>
+              {vysledek.celkem > 0 && <p className="text-[11px] text-muted-foreground" data-testid="chat-pdf-vcetne-drivejsich">{t('pdf.includesEarlier', { count: vysledek.celkem })}</p>}
+              <p className="text-[11px] text-muted-foreground">{t('pdf.overlayNote')}</p>
+            </>
           )}
         </div>
       )}
@@ -209,17 +332,35 @@ function Text({ text }) {
 // Zpráva uživatele s obrázkem: server do ní složí doprovodný text a pod značkou přepis.
 // Značku (je pro model) uživateli neukazujeme — přepis dostane vlastní podložený blok.
 const ZNACKA_PREPISU = /(?:^|\n\n)\[(?:Přepis obrázku|Image transcript)\]\n/;
+// PDF: pod značkou „[Text z PDF: název, N str.]“ je text stran — uživateli jen štítek
+// přílohy a text sbalený (je dlouhý; on svůj soubor zná)
+const ZNACKA_PDF = /(?:^|\n\n)\[(?:Text z PDF|PDF text):[^\n]*\]\n/;
 function ZpravaUzivatele({ zprava }) {
   const { t } = useTranslation('asistent');
   const obr = zprava.obrazek || {};
-  const m = String(zprava.content || '').split(ZNACKA_PREPISU);
-  const doprovod = m.length > 1 ? m[0] : zprava.content;
+  const pdf = zprava.pdf || null;
+  const zdroj = String(zprava.content || '');
+  const mp = pdf ? zdroj.split(ZNACKA_PDF) : [zdroj];
+  const textPdf = mp.length > 1 ? mp.slice(1).join('\n') : '';
+  const m = (mp.length > 1 ? mp[0] : zdroj).split(ZNACKA_PREPISU);
+  const doprovod = m.length > 1 ? m[0] : (mp.length > 1 ? mp[0] : zprava.content);
   const prepis = m.length > 1 ? m.slice(1).join('\n') : '';
   return (
     <>
       {obr.nahled && <img src={`data:${obr.mime || 'image/webp'};base64,${obr.nahled}`} alt="" className="mb-1.5 max-h-40 rounded-md" data-testid="chat-zprava-obrazek" />}
       {obr.orez && <p className="text-[11px] opacity-75 mb-1" data-testid="chat-zprava-obrazek-orez">{t('imageDropped')}</p>}
+      {pdf && (
+        <span className="mb-1.5 inline-flex items-center gap-1.5 rounded-md bg-primary-foreground/15 px-2 py-1 text-xs max-w-full" data-testid="chat-zprava-pdf">
+          <FileText className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{pdf.name}</span>{pdf.pages ? <span className="opacity-75 shrink-0">· {t('pdf.pages', { count: pdf.pages })}</span> : null}
+        </span>
+      )}
       {doprovod && <p className="whitespace-pre-wrap break-words">{doprovod}</p>}
+      {textPdf && (
+        <details className={`${doprovod ? 'mt-1.5 ' : ''}rounded-lg bg-primary-foreground/10 px-2 py-1.5 text-xs`} data-testid="chat-zprava-pdf-text">
+          <summary className="cursor-pointer opacity-75">{pdf && pdf.orez ? t('pdf.textDropped') : t('pdf.textShow')}</summary>
+          <p className="whitespace-pre-wrap break-words mt-1 max-h-60 overflow-y-auto">{textPdf}</p>
+        </details>
+      )}
       {prepis && (
         <div className={`${doprovod ? 'mt-1.5 ' : ''}rounded-lg bg-primary-foreground/10 px-2 py-1.5 text-xs`} data-testid="chat-zprava-prepis">
           <p className="opacity-75 mb-0.5">{t('imageTranscript')}</p>
@@ -230,7 +371,7 @@ function ZpravaUzivatele({ zprava }) {
   );
 }
 
-export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, mapy = [], vychoziMapa = '', onUlozKoncept, onOdkaz }) {
+export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, mapy = [], vychoziMapa = '', onUlozKoncept, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy }) {
   const { t } = useTranslation('asistent');
   if (zprava.role === 'tool') return null;
   const jaUzivatel = zprava.role === 'user';
@@ -248,7 +389,7 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
         {zprava.docasna && loading && <Loader2 className="w-3 h-3 animate-spin inline-block ml-1 opacity-70" />}
         {karty.map((k, i) => {
           if (k.type === 'otazky') return <KartaOtazky key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
-          if (k.type === 'akce') return <KartaAkce key={i} karta={k} onPotvrd={onPotvrd} loading={loading} onOdkaz={onOdkaz} />;
+          if (k.type === 'akce') return <KartaAkce key={i} karta={k} onPotvrd={onPotvrd} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />;
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
           if (k.type === 'koncept') return <KartaKoncept key={i} karta={k} mapy={mapy} vychoziMapa={vychoziMapa} onUlozKoncept={onUlozKoncept} />;
           if (k.type === 'skin') return <KartaSkin key={i} karta={k} onRevert={onRevertSkin} />;

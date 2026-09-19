@@ -349,7 +349,8 @@ H.beh(async () => {
 
   expect(await vlozDo('[data-testid="chat-form"]', 'drop'), 'přetažení souboru na políčko odesláno');
   expect(await cekej('[data-testid="chat-obrazek-nahled"] img'), 'přetažený obrázek ukáže náhled');
-  // přetažení PDF: prohlížeč ho NEotevře (stránka zůstane), panel řekne, že jde jen obrázek
+  // přetažení PDF: prohlížeč ho NEotevře (stránka zůstane). Od 18. 9. 2026 se PDF přijímá jako
+  // příloha (text stran) — tenhle „soubor“ jsou jen 4 bajty hlavičky, takže se nepřečte a panel to řekne
   const urlPred = page.url();
   await page.evaluate(() => {
     const dt = new DataTransfer();
@@ -362,7 +363,7 @@ H.beh(async () => {
   });
   await sleep(400);
   expect(await page.evaluate(() => window.__pdfDropZachycen === true) && page.url() === urlPred, 'přetažené PDF aplikace zachytí (prohlížeč ho neotevře)');
-  expect(await cekej('[data-testid="chat-obrazek-chyba"]', 3000) && /jen obrázek/.test(await page.$eval('[data-testid="chat-obrazek-chyba"]', (el) => el.innerText)), 'u PDF hláška „Vložit jde jen obrázek“');
+  expect(await cekej('[data-testid="chat-obrazek-chyba"]', 15000) && /Tohle není PDF/.test(await page.$eval('[data-testid="chat-obrazek-chyba"]', (el) => el.innerText)), 'u souboru, který není PDF, hláška „Tohle není PDF“ (skutečné PDF testuje ui-ai-chat-pdf.js)');
   await page.click('[data-testid="chat-obrazek-zrus"]');
   await sleep(300);
 

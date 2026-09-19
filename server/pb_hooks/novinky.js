@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.62-beta": {
+    cs: [
+      "Práce s PDF v asistentovi (ikona dokumentu v hlavičce panelu): sloučit víc PDF v zadaném pořadí, rozdělit podle stran, vyjmout nebo odebrat strany — všechno běží ve vašem prohlížeči, soubor nikam neodchází a nic to nestojí.",
+      "Opravy textu v hotovém PDF: „Opravit text s asistentem“ přečte text stran, vy řeknete co změnit (cena, jméno, datum, věta) a asistent navrhne opravy na kartě; po potvrzení prohlížeč PDF opraví, ukáže náhled a nabídne stažení. Další opravy se sčítají — stažený soubor má vždy všechny.",
+      "Poctivě: oprava je přelepka vestavěným písmem, původní text v souboru zůstává pod ní; skeny bez textu a PDF se zákazem úprav opravit nejdou. Asistent dostane jen text stran, ne soubor.",
+      "PDF jde do chatu přiložit i sponkou, Ctrl+V nebo přetažením, stejně jako obrázek; tah s PDF se do hodinového limitu počítá jako dva.",
+    ],
+    en: [
+      "PDF tools in the assistant (document icon in the panel header): merge several PDFs in a chosen order, split by pages, extract or remove pages — all in your browser, the file never leaves your computer and it costs nothing.",
+      "Text corrections in a finished PDF: “Correct text with the assistant” reads the page text, you say what to change (a price, a name, a date, a sentence) and the assistant proposes the corrections on a card; after confirmation the browser edits the PDF, shows a preview and offers the download. Further corrections add up — the downloaded file always has all of them.",
+      "Honestly: the correction is an overlay in a built-in font, the original text stays in the file underneath; scans without text and PDFs with editing restrictions cannot be corrected. The assistant receives only the page text, never the file.",
+      "A PDF can be attached to the chat with the paper-clip button, Ctrl+V or drag and drop, like an image; a turn with a PDF counts as two towards the hourly limit.",
+    ],
+  },
   "v0.61-beta": {
     cs: [
       "Nový AI asistent v panelu vpravo: vidí do vašich projektů, Můj den, zásobníku nápadů a pravidel, ptá se krátkými otázkami s připravenými odpověďmi a změny v projektech a pravidlech provede až po vašem potvrzení na kartě.",

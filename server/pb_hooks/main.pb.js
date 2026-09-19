@@ -1955,7 +1955,7 @@ kbRoute("POST", "/my-summary/refresh", (e) => {
 const CHAT_BODY_LIMIT = Math.max(2 * 1024 * 1024, Math.round((Number($os.getenv("KB_CHAT_MAX_IMG_MB")) || 1.2) * 1048576 * 4 / 3) + 256 * 1024);
 kbRoute("POST", "/chat", (e) => {
   const { userLang } = require(`${__hooks}/i18n.js`);
-  const { chatRun, chatCfg, chatBrzda, chatChyba, zkontrolujObrazek } = require(`${__hooks}/chat.js`);
+  const { chatRun, chatCfg, chatBrzda, chatChyba, zkontrolujObrazek, zkontrolujPdf } = require(`${__hooks}/chat.js`);
   const L = userLang(e.auth);
   const body = e.requestInfo().body || {};
   const c = chatCfg(e, body, L);
@@ -1963,6 +1963,10 @@ kbRoute("POST", "/chat", (e) => {
   // vadný obrázek / vypnuté čtení obrázků → 400 DŘÍV, než brzda ubere hodinový strop
   if (body.image_base64 && !body.mode) {
     try { zkontrolujObrazek(body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
+  }
+  // totéž pro text z PDF (moc stran / znaků, špatný tvar) — 18. 9. 2026
+  if (body.pdf_text && !body.mode) {
+    try { zkontrolujPdf(body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
   }
   const b = chatBrzda(e, L, body);
   if (b) return e.json(b.status, b.body);

@@ -9,6 +9,34 @@ below before you jump several versions.
 
 ---
 
+## v0.62-beta — 2026-09-19
+
+**PDF in the assistant: merge, split, extract, remove — and correct text with the assistant**
+
+- **PDF in the assistant** (new **PDF** tab in the panel): merge several PDFs in a chosen order,
+  split by page ranges, extract or remove pages — all **in the browser**, the file never leaves the
+  user's computer and nothing is sent to the server or the model. **Correct text with the
+  assistant**: the page text (only the text) goes to the assistant, it proposes replacements
+  (price, name, sentence) on a confirmation card, the browser then edits the PDF as an overlay
+  (built-in Liberation font, original text stays underneath), shows a page preview and offers the
+  corrected file for download; the assistant reports honestly what was and was not replaced.
+  Limits: 60 pages / 40 000 characters of text per attachment, 30 MB per file; scans without a
+  text layer and encrypted PDFs are refused. A turn with a PDF weighs 2 in the hourly limit
+  (`KB_AI_PDF_VAHA`). New dependencies: `pdf-lib` (MIT), `pdfjs-dist` (Apache-2.0), Liberation
+  fonts (OFL) — loaded lazily, not part of the lite bundle.
+- **Corrections add up**: every further correction card applies all earlier confirmed corrections
+  of the same file plus the new ones (the list is kept with the conversation, so it survives a page
+  reload — you only pick the file again). Corrections on the same line are drawn as one; unchecked
+  replacements are reported to the assistant as skipped. The page text of a PDF is treated as data:
+  memory or idea-buffer changes from such a turn need a confirmation card, like with images.
+- The PDF tab keeps its file list when you switch to the chat and back; a locked PDF (password or
+  editing restriction) is refused right when attached, with a plain message.
+
+**Upgrade notes**
+
+- No migration. New optional variable `KB_AI_PDF_VAHA` (default 2). The PDF libraries are served
+  from the instance itself (no CDN) and load only when the PDF tab or a PDF attachment is used.
+
 ## v0.61-beta — 2026-09-17
 
 **AI assistant on the side (with images and deadlines); share invitations for addresses without an account**

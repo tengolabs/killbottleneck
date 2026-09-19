@@ -14,6 +14,7 @@ BSD, Zlib, 0BSD, MPL-2.0-or-Apache-2.0). Full license texts are inside each pack
 | --- | --- | --- |
 | Inter | Rasmus Andersson | SIL Open Font License 1.1 |
 | Plus Jakarta Sans | Tokotype | SIL Open Font License 1.1 |
+| Liberation Sans, Liberation Serif (`fonts/pdf/`, Latin subset) | Red Hat / Google (Arimo, Tinos) | SIL Open Font License 1.1 |
 
 The fonts are served from your own instance on purpose — killBottleneck must not send your
 users' IP addresses to a third-party font CDN.
@@ -24,7 +25,7 @@ users' IP addresses to a third-party font CDN.
 | --- | --- |
 | PocketBase | MIT |
 
-## Runtime, frontend (252 packages)
+## Runtime, frontend (259 packages)
 
 | Package | Version | License |
 | --- | --- | --- |
@@ -42,9 +43,14 @@ users' IP addresses to a third-party font CDN.
 | `@jridgewell/resolve-uri` | 3.1.2 | MIT |
 | `@jridgewell/sourcemap-codec` | 1.5.5 | MIT |
 | `@jridgewell/trace-mapping` | 0.3.31 | MIT |
+| `@napi-rs/canvas` | 0.1.100 | MIT |
+| `@napi-rs/canvas-linux-x64-gnu` | 0.1.100 | MIT |
 | `@nodelib/fs.scandir` | 2.1.5 | MIT |
 | `@nodelib/fs.stat` | 2.0.5 | MIT |
 | `@nodelib/fs.walk` | 1.2.8 | MIT |
+| `@pdf-lib/fontkit` | 1.1.1 | MIT |
+| `@pdf-lib/standard-fonts` | 1.0.0 | MIT |
+| `@pdf-lib/upng` | 1.0.1 | MIT |
 | `@radix-ui/number` | 1.1.2 | MIT |
 | `@radix-ui/primitive` | 1.1.5 | MIT |
 | `@radix-ui/react-accordion` | 1.2.16 | MIT |
@@ -210,6 +216,8 @@ users' IP addresses to a third-party font CDN.
 | `object-hash` | 3.0.0 | MIT |
 | `pako` | 2.2.0 | (MIT AND Zlib) |
 | `path-parse` | 1.0.7 | MIT |
+| `pdf-lib` | 1.17.1 | MIT |
+| `pdfjs-dist` | 5.7.284 | Apache-2.0 |
 | `performance-now` | 2.1.0 | MIT |
 | `picocolors` | 1.1.1 | ISC |
 | `picomatch` | 2.3.2 | MIT |

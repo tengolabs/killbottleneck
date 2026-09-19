@@ -78,6 +78,11 @@ H.beh(async () => {
   const chipSel = (text) => `[data-testid^="gcal-chip-"][title^="${text}"]`;
   // spike DnD (7. 9. 2026): pohyb ≥ 6 px aktivuje MouseSensor, pak plynule na cíl
   const tahni = async (pg, zSel, doSel) => {
+    // cíl doprostřed okna: u spodního okraje stránka při tahu sama roluje (auto-scroll)
+    // a myš držená na místě pak pustí o řádek níž — 17. 9. 2026 „dnes+4“ = 4. řádek
+    // září, drop přistál na 28. 9. místo 21. 9. (změřeno: posun 128 px během tahu)
+    await pg.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'center' }), doSel);
+    await sleep(300);
     const z = await stred(pg, zSel);
     const c = await stred(pg, doSel);
     if (!z || !c) return false;

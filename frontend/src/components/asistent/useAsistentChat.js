@@ -121,16 +121,20 @@ export function useAsistentChat({ open }) {
   // Vrací { ok, vratit }: vratit = server zprávu NEZPRACOVAL (vadný obrázek, vypnuté čtení, přepis
   // selhal, brzda) → panel vrátí obrázek i text do políčka. Po jiné chybě (timeout, pád smyčky až
   // po přepisu) je zpráva na serveru už uložená — vrácení by vedlo ke zdvojenému tahu (checkup 16. 9.).
-  const send = useCallback(async (text, context, patchUser, obrazek) => {
+  // pdf = { name, pages, strany:[{page,text}] } z lib/pdf.nactiPdf (volitelné) — serveru jde JEN text,
+  // soubor zůstává v prohlížeči (panel ho drží pro kartu opravy).
+  const send = useCallback(async (text, context, patchUser, obrazek, pdf) => {
     const t = String(text || '').trim();
-    if ((!t && !obrazek) || loading) return { ok: false, vratit: false };
+    if ((!t && !obrazek && !pdf) || loading) return { ok: false, vratit: false };
     setError(null);
     setLoading(true);
     // optimisticky ukázat zprávu hned; server ji uloží i při chybě modelu
     const docasna = { role: 'user', content: t, ts: new Date().toISOString(), docasna: true };
     if (obrazek && obrazek.nahled) docasna.obrazek = { nahled: obrazek.nahled, mime: obrazek.nahledMime };
+    if (pdf) docasna.pdf = { name: pdf.name, pages: pdf.pages };
     setChat((c) => ({ ...(c || { id: chatId, title: '', pending: [] }), messages: [...((c && c.messages) || []), docasna] }));
     const obr = obrazek ? { image_base64: obrazek.base64, nahled_base64: obrazek.nahled || undefined } : {};
+    if (pdf) { obr.pdf_text = pdf.strany; obr.pdf_name = pdf.name; obr.pdf_pages = pdf.pages; }
     try {
       let r;
       try {
@@ -156,20 +160,21 @@ export function useAsistentChat({ open }) {
       if (!zivy.current) return { ok: false, vratit: nezpracovano };
       setError(prevedChybu(e));
       if (chatId) otevriChat(chatId);
-      else if (obrazek && nezpracovano) setChat((c) => (c && !c.id ? null : c)); // nový rozhovor se nezaložil → pryč s dočasnou bublinou
-      else if (obrazek) nactiSeznam(); // mohl vzniknout na serveru — ať je v historii
+      else if ((obrazek || pdf) && nezpracovano) setChat((c) => (c && !c.id ? null : c)); // nový rozhovor se nezaložil → pryč s dočasnou bublinou
+      else if (obrazek || pdf) nactiSeznam(); // mohl vzniknout na serveru — ať je v historii
       return { ok: false, vratit: nezpracovano };
     } finally {
       if (zivy.current) setLoading(false);
     }
   }, [chatId, loading, model, otevriChat, nactiSeznam, setChatId]);
 
-  const potvrd = useCallback(async (actionId, ok, context, patchUser) => {
+  // vysledek = výsledek akce vykonané prohlížečem (oprava PDF: {provedeno, nenalezeno, chyba}) — jen u karet s `klient`
+  const potvrd = useCallback(async (actionId, ok, context, patchUser, vysledek) => {
     if (!chatId || loading) return;
     setError(null);
     setLoading(true);
     try {
-      const r = await chatPotvrdit({ chat_id: chatId, action_id: actionId, ok: !!ok, context: context || {}, model: model || undefined });
+      const r = await chatPotvrdit({ chat_id: chatId, action_id: actionId, ok: !!ok, context: context || {}, model: model || undefined, ...(vysledek ? { vysledek } : {}) });
       if (!zivy.current) return;
       setChat(r.chat);
       projevKarty(r.chat, patchUser);

@@ -68,7 +68,7 @@ const MAX_KB = Number(process.env.LITE_MAX_KB || 515);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.
-const FORBIDDEN = ['@xyflow', '@radix-ui', 'recharts', 'jspdf', 'html2canvas', 'html-to-image', '@dnd-kit'];
+const FORBIDDEN = ['@xyflow', '@radix-ui', 'recharts', 'jspdf', 'html2canvas', 'html-to-image', '@dnd-kit', 'pdf-lib', 'pdfjs-dist', '@pdf-lib/fontkit'];
 
 let pass = 0, fail = 0;
 const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));

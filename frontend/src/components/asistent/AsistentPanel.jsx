@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Bot, Brain, ChevronDown, ChevronLeft, ChevronUp, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Trash2, X } from 'lucide-react';
+import { Bot, Brain, ChevronDown, ChevronLeft, ChevronUp, FileText, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Trash2, X } from 'lucide-react';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,7 @@ import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
 import { base44 } from '@/api/base44Client';
 import { pripravObrazek, obrazekZeSchranky } from '@/lib/obrazek';
 import AsistentZprava from './AsistentZprava';
+import PdfPohled from './PdfPohled';
 import { useAsistentChat } from './useAsistentChat';
 
 // AI chat na boku (13. 9. 2026): vpravo, přes celou výšku, minimalizovatelný na
@@ -102,7 +103,7 @@ export default function AsistentPanel() {
   const A = useMemo(() => ({ ...panel, ...rozhovor }), [panel, rozhovor]);
   const location = useLocation();
   const [text, setText] = useState('');
-  const [pohled, setPohled] = useState('chat'); // chat | pamet
+  const [pohled, setPohled] = useState('chat'); // chat | pamet | pdf
   // Vložený obrázek (Ctrl+V, přetažení, sponka) — 16. 9. 2026. Zmenšuje se hned při
   // vložení; server ho přepíše a originál zahodí, ve vlákně zůstane náhled a přepis.
   const [obrazek, setObrazek] = useState(null);   // { base64, nahled, nahledMime, url }
@@ -123,6 +124,56 @@ export default function AsistentPanel() {
       setObrazekChyba(true);
     }
   }, []);
+  // Příloha PDF (18. 9. 2026): text stran jde serveru, SOUBOR zůstává tady — pdfSoubory drží
+  // ORIGINÁLNÍ bajty (klíč název + počet stran). Každá další karta aplikuje na originál všechny
+  // dřívější potvrzené opravy + nové, takže druhá oprava neztratí první (Richard 19. 9. 2026:
+  // „potvrdím další a vrátí to původní“). Seznam dřívějších oprav se bere z ROZHOVORU (server
+  // u každé hotové karty drží vysledek_klienta), takže přežije i obnovení stránky — po reloadu
+  // stačí vybrat soubor znovu. Geometrie se vždy počítá z originálu a model může dál citovat
+  // původní text. Drží se poslední 3 soubory (na telefonu paměť).
+  const [pdf, setPdf] = useState(null);         // { name, pages, strany, bytes, stranyBezTextu }
+  const [pdfCte, setPdfCte] = useState(false);
+  const [pdfSeznam, setPdfSeznam] = useState([]); // soubory v záložce PDF — přežijí přepnutí do chatu
+  const pdfSoubory = useRef(new Map());        // klíč → { bytes }
+  const klicPdf = (name, pages) => `${name}|${pages || 0}`;
+  const najdiPdf = useCallback((name, pages) => pdfSoubory.current.get(klicPdf(name, pages)) || null, []);
+  const ulozPdf = useCallback((name, pages, bytes) => {
+    const m = pdfSoubory.current;
+    const k = klicPdf(name, pages);
+    if (m.has(k)) m.delete(k);
+    m.set(k, { bytes });
+    while (m.size > 3) m.delete(m.keys().next().value);
+  }, []);
+  // dřívější potvrzené opravy téhož souboru v tomto rozhovoru (karty PŘED tou danou)
+  const chatMsgs = A.chat && A.chat.messages;
+  const drivejsiOpravy = useCallback((kartaId, name, pages) => {
+    const out = [];
+    for (const m of chatMsgs || []) {
+      for (const k of m.karty || []) {
+        if (k.type !== 'akce' || k.klient !== 'pdf_nahrada') continue;
+        if (k.id === kartaId) return out;
+        if (k.stav !== 'hotovo' || !k.pdf || k.pdf.name !== name || (k.pdf.pages || 0) !== (pages || 0) || !k.vysledek_klienta) continue;
+        for (const x of k.vysledek_klienta.provedeno || []) out.push({ page: x.page, find: x.find, replace: x.replace });
+      }
+    }
+    return out;
+  }, [chatMsgs]);
+  const prijmiPdf = useCallback(async (soubor) => {
+    setObrazekChyba(false); setPdfCte(true);
+    try {
+      const P = await import('@/lib/pdf');
+      const priloha = await P.prilohaPdf(soubor);
+      ulozPdf(priloha.name, priloha.pages, priloha.bytes);
+      setPdf(priloha);
+    } catch (e) {
+      setObrazekChyba('pdf:' + (e && e.kod ? e.kod : 'poskozeno'));
+    } finally { setPdfCte(false); }
+  }, [ulozPdf]);
+  const jePdf = (f) => !!f && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''));
+  // první soubor z přetažení / schránky: obrázek → přepis, PDF → text stran
+  const prijmiSoubor = useCallback((soubor) => { if (jePdf(soubor)) prijmiPdf(soubor); else prijmiObrazek(soubor); }, [prijmiPdf, prijmiObrazek]);
+  const souborZPrenosu = (dt) => obrazekZeSchranky(dt) || [...((dt && dt.files) || [])].find(jePdf) || null;
+  const naOpravit = useCallback((priloha) => { ulozPdf(priloha.name, priloha.pages, priloha.bytes); setPdf(priloha); setObrazekChyba(false); setPohled('chat'); }, [ulozPdf]);
   const konec = useRef(null);
   const vstup = useRef(null);
   const [mobil, setMobil] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
@@ -210,17 +261,19 @@ export default function AsistentPanel() {
     const zPolicka = txt === undefined;
     const v = String(zPolicka ? text : txt).trim();
     const obr = zPolicka ? obrazek : null;
-    if (!v && !obr) return;
-    if (zPolicka) { setText(''); setObrazek(null); }
-    const vysl = await A.send(v, kontext, patchUser, obr || undefined);
-    if (!obr) return;
-    // server zprávu nezpracoval (přepis selhal, vadný obrázek, brzda) → obrázek i text zpátky do políčka
+    const prilohaPdf = zPolicka ? pdf : null;
+    if (!v && !obr && !prilohaPdf) return;
+    if (zPolicka) { setText(''); setObrazek(null); setPdf(null); }
+    const vysl = await A.send(v, kontext, patchUser, obr || undefined, prilohaPdf || undefined);
+    if (!obr && !prilohaPdf) return;
+    // server zprávu nezpracoval (přepis selhal, vadný obrázek, brzda) → příloha i text zpátky do políčka
     if (vysl && vysl.vratit) {
-      setObrazek((p) => { if (p) { URL.revokeObjectURL(obr.url); return p; } return obr; });
+      if (obr) setObrazek((p) => { if (p) { URL.revokeObjectURL(obr.url); return p; } return obr; });
+      if (prilohaPdf) setPdf((p) => p || prilohaPdf);
       setText((p) => p || v);
-    } else URL.revokeObjectURL(obr.url);
-  }, [A, text, obrazek, kontext, patchUser]);
-  const potvrd = useCallback((id, ok) => A.potvrd(id, ok, kontext, patchUser), [A, kontext, patchUser]);
+    } else if (obr) URL.revokeObjectURL(obr.url);
+  }, [A, text, obrazek, pdf, kontext, patchUser]);
+  const potvrd = useCallback((id, ok, vysledek) => A.potvrd(id, ok, kontext, patchUser, vysledek), [A, kontext, patchUser]);
   // na telefonu panel kryje celou obrazovku → po „Ukázat v mapě" ho schovat (Richard 13. 9.)
   const poOdkazu = useCallback(() => { if (mobil) A.setOpen(false); }, [mobil, A]);
   // Toasty (vpravo dole) zakrývaly políčko chatu, dokud nezmizely — např. „mapa sloučena“
@@ -346,6 +399,8 @@ export default function AsistentPanel() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* PDF mezi historií a pamětí (Richard 19. 9. 2026) */}
+          <Button variant={pohled === 'pdf' ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('pdf.tab')} aria-label={t('pdf.tab')} onClick={() => setPohled((p) => (p === 'pdf' ? 'chat' : 'pdf'))} data-testid="chat-pdf-btn"><FileText className="w-4 h-4" /></Button>
           <Button variant={pohled === 'pamet' ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('memory')} onClick={() => setPohled((p) => (p === 'pamet' ? 'chat' : 'pamet'))} data-testid="chat-pamet-btn"><Brain className="w-4 h-4" /></Button>
           <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
           {/* minimalizace, ne zavření — rozhovor zůstává (křížek sváděl k „zavírám úplně", Richard 13. 9.) */}
@@ -353,7 +408,7 @@ export default function AsistentPanel() {
         </div>
       </div>
 
-      {pohled === 'pamet' ? <PametPohled onZpet={() => setPohled('chat')} /> : (
+      {pohled === 'pamet' ? <PametPohled onZpet={() => setPohled('chat')} /> : pohled === 'pdf' ? <PdfPohled onZpet={() => setPohled('chat')} onOpravit={naOpravit} loading={A.loading} soubory={pdfSeznam} setSoubory={setPdfSeznam} /> : (
         <>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2" data-testid="chat-zpravy">
             {nabidnoutPoradu && !A.loading && (
@@ -375,13 +430,13 @@ export default function AsistentPanel() {
             )}
             {zpravy.map((z, i) => (
               <div key={i} ref={i === prvniOdpovedIdx ? zacatekOdpovedi : undefined} className={i === prvniOdpovedIdx ? 'scroll-mt-2' : undefined}>
-                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} mapy={mapy} vychoziMapa={vychoziMapa} onUlozKoncept={ulozKoncept} onOdkaz={poOdkazu} />
+                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} mapy={mapy} vychoziMapa={vychoziMapa} onUlozKoncept={ulozKoncept} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />
               </div>
             ))}
             {A.loading && (
               <div className="flex justify-start" data-testid="chat-thinking">
                 <div className="rounded-2xl rounded-bl-md bg-secondary px-3 py-2 text-xs text-muted-foreground inline-flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].obrazek ? t('imageReading') : t('thinking')}
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].obrazek ? t('imageReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].pdf ? t('pdf.thinking') : t('thinking')}
                 </div>
               </div>
             )}
@@ -398,8 +453,19 @@ export default function AsistentPanel() {
               ))}
             </div>
           )}
-          {(obrazek || obrazekChyba) && (
+          {(obrazek || obrazekChyba || pdf || pdfCte) && (
             <div className="border-t px-2 pt-2 flex items-center gap-2 shrink-0" data-testid="chat-obrazek-nahled">
+              {pdfCte && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" data-testid="chat-pdf-cte"><Loader2 className="w-3.5 h-3.5 animate-spin" />{t('pdf.reading')}</span>}
+              {pdf && (
+                <>
+                  <span className="inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs max-w-[14rem]" data-testid="chat-pdf-priloha">
+                    <FileText className="w-3.5 h-3.5 text-primary shrink-0" /><span className="truncate">{pdf.name}</span><span className="text-muted-foreground shrink-0">· {t('pdf.pages', { count: pdf.pages })}</span>
+                  </span>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setPdf(null)} data-testid="chat-pdf-zrus">
+                    <X className="w-3.5 h-3.5 mr-1" />{t('pdf.removeAttachment')}
+                  </Button>
+                </>
+              )}
               {obrazek && (
                 <>
                   <img src={obrazek.url} alt="" className="h-14 max-w-[8rem] rounded border object-cover" />
@@ -408,7 +474,7 @@ export default function AsistentPanel() {
                   </Button>
                 </>
               )}
-              {obrazekChyba && <p className="text-xs text-destructive" data-testid="chat-obrazek-chyba">{t(obrazekChyba === 'jenObrazek' ? 'imageOnly' : 'imageError')}</p>}
+              {obrazekChyba && <p className="text-xs text-destructive" data-testid="chat-obrazek-chyba">{t(obrazekChyba === 'jenObrazek' ? 'imageOnly' : obrazekChyba === true ? 'imageError' : `pdf.chyba.${String(obrazekChyba).replace(/^pdf:/, '')}`, { defaultValue: t('pdf.chyba.poskozeno') })}</p>}
             </div>
           )}
           <form
@@ -421,8 +487,8 @@ export default function AsistentPanel() {
               if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
               e.preventDefault();
               setPretahuje(false);
-              const f = obrazekZeSchranky(e.dataTransfer);
-              if (f) prijmiObrazek(f); else setObrazekChyba('jenObrazek');
+              const f = souborZPrenosu(e.dataTransfer);
+              if (f) prijmiSoubor(f); else setObrazekChyba('jenObrazek');
             }}
             data-testid="chat-form"
           >
@@ -431,7 +497,7 @@ export default function AsistentPanel() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); odesli(); } }}
-              onPaste={(e) => { const f = obrazekZeSchranky(e.clipboardData); if (f) { e.preventDefault(); prijmiObrazek(f); } }}
+              onPaste={(e) => { const f = souborZPrenosu(e.clipboardData); if (f) { e.preventDefault(); prijmiSoubor(f); } }}
               placeholder={pretahuje ? t('imageDrop') : t('placeholder')}
               title={t('imageHint')}
               rows={2}
@@ -441,10 +507,10 @@ export default function AsistentPanel() {
             <input
               ref={souborRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept="image/png,image/jpeg,image/webp,application/pdf,.pdf"
               className="hidden"
               data-testid="chat-obrazek-input"
-              onChange={(e) => { prijmiObrazek(e.target.files?.[0]); e.target.value = ''; }}
+              onChange={(e) => { prijmiSoubor(e.target.files?.[0]); e.target.value = ''; }}
             />
             <Button type="button" size="icon" variant="ghost" title={`${t('imageAdd')} — ${t('imageHint')}`} aria-label={t('imageAdd')} disabled={A.loading} onClick={() => souborRef.current?.click()} data-testid="chat-obrazek">
               <ImagePlus className="w-4 h-4" />
@@ -452,7 +518,7 @@ export default function AsistentPanel() {
             {mobil && (
               <Button type="button" size="icon" variant="outline" title={t('shrink')} aria-label={t('shrink')} onClick={zmensit} data-testid="chat-zmensit"><ChevronDown className="w-4 h-4" /></Button>
             )}
-            <Button type="submit" size="icon" disabled={A.loading || (!text.trim() && !obrazek)} title={t('send')} aria-label={t('send')} data-testid="chat-send">
+            <Button type="submit" size="icon" disabled={A.loading || pdfCte || (!text.trim() && !obrazek && !pdf)} title={t('send')} aria-label={t('send')} data-testid="chat-send">
               {A.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
           </form>

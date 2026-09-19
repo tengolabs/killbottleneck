@@ -10,7 +10,8 @@ const CHAT_IMG_TIMEOUT_MS = 300_000;
 const overrideMs = () => {
   try { return Number(localStorage.getItem('kb_ai_timeout_ms')) || 0; } catch { return 0; }
 };
-export const chat = (payload) => kbSend('/api/kb/chat', { body: payload, timeoutMs: overrideMs() || (payload && payload.image_base64 ? CHAT_IMG_TIMEOUT_MS : CHAT_TIMEOUT_MS) });
+// tah s textem PDF = dlouhý prompt (desítky tisíc znaků) → stejný strop jako obrázek
+export const chat = (payload) => kbSend('/api/kb/chat', { body: payload, timeoutMs: overrideMs() || (payload && (payload.image_base64 || payload.pdf_text) ? CHAT_IMG_TIMEOUT_MS : CHAT_TIMEOUT_MS) });
 export const chatPotvrdit = (payload) => kbSend('/api/kb/chat/potvrdit', { body: payload, timeoutMs: overrideMs() || CHAT_TIMEOUT_MS });
 export const chatSeznam = () => kbSend('/api/kb/chat/seznam', { method: 'GET' });
 export const chatDetail = (id) => kbSend(`/api/kb/chat/detail/${encodeURIComponent(id)}`, { method: 'GET' });
