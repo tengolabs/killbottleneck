@@ -117,7 +117,7 @@ const toDto = (name, r) => {
     case 'TaskComment':
       return { ...base, task_id: r.task, text: r.text, author_email: r.author_email };
     case 'Notification':
-      return { ...base, type: r.type, text: r.text, read: !!r.read, task_id: r.task || '', map_id: r.map || '', node_id: r.node_id || '' };
+      return { ...base, type: r.type, text: r.text, read: !!r.read, task_id: r.task || '', map_id: r.map || '', node_id: r.node_id || '', event_id: r.event_id || '' };
     case 'AgentRun':
       // token_hash ani secret se sem NIKDY nedostanou — server je v kolekci drží,
       // ale DTO je whitelist a běžný klient je k ničemu nepotřebuje

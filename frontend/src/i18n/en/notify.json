@@ -39,7 +39,9 @@
     "user_joined": "New member signed in",
     "rule_notice": "Rule message",
     "rule_broken": "Broken rule",
-    "new_version": "New version"
+    "new_version": "New version",
+    "reminder": "Timed reminder",
+    "event_invited": "Event invitation"
   },
   "prefs": {
     "title": "Notification settings",

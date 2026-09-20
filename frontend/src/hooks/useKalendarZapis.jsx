@@ -102,5 +102,32 @@ export function useKalendarZapis({ setMaps, tasksApi, loadMaps, toast }) {
     toast({ title: tEditor('nodeDialog.dlRequestSent'), action: vratit(() => zrusZadost(item)) });
   }, [loadMaps, toast, tEditor, vratit, chyba, zrusZadost]);
 
-  return useMemo(() => ({ zmenTermin, posliZadost, zrusZadost }), [zmenTermin, posliZadost, zrusZadost]);
+  // přesun události na jiný den (jen vlastník; server nuluje reminded_at →
+  // připomínka platí k novému dni); toast + Vrátit jako u termínu
+  const presunUdalost = useCallback(async (item, nova, puvodni) => {
+    const { ulozUdalost } = await import('@/api/udalosti');
+    const oznam = () => window.dispatchEvent(new CustomEvent('kb-udalosti-changed'));
+    try {
+      await ulozUdalost({ id: item.raw.id, day: nova });
+      oznam();
+    } catch (e) {
+      chyba(e, t('toast.udalostSelhala'));
+      throw e;
+    }
+    let vraceno = false;
+    toast({
+      title: t('toast.udalostPresunuta', { to: fmtDen(nova) }),
+      action: vratit(async () => {
+        if (vraceno) return;
+        vraceno = true;
+        try {
+          await ulozUdalost({ id: item.raw.id, day: puvodni });
+          oznam();
+          toast({ title: t('toast.udalostVracena', { from: fmtDen(puvodni) }) });
+        } catch (e) { vraceno = false; chyba(e, t('toast.udalostSelhala')); }
+      }),
+    });
+  }, [toast, t, vratit, chyba]);
+
+  return useMemo(() => ({ zmenTermin, posliZadost, zrusZadost, presunUdalost }), [zmenTermin, posliZadost, zrusZadost, presunUdalost]);
 }

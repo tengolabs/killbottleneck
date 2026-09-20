@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/AuthContext';
@@ -9,6 +9,10 @@ import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ReportRailButton from '@/components/shared/ReportRailButton';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import KalendarSPresunem from '@/components/tasks/kalendar/KalendarSPresunem';
+import { useUdalosti } from '@/hooks/useUdalosti';
+// události v kalendáři (19. 9. 2026) — líné chunky, otevírají se jen z kalendáře
+const DialogUdalost = lazy(() => import('@/components/tasks/kalendar/DialogUdalost'));
+const DialogNovaPolozka = lazy(() => import('@/components/tasks/kalendar/DialogNovaPolozka'));
 import TaskTimeline from '@/components/tasks/TaskTimeline';
 import TaskDialog from '@/components/tasks/TaskDialog';
 import NewNodeDialog from '@/components/tasks/NewNodeDialog';
@@ -69,6 +73,9 @@ export default function Tasks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newNodeOpen, setNewNodeOpen] = useState(false);
   const [calendarDeadline, setCalendarDeadline] = useState('');
+  // kalendář: volič „úkol / událost“ pro den + dialog události (nová / detail)
+  const [novaPolozkaDen, setNovaPolozkaDen] = useState(null);
+  const [udalostDialog, setUdalostDialog] = useState(null); // { udalost: DTO|null, den }
   const [editTask, setEditTask] = useState(null);
   const buffer = useBufferNodes(user);
   const [editBufferItem, setEditBufferItem] = useState(null);
@@ -109,13 +116,19 @@ export default function Tasks() {
   // /tasks?view=calendar je jednorázový deep-link: pohled z něj se uloží jako
   // zvolený (reload ho drží) a param se uklidí — jinak by po přepnutí pohledu
   // a reloadu zase vyhrál nad uloženou volbou
+  // ⚠️ Běží při KAŽDÉ změně params, ne jen při mountu: klik na událost z Můj den /
+  // zvonečku / karty asistenta vede na /tasks?view=calendar&udalost=…, a když už člověk
+  // na /tasks stojí (Tabulka), stránka se neremountuje — pohled se musí přepnout tady
+  // (panel /checkup 19. 9. 2026).
   useEffect(() => {
-    if (!searchParams.has('view')) return;
-    ulozKlic('kb-tasks-view', view);
+    const requested = searchParams.get('view');
+    if (!requested) return;
+    const cil = ['table', 'timeline', 'board', 'calendar'].includes(requested) ? requested : view;
+    if (cil !== view) setView(cil);
+    ulozKlic('kb-tasks-view', cil);
     searchParams.delete('view');
     setSearchParams(searchParams, { replace: true });
-
-  }, []);
+  }, [searchParams]);
 
   // deep-link z Home: /tasks?convert=<id nápadu> otevře převod nápadu na úkol
   // (Home nemá dialog úkolu — převod se dokončí tady výběrem projektu)
@@ -157,6 +170,19 @@ export default function Tasks() {
   });
 
   const openNodeInMap = (item) => navigate(`/map/${item.map_id}?node=${item.node_id}`);
+
+  // události + připomínky k uzlům — jen když je kalendář otevřený
+  const { items: udalostiItems, udalosti, pripominkyPodleUzlu, nacteno: udalostiNacteny } = useUdalosti({ aktivni: view === 'calendar', userEmail: user?.email });
+  // deep-link ze zvonečku: /tasks?view=calendar&udalost=<id> otevře detail události
+  useEffect(() => {
+    const uid = searchParams.get('udalost');
+    if (!uid || !udalostiNacteny) return;
+    const ev = udalosti.find((u) => u.id === uid);
+    searchParams.delete('udalost');
+    setSearchParams(searchParams, { replace: true });
+    if (ev) setUdalostDialog({ udalost: ev, den: ev.day });
+    else toast({ title: t('kalendar:udalost.nenalezena'), variant: 'destructive' });
+  }, [udalosti, udalostiNacteny, searchParams]);
 
   // akce nad uzly map (zápis, mazání, sdílení, stash, ikony) — viz
   // useMapNodeActions (F3-10)
@@ -292,7 +318,10 @@ export default function Tasks() {
   // „Nový úkol" zakládá UZEL (rozhodnutí Richarda 17. 8. 2026) — pod hlavní
   // cíl, nebo pod vybraný uzel; řešitel/termín hned v dalším kroku (dialog uzlu).
   const openCreate = () => { setCalendarDeadline(''); setNewNodeOpen(true); };
-  const openCalendarCreate = (deadline) => { setCalendarDeadline(deadline); setNewNodeOpen(true); };
+  // „+“ v kalendáři: nejdřív volba úkol (uzel do projektu) / událost (bez projektu)
+  const openCalendarCreate = (den) => setNovaPolozkaDen(den || '');
+  const openCalendarNode = (deadline) => { setNovaPolozkaDen(null); setCalendarDeadline(deadline); setNewNodeOpen(true); };
+  const openCalendarEvent = (den) => { setNovaPolozkaDen(null); setUdalostDialog({ udalost: null, den }); };
 
   const handleCreateNode = async (mapId, parentId, title, deadline = '') => {
     try {
@@ -607,15 +636,17 @@ export default function Tasks() {
           />
         ) : view === 'calendar' ? (
           <KalendarSPresunem
-            items={calendarItems}
+            items={udalostiItems.length ? [...calendarItems, ...udalostiItems] : calendarItems}
             maps={activeMaps}
             members={members}
             user={user}
             tasksApi={tasksApi}
             loadMaps={loadMaps}
             setMaps={setMaps}
+            pripominky={pripominkyPodleUzlu}
             onCreate={openCalendarCreate}
-            onOpen={(it) => (it.kind === 'node' ? setEditNodeItem(it.raw) : openEdit(it.raw))}
+            onOpen={(it) => (it.kind === 'event' ? setUdalostDialog({ udalost: it.raw, den: it.raw.day })
+              : it.kind === 'node' ? setEditNodeItem(it.raw) : openEdit(it.raw))}
           />
         ) : view === 'board' ? (
           <TaskBoard
@@ -669,6 +700,30 @@ export default function Tasks() {
         )}
       </div>
 
+      {(novaPolozkaDen !== null || udalostDialog) && (
+        <Suspense fallback={null}>
+          {novaPolozkaDen !== null && (
+            <DialogNovaPolozka
+              open
+              den={novaPolozkaDen}
+              onClose={() => setNovaPolozkaDen(null)}
+              onUkol={() => openCalendarNode(novaPolozkaDen)}
+              onUdalost={() => openCalendarEvent(novaPolozkaDen)}
+            />
+          )}
+          {udalostDialog && (
+            <DialogUdalost
+              open
+              udalost={udalostDialog.udalost}
+              defaultDay={udalostDialog.den}
+              members={members}
+              userEmail={user?.email}
+              toast={toast}
+              onClose={() => setUdalostDialog(null)}
+            />
+          )}
+        </Suspense>
+      )}
       <NewNodeDialog
         defaultDeadline={calendarDeadline}
         open={newNodeOpen}

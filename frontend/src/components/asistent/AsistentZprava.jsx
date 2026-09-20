@@ -102,6 +102,11 @@ function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drive
       ) : (
         <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>{popisek}{stav === 'chyba' && karta.vysledek ? ` — ${karta.vysledek}` : ''}</span>
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.udalost_id && (
+            <Link to={`/tasks?view=calendar&udalost=${encodeURIComponent(karta.odkaz.udalost_id)}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
+              {t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
+            </Link>
+          )}
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.map_id && (
             <Link to={`/map/${karta.odkaz.map_id}${karta.odkaz.node_id ? `?node=${encodeURIComponent(karta.odkaz.node_id)}` : ''}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
               {karta.odkaz.node_id ? t('actionOpenNode') : t('actionOpen')} <ExternalLink className="w-3 h-3" />
@@ -183,7 +188,7 @@ function KartaPdfOprava({ karta, onPotvrd, loading, najdiPdf, ulozPdf, drivejsiO
         {nahrady.map((n, i) => (
           <li key={i} className="flex items-start gap-1.5">
             {stav === 'ceka' && <input type="checkbox" className="mt-0.5" checked={!!vybrane[i]} onChange={(e) => setVybrane((v) => v.map((x, j) => (j === i ? e.target.checked : x)))} data-testid="chat-pdf-nahrada-vyber" />}
-            <span className="min-w-0"><span className="text-muted-foreground">{t('pdf.page', { n: n.page })}</span> „{n.find}“ → <span className="font-medium">„{n.replace}“</span></span>
+            <span className="min-w-0"><span className="text-muted-foreground">{t('pdf.page', { n: n.page })}</span> {t('pdf.quoted', { v: n.find })} → <span className="font-medium">{t('pdf.quoted', { v: n.replace })}</span></span>
           </li>
         ))}
       </ul>
@@ -213,7 +218,7 @@ function KartaPdfOprava({ karta, onPotvrd, loading, najdiPdf, ulozPdf, drivejsiO
           {vk && (vk.provedeno || []).length > 0 && <span> — {t('pdf.replaced', { done: vk.provedeno.length, total: (vk.provedeno || []).length + (vk.nenalezeno || []).length })}</span>}
           {vk && (vk.nenalezeno || []).length > 0 && (
             <ul className="mt-1 list-disc pl-4" data-testid="chat-pdf-nenalezeno">
-              {vk.nenalezeno.map((n, i) => <li key={i}>{t('pdf.page', { n: n.page })} „{n.find}“ — {t(`pdf.chyba.${n.kod || 'nenalezeno'}`, { defaultValue: t('pdf.chyba.nenalezeno') })}</li>)}
+              {vk.nenalezeno.map((n, i) => <li key={i}>{t('pdf.page', { n: n.page })} {t('pdf.quoted', { v: n.find })} — {t(`pdf.chyba.${n.kod || 'nenalezeno'}`, { defaultValue: t('pdf.chyba.nenalezeno') })}</li>)}
             </ul>
           )}
         </div>

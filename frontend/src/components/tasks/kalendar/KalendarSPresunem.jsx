@@ -19,7 +19,7 @@ import DialogTermin from './DialogTermin';
 // nedojede (pár kB, jednou), je tu jen krátký spinner. Když chunk nedojede
 // vůbec (starý tab po nasazení), useLazyNs přesto uvolní → kalendář se ukáže
 // s klíči místo textů, nikdy nezůstane u spinneru.
-export default function KalendarSPresunem({ items = [], maps = [], members = [], user, tasksApi, loadMaps, setMaps, onOpen, onCreate }) {
+export default function KalendarSPresunem({ items = [], maps = [], members = [], user, tasksApi, loadMaps, setMaps, onOpen, onCreate, pripominky }) {
   const nsReady = useLazyNs('kalendar');
   const { t } = useTranslation('kalendar');
   const { t: tCommon } = useTranslation('common');
@@ -50,9 +50,16 @@ export default function KalendarSPresunem({ items = [], maps = [], members = [],
           rezim: 'odmitnuto', stitek, nova: den, duvod: r.duvod,
           zadavatel: r.duvod === 'ciziZadost'
             ? (labelForEmail(members, item.deadlineChangeRequestedBy) || item.deadlineChangeRequestedBy)
-            : zadavatelOf(item),
+            : r.duvod === 'udalostCizi'
+              ? (labelForEmail(members, item.created_by) || item.created_by)
+              : zadavatelOf(item),
         });
       }
+      return;
+    }
+    // událost (bez projektu): vlastní dialog „Přesunout událost z X na Y?“
+    if (r.akce === 'udalost') {
+      setDialog({ rezim: 'presun', stitek, nova: den, puvodni: r.puvodni });
       return;
     }
     // plán se v kalendáři v2 nezobrazuje → větev 'plan' tu nenastane
@@ -67,6 +74,7 @@ export default function KalendarSPresunem({ items = [], maps = [], members = [],
     setBusy(true);
     try {
       if (dialog.rezim === 'zmena') await zapis.zmenTermin(dialog.stitek.item, dialog.nova, dialog.puvodni);
+      else if (dialog.rezim === 'presun') await zapis.presunUdalost(dialog.stitek.item, dialog.nova, dialog.puvodni);
       else if (dialog.rezim === 'zadost') await zapis.posliZadost(dialog.stitek.item, dialog.nova, note);
       setDialog(null);
     } catch { /* hlášku dal useKalendarZapis */ setDialog(null); }
@@ -89,6 +97,7 @@ export default function KalendarSPresunem({ items = [], maps = [], members = [],
         onCreate={onCreate}
         onPresun={onAkce}
         kontextPresunu={kontextPro}
+        pripominky={pripominky}
       />
       <DialogTermin
           stav={dialog}

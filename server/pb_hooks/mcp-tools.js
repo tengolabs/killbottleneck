@@ -241,6 +241,36 @@ const TOOLS = [
     description: "Read the portfolio overview across all team and shared maps the key owner can read (private maps are excluded, exactly like the Organization page): per-project completion, overdue and stuck items, people with overdue work and a 7-day change summary. Optional today=YYYY-MM-DD. Read-only.",
     inputSchema: { type: "object", properties: { today: { type: "string", description: "YYYY-MM-DD, defaults to the server date" } }, required: [], additionalProperties: false },
   },
+  {
+    name: "create_event",
+    description: "Create a personal calendar EVENT with a time (meeting, call, dentist…) — NOT a task and not part of any map. Optional participants (e-mails of instance members from list_people; each sees the event in their calendar) and a reminder N minutes before (in-app + e-mail). Times are the instance's local time.",
+    inputSchema: { type: "object", properties: {
+      title: { type: "string" },
+      day: { type: "string", description: "YYYY-MM-DD" },
+      time: { type: "string", description: "HH:MM (24h); omit for an all-day event" },
+      note: { type: "string" },
+      participants: { type: "array", items: { type: "string" }, description: "e-mails of instance members" },
+      remind_before_min: { type: "integer", minimum: 0, maximum: 10080, description: "reminder N minutes before start (0 = at start); omit for no reminder" },
+    }, required: ["title", "day"], additionalProperties: false },
+  },
+  {
+    name: "list_events",
+    description: "List the key owner's calendar events (own and invited) in a day range; default today−365 … +730. Read-only.",
+    inputSchema: { type: "object", properties: {
+      from: { type: "string", description: "YYYY-MM-DD" },
+      to: { type: "string", description: "YYYY-MM-DD" },
+    }, required: [], additionalProperties: false },
+  },
+  {
+    name: "create_reminder",
+    description: "Set a timed REMINDER for a map node relative to its deadline: offset_days before the deadline (0 = on the deadline day, 1 = the day before) at time HH:MM, instance local time. One reminder per person and node (calling again replaces it). Does NOT change the deadline; the node must already have one (set it with update_node first). Private to the key owner.",
+    inputSchema: { type: "object", properties: {
+      map_id: { type: "string" },
+      node_id: { type: "string" },
+      offset_days: { type: "integer", minimum: 0, maximum: 30 },
+      time: { type: "string", description: "HH:MM (24h)" },
+    }, required: ["map_id", "node_id", "time"], additionalProperties: false },
+  },
 ];
 
 // ---------- obsluha /mcp (Streamable HTTP, stateless) ----------
@@ -289,6 +319,13 @@ function renderMap(m) {
     ? "\nNotes:\n" + m.notes.map((n) => `  • ${n.text.slice(0, 200)} (id: ${n.id})`).join("\n")
     : "";
   return `${DATA_FENCE}\n\n${head}\n${body}${notes}`;
+}
+// kompaktní řádek události (create/list_events)
+function renderEvent(e) {
+  const kdy = e.time ? `${e.day} ${e.time}` : `${e.day} (all day)`;
+  const parts = (e.participants || []).length ? `, participants: ${e.participants.join(", ")}` : "";
+  const rem = e.remind ? `, reminder ${e.remind_before_min} min before` : "";
+  return `${kdy} — ${e.title} (id: ${e.id}, ${e.mine ? "mine" : "invited by " + e.owner_email}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ""}`;
 }
 // kompaktní řádek pravidla pro LLM výstupy (create/list/update_rule)
 function renderRule(r) {
@@ -458,6 +495,23 @@ const EXEC = {
   delete_rule_template: (auth, a) => {
     vcall(auth, "POST", `/api/kb/v1/rule-templates/${enc(a.template_id)}/delete`, {});
     return text("Template deleted.");
+  },
+  create_event: (auth, a) => {
+    const body = { title: a.title, day: a.day };
+    for (const k of ["time", "note", "participants", "remind_before_min"]) if (a[k] !== undefined) body[k] = a[k];
+    const r = vcall(auth, "POST", "/api/kb/v1/events", body);
+    return text(`Event created: ${renderEvent(r.event)}`);
+  },
+  list_events: (auth, a) => {
+    const q = [a.from ? `from=${enc(a.from)}` : "", a.to ? `to=${enc(a.to)}` : ""].filter(Boolean).join("&");
+    const r = vcall(auth, "GET", `/api/kb/v1/events${q ? "?" + q : ""}`);
+    if (!r.events.length) return text(`No events between ${r.from} and ${r.to}.`);
+    return text(DATA_FENCE + "\n\n" + r.events.map((x) => `• ${renderEvent(x)}`).join("\n"));
+  },
+  create_reminder: (auth, a) => {
+    const r = vcall(auth, "POST", `/api/kb/v1/maps/${enc(a.map_id)}/nodes/${enc(a.node_id)}/reminders`,
+      { offset_days: a.offset_days === undefined ? 0 : a.offset_days, time: a.time });
+    return text(`Reminder set for "${r.node_title}" (deadline ${r.deadline}): fires on ${r.reminder.fires_at} instance local time (in-app + e-mail if enabled). The deadline is unchanged.`);
   },
   get_org_structure: (auth) => {
     const r = vcall(auth, "GET", "/api/kb/v1/org-structure");
@@ -637,4 +691,4 @@ function validujArgumenty(schema, args, toolName) {
 }
 
 // renderery a validátor sdílí i chat na boku (chat.js) — jedna podoba mapy pro LLM
-module.exports = { TOOLS, zpracujMcpPost, renderMap, renderRule, renderPortfolio, validujArgumenty, DATA_FENCE };
+module.exports = { TOOLS, zpracujMcpPost, renderMap, renderRule, renderEvent, renderPortfolio, validujArgumenty, DATA_FENCE };

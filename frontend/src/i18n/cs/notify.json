@@ -39,7 +39,9 @@
     "user_joined": "Nový člen se přihlásil",
     "rule_notice": "Zpráva z pravidla",
     "rule_broken": "Rozbité pravidlo",
-    "new_version": "Nová verze"
+    "new_version": "Nová verze",
+    "reminder": "Připomínka s časem",
+    "event_invited": "Pozvání na událost"
   },
   "prefs": {
     "title": "Nastavení notifikací",

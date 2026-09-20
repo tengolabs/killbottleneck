@@ -5,7 +5,7 @@ import { Mail, Info } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { NOTIFY_TYPES, notifyMeta } from '@/lib/notifyMeta';
+import { NOTIFY_TYPES, NOTIFY_EMAIL_DEFAULT_ON, notifyMeta } from '@/lib/notifyMeta';
 
 // Nastavení notifikací per uživatel: typ × kanál (v aplikaci / e-mailem).
 // Chybějící záznam = in-app zapnuto, e-mail vypnuto (viz helpers.notifyChannels).
@@ -47,7 +47,8 @@ export default function NotificationPrefs({ emailEnabled = false }) {
 
   const channelOn = (type, channel) => {
     const p = prefs[type] || {};
-    return channel === 'in_app' ? p.in_app !== false : p.email === true;
+    // e-mail: bez uložené volby platí výchozí (u připomínek zapnuto — server stejně)
+    return channel === 'in_app' ? p.in_app !== false : (p.email === undefined ? NOTIFY_EMAIL_DEFAULT_ON.includes(type) : p.email === true);
   };
 
   const toggle = async (type, channel, value) => {
@@ -56,7 +57,9 @@ export default function NotificationPrefs({ emailEnabled = false }) {
       ...prefs,
       [type]: {
         in_app: channel === 'in_app' ? value : cur.in_app !== false,
-        email: channel === 'email' ? value : cur.email === true,
+        // druhý kanál zapsat tak, jak ho člověk VIDÍ — přepnutí zvonečku by jinak
+        // připomínce tiše vyplo výchozí e-mail (server ukládá email === true)
+        email: channel === 'email' ? value : channelOn(type, 'email'),
       },
     };
     setPrefs(next); // optimisticky, ať přepínač nepodskakuje

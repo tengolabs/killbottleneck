@@ -212,6 +212,22 @@ export default function LiteList({ kind, day, failed, onReload, onChanged, onFai
         </section>
       )}
 
+      {kind === 'today' && (day?.sections?.events || []).length > 0 && (
+        <section className="mb-4" data-testid="lite-udalosti">
+          <p className="flex items-center gap-1.5 px-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-sky-600 dark:text-sky-400">
+            <CalendarClock className="w-3.5 h-3.5" /> {t('today.events')} ({day.sections.events.length})
+          </p>
+          <div className="bg-card border-y">
+            {day.sections.events.map((ev) => (
+              <div key={ev.id} className="flex items-center gap-3 px-4 py-2 text-sm border-b last:border-b-0">
+                <span className="w-12 shrink-0 tabular-nums text-xs font-semibold text-sky-700 dark:text-sky-300">{ev.time || t('today.allDay')}</span>
+                <span className="truncate">{ev.title}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {groups.map((g) => (
         <section key={g.key} className="mb-4">
           <p className={`flex items-center gap-1.5 px-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wide ${g.cls}`}>

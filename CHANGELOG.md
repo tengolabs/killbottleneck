@@ -9,6 +9,87 @@ below before you jump several versions.
 
 ---
 
+## v0.63-beta — 2026-09-20
+
+**Events in the calendar, timed deadline reminders, and the assistant that sets both**
+
+**Events in the calendar**
+
+- The calendar's **+** now asks what to add: a **Task in a project** (a goal with that deadline,
+  as before) or an **Event**. An event is a meeting, the dentist, a video call — something with
+  a time that belongs to no project. It has a title, a day, a time (empty = all day), a note,
+  **invited colleagues** (instance members only; each sees it in their own calendar and gets an
+  *event invited* notification; an invitee can leave the event from its detail) and a **reminder** (at the start / 15 / 30 / 60 min / a day
+  before; an all-day event reminds in the morning at `KB_DEADLINE_HOUR`).
+- A deliberate decision: **an event is the first item outside projects** (like the idea stash)
+  and **it is not a task** — no assignee, no status, never written into a map, changes nothing
+  in any project. It lives in the calendar only, under the always-present *Events* filter row, with the time
+  before the title on its chip. Dragging it to another day asks *"Move the event from X to Y?"*
+  and moves it (the creator only; invitees read).
+- Today's events also appear in **My day** as a *Today in calendar* row ("14:00 Dentist"; plain
+  text in the lite view). Clicking opens the calendar with the event's detail.
+
+**Timed deadline reminders**
+
+- The goal detail of a goal with a deadline has **Remind me of the deadline** under the Deadline
+  field: on the deadline day / the day before (default, 16:00) / 2 days / a week before, plus the
+  hour. The reminder is **private** (one per person and node), **never changes the deadline**,
+  and **follows the deadline** when it moves; a done or deleted node drops it. A node with a
+  reminder shows a bell on its calendar chip.
+
+**Notifications**
+
+- Two new types: **Timed reminder** (`reminder`) and **Event invitation** (`event_invited`).
+  Clicking a reminder opens the calendar with the event or the map with the node.
+- A minute-by-minute `reminders` cron delivers timed reminders to the bell and **by e-mail**.
+  For **your own events and node reminders** e-mail is **on by default** (a meeting reminder that
+  never reaches a closed app is useless) and it is sent **immediately even in daily-digest mode**;
+  the *no e-mails* mode still applies. An **invitee** gets the reminder in the bell; by e-mail only
+  after ticking *Timed reminder → e-mail* in notification settings (an invitation you did not ask
+  for must not be a way to send you e-mail). An event created or moved into the past is marked
+  as reminded — nothing fires retroactively. Reminder times are the **instance time zone** (`TZ`); the event dialog warns
+  when it differs from the browser's. After an outage, reminders older than
+  `KB_REMINDER_CATCHUP_H` hours (default 48) are logged, not sent.
+
+**AI assistant**
+
+- The assistant creates an event from one sentence ("dentist tomorrow at 2, remind me half an
+  hour before, invite Jane" → a confirmation card; unknown invitees are refused before the
+  card), lists your events ("what meetings do I have this week?") and sets a timed deadline
+  reminder ("remind me about the Novak quote the day before the deadline at 9" → a card; the
+  node must have a deadline — otherwise it first offers to set one). New chat tools
+  `create_event`, `list_events`, `create_reminder`; untimed alerts still go through a
+  `deadline_approaching` rule.
+
+**API and MCP**
+
+- REST v1: `GET/POST /api/kb/v1/events`, `POST /api/kb/v1/events/{id}` (owner only; an invitee
+  gets 403, an invisible event 404), `POST /api/kb/v1/events/{id}/delete`, `POST /api/kb/v1/events/{id}/leave`
+  (an invitee removes themselves);
+  `GET/POST /api/kb/v1/maps/{id}/nodes/{nodeId}/reminders` (upsert `{offset_days 0–30, time
+  "HH:MM"}`; a node without a deadline or a time in the past → 400) and
+  `POST …/reminders/{rid}/delete`. No `base_updated` on any of them — nothing in a map changes.
+- MCP: 20 tools — new `create_event`, `list_events`, `create_reminder` in both the HTTP `/mcp`
+  server and the npm stdio package.
+- **Hint change:** an unknown `reminder` / `remind_at` / `time` / `hour` field on a node now points
+  to the reminders endpoint / `create_reminder` (it used to say "create a `deadline_approaching`
+  rule" — that stays the advice only for untimed alerts or a whole map); `event` / `meeting`
+  point to `/v1/events` / `create_event`.
+
+**Upgrade notes**: two migrations (`1789820000_udalosti_pripominky.js`, `1789889632_node_reminders_map_index.js`)
+add the collections `events` and `node_reminders` (server-written only), an index, and the notification
+types `reminder` and `event_invited`. Rolling the migrations back **deletes** both collections (events and
+reminders are lost). The *Export all data* file now includes events and node reminders, but
+*Import all data* does not restore them yet (it restores maps and the idea stash, as before).
+Limits: 2,000 events per user, 60 saves per minute. **`TZ` now matters for reminders**: a self-hosted instance defaults to UTC, so a
+reminder set for 14:00 fires at 14:00 UTC — set `TZ=Europe/Prague` (or your zone) before people
+start relying on reminders. New optional variable `KB_REMINDER_CATCHUP_H` (default 48). API
+integrations that sent `reminder` to a node endpoint still get a 400, but the hint now names
+the reminders endpoints instead of a rule. Nothing else changes; existing rules and deadline
+digests work as before.
+
+---
+
 ## v0.62-beta — 2026-09-19
 
 **PDF in the assistant: merge, split, extract, remove — and correct text with the assistant**
@@ -36,6 +117,8 @@ below before you jump several versions.
 
 - No migration. New optional variable `KB_AI_PDF_VAHA` (default 2). The PDF libraries are served
   from the instance itself (no CDN) and load only when the PDF tab or a PDF attachment is used.
+
+---
 
 ## v0.61-beta — 2026-09-17
 

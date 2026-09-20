@@ -49,7 +49,9 @@
     "delegated": "Delegated (waiting on others)",
     "delegatedOverdue": "Overdue at others",
     "stuck": "Not moving",
-    "open": "Open"
+    "open": "Open",
+    "events": "Today in calendar",
+    "allDay": "all day"
   },
   "export": {
     "buttonTitle": "Save this overview as an image (PNG for mobile)",

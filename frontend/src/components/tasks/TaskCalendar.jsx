@@ -21,6 +21,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
+  CalendarClock,
+  Bell,
 } from 'lucide-react';
 import { STATUSES, statusConfig } from '@/lib/statusMeta';
 import { intlLocale } from '@/lib/locale';
@@ -66,7 +68,12 @@ const PROJECT_PALETTE = [
   '#ea580c', // Orange
 ];
 
-export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, onPresun, kontextPresunu }) {
+// Události (19. 9. 2026) nemají projekt — v postranním filtru vystupují jako
+// pseudo-projekt „Osobní“ (jeden řádek, vlastní barva), aby šly schovat jako mapy.
+export const OSOBNI = '__osobni';
+const OSOBNI_BARVA = '#0ea5e9';
+
+export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, onPresun, kontextPresunu, pripominky }) {
   // texty kalendáře v2 = líný ns `kalendar` (tasks.json se veze do lite — strop 510 kB);
   // z `tasks` zůstává jen společné calendar.more/dow/todayButton (sdílí TaskTimeline) a tasksPage.*
   const { t } = useTranslation('kalendar');
@@ -114,14 +121,20 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   }, [maps, t]);
 
   const getProjectName = useCallback((item) => {
+    if (item.kind === 'event') return t('v2.personal');
     const mapId = item.raw?.map_id;
     return projectMeta[mapId]?.title || t('v2.noProject');
   }, [projectMeta, t]);
 
   const getProjectColor = useCallback((item) => {
+    if (item.kind === 'event') return OSOBNI_BARVA;
     const mapId = item.raw?.map_id;
     return projectMeta[mapId]?.color || '#64748b';
   }, [projectMeta]);
+  const jeUdalost = (item) => item.kind === 'event';
+  // uzel s mou připomínkou → zvoneček na chipu (pripominky = Map "<mapId>:<nodeId>")
+  const maPripominku = useCallback((item) => item.kind === 'node' && !!pripominky?.get?.(`${item.map_id}:${item.node_id}`), [pripominky]);
+  const jeVidetUdalosti = !hiddenProjects.has(OSOBNI);
 
   // Valid and filtered items
   const validItems = useMemo(() => {
@@ -141,8 +154,10 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   const mapsById = useMemo(() => Object.fromEntries(maps.map((m) => [m.id, m])), [maps]);
   // hotové se netahají; uzel jen když je mapa i s uzly v paměti (fáze 2 načtení);
   // úkolový záznam bez mapy by matice odmítla „mapaChybi“ → rovnou vypnout
-  const smiTahnout = useCallback((item) => dndZapnuto && item.status !== 'done' && !!item.map_id
-    && (item.kind !== 'node' || Array.isArray(mapsById[item.map_id]?.nodes)), [dndZapnuto, mapsById]);
+  // událost se táhne vždy — cizí tažení matice odmítne s vysvětlením (jako žádost u uzlu)
+  const smiTahnout = useCallback((item) => dndZapnuto && item.status !== 'done'
+    && (item.kind === 'event'
+      || (!!item.map_id && (item.kind !== 'node' || Array.isArray(mapsById[item.map_id]?.nodes)))), [dndZapnuto, mapsById]);
   const dnd = useKalendarDnd({
     kontextPro: kontextPresunu || (() => ({})),
     onAkce: onPresun || (() => {}),
@@ -151,13 +166,18 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return validItems.filter((item) => {
-      // Status filter
-      const st = item.status in STATUS_COLORS ? item.status : 'todo';
-      if (!visibleStatuses.has(st)) return false;
+      // událost nemá stav — řídí ji jen filtr „Osobní“ a hledání
+      if (jeUdalost(item)) {
+        if (!jeVidetUdalosti) return false;
+      } else {
+        // Status filter
+        const st = item.status in STATUS_COLORS ? item.status : 'todo';
+        if (!visibleStatuses.has(st)) return false;
 
-      // Project filter
-      const mapId = item.raw?.map_id;
-      if (mapId && hiddenProjects.has(mapId)) return false;
+        // Project filter
+        const mapId = item.raw?.map_id;
+        if (mapId && hiddenProjects.has(mapId)) return false;
+      }
 
       // Search query
       if (q) {
@@ -168,7 +188,7 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
 
       return true;
     });
-  }, [validItems, visibleStatuses, hiddenProjects, searchQuery, getProjectName]);
+  }, [validItems, visibleStatuses, hiddenProjects, jeVidetUdalosti, searchQuery, getProjectName]);
 
   // Group items by deadline day
   const byDay = useMemo(() => {
@@ -178,9 +198,13 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
     });
     Object.values(result).forEach((list) => {
       list.sort((a, b) => {
-        // Unfinished first, then overdue, then title
+        // Unfinished first; timed events in time order before untimed items; then title
         if (a.status === 'done' && b.status !== 'done') return 1;
         if (a.status !== 'done' && b.status === 'done') return -1;
+        const ta = a.time || '', tb = b.time || '';
+        if (ta && !tb) return -1;
+        if (!ta && tb) return 1;
+        if (ta !== tb) return ta < tb ? -1 : 1;
         return a.title.localeCompare(b.title, locale);
       });
     });
@@ -217,12 +241,13 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
     maps.forEach((m) => {
       counts[m.id] = validItems.filter((item) => periodKeys.has(item.deadline) && item.raw?.map_id === m.id).length;
     });
+    counts[OSOBNI] = validItems.filter((item) => periodKeys.has(item.deadline) && jeUdalost(item)).length;
     return counts;
   }, [maps, validItems, periodKeys]);
 
   // Overdue count
   const overdueCount = useMemo(() => {
-    return periodItems.filter((item) => item.deadline < todayKey && item.status !== 'done').length;
+    return periodItems.filter((item) => item.deadline < todayKey && item.status !== 'done' && !jeUdalost(item)).length;
   }, [periodItems, todayKey]);
 
   const completedCount = useMemo(() => {
@@ -298,7 +323,7 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   };
 
   const toggleAllProjects = () => {
-    setHiddenProjects((prev) => (prev.size === 0 ? new Set(maps.map((m) => m.id)) : new Set()));
+    setHiddenProjects((prev) => (prev.size === 0 ? new Set(maps.map((m) => m.id).concat([OSOBNI])) : new Set()));
   };
 
   // Klávesy t/m/w/d/a jen když uživatel nepíše, není otevřený dialog/modal
@@ -338,7 +363,7 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   // Event chip rendering (Google Calendar style)
   const renderEventChip = (item, options = {}) => {
     const isDone = item.status === 'done';
-    const isOverdue = item.deadline < todayKey && !isDone;
+    const isOverdue = item.deadline < todayKey && !isDone && !jeUdalost(item);
     const projColor = getProjectColor(item);
     const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.todo;
     const accentColor = options.colorByProject ? projColor : statusColor;
@@ -358,16 +383,21 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
         data-dragging={h?.isDragging || undefined}
         data-tazitelny={h ? !h.disabled : undefined}
         data-testid={`gcal-chip-${item.key}`}
+        data-kind={item.kind}
         onClick={(e) => {
           e.stopPropagation();
           onOpen?.(item);
         }}
-        title={`${item.title} · ${getProjectName(item)} · ${(statusConfig[item.status] || statusConfig.todo).label}${isOverdue ? ` (${t('v2.overdue')})` : ''}`}
+        title={jeUdalost(item)
+          ? `${item.time ? item.time + ' ' : ''}${item.title} · ${getProjectName(item)}`
+          : `${item.title} · ${getProjectName(item)} · ${(statusConfig[item.status] || statusConfig.todo).label}${isOverdue ? ` (${t('v2.overdue')})` : ''}`}
         {...(h?.props || {})}
       >
         <span className="gcal-chip-icon">
           {isDone ? (
             <Check size={11} strokeWidth={2.8} />
+          ) : jeUdalost(item) ? (
+            <CalendarClock size={10} strokeWidth={2.4} />
           ) : item.kind === 'node' ? (
             <Diamond size={10} strokeWidth={2.4} />
           ) : (
@@ -375,7 +405,11 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
           )}
         </span>
 
+        {item.time && <span className="gcal-chip-time">{item.time}</span>}
         <span className="gcal-chip-title">{item.title}</span>
+        {maPripominku(item) && (
+          <span className="gcal-chip-bell" title={t('pripominka.chipTitle')} data-testid="gcal-chip-zvonek"><Bell size={9} strokeWidth={2.6} /></span>
+        )}
 
         {isOverdue && (
           <span className="gcal-chip-overdue-dot" title={t('v2.overdue')} />
@@ -396,7 +430,7 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   // Detailed event card for Day & Agenda views
   const renderDetailCard = (item) => {
     const isDone = item.status === 'done';
-    const isOverdue = item.deadline < todayKey && !isDone;
+    const isOverdue = item.deadline < todayKey && !isDone && !jeUdalost(item);
     const projColor = getProjectColor(item);
     const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.todo;
     const statusLabel = (statusConfig[item.status] || statusConfig.todo).label;
@@ -412,12 +446,16 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
         }}
         data-done={isDone}
         data-overdue={isOverdue}
+        data-kind={item.kind}
+        data-testid={`gcal-card-${item.key}`}
         onClick={() => onOpen?.(item)}
       >
         <div className="gcal-card-indicator" />
         <div className="gcal-card-icon">
           {isDone ? (
             <CheckCircle2 size={16} className="text-emerald-500" />
+          ) : jeUdalost(item) ? (
+            <CalendarClock size={15} style={{ color: projColor }} />
           ) : item.kind === 'node' ? (
             <Diamond size={15} style={{ color: projColor }} />
           ) : (
@@ -439,9 +477,16 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
               <span className="gcal-project-dot" style={{ backgroundColor: projColor }} />
               {getProjectName(item)}
             </span>
-            <span className="gcal-status-pill">{statusLabel}</span>
+            {jeUdalost(item) ? (
+              <>
+                {item.participants?.length > 0 && <span className="gcal-status-pill">{t('udalost.ucastniciPocet', { count: item.participants.length })}</span>}
+                {item.remind && <span className="gcal-status-pill"><Bell size={10} /> {t('udalost.pripominkaKratce')}</span>}
+              </>
+            ) : (
+              <span className="gcal-status-pill">{statusLabel}{maPripominku(item) ? ' · ' : ''}{maPripominku(item) && <Bell size={10} />}</span>
+            )}
             <span className="gcal-card-date">
-              <Clock size={11} /> {item.deadline}
+              <Clock size={11} /> {item.deadline}{item.time ? ` ${item.time}` : ''}
             </span>
           </div>
         </div>
@@ -691,6 +736,21 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
                     </label>
                   );
                 })}
+                {/* události mají vlastní stálý řádek (Richard 19. 9.: „chybí mi tam na události, aby šly vypnout“)
+                    — i bez jediné události, ať je vidět, že se tu dají schovat */}
+                <label className="gcal-filter-row gcal-filter-row-udalosti" style={{ '--gcal-accent': OSOBNI_BARVA }} data-testid="gcal-filtr-osobni" title={t('v2.personalTitle')}>
+                    <input
+                      type="checkbox"
+                      checked={jeVidetUdalosti}
+                      onChange={() => toggleProject(OSOBNI)}
+                      className="gcal-checkbox"
+                    />
+                    <span className="gcal-custom-checkbox" style={{ borderColor: OSOBNI_BARVA, backgroundColor: jeVidetUdalosti ? OSOBNI_BARVA : 'transparent' }}>
+                      {jeVidetUdalosti && <Check size={10} color="#fff" strokeWidth={3} />}
+                    </span>
+                    <span className="gcal-filter-label"><CalendarClock size={12} /> {t('v2.personal')}</span>
+                    <span className="gcal-filter-count">{projectCounts[OSOBNI] || 0}</span>
+                  </label>
                 {maps.length === 0 && (
                   <p className="gcal-empty-hint">{t('v2.noProject')}</p>
                 )}
@@ -927,14 +987,15 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
                               >
                                 {getProjectName(item)}
                               </span>
-                              {item.deadline < todayKey && item.status !== 'done' && (
+                              {item.deadline < todayKey && item.status !== 'done' && !jeUdalost(item) && (
                                 <AlertTriangle size={12} className="text-rose-500" />
                               )}
+                              {maPripominku(item) && <Bell size={12} className="text-sky-600" data-testid="gcal-chip-zvonek" />}
                             </div>
-                            <h4 className="gcal-week-event-title">{item.title}</h4>
+                            <h4 className="gcal-week-event-title">{item.time ? `${item.time} · ` : ''}{item.title}</h4>
                             <div className="gcal-week-card-foot">
                               <span className="gcal-week-status-pill">
-                                {(statusConfig[item.status] || statusConfig.todo).label}
+                                {jeUdalost(item) ? t('v2.personal') : (statusConfig[item.status] || statusConfig.todo).label}
                               </span>
                             </div>
                           </div>

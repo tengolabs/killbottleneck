@@ -7,7 +7,7 @@
 import {
   KeyRound,
   MessageSquare, UserPlus, UserMinus, Target, PlayCircle, Timer,
-  Share2, Bot, CalendarClock, CheckCircle2, AlertTriangle, Zap, Sparkles,
+  Share2, Bot, CalendarClock, CheckCircle2, AlertTriangle, Zap, Sparkles, Bell, CalendarPlus,
 } from 'lucide-react';
 
 export const NOTIFY_TYPES = [
@@ -29,7 +29,15 @@ export const NOTIFY_TYPES = [
   'rule_notice',
   'rule_broken',
   'timer_autostop',
+  // časová připomínka (událost i uzel) + pozvání na událost (19. 9. 2026)
+  'reminder',
+  'event_invited',
 ];
+
+// E-mail výchozí ZAPNUTÝ (zrcadlo helpers.js NOTIFY_EMAIL_DEFAULT_ON): připomínka
+// s časem bez e-mailu by v zavřené aplikaci nedorazila; panel předvoleb ukáže
+// zaškrtnuto, dokud si to člověk nevypne.
+export const NOTIFY_EMAIL_DEFAULT_ON = ['reminder'];
 
 const META = {
   // Oznámení o nové verzi. ZÁMĚRNĚ není v NOTIFY_TYPES: chodí jednou za vydání
@@ -54,6 +62,8 @@ const META = {
   // automatizační pravidla: zpráva z akce „pošli notifikaci" / rozbité pravidlo
   rule_notice: { icon: Zap, className: 'text-sky-600' },
   rule_broken: { icon: AlertTriangle, className: 'text-amber-600' },
+  reminder: { icon: Bell, className: 'text-sky-600' },
+  event_invited: { icon: CalendarPlus, className: 'text-sky-600' },
   // bezpečnostní poplach „někdo jiný ti změnil heslo" — červená, ať nezapadne
   // mezi běžné zprávy; vypnout ho nejde (server: NOTIFY_ALWAYS)
   password_reset: { icon: KeyRound, className: 'text-red-600' },
@@ -78,6 +88,12 @@ export const notifyTarget = (n) => {
   // ⚠️ Bez tohohle spadl klik na oznámení „jste správcem struktury" do TABULKY
   // ÚKOLŮ (výchozí větev níž) — Richardův nález 17. 8.
   if (n.type === 'org_notice') return n.map_id ? `/map/${n.map_id}` : '/admin/users';
+  // připomínka: událost → kalendář s otevřeným detailem; uzel → mapa s uzlem
+  if (n.type === 'reminder' || n.type === 'event_invited') {
+    if (n.event_id) return `/tasks?view=calendar&udalost=${encodeURIComponent(n.event_id)}`;
+    if (n.map_id) return `/map/${n.map_id}${n.node_id ? `?node=${n.node_id}` : ''}`;
+    return '/tasks?view=calendar';
+  }
   if (n.type === 'deadline') {
     if (n.task_id) return `/tasks?task=${n.task_id}`;
     if (n.map_id) return `/map/${n.map_id}${n.node_id ? `?node=${n.node_id}` : ''}`;

@@ -35,6 +35,21 @@ export default function DialogTermin({ stav, busy, onZavrit, onPotvrdit, onDetai
               </DialogFooter>
             </form>
           )}
+          {rezim === 'presun' && (
+            <form onSubmit={submit}>
+              <DialogHeader>
+                <DialogTitle>{t('dialog.udalostTitulek', { from: fmtDen(stav.puvodni), to: fmtDen(stav.nova) })}</DialogTitle>
+                <DialogDescription>„{item.title}“{item.time ? ` · ${item.time}` : ''}</DialogDescription>
+              </DialogHeader>
+              <p className="text-xs text-muted-foreground mt-2">{t('dialog.udalostPozn')}</p>
+              <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={onZavrit} disabled={busy}>{tCommon('actions.cancel')}</Button>
+                <Button type="submit" autoFocus disabled={busy} data-testid="kal-dialog-potvrdit">
+                  {busy && <Loader2 className="w-4 h-4 animate-spin" />} {t('dialog.udalostPotvrdit')}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
           {rezim === 'zadost' && (
             <form onSubmit={submit}>
               <DialogHeader>
@@ -64,7 +79,9 @@ export default function DialogTermin({ stav, busy, onZavrit, onPotvrdit, onDetai
                 <DialogDescription>
                   {stav.duvod === 'ciziZadost'
                     ? t('dialog.ciziZadost', { who: stav.zadavatel || '—' })
-                    : t('dialog.ukolJenZadavatel', { assigner: stav.zadavatel || '—' })}
+                    : stav.duvod === 'udalostCizi'
+                      ? t('dialog.udalostCizi', { who: stav.zadavatel || '—' })
+                      : t('dialog.ukolJenZadavatel', { assigner: stav.zadavatel || '—' })}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="mt-4">

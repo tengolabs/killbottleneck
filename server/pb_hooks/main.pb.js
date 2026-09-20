@@ -476,7 +476,20 @@ const propsatNazevOrgMapy = (e) => {
   e.next();
 };
 onRecordAfterUpdateSuccess(propsatNazevOrgMapy, "org_settings");
+
 onRecordAfterCreateSuccess(propsatNazevOrgMapy, "org_settings");
+
+// Připomínky k uzlům sledují termín: po KAŽDÉM uložení mapy (session PATCH, v1,
+// pravidla, asistent — model hook chytá i $app.save) se přepočítá jejich den.
+onRecordAfterUpdateSuccess((e) => {
+  try {
+    const { syncNodeReminders } = require(`${__hooks}/helpers.js`);
+    syncNodeReminders(e.app, e.record);
+  } catch (err) {
+    try { e.app.logger().warn("reminders: sync po uložení mapy selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+  e.next();
+}, "goalmaps");
 
 // goalmaps: owner se bere z přihlášení, ne z requestu
 // ⚠️ Nové server-spravované pole goalmaps? Zkontroluj i POST /api/flowmap/v1/maps
@@ -1311,6 +1324,20 @@ cronAdd("deadline_notices", "25 * * * *", () => {
   }
 });
 
+// Časové připomínky (události s časem + připomínky k uzlům): cron KAŽDOU MINUTU
+// (vzor agent_run_dispatch) — jediná úloha s minutovou granularitou; oba dotazy
+// jdou po indexu (remind, reminded_at, day) / (fired_at, day), typicky prázdné.
+// Idempotenci drží razítka reminded_at/fired_at + notifications.dedup_key.
+cronAdd("reminders", "* * * * *", () => {
+  try {
+    const { runReminders } = require(`${__hooks}/helpers.js`);
+    const n = runReminders($app);
+    if (n > 0) $app.logger().info("reminders: odesláno připomínek", "count", n);
+  } catch (err) {
+    try { $app.logger().warn("reminders: běh selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+});
+
 // B1: denní e-mailový souhrn (notify_email_mode='digest'): cron HODINOVĚ
 // (offset 35 min za deadline_notices), helpers.runEmailDigests pošle od cílové
 // hodiny (NOTIFY_DIGEST_HOUR, default 8) jeden e-mail na osobu a den.
@@ -1542,6 +1569,17 @@ kbRoute("POST", "/run-deadline-notices", (e) => {
   }
   const { runDeadlineNotices } = require(`${__hooks}/helpers.js`);
   return e.json(200, { sent: runDeadlineNotices($app, { force: true }) });
+});
+
+// ruční/testovací spuštění časových připomínek — jen superuser (admin API).
+// `at` = "YYYY-MM-DD HH:MM" podvrhne „teď" (deterministické testy); dedup platí dál.
+kbRoute("POST", "/run-reminders", (e) => {
+  if (!e.hasSuperuserAuth()) {
+    return e.json(404, { error: "Not found." }); // neprozrazovat existenci routy
+  }
+  const { runReminders } = require(`${__hooks}/helpers.js`);
+  const info = e.requestInfo().body || {};
+  return e.json(200, { sent: runReminders($app, { at: info.at }) });
 });
 
 // B1: ruční spuštění denního e-mailového souhrnu (testy + ladění na instanci)
@@ -2364,6 +2402,9 @@ kbRoute("GET", "/config", (e) => {
     // Bez něj člověk kliknutím z mailu netuší, KAM se vlastně hlásí
     // (Richard 6. 8. 2026). Jakmile si organizaci pojmenuje sám, platí její název.
     customer: env("CUSTOMER") || null,
+    // časová zóna instance — v ní chodí časové připomínky (události, uzly);
+    // kalendář ji ukáže, když se liší od zóny prohlížeče
+    tz: $os.getenv("TZ") || "UTC",
     // zkušebka: datum konce a jestli už vypršela (frontend podle toho ukáže pruh)
     trial_until: (() => { const { trialUntil } = require(`${__hooks}/helpers.js`);
       const ms = trialUntil(); return ms ? new Date(ms).toISOString().slice(0, 10) : null; })(),
@@ -4235,6 +4276,76 @@ kbRoute("POST", "/rules/delete", (e) => {
   return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
+// ---------- UDÁLOSTI a PŘIPOMÍNKY K UZLŮM (session; jádro events-api.js) ----------
+// Zápis jde jen tudy (kolekce mají create/update/delete rule = null); čtení má
+// klient i přes RLS (realtime v kalendáři), routa GET dává hotové DTO s e-maily.
+kbRoute("GET", "/events", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const r = E.listEvents($app, e.auth, e.requestInfo().query || {});
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+kbRoute("POST", "/events/save", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang, t } = require(`${__hooks}/i18n.js`);
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const L = userLang(e.auth);
+  // brzda jako u Můj den: 60 zápisů za minutu na účet stačí i asistentovi, skript nezaplní DB
+  if (minuteLimitHit($app.store(), "evsave:" + e.auth.id, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const info = e.requestInfo().body || {};
+  let rec = null;
+  if (info.id) {
+    const f = E.findEvent($app, info.id, e.auth, L);
+    if (f.error) return e.json(f.error.status, f.error.body);
+    rec = f.rec;
+  }
+  const r = E.saveEvent($app, e.auth, rec, info, { lang: L });
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+kbRoute("POST", "/events/delete", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const f = E.findEvent($app, (e.requestInfo().body || {}).id, e.auth, L);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = E.deleteEvent($app, e.auth, f.rec, L);
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+// pozvaný se z události odebere sám (vlastník ji maže, ne opouští)
+kbRoute("POST", "/events/leave", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const f = E.findEvent($app, (e.requestInfo().body || {}).id, e.auth, L);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = E.leaveEvent($app, e.auth, f.rec, L);
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+kbRoute("GET", "/node-reminders", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const q = e.requestInfo().query || {};
+  const r = E.listNodeReminders($app, e.auth, q.map, q.node_id);
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+kbRoute("POST", "/node-reminders/save", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const info = e.requestInfo().body || {};
+  const r = E.saveNodeReminder($app, e.auth, info.map, info.node_id, info, { lang: userLang(e.auth) });
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+kbRoute("POST", "/node-reminders/delete", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const r = E.deleteNodeReminder($app, e.auth, (e.requestInfo().body || {}).id, userLang(e.auth));
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
 // log běhů — jednotný tvar pro UI (kolekce rule_runs je čitelná i přímo přes
 // RLS, ale routa drží DTO a filtr na pravidlo)
 kbRoute("GET", "/rule-runs", (e) => {
@@ -5182,6 +5293,104 @@ kbRoute("POST", "/v1/rule-templates/{id}/delete", (e) => {
   const a = apiKeyAuth($app, e, "read_write");
   if (a.error) return e.json(a.status, { error: a.error });
   const r = R.deleteRuleTemplate($app, e.request.pathValue("id"), { lang: a.lang, userEmail: a.user.getString("email"), isAdmin: jeAdmin(a.user) });
+  return e.json(r.status, r.body);
+});
+
+// ---------- v1: UDÁLOSTI a PŘIPOMÍNKY K UZLŮM (jádro events-api.js) ----------
+// Klíč jedná za svého vlastníka: vidí své události a ty, kam ho pozvali; zakládá
+// a mění jen vlastní. Asistent zapisuje TUDY (dočasným klíčem) — jedna validace
+// a jedny notifikace pro MCP, agenty i chat. Neznámé pole = 400 s nápovědou.
+kbRoute("GET", "/v1/events", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const q = e.requestInfo().query || {};
+  const r = E.listEvents($app, a.user, { from: q.from, to: q.to });
+  return e.json(r.status, r.body);
+});
+
+// založení: {title, day, time?, note?, participants?: [e-maily], remind?, remind_before_min?}
+kbRoute("POST", "/v1/events", (e) => {
+  const { apiKeyAuth, unknownFieldsError, V1_BODY_FIELDS } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  const badBody = unknownFieldsError(info, V1_BODY_FIELDS.event, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const r = E.saveEvent($app, a.user, null, info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
+kbRoute("POST", "/v1/events/{id}", (e) => {
+  const { apiKeyAuth, unknownFieldsError, V1_BODY_FIELDS } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  const badBody = unknownFieldsError(info, V1_BODY_FIELDS.event, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const f = E.findEvent($app, e.request.pathValue("id"), a.user, a.lang);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = E.saveEvent($app, a.user, f.rec, info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
+kbRoute("POST", "/v1/events/{id}/delete", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const f = E.findEvent($app, e.request.pathValue("id"), a.user, a.lang);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = E.deleteEvent($app, a.user, f.rec, a.lang);
+  return e.json(r.status, r.body);
+});
+
+kbRoute("POST", "/v1/events/{id}/leave", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const f = E.findEvent($app, e.request.pathValue("id"), a.user, a.lang);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = E.leaveEvent($app, a.user, f.rec, a.lang);
+  return e.json(r.status, r.body);
+});
+
+// připomínky vlastníka klíče k uzlu (mapu stačí VIDĚT — připomínka je soukromá)
+kbRoute("GET", "/v1/maps/{id}/nodes/{nodeId}/reminders", (e) => {
+  const { apiKeyAuth, v1ReadableMap } = require(`${__hooks}/helpers.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const m = v1ReadableMap($app, e.request.pathValue("id"), a.user);
+  if (!m) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
+  const r = E.listNodeReminders($app, a.user, m.map.id, e.request.pathValue("nodeId"));
+  return e.json(r.status, r.body);
+});
+
+// upsert: {offset_days (0 = v den termínu, 1 = den před…), time "HH:MM"}
+kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/reminders", (e) => {
+  const { apiKeyAuth, unknownFieldsError, V1_BODY_FIELDS } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  const badBody = unknownFieldsError(info, V1_BODY_FIELDS.nodeReminder, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const r = E.saveNodeReminder($app, a.user, e.request.pathValue("id"), e.request.pathValue("nodeId"), info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
+kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}/reminders/{rid}/delete", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const r = E.deleteNodeReminder($app, a.user, e.request.pathValue("rid"), a.lang);
   return e.json(r.status, r.body);
 });
 

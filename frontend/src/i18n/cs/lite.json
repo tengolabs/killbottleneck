@@ -18,7 +18,9 @@
     "noDate": "Bez termínu",
     "doneToday": "hotovo: {{count}}",
     "idea": "nápad",
-    "doneList": "Hotovo dnes"
+    "doneList": "Hotovo dnes",
+    "events": "Dnes v kalendáři",
+    "allDay": "celý den"
   },
   "delegated": {
     "title": "Co jsem zadal",

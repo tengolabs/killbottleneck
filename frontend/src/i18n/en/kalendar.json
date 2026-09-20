@@ -11,7 +11,11 @@
     "zadostOdeslat": "Send request",
     "ciziZadost": "A deadline request from {{who}} is already pending on this goal — resolve it in the detail.",
     "ukolJenZadavatel": "Only the assigner ({{assigner}}) or the project owner can change this task's deadline.",
-    "otevritDetail": "Open detail"
+    "otevritDetail": "Open detail",
+    "udalostTitulek": "Move the event from {{from}} to {{to}}?",
+    "udalostPozn": "The reminder moves with the event. Invitees will see it on the new day.",
+    "udalostPotvrdit": "Move",
+    "udalostCizi": "The event was created by {{who}} — only they can move it."
   },
   "toast": {
     "terminZmenen": "Deadline changed to {{to}}",
@@ -19,7 +23,10 @@
     "terminMezitim": "Someone else changed the deadline to {{now}} in the meantime",
     "zmenaSelhala": "The deadline could not be changed",
     "zadostZrusena": "Request cancelled",
-    "hotovoNepresouvat": "A done item cannot be moved."
+    "hotovoNepresouvat": "A done item cannot be moved.",
+    "udalostPresunuta": "Event moved to {{to}}",
+    "udalostVracena": "Event moved back to {{from}}",
+    "udalostSelhala": "The event could not be saved"
   },
   "v2": {
     "title": "Calendar",
@@ -49,7 +56,7 @@
       "day": "Next day",
       "agenda": "Next month"
     },
-    "addOn": "Add task on {{date}}",
+    "addOn": "Add a task or an event on {{date}}",
     "overdue": "Overdue",
     "freeDay": "No deadlines",
     "add": "Add",
@@ -72,6 +79,74 @@
     "noMatchingItems": "No tasks match your search or filters.",
     "createButton": "Create",
     "projectsNone": "None",
-    "projectsAll": "All"
+    "projectsAll": "All",
+    "personal": "Events",
+    "personalTitle": "Meetings, dentist, video calls… — outside projects. Untick to hide them in the calendar."
+  },
+  "nova": {
+    "titulek": "What to add on {{date}}?",
+    "popis": "A task belongs to a project. An event lives outside projects — a meeting, the dentist, a video call.",
+    "ukol": "Task in a project",
+    "ukolPopis": "A new goal in a project map, due on this day.",
+    "udalost": "Event",
+    "udalostPopis": "With a time, colleagues and a reminder. Changes nothing in projects."
+  },
+  "udalost": {
+    "titulekNova": "New event",
+    "titulekUprava": "Event",
+    "titulekDetail": "Event (invitation)",
+    "popis": "A meeting, the dentist, a video call… Not a task and not part of any project.",
+    "popisPozvany": "{{who}} invited you. Only they can edit it; you can leave.",
+    "nazev": "Title",
+    "nazevPh": "E.g. Dentist, Video call with a supplier",
+    "den": "Day",
+    "cas": "Time",
+    "casPozn": "Empty = all day",
+    "pripominka": "Reminder",
+    "pripominkaZadna": "No reminder",
+    "pripominkaVCas": "At start",
+    "pripominkaMin": "{{min}} min before",
+    "pripominkaDenPredem": "The day before",
+    "pripominkaCelyDen": "For an all-day event it arrives in the morning.",
+    "pripominkaKratce": "reminder",
+    "tz": "Reminders use the instance time zone ({{tz}}).",
+    "ucastnici": "Invite colleagues",
+    "ucastniciHledat": "Search members…",
+    "ucastniciZadni": "No participants",
+    "poznamka": "Note",
+    "zalozit": "Create event",
+    "zalozena": "Event \"{{title}}\" created",
+    "ulozena": "Event \"{{title}}\" saved",
+    "smazana": "Event \"{{title}}\" deleted",
+    "ulozeniSelhalo": "The event could not be saved",
+    "smazat": "Delete",
+    "smazatPotvrdit": "Really delete",
+    "nenalezena": "The event no longer exists.",
+    "opustit": "Leave the event",
+    "opustitPotvrdit": "Really leave",
+    "opustena": "You left the event \"{{title}}\"",
+    "ucastniciPocet_one": "{{count}} invited",
+    "ucastniciPocet_other": "{{count}} invited",
+    "ucastniciPocet_few": "{{count}} invited"
+  },
+  "pripominka": {
+    "chipTitle": "You have a reminder set here",
+    "titulek": "Deadline reminder",
+    "nastavit": "Remind me of the deadline",
+    "nastavena": "Reminder: {{kdy}} ({{at}})",
+    "zmenit": "change",
+    "zrusit": "remove",
+    "ulozit": "Set",
+    "ulozena": "I will remind you on {{at}}",
+    "zrusena": "Reminder removed",
+    "selhala": "The reminder could not be saved",
+    "pozn": "The reminder is yours only and does not change the deadline ({{deadline}}). If the deadline moves, it moves along.",
+    "offset": {
+      "0": "on the deadline day",
+      "1": "the day before the deadline",
+      "2": "2 days before the deadline",
+      "7": "a week before the deadline"
+    },
+    "offsetJine": "{{n}} days before the deadline"
   }
 }

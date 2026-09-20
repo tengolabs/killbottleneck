@@ -314,6 +314,26 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
             </div>
           )}
 
+          {/* dnešní události (zubař, telko…) s časem — nejsou práce, jen řádky nad seznamem */}
+          {(day?.sections?.events || []).length > 0 && (
+            <div data-testid="myday-udalosti">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide mb-1 text-sky-600 dark:text-sky-400">
+                <CalendarClock className="w-3.5 h-3.5" /> {t('sections.events')} ({day.sections.events.length})
+              </p>
+              <ul className="space-y-0.5">
+                {day.sections.events.map((ev) => (
+                  <li key={ev.id}>
+                    <button type="button" className="w-full flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-secondary text-left" onClick={() => navigate(`/tasks?view=calendar&udalost=${encodeURIComponent(ev.id)}`)} data-testid={`myday-udalost-${ev.id}`}>
+                      <span className="w-12 shrink-0 tabular-nums text-xs font-semibold text-sky-700 dark:text-sky-300">{ev.time || t('sections.allDay')}</span>
+                      <span className="truncate">{ev.title}</span>
+                      {ev.participants > 0 && <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" />{ev.participants}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {sections.map((s) => (
             <div key={s.key}>
               <p className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide mb-1 ${s.cls}`}>

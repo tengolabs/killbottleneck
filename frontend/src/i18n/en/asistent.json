@@ -87,6 +87,7 @@
   "modePorada": "Morning briefing",
   "modeRozbor": "Breakdown",
   "actionOpenNode": "Show in map",
+  "actionOpenEvent": "Show in calendar",
   "memoryProjects": "Project notes",
   "memoryProjectsEmpty": "None yet. Say for example: \"Remember for the project that Petr decides.\"",
   "memoryDelete": "Delete",
@@ -151,7 +152,7 @@
       "nevejdeSe": "the new text does not fit the space even when shrunk",
       "jinySoubor": "This is a different file (different page count) – choose the one the correction belongs to."
     },
-    "cardDone": "Corrected",
+    "cardDone": "Done",
     "page": "p. {{n}}:",
     "needFile": "The file \"{{name}}\" is no longer loaded in the browser (the page was reloaded). Choose it again; the correction runs on your computer.",
     "chooseFile": "Choose file",
@@ -163,6 +164,7 @@
     "textShow": "Show the PDF text",
     "includesEarlier_one": "The file also contains 1 correction confirmed earlier in this conversation.",
     "includesEarlier_few": "The file also contains {{count}} corrections confirmed earlier in this conversation.",
-    "includesEarlier_other": "The file also contains {{count}} corrections confirmed earlier in this conversation."
+    "includesEarlier_other": "The file also contains {{count}} corrections confirmed earlier in this conversation.",
+    "quoted": "“{{v}}”"
   }
 }

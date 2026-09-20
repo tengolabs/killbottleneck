@@ -489,6 +489,66 @@ server.registerTool('get_portfolio', {
   } catch (e) { return errText(e.message); }
 });
 
+// Události a časové připomínky (19. 9. 2026) — 1:1 s HTTP serverem
+// (server/pb_hooks/mcp-tools.js). Událost NENÍ úkol (nic v mapě), připomínka
+// k uzlu je relativní k termínu a termín nemění.
+function renderEvent(e) {
+  const kdy = e.time ? `${e.day} ${e.time}` : `${e.day} (all day)`;
+  const parts = (e.participants || []).length ? `, participants: ${e.participants.join(', ')}` : '';
+  const rem = e.remind ? `, reminder ${e.remind_before_min} min before` : '';
+  return `${kdy} — ${e.title} (id: ${e.id}, ${e.mine ? 'mine' : 'invited by ' + e.owner_email}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ''}`;
+}
+
+server.registerTool('create_event', {
+  description: 'Create a personal calendar EVENT with a time (meeting, call, dentist…) — NOT a task and not part of any map. Optional participants (e-mails of instance members from list_people; each sees the event in their calendar) and a reminder N minutes before (in-app + e-mail). Times are the instance\'s local time.',
+  inputSchema: strict({
+    title: z.string(),
+    day: z.string().describe('YYYY-MM-DD'),
+    time: z.string().optional().describe('HH:MM (24h); omit for an all-day event'),
+    note: z.string().optional(),
+    participants: z.array(z.string()).optional().describe('e-mails of instance members'),
+    remind_before_min: z.number().int().min(0).max(10080).optional().describe('reminder N minutes before start (0 = at start); omit for no reminder'),
+  }),
+}, async (a) => {
+  try {
+    const body = { title: a.title, day: a.day };
+    for (const k of ['time', 'note', 'participants', 'remind_before_min']) if (a[k] !== undefined) body[k] = a[k];
+    const r = await call('POST', '/api/kb/v1/events', body);
+    return text(`Event created: ${renderEvent(r.event)}`);
+  } catch (e) { return errText(e.message); }
+});
+
+server.registerTool('list_events', {
+  description: 'List the key owner\'s calendar events (own and invited) in a day range; default today−365 … +730. Read-only.',
+  inputSchema: strict({
+    from: z.string().optional().describe('YYYY-MM-DD'),
+    to: z.string().optional().describe('YYYY-MM-DD'),
+  }),
+}, async ({ from, to }) => {
+  try {
+    const q = [from ? `from=${enc(from)}` : '', to ? `to=${enc(to)}` : ''].filter(Boolean).join('&');
+    const r = await call('GET', `/api/kb/v1/events${q ? '?' + q : ''}`);
+    if (!r.events.length) return text(`No events between ${r.from} and ${r.to}.`);
+    return text(DATA_FENCE + '\n\n' + r.events.map((x) => `• ${renderEvent(x)}`).join('\n'));
+  } catch (e) { return errText(e.message); }
+});
+
+server.registerTool('create_reminder', {
+  description: 'Set a timed REMINDER for a map node relative to its deadline: offset_days before the deadline (0 = on the deadline day, 1 = the day before) at time HH:MM, instance local time. One reminder per person and node (calling again replaces it). Does NOT change the deadline; the node must already have one (set it with update_node first). Private to the key owner.',
+  inputSchema: strict({
+    map_id: z.string(),
+    node_id: z.string(),
+    offset_days: z.number().int().min(0).max(30).optional(),
+    time: z.string().describe('HH:MM (24h)'),
+  }),
+}, async ({ map_id, node_id, offset_days, time }) => {
+  try {
+    const r = await call('POST', `/api/kb/v1/maps/${enc(map_id)}/nodes/${enc(node_id)}/reminders`,
+      { offset_days: offset_days === undefined ? 0 : offset_days, time });
+    return text(`Reminder set for "${r.node_title}" (deadline ${r.deadline}): fires on ${r.reminder.fires_at} instance local time (in-app + e-mail if enabled). The deadline is unchanged.`);
+  } catch (e) { return errText(e.message); }
+});
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 // startup ping (nefatální): překlep v adrese ať je vidět hned, ne až u prvního nástroje.

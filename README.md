@@ -177,8 +177,9 @@ only the address differs.
    }
    ```
 
-Tools (17): `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`, `delete_node`,
-`list_people`, `get_portfolio`, `get_org_structure` and the rule tools (`create_rule`, `list_rules`,
+Tools (20): `list_maps`, `get_map`, `create_map`, `add_nodes`, `update_node`, `delete_node`,
+`list_people`, `get_portfolio`, `get_org_structure`, calendar events and timed reminders (`create_event`,
+`list_events`, `create_reminder`) and the rule tools (`create_rule`, `list_rules`,
 `update_rule`, `delete_rule`, `list_rule_runs`, `list_rule_templates`, `save_rule_template`,
 `delete_rule_template`). A goal with an assignee or a deadline IS a task — there are no
 separate task records. Assigning an `owner` through the API shares the map with that person as a

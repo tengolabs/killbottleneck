@@ -409,6 +409,23 @@ const STRINGS = {
     cs: "U externích lidí máte {count} {itemWord} s termínem zítra",
     en: "External people have {count} {itemWord} due tomorrow",
   },
+  // ── časové připomínky (minutový cron reminders) + pozvání na událost ──
+  "notify.reminderEvent": {
+    cs: "Připomínka: „{title}“ {day} v {time}",
+    en: "Reminder: \"{title}\" on {day} at {time}",
+  },
+  "notify.reminderEventAllDay": {
+    cs: "Připomínka: „{title}“ dnes ({day})",
+    en: "Reminder: \"{title}\" today ({day})",
+  },
+  "notify.reminderNode": {
+    cs: "Připomínka: „{title}“ v projektu „{map}“ má termín {deadline}",
+    en: "Reminder: \"{title}\" in project \"{map}\" is due {deadline}",
+  },
+  "notify.eventInvited": {
+    cs: "{by} vás pozval(a) na „{title}“ {day}{time}",
+    en: "{by} invited you to \"{title}\" on {day}{time}",
+  },
 
   // ── agentní běhy (webhook → callback) ──
   "notify.agentDone": {
@@ -897,6 +914,59 @@ const STRINGS = {
   },
   "err.bodyTooLarge": { cs: "Tělo požadavku je příliš velké.", en: "Request body is too large." },
   "err.nodeNotFound": { cs: "Uzel nebyl nalezen.", en: "Node not found." },
+  // ── události a připomínky (events-api.js) ──
+  "err.eventNotFound": { cs: "Událost nebyla nalezena.", en: "Event not found." },
+  "err.eventOwnerCannotLeave": {
+    cs: "Zakladatel se z události neodebírá — může ji smazat.",
+    en: "The creator cannot leave the event — they can delete it instead.",
+  },
+  "err.eventNotOwner": {
+    cs: "Událost smí měnit jen ten, kdo ji založil.",
+    en: "Only the person who created the event can change it.",
+  },
+  "err.eventTitleRequired": { cs: "Událost potřebuje název.", en: "The event needs a title." },
+  "err.eventTitleLong": { cs: "Název události je příliš dlouhý (max 200 znaků).", en: "Event title is too long (max 200 characters)." },
+  "err.eventNoteLong": { cs: "Poznámka je příliš dlouhá (max 2000 znaků).", en: "Note is too long (max 2000 characters)." },
+  "err.badDay": {
+    cs: "Den „{value}“ není platné datum (RRRR-MM-DD).",
+    en: "Day \"{value}\" is not a valid date (YYYY-MM-DD).",
+  },
+  "err.badTime": {
+    cs: "Čas „{value}“ není platný (HH:MM, 24 hodin).",
+    en: "Time \"{value}\" is not valid (HH:MM, 24-hour).",
+  },
+  "err.badRemindMin": {
+    cs: "Předstih připomínky musí být celé číslo minut 0–{max}.",
+    en: "Reminder lead time must be a whole number of minutes 0–{max}.",
+  },
+  "err.badOffsetDays": {
+    cs: "Předstih připomínky musí být 0–{max} dní před termínem.",
+    en: "Reminder offset must be 0–{max} days before the deadline.",
+  },
+  "err.participantsArray": { cs: "Účastníci musí být seznam e-mailů.", en: "Participants must be a list of e-mails." },
+  "err.participantsMany": { cs: "Příliš mnoho účastníků (max {max}).", en: "Too many participants (max {max})." },
+  "err.participantUnknown": {
+    cs: "Účastník „{email}“ není člen této instance. {hint}",
+    en: "Participant \"{email}\" is not a member of this instance. {hint}",
+  },
+  "err.participantExternal": {
+    cs: "Externí kontakt „{email}“ nelze pozvat na událost — pozvánka chodí jen členům instance.",
+    en: "External contact \"{email}\" cannot be invited — invitations go to instance members only.",
+  },
+  "err.reminderNeedsDeadline": {
+    cs: "Uzel nemá termín — připomínka se váže k termínu. Nejdřív termín nastavte (update_node deadline).",
+    en: "The node has no deadline — a reminder is tied to the deadline. Set the deadline first (update_node deadline).",
+  },
+  "err.reminderInPast": {
+    cs: "Připomínka by připadla na {at}, což už je pryč.",
+    en: "The reminder would fall on {at}, which has already passed.",
+  },
+  "err.reminderNotFound": { cs: "Připomínka nebyla nalezena.", en: "Reminder not found." },
+  "err.reminderNodeDone": {
+    cs: "Uzel je hotový nebo je projekt archivovaný — připomínka by už nepřišla.",
+    en: "The node is done or the project is archived — the reminder would never arrive.",
+  },
+  "err.eventLimit": { cs: "Příliš mnoho událostí (strop {max}). Smažte staré.", en: "Too many events (limit {max}). Delete old ones." },
   "err.noWriteAccess": {
     cs: "K téhle mapě nemáte právo zápisu.",
     en: "You do not have write access to this map.",
@@ -984,8 +1054,12 @@ const STRINGS = {
     en: "killBottleneck has no tags or labels (\"{key}\") — structure the map (sub-nodes) or use color.",
   },
   "hint.reminder": {
-    cs: "Připomínka („{key}“) je automatizační pravidlo: create_rule s trigger deadline_approaching a akcí notify.",
-    en: "A reminder (\"{key}\") is an automation rule: create_rule with trigger deadline_approaching and a notify action.",
+    cs: "Připomínka („{key}“) není pole uzlu a termín nemění. Připomínku s časem k uzlu založíte přes POST /v1/maps/{id}/nodes/{nodeId}/reminders (offset_days, time HH:MM) nebo MCP create_reminder; upozornění bez času pro celou mapu je pravidlo create_rule s trigger deadline_approaching.",
+    en: "A reminder (\"{key}\") is not a node field and does not change the deadline. Create a timed reminder via POST /v1/maps/{id}/nodes/{nodeId}/reminders (offset_days, time HH:MM) or MCP create_reminder; an untimed alert for a whole map is a create_rule with trigger deadline_approaching.",
+  },
+  "hint.event": {
+    cs: "Schůzka/událost („{key}“) není uzel mapy — založte ji přes POST /v1/events (title, day, time, participants, remind_before_min) nebo MCP create_event.",
+    en: "A meeting/event (\"{key}\") is not a map node — create it via POST /v1/events (title, day, time, participants, remind_before_min) or MCP create_event.",
   },
   "hint.deadline": {
     cs: "Termín se jmenuje deadline (RRRR-MM-DD), ne „{key}“.",

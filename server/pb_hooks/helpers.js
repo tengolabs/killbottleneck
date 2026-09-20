@@ -287,11 +287,21 @@ const NOTIFY_TYPES = [
   "org_notice",
   // změnu hesla rukou správce se člověk MUSÍ dozvědět — proto typ, ne tichý zápis
   "password_reset",
+  // časová připomínka (událost i uzel) + pozvání na událost (migrace 1789820000)
+  "reminder", "event_invited",
 ];
 
 // Typy, které uživatel NESMÍ vypnout — poplachy o vlastním účtu. Předvolby je
 // nesmí nabízet (frontend) ani potlačit (notifyChannels).
 const NOTIFY_ALWAYS = ["password_reset"];
+// Typy, které jdou e-mailem HNED i v režimu 'digest': připomínku s časem si
+// člověk výslovně vyžádal — souhrn v 8:00 pro schůzku ve 14:00 je k ničemu.
+// Režim 'none' platí i tady (vypnul si poštu úplně).
+const NOTIFY_INSTANT = ["reminder"];
+// Typy s e-mailem VÝCHOZE ZAPNUTÝM (ostatní čekají na zaškrtnutí v předvolbách):
+// připomínka bez e-mailu by v zavřené aplikaci nikdy nedorazila.
+// ⚠️ Držet v syncu s frontend NotificationPrefs (výchozí stav zaškrtnutí).
+const NOTIFY_EMAIL_DEFAULT_ON = ["reminder"];
 // Typy, které NIKDY nechodí e-mailem. Oznámení o nové verzi je informace do
 // zvonečku; e-mailem by z vydání byla hromadná pošta všem uživatelům instance.
 const NOTIFY_NIKDY_MAILEM = ["new_version"];
@@ -368,18 +378,23 @@ function oznamNovouVerzi(app) {
   return n;
 }
 
-function notifyChannels(user, type) {
+// opts.bezVychozihoEmailu = true → e-mail jen po VÝSLOVNÉM zašktnutí příjemce (ne podle
+// NOTIFY_EMAIL_DEFAULT_ON): připomínka cizí události, kam mě někdo pozval bez mého
+// souhlasu, nesmí být kanál, kterým mi kdokoli pošle e-mail s vlastním textem
+// (panel /checkup 19. 9. 2026). Vlastní události mají e-mail výchozí zapnutý dál.
+function notifyChannels(user, type, opts) {
   let prefs = {};
   try {
     prefs = jsonVal(user, "notify_prefs", {}) || {};
   } catch (err) { /* poškozené prefs = default */ }
   const p = (prefs && typeof prefs === "object" && prefs[type]) || {};
-  const emailDefault = env("NOTIFY_EMAIL_DEFAULT") === "1";
+  const emailDefault = env("NOTIFY_EMAIL_DEFAULT") === "1" || (NOTIFY_EMAIL_DEFAULT_ON.includes(type) && !(opts && opts.bezVychozihoEmailu));
   let email = p.email === true || (p.email === undefined && emailDefault);
   // Režim e-mailů PŘEBÍJÍ per-typ zaškrtnutí: 'none' = nikdy nic, 'digest' =
-  // jednotlivé e-maily ne (chodí jen jeden denní souhrn — viz runDeadlineNotices).
+  // jednotlivé e-maily ne (chodí jen jeden denní souhrn — viz runDeadlineNotices)
+  // — s výjimkou NOTIFY_INSTANT (časová připomínka musí přijít včas).
   const mode = user && user.getString ? user.getString("notify_email_mode") : "";
-  if (mode === "none" || mode === "digest") email = false;
+  if (mode === "none" || (mode === "digest" && !NOTIFY_INSTANT.includes(type))) email = false;
   // ⚠️ BEZPEČNOSTNÍ POPLACHY SE VYPNOUT NEDAJÍ. `password_reset` neříká „změnil sis
   // heslo", ale „NĚKDO JINÝ ti právě změnil heslo" — celý jeho smysl je dozvědět se,
   // že mi někdo bere účet. Kdyby šel vypnout, útočník s chvilkovým přístupem k účtu
@@ -536,7 +551,7 @@ function externalContactRows(app, userId) {
 // plurals = { paramName: { count, key } } → server dopočte správný tvar podle jazyka.
 // dedupKey (volitelný) = idempotence: partial UNIQUE index nad notifications.dedup_key
 // zaručí, že se stejná notifikace nepošle dvakrát ani při souběhu (termínový cron).
-function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, textKey, params, plurals, dedupKey }) {
+function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, textKey, params, plurals, dedupKey, bezVychozihoEmailu }) {
   if (!email || email === actorEmail) return;
   let user;
   try {
@@ -545,7 +560,7 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, textKey, 
     return; // neregistrovaný e-mail — není komu oznamovat
   }
   // preference vyhodnocujeme TADY, na jediném místě — žádný volající je nesmí obcházet
-  const ch = notifyChannels(user, type);
+  const ch = notifyChannels(user, type, { bezVychozihoEmailu: !!bezVychozihoEmailu });
   if (!ch.inApp && !ch.email) return;
   const i18n = require(`${__hooks}/i18n.js`);
   const lang = i18n.userLang(user);
@@ -637,6 +652,7 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, textKey, 
     if (taskId) rec.set("task", taskId);
     if (mapId) rec.set("map", mapId);
     if (nodeId) rec.set("node_id", nodeId);
+    if (eventId) rec.set("event_id", eventId);
     rec.set("text", text);
     rec.set("count", 1);
     rec.set("read", false);
@@ -1289,6 +1305,9 @@ const V1_BODY_FIELDS = {
   deleteNode: ["base_updated"],
   rule: ["name", "node_id", "trigger", "conditions", "actions", "enabled"],
   ruleTemplate: ["id", "name", "trigger", "conditions", "actions"],
+  // události a připomínky k uzlům (events-api.js: EVENT_FIELDS / NODE_REMINDER_FIELDS)
+  event: ["title", "day", "time", "note", "participants", "remind", "remind_before_min"],
+  nodeReminder: ["offset_days", "time"],
 };
 // tvar pravidla — zrcadlo RULE_TRIGGER / RULE_CONDITION / RULE_ACTION v mcp-tools.js
 const RULE_TRIGGER_FIELDS = ["type", "status", "when", "days", "freq", "weekday", "hour"];
@@ -1302,6 +1321,9 @@ const FOREIGN_FIELD_HINTS = {
   priority: "hint.priority", priorita: "hint.priority", importance: "hint.priority", urgency: "hint.priority", urgent: "hint.priority", priority_level: "hint.priority",
   tags: "hint.tags", tag: "hint.tags", labels: "hint.tags", label: "hint.tags", stitky: "hint.tags", category: "hint.tags", categories: "hint.tags",
   reminder: "hint.reminder", reminders: "hint.reminder", remind_at: "hint.reminder", remind: "hint.reminder", notify_at: "hint.reminder", alert: "hint.reminder",
+  // čas u uzlu neexistuje (termín je den) — s časem umí jen připomínka / událost
+  time: "hint.reminder", start_time: "hint.reminder", hour: "hint.reminder", at: "hint.reminder", deadline_time: "hint.reminder",
+  event: "hint.event", meeting: "hint.event", schuzka: "hint.event", udalost: "hint.event",
   due_date: "hint.deadline", due: "hint.deadline", due_on: "hint.deadline", due_at: "hint.deadline", termin: "hint.deadline", end_date: "hint.deadline",
   assignee: "hint.owner", assigned_to: "hint.owner", assignee_email: "hint.owner", resitel: "hint.owner", responsible: "hint.owner",
   estimate: "hint.estimate", estimated_hours: "hint.estimate", estimate_hours: "hint.estimate", effort: "hint.estimate", story_points: "hint.estimate", points: "hint.estimate", odhad: "hint.estimate",
@@ -5228,6 +5250,223 @@ function runDeadlineNotices(app, opts) {
   return sent;
 }
 
+// ---------- ČASOVÉ PŘIPOMÍNKY: události + připomínky k uzlům (19. 9. 2026) ----------
+// Čas = lokální čas kontejneru (env TZ) jako řetězce "YYYY-MM-DD HH:MM" a
+// porovnává se ŘETĚZCOVĚ — stejná konvence jako termíny (žádné new Date na
+// vstupu, žádné TZ posuny). goja nemá Intl s časovými zónami, per-user TZ tu není;
+// UI ukáže, v jaké zóně připomínky chodí, když se liší od prohlížeče.
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+// "YYYY-MM-DD HH:MM" teď (lokálně)
+function nowLocalMinute() {
+  const d = new Date();
+  return fmtDateLocal(d) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+}
+
+// den − n dní pro řetězec YYYY-MM-DD (přes lokální Date, den zůstává dnem)
+function dayMinusDays(day, n) {
+  const [y, m, d] = String(day).split("-").map(Number);
+  return addDaysStr(new Date(y, m - 1, d), -Number(n || 0));
+}
+
+// "YYYY-MM-DD HH:MM" = den + čas − minuty (přechod přes půlnoc je v pořádku)
+function minusMinutes(day, time, min) {
+  const [y, m, d] = String(day).split("-").map(Number);
+  const [H, M] = String(time || "00:00").split(":").map(Number);
+  const x = new Date(y, m - 1, d, H, M);
+  x.setMinutes(x.getMinutes() - Number(min || 0));
+  return fmtDateLocal(x) + " " + pad2(x.getHours()) + ":" + pad2(x.getMinutes());
+}
+
+// strop živých událostí na uživatele (bez něj by skript plnil DB donekonečna; panel 19. 9. 2026)
+const MAX_EVENTS_PER_USER = 2000;
+
+function reminderCatchupHours() {
+  const h = parseInt(env("REMINDER_CATCHUP_H"), 10);
+  return (h >= 0 && h <= 24 * 30) ? h : 48;
+}
+
+// Volá minutový cron `reminders` a superuser routa /run-reminders. Dvě smyčky:
+// (a) události s připomínkou (vlastník + účastníci), (b) připomínky k uzlům.
+// Idempotence: razítko reminded_at/fired_at + notifications.dedup_key (partial
+// UNIQUE) — po restartu se nic nepošle dvakrát. Připomínky starší než catch-up
+// okno (KB_REMINDER_CATCHUP_H, default 48 h) se jen označí a zalogují: po obnově
+// staré zálohy nesmí zvoneček zasypat týden starých schůzek.
+// opts.at = "YYYY-MM-DD HH:MM" (JEN superuser routa → deterministické testy).
+// Nikdy nemění termíny ani mapy — čte je.
+function runReminders(app, opts) {
+  if (pracovatSeNesmi()) return 0;
+  const o = opts || {};
+  // podvržené „teď“ jen s KB_TEST_CLOCK=1 (sady): na ostré instanci by `at` v budoucnosti
+  // označil čekající připomínky za odeslané/zmeškané (staging 19. 9. 2026 to předvedl)
+  const testClock = env("TEST_CLOCK") === "1";
+  const now = (testClock && typeof o.at === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(o.at)) ? o.at : nowLocalMinute();
+  const today = now.slice(0, 10);
+  const cutoff = (() => {
+    const [y, m, d] = today.split("-").map(Number);
+    const [H, M] = now.slice(11).split(":").map(Number);
+    const x = new Date(y, m - 1, d, H, M);
+    x.setHours(x.getHours() - reminderCatchupHours());
+    return fmtDateLocal(x) + " " + pad2(x.getHours()) + ":" + pad2(x.getMinutes());
+  })();
+  let sent = 0;
+  const warn = (msg, kv) => { try { app.logger().warn(msg, ...(kv || [])); } catch (e2) { /* log je bonus */ } };
+  const emailOf = (userId) => {
+    try { return app.findRecordById("users", userId).getString("email"); } catch (err) { return ""; }
+  };
+
+  // (a) události — výstřel = den+čas − předstih, tedy klidně několik dní PŘED dnem
+  // události (předstih až 7 dní = 10080 min); okno proto sahá 8 dní dopředu a o tom,
+  // co je splatné, rozhoduje až porovnání fireAt. Panel /checkup 19. 9. 2026: filtr
+  // `day <= dnes` posílal „den předem“ až o půlnoci a delší předstih nikdy.
+  let events = [];
+  try {
+    const [y, m, d] = today.split("-").map(Number);
+    const okno = addDaysStr(new Date(y, m - 1, d), 8);
+    events = app.findRecordsByFilter("events", "remind = true && reminded_at = '' && day <= {:d}", "day,time", 500, 0, { d: okno });
+  } catch (err) { warn("reminders: načtení událostí selhalo", ["error", String(err)]); }
+  for (const ev of events) {
+    try {
+      const day = ev.getString("day");
+      const time = ev.getString("time");
+      const fireAt = time
+        ? minusMinutes(day, time, Number(ev.get("remind_before_min")) || 0)
+        : day + " " + pad2(deadlineHour()) + ":00"; // celodenní: ráno v hodině termínových upozornění
+      if (fireAt > now) continue;
+      if (fireAt < cutoff) {
+        ev.set("reminded_at", now);
+        app.save(ev);
+        warn("reminders: zmeškaná připomínka události (mimo catch-up okno)", ["event", ev.id, "fireAt", fireAt]);
+        continue;
+      }
+      const ownerId = ev.getString("owner");
+      const ids = [ownerId].concat(ev.get("participants") || []);
+      for (const uid of ids) {
+        const email = emailOf(uid);
+        if (!email) continue;
+        const before = countNotifications(app, email);
+        notify(app, {
+          email: email,
+          actorEmail: "",
+          type: "reminder",
+          eventId: ev.id,
+          textKey: time ? "notify.reminderEvent" : "notify.reminderEventAllDay",
+          params: { title: ev.getString("title"), day: day, time: time },
+          dedupKey: "rem:ev:" + ev.id + ":" + fireAt + ":" + uid,
+          // pozvaný dostane e-mail jen po vlastním zaškrtnutí (viz notifyChannels)
+          bezVychozihoEmailu: uid !== ownerId,
+        });
+        if (countNotifications(app, email) > before) sent++;
+      }
+      ev.set("reminded_at", now);
+      app.save(ev);
+    } catch (err) {
+      warn("reminders: událost selhala", ["event", ev.id, "error", String(err)]);
+    }
+  }
+
+  // (b) připomínky k uzlům — před výstřelem se ověří AKTUÁLNÍ termín (mapa se
+  // mohla změnit bez hooku, např. obnovou zálohy); uzel hotový/smazaný/bez
+  // termínu = připomínka bez smyslu → smazat.
+  let rems = [];
+  try {
+    rems = app.findRecordsByFilter("node_reminders", "fired_at = '' && day <= {:d}", "day,time", 500, 0, { d: today });
+  } catch (err) { warn("reminders: načtení připomínek uzlů selhalo", ["error", String(err)]); }
+  const mapCache = {};
+  for (const rm of rems) {
+    try {
+      const mapId = rm.getString("map");
+      if (!(mapId in mapCache)) {
+        try { mapCache[mapId] = app.findRecordById("goalmaps", mapId); } catch (err) { mapCache[mapId] = null; }
+      }
+      const map = mapCache[mapId];
+      const node = map ? (jsonVal(map, "nodes", []) || []).find((n) => n && n.id === rm.getString("node_id")) : null;
+      const d = node ? (node.data || {}) : null;
+      // vlastník připomínky musí mapu POŘÁD vidět — po odsdílení by mu cron vynášel
+      // aktuální název uzlu a termín (PoC panelu /checkup 19. 9. 2026) → smazat
+      const email = emailOf(rm.getString("owner"));
+      const vidi = map && email && mapAccessLevel(app, map, rm.getString("owner"), email);
+      if (!map || !vidi || map.getBool("archived") || !node || d.status === "done" || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.deadline || ""))) {
+        app.delete(rm);
+        continue;
+      }
+      const skutecnyDen = dayMinusDays(String(d.deadline), Number(rm.get("offset_days")) || 0);
+      if (skutecnyDen !== rm.getString("day")) {
+        // termín se posunul mimo hook → srovnat a nechat na příští minutu
+        rm.set("day", skutecnyDen);
+        app.save(rm);
+        continue;
+      }
+      const fireAt = rm.getString("day") + " " + rm.getString("time");
+      if (fireAt > now) continue;
+      if (fireAt < cutoff) {
+        rm.set("fired_at", now);
+        app.save(rm);
+        warn("reminders: zmeškaná připomínka uzlu (mimo catch-up okno)", ["reminder", rm.id, "fireAt", fireAt]);
+        continue;
+      }
+      if (email) {
+        const before = countNotifications(app, email);
+        notify(app, {
+          email: email,
+          actorEmail: "",
+          type: "reminder",
+          mapId: map.id,
+          nodeId: node.id,
+          textKey: "notify.reminderNode",
+          params: { title: String(d.title || ""), map: map.getString("title"), deadline: String(d.deadline) },
+          dedupKey: "rem:nd:" + rm.id + ":" + fireAt,
+        });
+        if (countNotifications(app, email) > before) sent++;
+      }
+      rm.set("fired_at", now);
+      app.save(rm);
+    } catch (err) {
+      warn("reminders: připomínka uzlu selhala", ["reminder", rm.id, "error", String(err)]);
+    }
+  }
+  return sent;
+}
+
+// Po uložení mapy (model hook goalmaps — chytá session PATCH, v1 i pravidla přes
+// $app.save): přepočítat den připomínek podle AKTUÁLNÍCH termínů. Posun termínu
+// do budoucna = připomínka znovu platí (fired_at = ''); uzel pryč / hotový /
+// bez termínu = připomínka bez smyslu → smazat. Termíny se tu jen ČTOU.
+function syncNodeReminders(app, map) {
+  let rows = [];
+  try { rows = app.findRecordsByFilter("node_reminders", "map = {:m}", "", 500, 0, { m: map.id }); } catch (err) { return; }
+  if (!rows.length) return;
+  const nodes = jsonVal(map, "nodes", []) || [];
+  const byId = {};
+  for (const n of nodes) if (n && n.id) byId[n.id] = n;
+  const pristup = {}; // owner id → smí mapu vidět (jeden dotaz na člověka)
+  for (const rm of rows) {
+    try {
+      const oid = rm.getString("owner");
+      if (!(oid in pristup)) {
+        let em = "";
+        try { em = app.findRecordById("users", oid).getString("email"); } catch (err) { em = ""; }
+        pristup[oid] = !!(em && mapAccessLevel(app, map, oid, em));
+      }
+      const node = byId[rm.getString("node_id")];
+      const d = node ? (node.data || {}) : null;
+      // bez přístupu k mapě připomínka končí (odsdílení nesmí dál vynášet termíny)
+      if (!pristup[oid] || !node || d.status === "done" || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.deadline || ""))) {
+        app.delete(rm);
+        continue;
+      }
+      const den = dayMinusDays(String(d.deadline), Number(rm.get("offset_days")) || 0);
+      if (den === rm.getString("day")) continue;
+      rm.set("day", den);
+      if (den + " " + rm.getString("time") > nowLocalMinute()) rm.set("fired_at", "");
+      app.save(rm);
+    } catch (err) {
+      try { app.logger().warn("reminders: přepočet po uložení mapy selhal", "reminder", rm.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
+}
+
 // ---------- B1: denní e-mailový souhrn (users.notify_email_mode = 'digest') ----------
 
 // Cílová hodina souhrnu (0–23, lokální TZ). Default 8 = hodinu PO termínových
@@ -5270,9 +5509,10 @@ function runEmailDigests(app, opts) {
   let posledni = "";   // komu souhrn odešel naposled (nese ho denní značka níž)
   for (const u of users) {
     try {
-      // overflow řádek se vynechává — souhrn vyjmenovává obsah, ne meta-hlášku
+      // overflow řádek se vynechává — souhrn vyjmenovává obsah, ne meta-hlášku;
+      // časová připomínka (NOTIFY_INSTANT) už odešla HNED — v souhrnu by byla podruhé a zastaralá
       const rows = app.findRecordsByFilter("notifications",
-        "user = {:u} && created >= {:since} && type != 'overflow'", "-created", 200, 0,
+        "user = {:u} && created >= {:since} && type != 'overflow' && type != 'reminder'", "-created", 200, 0,
         { u: u.id, since: sinceIso });
       if (!rows.length) continue; // prázdný den = žádný e-mail (ticho je tu správné)
       // ⚠️ PŘEKONANÉ TERMÍNOVÉ ZPRÁVY VEN. Okno souhrnu je „od minulého běhu" (fallback
@@ -5763,6 +6003,18 @@ function buildExport(app, userId, email, opts) {
     title: b.getString("title"), description: b.getString("description"), color: b.getString("color"),
     deadline: b.getString("deadline"), planned_on: b.getString("planned_on"), created: b.getString("created"),
   }));
+  // události: vlastní i ty, kam mě pozvali (osobní kalendář = osobní data); připomínky k uzlům jen moje
+  let eventsOut = [];
+  try {
+    const rows = rowsOf("events", "owner = {:u} || participants.id ?= {:u}", { u: userId }, ROWS, "day,time");
+    if (rows.length >= ROWS) truncated.events = true;
+    const E = require(`${__hooks}/events-api.js`);
+    eventsOut = rows.map((ev) => { const d = E.eventDto(app, ev, userId); delete d.mine; return d; });
+  } catch (err) { /* kolekce chybí u starší instance */ }
+  const nodeReminders = own("node_reminders", "day,time", (rm) => ({
+    map: rm.getString("map"), node_id: rm.getString("node_id"), offset_days: Number(rm.get("offset_days")) || 0,
+    time: rm.getString("time"), day: rm.getString("day"), fired_at: rm.getString("fired_at"), created: rm.getString("created"),
+  }));
   const timeEntries = own("time_entries", "started", (t) => ({
     id: t.id, label: t.getString("label"), note: t.getString("note"), started: t.getString("started"), ended: t.getString("ended"),
     duration_min: t.get("duration_min"), map: t.getString("map"), node_id: t.getString("node_id"), task: t.getString("task"), client: t.getString("client"),
@@ -5800,11 +6052,13 @@ function buildExport(app, userId, email, opts) {
     members: memberRows(app),
     maps: mapsOut,
     buffer_nodes: buffer,
+    events: eventsOut,
+    node_reminders: nodeReminders,
     time_entries: timeEntries,
     external_contacts: contacts,
     notifications: notifications,
     rule_templates: ruleTemplates,
-    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
+    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, node_reminders: nodeReminders.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
     truncated: Object.keys(truncated).length ? truncated : null,
     errors: errors.length ? errors : null,
   };
@@ -6407,6 +6661,23 @@ function buildMyDay(app, userId, email, opts) {
   }
   const doneOut = doneToday.filter((it) => !otevreneKlice[it.kind + ":" + it.id]);
 
+  // Dnešní UDÁLOSTI (zubař, telekonference…) — vlastní i ty, kam mě pozvali.
+  // Nejsou práce (nezapočítávají se do counts), jen řádky s časem nad seznamem;
+  // celodenní první, pak podle času. `today` je den uživatele (klient), události
+  // nesou den v čase instance — shodné, dokud se člověk nepřihlásí z jiné zóny.
+  let events = [];
+  try {
+    events = app.findRecordsByFilter("events", "(owner = {:u} || participants.id ?= {:u}) && day = {:d}",
+      "time,created", 50, 0, { u: userId, d: today })
+      .map((ev) => ({
+        id: ev.id,
+        title: ev.getString("title") || untitled,
+        time: ev.getString("time"),
+        mine: ev.getString("owner") === userId,
+        participants: (ev.get("participants") || []).length,
+      }));
+  } catch (err) { events = []; }
+
   return {
     today: today,
     // Zkrácení se PŘIZNÁVÁ. Přehled, který mlčky vynechá část práce, je horší
@@ -6447,6 +6718,7 @@ function buildMyDay(app, userId, email, opts) {
       doneToday: doneOut,
       later: laterOut,
       noDate: noDateOut,
+      events: events,
     },
     // `rest` panel nezobrazuje (práce bez blízkého termínu) — používá ho AI sumář
     rest: [].concat(buckets.later, buckets.noDate),
@@ -7063,4 +7335,7 @@ module.exports = {
   RULE_RUNS_PRUNE_DAYS,
   resolveDynamicTarget, DYNAMIC_RULE_TARGETS,
   findOrgMap, findOrgMapAnyState, zalozOrgMapu, orgStructureRows, setPositionAssignment,
-  addOrgPosition, removeOrgPosition, orgSettingsName, deputyValueError, orgAssignmentInvalid };
+  addOrgPosition, removeOrgPosition, orgSettingsName, deputyValueError, orgAssignmentInvalid,
+  // časové připomínky (události + uzly)
+  NOTIFY_INSTANT, NOTIFY_EMAIL_DEFAULT_ON, runReminders, syncNodeReminders,
+  nowLocalMinute, dayMinusDays, minusMinutes, reminderCatchupHours, MAX_EVENTS_PER_USER };

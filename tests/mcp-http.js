@@ -35,6 +35,8 @@ const mcpPost = async (key, method, params, { raw } = {}) => {
   return { status: res.status, json, headers: res.headers };
 };
 const toolText = (r) => (((r.json || {}).result || {}).content || []).map((c) => c.text || '').join('\n');
+// id uzlu z renderovaného stromu get_map: „[ ] Krok 3 (id: node-…, …)"
+const findId = (text, title) => ((text.match(new RegExp(`\\] ${title} \\(id: ([^,)]+)`)) || [])[1] || '');
 
 let mcp = null;
 (async () => {
@@ -100,7 +102,7 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const stdioTools = (await stdioRpc('tools/list', {})).result.tools;
     const httpTools = (await mcpPost(keyRW, 'tools/list', {})).json.result.tools;
-    expect(httpTools.length === 17, `HTTP tools/list → 17 nástrojů (${httpTools.length})`);
+    expect(httpTools.length === 20, `HTTP tools/list → 20 nástrojů (${httpTools.length})`);
     const podle = (arr) => Object.fromEntries(arr.map((t) => [t.name, t]));
     const S = podle(stdioTools), H = podle(httpTools);
     expect(JSON.stringify(Object.keys(S).sort()) === JSON.stringify(Object.keys(H).sort()), 'stejná JMÉNA nástrojů');
@@ -148,6 +150,25 @@ let mcp = null;
     const gpStdio = await stdioRpc('tools/call', { name: 'get_portfolio', arguments: {} });
     const gpStdioText = (gpStdio.result.content || []).map((c) => c.text).join('\n');
     expect(/Portfolio as of/.test(toolText(gp)) && gpStdioText === toolText(gp), 'výstup get_portfolio je BYTE-SHODNÝ se stdio serverem');
+
+    console.log('== události a připomínky (19. 9. 2026) ==');
+    const zitra = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
+    const ce = await mcpPost(keyRW, 'tools/call', { name: 'create_event', arguments: { title: 'Zubař', day: zitra, time: '14:00', participants: ['b@x.cz'], remind_before_min: 30 } });
+    expect(/Event created: .*14:00 — Zubař .*participants: b@x\.cz, reminder 30 min before/.test(toolText(ce)), `create_event přes HTTP (${toolText(ce).slice(0, 120)})`);
+    const le = await mcpPost(keyRW, 'tools/call', { name: 'list_events', arguments: {} });
+    const leStdio = await stdioRpc('tools/call', { name: 'list_events', arguments: {} });
+    const leStdioText = (leStdio.result.content || []).map((c) => c.text).join('\n');
+    expect(/Zubař/.test(toolText(le)) && leStdioText === toolText(le), 'list_events je BYTE-SHODNÝ se stdio serverem');
+    const leB = await mcpPost(keyB, 'tools/call', { name: 'list_events', arguments: {} });
+    expect(/invited by a@x\.cz/.test(toolText(leB)), 'účastník vidí událost jako „invited by"');
+    const crBez = await mcpPost(keyRW, 'tools/call', { name: 'create_reminder', arguments: { map_id: mapId, node_id: findId(toolText(gm), 'Krok 3'), time: '09:00' } });
+    expect(crBez.json.result && crBez.json.result.isError && /deadline/.test(toolText(crBez)), 'create_reminder na uzel bez termínu → chyba s radou nastavit termín');
+    const za3 = (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString().slice(0, 10); })();
+    await mcpPost(keyRW, 'tools/call', { name: 'update_node', arguments: { map_id: mapId, node_id: findId(toolText(gm), 'Krok 3'), deadline: za3 } });
+    const cr = await mcpPost(keyRW, 'tools/call', { name: 'create_reminder', arguments: { map_id: mapId, node_id: findId(toolText(gm), 'Krok 3'), offset_days: 1, time: '09:00' } });
+    expect(/Reminder set for "Krok 3" \(deadline .*\): fires on .* 09:00/.test(toolText(cr)) && /deadline is unchanged/.test(toolText(cr)), `create_reminder → čas výstřelu (${toolText(cr).slice(0, 120)})`);
+    const neznamePole = await mcpPost(keyRW, 'tools/call', { name: 'create_event', arguments: { title: 'X', day: zitra, start: '10:00' } });
+    expect(neznamePole.json.error && neznamePole.json.error.code === -32602, 'neznámý argument create_event → -32602');
 
     console.log('== autorizace nástrojů ==');
     const ro = await mcpPost(keyRO, 'tools/call', { name: 'add_nodes', arguments: { map_id: mapId, items: [{ title: 'X' }] } });

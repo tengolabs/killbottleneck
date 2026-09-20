@@ -5,6 +5,9 @@ import { Label } from '@/components/ui/label';
 import { X as XIcon, CalendarClock } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import OwnerSelect from '@/components/OwnerSelect';
+import { lazy, Suspense } from 'react';
+// připomínka k uzlu (19. 9. 2026) — líný chunk, jen u uzlu s uloženým termínem
+const PripominkaUzlu = lazy(() => import('./PripominkaUzlu'));
 
 // „Zadání": termín (vč. celého mini-workflow žádosti o změnu termínu) + vlastník.
 // Práva drží hook (canEditDeadline/taskAssigner) — server je vynucuje nezávisle.
@@ -25,6 +28,12 @@ export default function AssignmentSection({ s, mapAccess, members, onShareAdd, o
         </div>
         {!s.canEditDeadline && (
           <p className="text-xs text-muted-foreground">{t('nodeDialog.deadlineOwnerOnly', { email: s.taskAssigner })}</p>
+        )}
+        {/* soukromá časová připomínka k termínu — mimo node.data, ukládá se hned; termín nemění */}
+        {!s.isApex && s.origDeadline && s.status !== 'done' && s.node?.id && s.mapId && (
+          <Suspense fallback={null}>
+            <PripominkaUzlu mapId={s.mapId} nodeId={s.node.id} deadline={s.origDeadline} />
+          </Suspense>
         )}
         {/* žádost o změnu termínu: řešitel navrhne, zadavatel schválí změnou termínu / zamítne
             — jen u běžného uzlu (vrchol tohle workflow nemá, parita s původním dialogem) */}

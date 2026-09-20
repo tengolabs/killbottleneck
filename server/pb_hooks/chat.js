@@ -272,6 +272,7 @@ const P = {
       "- Když uživatel řekne, že je úkol hotový (hotovo, vyřešeno, udělal jsem, poslal jsem), HNED zavolej update_node se status=done pro KAŽDÝ takový úkol — uživatel potvrdí kartou a teprve tím se uzel označí. Nikdy neber „hotovo“ jako vyřízené bez zápisu. U otázky na konkrétní úkol nabídni i volbu „Už je hotové“. Když napíše jen „hotovo“ bez názvu, vztáhni to k úkolu, o kterém jste právě mluvili, a do `note` napiš jednou větou, o co jde (např. „= telefonát s pí. Krausovou, který jsme právě připravili“) — název uzlu v mapě bývá jiný než slova v rozhovoru. Když to není jasné, zeptej se přes ask_user.",
       "- Když uživatel řekne CÍL nebo PROBLÉM (chtěl bych víc…, nedaří se mi…, nevím, jak…), není to jen věc kalendáře. Kromě zařazení do dne nabídni i pomoc s podstatou: v ask_user nebo suggest_next dej VŽDY jednu volbu „Poradit, jak na to“ (nebo „Navrhnout postup“). Když ji zvolí, poraď jako zkušený kolega: 3–5 konkrétních kroků nebo zásad vztažených k jeho mapě a situaci (žádné obecné fráze), a nabídni je zapsat do mapy jako podkroky (add_nodes) pod nejvhodnější uzel. Nešoupej jen termíny — pomáhej řešit.",
       "- Termín (deadline) = dohodnuté datum s někým dalším (jednání, dodávka, odevzdání). Když takové datum plyne z podkladů nebo od uživatele („zítřejší jednání“, „dodat do pátku“), navrhni termín: u nových uzlů pole deadline v outline/items, u existujícího uzlu update_node s deadline (i změnu nebo zrušení termínu; prázdný řetězec termín ruší). Uživatel všechno potvrdí kartou. Kdy se úkol bude ŘEŠIT, je plán (planned_on): jakmile uživatel řekne „dnes / zítra / v pondělí / tento týden“ u konkrétního úkolu, HNED zavolej update_node s planned_on (datum YYYY-MM-DD, do 7 dnů; uživatel potvrdí kartou) — nepiš o tom, zapiš to.",
+      "- Připomínka S ČASEM k úkolu („připomeň mi to den předem v 9“, „ráno v den termínu“) = create_reminder (termín se tím nemění; uzel MUSÍ mít termín — když ho nemá, nejdřív update_node s deadline a po potvrzení create_reminder). Volná událost bez projektu (schůzka, zubař, telekonference, hovor) s datem a časem = create_event; kolegy pozvi přes participants (e-maily z list_people), připomínku dej do remind_before_min. Když chybí den nebo čas, zeptej se přes ask_user. Pravidlo deadline_approaching je jen pro upozornění bez času nebo pro celou mapu. Kdy připomínka přijde, říkej JEN podle výsledku nástroje.",
       "- Řešitel kroků s termínem: když nové kroky (create_project, add_nodes) nesou termín, zeptej se PŘED zápisem VŽDY (i když se zdá, že je řeší uživatel; neptej se jen, když je má řešit někdo jiný) jedinou otázkou přes ask_user: „Chcete být řešitelem kroků s termínem? Pak je uvidíte v Můj den.“ s volbami „Ano, řeším je já“ a „Ne, nechat bez řešitele“. Při Ano dej těm krokům owner \"me\", při Ne owner \"none\" (krok s termínem bez ownera aplikace nezapíše). Slovo „me“ je jen hodnota pro nástroj — do textu pro uživatele ho nikdy nepiš (piš „vy“ / „řešitelem budete vy“). Tahle otázka platí i u projektu z obrázku a je výjimkou z pravidla „rovnou zavolej create_project“.",
       "- Neslibuj, co aplikace neumí, a nedomýšlej podrobnosti. Kdy a komu přijde upozornění z pravidla, říkej JEN podle výsledku nástroje create_rule (žádné „večer“, žádný čas navíc). Když nástroj vrátí chybu, řekni ji uživateli po lidsku a nabídni opravu (např. nejdřív nastavit termín nebo vlastníka).",
       "- E-mail, body k poradě, body k telefonátu nebo jiný text k použití NIKDY nepiš do odpovědi — pošli ho nástrojem draft_text (uživatel dostane pole s tlačítkem kopírovat), v textu jen jednu větu komentáře. Když se koncept týká projektu (zakázka, zákazník, dodavatel), dej do draft_text i `map` = název projektu — uloží se do poznámek projektu a uživatel ho najde i později. Takové koncepty aktivně nabízej v suggest_next („Napiš e-mail dodavatelům“, „Připrav body k poradě“, „Body k telefonátu s …“).",
@@ -356,6 +357,7 @@ const P = {
       "- When the user says a task is done (done, solved, I did it, I sent it), IMMEDIATELY call update_node with status=done for EVERY such task — the user confirms with a card and only that marks the node. Never treat \"done\" as handled without writing it. For a question about a specific task also offer the option \"Already done\". When they write just \"done\" without a name, relate it to the task you were just discussing and put one sentence into `note` explaining which one (e.g. \"= the phone call with Mrs. Krausová we just prepared\") — the node title in the map often differs from the words in the conversation. When unclear, ask via ask_user.",
       "- When the user states a GOAL or a PROBLEM (I'd like to…, I struggle with…, I don't know how…), it is not only a calendar matter. Besides scheduling, offer help with the substance: in ask_user or suggest_next ALWAYS include one option \"Advise me how to do it\" (or \"Propose an approach\"). When chosen, advise like an experienced colleague: 3–5 concrete steps or principles tied to their map and situation (no generic phrases), and offer to write them into the map as sub-steps (add_nodes) under the most fitting node. Do not just move dates — help solve it.",
       "- A deadline = a date agreed with someone else (a meeting, a delivery, a hand-over). When such a date follows from the material or from the user (\"tomorrow's meeting\", \"deliver by Friday\"), propose the deadline: for new nodes the deadline field in outline/items, for an existing node update_node with deadline (changing or removing it too; an empty string removes it). The user confirms everything with a card. WHEN a task will be worked on is the plan (planned_on): as soon as the user says \"today / tomorrow / on Monday / this week\" about a specific task, IMMEDIATELY call update_node with planned_on (YYYY-MM-DD, within 7 days; the user confirms with a card) — do not talk about it, write it.",
+      "- A TIMED reminder for a task (\"remind me the day before at 9\", \"on the deadline morning\") = create_reminder (the deadline stays unchanged; the node MUST have a deadline — if it has none, first update_node with deadline and after confirmation create_reminder). A free-standing event outside projects (meeting, dentist, video call, phone call) with a date and time = create_event; invite colleagues via participants (e-mails from list_people), put the reminder into remind_before_min. When the day or time is missing, ask via ask_user. A deadline_approaching rule is only for untimed alerts or a whole map. Say WHEN the reminder arrives ONLY according to the tool result.",
       "- Assignee of steps with a deadline: when new steps (create_project, add_nodes) carry a deadline, ALWAYS ask BEFORE writing (even if the user seems to handle them; skip only when someone else is to handle them) with a single ask_user question: \"Do you want to be the assignee of the steps with a deadline? Then you will see them in My day.\" with the options \"Yes, I handle them\" and \"No, leave them unassigned\". On Yes give those steps owner \"me\", on No owner \"none\" (the app refuses a step with a deadline and no owner). \"me\" is only a tool value — never write it in text for the user (say \"you\"). This question applies to a project from an image too and is an exception to the rule \"call create_project right away\".",
       "- Do not promise what the app cannot do and do not invent details. When and to whom a rule notification arrives, say ONLY according to the create_rule tool result (no \"in the evening\", no extra time). When a tool returns an error, tell the user plainly and offer a fix (e.g. set the deadline or the owner first).",
       "- An e-mail, meeting points, phone-call points or any other text to be used NEVER goes into the reply — send it with draft_text (the user gets a box with a copy button), in the text only a one-line comment. When the draft concerns a project (an order, a customer, a supplier), pass `map` = the project title in draft_text — it is stored in the project notes so the user finds it later. Offer such drafts actively in suggest_next (\"Write the e-mail to the suppliers\", \"Prepare meeting points\", \"Points for the call with …\").",
@@ -593,6 +595,13 @@ const NASTROJE = [
     parameters: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } }, required: ["title"], additionalProperties: false } },
   { name: "remember", kind: "direct", description: "Replace your memory with the given markdown text (whole text, brief bullets). Without `map`: memory about the user (preferences, style, context). With `map` (exact map title): your notes about that project (who decides, what is awaited, agreements, what blocks).",
     parameters: { type: "object", properties: { text: { type: "string" }, map: { type: "string", description: "exact map title — store notes about this project instead of the user" } }, required: ["text"], additionalProperties: false } },
+  // události a časové připomínky (19. 9. 2026) — skupina `udalosti`, zápis přes v1 dočasným klíčem
+  { name: "create_event", skupina: "udalosti", kind: "write", description: "Create a personal calendar EVENT with a time (meeting, call, dentist, video conference…) — NOT a task and not part of any map. Optional participants (e-mails of instance members from list_people — each sees it in their calendar) and a reminder N minutes before (in-app + e-mail). The user confirms first.",
+    parameters: { type: "object", properties: { title: { type: "string" }, day: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM (24h); omit for an all-day event" }, note: { type: "string" }, participants: { type: "array", items: { type: "string" }, description: "e-mails of instance members (from list_people)" }, remind_before_min: { type: "integer", description: "reminder N minutes before start (0 = at start); omit for no reminder" } }, required: ["title", "day"], additionalProperties: false } },
+  { name: "list_events", skupina: "udalosti", kind: "read", description: "The user's calendar events (own and invited) in a day range; default today−365 … +730.",
+    parameters: { type: "object", properties: { from: { type: "string", description: "YYYY-MM-DD" }, to: { type: "string", description: "YYYY-MM-DD" } }, required: [], additionalProperties: false } },
+  { name: "create_reminder", skupina: "udalosti", kind: "write", description: "Set a TIMED reminder for a map node relative to its deadline: offset_days before the deadline (0 = on the deadline day, 1 = the day before) at time HH:MM. Does NOT change the deadline; the node must already have one (set it with update_node first, the user confirms, then call this). One reminder per node (calling again replaces it). The user confirms first.",
+    parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, node_id: { type: "string", description: "the exact node title (from get_map)" }, offset_days: { type: "integer", description: "0 = on the deadline day, 1 = the day before, …" }, time: { type: "string", description: "HH:MM (24h)" } }, required: ["map_id", "node_id", "time"], additionalProperties: false } },
 ];
 const NASTROJ = {};
 for (const n of NASTROJE) NASTROJ[n.name] = n;
@@ -609,6 +618,8 @@ const SKUPINY_KLICE = {
   tym: /\btym|\blid[ie]|koleg|\bkdo\b|komu|prirad|vlastnik|portfolio|prehled|organizac|\bteam|people|\bwho\b|assign|owner|overview/i,
   pamet: /pamat|pamet|poznamk|zapamat|remember|memory|\bnotes?\b/i,
   obrazek: /\[prepis obrazku\]|\[image transcript\]/i,
+  // schůzka/zubař/telko s časem, „připomeň mi v 9“ — čas HH:MM nebo „v 9 hodin“ otevře skupinu i bez klíčového slova
+  udalosti: /udalost|schuzk|schuzce|telekonf|videokonf|jednani|zubar|doktor|lekar|navstev|meeting|\bevent|\bcall\b|pripom|remind|kalend|calendar|\b\d{1,2}[:.]\d{2}\b|\bv \d{1,2}\b|hodin|o'clock|\b\d{1,2}\s?(am|pm)\b/i,
   pdf: /\[text z pdf|\[pdf text|\bpdf\b/i,
 };
 const bezDiakritiky = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -1159,6 +1170,39 @@ function vykonej(app, auth, L, name, args) {
         return { text: `Rule ${a.enabled ? "enabled" : "disabled"}: ${M.renderRule(r.json.rule || {})}` };
       });
     }
+    // ---------- události a časové připomínky (19. 9. 2026) ----------
+    case "list_events": {
+      const E = require(`${__hooks}/events-api.js`);
+      const r = E.listEvents(app, auth, { from: a.from, to: a.to });
+      const ev = (r.body && r.body.events) || [];
+      if (!ev.length) return { text: `No events between ${r.body.from} and ${r.body.to}.` };
+      return { text: M.DATA_FENCE + "\n\n" + ev.map((x) => `• ${M.renderEvent(x)}`).join("\n") };
+    }
+    case "create_event": {
+      return sDocasnymKlicem(app, auth, (v1) => {
+        const body = { title: a.title, day: a.day };
+        for (const k of ["time", "note", "participants", "remind_before_min"]) if (a[k] !== undefined) body[k] = a[k];
+        const r = v1("POST", "/v1/events", body);
+        if (r.status !== 200) return { text: chybaV1(r) };
+        const ev = r.json.event || {};
+        const kdy = ev.remind ? ` Reminder fires ${ev.remind_before_min} min before start (in-app + e-mail if enabled), instance local time.` : "";
+        return { text: `Event created: ${M.renderEvent(ev)}.${kdy} Tell the user only this.`, karta: { type: "vysledek", udalost_id: ev.id, udalost_den: ev.day } };
+      });
+    }
+    case "create_reminder": {
+      const mid = mapaId(app, auth, a.map_id);
+      if (!mid) return { text: `Error: map "${String(a.map_id || "")}" not found or not accessible (use list_maps; pass the id or the exact title).` };
+      const nid = uzelId(app, auth, mid, a.node_id);
+      if (!nid) return { text: `Error: node "${String(a.node_id || "")}" not found in the map (use get_map; pass the node id or its exact title).` };
+      return sDocasnymKlicem(app, auth, (v1) => {
+        const r = v1("POST", `/v1/maps/${encodeURIComponent(mid)}/nodes/${encodeURIComponent(nid)}/reminders`,
+          { offset_days: a.offset_days === undefined ? 0 : a.offset_days, time: a.time });
+        if (r.status !== 200) return { text: chybaV1(r) };
+        const m = v1("GET", `/v1/maps/${encodeURIComponent(mid)}`);
+        return { text: `Reminder set for "${r.json.node_title}" (deadline ${r.json.deadline}): fires on ${r.json.reminder.fires_at} instance local time (in-app + e-mail if enabled). The deadline is unchanged. Tell the user only this.`,
+          karta: { type: "vysledek", map_id: mid, map_title: m.status === 200 ? m.json.title : "", node_id: nid } };
+      });
+    }
     default:
       return { text: `Error: unknown tool ${name}. Available: ${NASTROJE.map((n) => n.name).join(", ")}.` };
   }
@@ -1222,6 +1266,38 @@ function overZapis(app, auth, name, a) {
     case "update_node": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.node_id) || (a.node_id ? null : "Error: node_id is required.");
     case "create_rule": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.node_id) || chybaTvaruPravidla(app, auth, a) || chybaTerminovehoPravidla(app, auth, a);
     case "set_rule_enabled": return chybaMapy(a.map_id);
+    // událost: tvar i účastníci se ověří PŘED kartou — model dostane chybu hned (neznámý
+    // e-mail, špatný čas), uživatel nepotvrzuje něco, co server stejně odmítne
+    case "create_event": {
+      const E = require(`${__hooks}/events-api.js`);
+      const v = E.validateEvent(a, "en", null);
+      if (v.error) return `Error: ${v.error}`;
+      if (v.data.participants && v.data.participants.length) {
+        const p = E.resolveParticipants(app, v.data.participants, auth.id, "en");
+        if (p.error) return `Error: ${p.error} Use list_people for valid e-mails.`;
+      }
+      return null;
+    }
+    // připomínka: uzel musí mít termín a čas nesmí být v minulosti — jinak by karta
+    // slíbila připomenutí, které nepřijde (stejný důvod jako u chybaTerminovehoPravidla)
+    case "create_reminder": {
+      const chyba = chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.node_id) || (a.node_id ? null : "Error: node_id is required.");
+      if (chyba) return chyba;
+      const E = require(`${__hooks}/events-api.js`);
+      const { v1ReadableMap, jsonVal, dayMinusDays, nowLocalMinute } = require(`${__hooks}/helpers.js`);
+      const mid = mapaId(app, auth, a.map_id);
+      const nid = uzelId(app, auth, mid, a.node_id);
+      const r = v1ReadableMap(app, mid, auth);
+      const n = r ? jsonVal(r.map, "nodes", []).find((x) => x.id === nid) : null;
+      const d = (n && n.data) || {};
+      if (!E.validDay(d.deadline)) return `Error: the node "${d.title || a.node_id}" has no deadline — a reminder is tied to the deadline. First set the deadline with update_node (the user confirms), then call create_reminder.`;
+      if (!E.TIME_RE.test(String(a.time || ""))) return `Error: time must be HH:MM (24h), got "${String(a.time || "")}".`;
+      const off = a.offset_days === undefined ? 0 : Number(a.offset_days);
+      if (!Number.isInteger(off) || off < 0 || off > E.MAX_OFFSET_DAYS) return `Error: offset_days must be an integer 0–${E.MAX_OFFSET_DAYS}.`;
+      const kdy = dayMinusDays(String(d.deadline), off) + " " + a.time;
+      if (kdy <= nowLocalMinute()) return `Error: the reminder would fire on ${kdy}, which has already passed (deadline ${d.deadline}). Choose a later time or a smaller offset.`;
+      return null;
+    }
     case "pdf_replace_text": {
       // nástroj se nabízí i podle slova „pdf“ bez přílohy → bez PDF v rozhovoru není co opravovat
       if (!pdfPosledni(a.__msgs || [])) return "Error: no PDF is attached to this conversation — ask the user to attach the PDF (PDF tab → Correct with the assistant) first.";
@@ -1237,9 +1313,14 @@ function overZapis(app, auth, name, a) {
   }
 }
 
+// krátké datum pro kartu: cs „21. 9.“, en „21 Sep“ (do 19. 9. 2026 šlo v EN ISO — nález Richarda 17. 9.)
+const MESICE_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// uvozovky podle jazyka karty: cs „…“, en "…" (dluh ze 17. 9. 2026 — en karty měly české)
+const uvoz = (text, L) => (L === "en" ? `"${text}"` : `„${text}“`);
 function datumKratce(d, L) {
   const m = String(d || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return m && L !== "en" ? `${Number(m[3])}. ${Number(m[2])}.` : String(d || "");
+  if (!m) return String(d || "");
+  return L === "en" ? `${Number(m[3])} ${MESICE_EN[Number(m[2]) - 1] || m[2]}` : `${Number(m[3])}. ${Number(m[2])}.`;
 }
 
 // Pravidlo „blíží se termín“, které by nikdy nevystřelilo nebo by nikomu nepřišlo, se nezaloží —
@@ -1322,19 +1403,21 @@ function detailAkce(app, auth, L, name, a) {
   // špatně přečteného slova z obrázku dřív, než se uloží
   if (name === "remember") return ocisti(a.text, 400);
   if (name === "pdf_replace_text") {
-    return (Array.isArray(a.replacements) ? a.replacements : []).slice(0, MAX_NAHRAD_PDF).map((x) => `${L === "en" ? "p." : "str."} ${Number(x && x.page) || "?"}: „${ocisti(x && x.find, 120)}“ → „${ocisti(x && x.replace, 120)}“`).join(" · ").slice(0, 2000);
+    const q = (s) => (L === "en" ? `“${s}”` : `„${s}“`);
+    return (Array.isArray(a.replacements) ? a.replacements : []).slice(0, MAX_NAHRAD_PDF).map((x) => `${L === "en" ? "p." : "str."} ${Number(x && x.page) || "?"}: ${q(ocisti(x && x.find, 120))} → ${q(ocisti(x && x.replace, 120))}`).join(" · ").slice(0, 2000);
   }
   if (name === "add_ideas") {
-    return (Array.isArray(a.items) ? a.items : []).slice(0, MAX_NAPADU).map((x) => "„" + ocisti(x && x.title, 120) + "“").join(" · ").slice(0, 1500);
+    return (Array.isArray(a.items) ? a.items : []).slice(0, MAX_NAPADU).map((x) => uvoz(ocisti(x && x.title, 120), L)).join(" · ").slice(0, 1500);
   }
   // nové uzly s termínem (create_project, add_nodes): termín musí být vidět dřív, než se potvrdí
   if (["create_project", "create_project_from_ideas", "add_nodes"].includes(name)) {
     const s = [];
-    const projdi = (items) => { for (const it of Array.isArray(items) ? items : []) { if (it && it.deadline) s.push("„" + ocisti(it.title, 80) + "“ " + (L === "en" ? "deadline " : "termín ") + datumKratce(it.deadline, L)); if (it) projdi(it.children); } };
+    const projdi = (items) => { for (const it of Array.isArray(items) ? items : []) { if (it && it.deadline) s.push(uvoz(ocisti(it.title, 80), L) + " " + (L === "en" ? "deadline " : "termín ") + datumKratce(it.deadline, L)); if (it) projdi(it.children); } };
     projdi(a.outline || a.items);
     return s.join(" · ").slice(0, 600);
   }
-  if (name !== "update_node") return "";
+  if (name === "create_event") return ocisti(a.note, 200);
+  if (name !== "update_node" && name !== "create_reminder") return "";
   const casti = [];
   const note = ocisti(a.note, 160);
   if (note) casti.push(note);
@@ -1350,7 +1433,8 @@ function detailAkce(app, auth, L, name, a) {
       const e = edges.find((x) => x.target === nid);
       const par = e ? nodes.find((x) => x.id === e.source) : null;
       const parT = par ? ((par.data || {}).title || (par.data || {}).apexText || "") : "";
-      if (parT) casti.push((L === "en" ? "under " : "pod ") + "„" + parT + "“");
+      if (parT) casti.push((L === "en" ? "under " : "pod ") + uvoz(parT, L));
+      if (name === "create_reminder" && n && n.data && n.data.deadline) casti.push((L === "en" ? "deadline " : "termín ") + datumKratce(n.data.deadline, L));
       const d = ocisti((n && n.data && n.data.description) || "", 110);
       if (d) casti.push(d + ((n.data.description || "").length > 110 ? "…" : ""));
     }
@@ -1434,15 +1518,15 @@ function popisAkce(app, auth, L, name, a) {
       const stavy = cs ? { todo: "k udělání", in_progress: "rozpracované", done: "hotové" } : { todo: "to do", in_progress: "in progress", done: "done" };
       if (kl.length === 1 && kl[0] === "planned_on") {
         return a.planned_on
-          ? (cs ? `Naplánovat „${uzel}“ na ${datumCz(a.planned_on)} (termín se nemění)` : `Plan "${uzel}" for ${a.planned_on} (deadline unchanged)`)
+          ? (cs ? `Naplánovat „${uzel}“ na ${datumCz(a.planned_on)} (termín se nemění)` : `Plan "${uzel}" for ${datumKratce(a.planned_on, "en")} (deadline unchanged)`)
           : (cs ? `Zrušit plán u „${uzel}“` : `Clear the plan of "${uzel}"`);
       }
       if (kl.length === 1 && kl[0] === "deadline") {
         const puvodni = uzelData(a.map_id, a.node_id).deadline || "";
-        if (!a.deadline) return cs ? `Zrušit termín u „${uzel}“${puvodni ? ` (byl ${datumCz(puvodni)})` : ""}` : `Remove the deadline of "${uzel}"${puvodni ? ` (was ${puvodni})` : ""}`;
+        if (!a.deadline) return cs ? `Zrušit termín u „${uzel}“${puvodni ? ` (byl ${datumCz(puvodni)})` : ""}` : `Remove the deadline of "${uzel}"${puvodni ? ` (was ${datumKratce(puvodni, "en")})` : ""}`;
         return puvodni
-          ? (cs ? `Změnit termín „${uzel}“ z ${datumCz(puvodni)} na ${datumCz(a.deadline)}` : `Change the deadline of "${uzel}" from ${puvodni} to ${a.deadline}`)
-          : (cs ? `Nastavit termín „${uzel}“ na ${datumCz(a.deadline)}` : `Set the deadline of "${uzel}" to ${a.deadline}`);
+          ? (cs ? `Změnit termín „${uzel}“ z ${datumCz(puvodni)} na ${datumCz(a.deadline)}` : `Change the deadline of "${uzel}" from ${datumKratce(puvodni, "en")} to ${datumKratce(a.deadline, "en")}`)
+          : (cs ? `Nastavit termín „${uzel}“ na ${datumCz(a.deadline)}` : `Set the deadline of "${uzel}" to ${datumKratce(a.deadline, "en")}`);
       }
       if (kl.length === 1 && kl[0] === "status") return cs ? `Označit „${uzel}“ jako ${stavy[a.status] || a.status}` : `Mark "${uzel}" as ${stavy[a.status] || a.status}`;
       const zm = kl.map((k) => `${k}: ${String(a[k]).slice(0, 60)}`).join(", ");
@@ -1454,6 +1538,25 @@ function popisAkce(app, auth, L, name, a) {
     case "set_rule_enabled": return cs
       ? `${a.enabled ? "Zapnout" : "Vypnout"} pravidlo v projektu „${nazevMapy(a.map_id)}“`
       : `${a.enabled ? "Enable" : "Disable"} a rule in "${nazevMapy(a.map_id)}"`;
+    case "create_event": {
+      const kdy = a.time ? `${datumKratce(a.day, L)} ${a.time}` : (cs ? `${datumKratce(a.day, L)} (celý den)` : `${datumKratce(a.day, L)} (all day)`);
+      const casti = [cs ? `Založit událost „${ocisti(a.title, 120)}“ ${kdy}` : `Create the event "${ocisti(a.title, 120)}" ${kdy}`];
+      if (a.remind_before_min !== undefined) casti.push(cs ? `připomenout ${Number(a.remind_before_min) === 0 ? "v čas začátku" : `${a.remind_before_min} min předem`}` : `remind ${Number(a.remind_before_min) === 0 ? "at start" : `${a.remind_before_min} min before`}`);
+      const lide = (Array.isArray(a.participants) ? a.participants : []).map((p) => ocisti(p, 80)).filter(Boolean);
+      if (lide.length) casti.push((cs ? "pozvat: " : "invite: ") + lide.join(", "));
+      return casti.join(" · ");
+    }
+    case "create_reminder": {
+      const uzel = nazevUzlu(a.map_id, a.node_id);
+      const termin = uzelData(a.map_id, a.node_id).deadline || "";
+      const off = a.offset_days === undefined ? 0 : Number(a.offset_days);
+      let den = "";
+      try { const { dayMinusDays } = require(`${__hooks}/helpers.js`); if (/^\d{4}-\d{2}-\d{2}$/.test(termin)) den = dayMinusDays(termin, off); } catch (err) { /* bez dne */ }
+      const kdy = cs
+        ? (off === 0 ? "v den termínu" : off === 1 ? "den před termínem" : `${off} ${off <= 4 ? "dny" : "dní"} před termínem`) + (den ? ` (${datumKratce(den, L)})` : "") + ` v ${a.time}`
+        : (off === 0 ? "on the deadline day" : off === 1 ? "the day before the deadline" : `${off} days before the deadline`) + (den ? ` (${datumKratce(den, L)})` : "") + ` at ${a.time}`;
+      return cs ? `Připomenout „${uzel}“ (projekt „${nazevMapy(a.map_id)}“) ${kdy} — termín se nemění` : `Remind about "${uzel}" (project "${nazevMapy(a.map_id)}") ${kdy} — deadline unchanged`;
+    }
     default: return name;
   }
 }

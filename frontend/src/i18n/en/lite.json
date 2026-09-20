@@ -18,7 +18,9 @@
     "noDate": "No due date",
     "doneToday": "done: {{count}}",
     "idea": "idea",
-    "doneList": "Done today"
+    "doneList": "Done today",
+    "events": "Today in calendar",
+    "allDay": "all day"
   },
   "delegated": {
     "title": "What I assigned",

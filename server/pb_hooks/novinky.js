@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.63-beta": {
+    cs: [
+      "V kalendáři jde přes + založit kromě úkolu i událost — schůzku, zubaře, telekonferenci — s časem, pozvanými kolegy a připomínkou; do projektů nepatří a nic v nich nemění.",
+      "V detailu úkolu s termínem si nastavíte Připomenout mi termín (třeba den předem v 16:00) — připomínka je jen vaše, termín se jí nemění a když se termín posune, posune se s ním.",
+      "Připomínky chodí v nastavený čas do zvonečku i e-mailem (e-mail je u nich zapnutý rovnou a přijde hned i v režimu denního souhrnu).",
+      "Asistentovi stačí věta „zítra ve 14 zubař, připomeň půl hodiny předem, pozvi Janu“ nebo „připomeň mi nabídku den před termínem v 9“ — založí to po vašem potvrzení na kartě.",
+    ],
+    en: [
+      "The calendar's + can now add an event next to a task — a meeting, the dentist, a video call — with a time, invited colleagues and a reminder; it belongs to no project and changes nothing there.",
+      "In the detail of a task with a deadline you can set Remind me of the deadline (say, the day before at 16:00) — the reminder is yours only, it never moves the deadline and follows it when the deadline moves.",
+      "Reminders arrive at the set time in the bell and by e-mail (e-mail is on for them from the start and is sent immediately even in daily-digest mode).",
+      "One sentence is enough for the assistant — \"dentist tomorrow at 2, remind me half an hour before, invite Jane\" or \"remind me about the quote the day before the deadline at 9\" — it creates it after you confirm the card.",
+    ],
+  },
   "v0.62-beta": {
     cs: [
       "Práce s PDF v asistentovi (ikona dokumentu v hlavičce panelu): sloučit víc PDF v zadaném pořadí, rozdělit podle stran, vyjmout nebo odebrat strany — všechno běží ve vašem prohlížeči, soubor nikam neodchází a nic to nestojí.",

@@ -880,6 +880,97 @@ H.beh(async () => {
   r = await inst7.api('POST', '/api/kb/chat', { token: await inst7.login('h@example.com'), body: { message: '', image_base64: JPG } });
   expect(r.status === 400 && r.json.code === 'ai_vision_off', `KB_VISION_PROVIDER bez URL/MODEL → obrázky vypnuté (${r.status} ${JSON.stringify(r.json)})`);
 
+  console.log('== události a připomínky s časem (19. 9. 2026): skupina udalosti, karty, zápis přes v1 ==');
+  const den = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  fronta.push(nastroj('create_event', { title: 'Zubař', day: den(2), time: '14:00', participants: ['clen@example.com'], remind_before_min: 30, note: 'vzít kartičku' }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Pozítří ve 14:00 mám zubaře, připomeň mi to půl hodiny předem a pozvi Janu' } });
+  chat = r.json.chat;
+  const vE = posledniVolani();
+  expect(vE.tools.some((t) => t.function.name === 'create_event') && vE.tools.some((t) => t.function.name === 'create_reminder') && vE.tools.some((t) => t.function.name === 'list_events'),
+    'zpráva s časem otevřela skupinu udalosti (create_event, create_reminder, list_events)');
+  expect(/create_reminder|create_event/.test(systemZ(vE)), 'systémový prompt zná připomínky s časem a události');
+  const kE = chat.messages[chat.messages.length - 1].karty.find((k) => k.type === 'akce');
+  expect(!!kE && /^Založit událost „Zubař“ .*14:00 · připomenout 30 min předem · pozvat: clen@example.com$/.test(kE.popis), `karta události: název, čas, připomínka, pozvaní (${kE && kE.popis})`);
+  expect(kE && kE.detail === 'vzít kartičku', 'detail karty = poznámka');
+  fronta.push(text('Zubař je v kalendáři.'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kE.id, ok: true } });
+  chat = r.json.chat;
+  const evs = (await inst.api('GET', '/api/kb/events', { token: A })).json.events || [];
+  expect(evs.length === 1 && evs[0].title === 'Zubař' && evs[0].time === '14:00' && evs[0].participants[0] === 'clen@example.com' && evs[0].remind_before_min === 30, `událost zapsána přes v1 dočasným klíčem (${JSON.stringify(evs[0])})`);
+  const kEpo = chat.messages.flatMap((m) => m.karty || []).find((k) => k.id === kE.id);
+  expect(kEpo && kEpo.stav === 'hotovo' && kEpo.odkaz && kEpo.odkaz.udalost_id === evs[0].id && kEpo.odkaz.udalost_den === den(2), 'karta hotovo s odkazem na událost (id + den)');
+  expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'create_event' && /Reminder fires 30 min before start/.test(m.content)), 'model dostal výsledek s časem připomínky');
+  expect((await inst.api('GET', '/api/collections/notifications/records?filter=' + encodeURIComponent('type="event_invited"'), { token: B })).json.items.length === 1, 'pozvaná kolegyně dostala event_invited');
+  expect((await inst.api('GET', '/api/collections/api_keys/records', { token: A })).json.totalItems === 0, 'dočasný klíč po zápisu smazán');
+  // neznámý účastník = chyba modelu PŘED kartou (uživatel nepotvrzuje, co server odmítne)
+  fronta.push(nastroj('create_event', { title: 'Porada', day: den(3), time: '09:00', participants: ['nikdo@example.com'] }), text('Toho člověka neznám.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Porada s Karlem v 9' } });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => /nikdo@example.com/.test(m.content) && /list_people/.test(m.content)), 'neznámý účastník → chyba pro model, žádná karta');
+  fronta.push(nastroj('create_event', { title: 'X', day: den(3), time: '25:00' }), text('Špatný čas.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 've 25 hodin' } });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => /HH:MM/.test(m.content)), 'neplatný čas → chyba pro model před kartou');
+  // list_events: čtení hned, bez karty
+  fronta.push(nastroj('list_events', {}), text('Máš zubaře.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Co mám v kalendáři?' } });
+  expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'list_events' && /Zubař/.test(m.content) && /participants: clen@example.com/.test(m.content)), 'list_events vrací seznam s účastníky');
+
+  // připomínka k uzlu: bez termínu = chyba s radou; s termínem = karta „den před termínem v 16:00 — termín se nemění"
+  const mapaR = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {
+    title: 'Připomínky', nodes: [
+      { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Cíl', title: 'Cíl', status: 'todo' } },
+      { id: 'p1', type: 'goalNode', position: { x: 0, y: 200 }, data: { title: 'Nabídka pro Nováka', status: 'todo', deadline: den(5), owner: 'admin@example.com' } },
+      { id: 'p2', type: 'goalNode', position: { x: 0, y: 400 }, data: { title: 'Bez termínu', status: 'todo' } },
+    ], edges: [{ id: 'e1', source: 'root', target: 'p1' }, { id: 'e2', source: 'root', target: 'p2' }] } })).json;
+  fronta.push(nastroj('create_reminder', { map_id: 'Připomínky', node_id: 'Bez termínu', time: '09:00' }), text('Nejdřív termín.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Připomeň mi Bez termínu ráno' } });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => /has no deadline/.test(m.content) && /update_node/.test(m.content)), 'uzel bez termínu → chyba s radou nastavit termín, žádná karta');
+  fronta.push(nastroj('create_reminder', { map_id: 'Připomínky', node_id: 'nabidka pro novaka', offset_days: 1, time: '16:00' }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Připomeň mi nabídku pro Nováka den před termínem v 16' } });
+  chat = r.json.chat;
+  const kR = chat.messages[chat.messages.length - 1].karty.find((k) => k.type === 'akce');
+  expect(!!kR && /^Připomenout „Nabídka pro Nováka“ \(projekt „Připomínky“\) den před termínem \(.*\) v 16:00 — termín se nemění$/.test(kR.popis), `karta připomínky (${kR && kR.popis})`);
+  expect(kR && /termín/.test(kR.detail), `detail nese termín uzlu (${kR && kR.detail})`);
+  fronta.push(text('Připomenu.'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kR.id, ok: true } });
+  chat = r.json.chat;
+  const rems = (await inst.api('GET', `/api/kb/node-reminders?map=${mapaR.id}`, { token: A })).json.reminders || [];
+  expect(rems.length === 1 && rems[0].node_id === 'p1' && rems[0].day === den(4) && rems[0].time === '16:00', `připomínka zapsána (${JSON.stringify(rems[0])})`);
+  const kRpo = chat.messages.flatMap((m) => m.karty || []).find((k) => k.id === kR.id);
+  expect(kRpo && kRpo.stav === 'hotovo' && kRpo.odkaz && kRpo.odkaz.map_id === mapaR.id && kRpo.odkaz.node_id === 'p1', 'karta hotovo s odkazem na uzel');
+  expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'create_reminder' && new RegExp(`fires on ${den(4)} 16:00`).test(m.content) && /deadline is unchanged/.test(m.content)), 'model dostal čas výstřelu a „termín se nemění"');
+  const mapaRpo = (await inst.api('GET', `/api/collections/goalmaps/records/${mapaR.id}`, { token: A })).json;
+  expect(mapaRpo.nodes.find((n) => n.id === 'p1').data.deadline === den(5), 'termín uzlu se nezměnil');
+
+  console.log('== EN uživatel: anglický systém, karty s "…" a datem 21 Sep (pravidlo ze 17. 9.: EN je součást regrese) ==');
+  await inst.register('en@example.com', { name: 'Jane', language: 'en' });
+  const EN = await inst.login('en@example.com');
+  const enD = den(3);
+  const [, enM, enDd] = enD.split('-').map(Number);
+  const enDatum = `${enDd} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][enM - 1]}`;
+  fronta.push(nastroj('create_event', { title: 'Dentist', day: enD, time: '14:00', participants: ['clen@example.com'], remind_before_min: 30, note: 'bring the card' }));
+  r = await inst.api('POST', '/api/kb/chat', { token: EN, body: { message: 'Dentist in three days at 2 pm, remind me 30 minutes before and invite Jana' } });
+  chat = r.json.chat;
+  expect(/^You are the assistant inside killBottleneck/.test(systemZ(posledniVolani())), 'systémový prompt je anglický');
+  const kEn = chat.messages[chat.messages.length - 1].karty.find((k) => k.type === 'akce');
+  expect(!!kEn && kEn.popis === `Create the event "Dentist" ${enDatum} 14:00 · remind 30 min before · invite: clen@example.com`, `EN karta události: anglické uvozovky a datum ${enDatum} (${kEn && kEn.popis})`);
+  expect(kEn && !/[„“]/.test(kEn.popis + kEn.detail), 'EN karta bez českých uvozovek');
+  fronta.push(text('Done.'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: EN, body: { chat_id: chat.id, action_id: kEn.id, ok: true } });
+  expect(((await inst.api('GET', '/api/kb/events', { token: EN })).json.events || []).some((e) => e.title === 'Dentist'), 'EN událost zapsána');
+  const mapaEn = (await inst.api('POST', '/api/collections/goalmaps/records', { token: EN, body: {
+    title: 'Launch', nodes: [
+      { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Goal', title: 'Goal', status: 'todo' } },
+      { id: 'q1', type: 'goalNode', position: { x: 0, y: 200 }, data: { title: 'Offer for Novak', status: 'todo', deadline: den(6), owner: 'en@example.com' } },
+    ], edges: [{ id: 'e1', source: 'root', target: 'q1' }] } })).json;
+  fronta.push(nastroj('create_reminder', { map_id: 'Launch', node_id: 'Offer for Novak', offset_days: 1, time: '09:00' }));
+  r = await inst.api('POST', '/api/kb/chat', { token: EN, body: { chat_id: chat.id, message: 'Remind me of the offer for Novak the day before the deadline at 9' } });
+  const kEn2 = r.json.chat.messages[r.json.chat.messages.length - 1].karty.find((k) => k.type === 'akce');
+  const [, m5, d5] = den(5).split('-').map(Number);
+  const enDatum5 = `${d5} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m5 - 1]}`;
+  expect(!!kEn2 && kEn2.popis === `Remind about "Offer for Novak" (project "Launch") the day before the deadline (${enDatum5}) at 09:00 — deadline unchanged`, `EN karta připomínky (${kEn2 && kEn2.popis})`);
+  expect(kEn2 && /^under "Goal" · deadline \d{1,2} [A-Z][a-z]{2}$/.test(kEn2.detail), `EN detail: under "Goal" · deadline 21 Sep (${kEn2 && kEn2.detail})`);
+  void mapaEn;
+
   console.log('== bez AI: 503 ==');
   const inst3 = await H.startInstance({ slug: 'chat-vypnuto', env: { KB_UVODNI_MAPA: 0 } });
   await inst3.register('y@example.com');

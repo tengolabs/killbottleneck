@@ -768,6 +768,27 @@
   flex: 1;
 }
 
+/* události (19. 9. 2026): čas před názvem, zvoneček = uzel s mou připomínkou */
+.gcal-chip-time {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--event-color);
+}
+.gcal-chip-bell {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #0284c7;
+}
+.gcal-event-chip[data-kind="event"] {
+  --event-color: var(--proj-color);
+}
+
+/* řádek „Události“ ve filtru projektů — oddělený od map tenkou linkou */
+.gcal-filter-row-udalosti { border-bottom: 1px solid hsl(var(--border)); margin-bottom: 4px; padding-bottom: 6px; }
+.gcal-filter-row-udalosti .gcal-filter-label { display: inline-flex; align-items: center; gap: 4px; }
+
 .gcal-chip-overdue-dot {
   width: 6px;
   height: 6px;
@@ -1468,7 +1489,7 @@
     background-color: var(--event-color); overflow: hidden; color: transparent;
   }
   .gcal-event-chip[data-done="true"] { opacity: 0.4; }
-  .gcal-event-chip .gcal-chip-icon, .gcal-event-chip .gcal-chip-title, .gcal-event-chip .gcal-chip-overdue-dot { display: none; }
+  .gcal-event-chip .gcal-chip-icon, .gcal-event-chip .gcal-chip-title, .gcal-event-chip .gcal-chip-time, .gcal-event-chip .gcal-chip-bell, .gcal-event-chip .gcal-chip-overdue-dot { display: none; }
   .gcal-event-chip[data-overdue="true"] { box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.35); }
 
   /* Týden: svislý seznam dnů, každý den s vlastní hlavičkou */

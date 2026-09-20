@@ -11,7 +11,11 @@
     "zadostOdeslat": "Odeslat žádost",
     "ciziZadost": "Na tomto cíli už běží žádost o jiný termín ({{who}}) — vyřiďte ji v detailu.",
     "ukolJenZadavatel": "Termín tohoto úkolu smí změnit jen zadavatel ({{assigner}}) nebo vlastník projektu.",
-    "otevritDetail": "Otevřít detail"
+    "otevritDetail": "Otevřít detail",
+    "udalostTitulek": "Přesunout událost z {{from}} na {{to}}?",
+    "udalostPozn": "Připomínka se posune s událostí. Pozvaní ji uvidí v novém dni.",
+    "udalostPotvrdit": "Přesunout",
+    "udalostCizi": "Událost založil(a) {{who}} — přesunout ji může jen on/ona."
   },
   "toast": {
     "terminZmenen": "Termín změněn na {{to}}",
@@ -19,7 +23,10 @@
     "terminMezitim": "Termín mezitím změnil někdo jiný na {{now}}",
     "zmenaSelhala": "Termín se nepodařilo změnit",
     "zadostZrusena": "Žádost zrušena",
-    "hotovoNepresouvat": "Hotová položka se nepřesouvá."
+    "hotovoNepresouvat": "Hotová položka se nepřesouvá.",
+    "udalostPresunuta": "Událost přesunuta na {{to}}",
+    "udalostVracena": "Událost vrácena na {{from}}",
+    "udalostSelhala": "Událost se nepodařilo uložit"
   },
   "v2": {
     "title": "Kalendář",
@@ -49,7 +56,7 @@
       "day": "Další den",
       "agenda": "Další měsíc"
     },
-    "addOn": "Přidat úkol na {{date}}",
+    "addOn": "Přidat úkol nebo událost na {{date}}",
     "overdue": "Po termínu",
     "freeDay": "Bez termínů",
     "add": "Přidat",
@@ -72,6 +79,74 @@
     "noMatchingItems": "Žádné úkoly neodpovídají hledání ani filtrům.",
     "createButton": "Vytvořit",
     "projectsNone": "Žádný",
-    "projectsAll": "Vše"
+    "projectsAll": "Vše",
+    "personal": "Události",
+    "personalTitle": "Schůzky, zubař, telekonference… — mimo projekty. Odškrtnutím je v kalendáři schováte."
+  },
+  "nova": {
+    "titulek": "Co přidat na {{date}}?",
+    "popis": "Úkol patří do projektu. Událost je mimo projekty — schůzka, zubař, telekonference.",
+    "ukol": "Úkol do projektu",
+    "ukolPopis": "Nový cíl v mapě projektu s termínem na tento den.",
+    "udalost": "Událost",
+    "udalostPopis": "S časem, kolegy a připomínkou. Nic v projektech nemění."
+  },
+  "udalost": {
+    "titulekNova": "Nová událost",
+    "titulekUprava": "Událost",
+    "titulekDetail": "Událost (pozvánka)",
+    "popis": "Schůzka, zubař, telekonference… Není to úkol a do projektů nepatří.",
+    "popisPozvany": "Pozval(a) vás {{who}}. Upravit ji může jen on/ona; vy se můžete odebrat.",
+    "nazev": "Název",
+    "nazevPh": "Např. Zubař, Telekonference s dodavatelem",
+    "den": "Den",
+    "cas": "Čas",
+    "casPozn": "Prázdné = celý den",
+    "pripominka": "Připomínka",
+    "pripominkaZadna": "Bez připomínky",
+    "pripominkaVCas": "V čas začátku",
+    "pripominkaMin": "{{min}} min předem",
+    "pripominkaDenPredem": "Den předem",
+    "pripominkaCelyDen": "U celodenní události přijde ráno.",
+    "pripominkaKratce": "připomínka",
+    "tz": "Připomínky chodí v čase instance ({{tz}}).",
+    "ucastnici": "Pozvat kolegy",
+    "ucastniciHledat": "Hledat člena…",
+    "ucastniciZadni": "Žádní účastníci",
+    "poznamka": "Poznámka",
+    "zalozit": "Založit událost",
+    "zalozena": "Událost „{{title}}“ založena",
+    "ulozena": "Událost „{{title}}“ uložena",
+    "smazana": "Událost „{{title}}“ smazána",
+    "ulozeniSelhalo": "Událost se nepodařilo uložit",
+    "smazat": "Smazat",
+    "smazatPotvrdit": "Opravdu smazat",
+    "nenalezena": "Událost už neexistuje.",
+    "opustit": "Odebrat se z události",
+    "opustitPotvrdit": "Opravdu se odebrat",
+    "opustena": "Z události „{{title}}“ jste se odebrali",
+    "ucastniciPocet_one": "{{count}} pozvaný",
+    "ucastniciPocet_few": "{{count}} pozvaní",
+    "ucastniciPocet_other": "{{count}} pozvaných"
+  },
+  "pripominka": {
+    "chipTitle": "Máte tu nastavenou připomínku",
+    "titulek": "Připomínka k termínu",
+    "nastavit": "Připomenout mi termín",
+    "nastavena": "Připomínka: {{kdy}} ({{at}})",
+    "zmenit": "změnit",
+    "zrusit": "zrušit",
+    "ulozit": "Nastavit",
+    "ulozena": "Připomenu vám {{at}}",
+    "zrusena": "Připomínka zrušena",
+    "selhala": "Připomínku se nepodařilo uložit",
+    "pozn": "Připomínka je jen vaše a termín ({{deadline}}) se jí nemění. Posune-li se termín, posune se s ním.",
+    "offset": {
+      "0": "v den termínu",
+      "1": "den před termínem",
+      "2": "2 dny před termínem",
+      "7": "týden před termínem"
+    },
+    "offsetJine": "{{n}} dní před termínem"
   }
 }

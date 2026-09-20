@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.62-beta}
+        KB_VERSION: ${KB_VERSION:-v0.63-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -70,6 +70,8 @@ services:
       KB_SHARE_INVITE_INSTANCE_CAP: ${KB_SHARE_INVITE_INSTANCE_CAP:-}
       # Hour of deadline notices (0–23, local TZ), default 7.
       KB_DEADLINE_HOUR: ${KB_DEADLINE_HOUR:-${FLOWMAP_DEADLINE_HOUR:-7}}
+      # Catch-up window (hours) for timed reminders after an outage, default 48.
+      KB_REMINDER_CATCHUP_H: ${KB_REMINDER_CATCHUP_H:-48}
       # Hour of the daily e-mail digest (0–23, local TZ), default 8.
       KB_NOTIFY_DIGEST_HOUR: ${KB_NOTIFY_DIGEST_HOUR:-${FLOWMAP_NOTIFY_DIGEST_HOUR:-8}}
       # Notification budget per recipient per day — a runaway automation must not

@@ -112,6 +112,7 @@ export default function NotificationBell() {
               return (
                 <button
                   key={n.id}
+                  data-testid={`bell-item-${n.id}`}
                   onClick={() => openItem(n)}
                   className={`w-full text-left flex items-start gap-2 px-3 py-2.5 border-b last:border-0 hover:bg-secondary/50 transition-colors ${
                     n.read ? 'opacity-60' : ''

@@ -49,7 +49,9 @@
     "delegated": "Zadal jsem (čekám na druhé)",
     "delegatedOverdue": "U druhých po termínu",
     "stuck": "Tohle se nehýbe",
-    "open": "Otevřené"
+    "open": "Otevřené",
+    "events": "Dnes v kalendáři",
+    "allDay": "celý den"
   },
   "export": {
     "buttonTitle": "Uložit přehled jako obrázek (PNG pro mobil)",

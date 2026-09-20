@@ -66,7 +66,7 @@ docker run -i --rm -e KB_URL=https://firma.killbottleneck.com -e KB_API_KEY=kb_u
 ## Vzdálené připojení (bez lokálního serveru)
 
 Každá instance vystavuje MCP i přímo na **`/mcp`** (Streamable HTTP, stateless,
-stejných 17 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
+stejných 20 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
 doméně — asistent se připojí odkudkoli, bez instalace čehokoli lokálně.
 
 **Claude Code:**
@@ -116,6 +116,9 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `delete_rule_template` | smazání šablony (autor nebo admin) |
 | `get_org_structure` | organizační struktura: pozice a funkce s držiteli a zástupci (jen čtení) |
 | `list_people` | lidé instance (členové + viditelné externí kontakty) — platné hodnoty `owner`; neznámý e-mail server odmítne |
+| `create_event` | událost v kalendáři (schůzka, zubař) s časem, pozvanými členy a připomínkou — NENÍ úkol, do mapy nepatří |
+| `list_events` | události vlastníka klíče (vlastní i pozvané) v rozsahu dní |
+| `create_reminder` | časová připomínka k uzlu relativně k termínu (den před v HH:MM); termín nemění, jedna na uzel |
 | `get_portfolio` | pohled shora jako stránka Organizace: projekty s % hotovo, po termínu, nehýbe se, lidé, změny za 7 dní — nad týmovými a sdílenými mapami, které vlastník klíče vidí |
 
 **Úkol = uzel s řešitelem (`owner`) nebo termínem** — žádný samostatný úkolový

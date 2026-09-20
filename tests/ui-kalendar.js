@@ -277,5 +277,132 @@ H.beh(async () => {
   n2 = await uzel('n2');
   expect(!n2?.data?.deadlineChangeWanted, 'API: Vrátit žádost zrušilo');
 
+  console.log('== události (19. 9. 2026): „+“ → volič → dialog → chip s časem → detail → tažení → filtr Osobní → pozvaný ==');
+  const udalosti = async (token = V) => ((await inst.api('GET', '/api/kb/events', { token })).json?.events || []);
+  // page2 (řešitel) je teď tab v popředí — tab na pozadí Chrome škrtí (žádný rAF → page.click visí
+  // na protocolTimeout); a přihlášení řešitele přepsalo sdílené localStorage → přihlásit vlastníka znovu
+  await page.bringToFront();
+  await prihlas(page, VLASTNIK);
+  await otevriKalendar(page);
+  await page.click('.gcal-create-primary-btn');
+  await page.waitForSelector('[data-testid="kal-dialog-nova"]', { timeout: 8000 }).catch(() => {});
+  expect(!!(await page.$('[data-testid="kal-novy-ukol"]')) && !!(await page.$('[data-testid="kal-nova-udalost"]')), '„+“ nabízí Úkol do projektu / Událost');
+  await page.click('[data-testid="kal-nova-udalost"]');
+  await page.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 8000 }).catch(() => {});
+  expect(!!(await page.$('[data-testid="kal-dialog-udalost"]')), 'otevřel se dialog nové události');
+  await page.type('[data-testid="udalost-nazev"]', 'Zubař');
+  // <input type="time"> psaný klávesnicí závisí na locale prohlížeče (AM/PM) → hodnota přes nativní setter
+  await page.$eval('[data-testid="udalost-cas"]', (el) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '14:00');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(!!(await page.$(`[data-testid="udalost-ucastnik-${RESITEL}"]`)), 'seznam účastníků nabízí kolegu');
+  await page.click(`[data-testid="udalost-ucastnik-${RESITEL}"]`);
+  await page.click('[data-testid="udalost-ulozit"]');
+  await H.waitFor(async () => (await udalosti()).length === 1, { timeout: 8000, popis: 'událost v API' }).catch(() => {});
+  const ev = (await udalosti())[0];
+  expect(!!ev && ev.title === 'Zubař' && ev.time === '14:00' && ev.day === den(0) && ev.participants[0] === RESITEL && ev.remind && ev.remind_before_min === 30,
+    `API: událost Zubař dnes 14:00, pozván řešitel, připomínka 30 min (${JSON.stringify(ev)})`);
+  const chipZubar = await page.waitForSelector(chipSel('14:00 Zubař'), { timeout: 8000 }).catch(() => null);
+  expect(!!chipZubar, 'chip události je v mřížce s časem před názvem');
+  expect(await page.evaluate((s) => { const el = document.querySelector(s); return el?.dataset.kind === 'event' && /14:00/.test(el?.textContent || ''); }, chipSel('14:00 Zubař')), 'chip nese data-kind=event a čas 14:00');
+  expect(!!(await page.$('[data-testid="gcal-filtr-osobni"]')), 'postranní filtr má řádek „Osobní“');
+  // detail klepnutím
+  await page.click(chipSel('14:00 Zubař'));
+  await page.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 8000 }).catch(() => {});
+  expect((await page.$eval('[data-testid="udalost-nazev"]', (el) => el.value).catch(() => '')) === 'Zubař', 'klik na chip otevře detail události s názvem');
+  await page.keyboard.press('Escape');
+  await sleep(500);
+  // tažení na jiný den → dialog přesunu → API → Vrátit
+  const CIL_U = den(3);
+  expect(await tahni(page, chipSel('14:00 Zubař'), `[data-testid="gcal-den-${CIL_U}"]`), 'vlastník táhl událost');
+  expect(await dialogJe(page, 'presun'), 'otevřel se dialog „Přesunout událost“ (kal-dialog-presun)');
+  await page.click('[data-testid="kal-dialog-potvrdit"]');
+  await H.waitFor(async () => (await udalosti())[0]?.day === CIL_U, { timeout: 8000, popis: 'přesun události' }).catch(() => {});
+  expect((await udalosti())[0]?.day === CIL_U, `API: událost přesunuta na ${CIL_U}`);
+  const vratitU = await page.waitForSelector('[data-testid="kal-vratit"]', { timeout: 8000 }).catch(() => null);
+  expect(!!vratitU, 'hláška nabízí Vrátit');
+  if (vratitU) await vratitU.click();
+  await H.waitFor(async () => (await udalosti())[0]?.day === den(0), { timeout: 8000, popis: 'vrácení události' }).catch(() => {});
+  expect((await udalosti())[0]?.day === den(0), 'API: Vrátit posunulo událost zpět');
+  // filtr Osobní schová události, uzly zůstanou
+  await page.click('[data-testid="gcal-filtr-osobni"] .gcal-custom-checkbox');
+  await sleep(500);
+  expect(!(await page.$(chipSel('14:00 Zubař'))) && !!(await page.$(chipSel('Ochutnávka pro sousedy'))), 'filtr „Osobní“ schová událost, uzly zůstávají');
+  await page.click('[data-testid="gcal-filtr-osobni"] .gcal-custom-checkbox');
+  await sleep(500);
+  expect(!!(await page.$(chipSel('14:00 Zubař'))), 'a zase ji ukáže');
+  // připomínka k uzlu z detailu (den před termínem v 16:00) → API → zvoneček na chipu
+  await page.click(chipSel('Ochutnávka pro sousedy'));
+  const tlNastavit = await page.waitForSelector('[data-testid="uzel-pripominka-nastavit"]', { timeout: 8000 }).catch(() => null);
+  expect(!!tlNastavit, 'detail uzlu s termínem nabízí „Připomenout mi termín“');
+  if (tlNastavit) await tlNastavit.click();
+  await page.waitForSelector('[data-testid="uzel-pripominka-ulozit"]', { timeout: 8000 }).catch(() => {});
+  expect((await page.$eval('[data-testid="uzel-pripominka-cas"]', (el) => el.value).catch(() => '')) === '16:00', 'výchozí „den před termínem“ nabízí 16:00');
+  await page.click('[data-testid="uzel-pripominka-ulozit"]');
+  const pripominky = async () => ((await inst.api('GET', `/api/kb/node-reminders?map=${mapa.id}`, { token: V })).json?.reminders || []);
+  await H.waitFor(async () => (await pripominky()).length === 1, { timeout: 8000, popis: 'připomínka v API' }).catch(() => {});
+  const rem = (await pripominky())[0];
+  expect(!!rem && rem.node_id === 'n2' && rem.offset_days === 1 && rem.time === '16:00' && rem.day === den(1), `API: připomínka den před termínem 16:00 (${JSON.stringify(rem)})`);
+  expect(!!(await page.waitForSelector('[data-testid="uzel-pripominka-stav"]', { timeout: 8000 }).catch(() => null)), 'dialog ukazuje nastavenou připomínku');
+  expect((await uzel('n2'))?.data?.deadline === den(2), 'API: termín uzlu se připomínkou NEZMĚNIL');
+  await page.keyboard.press('Escape');
+  await sleep(600);
+  expect(!!(await page.waitForSelector(`${chipSel('Ochutnávka pro sousedy')} [data-testid="gcal-chip-zvonek"]`, { timeout: 8000 }).catch(() => null)), 'chip uzlu s připomínkou má zvoneček');
+  // Můj den: dnešní událost jako řádek s časem nad seznamem (server sections.events)
+  const mujDen = (await inst.api('GET', '/api/kb/my-day', { token: V })).json;
+  expect((mujDen?.sections?.events || []).some((e) => e.title === 'Zubař' && e.time === '14:00' && e.mine && e.participants === 1), `Můj den API nese dnešní událost s časem (${JSON.stringify((mujDen?.sections || {}).events)})`);
+  // na Úkolech je panel výchozí sbalený (Richard 11. 8.) → Projekty (rozbalený)
+  await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  const radekUdalosti = await page.waitForSelector('[data-testid="myday-udalosti"]', { timeout: 15000 }).catch(() => null);
+  expect(!!radekUdalosti && /14:00/.test(await page.evaluate((el) => el.innerText, radekUdalosti)) && /Zubař/.test(await page.evaluate((el) => el.innerText, radekUdalosti)), 'panel Můj den ukazuje „14:00 Zubař“');
+  // pozvaný kolega: vidí, ale nemění; tažení = vysvětlení; má pozvánku ve zvonečku
+  await page2.bringToFront();
+  await prihlas(page2, RESITEL);
+  await otevriKalendar(page2);
+  const chipHost = await page2.waitForSelector(chipSel('14:00 Zubař'), { timeout: 8000 }).catch(() => null);
+  expect(!!chipHost, 'pozvaný vidí událost ve svém kalendáři');
+  await page2.click(chipSel('14:00 Zubař'));
+  await page2.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 8000 }).catch(() => {});
+  expect(!(await page2.$('[data-testid="udalost-ulozit"]')) && !(await page2.$('[data-testid="udalost-smazat"]')), 'pozvaný má detail jen ke čtení (bez Uložit/Smazat)');
+  expect(!!(await page2.$('[data-testid="udalost-opustit"]')), 'pozvaný má tlačítko „Odebrat se z události“');
+  await page2.keyboard.press('Escape');
+  await sleep(500);
+  expect(await tahni(page2, chipSel('14:00 Zubař'), `[data-testid="gcal-den-${CIL_U}"]`), 'pozvaný zkusil událost táhnout');
+  expect(await dialogJe(page2, 'odmitnuto'), 'dostal vysvětlení, že událost přesouvá jen zakladatel');
+  expect((await udalosti())[0]?.day === den(0), 'API: událost se pozvanému nepřesunula');
+  const pozvanky = (await inst.api('GET', '/api/collections/notifications/records?filter=' + encodeURIComponent('type="event_invited"'), { token: W })).json?.items || [];
+  expect(pozvanky.length === 1 && pozvanky[0].event_id === ev.id, 'pozvaný má ve zvonečku event_invited s event_id');
+  // zvoneček → pozvánka → otevře detail události, i když pozvaný stojí na /tasks v TABULCE
+  // (pohled se přepne za běhu; panel /checkup 19. 9.: DTO nemělo event_id, Tasks četl ?view= jen při mountu)
+  await page2.keyboard.press('Escape'); // zavřít dialog „odmítnuto“ z tažení
+  await sleep(500);
+  await page2.goto(`${inst.base}/tasks?view=table`, { waitUntil: 'networkidle2' });
+  await sleep(800);
+  // Radix DropdownMenu se otvírá na pointerdown → skutečný klik myší, ne el.click()
+  for (const h of await page2.$$('button')) {
+    if (await page2.evaluate((el) => !!el.querySelector('svg.lucide-bell'), h)) { await h.click(); break; }
+  }
+  await sleep(600);
+  const polozka = await page2.waitForSelector(`[data-testid="bell-item-${pozvanky[0].id}"]`, { timeout: 8000 }).catch(() => null);
+  expect(!!polozka, 'zvoneček ukazuje pozvánku');
+  if (polozka) await polozka.click();
+  const dialogZeZvonku = await page2.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 15000 }).catch(() => null);
+  expect(!!dialogZeZvonku && (await page2.$eval('[data-testid="udalost-nazev"]', (el) => el.value).catch(() => '')) === 'Zubař', 'klik na pozvánku ve zvonečku přepnul na kalendář a otevřel detail události');
+  expect(!!(await page2.$('.gcal-wrapper')), 'pohled se přepnul z Tabulky na Kalendář');
+  await page2.keyboard.press('Escape');
+  await sleep(500);
+  await otevriKalendar(page2);
+  // odebrat se: dvojklik na tlačítko (první = potvrzení) → chip zmizí, API bez účastníka
+  await page2.click(chipSel('14:00 Zubař'));
+  await page2.waitForSelector('[data-testid="udalost-opustit"]', { timeout: 8000 }).catch(() => {});
+  await page2.click('[data-testid="udalost-opustit"]');
+  await sleep(300);
+  await page2.click('[data-testid="udalost-opustit"]');
+  await H.waitFor(async () => ((await udalosti())[0]?.participants || []).length === 0, { timeout: 8000, popis: 'odebrání' }).catch(() => {});
+  expect(((await udalosti())[0]?.participants || []).length === 0, 'API: pozvaný se z události odebral');
+  await H.waitFor(async () => !(await page2.$(chipSel('14:00 Zubař'))), { timeout: 8000, popis: 'chip zmizel' }).catch(() => {});
+  expect(!(await page2.$(chipSel('14:00 Zubař'))), 'a chip mu z kalendáře zmizel (realtime)');
+
   expect(chyby.length === 0, `konzole bez chyb (${chyby.length}${chyby.length ? ': ' + chyby[0].slice(0, 160) : ''})`);
 }, { nazev: 'UI-KALENDAR' });

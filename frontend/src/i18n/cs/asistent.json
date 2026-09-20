@@ -87,6 +87,7 @@
   "modePorada": "Ranní porada",
   "modeRozbor": "Rozbor",
   "actionOpenNode": "Ukázat v mapě",
+  "actionOpenEvent": "Ukázat v kalendáři",
   "memoryProjects": "Poznámky k projektům",
   "memoryProjectsEmpty": "Zatím žádné. Řekněte například: „Ulož si k projektu, že rozhoduje Petr.“",
   "memoryDelete": "Smazat",
@@ -151,7 +152,7 @@
       "nevejdeSe": "nový text se na místo nevejde ani po zmenšení",
       "jinySoubor": "Tohle je jiný soubor (jiný počet stran) – vyberte ten, ke kterému oprava patří."
     },
-    "cardDone": "Opraveno",
+    "cardDone": "Hotovo",
     "page": "str. {{n}}:",
     "needFile": "Soubor „{{name}}“ už není v prohlížeči načtený (stránka byla obnovena). Vyberte ho znovu, oprava proběhne u vás.",
     "chooseFile": "Vybrat soubor",
@@ -163,6 +164,7 @@
     "textShow": "Zobrazit text z PDF",
     "includesEarlier_one": "Soubor obsahuje i 1 opravu potvrzenou dříve v tomto rozhovoru.",
     "includesEarlier_few": "Soubor obsahuje i {{count}} opravy potvrzené dříve v tomto rozhovoru.",
-    "includesEarlier_other": "Soubor obsahuje i {{count}} oprav potvrzených dříve v tomto rozhovoru."
+    "includesEarlier_other": "Soubor obsahuje i {{count}} oprav potvrzených dříve v tomto rozhovoru.",
+    "quoted": "„{{v}}“"
   }
 }

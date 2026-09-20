@@ -120,6 +120,8 @@ const titles = (maps) => (maps || []).map((m) => m.map.title);
     expect(S.access.shares.some((s) => s.email === clen.email && s.permission === 'work'), 'sdílení mapy (komu a jak)');
     expect(T.changes.some((c) => c.field === 'created' && c.title === 'T-UZEL'), 'záznam změn mapy');
     expect(A.buffer_nodes.some((b) => b.title === 'NAPAD-ADMINA') && !A.buffer_nodes.some((b) => b.title === 'NAPAD-CLENA'), 'zásobník nápadů jen vlastní');
+    // události (vlastní i pozvané) a připomínky k uzlům jsou osobní data → v exportu (panel 19. 9. 2026)
+    expect(Array.isArray(A.events) && Array.isArray(A.node_reminders) && 'events' in (A.counts || {}), 'export nese events a node_reminders (i prázdné)');
     expect(A.time_entries.some((t) => t.label === 'CAS-ADMINA' && t.duration_min === 60), 'měření času');
     expect(A.external_contacts.some((c) => c.name === 'KONTAKT-TAJNY') && !C.external_contacts.some((c) => c.name === 'KONTAKT-TAJNY') && C.external_contacts.some((c) => c.name === 'KONTAKT-VEREJNY'), 'kontakty: vlastní privátní ano, cizí privátní ne, veřejné ano');
     const kt = A.external_contacts.find((c) => c.name === 'KONTAKT-TAJNY');
