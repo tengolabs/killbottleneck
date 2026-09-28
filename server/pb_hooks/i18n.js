@@ -520,6 +520,7 @@ const STRINGS = {
   // provider=openai: „lokální model" by lhalo (běží u poskytovatele), a u přepisu
   // je to navíc služba, ne model — proto neutrální předpona
   "err.aiFailed": { cs: "AI služba: {msg}", en: "AI service: {msg}" },
+  "err.aiFailedShort": { cs: "AI služba neodpověděla. Zkuste to za chvíli znovu; když chyba trvá, dejte vědět správci.", en: "The AI service did not respond. Try again in a moment; if it keeps failing, tell your admin." },
   "err.missingAiUrl": {
     cs: "Chybí konfigurace FLOWMAP_AI_URL.",
     en: "Missing FLOWMAP_AI_URL configuration.",
@@ -862,6 +863,8 @@ const STRINGS = {
   "err.adminOnly": { cs: "Tohle smí jen administrátor.", en: "Administrators only." },
   // AI chat na boku (13. 9. 2026)
   "err.chatFailed": { cs: "Asistent neodpověděl: {msg}", en: "The assistant did not respond: {msg}" },
+  // varianta bez detailu pro běžného člena (detail nese adresu AI brány — jen správci)
+  "err.chatFailedShort": { cs: "Asistent neodpověděl. Zkuste to za chvíli znovu; když chyba trvá, dejte vědět správci.", en: "The assistant did not respond. Try again in a moment; if it keeps failing, let your administrator know." },
   "err.chatNoMessage": { cs: "Napište zprávu.", en: "Write a message." },
   "err.chatImageType": { cs: "Obrázek musí být PNG, JPEG nebo WebP.", en: "The image must be PNG, JPEG or WebP." },
   "err.chatImageTooBig": { cs: "Obrázek je větší než {mb} MB.", en: "The image is larger than {mb} MB." },

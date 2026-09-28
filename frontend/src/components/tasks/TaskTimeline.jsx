@@ -110,6 +110,47 @@ export default function TaskTimeline({
       const mapTasks = tasks.filter((tk) => tk.map_id === map.id);
       const items = [];
 
+      // jedna položka osy pro uzel / úkol / podúkol (analýza kódu 2, F2-03: dřív 4 opsané
+      // bloky `items.push({...})`; pořadí polí zachováno)
+      const polozkaOsy = (rec, { typ, key, title, depth, start, end }) => ({
+        id: rec.id,
+        key,
+        title,
+        type: typ,
+        kind: typ,
+        depth,
+        status: rec.status || 'todo',
+        assignee: rec.assignee_email,
+        deadline: rec.deadline,
+        startDate: start,
+        endDate: end,
+        mapId: map.id,
+        mapTitle: map.title,
+        mapColor: map.color || '#3b82f6',
+        hasDeadline: !!rec.deadline,
+        raw: rec,
+      });
+
+      // podúkoly úkolu (byParent) — stejná logika pro úkol na uzlu i bez uzlu (F2-03:
+      // větev „bez uzlu" dřív podúkoly nevykreslila, ačkoli rodič prošel filtrem jen díky nim)
+      const pridejPodukoly = (task, taskStart, depth) => {
+        const subs = byParent[task.id] || [];
+        subs.forEach((sub) => {
+          const subDl = sub.deadline ? parseDateLocal(sub.deadline) : null;
+          const subStart = sub.planned_on ? parseDateLocal(sub.planned_on) : (subDl ? addDays(subDl, -1) : taskStart);
+          const subEnd = subDl || (subStart ? addDays(subStart, 1) : addDays(today, 1));
+
+          items.push(polozkaOsy(sub, {
+            typ: 'task',
+            key: `sub-${sub.id}`,
+            title: sub.title || t('timeline.unnamedTask', 'Podúkol'),
+            depth,
+            start: subStart,
+            end: subEnd,
+          }));
+        });
+      };
+
       const traverseNodes = (nodes, depth = 0) => {
         nodes.forEach((node) => {
           const dl = node.deadline ? parseDateLocal(node.deadline) : null;
@@ -117,7 +158,9 @@ export default function TaskTimeline({
           const start = node.planned_on ? parseDateLocal(node.planned_on) : (created || dl || today);
           const end = dl || (start ? addDays(start, 1) : addDays(today, 1));
 
-          const nodeTasks = mapTasks.filter((tk) => tk.node_id === node.id);
+          // skutečné id uzlu v mapě je `node.node_id` (`node.id` = `node-item-<mapa>-<uzel>`,
+          // hooks/useTaskTrees.js) — F2-14: s `node.id` úkol na uzlu nikdy nesedl
+          const nodeTasks = mapTasks.filter((tk) => tk.node_id === node.node_id);
 
           const matches =
             (!lowerSearch || (node.title || '').toLowerCase().includes(lowerSearch)) &&
@@ -125,24 +168,14 @@ export default function TaskTimeline({
             (assigneeFilter === '__all__' || node.assignee_email === assigneeFilter);
 
           if (matches || nodeTasks.length > 0 || (dl && !lowerSearch)) {
-            items.push({
-              id: node.id,
+            items.push(polozkaOsy(node, {
+              typ: 'node',
               key: `node-${map.id}-${node.id}`,
               title: node.title || t('timeline.unnamedGoal', 'Cíl projektu'),
-              type: 'node',
-              kind: 'node',
               depth,
-              status: node.status || 'todo',
-              assignee: node.assignee_email,
-              deadline: node.deadline,
-              startDate: start,
-              endDate: end,
-              mapId: map.id,
-              mapTitle: map.title,
-              mapColor: map.color || '#3b82f6',
-              hasDeadline: !!node.deadline,
-              raw: node,
-            });
+              start,
+              end,
+            }));
           }
 
           nodeTasks.forEach((task) => {
@@ -157,50 +190,16 @@ export default function TaskTimeline({
               (assigneeFilter === '__all__' || task.assignee_email === assigneeFilter);
 
             if (taskMatches) {
-              items.push({
-                id: task.id,
+              items.push(polozkaOsy(task, {
+                typ: 'task',
                 key: `task-${task.id}`,
                 title: task.title || t('timeline.unnamedTask', 'Úkol'),
-                type: 'task',
-                kind: 'task',
                 depth: depth + 1,
-                status: task.status || 'todo',
-                assignee: task.assignee_email,
-                deadline: task.deadline,
-                startDate: taskStart,
-                endDate: taskEnd,
-                mapId: map.id,
-                mapTitle: map.title,
-                mapColor: map.color || '#3b82f6',
-                hasDeadline: !!task.deadline,
-                raw: task,
-              });
+                start: taskStart,
+                end: taskEnd,
+              }));
 
-              const subs = byParent[task.id] || [];
-              subs.forEach((sub) => {
-                const subDl = sub.deadline ? parseDateLocal(sub.deadline) : null;
-                const subStart = sub.planned_on ? parseDateLocal(sub.planned_on) : (subDl ? addDays(subDl, -1) : taskStart);
-                const subEnd = subDl || (subStart ? addDays(subStart, 1) : addDays(today, 1));
-
-                items.push({
-                  id: sub.id,
-                  key: `sub-${sub.id}`,
-                  title: sub.title || t('timeline.unnamedTask', 'Podúkol'),
-                  type: 'task',
-                  kind: 'task',
-                  depth: depth + 2,
-                  status: sub.status || 'todo',
-                  assignee: sub.assignee_email,
-                  deadline: sub.deadline,
-                  startDate: subStart,
-                  endDate: subEnd,
-                  mapId: map.id,
-                  mapTitle: map.title,
-                  mapColor: map.color || '#3b82f6',
-                  hasDeadline: !!sub.deadline,
-                  raw: sub,
-                });
-              });
+              pridejPodukoly(task, taskStart, depth + 2);
             }
           });
 
@@ -218,24 +217,16 @@ export default function TaskTimeline({
         const taskStart = task.planned_on ? parseDateLocal(task.planned_on) : (taskDl ? addDays(taskDl, -2) : today);
         const taskEnd = taskDl || (taskStart ? addDays(taskStart, 1) : addDays(today, 1));
 
-        items.push({
-          id: task.id,
+        items.push(polozkaOsy(task, {
+          typ: 'task',
           key: `task-${task.id}`,
           title: task.title,
-          type: 'task',
-          kind: 'task',
           depth: 0,
-          status: task.status || 'todo',
-          assignee: task.assignee_email,
-          deadline: task.deadline,
-          startDate: taskStart,
-          endDate: taskEnd,
-          mapId: map.id,
-          mapTitle: map.title,
-          mapColor: map.color || '#3b82f6',
-          hasDeadline: !!task.deadline,
-          raw: task,
-        });
+          start: taskStart,
+          end: taskEnd,
+        }));
+
+        pridejPodukoly(task, taskStart, 1);
       });
 
       if (items.length > 0) {

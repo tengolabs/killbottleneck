@@ -40,7 +40,7 @@ const V1_BASE = "http://127.0.0.1:8090";
 // KB_CHAT_* → KB_SUMMARY_* → obecná AI (ai_settings / KB_AI_*). Model z UI smí
 // přepsat jen správce (kontroluje routa) a jen u ollama/openai.
 function chatAiConfig(app, modelOverride) {
-  const { env, summaryAiConfig } = require(`${__hooks}/helpers.js`);
+  const { env, summaryAiConfig, extraJson } = require(`${__hooks}/helpers.js`);
   let cfg;
   const p = String(env("CHAT_PROVIDER") || "").toLowerCase();
   if (p) {
@@ -55,7 +55,10 @@ function chatAiConfig(app, modelOverride) {
   // vrátily prázdno); KB_CHAT_THINK=low|medium|high|true pro měření
   cfg.think = parseThink(env("CHAT_THINK"));
   cfg.numCtx = Number(env("CHAT_NUM_CTX") || 0) || 0;
-  cfg.extra = extraJson(env("CHAT_OPENAI_EXTRA")); // openai: pole navíc do těla (např. chat_template_kwargs pro vypnutí myšlení u llama-serveru)
+  // openai: pole navíc do těla (např. chat_template_kwargs pro vypnutí myšlení u llama-serveru).
+  // Bez KB_CHAT_OPENAI_EXTRA se DĚDÍ z obecné konfigurace (KB_AI_OPENAI_EXTRA) — do
+  // 27. 9. 2026 to tady přepsal null a DeepSeek@AKI v asistentovi myslel bez stropu (S2-03).
+  cfg.extra = extraJson(env("CHAT_OPENAI_EXTRA")) || cfg.extra || null;
   // Hybrid (14. 9. 2026): lehký model (KB_CHAT_LIGHT_*) obslouží čtení, porady a
   // koncepty; hlavní model zápisy. KB_CHAT_HYBRID = strategie oddělené čárkou:
   //   rezim        režimy porada/rozbor jdou lehkému modelu
@@ -80,7 +83,7 @@ function chatAiConfig(app, modelOverride) {
 // poznámky z telefonu 92 %. Richard 16. 9.: primárně přes AKI (nejlevnější, neblokuje naše karty).
 // Časy: výchozí 45 s na pokus a žádné opakování — Cloudflare utne odpověď kolem 100 s a klient čeká 300 s.
 function visionAiConfig() {
-  const { env } = require(`${__hooks}/helpers.js`);
+  const { env, extraJson } = require(`${__hooks}/helpers.js`);
   const jedna = (pref, kde) => {
     const p = String(env(pref + "PROVIDER") || "").toLowerCase();
     if (!["ollama", "openai"].includes(p)) return null;
@@ -200,10 +203,6 @@ function klasifikuj(lehky, L, text, pred, stats) {
     const j = m ? JSON.parse(m[0]) : {};
     return !!j.zapis;
   } catch (err) { stats.klas = "chyba"; return true; } // při nejistotě hlavní model
-}
-function extraJson(v) {
-  if (!v) return null;
-  try { const o = JSON.parse(String(v)); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch (err) { return null; }
 }
 function parseThink(v) {
   const t = String(v || "").toLowerCase();
@@ -1841,7 +1840,11 @@ function smyckaHybrid(app, auth, L, cfg, rec, stats, ctx, text) {
   if (volba === cfg) return smycka(app, auth, L, cfg, rec, stats, ctx);
   let vysl;
   try { vysl = smycka(app, auth, L, volba, rec, stats, ctx); }
-  catch (err) { stats.predano = "chyba"; vysl = "predat"; }
+  catch (err) {
+    // chyba lehkého modelu k uživateli nejde (převezme hlavní) — do logu ale musí, jinak by výpadek lehkého nebyl vidět
+    try { app.logger().warn("chat: lehký model selhal, tah přebírá hlavní", "user", auth.id, "error", String(err && err.message ? err.message : err)); } catch (e2) { /* log je bonus */ }
+    stats.predano = "chyba"; vysl = "predat";
+  }
   if (vysl === "predat") { stats.tier = "heavy"; return smycka(app, auth, L, cfg, rec, stats, ctx); }
   return vysl;
 }
@@ -2154,12 +2157,18 @@ function chatCfg(e, body, L) {
   cfg.podrobneChyby = jeAdmin(e.auth);
   return { cfg: cfg };
 }
+// Chyba tahu → HTTP odpověď. Chyby s vlastním `status` (validace, brzdy) jdou dál
+// tak, jak jsou. Ostatní (doprava k modelu, výjimka nástroje) dostane doslova JEN
+// správce — text výjimky goja z $http.send nese celé URL brány i rozlišenou IP
+// (S1b-02, 27. 9. 2026); běžný člen dostane obecnou hlášku, plné znění je v logu.
 function chatChyba(e, err, L) {
   const { t } = require(`${__hooks}/i18n.js`);
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const m = String(err && err.message ? err.message : err);
   if (err && err.status) return { status: err.status, body: err.code ? { error: m, code: err.code } : { error: m } };
   try { $app.logger().warn("chat: kolo selhalo", "user", e.auth.id, "error", m); } catch (e2) { /* log je bonus */ }
-  return { status: 502, body: { error: t(L, "err.chatFailed", { msg: m }) } };
+  const podrobne = jeAdmin(e.auth);
+  return { status: 502, body: { error: podrobne ? t(L, "err.chatFailed", { msg: m }) : t(L, "err.chatFailedShort") } };
 }
 
 

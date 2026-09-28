@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pb } from '@/api/pb';
 import { patchNodeData } from '@/lib/taskActions';
+import { ulozUdalost } from '@/api/udalosti';
 import { fmtDate } from '@/lib/locale';
 
 // Zápisová vrstva kalendáře na stránce Úkoly (Richard 7. 9. 2026):
@@ -105,7 +106,6 @@ export function useKalendarZapis({ setMaps, tasksApi, loadMaps, toast }) {
   // přesun události na jiný den (jen vlastník; server nuluje reminded_at →
   // připomínka platí k novému dni); toast + Vrátit jako u termínu
   const presunUdalost = useCallback(async (item, nova, puvodni) => {
-    const { ulozUdalost } = await import('@/api/udalosti');
     const oznam = () => window.dispatchEvent(new CustomEvent('kb-udalosti-changed'));
     try {
       await ulozUdalost({ id: item.raw.id, day: nova });

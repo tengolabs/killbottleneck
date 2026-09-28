@@ -9,6 +9,7 @@ import i18next from 'i18next';
 //   Comment.goalmap_id ↔ goalmap · LoginLog.user_id ↔ user
 //   Task.map_id ↔ map · Task.parent_id ↔ parent · TaskComment.task_id ↔ task
 import { pb } from './pb';
+import { smazKliceAsistenta } from '@/lib/storageKeys';
 
 const COLLECTIONS = {
   GoalMap: 'goalmaps',
@@ -289,6 +290,8 @@ const authError = (err, fallback) => {
 // session, kdy logout() nikdo nezavolá). Cache je jen záchrana bez signálu,
 // takže smazat ji navíc nikdy nic nestojí.
 async function clearOfflineData() {
+  // klíče asistenta (`kb-chat-*`) patří k účtu — pryč při každém přihlášení i odhlášení (F4-06)
+  smazKliceAsistenta();
   try {
     if (typeof caches === 'undefined') return;
     const keys = await caches.keys();

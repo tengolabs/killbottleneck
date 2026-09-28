@@ -9,6 +9,9 @@ const fronta = [];
 const volani = [];
 const nastroj = (name, args) => ({ tool_calls: [{ function: { name, arguments: args } }] });
 const text = (s) => ({ content: s });
+// zpoždění odpovědi modelu v ms — krok F3-01 (Enter během „přemýšlím") potřebuje
+// okno, kdy panel čeká na odpověď; jinak 0 = odpověď hned
+let zpozdeni = 0;
 const mockHandler = (req, res, body) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url.startsWith('/api/tags')) { res.end(JSON.stringify({ models: [{ name: 'm-a' }, { name: 'm-b' }] })); return; }
@@ -17,7 +20,8 @@ const mockHandler = (req, res, body) => {
   const o = fronta.shift() || text('(fronta prázdná)');
   const message = { role: 'assistant', content: o.content || '' };
   if (o.tool_calls) message.tool_calls = o.tool_calls;
-  res.end(JSON.stringify({ message, prompt_eval_count: 100, eval_count: 20, done: true }));
+  const odpoved = JSON.stringify({ message, prompt_eval_count: 100, eval_count: 20, done: true });
+  if (zpozdeni > 0) setTimeout(() => res.end(odpoved), zpozdeni); else res.end(odpoved);
 };
 const systemZ = (v) => (v.messages.find((m) => m.role === 'system') || {}).content || '';
 
@@ -85,6 +89,29 @@ H.beh(async () => {
   expect(await page.evaluate(() => document.querySelectorAll('[data-testid="chat-msg"][data-role="user"]').length) === 1, 'jedna bublina uživatele (žádná duplicita po odpovědi)');
   expect(await page.evaluate(() => document.querySelector('[data-testid="chat-panel"]').innerText.includes('Ahoj, co umíš?')) && (await page.$('[data-testid="chat-chip"]')) === null, 'čipy zmizely po první zprávě');
   expect(/Truhlářství/.test(systemZ(volani[0])) && /^\[Uživatel je právě na přehledu projektů\]/.test(volani[0].messages.filter((m) => m.role === 'user').pop().content), 'server dostal kontext: seznam map + „na přehledu projektů"');
+
+  console.log('== Enter během čekání na odpověď nesmí vyprázdnit políčko (F3-01) ==');
+  // model odpoví až za 4 s; mezitím rozepsaná věta + Enter → text musí zůstat
+  // (před opravou `odesli` políčko smazal DŘÍV, než A.send zprávu při loading odmítl)
+  zpozdeni = 4000;
+  fronta.push(text('POMALA-MOCK.'));
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('První věta');
+  await page.keyboard.press('Enter');
+  expect(await cekej('[data-testid="chat-send"] .animate-spin', 3000), 'panel čeká na odpověď (spinner na Odeslat)');
+  await page.keyboard.type('Rozepsaná druhá věta');
+  await page.keyboard.press('Enter');
+  const behemCekani = await page.$eval('[data-testid="chat-input"]', (el) => el.value);
+  expect(await page.$('[data-testid="chat-send"] .animate-spin') !== null, 'Enter přišel ještě během čekání (spinner stále běží)');
+  expect(behemCekani === 'Rozepsaná druhá věta', `Enter během čekání nechal text v políčku („${behemCekani}")`);
+  zpozdeni = 0;
+  expect(await cekejText('POMALA-MOCK'), 'zpožděná odpověď dorazila');
+  expect(await page.evaluate(() => document.querySelectorAll('[data-testid="chat-msg"][data-role="user"]').length) === 2, 'druhá věta se neodeslala (2 bubliny uživatele)');
+  // políčko vyprázdnit klávesnicí, ať další kroky začínají naprázdno
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control');
+  await page.keyboard.press('Backspace');
+  expect(await page.$eval('[data-testid="chat-input"]', (el) => el.value) === '', 'políčko po úklidu prázdné');
 
   console.log('== čipy „co dál" → klik pošle zprávu ==');
   fronta.push(nastroj('suggest_next', { suggestions: ['Ukaž mi zásobník', 'Napiš poptávku'] }), text('Sekce jedna:\n- bod\n\nNAVRHY-MOCK.'));

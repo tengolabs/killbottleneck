@@ -41,7 +41,10 @@
     "rule_broken": "Broken rule",
     "new_version": "New version",
     "reminder": "Timed reminder",
-    "event_invited": "Event invitation"
+    "event_invited": "Event invitation",
+    "org_notice": "Organization",
+    "password_reset": "Password reset",
+    "overflow": "Notification digest"
   },
   "prefs": {
     "title": "Notification settings",

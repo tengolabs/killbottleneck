@@ -115,19 +115,20 @@ onRecordCreateRequest((e) => {
   // pojistka „externímu nikdy nic nechodí" stojí na tom, že notify() takový e-mail
   // v users NENAJDE. Účet s touto adresou by ji obešel. Platí pro obě cesty do
   // users — druhá (routa /invite přes $app.save) má týž guard u sebe.
-  {
-    const { isExternalOwner, jeAdmin } = require(`${__hooks}/helpers.js`);
-    // E-mail VŽDY malými písmeny (Richard 27. 8. 2026, dluh 1 po v0.46): PocketBase
-    // unikát je case-sensitive, takže `Dup@x.cz` a `dup@x.cz` byly dva účty, sdílení
-    // (ukládané lowercase) mixed-case účtu nikdy nedoručilo. Platí pro registraci
-    // i Google OAuth (týž hook); /invite lowercasuje už od dřív. Existující účty
-    // srovnává migrace users_email_lowercase (vč. všech míst, kde je e-mail uložený).
-    const mailLower = e.record.getString("email").trim().toLowerCase();
-    if (mailLower && mailLower !== e.record.getString("email")) e.record.set("email", mailLower);
-    if (isExternalOwner(e.record.getString("email"))) {
-      const { t, userLang } = require(`${__hooks}/i18n.js`);
-      throw new BadRequestError(t(userLang(null), "err.extEmailReserved"));
-    }
+  // ⚠️ Import je na úrovni handleru, ne v bloku `{}`: do 27. 9. 2026 byl `jeAdmin`
+  // importován uvnitř bloku a použit až za ním → `ReferenceError` a generické 400
+  // pro každý POST s tokenem admina (analýza kódu 2, S4-01).
+  const { isExternalOwner, jeAdmin } = require(`${__hooks}/helpers.js`);
+  // E-mail VŽDY malými písmeny (Richard 27. 8. 2026, dluh 1 po v0.46): PocketBase
+  // unikát je case-sensitive, takže `Dup@x.cz` a `dup@x.cz` byly dva účty, sdílení
+  // (ukládané lowercase) mixed-case účtu nikdy nedoručilo. Platí pro registraci
+  // i Google OAuth (týž hook); /invite lowercasuje už od dřív. Existující účty
+  // srovnává migrace users_email_lowercase (vč. všech míst, kde je e-mail uložený).
+  const mailLower = e.record.getString("email").trim().toLowerCase();
+  if (mailLower && mailLower !== e.record.getString("email")) e.record.set("email", mailLower);
+  if (isExternalOwner(e.record.getString("email"))) {
+    const { t, userLang } = require(`${__hooks}/i18n.js`);
+    throw new BadRequestError(t(userLang(null), "err.extEmailReserved"));
   }
   const total = arrayOf(new DynamicModel({ c: 0 }));
   e.app.db().newQuery("SELECT COUNT(*) as c FROM users").all(total);
@@ -1259,10 +1260,11 @@ cronAdd("nova_verze", "*/5 * * * *", () => {
 
 // Retence logů přihlášení: mažou se záznamy starší 90 dní, aby tabulka loginlogs
 // nerostla donekonečna (zapisuje se při každém přihlášení). Denně ve 3:30.
+// Bez try/catch (27. 9. 2026, S4-04): PocketBase výjimku z cronu sám zaloguje
+// (`ERROR [cronAdd] failed to execute cron job`) a server přežije — prázdný catch
+// tu jen umlčoval log. Platí pro všechny prune_* crony níže.
 cronAdd("prune_loginlogs", "30 3 * * *", () => {
-  try {
-    $app.db().newQuery("DELETE FROM loginlogs WHERE created < datetime('now','-90 days')").execute();
-  } catch (err) { /* úklid nesmí nikdy shodit server */ }
+  $app.db().newQuery("DELETE FROM loginlogs WHERE created < datetime('now','-90 days')").execute();
 });
 
 // Opakované šablony: cron běží HODINOVĚ; helpers.runAutoTemplates založí projekty
@@ -1354,12 +1356,10 @@ cronAdd("email_digests", "35 * * * *", () => {
 // Retence notifikací: přečtené starší 30 dní a cokoli staršího 180 dní. Bez tohohle
 // tabulka roste donekonečna (vzor prune_loginlogs). Denně ve 3:40.
 cronAdd("prune_notifications", "40 3 * * *", () => {
-  try {
-    $app.db().newQuery("DELETE FROM notifications WHERE read = true AND created < datetime('now','-30 days')").execute();
-    $app.db().newQuery("DELETE FROM notifications WHERE created < datetime('now','-180 days')").execute();
-    // účetnictví e-mailového stropu drží jen pár týdnů zpět (denní řádky)
-    $app.db().newQuery("DELETE FROM mail_budget WHERE created < datetime('now','-40 days')").execute();
-  } catch (err) { /* úklid nesmí nikdy shodit server */ }
+  $app.db().newQuery("DELETE FROM notifications WHERE read = true AND created < datetime('now','-30 days')").execute();
+  $app.db().newQuery("DELETE FROM notifications WHERE created < datetime('now','-180 days')").execute();
+  // účetnictví e-mailového stropu drží jen pár týdnů zpět (denní řádky)
+  $app.db().newQuery("DELETE FROM mail_budget WHERE created < datetime('now','-40 days')").execute();
 });
 
 // Hlášení chyb a nápadů: 30 dnů. Richard 19. 8. 2026: „chybu odstraníme hned
@@ -1369,17 +1369,18 @@ cronAdd("prune_notifications", "40 3 * * *", () => {
 // ⚠️ Doba je uvedená i v zásadách soukromí (docs/…/soukromi.md, čl. 3) a
 // v dokumentaci funkce — při změně upravit obojí, jinak si budou odporovat.
 cronAdd("prune_reports", "20 3 * * *", () => {
-  try {
-    // ⚠️ Mazat PŘES ZÁZNAMY, ne surovým SQL: hlášení může nést soubor (snímek
-    // obrazovky) a DELETE FROM by ho nechal v pb_data/storage navždy — přesně
-    // ta nejcitlivější data by přežívala 30denní slib zásad soukromí
-    // (nález panelu 24. 8. 2026). $app.delete() uklidí i soubor.
-    const stare = $app.findRecordsByFilter("reports", "created < {:hranice}", "", 500, 0,
-      { hranice: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().replace("T", " ") });
-    for (const rec of stare) {
-      try { $app.delete(rec); } catch (err) { /* jeden vzdorující záznam nesmí zastavit úklid */ }
+  // ⚠️ Mazat PŘES ZÁZNAMY, ne surovým SQL: hlášení může nést soubor (snímek
+  // obrazovky) a DELETE FROM by ho nechal v pb_data/storage navždy — přesně
+  // ta nejcitlivější data by přežívala 30denní slib zásad soukromí
+  // (nález panelu 24. 8. 2026). $app.delete() uklidí i soubor.
+  const stare = $app.findRecordsByFilter("reports", "created < {:hranice}", "", 500, 0,
+    { hranice: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().replace("T", " ") });
+  for (const rec of stare) {
+    // jeden vzdorující záznam nesmí zastavit úklid — ale musí být vidět v logu
+    try { $app.delete(rec); } catch (err) {
+      try { $app.logger().warn("prune_reports: záznam nešel smazat", "id", rec.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
     }
-  } catch (err) { /* úklid nesmí nikdy shodit server */ }
+  }
 });
 
 // Záznamník změn je jediná kolekce, která roste sama s každým uložením mapy —
@@ -1388,9 +1389,7 @@ cronAdd("prune_reports", "20 3 * * *", () => {
 // „vše za poslední rok". ⚠️ ZTRÁTOVÉ: starší historie zmizí nenávratně, kdo ji
 // potřebuje, ať si ji vyexportuje. Indexy k dotazům viz migrace 1785180000.
 cronAdd("prune_map_changes", "55 3 * * *", () => {
-  try {
-    $app.db().newQuery("DELETE FROM map_changes WHERE created < datetime('now','-400 days')").execute();
-  } catch (err) { /* úklid nesmí nikdy shodit server */ }
+  $app.db().newQuery("DELETE FROM map_changes WHERE created < datetime('now','-400 days')").execute();
 });
 
 // Odeslání zařazených běhů: na jedno uložení mapy se odešle nejvýš pár webhooků
@@ -1410,9 +1409,7 @@ cronAdd("agent_run_dispatch", "* * * * *", () => {
 // automatizacích je to nejrychleji rostoucí tabulka v instanci (request+result
 // až 8 kB na řádek) a jako jediná neměla úklid.
 cronAdd("prune_agent_runs", "45 3 * * *", () => {
-  try {
-    $app.db().newQuery("DELETE FROM agent_runs WHERE status IN ('done','failed') AND created < datetime('now','-60 days')").execute();
-  } catch (err) { /* úklid nesmí nikdy shodit server */ }
+  $app.db().newQuery("DELETE FROM agent_runs WHERE status IN ('done','failed') AND created < datetime('now','-60 days')").execute();
 });
 
 // Retence logu běhů pravidel: RULE_RUNS_PRUNE_DAYS (60), bez rozlišení stavu
@@ -1420,10 +1417,8 @@ cronAdd("prune_agent_runs", "45 3 * * *", () => {
 // úklidy. ⚠️ Hodnota se MUSÍ krýt s oknem overdue triggeru (helpers.js) —
 // dedup „jednou na termín" stojí na těchhle řádcích.
 cronAdd("prune_rule_runs", "35 3 * * *", () => {
-  try {
-    const { RULE_RUNS_PRUNE_DAYS } = require(`${__hooks}/helpers.js`);
-    $app.db().newQuery("DELETE FROM rule_runs WHERE created < datetime('now','-" + RULE_RUNS_PRUNE_DAYS + " days')").execute();
-  } catch (err) { /* úklid nesmí nikdy shodit server */ }
+  const { RULE_RUNS_PRUNE_DAYS } = require(`${__hooks}/helpers.js`);
+  $app.db().newQuery("DELETE FROM rule_runs WHERE created < datetime('now','-" + RULE_RUNS_PRUNE_DAYS + " days')").execute();
 });
 
 // Osiřelé přílohy: cascadeDelete je jen na MAPU, takže smazáním uzlu soubory
@@ -2563,12 +2558,21 @@ kbRoute("POST", "/advisor", (e) => {
       const { advisorRun } = require(`${__hooks}/advisor.js`);
       return e.json(200, advisorRun(body, {
         provider: provider, url: cfg.url, model: cfg.model, token: cfg.token,
+        // extra = KB_AI_OPENAI_EXTRA (reasoning_effort) — bez něj DeepSeek@AKI
+        // promyslí celý strop a vrátí 500 (stejně jako u sumáře v helpers.js)
+        extra: cfg.extra || null,
         // podrobnost cizí chyby jen adminovi — může nést i materiál klíče
         podrobneChyby: jeAdmin(e.auth),
       }));
     } catch (err) {
+      // Síťová výjimka goja ($http.send) nese celé URL brány i rozlišenou IP — plné
+      // znění dostane jen správce (stejně jako chatChyba v chat.js, panel 28. 9. 2026),
+      // člen obecnou hlášku; plné znění vždy do logu.
+      const m = String(err && err.message ? err.message : err);
+      try { $app.logger().warn("advisor: selhal", "user", e.auth.id, "mode", String(body.mode || ""), "error", m); } catch (e2) { /* log je bonus */ }
+      if (!jeAdmin(e.auth)) return e.json(502, { error: t(L, "err.aiFailedShort") });
       const klic = provider === "openai" ? "err.aiFailed" : "err.localModel";
-      return e.json(502, { error: t(L, klic, { msg: (err && err.message ? err.message : err) }) });
+      return e.json(502, { error: t(L, klic, { msg: m }) });
     }
   }
 

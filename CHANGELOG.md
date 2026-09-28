@@ -3,11 +3,56 @@
 All notable changes to killBottleneck. Dates are the release date of the tag.
 
 The version you are running is shown in the **About** dialog; the same string is in
-`KB_VERSION`. Upgrading is always `docker compose pull && docker compose up -d`
+`KB_VERSION`. Upgrading is always `git pull && docker compose up -d --build`
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
 ---
+
+## v0.64-beta — 2026-09-27
+
+**Fixes from the second code review (wave A) — no new features**
+
+- **Timeline**: tasks attached to a goal (and their subtasks) were never drawn on the timeline —
+  only goals and unattached tasks were; subtasks of unattached tasks were missing as well. Both are
+  shown now (the timeline compared the wrong node id since v0.57).
+- **Assistant**: pressing Enter while the assistant was still thinking silently discarded the message
+  you were typing and any attached image/PDF — the draft now stays in the box. Morning-briefing
+  preferences are stored per account (a second person on the same browser got no briefing).
+  A member no longer sees the internal address of the AI gateway in a "did not respond" error
+  (admins still get the full text). `KB_AI_OPENAI_EXTRA` (e.g. `reasoning_effort`) is now passed to
+  the Advisor, the assistant and summaries (before, only summaries with env config got it).
+- **Admin**: an admin creating a user through the REST API got a generic 400 (a JS scoping bug since
+  v0.47); deputy validation errors are readable again.
+- **Notifications**: *organization notice*, *password reset* and *digest overflow* rows showed a raw
+  translation key instead of the type name.
+- **MCP over HTTP**: `serverInfo.version` reported `0.1.0`; it is now the instance version (same as
+  `/api/kb/config`).
+- **Operations**: cleanup crons no longer swallow errors silently (PocketBase logs them);
+  `docker-compose.yml` now passes `KB_PURPOSE_ASK`, `KB_AI_OPENAI_EXTRA`, `KB_CHAT_TOOLS` and
+  `KB_VISION_ZALOHA_NUM_CTX` (they were documented/read but not forwarded); new
+  `cloud/kontrola-env.sh` keeps env × compose × docs in sync; the public-export guard no longer misses
+  internal machine paths; build warnings are no longer suppressed (`logLevel`).
+- **The "With AI" button is gone** (header split button, its menu item and the empty-state button on
+  Projects): creating a project with AI is the assistant's job now (side panel, `create_project`).
+  The Advisor dialog itself stays reachable through the **"…or let AI draft the project"** link at the
+  bottom of the New project dialog (Suggest with AI, Map from text, dictation). Three UI suites that
+  drove the removed button (`ui-ai-dialog`, `ui-ai-outage`, `ui-ai-timeout`) are retired; `ui-ai-mapa`
+  now goes through the link. Goal breakdown (wand) is unchanged.
+- Dead code removed (`OperationsCard`, `advanceDate`), root README rewritten, `sync/REVIEW.txt` gone.
+
+**Upgrade notes**
+- If you keep your own `docker-compose.yml`/override, forward `KB_PURPOSE_ASK`, `KB_AI_OPENAI_EXTRA`,
+  `KB_CHAT_TOOLS` and `KB_VISION_ZALOHA_NUM_CTX` (they were read by the server but not passed through).
+- `KB_AI_OPENAI_EXTRA` now also applies to the Advisor and the assistant (unless `KB_CHAT_OPENAI_EXTRA`
+  is set), not only to summaries — check it if you set it for summaries only.
+- The "With AI" project button is gone; its replacement is the assistant, which is available only with
+  `KB_CHAT_*` configured (ollama/openai). An instance with the Advisor only keeps the wand (goal breakdown)
+  and the "…or let AI draft the project" link in the New project dialog.
+- After logging out (or when another account signs in), the assistant's last-chat key is cleared; panel
+  open state, width and the model choice are kept.
+- Three UI suites were retired (`ui-ai-dialog`, `ui-ai-outage`, `ui-ai-timeout`); forks running
+  `tests/run-all.sh` will see three suites fewer.
 
 ## v0.63-beta — 2026-09-20
 

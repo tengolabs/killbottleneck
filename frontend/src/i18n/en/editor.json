@@ -449,18 +449,6 @@
     "plannedBadge": "Plan",
     "plannedHint": "When I want to work on it"
   },
-  "operations": {
-    "heading": "Suggested changes ({{count}})",
-    "add": "Add: {{title}}",
-    "untitled": "Untitled",
-    "update": "Edit: {{title}}",
-    "fieldTitle": "title",
-    "fieldDescription": "description",
-    "fieldStatus": "status→{{status}}",
-    "delete": "Delete: {{title}}",
-    "apply": "Apply",
-    "discard": "Discard"
-  },
   "aiAgents": {
     "title": "AI agent registry",
     "description": "Automations that can perform a process step. Nodes reference an agent by name — team members never see the URL or the key.",

@@ -7,9 +7,11 @@
 // mezi testem a produkcí je to, co se tady nesmí opakovat.
 //
 //   node product/tests/nahled-mailu.js [cílová složka]
+//   (bez argumentu: $KB_MAIL_PREVIEW_DIR, jinak <tmp>/kb-maily)
 const { execSync } = require('child_process');
 const net = require('net');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const NAME = 'flowmap-nahled-mailu';
@@ -18,7 +20,7 @@ const SMTP_PORT = 20528;
 const BASE = `http://127.0.0.1:${PORT}`;
 const PW = 'testheslo123';
 const SU = { email: 'su@example.com', pw: 'superheslo123' };
-const VEN = process.argv[2] || path.join(process.env.HOME, 'claude_spark', 'galerie', 'kb-maily');
+const VEN = process.argv[2] || process.env.KB_MAIL_PREVIEW_DIR || path.join(os.tmpdir(), 'kb-maily');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, p, { token, body } = {}) => {

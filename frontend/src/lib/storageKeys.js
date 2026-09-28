@@ -40,3 +40,26 @@ export function smazKlic(klic) {
     if (klic.startsWith(NOVA_PREDPONA)) localStorage.removeItem(stareJmeno(klic));
   } catch (err) { /* nevadí */ }
 }
+
+// Klíče ranní porady v asistentovi — VÁZANÉ NA ÚČET: panel je čte/zapisuje jako
+// `${KEY}:${user.id}` (analýza kódu 2, F4-06). Staré klíče bez sufixu se nemigrují.
+export const KEY_PORADA_NE = 'kb-chat-porada-ne';    // den, kdy uživatel poradu odmítl
+export const KEY_PORADA_DEN = 'kb-chat-porada-den';  // den, kdy nabídka vznikla
+export const KEY_AKTIVITA = 'kb-chat-aktivita';      // razítko poslední aktivity (ms)
+
+// Při odhlášení / vypršení session smazat všechny klíče asistenta (`kb-chat-*`):
+// rozhovor, model, porada, aktivita — patří k účtu, další člověk u téhož
+// prohlížeče je zdědit nesmí (F4-06).
+export function smazKliceAsistenta() {
+  try {
+    const smazat = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      // Stav a šířka panelu a volba modelu jsou předvolby prohlížeče, ne data účtu — ty
+      // zůstávají; klíče s `:` jsou vázané na id účtu (porada, aktivita), mezi účty
+      // uniknout nemůžou a smazat je by znamenalo nabídnout poradu podruhé (panel 28. 9.).
+      if (k && k.startsWith('kb-chat-') && !k.includes(':') && k !== 'kb-chat-open' && k !== 'kb-chat-width' && k !== 'kb-chat-model') smazat.push(k);
+    }
+    smazat.forEach((k) => localStorage.removeItem(k));
+  } catch (err) { /* úložiště nedostupné — není co mazat */ }
+}

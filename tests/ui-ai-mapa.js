@@ -131,7 +131,11 @@ const clickText = async (page, text, sel = 'button, [role="menuitem"], span, a')
     console.log('— Mapa z textu: obsah v DB hned po přijetí —');
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
     await sleep(2000);
-    expect(await clickText(page, 'S pomocí AI'), 'lišta má tlačítko „S pomocí AI"');
+    // 28. 9. 2026 (Richard): tlačítko „S pomocí AI" je schované — jediná cesta k AI
+    // dialogu je odkaz v dialogu Nový projekt (CreateProjectDialog createProject.orFromText).
+    expect(await clickText(page, 'Nový projekt'), 'lišta má „Nový projekt"');
+    await sleep(500);
+    expect(await clickText(page, 'Nebo nechte projekt navrhnout s AI…'), 'dialog Nový projekt má odkaz „Nebo nechte projekt navrhnout s AI…"');
     await sleep(400);
     expect(await clickText(page, 'Mapa z textu'), 'nabídka má „Mapa z textu"');
     await sleep(600);
@@ -175,7 +179,9 @@ const clickText = async (page, text, sel = 'button, [role="menuitem"], span, a')
     // ---------- 1c) zlobivá AI: duplicitní id / cyklus / self-parent ----------
     console.log('— Obrana proti vadnému náhledu z AI —');
     await sleep(1500); // Home po návratu dorenderovat
-    expect(await clickText(page, 'S pomocí AI'), 'znovu: tlačítko „S pomocí AI"');
+    expect(await clickText(page, 'Nový projekt'), 'znovu: „Nový projekt"');
+    await sleep(500);
+    expect(await clickText(page, 'Nebo nechte projekt navrhnout s AI…'), 'znovu: odkaz „navrhnout s AI"');
     await sleep(400);
     await clickText(page, 'Mapa z textu');
     await sleep(600);

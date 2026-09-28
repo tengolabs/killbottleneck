@@ -28,6 +28,10 @@ píšeme v cizím jazyce.
 Díky téhle hranici můžeme dál pravidelně vydávat funkce a opravovat chyby, místo abychom
 utopili čas v review. Precedens: takhle to dělá třeba SQLite.
 
+*Původ kódu:* frontend vznikl portem z exportu Base44 (červenec 2026) a záměrně se od něj liší
+jen v auth (PocketBase místo OTP/Google), v adaptéru `base44Client.js` a v přepisu hlasu
+(`FromTextDialog` posílá audio jako base64); Base44 už není udržovaný protějšek.
+
 ### Podle čeho posuzujeme nápady (anti-bloat pravidlo)
 
 Úkolníky neztloustnou naráz. Ztloustnou po jedné rozumné funkci — a nikdo z nich to
@@ -74,6 +78,11 @@ welcome; we do not write in our first language.
 
 This boundary lets us keep shipping features and fixing bugs instead of drowning in reviews.
 Precedent: this is roughly how SQLite operates.
+
+*Origin of the code:* the frontend was ported from a Base44 export (July 2026) and deliberately
+differs from it only in auth (PocketBase instead of OTP/Google), the `base44Client.js` adapter
+and voice transcription (`FromTextDialog` sends audio as base64); Base44 is no longer a maintained
+counterpart.
 
 ### How we judge ideas (the anti-bloat rule)
 

@@ -128,8 +128,11 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     expect(r.status === 400, `držitel=zástupce přes přímý PATCH = 400 (${r.status})`);
 
     console.log('== admin zakládá účet: deputy se validuje ==');
+    // ⚠️ Kontrolovat i TEXT hlášky: do 27. 9. 2026 tu 400 přicházelo z ReferenceError
+    // (`jeAdmin` importovaný v bloku — S4-01) a test byl zelený ze špatného důvodu.
+    // Plný scénář (admin založí účet → 200, člen nezíská roli) má sada admin-zaklada-ucet.js.
     r = await api('POST', '/api/collections/users/records', { token: A, body: { email: 'novy@example.com', password: PW, passwordConfirm: PW, deputy: 'neexistuje@example.com' } });
-    expect(r.status === 400, `pozvánka s neplatným zástupcem = 400 (${r.status})`);
+    expect(r.status === 400 && /existující člen|existing member/.test((r.json && r.json.message) || ''), `pozvánka s neplatným zástupcem = 400 s hláškou o zástupci (${r.status} ${JSON.stringify(r.json && r.json.message)})`);
 
     console.log('== degradace admina odebere edit org mapy ==');
     await api('PATCH', `/api/collections/users/records/${bId}`, { token: A, body: { role: 'user' } });

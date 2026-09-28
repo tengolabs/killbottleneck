@@ -6,21 +6,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Sparkles, Loader2, ChevronDown, Upload } from 'lucide-react';
+import { Plus, Loader2, ChevronDown, Upload } from 'lucide-react';
 import { useState } from 'react';
 import ImportMapDialog from '@/components/shared/ImportMapDialog';
 
-// Jediný zdroj pravdy pro akce v hlavičce (Nový projekt + AI založení mapy).
+// Jediný zdroj pravdy pro akce v hlavičce (Nový projekt + import).
 // Stejné popisky, ikony i responsivní chování na všech kartách (Projekty/Úkoly/Šablony).
 // Openery a stav dodává hook useMapCreation; sem se předá už hotové.
-// Obě AI cesty (Z cíle / Z textu) žijí jako záložky UVNITŘ sjednoceného
-// AiCreateDialog — tady je jedno tlačítko „S pomocí AI" (a stejná položka
-// v mobilní nabídce, protože samostatné tlačítko je pod md schované).
-export default function NewMapActions({ onCreate, onAi, ai, creating }) {
+// Do 28. 9. 2026 tu bylo i tlačítko „S pomocí AI" (Poradce, AiCreateDialog) —
+// Richard: Poradce se už nezobrazuje, projekt s AI zakládá asistent v panelu.
+export default function NewMapActions({ onCreate, creating }) {
   const { t } = useTranslation(['home', 'editor']);
   // import je vždy k dispozici (nezávisí na AI) — vlastní nabídka vedle „Nový projekt"
   const [importOpen, setImportOpen] = useState(false);
-  const aiAvailable = ai.has('generate') || ai.has('from_text');
   return (
     <>
       {/* Dělené tlačítko (Richard 31. 7.: „tyhle 2 tlačítka bych sloučil"):
@@ -43,13 +41,8 @@ export default function NewMapActions({ onCreate, onAi, ai, creating }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {/* AI i v této nabídce: na mobilu (<md) je samostatné AI tlačítko
-                schované a tohle je jediná cesta k němu (Richardův nález 7. 8.) */}
-            {aiAvailable && (
-              <DropdownMenuItem onClick={() => onAi()}>
-                <Sparkles className="w-4 h-4 mr-2" /> {t('newMap.withAi')}
-              </DropdownMenuItem>
-            )}
+            {/* „S pomocí AI“ tu bylo do 28. 9. 2026 — Richard: Poradce se už nezobrazuje,
+                projekt s AI zakládá asistent v panelu. */}
             <DropdownMenuItem onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4 mr-2" /> {t('editor:importMap.button')}
             </DropdownMenuItem>
@@ -57,22 +50,6 @@ export default function NewMapActions({ onCreate, onAi, ai, creating }) {
         </DropdownMenu>
       </div>
       <ImportMapDialog open={importOpen} onClose={() => setImportOpen(false)} />
-      {/* AI je zapnutá, ale právě neodpovídá (u hostované verze běží u poskytovatele).
-          Tlačítko schováme jako všude jinde, ale TADY ho uživatel hledá — proto
-          místo tichého zmizení zůstane zašedlé s vysvětlením, ať nemá pocit,
-          že se funkce ztratila. */}
-      {ai.configured && !ai.healthy && (
-        <Button variant="outline" disabled className="hidden md:inline-flex" title={t('newMap.aiUnavailableHint')}>
-          <Sparkles className="w-4 h-4 opacity-60" />
-          {t('newMap.aiUnavailable')}
-        </Button>
-      )}
-      {aiAvailable && (
-        <Button variant="outline" onClick={() => onAi()} disabled={creating} className="hidden md:inline-flex">
-          <Sparkles className="w-4 h-4" />
-          {t('newMap.withAi')}
-        </Button>
-      )}
     </>
   );
 }

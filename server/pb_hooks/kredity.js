@@ -4,8 +4,8 @@
 //
 // 1 kredit = jedna ranní porada s reálnou mapou = průměrný dotaz hodinového
 // testu rigu (2 410 tokenů vstup / 454 výstup) při ceníku Kosmik Compute ×2,
-// tj. 0,0764 Kč. Zdroj pravdy čísel: ~/Claude_Holly/kb-ai-clenstvi-2026-09-12/
-// kalkulace-kreditu.py (13. 9. 2026). Cache tokenů se v logu nerozlišuje →
+// tj. 0,0764 Kč. Zdroj pravdy čísel: interní podklad (mimo repo) kalkulace-kreditu.py
+// (13. 9. 2026). Cache tokenů se v logu nerozlišuje →
 // počítáme vstup plnou cenou (kredity vychází spíš VÝŠ než skutečný náklad).
 // Zatím se počítá jen chat asistenta (ai_chat_log); starší AI funkce v mapě
 // tokeny nelogují.

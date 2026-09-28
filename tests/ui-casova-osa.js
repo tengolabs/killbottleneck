@@ -6,10 +6,14 @@
 // po termínu s červeným prstencem. Volba pohledu se pamatuje (kb-tasks-view).
 //
 // Fixtura: projekt se 4 cíli — po termínu (včera), dnes, budoucí (+10 dní),
-// hotový (+5 dní). Vše přes API uživatele (uzly s termínem, žádné úkolové
-// záznamy — „uzel JE úkol").
+// hotový (+5 dní). Vše přes API uživatele (uzly s termínem). K tomu úkolové
+// záznamy (kolekce tasks, zakládá jen superuser — „detektor zbytků"): úkol na
+// uzlu n3 + jeho podúkol, úkol BEZ uzlu + jeho podúkol (analýza kódu 2, F2-14 + F2-03).
 //
 // MUTAČNÍ DŮKAZ: na image z main sada ČERVENÁ — záložka „Časová osa" neexistuje.
+// F2-14/F2-03 (27. 9. 2026): na kódu před opravou padne „úkol na uzlu je na ose"
+// (osa porovnávala tk.node_id s node.id = `node-item-…`, nikdy nesedlo) a
+// „podúkol úkolu bez uzlu je na ose" (větev bez uzlu byParent nečetla).
 const H = require('./_harness');
 const { expect, sleep } = H;
 
@@ -43,6 +47,19 @@ H.beh(async () => {
     ],
   } })).json;
   expect(!!mapa.id, 'projekt s termíny založen');
+
+  // úkolové záznamy: běžný účet je zakládat nesmí (slovník 17. 8.: úkol = uzel),
+  // superuser projde — stejná cesta jako fixtury detektoru zbytků (api-rls.js)
+  const ST = await inst.superuser();
+  const uid = (await inst.api('POST', '/api/collections/users/auth-with-password', { body: { identity: UCET, password: H.PW } })).json.record.id;
+  const zalozUkol = async (body) => (await inst.api('POST', '/api/collections/tasks/records', { token: ST, body: {
+    status: 'todo', map: mapa.id, owner: uid, owner_email: UCET, assignee_email: UCET, deadline: den(3), ...body,
+  } })).json;
+  const naUzlu = await zalozUkol({ title: 'Ukol-na-uzlu-XQ', node_id: 'n3' });
+  const podNaUzlu = await zalozUkol({ title: 'Podukol-na-uzlu-XQ', node_id: 'n3', parent: naUzlu.id });
+  const bezUzlu = await zalozUkol({ title: 'Ukol-bez-uzlu-XQ', node_id: '' });
+  const podBezUzlu = await zalozUkol({ title: 'Podukol-bez-uzlu-XQ', node_id: '', parent: bezUzlu.id });
+  expect(!!naUzlu.id && !!podNaUzlu.id && !!bezUzlu.id && !!podBezUzlu.id, 'úkol na uzlu + podúkol, úkol bez uzlu + podúkol založeny');
 
   const { page, chyby } = await H.browser();
   await page.goto(`${inst.base}/login`, { waitUntil: 'networkidle2' });
@@ -79,6 +96,11 @@ H.beh(async () => {
   for (const cil of ['Zpožděná kolaudace', 'Dnešní ochutnávka', 'Budoucí otevření', 'Hotové vybavení']) {
     expect(telo.includes(cil), `cíl „${cil}" je na ose`);
   }
+  // F2-14: úkol navěšený na uzel (n3) i jeho podúkol; F2-03: podúkol úkolu bez uzlu
+  expect(telo.includes('Ukol-na-uzlu-XQ'), 'úkol na uzlu je na ose (F2-14)');
+  expect(telo.includes('Podukol-na-uzlu-XQ'), 'podúkol úkolu na uzlu je na ose');
+  expect(telo.includes('Ukol-bez-uzlu-XQ'), 'úkol bez uzlu je na ose');
+  expect(telo.includes('Podukol-bez-uzlu-XQ'), 'podúkol úkolu bez uzlu je na ose (F2-03)');
   expect(/\d+\. týden/.test(telo), 'týdenní hlavička ukazuje číslo ISO týdne (výchozí škála Týdny)');
   expect(/\bDnes\b/.test(telo), 'značka/tlačítko Dnes existuje');
   // po termínu = červený prstenec (ring-red na značce, ring-rose na pruhu)

@@ -3,6 +3,9 @@
 //  2) žádná prázdná hodnota
 //  3) v EN katalozích není česká diakritika (nedopřeložený string)
 //  4) interpolační {{tokeny}} sedí mezi cs a en (stejná sada proměnných na klíč)
+//  5) každý typ notifikace, který server zná (NOTIFY_TYPES v server/pb_hooks/helpers.js),
+//     má v notify.json klíč `type.<typ>` — seznam notifikací ho vypisuje bez fallbacku
+//     (analýza kódu 2, M1-01: org_notice a password_reset se ukazovaly jako surový klíč)
 // Zdroj i18n: product/frontend/src/i18n/{cs,en}/*.json
 const fs = require('fs');
 const path = require('path');
@@ -53,6 +56,19 @@ for (const ns of NS) {
 
   const tokMismatch = csK.filter((k) => (k in en) && JSON.stringify(tokens(cs[k])) !== JSON.stringify(tokens(en[k])));
   expect(tokMismatch.length === 0, `${ns}: {{tokeny}} sedí cs↔en ${tokMismatch.length ? JSON.stringify(tokMismatch.slice(0, 5)) : ''}`);
+}
+
+console.log('== notify: klíč type.<typ> pro každý typ z NOTIFY_TYPES (server) ==');
+{
+  const helpers = fs.readFileSync(path.join(__dirname, '..', 'server', 'pb_hooks', 'helpers.js'), 'utf8');
+  const blok = (helpers.match(/const NOTIFY_TYPES = \[([\s\S]*?)\];/) || [])[1] || '';
+  const typy = [...blok.replace(/\/\/[^\n]*/g, '').matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  expect(typy.length >= 20, `NOTIFY_TYPES načteno z helpers.js (${typy.length} typů)`);
+  for (const lang of ['cs', 'en']) {
+    const notify = JSON.parse(fs.readFileSync(path.join(DIR, lang, 'notify.json'), 'utf8'));
+    const chybi = typy.filter((t) => !(notify.type || {})[t]);
+    expect(chybi.length === 0, `${lang}/notify.json: type.* pro všechny typy ${chybi.length ? 'chybí ' + JSON.stringify(chybi) : ''}`);
+  }
 }
 
 console.log(`\n${ok} ✅ / ${fail} ❌`);

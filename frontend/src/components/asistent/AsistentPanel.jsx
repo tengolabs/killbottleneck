@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bot, Brain, ChevronDown, ChevronLeft, ChevronUp, FileText, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Trash2, X } from 'lucide-react';
-import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
+import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA } from '@/lib/storageKeys';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -186,21 +186,25 @@ export default function AsistentPanel() {
   // Nabídka ranní porady (Richard 13. 9. 2026: „ráno otevřu a zeptá se mě"):
   // ukáže se při prvním otevření aplikace v daném dni nebo po víc než 8 h
   // od poslední aktivity, dokud dnes porada neproběhla nebo ji uživatel neodmítl.
+  // Klíče jsou vázané na účet (sufix id uživatele, analýza kódu 2 F4-06): u sdíleného
+  // počítače by odmítnutí / aktivita jednoho člověka potlačila nabídku druhému. Staré
+  // klíče bez sufixu se nemigrují; při odhlášení se `kb-chat-*` mažou (lib/storageKeys).
   const dnes = new Date().toLocaleDateString('en-CA');
-  const [poradaOdmitnuta, setPoradaOdmitnuta] = useState(() => nactiKlic('kb-chat-porada-ne') === dnes);
+  const klicUctu = (k) => `${k}:${user?.id || ''}`;
+  const [poradaOdmitnuta, setPoradaOdmitnuta] = useState(() => nactiKlic(klicUctu(KEY_PORADA_NE)) === dnes);
   const [poradaNabidka] = useState(() => {
-    const posledni = Number(nactiKlic('kb-chat-aktivita')) || 0;
+    const posledni = Number(nactiKlic(klicUctu(KEY_AKTIVITA))) || 0;
     const ted = Date.now();
-    ulozKlic('kb-chat-aktivita', String(ted));
+    ulozKlic(klicUctu(KEY_AKTIVITA), String(ted));
     // nabídka, jednou vzniklá, drží celý den (i přes reload), dokud ji uživatel nevyřídí
-    if (nactiKlic('kb-chat-porada-den') === dnes) return true;
+    if (nactiKlic(klicUctu(KEY_PORADA_DEN)) === dnes) return true;
     const nova = !posledni || new Date(posledni).toLocaleDateString('en-CA') !== dnes || ted - posledni > 8 * 3600 * 1000;
-    if (nova) ulozKlic('kb-chat-porada-den', dnes);
+    if (nova) ulozKlic(klicUctu(KEY_PORADA_DEN), dnes);
     return nova;
   });
   const poradaDnes = (A.seznam || []).some((c) => c.mode === 'porada' && String(c.updated || '').slice(0, 10) === dnes);
   const nabidnoutPoradu = dostupny && poradaNabidka && !poradaOdmitnuta && !poradaDnes;
-  const odmitniPoradu = () => { ulozKlic('kb-chat-porada-ne', dnes); setPoradaOdmitnuta(true); };
+  const odmitniPoradu = () => { ulozKlic(klicUctu(KEY_PORADA_NE), dnes); setPoradaOdmitnuta(true); };
 
   // kontext pro server: cesta + otevřená mapa (/map/:id) — „kde uživatel je"
   // + vybraný uzel z editoru (panel.uzel), jen když patří k otevřené mapě; server z toho
@@ -263,6 +267,9 @@ export default function AsistentPanel() {
     const obr = zPolicka ? obrazek : null;
     const prilohaPdf = zPolicka ? pdf : null;
     if (!v && !obr && !prilohaPdf) return;
+    // Enter během odpovědi / čtení PDF: A.send by zprávu odmítl (loading) — políčko ani
+    // přílohu NEmazat, jinak rozepsaný text tiše zmizí (analýza kódu 2, F3-01)
+    if (A.loading || pdfCte) return;
     if (zPolicka) { setText(''); setObrazek(null); setPdf(null); }
     const vysl = await A.send(v, kontext, patchUser, obr || undefined, prilohaPdf || undefined);
     if (!obr && !prilohaPdf) return;
@@ -272,7 +279,7 @@ export default function AsistentPanel() {
       if (prilohaPdf) setPdf((p) => p || prilohaPdf);
       setText((p) => p || v);
     } else if (obr) URL.revokeObjectURL(obr.url);
-  }, [A, text, obrazek, pdf, kontext, patchUser]);
+  }, [A, text, obrazek, pdf, pdfCte, kontext, patchUser]);
   const potvrd = useCallback((id, ok, vysledek) => A.potvrd(id, ok, kontext, patchUser, vysledek), [A, kontext, patchUser]);
   // na telefonu panel kryje celou obrazovku → po „Ukázat v mapě" ho schovat (Richard 13. 9.)
   const poOdkazu = useCallback(() => { if (mobil) A.setOpen(false); }, [mobil, A]);

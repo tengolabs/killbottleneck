@@ -610,7 +610,9 @@ function zpracujMcpPost(e) {
     return e.json(200, rpcOk(msg.id, {
       protocolVersion: PROTOKOLY.indexOf(zadana) >= 0 ? zadana : PROTOKOLY[0],
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "killbottleneck", version: "0.1.0" },
+      // verze = KB_VERSION z buildu, tentýž zdroj jako `version` v /api/kb/config
+      // (do 27. 9. 2026 natvrdo „0.1.0", S8-01). Dev build bez razítka = "dev" (Dockerfile ARG).
+      serverInfo: { name: "killbottleneck", version: require(`${__hooks}/helpers.js`).env("VERSION") || "dev" },
     }));
   }
   if (msg.method === "ping") return e.json(200, rpcOk(msg.id, {}));

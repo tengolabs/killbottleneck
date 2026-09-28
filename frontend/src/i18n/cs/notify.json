@@ -41,7 +41,10 @@
     "rule_broken": "Rozbité pravidlo",
     "new_version": "Nová verze",
     "reminder": "Připomínka s časem",
-    "event_invited": "Pozvání na událost"
+    "event_invited": "Pozvání na událost",
+    "org_notice": "Organizace",
+    "password_reset": "Reset hesla",
+    "overflow": "Souhrn upozornění"
   },
   "prefs": {
     "title": "Nastavení notifikací",

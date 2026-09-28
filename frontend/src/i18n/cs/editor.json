@@ -449,18 +449,6 @@
     "plannedBadge": "Plán",
     "plannedHint": "Kdy to chci řešit"
   },
-  "operations": {
-    "heading": "Navrhované změny ({{count}})",
-    "add": "Přidat: {{title}}",
-    "untitled": "Bez názvu",
-    "update": "Upravit: {{title}}",
-    "fieldTitle": "název",
-    "fieldDescription": "popis",
-    "fieldStatus": "stav→{{status}}",
-    "delete": "Smazat: {{title}}",
-    "apply": "Použít",
-    "discard": "Zahodit"
-  },
   "aiAgents": {
     "title": "Registr AI agentů",
     "description": "Automatizace, které umí vykonat krok procesu. V uzlu mapy se agent vybírá jménem — členové týmu adresu ani klíč nevidí.",

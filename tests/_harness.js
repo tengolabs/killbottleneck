@@ -84,7 +84,9 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
   // sada, která ho testuje, dá env: { KB_PURPOSE_ASK: null }
   const envAll = Object.assign({ KB_PURPOSE_ASK: 0 }, env);
   const envArgs = Object.entries(envAll).filter(([, v]) => v !== null && v !== undefined)
-    .map(([k, v]) => `-e ${k}=${String(v).replace(/'/g, "'\\''")}`).join(' ');
+    // hodnota v apostrofech (escapování apostrofu uvnitř): mezera, `;`, `$` ani uvozovky
+    // (JSON v KB_*_OPENAI_EXTRA) tak nerozbijí docker run (T1-02, 27. 9. 2026)
+    .map(([k, v]) => `-e ${k}='${String(v).replace(/'/g, "'\\''")}'`).join(' ');
   const hosts = [addHostGateway ? '--add-host=host.docker.internal:host-gateway' : '']
     .concat(Object.entries(addHosts).map(([h, ip]) => `--add-host=${h}:${ip}`)).filter(Boolean).join(' ');
   const vol = volume ? `-v ${volume === true ? name + '-data' : volume}:/app/pb_data` : '';

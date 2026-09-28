@@ -1,6 +1,6 @@
 // „Upravovat" = SPOLUSPRÁVCE — smí mapu i dál sdílet (Richard 20. 8. 2026).
 //
-// Rozhodnutí modelu práv (podklad ~/Claude_Holly/kb-prava-model-zadani.md):
+// Rozhodnutí modelu práv (interní podklad, mimo repo):
 // kdo rozdává práci, umí zařídit i přístup. Sdílení (jmenovitý seznam) spravuje
 // vlastník NEBO JMENOVANÝ spolusprávce — řádek v map_shares s permission=edit.
 // ⚠️ Plošné týmové „edit" (team_access) sdílet NESMÍ — jinak by adresné sdílení

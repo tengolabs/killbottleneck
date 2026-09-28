@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Plus, Target, Trash2, Loader2, Map as MapIcon, Users, Sparkles, Share2, Eye, Building2, ShieldCheck, Archive, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { Plus, Target, Trash2, Loader2, Map as MapIcon, Users, Share2, Eye, Building2, ShieldCheck, Archive, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import ShareDialog from '@/components/goal-map/ShareDialog';
 import TemplatesSection from '@/components/goal-map/TemplatesSection';
 import { useAuth } from '@/lib/AuthContext';
@@ -29,7 +29,7 @@ export default function Home() {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const [maps, setMaps] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { ai, creating, openCreate, openAi, dialogs: mapCreationDialogs } = useMapCreation();
+  const { creating, openCreate, dialogs: mapCreationDialogs } = useMapCreation();
   const [shareMapId, setShareMapId] = useState(null);
   // sbalování sekcí projektů (jako panel Můj den) — pamatuje se v localStorage
   const [collapsedSections, setCollapsedSections] = useState(() => {
@@ -141,8 +141,6 @@ export default function Home() {
         actions={
           <NewMapActions
             onCreate={openCreate}
-            onAi={openAi}
-            ai={ai}
             creating={creating}
           />
         }
@@ -212,12 +210,7 @@ export default function Home() {
                 )}
                 {t('empty.createFirst')}
               </Button>
-              {(ai.has('generate') || ai.has('from_text')) && (
-                <Button variant="outline" onClick={() => openAi()} disabled={creating}>
-                  <Sparkles className="w-4 h-4" />
-                  {t('newMap.withAi')}
-                </Button>
-              )}
+              {/* „S pomocí AI“ schováno 28. 9. 2026 (Richard) — AI projekt přes asistenta */}
             </div>
           </div>
             ) : (

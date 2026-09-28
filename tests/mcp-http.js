@@ -56,6 +56,11 @@ let mcp = null;
     const init = await mcpPost(keyRW, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '0' } });
     expect(init.status === 200 && init.json.result.protocolVersion === '2025-06-18'
       && init.json.result.serverInfo.name === 'killbottleneck', 'initialize → 2025-06-18, serverInfo killbottleneck');
+    // S8-01 (27. 9. 2026): HTTP /mcp hlásil natvrdo „0.1.0"; verze musí být táž, jakou
+    // instance ukazuje klientům v /api/kb/config (KB_VERSION z buildu, dev build = "dev")
+    const cfgVer = (((await api('GET', '/api/kb/config')).json) || {}).version;
+    const srvVer = init.json.result.serverInfo.version;
+    expect(srvVer !== '0.1.0' && srvVer === (cfgVer || 'dev'), `serverInfo.version = verze instance z /config (mcp ${JSON.stringify(srvVer)}, config ${JSON.stringify(cfgVer)})`);
     const initOld = await mcpPost(keyRW, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'e2e', version: '0' } });
     expect(initOld.json.result.protocolVersion === '2025-03-26', 'initialize se starší verzí → server ji potvrdí');
     const notif = await fetch(`${BASE}/mcp`, {

@@ -791,8 +791,19 @@ function nodesToWaitState(nodes, edges) {
   return blocked;
 }
 
+// KB_*_OPENAI_EXTRA: JSON objekt navíc do těla openai volání (např.
+// {"reasoning_effort":"none"} pro DeepSeek@AKI, chat_template_kwargs pro
+// llama-server). Jedno parsování pro aiConfig, summaryAiConfig i chat.js
+// (do 27. 9. 2026 opsané 2×, S2-03). Cokoli jiného než JSON objekt = null.
+function extraJson(v) {
+  if (!v) return null;
+  try { const o = JSON.parse(String(v)); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch (err) { return null; }
+}
+
 // AI konfigurace: záznam v ai_settings (administrace) má přednost, fallback .env.
 // Vrací i source ("db"/"env"), ať administrace umí říct, odkud config pochází.
+// `extra` (KB_AI_OPENAI_EXTRA) platí pro OBĚ větve: administrace pole navíc
+// nenabízí, env je jediná cesta — bez něj DeepSeek@AKI promyslí celý strop (S2-03).
 function aiConfig(app) {
   try {
     const rec = app.findFirstRecordByFilter("ai_settings", "id != ''");
@@ -805,6 +816,7 @@ function aiConfig(app) {
         token: rec.getString("token"),
         transcribeUrl: rec.getString("transcribe_url"),
         transcribeModel: rec.getString("transcribe_model"),
+        extra: extraJson(env("AI_OPENAI_EXTRA")),
       };
     }
   } catch (err) { /* kolekce/záznam nemusí existovat */ }
@@ -816,13 +828,7 @@ function aiConfig(app) {
     token: env("AI_TOKEN") || "",
     transcribeUrl: env("AI_TRANSCRIBE_URL") || "",
     transcribeModel: env("AI_TRANSCRIBE_MODEL") || "",
-    // KB_AI_OPENAI_EXTRA: JSON objekt navíc do těla openai volání (např.
-    // {"reasoning_effort":"none"} pro DeepSeek@AKI) — stejný vzor jako
-    // KB_CHAT_OPENAI_EXTRA v chat.js
-    extra: (function (v) {
-      if (!v) return null;
-      try { const o = JSON.parse(String(v)); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch (err) { return null; }
-    })(env("AI_OPENAI_EXTRA")),
+    extra: extraJson(env("AI_OPENAI_EXTRA")),
   };
 }
 
@@ -834,8 +840,9 @@ function aiConfig(app) {
 // termínu — každé pondělí je každé pondělí." Další termín = termín + interval;
 // prošlé výskyty se přeskočí po intervalech k nejbližšímu BUDOUCÍMU — den
 // v týdnu (a den v měsíci, vč. 31. s clampem jen v kratších měsících) drží.
-// Tím se liší od advanceDate níže, která základ posouvala na dnešek a pozdní
-// odbavení rytmus lámalo. Bez termínu se rytmus zakládá ode dneška.
+// Tím se liší od dřívější funkce advanceDate (posouvala základ na dnešek, takže
+// pozdní odbavení rytmus lámalo; smazána 27. 9. 2026 — nikdo ji nevolal). Bez
+// termínu se rytmus zakládá ode dneška.
 // „Dnes" = serverový den v UTC (kontejner) — viz past UTC×hostitel.
 function dalsiTermin(base, rec) {
   const n = new Date();
@@ -865,31 +872,6 @@ function dalsiTermin(base, rec) {
     return "";
   }
   return base || "";
-}
-
-function advanceDate(base, rec) {
-  const n = new Date();
-  const today = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()));
-  let d;
-  if (base && /^\d{4}-\d{2}-\d{2}$/.test(base)) {
-    d = new Date(base + "T00:00:00Z");
-    if (d < today) d = today;
-  } else {
-    d = today;
-  }
-  if (rec === "daily") d.setUTCDate(d.getUTCDate() + 1);
-  else if (rec === "weekly") d.setUTCDate(d.getUTCDate() + 7);
-  else if (rec === "monthly") {
-    // clamp na poslední den cílového měsíce (31.1. → 28./29.2., ne 3.3.)
-    const day = d.getUTCDate();
-    d.setUTCDate(1);
-    d.setUTCMonth(d.getUTCMonth() + 1);
-    const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-    d.setUTCDate(Math.min(day, last));
-  }
-  else return base || "";
-  const p = (n) => (n < 10 ? "0" + n : "" + n);
-  return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate());
 }
 
 // B1: tolerantní validace obsahu mapy (uzly/hrany) při zápisu goalmaps. Kontroluje
@@ -2434,7 +2416,7 @@ function assignSeriesNumber(app, record, tpl) {
   if (!fmt) return false;
   // Rok v LOKÁLNÍ TZ kontejneru — shodný s datem/názvem projektu (fmtDateLocal, cron
   // auto_templates), ať se čítač série i {rok} v názvu nerozejdou kolem Silvestru u TZ
-  // vzdálených od UTC. (advanceDate úkolů zůstává záměrně UTC.)
+  // vzdálených od UTC. (Opakování termínů — dalsiTermin — zůstává záměrně UTC.)
   const y = new Date().getFullYear();
   const row = new DynamicModel({ next_number: 0 });
   app.db()
@@ -5091,7 +5073,7 @@ function deadlineHour() {
 // JEDNA souhrnná notifikace na osobu a den: člověk s 30 prošlými položkami by
 // jinak dostal 30 zpráv.
 //
-// „Dnes"/„zítra" se počítají v LOKÁLNÍ TZ kontejneru (fmtDateLocal) — advanceDate
+// „Dnes"/„zítra" se počítají v LOKÁLNÍ TZ kontejneru (fmtDateLocal) — dalsiTermin
 // je záměrně UTC (opakování úkolů), ale tady by UTC znamenalo, že se v Praze mezi
 // 22:00 a půlnocí posílá „zítřejší" dnešek. Termíny jsou řetězce YYYY-MM-DD, takže
 // se porovnávají ŘETĚZCOVĚ (žádné new Date, žádné TZ posuny).
@@ -5620,6 +5602,8 @@ function summaryAiConfig(app) {
       url: env("SUMMARY_URL") || "",
       model: env("SUMMARY_MODEL") || "",
       token: env("SUMMARY_TOKEN") || "",
+      // vlastní KB_SUMMARY_OPENAI_EXTRA neexistuje → platí obecné KB_AI_OPENAI_EXTRA (S2-03)
+      extra: extraJson(env("AI_OPENAI_EXTRA")),
     };
   }
   return aiConfig(app);
@@ -7323,7 +7307,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 
 module.exports = {
   fmtDateLocal, addDaysStr,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, advanceDate, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

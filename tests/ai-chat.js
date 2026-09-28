@@ -572,6 +572,11 @@ H.beh(async () => {
   expect(r.status === 502 && /HTTP 500/.test(r.json.error || ''), `výpadek modelu → 502 s hláškou (${r.status})`);
   const det = (await inst.api('GET', `/api/kb/chat/detail/${chat.id}`, { token: A })).json.chat;
   expect(det.messages[det.messages.length - 1].role === 'user' && det.messages[det.messages.length - 1].content === 'Ještě něco', 'zpráva uživatele je uložená i po chybě');
+  // S1b-02 (27. 9. 2026): detail chyby (stav, adresa brány, IP) jen správci — člen dostane obecnou hlášku
+  selhani = 1;
+  r = await inst.api('POST', '/api/kb/chat', { token: B, body: { chat_id: seznamB.chats[0].id, message: 'Ještě něco od člena' } });
+  expect(r.status === 502 && /neodpověděl|did not respond/.test(r.json.error || '') && !/HTTP 500|host\.docker|\d+\.\d+\.\d+\.\d+|:\d{4,5}/.test(r.json.error || ''),
+    `člen při výpadku: 502 s obecnou hláškou bez detailu (${r.status} ${JSON.stringify(r.json && r.json.error)})`);
 
   console.log('== strop kol: po 8 voláních nástrojů model dopoví bez nástrojů ==');
   for (let i = 0; i < 8; i++) fronta.push(nastroj('get_memory', {}));
@@ -629,6 +634,20 @@ H.beh(async () => {
   expect(!!asst && typeof asst.tool_calls[0].function.arguments === 'string' && !!toolMsg && toolMsg.tool_call_id === asst.tool_calls[0].id && /Nápad rig/.test(toolMsg.content), 'historie pro model: tool_calls s řetězcovými argumenty a tool zpráva s tool_call_id');
   expect(mock.pozadavky.some((q) => q.url.startsWith('/v1/chat/completions') && q.headers.authorization === 'Bearer rig-token'), 'token jde v Authorization (proxy rigu)');
   expect(((await inst4.api('GET', '/api/kb/config')).json.ai_modes || []).includes('chat_panel'), 'provider openai → chat_panel v /config');
+
+  console.log('== KB_AI_OPENAI_EXTRA se bez KB_CHAT_* dědí do asistenta (S2-03) ==');
+  // Jediná konfigurace KB_AI_* (DeepSeek@AKI) — tělo pro model musí nést reasoning_effort;
+  // do 27. 9. 2026 chat zděděné `extra` přepsal null. Hodnota s uvozovkami stojí na T1-02 (harness apostrofuje -e).
+  const inst8 = await H.startInstance({ slug: 'chat-extra', addHostGateway: true, env: {
+    KB_AI_PROVIDER: 'openai', KB_AI_URL: mock.base + '/v1', KB_AI_MODEL: 'deepseek-mock', KB_AI_TOKEN: 'aki-token', KB_AI_OPENAI_EXTRA: '{"reasoning_effort":"low"}', KB_UVODNI_MAPA: 0,
+  } });
+  await inst8.register('x8@example.com', { name: 'Xenie' });
+  const X8 = await inst8.login('x8@example.com');
+  const pred8 = volani.length;
+  fronta.push(text('Dobrý den, jak mohu pomoci?'));
+  r = await inst8.api('POST', '/api/kb/chat', { token: X8, body: { message: 'Ahoj' } });
+  const v8 = volani.slice(pred8);
+  expect(r.status === 200 && v8.length === 1 && v8[0].reasoning_effort === 'low', `tělo pro model nese reasoning_effort z KB_AI_OPENAI_EXTRA (${r.status}, ${JSON.stringify(v8[0] && v8[0].reasoning_effort)})`);
 
   console.log('== obrázek: přepis před smyčkou, zásobník přes add_ideas, záloha, validace ==');
   // Podvržený vision model (naše karta = ollama) a záloha (OpenAI tvar). Vlastní fronty,

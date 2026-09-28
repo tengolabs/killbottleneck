@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.64-beta": {
+    cs: [
+      "Časová osa na Úkolech konečně ukazuje i úkoly navěšené na cíle a jejich podúkoly (od v0.57 kreslila jen cíle a úkoly bez cíle) — tabulka a kanban je měly, osa ne.",
+      "Asistent: Enter během „Přemýšlím“ už nesmaže rozepsanou zprávu ani přílohu; ranní porada se pamatuje na účet (druhý člověk u téhož prohlížeče o ni nepřijde); běžný člen už v chybě „neodpověděl“ nevidí interní adresu AI brány.",
+      "Tlačítko „S pomocí AI“ u zakládání projektu zmizelo — projekt s AI teď zakládá asistent v postranním panelu (stačí mu to říct). Návrh s AI, „Z textu“ a diktování najdete dál přes odkaz „Nebo nechte projekt navrhnout s AI…“ v dialogu Nový projekt; rozpad cíle hůlkou beze změny.",
+      "Opravy z druhé revize kódu: správce založí účet přes API (dřív obecná chyba 400), notifikace o organizaci/resetu hesla ukazují název místo klíče, MCP přes HTTP hlásí správnou verzi, reasoning_effort se dostane i k Poradci a asistentovi.",
+    ],
+    en: [
+      "The timeline on Tasks finally shows tasks attached to goals and their subtasks (since v0.57 it drew only goals and unattached tasks) — the table and kanban had them, the timeline did not.",
+      "Assistant: Enter while it is thinking no longer discards your draft or attachment; the morning briefing is remembered per account (a second person on the same browser is not skipped); a member no longer sees the internal AI gateway address in a \"did not respond\" error.",
+      "The \"With AI\" button next to New project is gone — the assistant in the side panel creates AI projects now (just ask it). Suggest with AI, \"From text\" and dictation remain behind the \"…or let AI draft the project\" link in the New project dialog; goal breakdown is unchanged.",
+      "Fixes from the second code review: an admin can create a user via the API (a generic 400 before), organization/password-reset notifications show a name instead of a key, MCP over HTTP reports the real version, reasoning_effort reaches the Advisor and the assistant too.",
+    ],
+  },
   "v0.63-beta": {
     cs: [
       "V kalendáři jde přes + založit kromě úkolu i událost — schůzku, zubaře, telekonferenci — s časem, pozvanými kolegy a připomínkou; do projektů nepatří a nic v nich nemění.",

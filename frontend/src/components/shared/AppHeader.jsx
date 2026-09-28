@@ -107,13 +107,15 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
           {user && ai.has('chat_panel') && (
             <Button
               variant={asistent.open ? 'default' : 'outline'}
-              size="icon"
               onClick={() => asistent.setOpen((v) => !v)}
               title={t('nav.aiChat')}
               aria-label={t('nav.aiChat')}
               data-testid="chat-toggle"
             >
+              {/* Stejné tlačítko jako v liště editoru (ikona + „Asistent“) — Richard 28. 9. 2026:
+                  „v mapě je tlačítko větší a lepší než na home“; na úzkém displeji jen ikona. */}
               <Bot className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('nav.aiChat')}</span>
             </Button>
           )}
           <NotificationBell />
