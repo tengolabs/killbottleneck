@@ -169,12 +169,14 @@ export function useAsistentChat({ open }) {
   }, [chatId, loading, model, otevriChat, nactiSeznam, setChatId]);
 
   // vysledek = výsledek akce vykonané prohlížečem (oprava PDF: {provedeno, nenalezeno, chyba}) — jen u karet s `klient`
+  // actionId = jedno id, nebo pole id („Provést vše" — jedna žádost, model dopoví jednou)
   const potvrd = useCallback(async (actionId, ok, context, patchUser, vysledek) => {
     if (!chatId || loading) return;
     setError(null);
     setLoading(true);
     try {
-      const r = await chatPotvrdit({ chat_id: chatId, action_id: actionId, ok: !!ok, context: context || {}, model: model || undefined, ...(vysledek ? { vysledek } : {}) });
+      const ktere = Array.isArray(actionId) ? { action_ids: actionId } : { action_id: actionId };
+      const r = await chatPotvrdit({ chat_id: chatId, ...ktere, ok: !!ok, context: context || {}, model: model || undefined, ...(vysledek ? { vysledek } : {}) });
       if (!zivy.current) return;
       setChat(r.chat);
       projevKarty(r.chat, patchUser);

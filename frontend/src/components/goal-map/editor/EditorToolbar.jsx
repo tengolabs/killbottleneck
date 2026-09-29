@@ -321,7 +321,16 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               „název mapy je málo viditelný a když je dlouhý, schová se").
               V liště se tísnil mezi ikonami a přebytek ořízl doprostřed slova. */}
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+        {/* Telefon (Richard 29. 9. 2026, „horní lišta plná" → „přes tři řádky" → „pořád divné"):
+            dvě PLNÉ řady. Nahoře logo + šipka zpět vlevo a napravo akce (+, hrdla, zvonek,
+            panáček, ⋮); dole zleva nástroje mapy (směr, zarovnat, čitelnost, kostička).
+            Technika: tahle skupina je na telefonu `contents` (její děti jsou přímo v hlavičce,
+            která zalamuje) a dvě vnitřní obálky — nástroje `basis-full order-last`, akce
+            `ml-auto` — jsou na počítači `sm:contents`, takže DOM i vzhled ≥640 px zůstávají 1:1.
+            Dřív (shrink-0 + w-full bez zalomení) řada jedenácti tlačítek přetekla přes okraj
+            a rolovala do strany celou stránku i s mapou. */}
+        <div className="contents sm:flex sm:items-center sm:gap-3 sm:w-auto sm:justify-end sm:shrink-0">
+          <div className="flex items-center gap-1.5 basis-full order-last sm:contents" data-testid="toolbar-nastroje">
           {/* Vyhledávání a filtr Moje úkoly se přestěhovaly do LEVÉ lišty pod
               zásobník a časovač (Richard 11. 8.: „vyhledávání dej ikonku pod
               zásobník a časovač… moje úkoly taky, je to jen filtr") — horní
@@ -487,6 +496,8 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
           <Button variant="outline" size="icon" className="min-[1850px]:hidden h-9 w-9 shrink-0 mr-auto" onClick={recenterMap} title={t('toolbar.fitViewTitle')}>
             <Maximize className="w-4 h-4" />
           </Button>
+          </div>
+          <div className="flex items-center gap-1.5 ml-auto sm:contents" data-testid="toolbar-akce">
           <PersonalTabs personalMap={personalMap} personalView={personalView} setPersonalView={setPersonalView} navigate={navigate} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -548,6 +559,14 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               )}
             </Button>
           )}
+          {/* Telefon: Asistent i v horní řadě (Richard 29. 9. 2026: „proč na mobilu není nahoře
+              taky tlačítko AI asistent?") — jako na titulce; do 1850 px je jinak jen v ⋮ menu
+              a na počítači ho zastupuje ouško na pravém okraji, na telefonu lišta dole. */}
+          {user && ai.has('chat_panel') && (
+            <Button variant="default" size="icon" className="sm:hidden h-9 w-9 shrink-0" onClick={() => asistent.setOpen((v) => !v)} title={t('toolbar.asistent')} aria-label={t('toolbar.asistent')} data-testid="toolbar-asistent-mobil">
+              <Bot className="w-4 h-4" />
+            </Button>
+          )}
           <NotificationBell />
           {/* Panáček jako všude jinde v aplikaci (reklamace z bety 12. 8. 2026):
               mapa byla jediné místo bez hlavičky, takže tu nabídka pod jménem
@@ -567,6 +586,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               {akce.filter((a) => a.viditelna && a.jen !== 'lista').map((a) => polozkaMenu(a, false))}
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </header>
   );

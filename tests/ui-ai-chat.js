@@ -177,6 +177,26 @@ H.beh(async () => {
   const mapPo = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
   expect(mapPo.nodes.length === 3 && mapPo.nodes.some((n) => n.data.title === 'Koupit novou pilu'), 'uzel je v mapě');
 
+  console.log('== víc akcí naráz → tlačítko „Provést vše" nad kartami, jedno klepnutí provede obě ==');
+  // Richard 29. 9. 2026: u termínu + řešitele na víc uzlech je správné odklikat každou kartu, ale má jít i všechny najednou
+  const napadV1 = (await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Dávka jedna', owner: me.id } })).json;
+  const napadV2 = (await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Dávka dvě', owner: me.id } })).json;
+  fronta.push({ tool_calls: [
+    { function: { name: 'add_idea_to_map', arguments: { idea_id: napadV1.id, map_id: map.id, parent_id: 'apex' } } },
+    { function: { name: 'add_idea_to_map', arguments: { idea_id: napadV2.id, map_id: map.id, parent_id: 'apex' } } },
+  ] });
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('Vlož obě dávky');
+  await page.keyboard.press('Enter');
+  expect(await cekej('[data-testid="chat-akce-vse"][data-pocet="2"]'), 'nad dvěma čekajícími kartami je „Provést vše (2)"');
+  expect((await page.$$('[data-testid="chat-akce"][data-stav="ceka"] [data-testid="chat-akce-ano"]')).length === 2, 'jednotlivé Ano u každé karty zůstává');
+  fronta.push(text('OBE-VLOZENY.'));
+  await page.click('[data-testid="chat-akce-vse"]');
+  expect(await cekejText('OBE-VLOZENY'), 'po Provést vše model dopověděl');
+  expect((await page.$$('[data-testid="chat-akce"][data-stav="hotovo"]')).length === 3 && !(await page.$('[data-testid="chat-akce-vse"]')), 'obě karty hotovo, tlačítko zmizelo');
+  const mapDavka = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
+  expect(['Dávka jedna', 'Dávka dvě'].every((tt) => mapDavka.nodes.some((n) => n.data.title === tt)), 'oba nápady jsou v mapě');
+
   console.log('== zásobník nápadů se po zásahu asistenta obnoví sám (bez reloadu) ==');
   // 13. 9. 2026 na tengo: asistent řekl „nápad je v zásobníku“, v DB byl, ale panel
   // zásobníku držel seznam z načtení stránky → vypadalo to jako lež modelu.
@@ -472,6 +492,11 @@ H.beh(async () => {
   await page.evaluate(() => localStorage.setItem('kb-chat-open', '0'));
   await page.goto(`${inst.base}/map/${map.id}`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-bar"]'), 'na úzkém displeji je dole lišta chatu');
+  // robot v horní liště editoru (jako na titulce) panel otevře, šipka dolů v hlavičce ho vrátí do lišty
+  await page.click('[data-testid="toolbar-asistent-mobil"]');
+  expect(await cekej('[data-testid="chat-panel"]'), 'tlačítko Asistent v horní liště mapy panel otevře');
+  await page.click('[data-testid="chat-zavrit"]');
+  expect(await cekej('[data-testid="chat-bar"]'), 'šipka dolů v hlavičce panel zmenší do lišty');
   fronta.push(text('MOBIL-MOCK.'));
   await page.click('[data-testid="chat-bar-rozbalit"]');
   expect(await cekej('[data-testid="chat-panel"]'), 'šipka nahoru v liště otevře panel');
@@ -494,6 +519,14 @@ H.beh(async () => {
   expect(/\?node=/.test(page.url()), 'a adresa vede na uzel');
   await page.click('[data-testid="chat-bar-rozbalit"]');
   expect(await cekej('[data-testid="chat-panel"]'), 'šipka nahoru v liště panel rozbalí');
+  // robot vlevo nahoře minimalizuje stejně jako šipka vpravo (Richard 29. 9. 2026)
+  // hned po provedené akci svítí nahoře toast — dřív ležel přes hlavičku panelu a klepnutí bral on;
+  // otevřený panel ho na telefonu posune pod svou hlavičku (CSS proměnná čtená ve výřezu toastů)
+  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--kb-toast-top') === '48px' && getComputedStyle(document.querySelector('[data-testid="toast-viewport"]')).top === '48px'), 'toasty na telefonu leží pod hlavičkou otevřeného panelu (48 px), ne přes její tlačítka');
+  await page.click('[data-testid="chat-robot-zavrit"]');
+  expect(await cekej('[data-testid="chat-bar"]'), 'klepnutí na robota v hlavičce chat zmenší do lišty (i s toastem na obrazovce)');
+  await page.click('[data-testid="chat-bar-rozbalit"]');
+  expect(await cekej('[data-testid="chat-panel"]'), 'a lišta ho zase rozbalí');
   await page.click('[data-testid="chat-input"]');
   await page.keyboard.type('Rozepsan');
   await page.click('[data-testid="chat-zmensit"]');

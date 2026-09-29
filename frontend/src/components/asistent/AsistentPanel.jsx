@@ -286,10 +286,14 @@ export default function AsistentPanel() {
   // Toasty (vpravo dole) zakrývaly políčko chatu, dokud nezmizely — např. „mapa sloučena“
   // hned po potvrzené akci asistenta (klik-test 14. 9. 2026: psaní šlo do toastu). Otevřený
   // panel na desktopu posune výřez toastů vlevo o svou šířku (CSS proměnná čtená v toast.jsx).
+  // Telefon: toasty jsou NAHOŘE a ležely přes hlavičku panelu (robot, Nový, historie, šipka
+  // dolů) — pár vteřin po každé provedené akci nešlo panel zmenšit, klepnutí bralo oznámení
+  // (klik-test 29. 9. 2026). Otevřený panel je posune pod svou hlavičku (h-12 = 48 px).
   useEffect(() => {
     const el = document.documentElement;
     if (panel.open && !mobil) el.style.setProperty('--kb-toast-right', `${panel.width}px`); else el.style.removeProperty('--kb-toast-right');
-    return () => el.style.removeProperty('--kb-toast-right');
+    if (panel.open && mobil) el.style.setProperty('--kb-toast-top', '48px'); else el.style.removeProperty('--kb-toast-top');
+    return () => { el.style.removeProperty('--kb-toast-right'); el.style.removeProperty('--kb-toast-top'); };
   }, [panel.open, panel.width, mobil]);
   const vratSkin = useCallback((predchozi) => {
     const id = predchozi || DEFAULT_SKIN_ID;
@@ -382,7 +386,8 @@ export default function AsistentPanel() {
       )}
       <div className="h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <Bot className="w-4 h-4 text-primary shrink-0" />
+          {/* robot vlevo = taky minimalizace (Richard 29. 9. 2026: „zmenšit i při kliknutí vlevo nahoře na ikonku robota") */}
+          <button type="button" className="shrink-0 rounded p-1 -m-1 hover:bg-muted" title={t('close')} aria-label={t('close')} onClick={() => A.setOpen(false)} data-testid="chat-robot-zavrit"><Bot className="w-4 h-4 text-primary" /></button>
           <span className="text-sm font-semibold truncate">{(A.chat && A.chat.title) || t('title')}</span>
           {/* Nový rozhovor hned u názvu a s popiskem — mezi samotnými ikonami vpravo se hledal (Richard 17. 9. 2026) */}
           <Button variant="outline" size="sm" className="h-8 px-2 gap-1 shrink-0" title={t('newChat')} onClick={() => { setPohled('chat'); A.novy(); }} data-testid="chat-novy"><Plus className="w-4 h-4" />{t('newChatShort')}</Button>

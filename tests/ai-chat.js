@@ -160,6 +160,37 @@ H.beh(async () => {
   expect(klice.totalItems === 0, 'dočasný API klíč po zápisu smazán');
   expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'add_idea_to_map' && /moved into map/.test(m.content)), 'model dostal výsledek zápisu a dopověděl');
 
+  console.log('== dávka: víc akcí naráz → action_ids provede všechny, model dopoví jednou ==');
+  // Richard 29. 9. 2026: termín + řešitel na pěti uzlech = pět karet, každou zvlášť odklikat je správně,
+  // ale má jít i „všechny najednou". Server: jedna žádost, akce v pořadí karet, model dopoví až po všech.
+  const napadD1 = (await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Dávka jedna', owner: meA.id } })).json;
+  const napadD2 = (await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Dávka dvě', owner: meA.id } })).json;
+  fronta.push({ tool_calls: [
+    { function: { name: 'add_idea_to_map', arguments: { idea_id: napadD1.id, map_id: map.id, parent_id: 'apex' } } },
+    { function: { name: 'add_idea_to_map', arguments: { idea_id: napadD2.id, map_id: map.id, parent_id: 'apex' } } },
+  ] });
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Vlož obě dávky' } });
+  chat = r.json.chat;
+  const kartyD = chat.messages[chat.messages.length - 1].karty.filter((k) => k.type === 'akce' && k.stav === 'ceka');
+  expect(kartyD.length === 2, `dvě karty čekají (${kartyD.length})`);
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_ids: [kartyD[0].id, 'neexistuje'], ok: true } });
+  expect(r.status === 404, `neznámé id v dávce → 404, nic se neprovede (${r.status})`);
+  mapPo = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
+  expect(!mapPo.nodes.some((n) => /^Dávka/.test(n.data.title)), 'po odmítnuté dávce v mapě nic nepřibylo');
+  const volaniPredDavkou = volani.length;
+  fronta.push(text('OBE-VLOZENY.'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_ids: [kartyD[1].id, kartyD[0].id], ok: true } });
+  expect(r.status === 200, `dávka → 200 (${r.status} ${JSON.stringify(r.json).slice(0, 160)})`);
+  chat = r.json.chat;
+  const kartyPo = chat.messages.flatMap((m) => m.karty || []).filter((k) => k.type === 'akce' && kartyD.some((d) => d.id === k.id));
+  expect(kartyPo.length === 2 && kartyPo.every((k) => k.stav === 'hotovo' && k.odkaz), 'obě karty hotovo s odkazem');
+  mapPo = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
+  expect(['Dávka jedna', 'Dávka dvě'].every((tt) => mapPo.nodes.some((n) => n.data.title === tt)), 'oba nápady jsou v mapě');
+  expect(volani.length === volaniPredDavkou + 1, `model dopověděl JEDNOU po celé dávce (${volani.length - volaniPredDavkou} volání)`);
+  const toolsD = toolZ(posledniVolani()).filter((m) => m.tool_name === 'add_idea_to_map' && /moved into map/.test(m.content));
+  expect(toolsD.length >= 2, 'model dostal výsledky obou zápisů');
+  expect((r.json.chat.pending || []).length === 0 || !r.json.chat.pending, 'nic už nečeká');
+
   console.log('== nápad podle NÁZVU pod rodiče podle NÁZVU (id si modely pletou) ==');
   const napadX = (await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Objednat brusný papír', owner: meA.id } })).json;
   fronta.push(nastroj('add_idea_to_map', { idea_id: 'objednat brusny papir', map_id: 'Truhlářství', parent_id: 'Koupit novou pilu' }));

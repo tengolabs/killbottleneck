@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { base44 } from '@/api/base44Client';
 import { useTimer, formatElapsed, formatTimeRange } from '@/lib/TimerContext';
 import { formatMinutes } from '@/components/time/TimeSummary';
@@ -27,6 +28,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
   const { toast } = useToast();
   const { running, elapsed, start, stop } = useTimer();
   const pos = fixed ? 'fixed' : 'absolute';
+  const spodek = useSpodekHlavicky(fixed); // fixed ouško: pod skutečnou hlavičkou (viz hook)
   const [entries, setEntries] = useState([]);
   const [maps, setMaps] = useState([]);
   const [note, setNote] = useState('');
@@ -110,8 +112,8 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
     return (
       <button
         onClick={onToggle}
-        style={{ left: leftOffset }}
-        className={`${pos} top-28 z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2 text-xs font-medium text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset ? '' : 'border-l-0'}`}
+        style={{ left: leftOffset, ...(fixed ? { top: spodek + 56 } : {}) }}
+        className={`${pos} ${fixed ? '' : 'top-28'} z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2 text-xs font-medium text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset ? '' : 'border-l-0'}`}
         title={t('timeLog.openTitle')}
       >
         <Timer className={`w-4 h-4 ${running ? 'text-red-500 animate-spin' : ''}`} />

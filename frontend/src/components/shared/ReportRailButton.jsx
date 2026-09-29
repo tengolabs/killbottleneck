@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bug } from 'lucide-react';
 import { useReportConfig } from '@/hooks/useReportConfig';
+import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useAuth } from '@/lib/AuthContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import ReportDialog from './ReportDialog';
@@ -25,6 +26,7 @@ export default function ReportRailButton({ top = 'top-40', leftOffset = 0, fixed
   const { enabled, version } = useReportConfig();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const spodek = useSpodekHlavicky(fixed); // fixed ouško: pod skutečnou hlavičkou (viz hook); `top` platí jen pro absolute
 
   if (!enabled) return null;
 
@@ -33,10 +35,10 @@ export default function ReportRailButton({ top = 'top-40', leftOffset = 0, fixed
     <>
       <button
         onClick={() => setOpen(true)}
-        style={{ left: leftOffset }}
+        style={{ left: leftOffset, ...(fixed ? { top: spodek + 104 } : {}) }}
         title={nsReady ? t('report.titulek') : undefined}
         data-rail-report
-        className={`${pos} ${top} z-30 flex items-center rounded-r-lg border bg-card px-2 py-2.5 text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset ? '' : 'border-l-0'}`}
+        className={`${pos} ${fixed ? '' : top} z-30 flex items-center rounded-r-lg border bg-card px-2 py-2.5 text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset ? '' : 'border-l-0'}`}
       >
         <Bug className="w-4 h-4" />
       </button>

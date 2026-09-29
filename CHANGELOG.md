@@ -9,7 +9,26 @@ below before you jump several versions.
 
 ---
 
-## v0.64-beta — 2026-09-27
+## v0.65-beta — 2026-09-29
+
+**Phone fixes from real use + "Do all" in the assistant**
+
+- **Map header on the phone**: the row of eleven buttons could not wrap, overflowed the screen and
+  let the whole page (map included) scroll sideways. Below 640 px it is now two full rows — back,
+  add goal, bottlenecks, assistant, bell and menu on top; map tools (direction, align, readability,
+  fit) below. Desktop layout is unchanged.
+- **Assistant on the phone**: a button at the top of the map (the same as on Home, highlighted like
+  *Add*); the panel shrinks by tapping the robot icon on the left of its header as well as the arrow
+  on the right. Toasts on the phone used to sit *over* the panel header for a few seconds after every
+  executed action, swallowing taps — with the panel open they now appear below the header.
+- **Assistant "Do all"**: when several actions are proposed at once (e.g. a date and an assignee on
+  five steps), a *Do all (N)* button sits above the first pending card; individual Yes/No stay.
+  `POST /api/kb/chat/potvrdit` accepts `action_ids: [...]` next to `action_id` — actions run in card
+  order and the model replies once after all of them; an unknown id rejects the whole batch (404).
+  Browser-side actions (PDF fixes) keep their own selection and are not batched.
+- **Left rail tabs on Home and Tasks** (idea inbox, timer, report a problem) were pinned at fixed
+  offsets computed for a one-line header without the trial banner; on the phone the inbox tab sat on
+  the *New* button. They now measure the real header height (banner included).
 
 **Fixes from the second code review (wave A) — no new features**
 

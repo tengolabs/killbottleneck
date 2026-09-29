@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.65-beta": {
+    cs: [
+      "Na telefonu se hlavička mapy vejde do dvou řad — nahoře zpět, přidat cíl, úzká hrdla, asistent, zvonek a menu, dole nástroje mapy — a stránka už neujíždí do strany.",
+      "Asistent na telefonu: tlačítko je i nahoře v mapě (žluté jako Přidat), panel zmenšíte klepnutím na robota vlevo stejně jako šipkou vpravo a oznámení po provedené akci už tlačítka hlavičky nezakrývají.",
+      "Když asistent navrhne víc změn naráz (třeba termín a řešitele na pěti krocích), je nad kartami „Provést vše“ — jedno klepnutí, jedna odpověď; jednotlivé Ano/Ne zůstávají.",
+      "Ouško zásobníku nápadů na titulce a v úkolech už na telefonu neleží přes tlačítko Nový — drží se pod hlavičkou i s proužkem zkušební verze.",
+    ],
+    en: [
+      "On the phone the map header fits in two rows — back, add goal, bottlenecks, assistant, bell and menu on top, map tools below — and the page no longer slides sideways.",
+      "Assistant on the phone: there is a button at the top of the map too (highlighted like Add), the panel shrinks by tapping the robot on the left as well as the arrow on the right, and notifications after an action no longer cover the header buttons.",
+      "When the assistant proposes several changes at once (say a date and an assignee on five steps), a \"Do all\" button sits above the cards — one tap, one reply; the individual Yes/No stay.",
+      "The idea inbox tab on Home and Tasks no longer sits over the New button on the phone — it stays below the header, trial banner included.",
+    ],
+  },
   "v0.64-beta": {
     cs: [
       "Časová osa na Úkolech konečně ukazuje i úkoly navěšené na cíle a jejich podúkoly (od v0.57 kreslila jen cíle a úkoly bez cíle) — tabulka a kanban je měly, osa ne.",

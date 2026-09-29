@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Check, Copy, Download, ExternalLink, FileText, Loader2, Mail, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { Check, CheckCheck, Copy, Download, ExternalLink, FileText, Loader2, Mail, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
@@ -382,6 +382,11 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
   const jaUzivatel = zprava.role === 'user';
   const karty = zprava.karty || [];
   const nahlednuto = karty.filter((k) => k.type === 'nastroje').flatMap((k) => k.jmena || []);
+  // „Provést vše": když čeká víc akcí naráz (termín + řešitel na pěti uzlech), jednotlivé
+  // potvrzení zůstává, ale navrch je jedno tlačítko pro všechny (Richard 29. 9. 2026).
+  // Karty vykonávané prohlížečem (oprava PDF) mají vlastní výběr — do dávky nejdou.
+  const cekajici = karty.filter((k) => k.type === 'akce' && k.stav === 'ceka' && !k.klient);
+  const prvniCekajici = karty.indexOf(cekajici[0]);
   return (
     <div className={`flex ${jaUzivatel ? 'justify-end' : 'justify-start'}`} data-testid="chat-msg" data-role={zprava.role}>
       <div className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${jaUzivatel ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-secondary text-foreground rounded-bl-md'}`}>
@@ -394,7 +399,18 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
         {zprava.docasna && loading && <Loader2 className="w-3 h-3 animate-spin inline-block ml-1 opacity-70" />}
         {karty.map((k, i) => {
           if (k.type === 'otazky') return <KartaOtazky key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
-          if (k.type === 'akce') return <KartaAkce key={i} karta={k} onPotvrd={onPotvrd} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />;
+          if (k.type === 'akce') return (
+            <Fragment key={i}>
+              {i === prvniCekajici && cekajici.length > 1 && (
+                <div className="mt-2 flex justify-end">
+                  <Button size="sm" disabled={loading} onClick={() => onPotvrd(cekajici.map((c) => c.id), true)} data-testid="chat-akce-vse" data-pocet={cekajici.length}>
+                    <CheckCheck className="w-3.5 h-3.5 mr-1" />{t('actionAll', { count: cekajici.length })}
+                  </Button>
+                </div>
+              )}
+              <KartaAkce karta={k} onPotvrd={onPotvrd} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />
+            </Fragment>
+          );
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
           if (k.type === 'koncept') return <KartaKoncept key={i} karta={k} mapy={mapy} vychoziMapa={vychoziMapa} onUlozKoncept={onUlozKoncept} />;
           if (k.type === 'skin') return <KartaSkin key={i} karta={k} onRevert={onRevertSkin} />;

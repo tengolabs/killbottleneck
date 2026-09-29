@@ -54,7 +54,7 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
     {/* Pruh o zkušební době patří NAD hlavičku, ať ho vidí každá stránka
         s AppHeaderem — jinak by se musel opakovat na pěti místech. */}
     <TrialBanner />
-    <header className="border-b bg-card">
+    <header className="border-b bg-card" data-app-header>
       <div className={`${PAGE_CONTAINER} min-h-14 sm:h-14 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 py-1.5 sm:py-0`}>
         <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
           {backTo && (
@@ -107,6 +107,9 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
           {user && ai.has('chat_panel') && (
             <Button
               variant={asistent.open ? 'default' : 'outline'}
+              // telefon: zvýrazněné jako „+ Nový" (Richard 29. 9. 2026: „nechal bych i toho agenta");
+              // stav „otevřeno" tam barva hlásit nemusí, panel překryje celou obrazovku
+              className="max-sm:bg-primary max-sm:text-primary-foreground max-sm:border-primary max-sm:hover:bg-primary/90 max-sm:hover:text-primary-foreground"
               onClick={() => asistent.setOpen((v) => !v)}
               title={t('nav.aiChat')}
               aria-label={t('nav.aiChat')}

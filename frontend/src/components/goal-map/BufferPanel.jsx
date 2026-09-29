@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -175,6 +176,8 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
   const { items, loading } = buffer;
   const toggle = onToggle;
   const pos = fixed ? 'fixed' : 'absolute';
+  // fixed ouško: pod skutečnou hlavičkou (na telefonu dvouřádkovou), ne pevných 64 px
+  const spodek = useSpodekHlavicky(fixed);
 
   const handleAdd = async () => {
     const title = newTitle.trim();
@@ -194,8 +197,8 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
         onClick={toggle}
         data-testid="buffer-toggle"
         title={t('tasks:taskTable.bufferSection')}
-        style={{ left: leftOffset }}
-        className={`${pos} top-16 z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all ${leftOffset ? '' : 'border-l-0'}`}
+        style={{ left: leftOffset, ...(fixed ? { top: spodek + 8 } : {}) }}
+        className={`${pos} ${fixed ? '' : 'top-16'} z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all ${leftOffset ? '' : 'border-l-0'}`}
       >
         <Inbox className="w-4 h-4 text-primary" />
         {items.length > 0 && (

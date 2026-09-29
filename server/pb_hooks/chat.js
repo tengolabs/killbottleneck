@@ -1991,8 +1991,12 @@ function pdfPosledni(msgs) {
   return null;
 }
 
-// POST /chat/potvrdit — {chat_id, action_id, ok}. Vykoná (ok) nebo zamítne akci;
-// když už žádná nečeká, model dostane výsledky a dopoví.
+// POST /chat/potvrdit — {chat_id, action_id, ok} nebo {chat_id, action_ids: [...], ok}.
+// Vykoná (ok) nebo zamítne akci; když už žádná nečeká, model dostane výsledky a dopoví.
+// Dávka (action_ids, Richard 29. 9. 2026: „označit všechny najednou" u změny termínu
+// a řešitele na víc uzlech): akce se vykonají v pořadí karet a model dopoví JEDNOU
+// až po všech — po jedné by dopovídal po každé a bral by AI tah navíc. Akce vykonávané
+// prohlížečem (oprava PDF) do dávky nepatří — ty nesou výsledek jen jednotlivě.
 function chatPotvrdit(app, auth, body, cfg, L) {
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
@@ -2000,33 +2004,39 @@ function chatPotvrdit(app, auth, body, cfg, L) {
   if (!rec) { const e = new Error(t(L, "err.chatNotFound")); e.status = 404; throw e; }
   const ctx = (body && body.context) || {};
   const pend = jsonVal(rec, "pending", []);
-  const idx = pend.findIndex((p) => p.id === String((body && body.action_id) || ""));
-  if (idx < 0) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 404; throw e; }
-  const akce = pend[idx];
+  const davka = body && Array.isArray(body.action_ids);
+  const ids = davka ? body.action_ids.map((x) => String(x || "")) : [String((body && body.action_id) || "")];
+  // pořadí = pořadí v pending (= pořadí karet), ne pořadí v požadavku; neznámé id = 404
+  const vybrane = pend.filter((p) => ids.includes(p.id));
+  if (!vybrane.length || (davka && vybrane.length !== new Set(ids).size)) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 404; throw e; }
   const msgs = jsonVal(rec, "messages", []);
   const stats = { calls: 0, in: 0, out: 0, cached: 0, tools: [], model: "" };
   const t0 = Date.now();
   let vysledek;
   let stav;
-  const defAkce = NASTROJ[akce.name];
-  if (body && body.ok && defAkce && defAkce.kind === "client") {
-    // vykonal prohlížeč (oprava PDF) — server jen zapíše, co se povedlo, a model dopoví
-    vysledek = vysledekKlienta(body.vysledek, akce.args);
-    stav = vysledek.chyba ? "chyba" : "hotovo";
-    stats.tools.push(akce.name);
-  } else if (body && body.ok) {
-    try { vysledek = vykonej(app, auth, L, akce.name, akce.args); } catch (err) { vysledek = { text: "Error: " + String(err && err.message ? err.message : err).slice(0, 300) }; }
-    stav = /^Error/.test(vysledek.text) ? "chyba" : "hotovo";
-    stats.tools.push(akce.name);
-  } else {
-    vysledek = { text: P[L].zamitnuto };
-    stav = "zamitnuto";
+  let akce;
+  for (akce of vybrane) {
+    const defAkce = NASTROJ[akce.name];
+    if (body && body.ok && defAkce && defAkce.kind === "client") {
+      if (davka) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 400; throw e; }
+      // vykonal prohlížeč (oprava PDF) — server jen zapíše, co se povedlo, a model dopoví
+      vysledek = vysledekKlienta(body.vysledek, akce.args);
+      stav = vysledek.chyba ? "chyba" : "hotovo";
+      stats.tools.push(akce.name);
+    } else if (body && body.ok) {
+      try { vysledek = vykonej(app, auth, L, akce.name, akce.args); } catch (err) { vysledek = { text: "Error: " + String(err && err.message ? err.message : err).slice(0, 300) }; }
+      stav = /^Error/.test(vysledek.text) ? "chyba" : "hotovo";
+      stats.tools.push(akce.name);
+    } else {
+      vysledek = { text: P[L].zamitnuto };
+      stav = "zamitnuto";
+    }
+    for (const m of msgs) for (const k of (m.karty || [])) {
+      if (k.type === "akce" && k.id === akce.id) { k.stav = stav; k.vysledek = vysledek.text.slice(0, 300); if (vysledek.karta) k.odkaz = vysledek.karta; if (vysledek.klient) k.vysledek_klienta = vysledek.klient; }
+    }
+    msgs.push({ role: "tool", name: akce.name, toolCallId: akce.toolCallId, content: vysledek.text });
+    pend.splice(pend.indexOf(akce), 1);
   }
-  for (const m of msgs) for (const k of (m.karty || [])) {
-    if (k.type === "akce" && k.id === akce.id) { k.stav = stav; k.vysledek = vysledek.text.slice(0, 300); if (vysledek.karta) k.odkaz = vysledek.karta; if (vysledek.klient) k.vysledek_klienta = vysledek.klient; }
-  }
-  msgs.push({ role: "tool", name: akce.name, toolCallId: akce.toolCallId, content: vysledek.text });
-  pend.splice(idx, 1);
   rec.set("pending", pend);
   rec.set("messages", msgs);
   let chyba = "";
