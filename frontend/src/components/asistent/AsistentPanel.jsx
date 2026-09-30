@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Bot, Brain, ChevronDown, ChevronLeft, ChevronUp, FileText, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Trash2, X } from 'lucide-react';
+import { Bot, Brain, ChevronDown, ChevronLeft, ChevronUp, FileText, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Moon, Trash2, X } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA } from '@/lib/storageKeys';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -403,7 +403,7 @@ export default function AsistentPanel() {
               {A.seznam.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('historyEmpty')}</div>}
               {A.seznam.map((c) => (
                 <DropdownMenuItem key={c.id} onSelect={() => { setPohled('chat'); A.otevriChat(c.id); }} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{c.mode === 'porada' ? '☀ ' : c.mode === 'rozbor' ? '⚒ ' : ''}{c.title || t('newChat')}</span>
+                  <span className="truncate">{c.mode === 'porada' ? '☀ ' : c.mode === 'nocni' ? '☾ ' : c.mode === 'rozbor' ? '⚒ ' : ''}{c.title || t('newChat')}</span>
                   <button type="button" className="text-muted-foreground hover:text-destructive" title={t('delete')} onClick={(e) => { e.stopPropagation(); e.preventDefault(); A.smaz(c.id); }}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -433,6 +433,18 @@ export default function AsistentPanel() {
                 </div>
               </div>
             )}
+            {/* Noční plánování (Richard 29.–30. 9. 2026): vlastní rámeček pod nabídkou ranní porady, v prázdném
+                rozhovoru VŽDY — žádná logika dne, nabídka ani notifikace, nic k odmítání; spouští ho jen uživatel.
+                Spuštění uklidí ranní nabídku pro dnešek (Richard 30. 9.: „už by mi neměla svítit“) */}
+            {zpravy.length === 0 && dostupny && !A.loading && (
+              <div className="rounded-lg border border-primary/50 bg-background/70 p-3 text-sm" data-testid="chat-nocni-nabidka">
+                <p className="inline-flex items-center gap-1.5 font-medium"><Moon className="w-4 h-4 text-primary" />{t('nocniOffer')}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('nocniOfferHint')}</p>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { odmitniPoradu(); setPohled('chat'); A.zacniRezim('nocni', {}, kontext, patchUser); }} data-testid="chat-nocni-start">{t('nocniYes')}</Button>
+                </div>
+              </div>
+            )}
             {zpravy.length === 0 && (
               <div className="pt-6 text-center space-y-3">
                 <Bot className="w-8 h-8 mx-auto text-primary/70" />
@@ -457,7 +469,7 @@ export default function AsistentPanel() {
           </div>
           {zpravy.length === 0 && Array.isArray(chips) && (
             <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-              {/* průvodci: ranní porada, rozbor projektu (na mapě: tenhle projekt), zaseknutí */}
+              {/* průvodci: ranní porada, rozbor projektu (na mapě: tenhle projekt), zaseknutí; noční plánování má vlastní rámeček výš */}
               <button type="button" onClick={() => A.zacniRezim('porada', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-porada">{t('chipPorada')}</button>
               <button type="button" onClick={() => A.zacniRezim('rozbor', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-rozbor">{kontext.map_id ? t('chipRozborMapa') : t('chipRozbor')}</button>
               {chips.map((c) => (

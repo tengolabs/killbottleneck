@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.66-beta": {
+    cs: [
+      "Noční plánování: nový rámeček v asistentovi pod ranní poradou — vložíte fotku poznámek z dneška a vypíšete, co vám zůstalo v hlavě; asistent to roztřídí a doporučí, co z toho bude (nový projekt, do projektu, zásobník na později), a zapíše až po vašem „Ano“.",
+      "Ranní porada začíná stejnou výzvou na fotku a nápady, teprve potom přijde plán dne.",
+      "Přepis fotky poznámek je chytřejší: nadpis seznamu bere jako název projektu, tlačítka aplikace na screenshotu vynechá a prázdné kolečko už neznamená hotovo.",
+      "Kroky s termínem: na řešitele se asistent ptá rovnou v otázce k doporučení, ne až podruhé; závěrečná věta se v rozhovoru už neopakuje dvakrát.",
+    ],
+    en: [
+      "Evening planning: a new box in the assistant below the morning briefing — paste a photo of today's notes and write down what is still on your mind; the assistant sorts it, recommends what to make of it (a new project, into a project, the buffer for later) and writes only after your \"Yes\".",
+      "The morning briefing opens with the same photo-and-ideas invitation, the day's plan comes after.",
+      "Reading a notes photo is smarter: a list heading becomes the project title, app buttons in a screenshot are skipped and an empty checkbox no longer means done.",
+      "Steps with a deadline: the assistant asks about the assignee right in the recommendation question, not a second time; the closing sentence no longer repeats twice in the conversation.",
+    ],
+  },
   "v0.65-beta": {
     cs: [
       "Na telefonu se hlavička mapy vejde do dvou řad — nahoře zpět, přidat cíl, úzká hrdla, asistent, zvonek a menu, dole nástroje mapy — a stránka už neujíždí do strany.",

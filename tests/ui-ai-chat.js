@@ -57,6 +57,7 @@ H.beh(async () => {
   const cekej = async (sel, ms = 10000) => page.waitForSelector(sel, { timeout: ms }).then(() => true).catch(() => false);
   const textPanelu = () => page.evaluate(() => document.querySelector('[data-testid="chat-panel"]')?.innerText || '');
   const cekejText = async (s, ms = 15000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if ((await textPanelu()).includes(s)) return true; await sleep(300); } return false; };
+  const cekejTextDokumentu = async (s, ms = 10000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if ((await page.evaluate(() => document.body.innerText)).includes(s)) return true; await sleep(300); } return false; };
 
   console.log('== ouško → panel, stav přežije reload ==');
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
@@ -71,6 +72,9 @@ H.beh(async () => {
 
   console.log('== nabídka ranní porady při prvním otevření, „Dnes ne" drží ==');
   expect(await cekej('[data-testid="chat-porada-nabidka"]'), 'první otevření dne → nabídka ranní porady');
+  expect(!!(await page.$('[data-testid="chat-nocni-nabidka"]')), 'pod ní je i rámeček Noční plánování (Richard 30. 9. 2026: solo rámeček)');
+  const poradiRamecku = await page.evaluate(() => { const a = document.querySelector('[data-testid="chat-porada-nabidka"]'), b = document.querySelector('[data-testid="chat-nocni-nabidka"]'); return a && b ? (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? 'pod' : 'nad') : 'chybí'; });
+  expect(poradiRamecku === 'pod', `rámeček Noční plánování je pod ranní nabídkou (${poradiRamecku})`);
   await page.click('[data-testid="chat-porada-ne"]');
   await sleep(300);
   expect((await page.$('[data-testid="chat-porada-nabidka"]')) === null, 'Dnes ne → nabídka zmizela');
@@ -364,6 +368,22 @@ H.beh(async () => {
   expect(await cekejText('Ranní porada'), 'titulek rozhovoru = Ranní porada');
   const vP = volani[volani.length - 1];
   expect(/RANNÍ PORADA/.test(systemZ(vP)) && vP.messages.some((m) => m.role === 'user' && /ranní poradu/.test(m.content)), 'server dostal režim porada a složil úvodní zprávu');
+
+  console.log('== Noční plánování = vlastní rámeček pod nabídkou ranní porady (Richard 30. 9. 2026: „ne 3. tlačítko, solo rámeček“) ==');
+  await page.click('[data-testid="chat-novy"]');
+  expect(await cekej('[data-testid="chat-nocni-nabidka"]'), 'rámeček Noční plánování v prázdném rozhovoru (i když ranní nabídka už není)');
+  expect((await page.$('[data-testid="chat-chip-nocni"]')) === null, 'noční plánování není čip, jen rámeček');
+  fronta.push(text('NOCNI-UI-MOCK.'));
+  await page.click('[data-testid="chat-nocni-start"]');
+  expect(await cekejText('NOCNI-UI-MOCK'), 'noční plánování odpovědělo');
+  expect(await cekejText('Noční plánování'), 'titulek rozhovoru = Noční plánování');
+  expect((await page.$('[data-testid="chat-nocni-nabidka"]')) === null, 'v běžícím rozhovoru rámeček není');
+  expect(await page.evaluate(() => Object.entries(localStorage).some(([k, v]) => k.startsWith('kb-chat-porada-ne:') && v === new Date().toLocaleDateString('en-CA'))), 'spuštění nočního plánování uklidí ranní nabídku pro dnešek (Richard 30. 9. 2026)');
+  const vN = volani[volani.length - 1];
+  expect(/NOČNÍ PLÁNOVÁNÍ/.test(systemZ(vN)) && vN.messages.some((m) => m.role === 'user' && /noční plánování/.test(m.content)), 'server dostal režim nocni a složil úvodní zprávu');
+  await page.click('[data-testid="chat-historie"]');
+  expect(await cekejTextDokumentu('☾ Noční plánování'), 'v historii má noční plánování ikonu měsíce');
+  await page.keyboard.press('Escape');
 
   console.log('== obrázek: Ctrl+V, sponka, přetažení → přepis → karta se všemi položkami → zásobník ==');
   await page.click('[data-testid="chat-novy"]');

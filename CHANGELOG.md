@@ -9,6 +9,25 @@ below before you jump several versions.
 
 ---
 
+## v0.66-beta — 2026-09-30
+
+**Morning briefing asks for your notes + Evening planning**
+
+- **Morning briefing** now opens by inviting you to paste a photo of your notes (Ctrl+V, drag and
+  drop, paperclip / camera on the phone) and to write down everything on your mind; the items are
+  sorted into the idea buffer or projects (cards to confirm) before the day's recommendations.
+  "Nothing to add, go on" skips the step. The offer on first open of the day is unchanged.
+- **Evening planning** (`mode: nocni`): its own box in an empty conversation, below the
+  morning-briefing offer — always there, no day logic, no reminder, nothing to dismiss. The
+  assistant invites you to empty your head (photo + ideas), saves nothing right away, sorts the
+  items and recommends what to make of them (new project / into a project / buffer for later),
+  asks "Do it this way?" and only then creates the project and writes (cards). It does not touch
+  today's or tomorrow's tasks — the morning briefing does. History shows it with a ☾ icon.
+  `POST /api/kb/chat` accepts `mode: "nocni"` next to `porada` and `rozbor`.
+- **Image transcript rules**: a heading above a list is a project title, not an item; app controls
+  (e.g. "Add item") are skipped; an empty checkbox is not "done"; pasted lists are sorted with a
+  recommendation before anything is saved.
+
 ## v0.65-beta — 2026-09-29
 
 **Phone fixes from real use + "Do all" in the assistant**

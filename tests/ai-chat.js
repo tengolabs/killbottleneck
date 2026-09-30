@@ -480,6 +480,104 @@ H.beh(async () => {
   expect(/RANNÍ PORADA/.test(systemZ(posledniVolani())) && /get_my_day/.test(systemZ(posledniVolani())), 'systém nese scénář porady');
   const seznamP = (await inst.api('GET', '/api/kb/chat/seznam', { token: A })).json.chats;
   expect(seznamP.some((c) => c.mode === 'porada'), 'seznam rozhovorů nese režim');
+  expect(/Vložím fotku nebo nápady/.test(systemZ(posledniVolani())) && /Nic nemám, pokračuj/.test(systemZ(posledniVolani())), 'porada: krok 0 = výzva vložit fotku poznámek a nápady (Richard 29. 9. 2026)');
+  expect(/Udělat to takhle\?/.test(systemZ(posledniVolani())) && /NIC neukládej rovnou/.test(systemZ(posledniVolani())), 'porada: vložené položky = doporučení + potvrzení, ne rovnou zásobník (Richard 30. 9. 2026)');
+
+  console.log('== noční plánování (Richard 30. 9. 2026: výzva → TŘÍDĚNÍ S DOPORUČENÍM → potvrzení → provést; úkoly NEřeší) ==');
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Dáte sem nápady a poznámky z dneška?', options: ['Vložím fotku nebo nápady', 'Nic nemám, pokračuj'] }] }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'nocni', message: '', context: { route: '/' } } });
+  expect(r.status === 200 && r.json.chat.mode === 'nocni' && /^Noční plánování \d+\. \d+\.$/.test(r.json.chat.title), `nocni = nový rozhovor s režimem a titulkem (${r.status} ${r.json.chat && r.json.chat.title})`);
+  expect(r.json.chat.messages[0].role === 'user' && /noční plánování/.test(r.json.chat.messages[0].content), 'zprávu za uživatele složil server (kickoff nocni)');
+  const sysN = systemZ(posledniVolani());
+  expect(/NOČNÍ PLÁNOVÁNÍ/.test(sysN) && /TŘÍDĚNÍ S DOPORUČENÍM/.test(sysN) && /Nový projekt „<název>“ \(N položek\)/.test(sysN) && /Do zásobníku na později \(K\) — nehodí se k ničemu/.test(sysN), 'systém nese scénář: roztřídit a doporučit (nový projekt / do projektu / zásobník na později)');
+  expect(/„Ano, udělej to tak“, „Chci to jinak – ptej se dál“ a „Vše do zásobníku“/.test(sysN) && /NIC neukládej rovnou/.test(sysN), 'doporučení se před zápisem potvrzuje, nic se neukládá rovnou');
+  expect(/všechny nápady a poznámky/.test(sysN) && /Vložím fotku nebo nápady/.test(sysN), 'systém nese výzvu: všechny nápady a poznámky textem nebo fotkou');
+  expect(sysN.indexOf('Vložím fotku nebo nápady') < sysN.indexOf('TŘÍDĚNÍ S DOPORUČENÍM'), 'výzva na nápady je PRVNÍ krok');
+  expect(/Dnešní ani zítřejší úkoly NEŘEŠ/.test(sysN) && !/PO JEDNOTLIVÝCH ÚKOLECH/.test(sysN), 'úkoly dne noční plánování neřeší (to je ranní porada)');
+  expect(/nikdy seznam dnešních položek/.test(sysN), 'paměť: jen trvalé věci, ne denní seznam');
+  expect(!/RANNÍ PORADA/.test(sysN) && !/REŽIM ROZBOR/.test(sysN), 'scénáře porady a rozboru v nočním plánování nejsou');
+  const chatN = r.json.chat;
+  const kV = chatN.messages[chatN.messages.length - 1].karty.find((k) => k.type === 'otazky');
+  expect(!!kV && kV.questions[0].options[0] === 'Vložím fotku nebo nápady', 'první tah = karta výzvy (fotka nebo nápady / nic nemám)');
+  // položky textem → model čte mapy, napíše doporučení a zeptá se; nic se nezapsalo
+  fronta.push(nastroj('list_maps', {}), { content: 'Doporučení:\nNový projekt „Oslava“ (3 položky):\n- sál\n- dort\n- hosté\nDo zásobníku na později (1) — nehodí se k ničemu:\n- koupit ponožky', tool_calls: [{ function: { name: 'ask_user', arguments: { questions: [{ text: 'Udělat to takhle?', options: ['Ano, udělej to tak', 'Chci to jinak – ptej se dál', 'Vše do zásobníku'] }] } } }] });
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatN.id, message: '[Přepis obrázku]\n- sál\n- dort\n- hosté\n- koupit ponožky' } }); // značka přepisu v poslední zprávě = jediná cesta, kde sNovymProjektem vůbec zasáhne
+  const mDop = r.json.chat.messages[r.json.chat.messages.length - 1];
+  expect(/Nový projekt „Oslava“/.test(mDop.content) && (mDop.karty || []).some((k) => k.type === 'otazky' && k.questions[0].options[0] === 'Ano, udělej to tak'), 'doporučení v textu + otázka Udělat to takhle?');
+  expect(r.json.chat.pending.length === 0, 'před souhlasem žádná karta k potvrzení (nic se neukládá rovnou)');
+  expect(JSON.stringify(mDop.karty.find((k) => k.type === 'otazky').questions[0].options) === JSON.stringify(['Ano, udělej to tak', 'Chci to jinak – ptej se dál', 'Vše do zásobníku']), 'k otázce „Udělat to takhle?“ se NEpřilepí automatická volba Založit nový projekt (doporučení ho už obsahuje)');
+  fronta.push({ tool_calls: [{ function: { name: 'create_project', arguments: { title: 'Oslava', goal: 'Uspořádat oslavu', outline: [{ title: 'sál' }, { title: 'dort' }, { title: 'hosté' }] } } }, { function: { name: 'add_ideas', arguments: { items: [{ title: 'koupit ponožky' }] } } }] });
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatN.id, message: '1) Ano, udělej to tak' } });
+  const kartyN = (r.json.chat.messages[r.json.chat.messages.length - 1].karty || []).filter((k) => k.type === 'akce');
+  expect(kartyN.length === 2 && /Založit nový projekt „Oslava“/.test(kartyN[0].popis) && /Uložit do zásobníku nápadů 1 položk/.test(kartyN[1].popis), `po souhlasu obě karty naráz: projekt + zbytek do zásobníku (${kartyN.map((k) => k.popis).join(' | ')})`);
+  fronta.push(text('Hotovo, den je uzavřený.'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chatN.id, action_ids: kartyN.map((k) => k.id), ok: true } });
+  expect(r.status === 200 && /den je uzavřený/.test(r.json.chat.messages[r.json.chat.messages.length - 1].content), `Provést vše → obě provedeny, model dopoví (${r.status})`);
+  expect((await inst.api('GET', '/api/kb/chat/seznam', { token: A })).json.chats.length >= 1 && (await inst.api('GET', '/api/collections/goalmaps/records?filter=' + encodeURIComponent('title="Oslava"'), { token: A })).json.totalItems === 1, 'projekt Oslava skutečně založen');
+  // Richard 30. 9. (zápisnice s termínem): řešitel se ptá v TÉŽE otázce jako doporučení → po Ano rovnou karta, žádná druhá otázka
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Dáte sem nápady?', options: ['Vložím fotku nebo nápady', 'Nic nemám, pokračuj'] }] }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'nocni', message: '', context: { route: '/' } } });
+  const chatT = r.json.chat;
+  expect(/Kroky s termínem řešíte vy\?/.test(systemZ(posledniVolani())) && /do TÉHOŽ volání ask_user/.test(systemZ(posledniVolani())), 'systém: řešitel kroků s termínem se ptá v témže ask_user jako doporučení');
+  expect(/owner = „none“ při Ne/.test(systemZ(posledniVolani())) && /prázdný owner u kroku s termínem server odmítne/.test(systemZ(posledniVolani())), 'prompt: při Ne owner = none (prázdný by server odmítl a zeptal se znovu — /checkup 30. 9.)');
+  expect(/přednost před obecným pravidlem pro „\[Přepis obrázku\]“/.test(systemZ(posledniVolani())) && /v TÉŽE odpovědi/.test(systemZ(posledniVolani())) && /odpověz jen jednou větou/.test(systemZ(posledniVolani())), 'prompt: přednost režimu, text+otázka v téže odpovědi, po „Vložím“ jen čekat');
+  fronta.push(nastroj('list_maps', {}), { content: 'Doporučení: nový projekt „Dodávky“ (2).', tool_calls: [{ function: { name: 'ask_user', arguments: { questions: [{ text: 'Doporučuji: nový projekt „Dodávky“ (2 položky). Udělat to takhle?', options: ['Ano, udělej to tak', 'Chci to jinak – ptej se dál', 'Vše do zásobníku'] }, { text: 'Kroky s termínem řešíte vy?', options: ['Ano, řeším je já', 'Ne, nechat bez řešitele'] }] } } }] });
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatT.id, message: '[Přepis obrázku]\n- materiál do skladu v Dolní Lhotě do 8. 9. 14:00\n- eskalovat interně' } });
+  expect((r.json.chat.messages[r.json.chat.messages.length - 1].karty || []).some((k) => k.type === 'otazky' && k.questions.length === 2), 'doporučení + řešitel = jedna karta se dvěma otázkami');
+  expect(JSON.stringify(r.json.chat.messages[r.json.chat.messages.length - 1].karty.find((k) => k.type === 'otazky').questions[0].options) === JSON.stringify(['Ano, udělej to tak', 'Chci to jinak – ptej se dál', 'Vše do zásobníku']), 'ani tady se nepřilepí Založit nový projekt');
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Doporučuji: doplnit poznámku. Udělat to takhle?', options: ['Ano, doplnit poznámku', 'Chci to jinak – ptej se dál', 'Vše do zásobníku'] }] }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatT.id, message: '[Přepis obrázku]\n- ještě poznámka k obrázku' } });
+  expect(JSON.stringify(r.json.chat.messages[r.json.chat.messages.length - 1].karty.find((k) => k.type === 'otazky').questions[0].options) === JSON.stringify(['Ano, doplnit poznámku', 'Chci to jinak – ptej se dál', 'Vše do zásobníku']), 'přeformulovaná první volba (Ano, …) + Vše do zásobníku = pořád otázka doporučení, bez přilepené volby (Richard 30. 9.)');
+  fronta.push(nastroj('create_project', { title: 'Dodávky', goal: 'Zajistit materiál', outline: [{ title: 'Materiál do skladu', deadline: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })(), owner: 'me' }, { title: 'Eskalovat interně' }] }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatT.id, message: '1) Ano, udělej to tak\n2) Ano, řeším je já' } });
+  const kT = (r.json.chat.messages[r.json.chat.messages.length - 1].karty || []).find((k) => k.type === 'akce');
+  expect(!!kT && /Založit nový projekt „Dodávky“/.test(kT.popis) && !r.json.chat.messages.some((m) => m.role === 'tool' && /has not been asked who handles/.test(m.content || '')), `po odpovědi na obě otázky rovnou karta projektu, bez druhé otázky na řešitele (${kT && kT.popis})`);
+  // zdvojený závěr: text před remember/suggest_next + stejný text po nich → jedna bublina
+  fronta.push({ content: 'Hotovo — projekt „Dodávky“ je založený se 2 kroky.', tool_calls: [{ function: { name: 'remember', arguments: { text: '- Řeší dodávky plechů' } } }] }, nastroj('suggest_next', { suggestions: ['Rozebrat projekt Dodávky'] }), text('Hotovo — projekt „Dodávky“ je založený se 2 kroky.'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chatT.id, action_id: kT.id, ok: true } });
+  const odUserT = r.json.chat.messages.map((m) => m.role).lastIndexOf('user');
+  const bublinyT = r.json.chat.messages.slice(odUserT + 1).filter((m) => m.role === 'assistant' && /Hotovo — projekt „Dodávky“/.test(m.content || ''));
+  expect(bublinyT.length === 1, `závěr napsaný před remember/suggest_next a zopakovaný po nich = jedna bublina (${bublinyT.length})`);
+  // (níže až po potvrzení karty Dodávky — nová zpráva uživatele by čekající kartu zahodila)
+  // větev „Ne, nechat bez řešitele“ → owner "none" → karta rovnou, žádná druhá otázka na řešitele (/checkup 30. 9.)
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Doporučuji: nový projekt „Kotelna“ (1 položka). Udělat to takhle?', options: ['Ano, udělej to tak', 'Chci to jinak – ptej se dál', 'Vše do zásobníku'] }, { text: 'Kroky s termínem řešíte vy?', options: ['Ano, řeším je já', 'Ne, nechat bez řešitele'] }] }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatT.id, message: '[Přepis obrázku]\n- revize kotle do 15. 11.' } });
+  fronta.push(nastroj('create_project', { title: 'Kotelna', goal: 'Projít revizí', outline: [{ title: 'Revize kotle', deadline: (() => { const d = new Date(); d.setDate(d.getDate() + 45); return d.toISOString().slice(0, 10); })(), owner: 'none' }] }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatT.id, message: '1) Ano, udělej to tak\n2) Ne, nechat bez řešitele' } });
+  const kNe = (r.json.chat.messages[r.json.chat.messages.length - 1].karty || []).find((k) => k.type === 'akce');
+  const ptalSeZnovu = r.json.chat.messages.slice(-3).some((m) => m.role === 'tool' && /has not been asked who handles/.test(m.content || ''));
+  expect(!!kNe && /Založit nový projekt „Kotelna“/.test(kNe.popis) && !ptalSeZnovu, `„Ne, nechat bez řešitele“ → owner none → karta projektu rovnou, bez druhé otázky (${kNe && kNe.popis} | znovu=${ptalSeZnovu})`);
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chatT.id, action_id: kNe.id, ok: false } });
+  for (const mp of (await inst.api('GET', '/api/collections/goalmaps/records?filter=' + encodeURIComponent('title="Dodávky"'), { token: A })).json.items) await inst.api('DELETE', `/api/collections/goalmaps/records/${mp.id}`, { token: A });
+  // balíček + hybrid: úvodní tah lehkému, tah po výzvě (položky) HLAVNÍMU bez klasifikátoru (Richard 30. 9. 2026: jen balíčkové konverzace)
+  const instHy = await H.startInstance({ slug: 'chat-hybrid-balicek', addHostGateway: true, env: {
+    KB_CHAT_PROVIDER: 'ollama', KB_CHAT_URL: mock.base, KB_CHAT_MODEL: 'm-a', KB_UVODNI_MAPA: 0,
+    KB_CHAT_LIGHT_PROVIDER: 'ollama', KB_CHAT_LIGHT_URL: mock.base, KB_CHAT_LIGHT_MODEL: 'm-light', KB_CHAT_HYBRID: 'rezim,klasifikator',
+  } });
+  await instHy.register('hy@example.com', { name: 'Hy' }); const HY = await instHy.login('hy@example.com');
+  let predHy = volani.length;
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Dáte sem nápady?', options: ['Vložím fotku nebo nápady', 'Nic nemám, pokračuj'] }] }));
+  r = await instHy.api('POST', '/api/kb/chat', { token: HY, body: { mode: 'nocni', message: '' } });
+  const chatHy = r.json.chat;
+  expect(volani.slice(predHy).map((v) => v.model).join(',') === 'm-light', `úvodní tah balíčku = lehký model (${volani.slice(predHy).map((v) => v.model).join(',')})`);
+  predHy = volani.length;
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Doporučuji: 1 do zásobníku. Udělat to takhle?', options: ['Ano, udělej to tak', 'Chci to jinak – ptej se dál', 'Vše do zásobníku'] }] }));
+  r = await instHy.api('POST', '/api/kb/chat', { token: HY, body: { chat_id: chatHy.id, message: 'koupit ponožky' } });
+  expect(volani.slice(predHy).map((v) => v.model).join(',') === 'm-a', `tah po výzvě = hlavní model, bez klasifikátoru (${volani.slice(predHy).map((v) => v.model).join(',')})`);
+  // rozbor není balíček: tah po první odpovědi jde přes klasifikátor (lehký rozhodne)
+  predHy = volani.length;
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Který projekt?', options: ['A', 'B'] }] }));
+  r = await instHy.api('POST', '/api/kb/chat', { token: HY, body: { mode: 'rozbor', message: '' } });
+  const chatRz = r.json.chat; predHy = volani.length;
+  fronta.push(text('{"zapis": false}'), text('Rozumím.'));
+  r = await instHy.api('POST', '/api/kb/chat', { token: HY, body: { chat_id: chatRz.id, message: 'jen se ptám' } });
+  expect(volani.slice(predHy).map((v) => v.model).join(',') === 'm-light,m-light', `rozbor (ne balíček) → klasifikátor + lehký (${volani.slice(predHy).map((v) => v.model).join(',')})`);
+  // úklid po scénáři: projekt a nápad pryč, ať další kontroly (počet nápadů = 1, seznam map v systému) sedí jako dřív
+  for (const mp of (await inst.api('GET', '/api/collections/goalmaps/records?filter=' + encodeURIComponent('title="Oslava"'), { token: A })).json.items) await inst.api('DELETE', `/api/collections/goalmaps/records/${mp.id}`, { token: A });
+  for (const bn of (await inst.api('GET', '/api/collections/buffer_nodes/records?filter=' + encodeURIComponent('title="koupit ponožky"'), { token: A })).json.items) await inst.api('DELETE', `/api/collections/buffer_nodes/records/${bn.id}`, { token: A });
+  expect((await inst.api('GET', '/api/kb/chat/seznam', { token: A })).json.chats.some((c) => c.mode === 'nocni'), 'seznam rozhovorů nese režim nocni');
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'vecer', message: 'x' } });
+  expect(r.status === 200 && !r.json.chat.mode, 'neznámý režim se tiše bere jako obyčejný rozhovor (whitelist)');
   fronta.push(text('ROZBOR-MOCK.'));
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'rozbor', target: { map: 'Truhlářství' }, message: '' } });
   expect(r.status === 200 && r.json.chat.mode === 'rozbor' && r.json.chat.title === 'Rozbor: Truhlářství' && r.json.chat.target.map_id === map.id, 'rozbor s cílovou mapou podle názvu');
@@ -732,6 +830,8 @@ H.beh(async () => {
   expect(/\[Přepis obrázku\]\n/.test(cUser.content) && /koupit pilu/.test(cUser.content) && /logo \(hotovo\)/.test(cUser.content), 'chat model dostal přepis se značkou, ne obrázek');
   expect(cv.every((v) => v.messages.every((m) => !m.images)), 'do smyčky nástrojů obrázek NEJDE (žádné images v chat voláních)');
   expect(Array.isArray(cv[0].tools) && cv[0].tools.some((t) => t.function.name === 'add_ideas'), 'po přepisu model dostal nástroj add_ideas');
+  expect(/NADPIS/.test(systemZ(cv[0])) && /PŘEDNOST MÁ PLÁN/.test(systemZ(cv[0])) && /create_project s title = nadpis/.test(systemZ(cv[0])), 'pravidlo: nadpis není položka, seznam s nadpisem → návrh projektu, zásobník až poslední (Richard 30. 9. 2026)');
+  expect(/nadpis nebo název seznamu nech na vlastním řádku BEZ pomlčky/.test(JSON.stringify(volaniVize[volaniVize.length - 1])) && /Ovládací prvky aplikace/.test(JSON.stringify(volaniVize[volaniVize.length - 1])) && /prázdné kolečko/.test(JSON.stringify(volaniVize[volaniVize.length - 1])), 'přepis: nadpis bez pomlčky, tlačítka aplikace vynechat, prázdné kolečko ≠ hotovo (Richardův screenshot 30. 9.)');
   expect(/Přepis obrázku/.test(systemZ(cv[0])), 'systémová instrukce popisuje, co s přepisem');
   const ulozeno = JSON.stringify(chat);
   expect(ulozeno.indexOf(JPG.slice(0, 60)) < 0, 'originál obrázku se do rozhovoru NEuložil');
