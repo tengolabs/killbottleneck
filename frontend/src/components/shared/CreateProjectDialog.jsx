@@ -20,6 +20,7 @@ import {
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useAiModes } from '@/hooks/useAiEnabled';
+import { useAsistent } from '@/lib/AsistentContext';
 import { createEmptyProject, createProjectFromTemplate } from '@/lib/createProject';
 import { isProcessTemplate, templateForLang } from '@/lib/templateConvert';
 import { getCategoryLabel } from '@/lib/templateCategories';
@@ -34,10 +35,11 @@ import i18next from 'i18next';
 import { useLazyNs, ensureNs } from '@/i18n/lazyNs';
 import { useToast } from '@/components/ui/use-toast';
 
-// Jednotné zakládání projektu (Home i Úkoly): Prázdný / Ze šablony,
-// volitelně odbočka na sjednocený AI dialog (onOpenAi — dialog vlastní volající).
-// Odbočka předává rozepsaná pole (cíl/emoji/barva/klient), ať se nezahodí.
-export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi }) {
+// Jednotné zakládání projektu (Home i Úkoly): Prázdný / Ze šablony, volitelně odkaz „navrhnout s AI“.
+// Odkaz od 1. 10. 2026 spouští asistenta (balíček Nový projekt s AI, převedený Poradce) a předává
+// mu rozepsaná pole (cíl/emoji/barva/klient), ať se nezahodí — emoji, barvu a klienta doplní
+// server k založené mapě, model je nevidí.
+export default function CreateProjectDialog({ open, onClose, onCreated }) {
   // `t` je uvnitř tohoto souboru položka šablony (filter) — překladač jako `tr`
   const { t: tr } = useTranslation(['home', 'rules']);
   // odznak „vč. N pravidel" u šablon s pravidly — text v lazy ns rules
@@ -45,6 +47,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
   const rulesNsReady = useLazyNs('rules');
   const { toast } = useToast();
   const ai = useAiModes();
+  const asistent = useAsistent();
   const { user } = useAuth();
   const [tab, setTab] = useState('empty');
   const [name, setName] = useState('');
@@ -285,13 +288,14 @@ export default function CreateProjectDialog({ open, onClose, onCreated, onOpenAi
             );
           })()}
 
-          {(ai.has('generate') || ai.has('from_text')) && onOpenAi && (
+          {ai.has('chat_panel') && (
             <Button
               variant="link"
               className="justify-start px-0 h-auto text-xs"
+              data-testid="create-project-ai"
               onClick={() => {
                 onClose();
-                onOpenAi({ goal: name.trim(), emoji, color, clientId });
+                asistent.spust('novy_projekt', { cil: name.trim(), meta: { emoji, color, client: clientId } });
               }}
             >
               <Sparkles className="w-3 h-3" /> {tr('createProject.orFromText')}

@@ -159,6 +159,79 @@ function teplota(opts) {
 }
 
 // ---------- OpenAI-kompatibilní (/chat/completions) ----------
+// Uvažující modely (o-series, gpt-5* vč. GPT-5.6 Luna) odmítají temperature ≠ 1 i max_tokens → bohaté
+// tělo u nich VŽDY skončilo 400 a každé volání šlo dvakrát; strop 1500 tokenů jim navíc spolkne přemýšlení
+// a vrátí prázdno (finish_reason length). Poznají se podle jména, nebo podle toho, že odpověď nesla
+// reasoning_tokens / že odmítly max_tokens či teplotu — instance si to pamatuje ($app.store, klíč base|model).
+// Dostanou rovnou holé tělo s rezervou KB_AI_REASONING_BUDGET (4000) a reasoning_effort KB_AI_REASONING_EFFORT
+// („low“; `extra` z prostředí má přednost, „auto“ = neposílat). 30. 9. 2026 — příprava na ostrý test OpenAI.
+const jeUvazujici = (model) => /(^|\/)(o\d|gpt-5)/i.test(String(model || ""));
+function posliOpenAI(cfg, base, bohate, hole, limit, timeout) {
+  const { env } = require(`${__hooks}/helpers.js`);
+  const model = (cfg && cfg.model) || "";
+  const extra = (cfg && cfg.extra) || null;
+  const store = $app.store();
+  const klic = "llm:tvar:" + base + "|" + model;
+  const posli = (payload) => $http.send({
+    url: base + "/chat/completions",
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + ((cfg && cfg.token) || ""),
+      // OpenRouter tímhle pozná, odkud volání je; ostatní brány to ignorují
+      "HTTP-Referer": "https://killbottleneck.com",
+      "X-Title": "killBottleneck",
+    },
+    timeout: Number(timeout) || 300,
+  });
+  const pamet = store.get(klic);
+  const uvazujici = jeUvazujici(model) || pamet === "uvazujici";
+  const rezerva = Number(env("AI_REASONING_BUDGET")) > 0 ? Number(env("AI_REASONING_BUDGET")) : 4000;
+  const effort = String(env("AI_REASONING_EFFORT") || "low").toLowerCase();
+  const effortZExtra = !!(extra && extra.reasoning_effort !== undefined);
+  // holé tělo; uvažujícímu modelu navíc rezerva na přemýšlení a effort (extra z prostředí má přednost)
+  const holeTelo = (uvaz) => {
+    const t = Object.assign({}, hole);
+    if (uvaz) {
+      t.max_completion_tokens = limit + rezerva;
+      if (effort && effort !== "auto" && !effortZExtra) t.reasoning_effort = effort;
+    }
+    if (extra) Object.assign(t, extra);
+    return t;
+  };
+  // model/brána effort nezná → jednou bez něj (effort z prostředí nastavil správce vědomě, ten se nechá)
+  const zkus = (t) => {
+    let r = posli(t);
+    if (r.statusCode === 400 && t.reasoning_effort !== undefined && !effortZExtra && /reasoning/i.test(errDetail(r))) {
+      const bez = Object.assign({}, t);
+      delete bez.reasoning_effort;
+      r = posli(bez);
+    }
+    return r;
+  };
+  let res;
+  if (uvazujici) res = zkus(holeTelo(true));
+  else {
+    res = posli(extra ? Object.assign({}, bohate, extra) : bohate);
+    if (res.statusCode === 400) {
+      // odmítnuté max_tokens / teplota = uvažující model, jehož jméno to neprozradí → rovnou s rezervou
+      // (jinak by první tah skončil „spotřeboval limit na přemýšlení“) a instance si to pamatuje.
+      // Jiné 400 (brána nezná response_format…) se NEpamatuje: Poradce by jinak asistentovi na témže
+      // modelu vzal nastavenou teplotu — tam zůstává druhý pokus jako dřív.
+      const uvaz = /max_completion_tokens|max_tokens|temperature|reasoning/i.test(errDetail(res));
+      res = uvaz ? zkus(holeTelo(true)) : posli(holeTelo(false));
+      if (uvaz && res.statusCode >= 200 && res.statusCode < 300) store.set(klic, "uvazujici");
+    }
+  }
+  // odpověď přiznala přemýšlení → příště jako uvažující (rezerva + effort), i když to jméno neprozradí
+  try {
+    const det = (res.json && res.json.usage && res.json.usage.completion_tokens_details) || {};
+    if (res.statusCode >= 200 && res.statusCode < 300 && Number(det.reasoning_tokens) > 0 && pamet !== "uvazujici") store.set(klic, "uvazujici");
+  } catch (err) { /* tělo nemusí být JSON */ }
+  return res;
+}
+
 // Dva pokusy, ne jeden: „OpenAI-kompatibilní" je v praxi rodina rozhraní, ne
 // jedno rozhraní. Bohatší tělo (response_format, temperature, max_tokens) umí
 // většina, ale ne všichni:
@@ -172,7 +245,6 @@ function chatOpenAI(cfg, system, user, opts) {
   const base = openaiBase(cfg && cfg.url);
   if (!base || base === "/v1") throw new Error(msg(lang, "noUrl"));
   const model = (cfg && cfg.model) || "";
-  const token = (cfg && cfg.token) || "";
   const messages = zpravy(system, user, opts).map(naDratOpenAI);
   const limit = opts.numPredict || 4000;
 
@@ -182,32 +254,16 @@ function chatOpenAI(cfg, system, user, opts) {
   };
   if (opts.json) bohate.response_format = { type: "json_object" };
   // holé tělo: nic, co by šlo odmítnout jako neznámý nebo nepovolený parametr
+  // (pole navíc z KB_*_OPENAI_EXTRA — llama-server chat_template_kwargs apod. — přidá posliOpenAI do obou)
   const hole = { model: model, messages: messages, stream: false, max_completion_tokens: limit };
-  if (cfg && cfg.extra) { Object.assign(bohate, cfg.extra); Object.assign(hole, cfg.extra); } // KB_CHAT_OPENAI_EXTRA: pole navíc do těla (llama-server chat_template_kwargs apod.)
 
-  function odesli(payload) {
-    return $http.send({
-      url: base + "/chat/completions",
-      method: "POST",
-      body: JSON.stringify(payload),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + token,
-        // OpenRouter tímhle pozná, odkud volání je; ostatní brány to ignorují
-        "HTTP-Referer": "https://killbottleneck.com",
-        "X-Title": "killBottleneck",
-      },
-      timeout: Number(opts.timeout) || 300,
-    });
-  }
-
-  let res = odesli(bohate);
-  if (res.statusCode === 400) res = odesli(hole);
+  const res = posliOpenAI(cfg, base, bohate, hole, limit, opts.timeout);
   if (res.statusCode < 200 || res.statusCode >= 300) {
     throw chybaSluzby(res, lang, !!(cfg && cfg.podrobneChyby));
   }
   const volba = (res.json && res.json.choices && res.json.choices[0]) || null;
-  const content = volba && volba.message && volba.message.content;
+  // odmítnutí modelu (refusal) je taky odpověď — prázdno by vypadalo jako „nic se nestalo“
+  const content = volba && volba.message && (volba.message.content || volba.message.refusal);
   if (!content) {
     // ⚠️ Uvažující model umí spotřebovat celý strop na přemýšlení a vrátit
     // prázdný content — pro uživatele to vypadá jako „nic se nestalo". Pozná
@@ -269,18 +325,20 @@ function llmTranscribe(cfg, body, lang) {
     form.append("model", model);
     form.append("language", L);
     form.append("response_format", "json");
+    if (cfg && cfg.vad) form.append("vad_filter", "true"); // speaches/faster-whisper: bez filtru ticha si na tichu vymýšlí text
     const res = $http.send({
       url: base + "/audio/transcriptions",
       method: "POST",
       body: form,
-      headers: { "Authorization": "Bearer " + ((cfg && cfg.token) || "") },
+      // prázdný token = žádná hlavička (vlastní whisper bez klíče; „Bearer “ naprázdno některé servery odmítnou)
+      headers: (cfg && cfg.token) ? { "Authorization": "Bearer " + cfg.token } : {},
       timeout: 600, // dlouhá nahrávka legitimně trvá minuty
     });
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw new Error(msg(L, "transcribeFailed", { status: res.statusCode }));
     }
     const text = res.json && res.json.text;
-    if (!text) throw new Error(msg(L, "transcribeEmpty"));
+    if (!text) { const e = new Error(msg(L, "transcribeEmpty")); e.prazdny = true; throw e; } // hlasovka: „nebyla slyšet řeč“, ne výpadek
     return { text: String(text) };
   } finally {
     // úklid MUSÍ proběhnout i po chybě — jinak dočasné soubory s nahrávkami
@@ -356,24 +414,18 @@ function llmChatTools(cfg, zpravyIn, nastroje, opts) {
     const base = openaiBase(cfg && cfg.url);
     if (!base || base === "/v1") throw new Error(msg(lang, "noUrl"));
     const model = (cfg && cfg.model) || "";
-    const token = (cfg && cfg.token) || "";
     const messages = zpravyIn.map(naDratOpenAI);
     const tools = (nastroje || []).map((n) => ({ type: "function", function: { name: n.name, description: n.description, parameters: n.parameters } }));
-    const bohate = { model: model, messages: messages, stream: false, temperature: teplota(o), max_tokens: limit, tools: tools };
-    const hole = { model: model, messages: messages, stream: false, max_completion_tokens: limit, tools: tools };
-  if (cfg && cfg.extra) { Object.assign(bohate, cfg.extra); Object.assign(hole, cfg.extra); } // KB_CHAT_OPENAI_EXTRA: pole navíc do těla (llama-server chat_template_kwargs apod.)
-    const odesli = (payload) => $http.send({
-      url: base + "/chat/completions", method: "POST", body: JSON.stringify(payload),
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token, "HTTP-Referer": "https://killbottleneck.com", "X-Title": "killBottleneck" },
-      timeout: 300,
-    });
-    let res = odesli(bohate);
-    if (res.statusCode === 400) res = odesli(hole);
+    const bohate = { model: model, messages: messages, stream: false, temperature: teplota(o), max_tokens: limit };
+    const hole = { model: model, messages: messages, stream: false, max_completion_tokens: limit };
+    // prázdný seznam nástrojů (poslední kolo smyčky, pokus „dopověz textem“) OpenAI odmítá 400 → vůbec neposílat
+    if (tools.length) { bohate.tools = tools; hole.tools = tools; }
+    const res = posliOpenAI(cfg, base, bohate, hole, limit, 300);
     if (res.statusCode < 200 || res.statusCode >= 300) throw chybaSluzby(res, lang, !!(cfg && cfg.podrobneChyby));
     const volba = (res.json && res.json.choices && res.json.choices[0]) || null;
     const m = (volba && volba.message) || {};
     const toolCalls = zDratu(m.tool_calls, true);
-    const content = String(m.content || "");
+    const content = String(m.content || m.refusal || "");
     if (!content && !toolCalls.length) {
       if (volba && volba.finish_reason === "length") throw new Error(msg(lang, "emptyThinking"));
       const e = new Error(msg(lang, "emptyReply")); e.emptyReply = true; throw e;

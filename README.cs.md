@@ -99,24 +99,39 @@ Víc v [návodu ke zjednodušenému zobrazení](https://killbottleneck.cz/funkce
 
 ## AI funkce (volitelné)
 
-![Návrh mapy s AI](assets/ai-navrhnout-cs.jpg)
+**Asistent** bydlí v postranním panelu vedle map. Naplánuje s vámi den (ranní porada,
+noční plánování), roztřídí poznámky z fotky, PDF nebo **hlasovky**, po pár otázkách navrhne
+celý projekt, připraví podklady na schůzku, projde s vámi týden a vedoucím udělá týmovou
+poradu. Mapy si čte sám; každou změnu navrhne kartou, kterou potvrdíte — nic se nezapíše za
+vašimi zády. E-maily, poznámky a sumáře, které napíše, zůstávají jako dokumenty vedle chatu.
+Vedle asistenta je tu **hůlka na uzlu** (podkroky, milníky, KPI, rizika), **AI souhrn
+projektu** a **denní povzbuzení** v Můj den.
 
-AI poradce (návrh mapy z cíle, rozšíření větví, chat nad mapou, AI souhrn projektu,
-návrh úkolů z uzlu, mapa z textu/hlasu) se aktivuje v `.env` — `KB_AI_PROVIDER`:
+AI se zapíná v `.env` — `KB_AI_PROVIDER`:
 
 - `openai` — **jakékoli OpenAI-kompatibilní API**: OpenAI, OpenRouter, Groq, Mistral,
   Together nebo vaše vlastní vLLM / LM Studio / llama.cpp / liteLLM proxy. Nastavíte
   `KB_AI_URL=https://openrouter.ai/api/v1` (základní adresa, obvykle končí `/v1`),
-  `KB_AI_TOKEN=<váš klíč>` a `KB_AI_MODEL=<přesný název modelu>`. Diktování jde přes
-  tutéž službu; dotazy vám účtuje váš poskytovatel.
+  `KB_AI_TOKEN=<váš klíč>` a `KB_AI_MODEL=<přesný název modelu>`. Hlasovky přepisuje
+  tatáž služba, pokud nabízí model Whisper / transcribe; dotazy vám účtuje váš poskytovatel.
 - `api` — vzdálená AI služba kompatibilní s killBottleneck API kontraktem: vložíte
-  adresu a token od svého poskytovatele. Bez vlastního GPU a údržby.
+  adresu a token od svého poskytovatele. Bez vlastního GPU a údržby. (Obslouží hůlku,
+  souhrn a povzbuzení; asistent potřebuje `ollama` nebo `openai`.)
 - `ollama` — **vlastní lokální model**: nainstalujte [Ollama](https://ollama.com),
   stáhněte model (`ollama pull gpt-oss:20b`) a nastavte
   `KB_AI_URL=http://IP:11434` + `KB_AI_MODEL=gpt-oss:20b`.
-  Vše běží u vás, data neopouští síť. (Základní prompty; přepis hlasu není součástí.)
+  Vše běží u vás, data neopouští síť. (Hlasovky potřebují vlastní přepis řeči — viz níž.)
 - `custom` — vlastní endpoint se stejným API kontraktem
   ([kontrakt je sepsaný tady](https://killbottleneck.cz/reference/vlastni-ai-rozhrani)).
+
+Asistent používá týž model, pokud mu nedáte vlastní (`KB_CHAT_PROVIDER/URL/MODEL/TOKEN`).
+Čtení fotek potřebuje model, který vidí obrázky (`KB_VISION_*`, nebo zaškrtněte *Asistent
+čte obrázky* v Administraci → AI). Hlasovky jdou s jakýmkoli přepisem řeči v OpenAI tvaru
+(`KB_TRANSCRIBE_PROVIDER=openai` + `KB_TRANSCRIBE_URL` — speaches, whisper.cpp, OpenAI…);
+nahrávka sama se nikam neukládá. Mikrofon prohlížeče povolí jen přes **HTTPS** (nebo
+localhost) a reverzní proxy před aplikací musí pustit tělo požadavku kolem 5 MB (hlasovka
+nebo fotka cestuje uvnitř požadavku). Víc v
+[návodu k asistentovi](https://killbottleneck.cz/jak-na-to/ai-asistent).
 
 Data map se při použití AI odesílají na zvolený endpoint; s `none` (výchozí)
 neopouští váš server nikdy nic.

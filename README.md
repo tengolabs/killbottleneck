@@ -104,25 +104,41 @@ More in the [Simplified view guide](https://killbottleneck.com/features/lite-vie
 
 ## AI features (optional)
 
-![Drafting a map with AI](assets/ai-navrhnout-en.jpg)
+**The assistant** lives in a side panel next to your maps. It plans your day with you (morning
+briefing, evening planning), sorts notes from a photo, a PDF or a **voice note**, drafts a whole
+project after a few questions, prepares a meeting, reviews your week and, for managers, runs a
+team meeting. It reads your maps itself; every change it proposes is a card you confirm — nothing
+is written behind your back. E-mails, notes and summaries it writes are kept as documents next to
+the chat. Besides the assistant there is the **wand on a node** (sub-steps, milestones, KPIs,
+risks), an **AI project summary** and the **daily encouragement** in My day.
 
-The AI advisor (draft a map from a goal, expand branches, chat about a map, AI project summary,
-suggest tasks from a goal, a map from text/voice) is switched on in `.env` via `KB_AI_PROVIDER`:
+AI is switched on in `.env` via `KB_AI_PROVIDER`:
 
 - `openai` — **any OpenAI-compatible API**: OpenAI, OpenRouter, Groq, Mistral, Together,
   or your own vLLM / LM Studio / llama.cpp / liteLLM proxy. Set
   `KB_AI_URL=https://openrouter.ai/api/v1` (the base address, usually ending in `/v1`),
-  `KB_AI_TOKEN=<your API key>` and `KB_AI_MODEL=<exact model name>`. Dictation works
-  through the same service; your provider bills you for the requests.
+  `KB_AI_TOKEN=<your API key>` and `KB_AI_MODEL=<exact model name>`. Voice notes are
+  transcribed by the same service when it offers a Whisper / transcribe model; your provider
+  bills you for the requests.
 - `api` — a remote AI service compatible with the killBottleneck API contract: enter the
   address and token you got from your provider. No GPU of your own and no maintenance.
+  (Runs the wand, the summary and the encouragement; the assistant needs `ollama` or `openai`.)
 - `ollama` — **your own local model**: install [Ollama](https://ollama.com), pull a model
   (`ollama pull gpt-oss:20b`) and set
   `KB_AI_URL=http://IP:11434` + `KB_AI_MODEL=gpt-oss:20b`.
-  Everything runs on your side, no data leaves your network. (Basic prompts; voice
-  transcription is not included.)
+  Everything runs on your side, no data leaves your network. (Voice notes need a
+  speech-to-text service of your own — see below.)
 - `custom` — your own endpoint honouring the same API contract
   ([the contract is written down here](https://killbottleneck.com/reference/custom-ai-endpoint)).
+
+The assistant uses the same model unless you give it its own
+(`KB_CHAT_PROVIDER/URL/MODEL/TOKEN`). Reading photos needs a vision model (`KB_VISION_*`, or
+tick *The assistant reads images* in Administration → AI). Voice notes work with any
+speech-to-text in the OpenAI shape (`KB_TRANSCRIBE_PROVIDER=openai` + `KB_TRANSCRIBE_URL` —
+speaches, whisper.cpp, OpenAI…); the recording itself is never stored. Browsers allow the
+microphone only over **HTTPS** (or localhost), and a reverse proxy in front must let request
+bodies of about 5 MB through (a voice note or a photo travels inside the request).
+More in the [assistant guide](https://killbottleneck.com/tutorials/ai-panel-assistant).
 
 When AI is used, map data is sent to the endpoint you chose; with `none` (the default) nothing
 ever leaves your server.

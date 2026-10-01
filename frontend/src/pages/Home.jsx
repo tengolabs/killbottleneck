@@ -29,7 +29,7 @@ export default function Home() {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const [maps, setMaps] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { creating, openCreate, dialogs: mapCreationDialogs } = useMapCreation();
+  const { openCreate, dialogs: mapCreationDialogs } = useMapCreation();
   const [shareMapId, setShareMapId] = useState(null);
   // sbalování sekcí projektů (jako panel Můj den) — pamatuje se v localStorage
   const [collapsedSections, setCollapsedSections] = useState(() => {
@@ -139,10 +139,7 @@ export default function Home() {
         active={view === 'templates' ? 'templates' : 'projects'}
         org={org}
         actions={
-          <NewMapActions
-            onCreate={openCreate}
-            creating={creating}
-          />
+          <NewMapActions onCreate={openCreate} />
         }
       />
       {/* převod nápadu vyžaduje výběr projektu → dokončí se v dialogu na /tasks */}
@@ -202,12 +199,8 @@ export default function Home() {
               {t('empty.desc')}
             </p>
             <div className="flex items-center gap-2 justify-center">
-              <Button onClick={openCreate} disabled={creating}>
-                {creating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
+              <Button onClick={openCreate}>
+                <Plus className="w-4 h-4" />
                 {t('empty.createFirst')}
               </Button>
               {/* „S pomocí AI“ schováno 28. 9. 2026 (Richard) — AI projekt přes asistenta */}

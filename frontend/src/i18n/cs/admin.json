@@ -37,5 +37,15 @@
     "save": "Uložit",
     "saved": "Uloženo",
     "loadError": "Spotřebu se nepodařilo načíst."
+  },
+  "aiVision": {
+    "label": "Asistent čte obrázky (fotky poznámek, snímky obrazovky)",
+    "hint": "Model musí umět obrázky (např. gpt-4o-mini, gpt-4.1-mini, gemma4). Po uložení se vyzkouší na vestavěném obrázku — obrázky se zapnou, jen když ho model opravdu přečte.",
+    "modelLabel": "Model pro obrázky (nepovinné)",
+    "modelPlaceholder": "stejný jako model chatu",
+    "test": "Otestovat obrázek",
+    "ok": "Ověřeno — asistent čte obrázky.",
+    "notTested": "Zatím neověřeno — uložte nastavení nebo klikněte na Otestovat obrázek.",
+    "env": "Čtení obrázků nastavil provozovatel (proměnné prostředí KB_VISION_*) — tady se nemění."
   }
 }

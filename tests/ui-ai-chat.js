@@ -128,7 +128,9 @@ H.beh(async () => {
   await (await page.$('[data-testid="chat-navrh"]')).click();
   expect(await cekejText('PO-NAVRHU'), 'klik na čip poslal zprávu a přišla odpověď');
   expect(volani[volani.length - 1].messages.some((m) => m.role === 'user' && /\nUkaž mi zásobník$/.test(m.content)), 'text čipu šel modelu jako zpráva uživatele (za závorkou kontextu)');
-  expect((await page.$$('[data-testid="chat-navrh"]')).length === 0, 'starší čipy už nejsou klikací');
+  // starší čipy už nejsou klikací; pod odpovědí bez čipů je pojistka „Co dál?“ (vždy je na co kliknout, 1. 10. 2026)
+  const zbyle = await page.$$eval('[data-testid="chat-navrh"]', (els) => els.map((x) => x.innerText.trim()));
+  expect(!zbyle.includes('Ukaž mi zásobník') && !zbyle.includes('Napiš poptávku') && zbyle.join('|') === 'Co dál?', `starší čipy už nejsou klikací, nový čip „Co dál?“ (${JSON.stringify(zbyle)})`);
 
   console.log('== koncept e-mailu: pole s kopírováním ==');
   fronta.push(nastroj('draft_text', { kind: 'email', title: 'Poptávka', text: 'Předmět: Poptávka\n\nDobrý den, KONCEPT-MOCK.' }), text('Tady je koncept.'));
@@ -162,6 +164,36 @@ H.beh(async () => {
   const vAsk = volani[volani.length - 1];
   expect(vAsk.messages.some((m) => m.role === 'tool' && /Odpovědi uživatele: 1\) Truhlářství/.test(m.content)), 'odpověď z čipu šla modelu jako výsledek ask_user');
   expect((await page.$$('[data-testid="chat-otazka-volba"]')).length === 0, 'starší otázky už nejsou aktivní (bez čipů)');
+
+  console.log('== Enter v poli vlastní odpovědi odešle (Richard 1. 10. 2026); u víc otázek nejdřív skočí na další ==');
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Co se zásobníkem?', options: ['Nechat', 'Probrat'] }] }));
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('Projdi zásobník');
+  await page.keyboard.press('Enter');
+  expect(await cekej('[data-testid="chat-otazka-text"]'), 'karta s polem pro vlastní odpověď');
+  fronta.push(text('PO-ENTERU: rozumím.'));
+  await page.click('[data-testid="chat-otazka-text"]');
+  await page.keyboard.type('vymazat vše');
+  await page.keyboard.press('Enter');
+  expect(await cekejText('PO-ENTERU'), 'Enter v poli odeslal odpověď');
+  expect(volani[volani.length - 1].messages.some((m) => m.role === 'tool' && /Odpovědi uživatele: 1\) vymazat vše/.test(m.content)), 'vlastní odpověď z pole šla modelu');
+  // dvě otázky: Enter v první skočí do pole druhé (nic neodejde), Enter v poslední odešle obě
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'Kdy?', options: ['Dnes', 'Zítra'] }, { text: 'Kdo?', options: ['Já', 'Tým'] }] }));
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('Naplánuj to');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="chat-otazka-text"]').length === 2, { timeout: 15000 }).catch(() => {});
+  const predDve = volani.length;
+  await (await page.$$('[data-testid="chat-otazka-text"]'))[0].click();
+  await page.keyboard.type('v pátek');
+  await page.keyboard.press('Enter');
+  await sleep(600);
+  const fokusDruhe = await page.evaluate(() => { const pole = [...document.querySelectorAll('[data-testid="chat-otazka-text"]')]; return pole.length === 2 && document.activeElement === pole[1]; });
+  expect(volani.length === predDve && fokusDruhe, 'dvě otázky: Enter v první nic neodešle a kurzor skočí do druhé');
+  fronta.push(text('PO-DVOU: jasné.'));
+  await page.keyboard.type('Jana');
+  await page.keyboard.press('Enter');
+  expect(await cekejText('PO-DVOU') && volani[volani.length - 1].messages.some((m) => m.role === 'tool' && /1\) v pátek\n2\) Jana/.test(m.content)), 'Enter v poslední otázce odešle obě odpovědi');
 
   console.log('== akce → karta → Ano → uzel v mapě ==');
   fronta.push(nastroj('add_idea_to_map', { idea_id: napad.id, map_id: map.id, parent_id: 'apex' }));
@@ -361,12 +393,18 @@ H.beh(async () => {
   expect(await page.evaluate(() => [...document.querySelectorAll('.react-flow__node.selected')].some((n) => n.innerText.includes('Objednat dýhu'))), 'editor najel na nový uzel a označil ho (mapa byla otevřená)');
   expect(!!napad2.id, 'nápad pro editor založen');
 
-  console.log('== čip Ranní porada → nový rozhovor v režimu ==');
+  console.log('== čip Ranní porada → nový rozhovor v režimu; úvod složí aplikace hned (Richard 1. 10. 2026) ==');
   await page.click('[data-testid="chat-novy"]');
-  fronta.push(text('PORADA-UI-MOCK.'));
+  const predPorada = volani.length;
   await page.click('[data-testid="chat-chip-porada"]');
-  expect(await cekejText('PORADA-UI-MOCK'), 'porada odpověděla');
+  expect(await cekej('[data-testid="chat-otazky"]', 5000), 'porada: úvodní otázka je tu hned');
+  expect(await cekejText('co máte v hlavě', 3000) && await cekejText('Máte něco na papíře nebo v hlavě?', 1000), 'porada: výzva vypsat, co je v hlavě, s otázkou');
   expect(await cekejText('Ranní porada'), 'titulek rozhovoru = Ranní porada');
+  expect(volani.length === predPorada, `úvod porady bez volání modelu (${volani.length - predPorada})`);
+  fronta.push(text('PORADA-UI-MOCK.'));
+  await page.evaluate(() => [...document.querySelectorAll('[data-testid="chat-otazka-volba"]')].find((b) => /Nic nemám/.test(b.innerText)).click());
+  await page.click('[data-testid="chat-otazky-odeslat"]');
+  expect(await cekejText('PORADA-UI-MOCK'), 'porada odpověděla');
   const vP = volani[volani.length - 1];
   expect(/RANNÍ PORADA/.test(systemZ(vP)) && vP.messages.some((m) => m.role === 'user' && /ranní poradu/.test(m.content)), 'server dostal režim porada a složil úvodní zprávu');
 
@@ -374,10 +412,16 @@ H.beh(async () => {
   await page.click('[data-testid="chat-novy"]');
   expect(await cekej('[data-testid="chat-nocni-nabidka"]'), 'rámeček Noční plánování v prázdném rozhovoru (i když ranní nabídka už není)');
   expect((await page.$('[data-testid="chat-chip-nocni"]')) === null, 'noční plánování není čip, jen rámeček');
-  fronta.push(text('NOCNI-UI-MOCK.'));
+  const predNocni = volani.length;
   await page.click('[data-testid="chat-nocni-start"]');
-  expect(await cekejText('NOCNI-UI-MOCK'), 'noční plánování odpovědělo');
+  expect(await cekej('[data-testid="chat-otazky"]', 5000), 'noční plánování: úvodní otázka je tu hned');
+  expect(await cekejText('z celého dne zůstaly v hlavě', 3000) && await cekejText('Máte něco z dneška?', 1000), 'noční plánování: výzva k nápadům z celého dne, s otázkou');
   expect(await cekejText('Noční plánování'), 'titulek rozhovoru = Noční plánování');
+  expect(volani.length === predNocni, `úvod nočního plánování bez volání modelu (${volani.length - predNocni})`);
+  fronta.push(text('NOCNI-UI-MOCK.'));
+  await page.evaluate(() => [...document.querySelectorAll('[data-testid="chat-otazka-volba"]')].find((b) => /Nic nemám/.test(b.innerText)).click());
+  await page.click('[data-testid="chat-otazky-odeslat"]');
+  expect(await cekejText('NOCNI-UI-MOCK'), 'noční plánování odpovědělo');
   expect((await page.$('[data-testid="chat-nocni-nabidka"]')) === null, 'v běžícím rozhovoru rámeček není');
   expect(await page.evaluate(() => Object.entries(localStorage).some(([k, v]) => k.startsWith('kb-chat-porada-ne:') && v === new Date().toLocaleDateString('en-CA'))), 'spuštění nočního plánování uklidí ranní nabídku pro dnešek (Richard 30. 9. 2026)');
   const vN = volani[volani.length - 1];
@@ -385,6 +429,41 @@ H.beh(async () => {
   await page.click('[data-testid="chat-historie"]');
   expect(await cekejTextDokumentu('☾ Noční plánování'), 'v historii má noční plánování ikonu měsíce');
   await page.keyboard.press('Escape');
+
+  console.log('== přepnutí rozhovoru z historie: stav karty otázek nepřeteče do jiného rozhovoru ==');
+  // nejdřív rozhovor se DVĚMA otázkami, potom nový s JEDNOU (čerstvě vykreslený) a z něj historií zpět do prvního —
+  // dřív karta držela stav podle pořadí zprávy: druhá otázka nešla zvolit a Odeslat spadlo na TypeError
+  await page.click('[data-testid="chat-novy"]');
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'DVE-A: Do kdy?', options: ['Do pátku', 'Do měsíce'] }, { text: 'DVE-B: Pro koho?', options: ['Pro tým', 'Pro mě'] }] }));
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('Dvojotazka pro test prepnuti');
+  await page.keyboard.press('Enter');
+  expect(await cekejText('DVE-B: Pro koho?'), 'rozhovor se dvěma otázkami je připravený');
+  await page.click('[data-testid="chat-novy"]');
+  fronta.push(nastroj('ask_user', { questions: [{ text: 'JEDNA: Kam s tím?', options: ['Do zásobníku', 'Do projektu'] }] }));
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('Jednootazka pro test prepnuti');
+  await page.keyboard.press('Enter');
+  expect(await cekejText('JEDNA: Kam s tím?'), 'rozhovor s jednou otázkou je připravený');
+  // rozepsaná vlastní odpověď v kartě s jednou otázkou
+  await page.click('[data-testid="chat-otazky"] input');
+  await page.keyboard.type('rozepsano-v-jednom');
+  await page.click('[data-testid="chat-historie"]');
+  await cekejTextDokumentu('Dvojotazka pro test prepnuti');
+  const polozkyHistoriePrep = await page.$$('[role="menuitem"]');
+  let kliknutoPrep = false;
+  for (const el of polozkyHistoriePrep) { if (/Dvojotazka pro test prepnuti/.test(await el.evaluate((n) => n.innerText))) { await el.click(); kliknutoPrep = true; break; } }
+  expect(kliknutoPrep && await cekejText('DVE-B: Pro koho?') && !(await textPanelu()).includes('JEDNA: Kam s tím?'), 'historie přepnula do rozhovoru se dvěma otázkami');
+  const rozepsanePrep = await page.$$eval('[data-testid="chat-otazky"] input', (els) => els.map((e) => e.value).join('|'));
+  expect(rozepsanePrep === '|', `rozepsaná odpověď z jiného rozhovoru se nepřenesla (${JSON.stringify(rozepsanePrep)})`);
+  // zvolit odpověď u OBOU otázek a odeslat
+  await page.evaluate(() => { const v = [...document.querySelectorAll('[data-testid="chat-otazka-volba"]')]; v.find((b) => b.innerText.trim() === 'Do pátku').click(); v.find((b) => b.innerText.trim() === 'Pro mě').click(); });
+  const predDvePrep = volani.length;
+  fronta.push(text('DVE-ODPOVED-MOCK'));
+  await page.click('[data-testid="chat-otazky-odeslat"]');
+  expect(await cekejText('DVE-ODPOVED-MOCK'), 'odpověď na obě otázky odešla a model odpověděl');
+  const odeslanoPrep = JSON.stringify(((volani[predDvePrep] || {}).messages || []).slice(-1));
+  expect(/1\) Do pátku/.test(odeslanoPrep) && /2\) Pro mě/.test(odeslanoPrep), `modelu došly obě odpovědi (${odeslanoPrep.slice(0, 200)})`);
 
   console.log('== obrázek: Ctrl+V, sponka, přetažení → přepis → karta se všemi položkami → zásobník ==');
   await page.click('[data-testid="chat-novy"]');

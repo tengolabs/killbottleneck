@@ -133,17 +133,7 @@
   },
   "newMap": {
     "newProject": "Nový projekt",
-    "suggestAi": "Navrhnout s AI",
-    "fromText": "Mapa z textu",
-    "defaultTitle": "Nová mapa cílů",
-    "withAi": "S pomocí AI",
-    "aiUnavailable": "AI dočasně nedostupná",
-    "aiUnavailableHint": "AI služba právě neodpovídá. Zbytek aplikace funguje normálně — zkuste to za chvíli, tlačítka se objeví sama.",
     "moreOptions": "Další možnosti"
-  },
-  "aiCreate": {
-    "title": "Vytvořit projekt s AI",
-    "shortTextSwitched": "Text je krátký, AI se nejdřív zeptá na pár upřesňujících otázek — z pár slov by vznikla vymyšlená mapa."
   },
   "bell": {
     "justNow": "právě teď",

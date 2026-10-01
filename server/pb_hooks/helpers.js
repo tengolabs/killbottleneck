@@ -817,6 +817,10 @@ function aiConfig(app) {
         transcribeUrl: rec.getString("transcribe_url"),
         transcribeModel: rec.getString("transcribe_model"),
         extra: extraJson(env("AI_OPENAI_EXTRA")),
+        // obrázky v asistentovi z Administrace (30. 9. 2026) — zapnuté až po úspěšném testu obrázku
+        visionEnabled: rec.getBool("vision_enabled"),
+        visionModel: rec.getString("vision_model"),
+        visionOk: rec.getBool("vision_ok"),
       };
     }
   } catch (err) { /* kolekce/záznam nemusí existovat */ }
@@ -1960,6 +1964,11 @@ function notifyAutomationReady(app, record, pending, actorEmail) {
 function jeAdmin(auth) {
   return !!auth && auth.getString("role") === "admin";
 }
+// správce nebo vedoucí (role manager) — týž předpis jako brána /portfolio; NE správce AI (is_ai_manager)
+function jeAdminNeboManazer(auth) {
+  const role = auth ? auth.getString("role") : "";
+  return role === "admin" || role === "manager";
+}
 function jeAdminNeboAiManazer(auth) {
   return jeAdmin(auth) || (!!auth && auth.getBool("is_ai_manager") === true);
 }
@@ -2474,6 +2483,58 @@ function notifyAssignedFromNodes(app, record, actorEmail, onlyIds) {
 
 // ---------- serverová instantiace šablony (opakované šablony / cron) ----------
 // Porty frontendových lib/treeLayout.js a lib/templateConvert.js — držet v synchronizaci!
+
+// Pohyb práce v mapě za `days` dní (0 = celá historie) — skupiny, jak je člověk hlásí na poradě. Sdílí ho routa
+// /map-changes a nástroj asistenta get_project_changes (fáze E plánu AI funkcí, 1. 10. 2026; logika 1:1 z routy).
+// ⚠️ PRÁVA řeší VOLAJÍCÍ (userSeesMap bez veřejných map — historie není součástí veřejné prezentace mapy).
+function mapChangeGroups(app, mapId, days) {
+  const params = { m: mapId };
+  // ⚠️ Filtrovat POLE UŽ V DOTAZU, ne až v JS níž. Od 19. 8. 2026 zapisuje záznamník i změny zadání, ikony,
+  // barvy, vykonavatele a čekání — ty se sem nehlásí (souhrn je o POHYBU práce, ne o kosmetice). Kdyby se
+  // natáhly a zahodily až v JS, ujídaly by ze stropu 500 řádků a na činné mapě by z okna vytlačily SKUTEČNÉ
+  // události. Report by pak tiše mlčel o práci, která proběhla.
+  let filter = "map = {:m} && (field = 'status' || field = 'deadline' || field = 'owner'"
+    + " || field = 'created' || field = 'deleted' || field = 'parent')";
+  let since = "";
+  if (days > 0) {
+    since = pbDateString(new Date(Date.now() - days * 86400000));
+    filter += " && created >= {:since}";
+    params.since = since;
+  }
+  let rows = [];
+  try {
+    rows = app.findRecordsByFilter("map_changes", filter, "-created", 500, 0, params);
+  } catch (err) { rows = []; }
+  // Skupiny odpovídají tomu, co člověk hlásí na poradě. Jeden řádek = jedna změna; „hotovo" a „rozjelo se"
+  // se poznají z cílového stavu, ne z pole.
+  const groups = { done: [], started: [], added: [], deadline: [], owner: [], moved: [], removed: [] };
+  for (const r of rows) {
+    const item = {
+      kind: r.getString("kind"),
+      id: r.getString("item_id"),
+      title: r.getString("title"),
+      from: r.getString("from"),
+      to: r.getString("to"),
+      actor: r.getString("actor_email"),
+      when: r.getString("created"),
+    };
+    const field = r.getString("field");
+    if (field === "status") {
+      if (item.to === "done") groups.done.push(item);
+      else if (item.to === "in_progress") groups.started.push(item);
+      // done → todo (vrácení do hry) se počítá jako rozjetí, ať to nezapadne
+      else if (item.from === "done") groups.started.push(item);
+    } else if (field === "created") groups.added.push(item);
+    else if (field === "deleted") groups.removed.push(item);
+    else if (field === "deadline") groups.deadline.push(item);
+    else if (field === "owner") groups.owner.push(item);
+    else if (field === "parent") groups.moved.push(item); // kanban posun / přesun pod jiný uzel
+    // změna názvu se do souhrnu nedává — je to úprava formulace, ne pohyb
+  }
+  const counts = {};
+  for (const k of Object.keys(groups)) counts[k] = groups[k].length;
+  return { since: since, truncated: rows.length >= 500, counts: counts, groups: groups };
+}
 
 function fmtDateLocal(d) {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -7313,7 +7374,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 }
 
 module.exports = {
-  fmtDateLocal, addDaysStr,
+  fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,

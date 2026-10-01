@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.67-beta}
+        KB_VERSION: ${KB_VERSION:-v0.68-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -97,6 +97,9 @@ services:
       # {"reasoning_effort":"none"} — the only way to switch reasoning off at
       # the provider (same idea as KB_CHAT_OPENAI_EXTRA below).
       KB_AI_OPENAI_EXTRA: ${KB_AI_OPENAI_EXTRA:-}
+      # reasoning models (o-series, gpt-5*): reserve for reasoning + reasoning_effort (defaults 4000 / low)
+      KB_AI_REASONING_BUDGET: ${KB_AI_REASONING_BUDGET:-}
+      KB_AI_REASONING_EFFORT: ${KB_AI_REASONING_EFFORT:-}
       KB_AI_TRANSCRIBE_URL: ${KB_AI_TRANSCRIBE_URL:-${FLOWMAP_AI_TRANSCRIBE_URL:-}}
       # provider=openai only: transcription model (default whisper-1)
       KB_AI_TRANSCRIBE_MODEL: ${KB_AI_TRANSCRIBE_MODEL:-${FLOWMAP_AI_TRANSCRIBE_MODEL:-}}
@@ -126,8 +129,9 @@ services:
       KB_CHAT_THINK: ${KB_CHAT_THINK:-}
       KB_CHAT_NUM_CTX: ${KB_CHAT_NUM_CTX:-}
       KB_CHAT_OPENAI_EXTRA: ${KB_CHAT_OPENAI_EXTRA:-}
-      # Tool schemas sent to the assistant: empty = only the groups the conversation
-      # needs (saves tokens); all = every tool on every call (A/B measurements).
+      # Tool schemas sent to the assistant: auto (default) = GPT models get every tool, others
+      # only the groups the conversation needs (saves tokens); groups = always only the groups;
+      # all = every tool on every call.
       KB_CHAT_TOOLS: ${KB_CHAT_TOOLS:-}
       # hybrid: lehký model na čtení/porady, hlavní na zápisy (KB_CHAT_HYBRID=rezim,klasifikator,predani)
       KB_CHAT_HYBRID: ${KB_CHAT_HYBRID:-}
@@ -163,6 +167,17 @@ services:
       KB_AI_IMG_VAHA: ${KB_AI_IMG_VAHA:-}
       # kolik tahů z hodinového stropu ubere tah s textem PDF (2); PDF samo se zpracovává v prohlížeči
       KB_AI_PDF_VAHA: ${KB_AI_PDF_VAHA:-}
+      # Hlasovky v asistentovi: vlastní přepis v OpenAI tvaru (speaches, whisper.cpp, OpenAI…),
+      # jinak obecná AI; none = vypnout. Délka hlasovky (s), největší nahrávka (MB), váha v hodinovém stropu (2).
+      KB_TRANSCRIBE_PROVIDER: ${KB_TRANSCRIBE_PROVIDER:-}
+      KB_TRANSCRIBE_URL: ${KB_TRANSCRIBE_URL:-}
+      KB_TRANSCRIBE_MODEL: ${KB_TRANSCRIBE_MODEL:-}
+      KB_TRANSCRIBE_TOKEN: ${KB_TRANSCRIBE_TOKEN:-}
+      # filtr ticha (speaches/faster-whisper): výchozí zapnuto u vlastního přepisovače mimo OpenAI/Groq; 0 = vypnout, 1 = vždy
+      KB_TRANSCRIBE_VAD: ${KB_TRANSCRIBE_VAD:-}
+      KB_CHAT_HLAS_MAX_S: ${KB_CHAT_HLAS_MAX_S:-}
+      KB_CHAT_MAX_AUDIO_MB: ${KB_CHAT_MAX_AUDIO_MB:-}
+      KB_AI_HLAS_VAHA: ${KB_AI_HLAS_VAHA:-}
       # Where "Report a bug or idea" (under the person icon) sends to. EMPTY BY
       # DEFAULT — with no address the route returns 404 and the item is not even
       # shown, so a self-hosted instance never sends anything out on its own.

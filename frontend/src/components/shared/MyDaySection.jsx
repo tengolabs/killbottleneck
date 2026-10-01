@@ -13,6 +13,7 @@ import {
   Users,
   ImageDown,
   Lightbulb,
+  LifeBuoy,
   Loader2,
   Map as MapIcon,
   Pause,
@@ -35,6 +36,7 @@ import { sortFocusFirst, focusStateOf } from '@/lib/focus';
 import { base44 } from '@/api/base44Client';
 import { refreshMySummary, fetchMyDay } from '@/api/kb';
 import { useAiModes } from '@/hooks/useAiEnabled';
+import { useAsistent } from '@/lib/AsistentContext';
 import { captureElementPng, shareElementPng, canShareImages } from '@/lib/dashboardExport';
 import { dateStamp } from '@/lib/saveFile';
 import { getDeadlineStatus, formatDeadline } from '@/lib/nodeMeta';
@@ -65,6 +67,9 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
   const navigate = useNavigate();
   const { toast } = useToast();
   const ai = useAiModes();
+  // propojení s asistentem (fáze D, 1. 10. 2026): povzbuzení → „Probrat na ranní poradě“, řádek po termínu →
+  // „Zasekl ses?“ (rozbor toho uzlu); jen kde asistent běží
+  const asistent = useAsistent();
   const [collapsed, setCollapsed] = useState(() => {
     const v = nactiKlic(storageKey);
     return v === null ? defaultCollapsed : v === '1';
@@ -307,6 +312,11 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
             <div className="flex items-start gap-2 text-sm rounded-lg bg-secondary/40 px-3 py-2">
               <span className="leading-relaxed flex-1 min-w-0 whitespace-pre-wrap">
                 {refreshing ? t('panel.thinking') : (summary?.text || t('panel.noSummaryYet'))}
+                {asistent.dostupny && (
+                  <button type="button" onClick={() => asistent.spust('porada', {})} className="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:underline" data-testid="myday-porada">
+                    <Sunrise className="w-3.5 h-3.5" />{t('panel.porada')}
+                  </button>
+                )}
               </span>
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={handleRefreshSummary} disabled={refreshing} title={t('panel.refreshTitle')}>
                 {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -424,6 +434,13 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
                       )}
                     </span>
                   </button>
+                  {/* po termínu → rozbor toho uzlu s asistentem (fáze D); na telefonu jen ikona */}
+                  {s.key === 'overdue' && item.kind === 'node' && asistent.dostupny && (
+                    <button type="button" onClick={() => asistent.spust('rozbor', { map: item.mapId, node: item.title })} title={t('panel.zaseklTitle')} aria-label={t('panel.zaseklTitle')}
+                      className="shrink-0 mr-1 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-primary hover:bg-secondary" data-testid="myday-zasekl">
+                      <LifeBuoy className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t('panel.zasekl')}</span>
+                    </button>
+                  )}
                   {/* Vidět VŽDY, ne až na najetí myší — na dotyku hover neexistuje
                       a i na počítači nemá uživatel jak tušit, že tam akce jsou. */}
                   <TaskRowActions

@@ -9,6 +9,218 @@ below before you jump several versions.
 
 ---
 
+## v0.68-beta — 2026-10-02
+
+**Meeting prep and Team meeting in the assistant**
+
+- **Meeting prep** (AI helpers): the app asks at once (no model call) which meeting — the project the user
+  is in first, the nearest calendar events, recent projects, "With a person" (then the team's names as
+  chips); the model starts with the answer. New read tools `get_project_changes` (what moved in
+  a project over 7/14/30 days — the same logic as `/map-changes`, now shared via `mapChangeGroups`) and
+  `get_person_work` (a colleague's open work only in projects the user can see). Output: a draft with
+  Agenda / Open points / Stuck / What moved / To decide, then a calendar event on a card or an e-mail.
+- **Team meeting** (administrators and managers only): new tool `get_team_work` over `buildPortfolio`
+  (team and shared projects only; private projects are neither listed nor counted). The app shows the team
+  overview (who has the most work, on fire, stuck) from the same data at once and asks *What shall we do
+  about it?*; after *Suggest handovers* the assistant proposes at most three handovers, writes them as `update_node` cards that may change only the assignee (and the deadline when
+  asked) and drafts a message for the team.
+- Privacy layer of the team meeting: the role is checked at the start, on every turn and when a card is
+  confirmed (403 `err.teamMeetingManagerOnly`); only an allow-list of tools is offered and executed (also
+  through the tool-group safety net and on confirmation); no personal memory, project notes, map list or
+  page context (open map, selected node) reaches the model; reads and writes only in team/shared maps.
+- `/map-changes` behaviour unchanged (the route now calls the shared helper).
+- A draft saved without a title no longer takes a section heading as its name ("Program:" in Documents):
+  when the first line ends with a colon the title falls back to the kind, the project and the day
+  ("Podklady na schůzku – Dílna 1. 10."); the meeting-prep prompt now asks for a title.
+
+**After the meeting and Weekly review in the assistant, links from My day**
+
+- **After the meeting** (AI helpers block): the app opens at once (no model call) with an invitation to
+  send a photo of the notes, a voice note or the text and who was there — naming today's meeting from the
+  calendar when one has already started; with the notes the assistant proposes tasks per project ("task → who, by
+  when", a new project, what is unclear), asks *Do it this way?*, then writes the tasks on cards and
+  drafts an e-mail to the participants "who – what – by when".
+- **Weekly review**: a new read tool `get_week_review` — only the user's own work: finished in the last 7
+  days (from the change log), overdue, due or planned within 7 days, stuck, blocking others, assigned to
+  others and overdue. The app shows the overview Done / Stuck / Next week from the same data at once (no
+  model call) and asks what to handle next week (the tasks as options) and what to do with what is stuck
+  (Break it down · Write to the owner · Leave it); the answers go to the main model in the hybrid setup.
+- Cards that assign a step to someone who cannot see the project yet say so up front: "(this gives … access
+  to the project)" — the assignment shares the project (work access), as the v1 API always did.
+- **My day → assistant**: *Discuss in the morning briefing* below the morning encouragement and *Stuck?*
+  on an overdue task (breaks that task down with the assistant).
+
+**AI helpers in the assistant — New project with AI replaces the old advisor dialog**
+
+- An **AI helpers** block below Evening planning (empty conversation only): **Sort my notes** and
+  **New project with AI**. A grid on a computer, a collapsed row "AI helpers (2)" on a phone (the
+  choice to expand is remembered per account).
+- **Sort my notes**: like Evening planning without "today" — paste a photo, record a voice note or
+  write ideas; the assistant sorts them and recommends a new project / into a project / keep in the
+  buffer, writes on cards after your Yes. The idea buffer panel has **Sort with AI** from two ideas
+  on (the assistant goes through the ideas already in the buffer).
+- **New project with AI**: the **Or let AI draft the project…** link in the New project dialog now
+  opens the assistant with the goal you typed; the emoji, colour and client from the dialog are put
+  on the new map by the server (the model never sees them, the public v1 API is unchanged). The
+  assistant asks 3 questions, the app adds **How detailed should the plan be?** (Brief 5–7 points /
+  Detailed 3 areas × 2–3 steps / In-depth 3 levels, 18–25 steps — the rules of the former advisor),
+  checks the proposed tree against the chosen level before the card (at most twice, then lets it
+  through) and shows the whole tree on the card. Without a goal it asks for one or for material
+  (text, `.txt`/`.md`, PDF, photo, voice note). Started from the AI helpers block without a goal it opens
+  with a **form** like the former advisor (goal with clickable examples + level of detail), composed by the
+  app itself — instantly, no model call, no credits; the model then asks the follow-up questions. Whoever
+  types the goal into the message box (or sends a voice note) instead of filling the form gets the
+  level-of-detail question with the follow-up questions (asked at most twice per conversation), so the tree
+  is always checked against a chosen level. In the hybrid setup the follow-up questions come from the main
+  model, and an over-sized In-depth tree is returned with a concrete hint (how many sub-steps may stay).
+- **Guided flows open instantly**: the opening step of the morning briefing, Evening planning and Sort my
+  notes (the invitation to send a photo, a voice note or ideas, with the choices on a card) is composed by
+  the app — at once, no model call, no credits. Tapping "I will write my ideas" (or "I will send a
+  photo…") gets the app's own "Go ahead, I am waiting for …" with a "Nothing to add" chip; the model starts
+  with your material or answer.
+- **Delete ideas from the buffer through the assistant**: a new tool `delete_ideas` (exact titles, or the
+  whole buffer) — always a confirmation card that lists every idea to be deleted and says it cannot be
+  undone; only the user's own ideas, and exactly those the card showed. *Sort the buffer* now also suggests
+  a "Delete" section for obvious test or nonsense entries, and the assistant no longer offers to put ideas
+  "into the buffer" that are already there.
+- Confirmation cards: new steps show their **description** on the card (e.g. a measurable goal written by
+  the assistant), and a rename reads *Rename "X" to "Y"* instead of "(title: …)".
+- **Always something to click**: a reply that ends with no question, no card to confirm and no chips gets a
+  chip — the other options of the question just answered (e.g. "Nothing to add, go on" while the assistant
+  waits for your notes), otherwise "What next?".
+- The confirmation card for `create_project`, `create_project_from_ideas` and `add_nodes` shows **the
+  whole tree** (indented, with owner, deadline and plan; the first 12 rows and *Show the whole
+  tree*). A plan date further than 7 days or an unknown owner is returned to the model **before**
+  the card instead of failing after your Yes.
+- The chat file picker takes `.txt`/`.md` (the content goes into the input box); a message can be
+  8,000 characters (was 6,000).
+- **Removed**: the old *Suggest with AI* / *Map from text* dialogs (`AiCreateDialog`,
+  `AdvisorDialog`, `FromTextDialog`) and their translations. The wand on a node, the project AI
+  summary and the morning encouragement stay. The docs page "Working with the AI assistant" now
+  points to the assistant page.
+- Fixed: the project dashboard showed the raw key `editor:aiChat.connectionError` when the AI summary
+  failed.
+
+**Voice notes in the assistant**
+
+- A **microphone** next to the paperclip (on a phone in the bottom bar in place of *Send* while the
+  field is empty): record, **Send** — the voice note goes out right away, the app transcribes it and
+  the assistant sorts it like a photo of notes (changes on cards to confirm). The bubble shows
+  "🎤 Voice note 0:42" and the transcript; the recording itself is not stored. At most 5 minutes
+  (`KB_CHAT_HLAS_MAX_S`, recording stops and sends by itself), under 1 s is not sent; a finished
+  recording (a WhatsApp `.opus`, `.m4a`, `.mp3`, up to `KB_CHAT_MAX_AUDIO_MB`) can be sent with the
+  paperclip or dropped; a file that is too large is refused in the browser with a plain message. When
+  the voice note does not go out — transcription fails, the network drops, a proxy returns an error —
+  the recording is kept: *Try again* / *Download* / *Discard* (the server marks the one case where the
+  transcript is already in the conversation, `ulozeno`, so it is not sent twice). Recording runs only
+  while its bar is visible: closing the panel or switching to PDF stops it and keeps the note for you
+  to send — the microphone never runs blind.
+- **Fix a transcript with the pencil**: the last voice note or photo transcript has a pencil in its bubble —
+  edit the text, *Send the correction*, and the assistant answers again from the corrected text
+  (`POST /api/kb/chat/oprav`; unconfirmed proposals of that turn are dropped, one more AI turn). Offered
+  only while nothing has come out of that turn yet (a confirmed card, a saved document, memory, an idea);
+  the conversation DTO carries `lze_opravit`.
+- **Enter sends the answers** from the own-answer field of a question card (with several questions it
+  first jumps to the next unanswered one).
+- The microphone shows only where transcription works (`/api/kb/config` → `chat_voice`,
+  `chat_voice_max_s`, `chat_voice_max_mb`). Browsers allow the microphone only on https/localhost —
+  on a plain-http address tapping it explains why; attaching a finished recording still works.
+  Morning briefing and evening planning invite a voice note too.
+- **One transcription path** (`pb_hooks/prepis.js`) for voice notes and the transcription API mode
+  (`/api/kb/advisor`, `mode: transcribe` — the old *Upload audio* dialog is gone, see below):
+  `KB_TRANSCRIBE_PROVIDER=openai` + `KB_TRANSCRIBE_URL`/`_MODEL`/`_TOKEN` (OpenAI shape — speaches,
+  whisper.cpp, OpenAI…; `none` = off), otherwise the general AI as before. `KB_AI_TRANSCRIBE_URL`
+  ending in `/audio/transcriptions` now really gets the OpenAI shape (the docs promised it); the
+  service key goes there only on the same origin. The recording type is recognised from its
+  content (a WhatsApp `.opus` goes as `.ogg`). A voice turn uses 2 turns of the hourly cap
+  (`KB_AI_HLAS_VAHA`), recordings up to `KB_CHAT_MAX_AUDIO_MB` (3). The length is logged
+  (`ai_chat_log.audio_ms`); credits are still charged only for the assistant's reply. The
+  transcription API mode has its hourly cap with every provider (`KB_AI_MAX_TRANSCRIBE_PER_HOUR`),
+  and a failing transcriber no longer returns its address in the error text.
+- Android app: `RECORD_AUDIO` + `MODIFY_AUDIO_SETTINGS` permissions.
+
+**Fixes from the pre-release review**
+
+- **Deleting ideas only ever deletes what the card showed**: a stale id (the idea was removed elsewhere,
+  or moved by another card of the same turn) no longer falls back to a title search that could hit a
+  different idea with a very short title. Two ideas with the same title are both listed and both
+  deleted; the result tells the assistant how many ideas remain.
+- A proposal that would not fit into the confirmation queue (a big tree with long descriptions) is
+  returned to the model to shorten or split instead of losing the whole turn.
+- Cards name the **real project** even when the model passed only part of its title; *Create a project
+  from ideas* says who gets access through an assignment, like the other cards.
+- Team meeting: `null` in optional fields (GPT models send it) is no longer taken for a forbidden
+  change; "Who has the most work" is ordered by open work, not by delay; an external contact shows by
+  name (or as "external contact"), never as its internal pseudo-address.
+- A PDF sent as the answer to a question (the New project form invites one) reaches the model whole,
+  not cut at 8,000 characters; correcting a photo transcript no longer cuts the PDF text attached to
+  the same message, and the correction is saved in a single write (nothing is lost if the process
+  dies mid-turn).
+- Weekly review: an idea from the buffer with a deadline is marked as such and is not offered among
+  the tasks to plan. After a voice note, "Create a new project" is added to the first question only
+  where sorting happens (not in Meeting prep, Weekly review or the Team meeting).
+- Hybrid setup: the first model turn of Meeting prep goes to the main model also after "With a
+  person → name". Fallback chips no longer offer the other options of a question that has just
+  been carried out ("No, thanks" after the notes were saved).
+- Limits: the hourly weight follows the real mode (an unknown `mode` no longer made an image or
+  voice turn count as 1), a nonsensical voice-note length from the client cannot drop the usage log
+  row, `POST /api/kb/chat/oprav` has a body limit.
+- Panel: question cards and an open transcript editor no longer carry their state over to another
+  conversation picked from the history; a reply that arrives after you switched conversations is not
+  drawn into the wrong one; the "Looked into: …" line names the new read tools.
+- **An error in a running conversation is shown again**: when sending or confirming failed, the
+  message explaining why was cleared at once by the reload of the conversation (it only stayed in a
+  brand-new conversation) — the message just vanished without a word. In the app since the assistant
+  panel exists.
+- A transcript longer than a message can hold (an attached recording of tens of minutes) ends with a
+  note that the rest did not fit, instead of being cut silently.
+
+**The assistant on the real OpenAI API**
+
+- **Fixed: the conversation stopped with HTTP 400 on api.openai.com** whenever the assistant asked a
+  question and offered next-step chips in the same reply (the morning briefing and evening planning
+  do exactly that), when you typed instead of confirming a card, or confirmed one of two cards. The
+  history sent to the model now answers every tool call before anything else, as OpenAI requires
+  (Ollama, llama.cpp and most gateways tolerated the old order, so it went unnoticed).
+- The last round of the tool loop and the "answer in text" retry no longer send an empty `tools`
+  list (OpenAI rejects it).
+- **Reasoning models** (o-series, `gpt-5*` incl. GPT-5.6 Luna): the request goes out in the shape they
+  accept on the first try (no double call), with a reserve for reasoning (`KB_AI_REASONING_BUDGET`,
+  default 4000 tokens) and `reasoning_effort` (`KB_AI_REASONING_EFFORT`, default `low`; `auto` = do not
+  send; `KB_*_OPENAI_EXTRA` wins). A model whose name does not reveal it is recognised after its first
+  refusal of `max_tokens`/temperature or by `reasoning_tokens` in the reply, and remembered. Applies to
+  the assistant, the old advisor functions, summaries and image reading.
+- GPT models get all assistant tools at once (`KB_CHAT_TOOLS=auto`, default) — they do not call a tool
+  they were not offered, so keyword-gated features silently disappeared. Qwen, DeepSeek and gpt-oss
+  keep the tool groups. `null` in optional tool arguments is ignored instead of failing validation;
+  Markdown in replies (`**bold**`, `#` headings, `*` bullets, tables) is converted to the panel's
+  plain-text style; a model refusal is shown as the reply.
+- **Images only where they can be read**: `/api/kb/config` reports `chat_image` when a vision model is
+  configured. Without it the paperclip takes PDFs only, a pasted image gets a local explanation, and
+  the morning briefing / evening planning invite you to write your ideas instead of pasting a photo
+  (with a vision model the wording is unchanged).
+- **Images from Administration**: with an Ollama or OpenAI provider set in Administration → AI, tick
+  *The assistant reads images* (optionally a separate image model) and save — the app immediately
+  tries a built-in image with known text and enables images only if the model actually reads it
+  (*Test an image* repeats the check; the test always uses the saved settings). Until now images
+  needed the `KB_VISION_*` environment variables, so an OpenAI key entered in the app gave no images.
+
+### Upgrade notes
+- New migration adds `vision_enabled`, `vision_model`, `vision_ok` to `ai_settings` (defaults off)
+  and `audio_ms` to `ai_chat_log`.
+- The `/api/kb/chat` body limit grew from 2 MB to about 4.25 MB (a 3 MB voice note in base64). **If a
+  reverse proxy sits in front of the app, raise its request body limit accordingly** (nginx:
+  `client_max_body_size 5m;` — its default of 1 MB rejects voice notes and larger photos with 413).
+- **Drafting a project with AI now needs the assistant** (provider `ollama` or `openai`, or
+  `KB_CHAT_*`). Instances whose AI runs only through the remote `api` service or a `custom` endpoint
+  lose the *Suggest with AI* / *Map from text* dialogs without a replacement; the wand on a node, the
+  project AI summary and the morning encouragement keep working there.
+- Rolling back to v0.67-beta works over the same data (tested): the new fields are ignored and
+  conversations started with the new helpers continue as ordinary conversations.
+- `KB_CHAT_TOOLS` default is now `auto` (see above); set `groups` to keep the old behaviour for GPT models.
+
+---
+
 ## v0.67-beta — 2026-10-01
 
 **Assistant documents — notes, e-mails and summaries next to the chat**

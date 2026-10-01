@@ -37,5 +37,15 @@
     "save": "Save",
     "saved": "Saved",
     "loadError": "Could not load the usage."
+  },
+  "aiVision": {
+    "label": "The assistant reads images (photos of notes, screenshots)",
+    "hint": "The model must see images (e.g. gpt-4o-mini, gpt-4.1-mini, gemma4). After saving it is tried on a built-in image — images are enabled only when the model actually reads it.",
+    "modelLabel": "Model for images (optional)",
+    "modelPlaceholder": "same as the chat model",
+    "test": "Test an image",
+    "ok": "Verified — the assistant reads images.",
+    "notTested": "Not verified yet — save the settings or click Test an image.",
+    "env": "Image reading is set by the operator (KB_VISION_* environment variables) — it cannot be changed here."
   }
 }

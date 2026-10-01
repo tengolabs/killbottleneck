@@ -227,12 +227,15 @@ H.beh(async () => {
   expect((await inst.api('GET', `/api/kb/chat/dokument/${rucni}`, { token: A })).status === 404, 'smazaný dokument už není');
 
   console.log('== porada a noční plánování nabídnou zápis ==');
-  fronta.push(text('PORADA.'));
+  // úvod porady/nočního skládá aplikace (1. 10. 2026) → prompt jde modelu až s prvním skutečným tahem
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'porada', message: '' } });
+  fronta.push(text('PORADA.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: '1) Nic nemám, pokračuj' } });
   let sysP = systemZ(posledniVolani());
   expect(/Uložit zápis z porady do dokumentů\?/.test(sysP) && /kind summary/.test(sysP) && /Ranní porada <dnešní datum>/.test(sysP), 'porada: na konci nabídka uložit zápis (sumář)');
-  fronta.push(text('NOC.'));
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'nocni', message: '' } });
+  fronta.push(text('NOC.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: '1) Nic nemám, pokračuj' } });
   sysP = systemZ(posledniVolani());
   expect(/Uložit zápis z nočního plánování do dokumentů\?/.test(sysP) && /Noční plánování <dnešní datum>/.test(sysP), 'noční plánování: nabídka uložit zápis');
 

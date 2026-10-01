@@ -90,7 +90,9 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
   const hosts = [addHostGateway ? '--add-host=host.docker.internal:host-gateway' : '']
     .concat(Object.entries(addHosts).map(([h, ip]) => `--add-host=${h}:${ip}`)).filter(Boolean).join(' ');
   const vol = volume ? `-v ${volume === true ? name + '-data' : volume}:/app/pb_data` : '';
-  execSync(`docker rm -f ${name} 2>/dev/null; true`, { stdio: 'ignore' });
+  // -v: s kontejnerem zmizí i jeho ANONYMNÍ volume (obraz má VOLUME /app/pb_data) — jinak po každé instanci zůstane
+  // viset (1. 10. 2026: 34 tisíc visících volume, 75 GB); pojmenovaný volume (`volume:`) -v nemaže
+  execSync(`docker rm -f -v ${name} 2>/dev/null; true`, { stdio: 'ignore' });
   execSync(`docker run -d --name ${name} ${envArgs} ${hosts} ${vol} ${extraArgs} -p 127.0.0.1::8090 ${img}`, { stdio: 'ignore' });
   const inst = { name, port: 0, base: '', image: img };
   const ctiPort = () => {
@@ -128,7 +130,7 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
     pause: () => { execSync(`docker stop ${name}`, { stdio: 'ignore' }); },
     resume: async () => { execSync(`docker start ${name}`, { stdio: 'ignore' }); ctiPort(); await waitHealthy(inst); return inst.base; },
     restart: async () => { execSync(`docker restart ${name}`, { stdio: 'ignore' }); ctiPort(); await waitHealthy(inst); return inst.base; },
-    stop: () => { execSync(`docker rm -f ${name} 2>/dev/null; true`, { stdio: 'ignore' }); if (inst.volume) execSync(`docker volume rm -f ${inst.volume} 2>/dev/null; true`, { stdio: 'ignore' }); },
+    stop: () => { execSync(`docker rm -f -v ${name} 2>/dev/null; true`, { stdio: 'ignore' }); if (inst.volume) execSync(`docker volume rm -f ${inst.volume} 2>/dev/null; true`, { stdio: 'ignore' }); },
   });
   instance.push(inst);
   return waitHealthy(inst).then(() => inst);
@@ -202,9 +204,11 @@ function httpMock(handler) {
 // ⚠️ whitelist konzole je ÚZKÝ (jen Google Fonts) — „všechny cizí originy" by
 // zaslepilo chyby brány api.killbottleneck.com (ui-smoke.js, 20. 8. 2026)
 const cizihoPuvodu = (m) => /fonts\.g(oogleapis|static)\.com/.test(m.text() || '') || (m.location && /fonts\.g(oogleapis|static)\.com/.test(m.location().url || ''));
-async function browser({ viewport = { width: 1400, height: 900 }, mobil = false, konzole = true } = {}) {
+// args = přepínače Chromu navíc (např. falešný mikrofon pro hlasovky: --use-fake-device-for-media-stream …);
+// výchozí je jen --no-sandbox jako dřív
+async function browser({ viewport = { width: 1400, height: 900 }, mobil = false, konzole = true, args = [] } = {}) {
   const puppeteer = require('puppeteer-core');
-  const b = await puppeteer.launch({ executablePath: process.env.KB_CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
+  const b = await puppeteer.launch({ executablePath: process.env.KB_CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'].concat(args) });
   uklid.push(() => b.close().catch(() => {}));
   const chyby = [];
   const novaStranka = async () => {

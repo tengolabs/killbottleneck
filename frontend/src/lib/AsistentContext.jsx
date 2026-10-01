@@ -38,6 +38,10 @@ export function AsistentProvider({ children }) {
   // vybraný uzel v editoru mapy {map_id, node_id, title} — editor ho hlásí, panel ho
   // posílá v kontextu (Richard 14. 9. 2026: „tenhle krok“ = vybraný uzel)
   const [uzel, setUzel] = useState(null);
+  // Spuštění balíčku asistenta odjinud (dialog Nový projekt → „Navrhnout s AI“, zásobník →
+  // „Roztřídit s AI“, 1. 10. 2026). Panel je líný, proto jen žádost: vyřídí ji, jakmile je
+  // načtený a volný.
+  const [zadost, setZadost] = useState(null);
   const [dokOpen, setDokOpenState] = useState(() => nactiKlic(KEY_DOK_OPEN) === '1');
   const [dokWidth, setDokWidthState] = useState(ctiSirkuDok);
   const [dokId, setDokId] = useState('');      // otevřený dokument ('' = seznam)
@@ -79,16 +83,19 @@ export function AsistentProvider({ children }) {
     setWidthState(n);
     ulozKlic(KEY_WIDTH, String(n));
   }, []);
+  const spust = useCallback((mode, target) => { setZadost({ mode, target: target || {} }); setOpen(true); }, [setOpen]);
+  const vyridZadost = useCallback(() => setZadost(null), []);
   const value = useMemo(() => ({
     open, setOpen, width, setWidth, dostupny, setDostupny, uzel, setUzel,
     dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
-  }), [open, setOpen, width, setWidth, dostupny, uzel, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny]);
+    zadost, spust, vyridZadost,
+  }), [open, setOpen, width, setWidth, dostupny, uzel, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, dostupny: false, uzel: null, setUzel: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn() };
+const PRAZDNO = { open: false, width: 0, dostupny: false, uzel: null, setUzel: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }

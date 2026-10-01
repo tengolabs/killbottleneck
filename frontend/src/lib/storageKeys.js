@@ -46,6 +46,7 @@ export function smazKlic(klic) {
 export const KEY_PORADA_NE = 'kb-chat-porada-ne';    // den, kdy uživatel poradu odmítl
 export const KEY_PORADA_DEN = 'kb-chat-porada-den';  // den, kdy nabídka vznikla
 export const KEY_AKTIVITA = 'kb-chat-aktivita';      // razítko poslední aktivity (ms)
+export const KEY_AI_BLOK = 'kb-chat-ai-blok';        // blok AI pomocníků na telefonu rozbalený ('1')
 
 // Při odhlášení / vypršení session smazat všechny klíče asistenta (`kb-chat-*`):
 // rozhovor, model, porada, aktivita — patří k účtu, další člověk u téhož

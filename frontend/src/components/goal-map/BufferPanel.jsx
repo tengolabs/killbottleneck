@@ -13,10 +13,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { X, Plus, Trash2, Inbox, GripVertical, ArrowRight, Loader2, Pencil, Calendar, X as XIcon, Network } from 'lucide-react';
+import { X, Plus, Trash2, Inbox, GripVertical, ArrowRight, Loader2, Pencil, Calendar, X as XIcon, Network, Sparkles } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import { intlLocale } from '@/lib/locale';
 import { popisJakoText } from '@/lib/popisFormat';
+import { useAsistent } from '@/lib/AsistentContext';
 
 export const BUFFER_DRAG_MIME = 'application/kb-buffer';
 
@@ -170,6 +171,9 @@ export function BufferEditDialog({ item, onSave, onClose }) {
 // panel, ouško se přilepí na jeho hranu místo plavání přes jeho obsah.
 export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open, onToggle, fixed = false, leftOffset = 0 }) {
   const { t } = useTranslation('editor');
+  // „Roztřídit s AI“ (1. 10. 2026): asistent roztřídí zásobník (balíček trideni, varianta zásobník) —
+  // jen kde asistent běží a je co třídit (aspoň 2 nápady)
+  const asistent = useAsistent();
   const [newTitle, setNewTitle] = useState('');
   const [adding, setAdding] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -239,6 +243,11 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
             {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           </Button>
         </div>
+        {asistent.dostupny && items.length >= 2 && (
+          <Button variant="outline" size="sm" className="mt-2 w-full h-8 text-xs" title={t('buffer.sortAiHint')} onClick={() => asistent.spust('trideni', { zdroj: 'zasobnik' })} data-testid="buffer-roztridit">
+            <Sparkles className="w-3.5 h-3.5 mr-1.5 text-primary" />{t('buffer.sortAi')}
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">

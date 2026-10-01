@@ -1695,66 +1695,18 @@ kbRoute("GET", "/map-changes", (e) => {
   }
 
   const days = range === "all" ? 0 : (range === "30" ? 30 : 7);
-  let rows = [];
-  const params = { m: mapId };
-  // ⚠️ Filtrovat POLE UŽ V DOTAZU, ne až v JS níž. Od 19. 8. 2026 zapisuje
-  // záznamník i změny zadání, ikony, barvy, vykonavatele a čekání — ty se sem
-  // nehlásí (souhrn je o POHYBU práce, ne o kosmetice). Kdyby se natáhly a
-  // zahodily až v JS, ujídaly by ze stropu 500 řádků a na činné mapě by
-  // z okna vytlačily SKUTEČNÉ události. Report by pak tiše mlčel o práci,
-  // která proběhla.
-  let filter = "map = {:m} && (field = 'status' || field = 'deadline' || field = 'owner'"
-    + " || field = 'created' || field = 'deleted' || field = 'parent')";
-  let since = "";
-  if (days > 0) {
-    const { pbDateString } = require(`${__hooks}/helpers.js`);
-    since = pbDateString(new Date(Date.now() - days * 86400000));
-    filter += " && created >= {:since}";
-    params.since = since;
-  }
-  try {
-    rows = e.app.findRecordsByFilter("map_changes", filter, "-created", 500, 0, params);
-  } catch (err) { rows = []; }
-
-  // Skupiny odpovídají tomu, co člověk hlásí na poradě. Jeden řádek = jedna
-  // změna; „hotovo" a „rozjelo se" se poznají z cílového stavu, ne z pole.
-  const groups = { done: [], started: [], added: [], deadline: [], owner: [], moved: [], removed: [] };
-  for (const r of rows) {
-    const item = {
-      kind: r.getString("kind"),
-      id: r.getString("item_id"),
-      title: r.getString("title"),
-      from: r.getString("from"),
-      to: r.getString("to"),
-      actor: r.getString("actor_email"),
-      when: r.getString("created"),
-    };
-    const field = r.getString("field");
-    if (field === "status") {
-      if (item.to === "done") groups.done.push(item);
-      else if (item.to === "in_progress") groups.started.push(item);
-      // done → todo (vrácení do hry) se počítá jako rozjetí, ať to nezapadne
-      else if (item.from === "done") groups.started.push(item);
-    } else if (field === "created") groups.added.push(item);
-    else if (field === "deleted") groups.removed.push(item);
-    else if (field === "deadline") groups.deadline.push(item);
-    else if (field === "owner") groups.owner.push(item);
-    else if (field === "parent") groups.moved.push(item); // kanban posun / přesun pod jiný uzel
-    // změna názvu se do souhrnu nedává — je to úprava formulace, ne pohyb
-  }
+  // logika pohybu práce je sdílená s nástrojem asistenta get_project_changes (helpers.mapChangeGroups)
+  const { mapChangeGroups } = require(`${__hooks}/helpers.js`);
+  const d = mapChangeGroups(e.app, mapId, days);
 
   e.response.header().set("Cache-Control", "private, no-store");
   e.response.header().add("Vary", "Authorization");
   return e.json(200, {
     range: range,
-    since: since ? since.slice(0, 10) : "",
-    truncated: rows.length >= 500,
-    counts: {
-      done: groups.done.length, started: groups.started.length, added: groups.added.length,
-      deadline: groups.deadline.length, owner: groups.owner.length, moved: groups.moved.length,
-      removed: groups.removed.length,
-    },
-    groups: groups,
+    since: d.since ? d.since.slice(0, 10) : "",
+    truncated: d.truncated,
+    counts: d.counts,
+    groups: d.groups,
   });
 }, $apis.requireAuth());
 
@@ -1985,21 +1937,29 @@ kbRoute("POST", "/my-summary/refresh", (e) => {
 
 // Strop těla PŘED parsováním (checkup 16. 9.): bez něj se celé mnohamegabajtové tělo načetlo do paměti,
 // než chatRun zkontroloval obrázek. Obrázek max KB_CHAT_MAX_IMG_MB (výchozí 1,2) → base64 ×4/3 + náhled a text.
-const CHAT_BODY_LIMIT = Math.max(2 * 1024 * 1024, Math.round((Number($os.getenv("KB_CHAT_MAX_IMG_MB")) || 1.2) * 1048576 * 4 / 3) + 256 * 1024);
+const CHAT_BODY_LIMIT = Math.max(2 * 1024 * 1024, Math.round(Math.max(Number($os.getenv("KB_CHAT_MAX_IMG_MB")) || 1.2, Number($os.getenv("KB_CHAT_MAX_AUDIO_MB")) || 3) * 1048576 * 4 / 3) + 256 * 1024); // obrázek nebo hlasovka (1. 10. 2026)
 kbRoute("POST", "/chat", (e) => {
   const { userLang } = require(`${__hooks}/i18n.js`);
-  const { chatRun, chatCfg, chatBrzda, chatChyba, zkontrolujObrazek, zkontrolujPdf } = require(`${__hooks}/chat.js`);
+  const { chatRun, chatCfg, chatBrzda, chatChyba, zkontrolujObrazek, zkontrolujPdf, jeRezim } = require(`${__hooks}/chat.js`);
   const L = userLang(e.auth);
   const body = e.requestInfo().body || {};
   const c = chatCfg(e, body, L);
   if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
+  // přílohy ignoruje jen ZNÁMÝ režim (start průvodce); neznámý `mode` chatRun nebere a přílohu zpracuje →
+  // předkontroly i váha brzdy se řídí tímtéž (dřív stačilo poslat mode:"x" a obrázek šel s váhou 1)
+  const bezRezimu = !jeRezim(body.mode);
   // vadný obrázek / vypnuté čtení obrázků → 400 DŘÍV, než brzda ubere hodinový strop
-  if (body.image_base64 && !body.mode) {
+  if (body.image_base64 && bezRezimu) {
     try { zkontrolujObrazek(body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
   }
   // totéž pro text z PDF (moc stran / znaků, špatný tvar) — 18. 9. 2026
-  if (body.pdf_text && !body.mode) {
+  if (body.pdf_text && bezRezimu) {
     try { zkontrolujPdf(body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
+  }
+  // a pro hlasovku: vypnutý přepis, neznámý formát, moc velká nahrávka — 1. 10. 2026
+  if (body.audio_base64 && bezRezimu) {
+    const { zkontrolujHlas } = require(`${__hooks}/prepis.js`);
+    try { zkontrolujHlas($app, body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
   }
   const b = chatBrzda(e, L, body);
   if (b) return e.json(b.status, b.body);
@@ -2012,6 +1972,26 @@ kbRoute("POST", "/chat", (e) => {
   }
   return e.json(200, { chat: vysledek });
 }, $apis.requireAuth(), $apis.bodyLimit(CHAT_BODY_LIMIT));
+
+// oprava přepisu poslední hlasovky / fotky (tužka v bublině): zahodí nepotvrzené návrhy a model odpoví znovu
+kbRoute("POST", "/chat/oprav", (e) => {
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const { chatOprav, chatCfg, chatBrzda, chatChyba } = require(`${__hooks}/chat.js`);
+  const L = userLang(e.auth);
+  const body = e.requestInfo().body || {};
+  const c = chatCfg(e, body, L);
+  if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
+  const b = chatBrzda(e, L);
+  if (b) return e.json(b.status, b.body);
+  let vysledek;
+  try {
+    vysledek = chatOprav($app, e.auth, body, c.cfg, L);
+  } catch (err) {
+    const ch = chatChyba(e, err, L);
+    return e.json(ch.status, ch.body);
+  }
+  return e.json(200, { chat: vysledek });
+}, $apis.requireAuth(), $apis.bodyLimit(64 * 1024)); // opravený přepis má nejvýš 8000 znaků
 
 kbRoute("POST", "/chat/potvrdit", (e) => {
   const { userLang } = require(`${__hooks}/i18n.js`);
@@ -2415,12 +2395,27 @@ kbRoute("GET", "/config", (e) => {
     const ccfg = chatAiConfig($app, "");
     if (["ollama", "openai"].includes(ccfg.provider) && !modes.includes("chat_panel")) modes = modes.concat(["chat_panel"]);
     if (ccfg.provider !== "ollama" && ccfg.provider !== "openai") modes = modes.filter((m) => m !== "chat_panel");
+    // obrázky v asistentovi jen s modelem, který obrázky vidí (KB_VISION_*) — jinak panel fotku
+    // nenabízí a porada ani noční plánování o ni nežádají (30. 9. 2026)
+    const { visionAiConfig } = require(`${__hooks}/chat.js`);
+    if (modes.includes("chat_panel") && visionAiConfig($app).length) modes = modes.concat(["chat_image"]);
+    // přepis řeči: vlastní KB_TRANSCRIBE_* ho zapne i bez obecné AI, KB_TRANSCRIBE_PROVIDER=none vypne;
+    // hlasovky v asistentovi (chat_voice) jen tam, kde přepis opravdu jde (1. 10. 2026)
+    const { prepisConfig } = require(`${__hooks}/prepis.js`);
+    const pc = prepisConfig($app);
+    if (pc && pc.vlastni && !modes.includes("transcribe")) modes = modes.concat(["transcribe"]);
+    if (!pc) modes = modes.filter((m) => m !== "transcribe");
+    if (modes.includes("chat_panel") && modes.includes("transcribe")) modes = modes.concat(["chat_voice"]);
   } catch (err) { /* bez chatu */ }
   return e.json(200, {
     skin: instanceSkin,
     ai_enabled: modes.length > 0,
     ai_provider: provider,
     ai_modes: modes,
+    // nejdelší hlasovka v asistentovi (s) — klient podle toho zastaví nahrávání
+    chat_voice_max_s: (() => { const n = parseInt(env("CHAT_HLAS_MAX_S"), 10); return n > 0 && n <= 900 ? n : 300; })(),
+    // největší nahrávka (MB) — klient podle ní zastaví nahrávání a moc velký soubor odmítne dřív, než ho pošle
+    chat_voice_max_mb: (() => { const n = Number(env("CHAT_MAX_AUDIO_MB")); return n > 0 ? n : 3; })(),
     // false = AI je nastavená, ale právě neodpovídá (výpadek domácí strany)
     ai_healthy: healthy,
     claimed: totalUsers[0].c > 0,
@@ -2511,7 +2506,10 @@ kbRoute("POST", "/advisor", (e) => {
   const L = userLang(e.auth);
   const cfg = aiConfig($app);
   const provider = cfg.provider;
-  if (!["api", "custom", "ollama", "openai"].includes(provider)) {
+  const body = e.requestInfo().body || {};
+  // přepis má vlastní nastavení (KB_TRANSCRIBE_*) — smí i bez obecné AI (1. 10. 2026)
+  const { prepisConfig } = require(`${__hooks}/prepis.js`);
+  if (!["api", "custom", "ollama", "openai"].includes(provider) && !(body.mode === "transcribe" && prepisConfig($app))) {
     return e.json(503, { error: t(L, "err.aiDisabled") });
   }
 
@@ -2526,7 +2524,6 @@ kbRoute("POST", "/advisor", (e) => {
     return e.json(503, { error: t(L, "err.aiHostPrivate") });
   }
 
-  const body = e.requestInfo().body || {};
   // jazyk uživatele → do payloadu; vlastní model (advisor.js), cloud/n8n advisor
   // i přepis zvuku (Whisper language na bráně) podle něj volí jazyk. Vždy
   // PŘEPÍŠEME serverovým userLang (∈ cs/en) — klient nesmí podvrhnout
@@ -2537,56 +2534,38 @@ kbRoute("POST", "/advisor", (e) => {
   // vlastní GPU čas, u api hlídá kvótu brána). Bez stropu by kterýkoli člen —
   // nebo unesený účet — vypálil kredit ve smyčce. Fixní hodinové okno ve
   // sdíleném store, stejný levný vzor jako brzda u registrace a u sumářů.
-  // Schválně JEN pro openai: stávajícím instancím se nesmí nic změnit pod rukama.
-  if (provider === "openai") {
+  // Ostatní módy schválně JEN pro openai: stávajícím instancím se nesmí nic změnit pod rukama.
+  // PŘEPIS má strop u každého providera (panel 1. 10. 2026): vlastní přepisovač přes KB_TRANSCRIBE_* je placená
+  // služba nebo sdílená GPU bez ohledu na to, co je obecná AI — bez stropu by šel volat ve smyčce.
+  const jePrepis = body.mode === "transcribe";
+  if (provider === "openai" || jePrepis) {
     const { env } = require(`${__hooks}/helpers.js`);
-    const jePrepis = body.mode === "transcribe";
     // přepis je dražší a nikdo ho nepotřebuje desetkrát za minutu → vlastní strop
     const strop = parseInt(env(jePrepis ? "AI_MAX_TRANSCRIBE_PER_HOUR" : "AI_MAX_PER_HOUR"), 10);
     const limit = strop > 0 ? strop : (jePrepis ? 20 : 60);
-    const store = $app.store();
     const okno = Math.floor(Date.now() / 3600000);
     const klic = "airl:" + (jePrepis ? "t:" : "c:") + e.auth.id;
-    const drive = String(store.get(klic) || "").split(":");
-    const pouzito = Number(drive[0]) === okno ? Number(drive[1]) || 0 : 0;
-    if (pouzito >= limit) {
-      return e.json(429, { error: t(L, "err.aiRateLimited", { limit: limit }), code: "ai_rate" });
-    }
-    store.set(klic, okno + ":" + (pouzito + 1));
+    // atomicky (setFunc): souběžné požadavky jinak přečetly stejné `pouzito` a strop šel obejít
+    let odmitnuto = false;
+    $app.store().setFunc(klic, (stary) => {
+      const drive = String(stary || "").split(":");
+      const pouzito = Number(drive[0]) === okno ? Number(drive[1]) || 0 : 0;
+      if (pouzito >= limit) { odmitnuto = true; return stary; }
+      return okno + ":" + (pouzito + 1);
+    });
+    if (odmitnuto) return e.json(429, { error: t(L, "err.aiRateLimited", { limit: limit }), code: "ai_rate" });
   }
 
   // vlastní model (Ollama i OpenAI-kompatibilní rozhraní): killBottleneck si
   // prompty i parsování řeší sám (pb_hooks/advisor.js), doprava je v llm.js
+  // přepis řeči: JEDNO místo i pro hlasovky v asistentovi (pb_hooks/prepis.js, 1. 10. 2026) — pořadí
+  // KB_TRANSCRIBE_* → adresa přepisu → služba openai → brána; dosavadní nastavení se chovají stejně
+  if (body.mode === "transcribe") {
+    const { prepisSurovy } = require(`${__hooks}/prepis.js`);
+    const v = prepisSurovy($app, L, body);
+    return e.json(v.status, v.json);
+  }
   if (provider === "ollama" || provider === "openai") {
-    if (body.mode === "transcribe") {
-      const turl = cfg.transcribeUrl;
-      // Vlastní adresa přepisu má PŘEDNOST i u openai: kdo si ji nastavil
-      // (whisper na vlastním železe), tomu se nesmí cesta změnit pod rukama.
-      if (turl) {
-        try {
-          const tres = $http.send({
-            url: turl, method: "POST", body: JSON.stringify(body),
-            headers: { "Content-Type": "application/json" }, timeout: 300,
-          });
-          return e.json(tres.statusCode, tres.json);
-        } catch (err) {
-          return e.json(502, { error: t(L, "err.transcribeUnavailable") });
-        }
-      }
-      // OpenAI-kompatibilní služby přepis umí samy (multipart /audio/transcriptions),
-      // takže bez zvlášť nastavené adresy jde diktování rovnou tam.
-      if (provider === "openai") {
-        try {
-          const { llmTranscribe } = require(`${__hooks}/llm.js`);
-          return e.json(200, llmTranscribe({
-            url: cfg.url, token: cfg.token, transcribeModel: cfg.transcribeModel,
-          }, body, L));
-        } catch (err) {
-          return e.json(502, { error: t(L, "err.aiFailed", { msg: (err && err.message ? err.message : err) }) });
-        }
-      }
-      return e.json(503, { error: t(L, "err.transcribeNotConfigured") });
-    }
     try {
       const { advisorRun } = require(`${__hooks}/advisor.js`);
       return e.json(200, advisorRun(body, {
@@ -2615,15 +2594,8 @@ kbRoute("POST", "/advisor", (e) => {
     return e.json(503, { error: t(L, "err.missingAiUrl") });
   }
 
-  let url = baseUrl;
-  if (body.mode === "transcribe") {
-    // Odvození adresy přepisu z adresy poradce. PŘECHOD: self-hoster může mít
-    // nastavený starý (flowmap-advisor) i nový (kb-advisor) webhook — obojí
-    // musí trefit odpovídající transcribe cestu.
-    url = cfg.transcribeUrl ||
-      baseUrl.replace(/kb-advisor\/?$/, "kb-transcribe")
-             .replace(/flowmap-advisor\/?$/, "flowmap-transcribe");
-  }
+  // (přepis řeči odbočil výš do prepis.js — tam žije i odvození kb-advisor → kb-transcribe)
+  const url = baseUrl;
 
   try {
     const res = $http.send({
@@ -2634,9 +2606,7 @@ kbRoute("POST", "/advisor", (e) => {
         "Content-Type": "application/json",
         "X-KB-Token": token,
       },
-      // přepis nahrávky legitimně trvá minuty (Whisper na bráně má 600 s) —
-      // s jednotnými 120 s umírala dlouhá nahrávka tady, dřív než na bráně
-      timeout: body.mode === "transcribe" ? 600 : 120,
+      timeout: 120,
     });
     if (res.statusCode < 200 || res.statusCode >= 300) {
       // tarifní odmítnutí (mimo tarif / vyčerpaný limit) propustit s vysvětlením
@@ -3196,7 +3166,7 @@ kbRoute("GET", "/ai-settings", (e) => {
   if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
   }
-  const { aiConfig } = require(`${__hooks}/helpers.js`);
+  const { aiConfig, env } = require(`${__hooks}/helpers.js`);
   const cfg = aiConfig($app);
   return e.json(200, {
     provider: cfg.provider,
@@ -3206,6 +3176,11 @@ kbRoute("GET", "/ai-settings", (e) => {
     transcribe_model: cfg.transcribeModel,
     token_set: !!cfg.token,
     source: cfg.source,
+    // obrázky v asistentovi (30. 9. 2026); vision_env = nastavil provozovatel přes KB_VISION_* (Administrace je nemění)
+    vision_enabled: !!cfg.visionEnabled,
+    vision_model: cfg.visionModel || "",
+    vision_ok: !!cfg.visionOk,
+    vision_env: ["ollama", "openai"].includes(String(env("VISION_PROVIDER") || "").toLowerCase()),
   });
 }, $apis.requireAuth());
 
@@ -3237,11 +3212,16 @@ kbRoute("POST", "/ai-settings", (e) => {
     rec = new Record($app.findCollectionByNameOrId("ai_settings"));
     isNew = true;
   }
+  // otisk toho, na čem čtení obrázků závisí — změna = obrázky se musí znovu otestovat (30. 9. 2026)
+  const otiskObrazku = () => [rec.getString("provider"), rec.getString("url"), rec.getString("model"), rec.getString("token"), rec.getString("vision_model"), rec.getBool("vision_enabled")].join("|");
+  const predtim = isNew ? "" : otiskObrazku();
   rec.set("provider", provider);
   rec.set("url", String(info.url || "").trim());
   rec.set("model", String(info.model || "").trim());
   rec.set("transcribe_url", String(info.transcribe_url || "").trim());
   rec.set("transcribe_model", String(info.transcribe_model || "").trim());
+  if (info.vision_enabled !== undefined) rec.set("vision_enabled", !!info.vision_enabled);
+  if (info.vision_model !== undefined) rec.set("vision_model", String(info.vision_model || "").trim().slice(0, 120));
   // token: prázdný v požadavku = ponechat stávající (admin ho nemusí přepisovat)
   if (info.clear_token) {
     rec.set("token", "");
@@ -3252,9 +3232,24 @@ kbRoute("POST", "/ai-settings", (e) => {
     // takže by se jinak konfigurací z administrace ztratil
     rec.set("token", env("AI_TOKEN") || "");
   }
+  const zmenaObrazku = otiskObrazku() !== predtim;
+  if (zmenaObrazku) rec.set("vision_ok", false);
   $app.save(rec);
   $app.store().remove("aiModesCache"); // ať se tarifní módy přenačtou hned
-  return e.json(200, { success: true, provider: provider, token_set: !!rec.getString("token") });
+  // obrázky zapnuté a nastavení se změnilo → rovnou otestovat (model bez vidění by si přepis vymyslel)
+  const out = { success: true, provider: provider, token_set: !!rec.getString("token"), vision_ok: rec.getBool("vision_ok") };
+  if (zmenaObrazku && rec.getBool("vision_enabled")) {
+    const { otestujObrazek } = require(`${__hooks}/chat.js`);
+    const v = otestujObrazek($app, L);
+    rec.set("vision_ok", !!v.ok);
+    $app.save(rec);
+    out.vision_ok = !!v.ok;
+    out.vision_message = v.ok ? t(L, "err.visionTestOk", { model: v.model })
+      : v.duvod === "nastaveni" ? t(L, "err.visionTestSettings")
+      : v.duvod === "chyba" ? t(L, "err.visionTestError", { text: v.text || "?" })
+      : t(L, "err.visionTestFail", { model: v.model, text: v.text || "—" });
+  }
+  return e.json(200, out);
 }, $apis.requireAuth());
 
 // Výchozí skin instance (kolekce instance_settings, jediný záznam). Platí pro
@@ -3413,6 +3408,20 @@ kbRoute("POST", "/ai-test", (e) => {
   const { aiConfig, aiHostBlocked } = require(`${__hooks}/helpers.js`);
   const saved = aiConfig($app);
   const info = e.requestInfo().body || {};
+  // „Otestovat obrázek“ (30. 9. 2026): jen ULOŽENÉ nastavení, výsledek se zapíše (zapne/vypne obrázky v asistentovi)
+  if (String(info.mode || "") === "vision") {
+    const { otestujObrazek } = require(`${__hooks}/chat.js`);
+    const v = otestujObrazek($app, L);
+    try {
+      const rec = $app.findFirstRecordByFilter("ai_settings", "id != ''");
+      rec.set("vision_ok", !!v.ok);
+      $app.save(rec);
+    } catch (err) { /* bez záznamu není co zapisovat — v.duvod = nastaveni */ }
+    return e.json(200, { ok: !!v.ok, vision_ok: !!v.ok, message: v.ok ? t(L, "err.visionTestOk", { model: v.model })
+      : v.duvod === "nastaveni" ? t(L, "err.visionTestSettings")
+      : v.duvod === "chyba" ? t(L, "err.visionTestError", { text: v.text || "?" })
+      : t(L, "err.visionTestFail", { model: v.model, text: v.text || "—" }) });
+  }
   const provider = String(info.provider || saved.provider || "none").toLowerCase();
   const url = String(info.url || "").trim() || saved.url;
   const model = String(info.model || "").trim() || saved.model;

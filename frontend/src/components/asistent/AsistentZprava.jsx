@@ -1,12 +1,13 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Check, CheckCheck, ClipboardList, Copy, Download, ExternalLink, FileText, Loader2, Mail, NotebookPen, PanelLeftOpen, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { Check, CheckCheck, ClipboardList, Copy, Download, ExternalLink, FileText, Loader2, Mail, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
 import { copyToClipboard } from '@/lib/clipboard';
 import { PAMET } from '@/lib/AsistentContext';
+import { ZNACKA_PREPISU, ZNACKA_PDF, ZNACKA_HLASU } from '@/lib/prepisZpravy';
 
 // Jedna zpráva chatu + její karty (otázky s volbami, akce k potvrzení, skin,
 // paměť, nápad, „nahlédl do"). Zprávy nástrojů (role tool) se nekreslí —
@@ -23,6 +24,15 @@ function KartaOtazky({ karta, aktivni, onSend, loading }) {
   const odeslat = () => {
     const radky = karta.questions.map((q, i) => `${i + 1}) ${odpovedi[i].trim() || '—'}`);
     onSend(radky.join('\n'));
+  };
+  // Enter v poli vlastní odpovědi = odeslat (Richard 1. 10. 2026). U víc otázek nejdřív skočí na další
+  // nezodpovězenou — nedopsaný formulář neodejde omylem; tlačítkem jde odeslat kdykoli.
+  const pole = useRef([]);
+  const enter = (i) => {
+    if (loading) return;
+    const dalsi = karta.questions.findIndex((q, j) => j !== i && !odpovedi[j].trim());
+    if (odpovedi[i].trim() && dalsi >= 0) { if (pole.current[dalsi]) pole.current[dalsi].focus(); return; }
+    if (hotovo) odeslat();
   };
   return (
     // výrazně oddělený blok (Richard 13. 9.: „oblast otázek by mohla být oddělená ještě víc")
@@ -54,6 +64,8 @@ function KartaOtazky({ karta, aktivni, onSend, loading }) {
               <Input
                 value={q.options.includes(odpovedi[i]) ? '' : odpovedi[i]}
                 onChange={(e) => nastav(i, e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enter(i); } }}
+                ref={(el) => { pole.current[i] = el; }}
                 placeholder={t('questionsAnswer')}
                 className="h-8 text-xs"
                 data-testid="chat-otazka-text"
@@ -83,6 +95,35 @@ const STAV_STYL = {
 
 // Akce čekající na potvrzení (zapisovací nástroj). Ano → server ji vykoná
 // vlastním v1 API; Ne → model dostane „zamítnuto" a hledá jinou cestu.
+// Celý strom nových uzlů na kartě (fáze C, 1. 10. 2026): prvních 12 řádků, zbytek po rozbalení — náhled
+// před založením, jaký měl starý Poradce. Řádek = odsazení podle úrovně, řešitel, termín, plán.
+function KartaStrom({ strom }) {
+  const { t } = useTranslation('asistent');
+  const [vse, setVse] = useState(false);
+  const radky = vse ? strom : strom.slice(0, 12);
+  return (
+    <div className="mt-1.5 rounded-md border bg-background/60 px-2 py-1.5 text-xs" data-testid="chat-akce-strom">
+      {radky.map((r, i) => (
+        <div key={i} className="flex items-baseline gap-1.5 py-0.5" style={{ paddingLeft: `${Math.min(r.u, 6) * 14}px` }} data-testid="chat-akce-strom-uzel" data-uroven={r.u}>
+          <span className="text-muted-foreground">{r.u === 0 ? '•' : '–'}</span>
+          <span className="flex-1 min-w-0 break-words">{r.t}{r.z ? <span className="text-muted-foreground"> · {t('treeFromBuffer')}</span> : null}
+            {/* popis kroku (třeba měřitelný cíl od AI) musí být vidět PŘED potvrzením — klik-test 1. 10. 2026 */}
+            {r.k ? <span className="block text-muted-foreground" data-testid="chat-akce-strom-popis">{r.k}</span> : null}
+          </span>
+          {r.o && <span className="shrink-0 text-muted-foreground truncate max-w-[9rem]" title={r.o}>{r.o}</span>}
+          {r.d && <span className="shrink-0 rounded bg-destructive/10 px-1 text-destructive">{r.d.slice(8, 10)}. {Number(r.d.slice(5, 7))}.</span>}
+          {r.p && !r.d && <span className="shrink-0 rounded bg-primary/10 px-1 text-primary">{t('treePlan')} {r.p.slice(8, 10)}. {Number(r.p.slice(5, 7))}.</span>}
+        </div>
+      ))}
+      {strom.length > 12 && (
+        <button type="button" className="mt-1 text-primary hover:underline" onClick={() => setVse((v) => !v)} data-testid="chat-akce-strom-vse">
+          {vse ? t('treeLess') : t('treeAll', { count: strom.length })}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument }) {
   const { t } = useTranslation('asistent');
   const stav = karta.stav || 'ceka';
@@ -92,6 +133,7 @@ function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drive
     <div className={`mt-2 rounded-lg border p-2.5 text-sm ${STAV_STYL[stav] || STAV_STYL.ceka}`} data-testid="chat-akce" data-stav={stav}>
       <p className="font-medium leading-snug">{karta.popis}</p>
       {karta.detail && <p className="text-xs text-muted-foreground mt-0.5" data-testid="chat-akce-detail">{karta.detail}</p>}
+      {Array.isArray(karta.strom) && karta.strom.length > 0 && <KartaStrom strom={karta.strom} />}
       {stav === 'ceka' ? (
         <div className="mt-2 flex gap-2">
           <Button size="sm" disabled={loading} onClick={() => onPotvrd(karta.id, true)} data-testid="chat-akce-ano">
@@ -327,20 +369,55 @@ function Text({ text }) {
 
 // Zpráva uživatele s obrázkem: server do ní složí doprovodný text a pod značkou přepis.
 // Značku (je pro model) uživateli neukazujeme — přepis dostane vlastní podložený blok.
-const ZNACKA_PREPISU = /(?:^|\n\n)\[(?:Přepis obrázku|Image transcript)\]\n/;
-// PDF: pod značkou „[Text z PDF: název, N str.]“ je text stran — uživateli jen štítek
-// přílohy a text sbalený (je dlouhý; on svůj soubor zná)
-const ZNACKA_PDF = /(?:^|\n\n)\[(?:Text z PDF|PDF text):[^\n]*\]\n/;
-function ZpravaUzivatele({ zprava }) {
+// PDF: pod značkou je text stran — uživateli jen štítek přílohy a text sbalený (je dlouhý; on svůj soubor zná).
+// Hlasovka (1. 10. 2026): pod značkou je přepis — uživatel vidí „🎤 Hlasovka 0:42“ a co z nahrávky vyšlo.
+// Značky jsou v lib/prepisZpravy.js (sdílí je oprava přepisu).
+const mmss = (s) => `${Math.floor((s || 0) / 60)}:${String(Math.floor((s || 0) % 60)).padStart(2, '0')}`;
+
+// Oprava přepisu (tužka v bublině, Richard 1. 10. 2026): jen u POSLEDNÍ hlasovky / fotky a jen dokud z jejího tahu nic
+// nevzniklo (rozhoduje server: chat.lze_opravit). Odeslání zahodí nepotvrzené návrhy a asistent odpoví znovu.
+function TuzkaPrepisu({ onClick }) {
   const { t } = useTranslation('asistent');
+  return (
+    <button type="button" onClick={onClick} title={t('transcriptEdit')} aria-label={t('transcriptEdit')} className="ml-auto -my-1 -mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md opacity-80 hover:opacity-100 hover:bg-primary-foreground/15" data-testid="chat-prepis-upravit">
+      <Pencil className="w-3.5 h-3.5" />
+    </button>
+  );
+}
+function OpravaPrepisu({ text, onOdeslat, onZrusit, zaneprazdnen }) {
+  const { t } = useTranslation('asistent');
+  const [hodnota, setHodnota] = useState(text);
+  const pole = useRef(null);
+  useEffect(() => { if (pole.current) { pole.current.focus(); pole.current.setSelectionRange(pole.current.value.length, pole.current.value.length); } }, []);
+  const zmena = hodnota.trim() && hodnota.trim() !== String(text).trim();
+  return (
+    <div data-testid="chat-prepis-oprava">
+      <textarea ref={pole} value={hodnota} onChange={(e) => setHodnota(e.target.value)} rows={Math.min(10, Math.max(3, Math.ceil(hodnota.length / 42)))} maxLength={8000}
+        className="w-full rounded-md border border-border bg-background p-1.5 text-base leading-snug text-foreground sm:text-sm" data-testid="chat-prepis-pole" />
+      <p className="mt-0.5 opacity-75">{t('transcriptEditHint')}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!zmena || zaneprazdnen} onClick={() => onOdeslat(hodnota.trim())} className="rounded-md border border-border bg-background px-2 py-1 font-medium text-foreground disabled:opacity-50" data-testid="chat-prepis-odeslat">{t('transcriptEditSend')}</button>
+        <button type="button" onClick={onZrusit} className="px-1 py-1 underline opacity-80 hover:opacity-100" data-testid="chat-prepis-zrusit">{t('transcriptEditCancel')}</button>
+      </div>
+    </div>
+  );
+}
+function ZpravaUzivatele({ zprava, lzeOpravit, onOprav, loading }) {
+  const { t } = useTranslation('asistent');
+  const [editStav, setEdit] = useState(false);
+  const edit = editStav && !!lzeOpravit; // úprava jen tam, kde ji server dovolí (ne po přepnutí rozhovoru, ne po další zprávě)
+  const odesliOpravu = (txt) => { setEdit(false); if (onOprav) onOprav(txt); };
   const obr = zprava.obrazek || {};
   const pdf = zprava.pdf || null;
   const zdroj = String(zprava.content || '');
   const mp = pdf ? zdroj.split(ZNACKA_PDF) : [zdroj];
   const textPdf = mp.length > 1 ? mp.slice(1).join('\n') : '';
-  const m = (mp.length > 1 ? mp[0] : zdroj).split(ZNACKA_PREPISU);
-  const doprovod = m.length > 1 ? m[0] : (mp.length > 1 ? mp[0] : zprava.content);
+  const mh = (mp.length > 1 ? mp[0] : zdroj).split(ZNACKA_HLASU);
+  const prepisHlasu = mh.length > 1 ? mh.slice(1).join('\n') : '';
+  const m = mh[0].split(ZNACKA_PREPISU);
+  const doprovod = m.length > 1 ? m[0] : (mp.length > 1 || mh.length > 1 ? mh[0] : zprava.content);
   const prepis = m.length > 1 ? m.slice(1).join('\n') : '';
+  const hlas = zprava.hlas || (prepisHlasu ? {} : null);
   return (
     <>
       {obr.nahled && <img src={`data:${obr.mime || 'image/webp'};base64,${obr.nahled}`} alt="" className="mb-1.5 max-h-40 rounded-md" data-testid="chat-zprava-obrazek" />}
@@ -351,6 +428,16 @@ function ZpravaUzivatele({ zprava }) {
         </span>
       )}
       {doprovod && <p className="whitespace-pre-wrap break-words">{doprovod}</p>}
+      {hlas && (
+        <div className={`${doprovod ? 'mt-1.5 ' : ''}rounded-lg bg-primary-foreground/10 px-2 py-1.5 text-xs`} data-testid="chat-zprava-hlas">
+          <p className="flex items-center gap-1 opacity-90 font-medium mb-0.5"><Mic className="w-3.5 h-3.5 shrink-0" />{hlas.s ? t('voiceNote', { cas: mmss(hlas.s) }) : t('voiceNoteNoTime')}{zprava.docasna ? <span className="opacity-75 font-normal"> · {t('voiceReading')}</span> : null}{zprava.opraveno ? <span className="opacity-75 font-normal" data-testid="chat-prepis-upraveno"> · {t('transcriptEdited')}</span> : null}
+            {lzeOpravit && !loading && prepisHlasu && !edit && <TuzkaPrepisu onClick={() => setEdit(true)} />}
+          </p>
+          {edit && prepisHlasu ? <OpravaPrepisu text={prepisHlasu} onOdeslat={odesliOpravu} onZrusit={() => setEdit(false)} zaneprazdnen={loading} /> : prepisHlasu && (prepisHlasu.length > 600 ? (
+            <details data-testid="chat-zprava-hlas-dlouhy"><summary className="cursor-pointer opacity-75">{prepisHlasu.slice(0, 160)}… {t('voiceShowAll')}</summary><p className="whitespace-pre-wrap break-words mt-1 max-h-60 overflow-y-auto">{prepisHlasu}</p></details>
+          ) : <p className="whitespace-pre-wrap break-words" data-testid="chat-zprava-hlas-prepis">{prepisHlasu}</p>)}
+        </div>
+      )}
       {textPdf && (
         <details className={`${doprovod ? 'mt-1.5 ' : ''}rounded-lg bg-primary-foreground/10 px-2 py-1.5 text-xs`} data-testid="chat-zprava-pdf-text">
           <summary className="cursor-pointer opacity-75">{pdf && pdf.orez ? t('pdf.textDropped') : t('pdf.textShow')}</summary>
@@ -359,15 +446,17 @@ function ZpravaUzivatele({ zprava }) {
       )}
       {prepis && (
         <div className={`${doprovod ? 'mt-1.5 ' : ''}rounded-lg bg-primary-foreground/10 px-2 py-1.5 text-xs`} data-testid="chat-zprava-prepis">
-          <p className="opacity-75 mb-0.5">{t('imageTranscript')}</p>
-          <p className="whitespace-pre-wrap break-words">{prepis}</p>
+          <p className="flex items-center gap-1 mb-0.5"><span className="opacity-75">{t('imageTranscript')}{zprava.opraveno ? <span data-testid="chat-prepis-upraveno"> · {t('transcriptEdited')}</span> : null}</span>
+            {lzeOpravit && !loading && !edit && <TuzkaPrepisu onClick={() => setEdit(true)} />}
+          </p>
+          {edit ? <OpravaPrepisu text={prepis} onOdeslat={odesliOpravu} onZrusit={() => setEdit(false)} zaneprazdnen={loading} /> : <p className="whitespace-pre-wrap break-words">{prepis}</p>}
         </div>
       )}
     </>
   );
 }
 
-export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument }) {
+export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, lzeOpravit, onOprav }) {
   const { t } = useTranslation('asistent');
   if (zprava.role === 'tool') return null;
   const jaUzivatel = zprava.role === 'user';
@@ -386,7 +475,7 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
             {t('toolsLooked', { names: [...new Set(nahlednuto)].map((n) => t(`toolNames.${n}`, { defaultValue: n })).join(', ') })}
           </p>
         )}
-        {jaUzivatel ? <ZpravaUzivatele zprava={zprava} /> : (zprava.content && <Text text={zprava.content} />)}
+        {jaUzivatel ? <ZpravaUzivatele zprava={zprava} lzeOpravit={!!lzeOpravit && !zprava.docasna} onOprav={onOprav} loading={loading} /> : (zprava.content && <Text text={zprava.content} />)}
         {zprava.docasna && loading && <Loader2 className="w-3 h-3 animate-spin inline-block ml-1 opacity-70" />}
         {karty.map((k, i) => {
           if (k.type === 'otazky') return <KartaOtazky key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;

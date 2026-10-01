@@ -811,6 +811,46 @@ const STRINGS = {
     cs: "Klíč platí, ale model „{model}“ není mezi {count} nabízenými. Zkontrolujte přesný název u poskytovatele.",
     en: "The key is valid, but model “{model}” is not among the {count} offered. Check the exact name with your provider.",
   },
+  "err.chatVoiceOff": {
+    cs: "Hlasovky nejsou na téhle instanci zapnuté (chybí přepis řeči). Napište to prosím textem.",
+    en: "Voice notes are not enabled on this instance (speech-to-text is missing). Please type it instead.",
+  },
+  "err.chatVoiceMix": {
+    cs: "Hlasovku pošlete samostatně — bez obrázku a PDF v téže zprávě.",
+    en: "Send the voice note on its own — without an image or PDF in the same message.",
+  },
+  "err.chatVoiceTooBig": {
+    cs: "Hlasovka je moc dlouhá (nad {mb} MB). Rozdělte ji prosím na kratší.",
+    en: "The voice note is too long (over {mb} MB). Please split it into shorter ones.",
+  },
+  "err.chatVoiceType": {
+    cs: "Tohle není nahrávka, kterou umíme přepsat (WebM, Ogg/Opus, M4A, MP3 nebo WAV).",
+    en: "This is not a recording we can transcribe (WebM, Ogg/Opus, M4A, MP3 or WAV).",
+  },
+  "err.chatVoiceFailed": {
+    cs: "Hlasovku se teď nepodařilo přepsat — nahrávka zůstala v panelu, zkuste ji poslat znovu za chvíli.",
+    en: "The voice note could not be transcribed right now — the recording stayed in the panel, try sending it again shortly.",
+  },
+  "err.chatVoiceEmpty": {
+    cs: "V nahrávce nebyla slyšet žádná řeč. Zkuste to prosím znovu, blíž k mikrofonu.",
+    en: "No speech could be heard in the recording. Please try again, closer to the microphone.",
+  },
+  "err.visionTestOk": {
+    cs: "Obrázek přečten (model „{model}“) — asistent teď umí fotky poznámek.",
+    en: "Image read (model “{model}”) — the assistant can now read photos of notes.",
+  },
+  "err.visionTestFail": {
+    cs: "Model „{model}“ testovací obrázek nepřečetl (odpověď: „{text}“). Zvolte model, který umí obrázky — obrázky zůstávají vypnuté.",
+    en: "Model “{model}” did not read the test image (reply: “{text}”). Pick a model that can see images — images stay off.",
+  },
+  "err.visionTestSettings": {
+    cs: "Nejdřív uložte poskytovatele Ollama nebo OpenAI, adresu, model a zapněte čtení obrázků.",
+    en: "First save an Ollama or OpenAI provider, the address and model, and turn image reading on.",
+  },
+  "err.visionTestError": {
+    cs: "Test obrázku selhal: {text}",
+    en: "The image test failed: {text}",
+  },
   "err.openaiOkModel": {
     cs: "Připojeno. Model „{model}“ je k dispozici.",
     en: "Connected. Model “{model}” is available.",
@@ -837,6 +877,10 @@ const STRINGS = {
   "err.inviteAdminManagerOnly": {
     cs: "Zvát uživatele může jen admin nebo manažer.",
     en: "Only an admin or manager can invite users.",
+  },
+  "err.teamMeetingManagerOnly": {
+    cs: "Týmovou poradu může vést jen admin nebo manažer.",
+    en: "Only an admin or manager can run the team meeting.",
   },
   "err.portfolioAdminManagerOnly": {
     cs: "Přehled organizace vidí jen admin nebo manažer.",
@@ -873,6 +917,8 @@ const STRINGS = {
   "err.chatPdfEmpty": { cs: "V PDF není žádný text (nejspíš sken) — asistent umí opravovat jen PDF s textovou vrstvou.", en: "The PDF contains no text (probably a scan) — the assistant can only correct PDFs with a text layer." },
   "err.chatVisionOff": { cs: "Čtení obrázků není na téhle instanci zapnuté — řekněte to prosím správci.", en: "Reading images is not enabled on this instance — please tell your administrator." },
   "err.chatNotFound": { cs: "Rozhovor nenalezen.", en: "Conversation not found." },
+  "err.chatEditNone": { cs: "Opravit jde jen přepis poslední hlasovky nebo fotky.", en: "Only the transcript of the last voice note or photo can be corrected." },
+  "err.chatEditDone": { cs: "Z této zprávy už něco vzniklo (potvrzená změna, dokument nebo poznámka). Opravu napište jako další zprávu.", en: "Something was already created from this message (a confirmed change, a document or a note). Send the correction as a new message." },
   "err.chatActionNotFound": { cs: "Akce už nečeká na potvrzení.", en: "This action is no longer waiting for confirmation." },
   "err.chatMemoryTooLong": { cs: "Paměť je příliš dlouhá (max {max} znaků).", en: "The memory is too long (max {max} characters)." },
   // dokumenty asistenta (30. 9. 2026)

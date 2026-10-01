@@ -16,7 +16,10 @@ import { setSkin } from '@/lib/theme';
 import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
 import { base44 } from '@/api/base44Client';
 import { pripravObrazek, obrazekZeSchranky } from '@/lib/obrazek';
+import { loadKbConfig } from '@/hooks/useKbConfig';
+import { useHlasovka, HlasovkaTlacitko, HlasovkaPruh } from './Hlasovka';
 import AsistentZprava from './AsistentZprava';
+import AiBlok from './AiBlok';
 import PdfPohled from './PdfPohled';
 import DokumentyPanel from './DokumentyPanel';
 import { useAsistentChat } from './useAsistentChat';
@@ -29,6 +32,11 @@ import { useAsistentChat } from './useAsistentChat';
 // teď to zabírá místo"). Model se řídí KB_CHAT_MODEL; routa /chat/modely a `model`
 // v požadavku (správce) zůstávají pro měření skripty.
 
+// značka režimu v historii rozhovorů
+const IKONA_REZIMU = { porada: '☀ ', nocni: '☾ ', rozbor: '⚒ ', trideni: '☰ ', novy_projekt: '✦ ', po_schuzce: '✎ ', revize: '↻ ', priprava: '☷ ', tymova_porada: '⚑ ' };
+const MAX_TEXT = 8000; // strop zprávy na serveru (chat.js)
+const CHYBA_TEXTU = { textDlouhy: 'textTooLong', textPrazdny: 'textEmpty', textChyba: 'textError', zvukVelky: 'voiceTooBig' };
+
 export default function AsistentPanel() {
   const ready = useLazyNs('asistent');
   const { t } = useTranslation('asistent');
@@ -36,6 +44,14 @@ export default function AsistentPanel() {
   const panel = useAsistent();
   const ai = useAiModes();
   const dostupny = ai.has('chat_panel');
+  // obrázky jen s modelem, který je vidí (server hlásí chat_image, 30. 9. 2026) — jinak sponka bere jen
+  // PDF a vložený obrázek dostane místní hlášku místo chyby ze serveru
+  const umiObrazek = ai.has('chat_image');
+  // hlasovky (1. 10. 2026): jen kde přepis opravdu jde (server hlásí chat_voice)
+  const umiHlas = ai.has('chat_voice');
+  const [maxHlas, setMaxHlas] = useState(300);
+  const [maxHlasMb, setMaxHlasMb] = useState(3);
+  useEffect(() => { loadKbConfig().then((c) => { if (c && c.chat_voice_max_s) setMaxHlas(c.chat_voice_max_s); if (c && c.chat_voice_max_mb) setMaxHlasMb(c.chat_voice_max_mb); }).catch(() => {}); }, []);
   const { setDostupny } = panel;
   useEffect(() => { if (setDostupny) setDostupny(dostupny); }, [dostupny, setDostupny]);
   const rozhovor = useAsistentChat({ open: panel.open && dostupny });
@@ -56,6 +72,7 @@ export default function AsistentPanel() {
   const odeberObrazek = useCallback(() => { setObrazekChyba(false); setObrazek((o) => { if (o) URL.revokeObjectURL(o.url); return null; }); }, []);
   const prijmiObrazek = useCallback(async (soubor) => {
     if (!soubor || !String(soubor.type).startsWith('image/')) return;
+    if (!umiObrazek) { setObrazekChyba('bezObrazku'); return; }
     try {
       const o = await pripravObrazek(soubor);
       setObrazek((p) => { if (p) URL.revokeObjectURL(p.url); return o; });
@@ -63,7 +80,7 @@ export default function AsistentPanel() {
     } catch {
       setObrazekChyba(true);
     }
-  }, []);
+  }, [umiObrazek]);
   // Příloha PDF (18. 9. 2026): text stran jde serveru, SOUBOR zůstává tady — pdfSoubory drží
   // ORIGINÁLNÍ bajty (klíč název + počet stran). Každá další karta aplikuje na originál všechny
   // dřívější potvrzené opravy + nové, takže druhá oprava neztratí první (Richard 19. 9. 2026:
@@ -110,9 +127,35 @@ export default function AsistentPanel() {
     } finally { setPdfCte(false); }
   }, [ulozPdf]);
   const jePdf = (f) => !!f && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''));
-  // první soubor z přetažení / schránky: obrázek → přepis, PDF → text stran
-  const prijmiSoubor = useCallback((soubor) => { if (jePdf(soubor)) prijmiPdf(soubor); else prijmiObrazek(soubor); }, [prijmiPdf, prijmiObrazek]);
-  const souborZPrenosu = (dt) => obrazekZeSchranky(dt) || [...((dt && dt.files) || [])].find(jePdf) || null;
+  // textový soubor (.txt/.md) → obsah do políčka (podklady pro Nový projekt s AI, poznámky k roztřídění)
+  const jeText = (f) => !!f && (f.type === 'text/plain' || f.type === 'text/markdown' || /\.(txt|md|markdown)$/i.test(f.name || ''));
+  // zvukový soubor (hlasovka z WhatsAppu .opus, diktafon .m4a…) — druh pozná server podle obsahu
+  const jeZvuk = (f) => !!f && (String(f.type).startsWith('audio/') || /\.(opus|ogg|oga|m4a|mp3|wav|webm)$/i.test(f.name || ''));
+  const hlasRef = useRef(null);
+  // první soubor z přetažení / schránky: obrázek → přepis, PDF → text stran, zvuk → hlasovka (odejde hned)
+  const prijmiText = useCallback(async (soubor) => {
+    setObrazekChyba(false);
+    try {
+      const obsah = String(await soubor.text()).replace(/\r\n?/g, '\n').trim();
+      if (!obsah) { setObrazekChyba('textPrazdny'); return; }
+      const spojeno = (text.trim() ? `${text.trim()}\n\n` : '') + obsah;
+      if (spojeno.length > MAX_TEXT) setObrazekChyba('textDlouhy');
+      setText(spojeno.slice(0, MAX_TEXT));
+      if (vstup.current) vstup.current.focus();
+    } catch { setObrazekChyba('textChyba'); }
+  }, [text]);
+  const prijmiSoubor = useCallback((soubor) => {
+    if (jeText(soubor)) prijmiText(soubor);
+    else if (jePdf(soubor)) prijmiPdf(soubor);
+    else if (jeZvuk(soubor)) {
+      if (!(umiHlas && hlasRef.current)) setObrazekChyba('jenObrazek');
+      // moc velkou nahrávku říct hned tady — server by ji odmítl holým 413 dřív, než by došlo na srozumitelnou hlášku
+      else if (soubor.size > maxHlasMb * 1024 * 1024) setObrazekChyba('zvukVelky');
+      else { setObrazekChyba(false); hlasRef.current.posliSoubor(soubor); }
+    }
+    else prijmiObrazek(soubor);
+  }, [prijmiText, prijmiPdf, prijmiObrazek, umiHlas, maxHlasMb]);
+  const souborZPrenosu = (dt) => obrazekZeSchranky(dt) || [...((dt && dt.files) || [])].find((f) => jePdf(f) || jeZvuk(f) || jeText(f)) || null;
   const naOpravit = useCallback((priloha) => { ulozPdf(priloha.name, priloha.pages, priloha.bytes); setPdf(priloha); setObrazekChyba(false); setPohled('chat'); }, [ulozPdf]);
   const konec = useRef(null);
   const vstup = useRef(null);
@@ -214,7 +257,20 @@ export default function AsistentPanel() {
       setText((p) => p || v);
     } else if (obr) URL.revokeObjectURL(obr.url);
   }, [A, text, obrazek, pdf, pdfCte, kontext, patchUser]);
+  // hlasovka odejde hned (rozhodnutí 30. 9.); když ji server nezpracuje (přepis selhal), zůstane v pruhu k opakování
+  const odesliHlas = useCallback(async (h) => (A.loading ? { ok: false, vratit: true } : A.send('', kontext, patchUser, undefined, undefined, h)), [A, kontext, patchUser]);
+  const hlas = useHlasovka({ maxS: maxHlas, maxMb: maxHlasMb, onOdeslat: odesliHlas });
+  hlasRef.current = hlas;
+  // Pruh nahrávání (● 0:42 · Zrušit · Odeslat) je vidět jen v otevřeném chatu a na telefonu ve spodní liště.
+  // Zavřený panel na počítači nebo pohled PDF ho nekreslí → nahrávání se zastaví a nahrávka počká v pruhu
+  // „Neodesláno“ (mikrofon nesmí běžet naslepo a hlasovka sama odejít).
+  // (a když panel není vůbec — AI právě není dostupná —, nekreslí se nic: taky zastavit)
+  const pruhVidet = ready && dostupny && (A.open ? pohled === 'chat' : mobil);
+  const podrzHlas = hlas.podrz;
+  useEffect(() => { if (!pruhVidet) podrzHlas(); }, [pruhVidet, podrzHlas]);
   const potvrd = useCallback((id, ok, vysledek) => A.potvrd(id, ok, kontext, patchUser, vysledek), [A, kontext, patchUser]);
+  // oprava přepisu poslední hlasovky / fotky (tužka v bublině): server zahodí nepotvrzené návrhy a asistent odpoví znovu
+  const opravPrepis = useCallback((txt) => A.oprav(txt, kontext, patchUser), [A, kontext, patchUser]);
   // na telefonu panel kryje celou obrazovku → po „Ukázat v mapě" ho schovat (Richard 13. 9.)
   const poOdkazu = useCallback(() => { if (mobil) zavriChat(); }, [mobil, zavriChat]);
   // Toasty (vpravo dole) zakrývaly políčko chatu, dokud nezmizely — např. „mapa sloučena“
@@ -268,6 +324,16 @@ export default function AsistentPanel() {
     window.addEventListener('pointerup', up);
   }, [A]);
 
+  // balíček spuštěný odjinud (Nový projekt → „Navrhnout s AI“, zásobník → „Roztřídit s AI“): vyřídit, až je
+  // panel volný — během odpovědi by zacniRezim žádost tiše zahodil
+  const { zadost, vyridZadost } = panel;
+  useEffect(() => {
+    if (!zadost || !ready || !dostupny || A.loading) return;
+    vyridZadost();
+    setPohled('chat');
+    A.zacniRezim(zadost.mode, zadost.target, kontext, patchUser);
+  }, [zadost, ready, dostupny, A, kontext, patchUser, vyridZadost]);
+
   if (!ready || !dostupny) return null;
 
   if (!A.open && mobil) {
@@ -286,6 +352,7 @@ export default function AsistentPanel() {
           {(nabidnoutPoradu || cekaKarta) && <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" data-testid={cekaKarta ? 'chat-bar-karta' : 'chat-tab-porada'} />}
         </button>
         <form className="p-2 pt-1 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); odesli(); }}>
+          {hlas.aktivni ? <HlasovkaPruh h={hlas} kompaktni /> : (<>
           <input
             ref={vstupListy}
             value={text}
@@ -295,7 +362,10 @@ export default function AsistentPanel() {
             data-testid="chat-bar-input"
           />
           <Button type="button" size="icon" variant="outline" className="h-9 w-9" title={t('expand')} aria-label={t('expand')} onClick={() => { zListy.current = true; A.setOpen(true); }} data-testid="chat-bar-rozbalit"><ChevronUp className="w-4 h-4" /></Button>
-          <Button type="submit" size="icon" className="h-9 w-9" disabled={A.loading || !text.trim()} aria-label={t('send')} data-testid="chat-bar-send"><Send className="w-4 h-4" /></Button>
+          {umiHlas && !text.trim()
+            ? <HlasovkaTlacitko h={hlas} disabled={A.loading} className="h-9 w-9" />
+            : <Button type="submit" size="icon" className="h-9 w-9" disabled={A.loading || !text.trim()} aria-label={t('send')} data-testid="chat-bar-send"><Send className="w-4 h-4" /></Button>}
+          </>)}
         </form>
       </div>
     );
@@ -320,6 +390,7 @@ export default function AsistentPanel() {
 
   // poslední VIDITELNÁ zpráva (zprávy nástrojů se nekreslí): když model skončí textem
   // a zároveň suggest_next, leží za odpovědí ještě výsledek nástroje a čipy by byly zašedlé
+  const posledniUzivatelIdx = zpravy.map((z) => z.role).lastIndexOf('user');
   let posledniIdx = zpravy.length - 1;
   while (posledniIdx > 0 && zpravy[posledniIdx].role === 'tool') posledniIdx--;
   const chyba = A.error ? (A.error === 'rate' ? t('errorRate') : A.error === 'timeout' ? t('errorTimeout') : A.error === 'lost' ? t('errorLost') : A.error === 'generic' ? t('errorGeneric') : A.error) : null;
@@ -361,7 +432,7 @@ export default function AsistentPanel() {
               {A.seznam.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('historyEmpty')}</div>}
               {A.seznam.map((c) => (
                 <DropdownMenuItem key={c.id} onSelect={() => { setPohled('chat'); A.otevriChat(c.id); }} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{c.mode === 'porada' ? '☀ ' : c.mode === 'nocni' ? '☾ ' : c.mode === 'rozbor' ? '⚒ ' : ''}{c.title || t('newChat')}</span>
+                  <span className="truncate">{IKONA_REZIMU[c.mode] || ''}{c.title || t('newChat')}</span>
                   <button type="button" className="text-muted-foreground hover:text-destructive" title={t('delete')} onClick={(e) => { e.stopPropagation(); e.preventDefault(); A.smaz(c.id); }}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -404,6 +475,11 @@ export default function AsistentPanel() {
                 </div>
               </div>
             )}
+            {/* AI blok (fáze C, 1. 10. 2026): balíčky, které si uživatel spustí sám — pod Nočním plánováním,
+                jen v prázdném rozhovoru */}
+            {zpravy.length === 0 && dostupny && !A.loading && (
+              <AiBlok mobil={mobil} userId={user?.id} vedouci={user?.role === 'admin' || user?.role === 'manager'} disabled={A.loading} onSpust={(mode) => { setPohled('chat'); A.zacniRezim(mode, {}, kontext, patchUser); }} />
+            )}
             {zpravy.length === 0 && (
               <div className="pt-6 text-center space-y-3">
                 <Bot className="w-8 h-8 mx-auto text-primary/70" />
@@ -412,14 +488,16 @@ export default function AsistentPanel() {
               </div>
             )}
             {zpravy.map((z, i) => (
-              <div key={i} ref={i === prvniOdpovedIdx ? zacatekOdpovedi : undefined} className={i === prvniOdpovedIdx ? 'scroll-mt-2' : undefined}>
-                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} />
+              // klíč nese i rozhovor: jinak stav karet (rozepsaná odpověď, otevřená úprava přepisu) přežil přepnutí
+              // rozhovoru z historie a karta s jiným počtem otázek pak při odeslání spadla
+              <div key={`${(A.chat && A.chat.id) || 'novy'}:${i}`} ref={i === prvniOdpovedIdx ? zacatekOdpovedi : undefined} className={i === prvniOdpovedIdx ? 'scroll-mt-2' : undefined}>
+                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} lzeOpravit={i === posledniUzivatelIdx && !!(A.chat && A.chat.lze_opravit)} onOprav={opravPrepis} />
               </div>
             ))}
             {A.loading && (
               <div className="flex justify-start" data-testid="chat-thinking">
                 <div className="rounded-2xl rounded-bl-md bg-secondary px-3 py-2 text-xs text-muted-foreground inline-flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].obrazek ? t('imageReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].pdf ? t('pdf.thinking') : t('thinking')}
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].obrazek ? t('imageReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].hlas ? t('voiceReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].pdf ? t('pdf.thinking') : t('thinking')}
                 </div>
               </div>
             )}
@@ -457,7 +535,7 @@ export default function AsistentPanel() {
                   </Button>
                 </>
               )}
-              {obrazekChyba && <p className="text-xs text-destructive" data-testid="chat-obrazek-chyba">{t(obrazekChyba === 'jenObrazek' ? 'imageOnly' : obrazekChyba === true ? 'imageError' : `pdf.chyba.${String(obrazekChyba).replace(/^pdf:/, '')}`, { defaultValue: t('pdf.chyba.poskozeno') })}</p>}
+              {obrazekChyba && <p className="text-xs text-destructive" data-testid="chat-obrazek-chyba">{t(obrazekChyba === 'jenObrazek' ? (umiObrazek ? 'imageOnly' : 'pdfOnly') : obrazekChyba === 'bezObrazku' ? 'imageOff' : obrazekChyba === true ? 'imageError' : CHYBA_TEXTU[obrazekChyba] || `pdf.chyba.${String(obrazekChyba).replace(/^pdf:/, '')}`, { defaultValue: t('pdf.chyba.poskozeno'), mb: maxHlasMb })}</p>}
             </div>
           )}
           <form
@@ -475,6 +553,7 @@ export default function AsistentPanel() {
             }}
             data-testid="chat-form"
           >
+            {hlas.aktivni ? <HlasovkaPruh h={hlas} /> : (<>
             <Textarea
               ref={vstup}
               value={text}
@@ -482,7 +561,7 @@ export default function AsistentPanel() {
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); odesli(); } }}
               onPaste={(e) => { const f = souborZPrenosu(e.clipboardData); if (f) { e.preventDefault(); prijmiSoubor(f); } }}
               placeholder={pretahuje ? t('imageDrop') : t('placeholder')}
-              title={t('imageHint')}
+              title={t(umiObrazek ? 'imageHint' : 'pdfHint')}
               rows={2}
               className="min-h-[44px] max-h-40 text-sm resize-none"
               data-testid="chat-input"
@@ -490,20 +569,22 @@ export default function AsistentPanel() {
             <input
               ref={souborRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,application/pdf,.pdf"
+              accept={(umiObrazek ? 'image/png,image/jpeg,image/webp,' : '') + 'application/pdf,.pdf,text/plain,text/markdown,.txt,.md' + (umiHlas ? ',audio/*,.opus,.ogg,.m4a,.mp3,.wav' : '')}
               className="hidden"
               data-testid="chat-obrazek-input"
               onChange={(e) => { prijmiSoubor(e.target.files?.[0]); e.target.value = ''; }}
             />
-            <Button type="button" size="icon" variant="ghost" title={`${t('imageAdd')} — ${t('imageHint')}`} aria-label={t('imageAdd')} disabled={A.loading} onClick={() => souborRef.current?.click()} data-testid="chat-obrazek">
-              <ImagePlus className="w-4 h-4" />
+            <Button type="button" size="icon" variant="ghost" title={umiObrazek ? `${t('imageAdd')} — ${t('imageHint')}` : `${t('pdfAdd')} — ${t('pdfHint')}`} aria-label={t(umiObrazek ? 'imageAdd' : 'pdfAdd')} disabled={A.loading} onClick={() => souborRef.current?.click()} data-testid="chat-obrazek">
+              {umiObrazek ? <ImagePlus className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
             </Button>
+            {umiHlas && <HlasovkaTlacitko h={hlas} disabled={A.loading} />}
             {mobil && (
               <Button type="button" size="icon" variant="outline" title={t('shrink')} aria-label={t('shrink')} onClick={zmensit} data-testid="chat-zmensit"><ChevronDown className="w-4 h-4" /></Button>
             )}
             <Button type="submit" size="icon" disabled={A.loading || pdfCte || (!text.trim() && !obrazek && !pdf)} title={t('send')} aria-label={t('send')} data-testid="chat-send">
               {A.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
+            </>)}
           </form>
         </>
       )}

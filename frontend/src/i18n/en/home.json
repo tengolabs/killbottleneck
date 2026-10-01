@@ -133,17 +133,7 @@
   },
   "newMap": {
     "newProject": "New project",
-    "suggestAi": "Suggest with AI",
-    "fromText": "Map from text",
-    "defaultTitle": "New goal map",
-    "withAi": "With AI",
-    "aiUnavailable": "AI temporarily unavailable",
-    "aiUnavailableHint": "The AI service is not responding right now. The rest of the app works normally — try again shortly, the buttons will come back on their own.",
     "moreOptions": "More options"
-  },
-  "aiCreate": {
-    "title": "Create a project with AI",
-    "shortTextSwitched": "The text is short, so the AI will first ask a few clarifying questions — a map built from just a few words would be made up."
   },
   "bell": {
     "justNow": "just now",

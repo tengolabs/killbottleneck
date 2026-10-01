@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.68-beta": {
+    cs: [
+      "Hlasovky v asistentovi: mikrofon vedle sponky — namluvíte, hlasovka hned odejde, přepis vidíte v bublině a asistent z něj navrhne změny ke schválení (nejvýš 5 minut; poslat jde i hotová nahrávka, třeba z WhatsAppu).",
+      "AI pomocníci pod nočním plánováním: Roztřídit poznámky, Nový projekt s AI (pár otázek, podrobnost plánu a celý strom ke schválení — nahrazuje starý dialog Navrhnout s AI), Po schůzce, Týdenní revize, Příprava na schůzku a pro vedoucí Týmová porada.",
+      "Průvodci začínají hned: první krok (výzvu, formulář, přehled týdne nebo týmu) skládá aplikace bez čekání na AI a v rozhovoru je vždy na co kliknout.",
+      "Přepis hlasovky i fotky opravíte tužkou v bublině a asistent odpoví znovu; Enter v kartě otázek odešle odpověď a asistent umí na požádání smazat nápady ze zásobníku — vždy kartou se seznamem.",
+      "Vlastní instalace s OpenAI: ranní porada a noční plánování už nekončí chybou 400, uvažující modely (GPT-5) jedou napoprvé a čtení obrázků zapnete v Administraci → AI.",
+    ],
+    en: [
+      "Voice notes in the assistant: a microphone next to the paperclip — record, the note is sent right away, the transcript shows in the bubble and the assistant proposes changes for you to confirm (up to 5 minutes; a finished recording, e.g. from WhatsApp, works too).",
+      "AI helpers below Evening planning: Sort my notes, New project with AI (a few questions, the level of detail and the whole tree to approve — replaces the old Suggest with AI dialog), After the meeting, Weekly review, Meeting prep and, for managers, Team meeting.",
+      "Guided flows start instantly: the first step (the invitation, the form, the weekly or team overview) is composed by the app without waiting for the AI, and there is always something to click.",
+      "Fix a voice-note or photo transcript with the pencil in its bubble and the assistant answers again; Enter in a question card sends your answer, and the assistant can delete ideas from the buffer on request — always through a card that lists them.",
+      "Self-hosted with OpenAI: the morning briefing and evening planning no longer stop with HTTP 400, reasoning models (GPT-5) work on the first try and image reading can be switched on in Administration → AI.",
+    ],
+  },
   "v0.67-beta": {
     cs: [
       "Dokumenty vedle asistenta: e-maily, poznámky a sumáře, které asistent napíše, se samy uloží a na počítači otevřou v panelu vlevo od chatu — mapa zůstane vidět vedle.",

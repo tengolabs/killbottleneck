@@ -5,7 +5,7 @@ import { refreshAiModes } from '@/hooks/useAiEnabled';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Loader2, Check, PlugZap, Server, Cloud, Ban, Wrench, KeyRound } from 'lucide-react';
+import { Sparkles, Loader2, Check, PlugZap, Server, Cloud, Ban, Wrench, KeyRound, ImageIcon } from 'lucide-react';
 
 // Nastavení AI providera z administrace (zamčená kolekce ai_settings; token
 // nikdy nechodí do prohlížeče — server vrací jen token_set). Fallback: dokud
@@ -15,7 +15,7 @@ import { Sparkles, Loader2, Check, PlugZap, Server, Cloud, Ban, Wrench, KeyRound
 const API_URL_PLACEHOLDER = 'https://vase-ai-sluzba.cz/v1/advisor';
 
 export default function AiSettingsSection() {
-  const { t } = useTranslation('auth');
+  const { t } = useTranslation(['auth', 'admin']);
   const PROVIDERS = [
     { value: 'none', label: t('aiSettings.providerNoneLabel'), icon: Ban, hint: t('aiSettings.providerNoneHint') },
     { value: 'ollama', label: t('aiSettings.providerOllamaLabel'), icon: Server, hint: t('aiSettings.providerOllamaHint') },
@@ -36,6 +36,14 @@ export default function AiSettingsSection() {
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  // Obrázky v asistentovi (30. 9. 2026): bez KB_VISION_* v prostředí je zapne jen úspěšný test
+  // vestavěného obrázku — model, který obrázky nevidí, by si přepis fotky vymyslel.
+  const [visionEnabled, setVisionEnabled] = useState(false);
+  const [visionModel, setVisionModel] = useState('');
+  const [visionOk, setVisionOk] = useState(false);
+  const [visionEnv, setVisionEnv] = useState(false);
+  const [visionTesting, setVisionTesting] = useState(false);
+  const [visionResult, setVisionResult] = useState(null);
 
   useEffect(() => {
     pb.send('/api/kb/ai-settings', { method: 'GET' })
@@ -47,6 +55,10 @@ export default function AiSettingsSection() {
         setTranscribeModel(d.transcribe_model || '');
         setTokenSet(!!d.token_set);
         setSource(d.source || 'db');
+        setVisionEnabled(!!d.vision_enabled);
+        setVisionModel(d.vision_model || '');
+        setVisionOk(!!d.vision_ok);
+        setVisionEnv(!!d.vision_env);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -64,9 +76,11 @@ export default function AiSettingsSection() {
     try {
       const d = await pb.send('/api/kb/ai-settings', {
         method: 'POST',
-        body: { provider, url, model, transcribe_url: transcribeUrl, transcribe_model: transcribeModel, token },
+        body: { provider, url, model, transcribe_url: transcribeUrl, transcribe_model: transcribeModel, token, vision_enabled: visionEnabled, vision_model: visionModel },
       });
       setTokenSet(!!d.token_set);
+      setVisionOk(!!d.vision_ok);
+      setVisionResult(d.vision_message ? { ok: !!d.vision_ok, message: d.vision_message } : null);
       setToken('');
       setSource('db');
       setSaved(true);
@@ -92,6 +106,22 @@ export default function AiSettingsSection() {
       setTestResult({ ok: false, message: t('aiSettings.testFailed') });
     } finally {
       setTesting(false);
+    }
+  };
+
+  // test čte ULOŽENÉ nastavení (server adresu z formuláře záměrně nebere)
+  const handleVisionTest = async () => {
+    setVisionTesting(true);
+    setVisionResult(null);
+    try {
+      const d = await pb.send('/api/kb/ai-test', { method: 'POST', body: { mode: 'vision' } });
+      setVisionOk(!!d.vision_ok);
+      setVisionResult({ ok: !!d.ok, message: d.message });
+      refreshAiModes();
+    } catch {
+      setVisionResult({ ok: false, message: t('aiSettings.testFailed') });
+    } finally {
+      setVisionTesting(false);
     }
   };
 
@@ -186,6 +216,38 @@ export default function AiSettingsSection() {
                 {provider === 'openai' ? t('aiSettings.transcribeLabelOpenai') : t('aiSettings.transcribeLabel')}
               </Label>
               <Input id="ai-transcribe" value={transcribeUrl} onChange={(e) => setTranscribeUrl(e.target.value)} placeholder="http://…" />
+            </div>
+          )}
+          {(provider === 'ollama' || provider === 'openai') && (
+            <div className="space-y-2 rounded-lg border p-3" data-testid="ai-vision">
+              {visionEnv ? (
+                <p className="text-[11px] text-muted-foreground">{t('admin:aiVision.env')}</p>
+              ) : (
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={visionEnabled} onChange={(e) => { setVisionEnabled(e.target.checked); setVisionResult(null); }} data-testid="ai-vision-zapnout" />
+                    <ImageIcon className="w-4 h-4 text-primary" /> {t('admin:aiVision.label')}
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">{t('admin:aiVision.hint')}</p>
+                  {visionEnabled && (
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="space-y-1 flex-1 min-w-[12rem]">
+                        <Label htmlFor="ai-vision-model" className="text-xs text-muted-foreground">{t('admin:aiVision.modelLabel')}</Label>
+                        <Input id="ai-vision-model" value={visionModel} onChange={(e) => setVisionModel(e.target.value)} placeholder={model || t('admin:aiVision.modelPlaceholder')} data-testid="ai-vision-model" />
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={handleVisionTest} disabled={visionTesting} data-testid="ai-vision-test">
+                        {visionTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                        {t('admin:aiVision.test')}
+                      </Button>
+                    </div>
+                  )}
+                  {visionResult ? (
+                    <p className={`text-xs ${visionResult.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} data-testid="ai-vision-vysledek">{visionResult.message}</p>
+                  ) : visionEnabled && (
+                    <p className="text-[11px] text-muted-foreground" data-testid="ai-vision-stav">{visionOk ? t('admin:aiVision.ok') : t('admin:aiVision.notTested')}</p>
+                  )}
+                </>
+              )}
             </div>
           )}
           {provider === 'openai' && (

@@ -99,7 +99,7 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
         setSummary(data.reply);
       }
     } catch (err) {
-      setSummary(`⚠️ ${err.response?.error || err.message || t('editor:aiChat.connectionError')}`);
+      setSummary(`⚠️ ${err.response?.error || err.message || t('editor:toasts.aiConnectionError')}`);
     } finally {
       setSummarizing(false);
     }

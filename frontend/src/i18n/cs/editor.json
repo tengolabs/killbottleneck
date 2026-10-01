@@ -72,7 +72,6 @@
     "readabilityShort_large": "větší",
     "readabilityShort_titleOnly": "jen název",
     "rules": "Pravidla",
-    "suggestAi": "Navrhnout s AI",
     "asistent": "Asistent"
   },
   "saveState": {
@@ -123,8 +122,6 @@
     "allDone": "Vše hotovo 🎉",
     "allDoneDesc": "Všechny cíle projektu jsou dokončené. Chcete ho přesunout do archivu?",
     "archiveAction": "Archivovat",
-    "structureAdded": "Struktura přidána",
-    "structureAddedDesc": "{{count}} cílů bylo přidáno do mapy.",
     "aiInvalidResponse": "Neplatná odpověď od AI poradce.",
     "nodeImproved": "Uzel vylepšen",
     "nodeImprovedDesc": "AI aktualizovala text uzlu.",
@@ -309,47 +306,9 @@
     "emptyTitle": "Zásobník je prázdný.",
     "emptyHint": "Zapište si nápad — uvidíte ho ve všech mapách.",
     "insertTitle": "Vložit do mapy",
-    "dragHint": "Přetáhněte nápad na plátno, nebo použijte šipku."
-  },
-  "fromText": {
-    "uploadText": "Nahrát .txt / .md",
-    "uploadAudio": "Nahrát zvuk",
-    "transcribing": "Přepisuji nahrávku… ({{fileName}})",
-    "loaded": "Načteno: {{fileName}}",
-    "fileReadError": "Nepodařilo se načíst soubor.",
-    "transcribeError": "Chyba při přepisu nahrávky.",
-    "sourceLabel": "Zdrojový text",
-    "sourcePlaceholder": "Vložte poznámky, úvahu nebo přepis hovoru…",
-    "creating": "Vytváření...",
-    "createButton": "Vytvořit mapu"
-  },
-  "advisor": {
-    "scopeLabel": "Rozsah mapy",
-    "scopes": {
-      "strucna": {
-        "label": "Stručná",
-        "desc": "hlavní pilíře"
-      },
-      "detailni": {
-        "label": "Detailní",
-        "desc": "střední"
-      },
-      "hloubkova": {
-        "label": "Hloubková",
-        "desc": "podrobná"
-      }
-    },
-    "goalLabel": "Text (popis projektu)",
-    "goalPlaceholder": "Zadejte popis projektu...",
-    "questionsIntro": "AI položila doplňující otázky pro lepší strukturu cílů:",
-    "answerPlaceholder": "Nebo napište vlastní odpověď (nepovinné)…",
-    "previewIntro": "Náhled navržené struktury:",
-    "discard": "Zahodit",
-    "accept": "Přijmout",
-    "generating": "Generování...",
-    "generateButton": "Generovat cíle",
-    "loading": "Načítání...",
-    "startButton": "Spustit AI"
+    "dragHint": "Přetáhněte nápad na plátno, nebo použijte šipku.",
+    "sortAi": "Roztřídit s AI",
+    "sortAiHint": "Asistent navrhne, co z nápadů udělat: nový projekt, zařadit do projektu, nebo nechat."
   },
   "shareDialog": {
     "title": "Sdílet mapu",

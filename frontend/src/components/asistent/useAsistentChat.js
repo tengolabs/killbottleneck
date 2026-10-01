@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chat as chatApi, chatPotvrdit, chatDetail, chatSeznam, chatSmazat } from '@/api/asistentApi';
+import { chat as chatApi, chatPotvrdit, chatOprav, chatDetail, chatSeznam, chatSmazat } from '@/api/asistentApi';
+import { nahradPrepis } from '@/lib/prepisZpravy';
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
 import { setSkin, setTheme } from '@/lib/theme';
 import { getBuiltinSkin } from '@/lib/skins';
@@ -48,7 +49,9 @@ const prevedChybu = (e) => {
   if (e && e.isTimeout) return 'timeout';
   // vyčerpaná týdenní kvóta kreditů organizace: server říká komu a kolik → ukázat jeho text
   if (e && e.status === 429 && e.response && e.response.code === 'ai_kvota' && e.response.error) return e.response.error;
-  if (e && e.status === 429) return 'rate';
+  // 'rate' = hodinový strop (ai_rate). Jiné 429 mají vlastní text ze serveru — měsíční limit přepisu u brány,
+  // strop zkušebky — a „hodinový strop“ by u nich lhal (panel 1. 10. 2026); 429 bez textu (proxy) = rate
+  if (e && e.status === 429 && !(e.response && e.response.error && e.response.code !== 'ai_rate')) return 'rate';
   return (e && e.response && (e.response.error || e.response.message)) || 'generic';
 };
 
@@ -61,6 +64,10 @@ export function useAsistentChat({ open }) {
   const [model, setModelState] = useState(() => nactiKlic(KEY_MODEL) || '');
   const zivy = useRef(true);
   useEffect(() => () => { zivy.current = false; }, []);
+  // právě otevřený rozhovor — odpověď na potvrzení / opravu, která dorazí po přepnutí jinam, se nesmí vykreslit
+  // do cizího rozhovoru (panel by ukazoval rozhovor A s id rozhovoru B a další zpráva by šla do B)
+  const aktualni = useRef(chatId);
+  aktualni.current = chatId;
 
   const setModel = useCallback((m) => {
     setModelState(m || '');
@@ -73,8 +80,10 @@ export function useAsistentChat({ open }) {
   const nactiSeznam = useCallback(async () => {
     try { const r = await chatSeznam(); if (zivy.current) setSeznam(r.chats || []); } catch { /* seznam je bonus */ }
   }, []);
-  const otevriChat = useCallback(async (id) => {
-    setError(null);
+  // ponechChybu: znovunačtení rozhovoru PO chybě (zpráva neodešla, karta se nepotvrdila) nesmí smazat hlášku, která
+  // právě říká proč — dřív ji smazalo hned, takže v rozběhnutém rozhovoru zpráva jen beze slova zmizela
+  const otevriChat = useCallback(async (id, ponechChybu) => {
+    if (!ponechChybu) setError(null);
     if (!id) { setChat(null); setChatId(''); return; }
     try {
       const r = await chatDetail(id);
@@ -123,18 +132,21 @@ export function useAsistentChat({ open }) {
   // po přepisu) je zpráva na serveru už uložená — vrácení by vedlo ke zdvojenému tahu (checkup 16. 9.).
   // pdf = { name, pages, strany:[{page,text}] } z lib/pdf.nactiPdf (volitelné) — serveru jde JEN text,
   // soubor zůstává v prohlížeči (panel ho drží pro kartu opravy).
-  const send = useCallback(async (text, context, patchUser, obrazek, pdf) => {
+  // hlas = { base64, s } z Hlasovka.jsx (1. 10. 2026) — nahrávka jde serveru jen k přepisu, neukládá se
+  const send = useCallback(async (text, context, patchUser, obrazek, pdf, hlas) => {
     const t = String(text || '').trim();
-    if ((!t && !obrazek && !pdf) || loading) return { ok: false, vratit: false };
+    if ((!t && !obrazek && !pdf && !hlas) || loading) return { ok: false, vratit: false };
     setError(null);
     setLoading(true);
     // optimisticky ukázat zprávu hned; server ji uloží i při chybě modelu
     const docasna = { role: 'user', content: t, ts: new Date().toISOString(), docasna: true };
     if (obrazek && obrazek.nahled) docasna.obrazek = { nahled: obrazek.nahled, mime: obrazek.nahledMime };
     if (pdf) docasna.pdf = { name: pdf.name, pages: pdf.pages };
+    if (hlas) docasna.hlas = { s: hlas.s || 0 };
     setChat((c) => ({ ...(c || { id: chatId, title: '', pending: [] }), messages: [...((c && c.messages) || []), docasna] }));
     const obr = obrazek ? { image_base64: obrazek.base64, nahled_base64: obrazek.nahled || undefined } : {};
     if (pdf) { obr.pdf_text = pdf.strany; obr.pdf_name = pdf.name; obr.pdf_pages = pdf.pages; }
+    if (hlas) { obr.audio_base64 = hlas.base64; obr.audio_s = hlas.s || 0; }
     try {
       let r;
       try {
@@ -156,12 +168,17 @@ export function useAsistentChat({ open }) {
       return { ok: true, vratit: false };
     } catch (e) {
       const kod = e && e.response && e.response.code;
-      const nezpracovano = !!(e && !e.isTimeout && (e.status === 400 || e.status === 429 || kod === 'ai_vision'));
+      // Hlasovka: nahrávka zůstane k opakování VŽDY, když ji server neuložil do rozhovoru — přepis selhal, nebyla
+      // v ní řeč, brána odmítla, ale i výpadek sítě, chyba proxy (413/502/504) nebo vypršení času. Jen když server
+      // řekne `ulozeno` (přepis je v rozhovoru, selhal až model), nahrávka potřeba není — poslala by se podruhé.
+      // Obrázek / PDF: jako dosud jen při odmítnutí vstupu (jinak mohly být zpracované).
+      const ulozeno = !!(e && e.response && e.response.ulozeno);
+      const nezpracovano = hlas ? !ulozeno : !!(e && !e.isTimeout && (e.status === 400 || e.status === 429 || e.status === 422 || kod === 'ai_vision' || String(kod || '').startsWith('ai_hlas')));
       if (!zivy.current) return { ok: false, vratit: nezpracovano };
       setError(prevedChybu(e));
-      if (chatId) otevriChat(chatId);
-      else if ((obrazek || pdf) && nezpracovano) setChat((c) => (c && !c.id ? null : c)); // nový rozhovor se nezaložil → pryč s dočasnou bublinou
-      else if (obrazek || pdf) nactiSeznam(); // mohl vzniknout na serveru — ať je v historii
+      if (chatId) otevriChat(chatId, true);
+      else if ((obrazek || pdf || hlas) && nezpracovano) setChat((c) => (c && !c.id ? null : c)); // nový rozhovor se nezaložil → pryč s dočasnou bublinou
+      else if (obrazek || pdf || hlas) nactiSeznam(); // mohl vzniknout na serveru — ať je v historii
       return { ok: false, vratit: nezpracovano };
     } finally {
       if (zivy.current) setLoading(false);
@@ -178,17 +195,50 @@ export function useAsistentChat({ open }) {
       const ktere = Array.isArray(actionId) ? { action_ids: actionId } : { action_id: actionId };
       const r = await chatPotvrdit({ chat_id: chatId, ...ktere, ok: !!ok, context: context || {}, model: model || undefined, ...(vysledek ? { vysledek } : {}) });
       if (!zivy.current) return;
+      ohlasZmenuMapy(r.chat); // změna v mapě platí, i když uživatel mezitím otevřel jiný rozhovor
+      if (aktualni.current !== chatId) { nactiSeznam(); return; }
       setChat(r.chat);
       projevKarty(r.chat, patchUser);
-      ohlasZmenuMapy(r.chat);
     } catch (e) {
-      if (!zivy.current) return;
+      if (!zivy.current || aktualni.current !== chatId) return;
       setError(prevedChybu(e));
-      otevriChat(chatId);
+      otevriChat(chatId, true);
     } finally {
       if (zivy.current) setLoading(false);
     }
-  }, [chatId, loading, model, otevriChat]);
+  }, [chatId, loading, model, otevriChat, nactiSeznam]);
+
+  // Oprava přepisu POSLEDNÍ hlasovky / fotky (tužka v bublině, 1. 10. 2026): server nahradí text pod značkou, zahodí
+  // odpověď a nepotvrzené návrhy z toho tahu a asistent odpoví znovu. Opravený text i zmizelá odpověď jsou vidět hned.
+  const oprav = useCallback(async (text, context, patchUser) => {
+    const t = String(text || '').trim();
+    if (!t || !chatId || loading) return false;
+    setError(null);
+    setLoading(true);
+    setChat((c) => {
+      const msgs = (c && c.messages) || [];
+      const i = msgs.map((m) => m.role).lastIndexOf('user');
+      if (i < 0) return c;
+      return { ...c, pending: [], lze_opravit: false, messages: [...msgs.slice(0, i), { ...msgs[i], content: nahradPrepis(msgs[i].content, t), opraveno: true }] };
+    });
+    try {
+      const r = await chatOprav({ chat_id: chatId, text: t, context: context || {}, model: model || undefined });
+      if (!zivy.current) return true;
+      nactiSeznam();
+      if (aktualni.current !== chatId) return true; // mezitím otevřen jiný rozhovor — odpověď patří tomu původnímu
+      setChat(r.chat);
+      projevKarty(r.chat, patchUser);
+      ohlasZmenuMapy(r.chat);
+      return true;
+    } catch (e) {
+      if (!zivy.current || aktualni.current !== chatId) return false;
+      setError(prevedChybu(e));
+      otevriChat(chatId, true); // server je směrodatný: buď původní stav (odmítnuto), nebo opravená zpráva bez odpovědi (pád modelu)
+      return false;
+    } finally {
+      if (zivy.current) setLoading(false);
+    }
+  }, [chatId, loading, model, otevriChat, nactiSeznam]);
 
   const novy = useCallback(() => { setChat(null); setChatId(''); setError(null); }, [setChatId]);
   const smaz = useCallback(async (id) => {
@@ -197,5 +247,5 @@ export function useAsistentChat({ open }) {
     nactiSeznam();
   }, [chatId, novy, nactiSeznam]);
 
-  return { chat, chatId, seznam, loading, error, model, setModel, send, potvrd, novy, smaz, otevriChat, zacniRezim };
+  return { chat, chatId, seznam, loading, error, model, setModel, send, potvrd, oprav, novy, smaz, otevriChat, zacniRezim };
 }

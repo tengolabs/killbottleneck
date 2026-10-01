@@ -86,7 +86,7 @@ export default function Tasks() {
   const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
   const [editNodeItem, setEditNodeItem] = useState(null);
   // Globální „create mapy" akce v hlavičce sdílené s Home (Nový projekt / Navrhnout s AI / Mapa z textu).
-  const { creating, openCreate: openNewProject, dialogs: mapCreationDialogs } = useMapCreation();
+  const { openCreate: openNewProject, dialogs: mapCreationDialogs } = useMapCreation();
 
   useEffect(() => {
     if (!isLoadingAuth && !user) navigate('/login');
@@ -389,10 +389,7 @@ export default function Tasks() {
         org={org}
         onInvited={reloadMembers}
         actions={
-          <NewMapActions
-            onCreate={openNewProject}
-            creating={creating}
-          />
+          <NewMapActions onCreate={openNewProject} />
         }
       />
 

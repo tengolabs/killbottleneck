@@ -72,7 +72,6 @@
     "readabilityShort_large": "larger",
     "readabilityShort_titleOnly": "title only",
     "rules": "Rules",
-    "suggestAi": "Suggest with AI",
     "asistent": "Assistant"
   },
   "saveState": {
@@ -123,8 +122,6 @@
     "allDone": "All done 🎉",
     "allDoneDesc": "All goals in this project are complete. Would you like to move it to the archive?",
     "archiveAction": "Archive",
-    "structureAdded": "Structure added",
-    "structureAddedDesc": "{{count}} goals were added to the map.",
     "aiInvalidResponse": "Invalid response from the AI advisor.",
     "nodeImproved": "Node improved",
     "nodeImprovedDesc": "The AI updated the node's text.",
@@ -309,47 +306,9 @@
     "emptyTitle": "The stash is empty.",
     "emptyHint": "Jot down an idea — you'll see it in every map.",
     "insertTitle": "Insert into the map",
-    "dragHint": "Drag an idea onto the canvas, or use the arrow."
-  },
-  "fromText": {
-    "uploadText": "Upload .txt / .md",
-    "uploadAudio": "Upload audio",
-    "transcribing": "Transcribing the recording… ({{fileName}})",
-    "loaded": "Loaded: {{fileName}}",
-    "fileReadError": "Couldn't read the file.",
-    "transcribeError": "Error while transcribing the recording.",
-    "sourceLabel": "Source text",
-    "sourcePlaceholder": "Paste notes, thoughts, or a call transcript…",
-    "creating": "Creating...",
-    "createButton": "Create map"
-  },
-  "advisor": {
-    "scopeLabel": "Map scope",
-    "scopes": {
-      "strucna": {
-        "label": "Brief",
-        "desc": "main pillars"
-      },
-      "detailni": {
-        "label": "Detailed",
-        "desc": "medium"
-      },
-      "hloubkova": {
-        "label": "In-depth",
-        "desc": "thorough"
-      }
-    },
-    "goalLabel": "Text (project description)",
-    "goalPlaceholder": "Describe the project...",
-    "questionsIntro": "The AI asked follow-up questions to structure the goals better:",
-    "answerPlaceholder": "Or write your own answer (optional)…",
-    "previewIntro": "Preview of the suggested structure:",
-    "discard": "Discard",
-    "accept": "Accept",
-    "generating": "Generating...",
-    "generateButton": "Generate goals",
-    "loading": "Loading...",
-    "startButton": "Run AI"
+    "dragHint": "Drag an idea onto the canvas, or use the arrow.",
+    "sortAi": "Sort with AI",
+    "sortAiHint": "The assistant suggests what to do with the ideas: a new project, into an existing project, or keep them."
   },
   "shareDialog": {
     "title": "Share map",

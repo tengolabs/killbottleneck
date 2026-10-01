@@ -90,6 +90,16 @@ H.beh(async () => {
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
   await cekej('[data-testid="chat-tab"]');
   await page.click('[data-testid="chat-tab"]');
+  // instance BEZ modelu na obrázky (30. 9. 2026): sponka bere jen PDF, vložený obrázek dostane místní hlášku
+  // místo chyby ze serveru (dřív se fotka nabízela a skončila 400 ai_vision_off)
+  // od 1. 10. 2026 bere sponka i textové soubory (.txt/.md do políčka) — hlídá se, že bez modelu na obrázky NEnabízí obrázky
+  const acceptBez = await cekej('[data-testid="chat-obrazek-input"]') ? await page.$eval('[data-testid="chat-obrazek-input"]', (el) => el.accept) : '';
+  expect(/application\/pdf/.test(acceptBez) && /\.txt/.test(acceptBez) && !/image/.test(acceptBez), `bez obrázků bere sponka PDF a text, ne obrázky (${acceptBez})`);
+  const png = path.join(require('os').tmpdir(), `kb-bez-vize-${process.pid}.png`);
+  require('fs').writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
+  await (await page.$('[data-testid="chat-obrazek-input"]')).uploadFile(png);
+  expect(await cekej('[data-testid="chat-obrazek-chyba"]') && /obrázky nečte/.test(await page.$eval('[data-testid="chat-obrazek-chyba"]', (el) => el.innerText)) && !(await page.$('[data-testid="chat-obrazek-nahled"] img')), 'vložený obrázek bez modelu na obrázky = místní hláška, žádný náhled ani požadavek');
+  require('fs').unlinkSync(png);
   expect(await cekej('[data-testid="chat-pdf-btn"]'), 'v hlavičce panelu je tlačítko PDF');
   await page.click('[data-testid="chat-pdf-btn"]');
   expect(await cekej('[data-testid="chat-pdf"]'), 'záložka PDF se otevře');
