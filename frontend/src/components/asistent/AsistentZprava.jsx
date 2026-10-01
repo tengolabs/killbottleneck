@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Check, CheckCheck, Copy, Download, ExternalLink, FileText, Loader2, Mail, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { Check, CheckCheck, ClipboardList, Copy, Download, ExternalLink, FileText, Loader2, Mail, NotebookPen, PanelLeftOpen, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
+import { copyToClipboard } from '@/lib/clipboard';
+import { PAMET } from '@/lib/AsistentContext';
 
 // Jedna zpráva chatu + její karty (otázky s volbami, akce k potvrzení, skin,
 // paměť, nápad, „nahlédl do"). Zprávy nástrojů (role tool) se nekreslí —
@@ -81,7 +83,7 @@ const STAV_STYL = {
 
 // Akce čekající na potvrzení (zapisovací nástroj). Ano → server ji vykoná
 // vlastním v1 API; Ne → model dostane „zamítnuto" a hledá jinou cestu.
-function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy }) {
+function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument }) {
   const { t } = useTranslation('asistent');
   const stav = karta.stav || 'ceka';
   if (karta.klient === 'pdf_nahrada') return <KartaPdfOprava karta={karta} onPotvrd={onPotvrd} loading={loading} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />;
@@ -106,6 +108,11 @@ function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drive
             <Link to={`/tasks?view=calendar&udalost=${encodeURIComponent(karta.odkaz.udalost_id)}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
               {t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
             </Link>
+          )}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'dokument' && karta.odkaz.doc_id && onOtevriDokument && (
+            <button type="button" onClick={() => onOtevriDokument(karta.odkaz.doc_id)} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-dokument">
+              {t('dok.open')} <PanelLeftOpen className="w-3 h-3" />
+            </button>
           )}
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.map_id && (
             <Link to={`/map/${karta.odkaz.map_id}${karta.odkaz.node_id ? `?node=${encodeURIComponent(karta.odkaz.node_id)}` : ''}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
@@ -268,28 +275,16 @@ function KartaNavrhy({ karta, aktivni, onSend, loading }) {
 
 // Koncept k použití (nástroj draft_text): e-mail / body k poradě / k telefonátu
 // v poli s ikonou kopírování — jako blok kódu (Richard 13. 9. 2026).
-const KONCEPT_IKONA = { email: Mail, meeting: Users, call: Phone, other: ScrollText };
-function KartaKoncept({ karta, mapy, vychoziMapa, onUlozKoncept }) {
+// Od 30. 9. 2026 se koncept sám ukládá do Dokumentů (doc_id) → „Otevřít vedle“ ho ukáže v panelu vlevo od chatu.
+// „Uložit do projektu“ (připsání do poznámek projektu) zrušeno 1. 10. 2026 (Richard): dokument si projekt
+// pamatuje sám a odkazuje na mapu; celé texty v poznámkách projektu vytlačovaly poznatky o projektu.
+const KONCEPT_IKONA = { email: Mail, meeting: Users, call: Phone, note: NotebookPen, summary: ClipboardList, other: ScrollText };
+function KartaKoncept({ karta, onOtevriDokument }) {
   const { t } = useTranslation('asistent');
   const [zkopirovano, setZkopirovano] = useState(false);
-  // uložení do poznámek projektu: model ho udělal sám (map_id), nebo tlačítkem
-  const [ulozeno, setUlozeno] = useState(karta.map_id || '');
-  const [vyber, setVyber] = useState(false);
-  const [mapa, setMapa] = useState(vychoziMapa || '');
-  const [uklada, setUklada] = useState(false);
   const Ikona = KONCEPT_IKONA[karta.kind] || ScrollText;
-  const nazevMapy = (id) => (mapy.find((m) => m.id === id) || {}).title || '';
-  const uloz = async () => {
-    const cil = mapa || vychoziMapa || (mapy[0] && mapy[0].id);
-    if (!cil) return;
-    setUklada(true);
-    try { await onUlozKoncept({ text: karta.text, kind: karta.kind, title: karta.title, map_id: cil }); setUlozeno(cil); setVyber(false); } catch { /* chyba = zůstane tlačítko */ }
-    setUklada(false);
-  };
   const kopiruj = async () => {
-    try { await navigator.clipboard.writeText(karta.text); } catch {
-      try { const ta = document.createElement('textarea'); ta.value = karta.text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } catch { /* bez schránky */ }
-    }
+    if (!(await copyToClipboard(karta.text))) return; // „Zkopírováno“ jen když se to opravdu povedlo
     setZkopirovano(true);
     setTimeout(() => setZkopirovano(false), 1500);
   };
@@ -301,21 +296,17 @@ function KartaKoncept({ karta, mapy, vychoziMapa, onUlozKoncept }) {
           {zkopirovano ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}{zkopirovano ? t('draft.copied') : t('draft.copy')}
         </button>
       </div>
+      {/* adresát i předmět vidět už na kartě — e-mail z tahu s cizím PDF nesmí nést skrytého adresáta (checkup 1. 10.) */}
+      {karta.to && <p className="px-2.5 pt-2 text-muted-foreground break-all" data-testid="chat-koncept-komu">{t('dok.to')}: <span className="text-foreground">{karta.to}</span></p>}
+      {karta.subject && <p className={`px-2.5 ${karta.to ? 'pt-0.5' : 'pt-2'} text-muted-foreground`} data-testid="chat-koncept-predmet">{t('dok.subject')}: <span className="text-foreground">{karta.subject}</span></p>}
       <pre className="whitespace-pre-wrap break-words font-sans px-2.5 py-2 max-h-72 overflow-y-auto select-text" data-testid="chat-koncept-text">{karta.text}</pre>
-      <div className="border-t border-border px-2.5 py-1.5 flex flex-wrap items-center gap-2" data-testid="chat-koncept-ulozeni">
-        {ulozeno ? (
-          <span className="text-muted-foreground inline-flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-500" />{t('draft.saved', { title: nazevMapy(ulozeno) || '…' })}</span>
-        ) : vyber ? (
-          <>
-            <select value={mapa || vychoziMapa || ''} onChange={(e) => setMapa(e.target.value)} className="h-7 rounded-md border border-input bg-background px-1.5 text-xs max-w-[220px]" data-testid="chat-koncept-mapa">
-              {mapy.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
-            </select>
-            <Button size="sm" className="h-7 text-xs" disabled={uklada || !mapy.length} onClick={uloz} data-testid="chat-koncept-ulozit">{t('draft.saveConfirm')}</Button>
-          </>
-        ) : (
-          <button type="button" onClick={() => setVyber(true)} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-koncept-do-projektu">{t('draft.save')}</button>
-        )}
-      </div>
+      {karta.doc_id && onOtevriDokument && (
+        <div className="border-t border-border px-2.5 py-1.5 flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => onOtevriDokument(karta.doc_id)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline" data-testid="chat-koncept-otevrit">
+            <PanelLeftOpen className="w-3.5 h-3.5" />{t('dok.openBeside')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -376,7 +367,7 @@ function ZpravaUzivatele({ zprava }) {
   );
 }
 
-export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, mapy = [], vychoziMapa = '', onUlozKoncept, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy }) {
+export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument }) {
   const { t } = useTranslation('asistent');
   if (zprava.role === 'tool') return null;
   const jaUzivatel = zprava.role === 'user';
@@ -408,17 +399,28 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
                   </Button>
                 </div>
               )}
-              <KartaAkce karta={k} onPotvrd={onPotvrd} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />
+              <KartaAkce karta={k} onPotvrd={onPotvrd} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={onOtevriDokument} />
             </Fragment>
           );
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
-          if (k.type === 'koncept') return <KartaKoncept key={i} karta={k} mapy={mapy} vychoziMapa={vychoziMapa} onUlozKoncept={onUlozKoncept} />;
+          if (k.type === 'koncept') return <KartaKoncept key={i} karta={k} onOtevriDokument={onOtevriDokument} />;
+          if (k.type === 'dokument') return (
+            <button key={i} type="button" onClick={() => onOtevriDokument && onOtevriDokument(k.doc_id)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-secondary" data-testid="chat-dokument-karta">
+              <PanelLeftOpen className="w-3.5 h-3.5" />{t('dok.updatedCard', { title: k.title })}
+            </button>
+          );
           if (k.type === 'skin') return <KartaSkin key={i} karta={k} onRevert={onRevertSkin} />;
           if (k.type === 'theme') return <p key={i} className="mt-1.5 text-xs text-muted-foreground">{t('themeChanged', { name: k.theme === 'dark' ? t('themeDark') : t('themeLight') })}</p>;
           if (k.type === 'pamet') return (
             <div key={i} className="mt-2 rounded-lg border border-border bg-background/60 p-2 text-xs" data-testid="chat-pamet-karta">
               <p className="text-muted-foreground mb-1">{t('memorySaved')}</p>
               <p className="whitespace-pre-wrap">{k.text}</p>
+              {/* paměť bydlí od 1. 10. 2026 v Dokumentech (připnutá nahoře) */}
+              {onOtevriDokument && (
+                <button type="button" onClick={() => onOtevriDokument(PAMET)} className="mt-1.5 inline-flex items-center gap-1 font-medium text-primary hover:underline" data-testid="chat-pamet-otevrit">
+                  <PanelLeftOpen className="w-3.5 h-3.5" />{t('dok.memoryOpen')}
+                </button>
+              )}
             </div>
           );
           if (k.type === 'otevrit') return (

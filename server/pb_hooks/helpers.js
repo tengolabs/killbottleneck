@@ -5999,6 +5999,12 @@ function buildExport(app, userId, email, opts) {
     map: rm.getString("map"), node_id: rm.getString("node_id"), offset_days: Number(rm.get("offset_days")) || 0,
     time: rm.getString("time"), day: rm.getString("day"), fired_at: rm.getString("fired_at"), created: rm.getString("created"),
   }));
+  // dokumenty asistenta (1. 10. 2026) — soukromé e-maily, poznámky, sumáře; obsah, který uživatel upravuje
+  const documents = rowsOf("ai_documents", "user = {:u}", { u: userId }, ROWS, "created").map((d) => ({
+    kind: d.getString("kind"), title: d.getString("title"), text: d.getString("text"), email_to: d.getString("email_to"),
+    email_subject: d.getString("email_subject"), map: d.getString("map"), created: d.getString("created"), updated: d.getString("updated"),
+  }));
+  if (documents.length >= ROWS) truncated.ai_documents = true;
   const timeEntries = own("time_entries", "started", (t) => ({
     id: t.id, label: t.getString("label"), note: t.getString("note"), started: t.getString("started"), ended: t.getString("ended"),
     duration_min: t.get("duration_min"), map: t.getString("map"), node_id: t.getString("node_id"), task: t.getString("task"), client: t.getString("client"),
@@ -6038,11 +6044,12 @@ function buildExport(app, userId, email, opts) {
     buffer_nodes: buffer,
     events: eventsOut,
     node_reminders: nodeReminders,
+    documents: documents,
     time_entries: timeEntries,
     external_contacts: contacts,
     notifications: notifications,
     rule_templates: ruleTemplates,
-    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, node_reminders: nodeReminders.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
+    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, node_reminders: nodeReminders.length, documents: documents.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
     truncated: Object.keys(truncated).length ? truncated : null,
     errors: errors.length ? errors : null,
   };

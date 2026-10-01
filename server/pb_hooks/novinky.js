@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.67-beta": {
+    cs: [
+      "Dokumenty vedle asistenta: e-maily, poznámky a sumáře, které asistent napíše, se samy uloží a na počítači otevřou v panelu vlevo od chatu — mapa zůstane vidět vedle.",
+      "Dokument upravíte přímo v panelu nebo řeknete asistentovi „udělej to formálnější“; předchozí verzi jde vrátit, e-mail zkopírujete nebo otevřete v poště s vyplněným adresátem a předmětem.",
+      "Dokument k projektu má odkaz na jeho mapu a ranní porada i noční plánování na konci nabídnou uložit zápis.",
+      "Paměť asistenta najdete nahoře v Dokumentech a koncepty se už nepřipisují do poznámek projektu — ty drží jen krátké poznatky.",
+    ],
+    en: [
+      "Documents next to the assistant: e-mails, notes and summaries the assistant writes are saved automatically and, on a computer, open in a panel to the left of the chat — the map stays visible beside it.",
+      "Edit a document right in the panel or ask the assistant to \"make it more formal\"; the previous version can be restored, and an e-mail can be copied or opened in your mail app with recipient and subject filled in.",
+      "A document that belongs to a project links to its map, and the morning briefing and evening planning offer to save their notes at the end.",
+      "The assistant's memory now sits at the top of Documents, and drafts are no longer appended to project notes — those keep short facts only.",
+    ],
+  },
   "v0.66-beta": {
     cs: [
       "Noční plánování: nový rámeček v asistentovi pod ranní poradou — vložíte fotku poznámek z dneška a vypíšete, co vám zůstalo v hlavě; asistent to roztřídí a doporučí, co z toho bude (nový projekt, do projektu, zásobník na později), a zapíše až po vašem „Ano“.",

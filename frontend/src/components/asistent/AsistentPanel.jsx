@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Bot, Brain, ChevronDown, ChevronLeft, ChevronUp, FileText, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Moon, Trash2, X } from 'lucide-react';
+import { Bot, ChevronDown, ChevronUp, FileText, FolderOpen, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Moon, Trash2, X } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA } from '@/lib/storageKeys';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,81 +9,21 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/lib/AuthContext';
-import { useAsistent, MIN_W, MAX_W } from '@/lib/AsistentContext';
+import { useAsistent, MIN_W, MAX_W, sirkaDokumentu } from '@/lib/AsistentContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAiModes } from '@/hooks/useAiEnabled';
-import { chatPamet, chatPametUloz, chatKonceptUloz } from '@/api/asistentApi';
 import { setSkin } from '@/lib/theme';
 import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
 import { base44 } from '@/api/base44Client';
 import { pripravObrazek, obrazekZeSchranky } from '@/lib/obrazek';
 import AsistentZprava from './AsistentZprava';
 import PdfPohled from './PdfPohled';
+import DokumentyPanel from './DokumentyPanel';
 import { useAsistentChat } from './useAsistentChat';
 
 // AI chat na boku (13. 9. 2026): vpravo, přes celou výšku, minimalizovatelný na
 // ouško. Rozhovor drží AsistentContext (nad Routerem); tahle komponenta jen
 // kreslí a posílá kontext „kde uživatel je" (cesta + otevřená mapa).
-
-// Paměť asistenta o uživateli — čte se a přepisuje přes /chat/pamet.
-// Poznámky k jednomu projektu (paměť projektu): upravit / smazat
-function PametProjektu({ p, onUloz }) {
-  const { t } = useTranslation('asistent');
-  const [text, setText] = useState(p.text || '');
-  const [uklada, setUklada] = useState(false);
-  const uloz = async (hodnota) => { setUklada(true); try { await onUloz(p.map_id, hodnota); setText(hodnota); } catch { /* text zůstane */ } setUklada(false); };
-  return (
-    <div className="rounded-lg border border-border p-2 space-y-1.5" data-testid="chat-pamet-projekt">
-      <p className="text-xs font-semibold">{p.title}</p>
-      <Textarea value={text} onChange={(e) => setText(e.target.value)} className="min-h-[90px] text-xs font-mono" data-testid="chat-pamet-projekt-text" />
-      <div className="flex gap-2">
-        <Button size="sm" className="h-7 text-xs" disabled={uklada} onClick={() => uloz(text)}>{t('memorySave')}</Button>
-        <Button size="sm" variant="outline" className="h-7 text-xs" disabled={uklada || !text} onClick={() => uloz('')} data-testid="chat-pamet-projekt-smaz">{t('memoryDelete')}</Button>
-      </div>
-    </div>
-  );
-}
-
-function PametPohled({ onZpet }) {
-  const { t } = useTranslation('asistent');
-  const [text, setText] = useState('');
-  const [projekty, setProjekty] = useState([]);
-  const [nacteno, setNacteno] = useState(false);
-  const [uklada, setUklada] = useState(false);
-  useEffect(() => {
-    let zivy = true;
-    chatPamet().then((r) => { if (zivy) { setText(r.text || ''); setProjekty(r.projekty || []); setNacteno(true); } }).catch(() => { if (zivy) setNacteno(true); });
-    return () => { zivy = false; };
-  }, []);
-  const uloz = async (hodnota) => {
-    setUklada(true);
-    try { const r = await chatPametUloz(hodnota); setText(r.text || ''); } catch { /* toast není třeba, text zůstane */ }
-    setUklada(false);
-  };
-  const ulozProjekt = async (mapId, hodnota) => {
-    await chatPametUloz(hodnota, mapId);
-    if (!hodnota) setProjekty((p) => p.filter((x) => x.map_id !== mapId));
-  };
-  return (
-    <div className="flex-1 flex flex-col min-h-0 p-3 gap-2 overflow-y-auto" data-testid="chat-pamet">
-      <button type="button" onClick={onZpet} className="self-start inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="w-3.5 h-3.5" />{t('memoryBack')}
-      </button>
-      <h3 className="text-sm font-semibold">{t('memoryTitle')}</h3>
-      <p className="text-xs text-muted-foreground">{t('memoryHint')}</p>
-      {nacteno ? (
-        <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={t('memoryEmpty')} className="min-h-[120px] text-sm font-mono shrink-0" data-testid="chat-pamet-text" />
-      ) : <Loader2 className="w-4 h-4 animate-spin" />}
-      <div className="flex gap-2 shrink-0">
-        <Button size="sm" disabled={uklada || !nacteno} onClick={() => uloz(text)} data-testid="chat-pamet-uloz">{t('memorySave')}</Button>
-        <Button size="sm" variant="outline" disabled={uklada || !nacteno || !text} onClick={() => { setText(''); uloz(''); }} data-testid="chat-pamet-smaz">{t('memoryClear')}</Button>
-      </div>
-      <h3 className="text-sm font-semibold mt-2">{t('memoryProjects')}</h3>
-      {nacteno && projekty.length === 0 && <p className="text-xs text-muted-foreground">{t('memoryProjectsEmpty')}</p>}
-      {projekty.map((p) => <PametProjektu key={p.map_id} p={p} onUloz={ulozProjekt} />)}
-    </div>
-  );
-}
 
 // Přepínač modelu v UI byl odstraněn 13. 9. 2026 (Richard: „to budeme dělat my v pozadí,
 // teď to zabírá místo"). Model se řídí KB_CHAT_MODEL; routa /chat/modely a `model`
@@ -103,7 +43,7 @@ export default function AsistentPanel() {
   const A = useMemo(() => ({ ...panel, ...rozhovor }), [panel, rozhovor]);
   const location = useLocation();
   const [text, setText] = useState('');
-  const [pohled, setPohled] = useState('chat'); // chat | pamet | pdf
+  const [pohled, setPohled] = useState('chat'); // chat | pdf (paměť je od 1. 10. 2026 v Dokumentech)
   // Vložený obrázek (Ctrl+V, přetažení, sponka) — 16. 9. 2026. Zmenšuje se hned při
   // vložení; server ho přepíše a originál zahodí, ve vlákně zůstane náhled a přepis.
   const [obrazek, setObrazek] = useState(null);   // { base64, nahled, nahledMime, url }
@@ -217,14 +157,6 @@ export default function AsistentPanel() {
   }, [location.pathname, panel.uzel]);
 
   const zpravy = (A.chat && A.chat.messages) || [];
-  // mapy pro „Uložit do projektu" u konceptu — jednou po otevření panelu
-  const [mapy, setMapy] = useState([]);
-  useEffect(() => {
-    if (!panel.open || !dostupny || mapy.length) return;
-    base44.entities.GoalMap.list('-updated_date', 50).then((rows) => setMapy((rows || []).filter((m) => m.kind !== 'org').map((m) => ({ id: m.id, title: m.title })))).catch(() => {});
-  }, [panel.open, dostupny, mapy.length]);
-  const vychoziMapa = kontext.map_id || (A.chat && A.chat.target && A.chat.target.map_id) || '';
-  const ulozKoncept = useCallback((payload) => chatKonceptUloz(payload), []);
   // Posun: při odeslání dolů (vlastní zpráva + „přemýšlím"), po odpovědi na
   // ZAČÁTEK odpovědi — dlouhá odpověď jinak skočí na konec a člověk musí jet
   // nahoru, aby viděl, jak začíná (Richard 13. 9., z telefonu).
@@ -253,7 +185,9 @@ export default function AsistentPanel() {
     vstupListy.current.focus();
     doListy.current = false;
   }, [A.open, mobil]);
-  const zmensit = useCallback(() => { doListy.current = true; A.setOpen(false); }, [A]);
+  // zavření/zmenšení chatu zavře i Dokumenty → přes hlídač neuložených změn (checkup 1. 10.)
+  const zavriChat = useCallback(() => A.opatrne(() => A.setOpen(false)), [A]);
+  const zmensit = useCallback(() => A.opatrne(() => { doListy.current = true; A.setOpen(false); }), [A]);
 
   const persistSkin = useCallback((fields) => {
     if (!user?.id) return;
@@ -282,7 +216,7 @@ export default function AsistentPanel() {
   }, [A, text, obrazek, pdf, pdfCte, kontext, patchUser]);
   const potvrd = useCallback((id, ok, vysledek) => A.potvrd(id, ok, kontext, patchUser, vysledek), [A, kontext, patchUser]);
   // na telefonu panel kryje celou obrazovku → po „Ukázat v mapě" ho schovat (Richard 13. 9.)
-  const poOdkazu = useCallback(() => { if (mobil) A.setOpen(false); }, [mobil, A]);
+  const poOdkazu = useCallback(() => { if (mobil) zavriChat(); }, [mobil, zavriChat]);
   // Toasty (vpravo dole) zakrývaly políčko chatu, dokud nezmizely — např. „mapa sloučena“
   // hned po potvrzené akci asistenta (klik-test 14. 9. 2026: psaní šlo do toastu). Otevřený
   // panel na desktopu posune výřez toastů vlevo o svou šířku (CSS proměnná čtená v toast.jsx).
@@ -291,10 +225,32 @@ export default function AsistentPanel() {
   // (klik-test 29. 9. 2026). Otevřený panel je posune pod svou hlavičku (h-12 = 48 px).
   useEffect(() => {
     const el = document.documentElement;
-    if (panel.open && !mobil) el.style.setProperty('--kb-toast-right', `${panel.width}px`); else el.style.removeProperty('--kb-toast-right');
+    // otevřené dokumenty leží vlevo od chatu → toasty ještě o jejich šířku dál (orientačně; na úzkém okně je panel užší)
+    if (panel.open && !mobil) el.style.setProperty('--kb-toast-right', `${panel.width + (panel.dokOpen ? sirkaDokumentu(window.innerWidth, panel.width, panel.dokWidth) : 0)}px`); else el.style.removeProperty('--kb-toast-right');
     if (panel.open && mobil) el.style.setProperty('--kb-toast-top', '48px'); else el.style.removeProperty('--kb-toast-top');
     return () => { el.style.removeProperty('--kb-toast-right'); el.style.removeProperty('--kb-toast-top'); };
-  }, [panel.open, panel.width, mobil]);
+  }, [panel.open, panel.width, panel.dokOpen, panel.dokWidth, mobil]);
+  // Dokumenty (30. 9. 2026): když asistent v tahu dokument založí (draft_text) nebo přepíše
+  // (update_document), panel dokumentů se na počítači sám otevře s ním — jako artefakt v Claude.
+  // Jen po DOKONČENÉM tahu (loading true → false), ne při načtení starého rozhovoru z historie, a jen na
+  // dokumenty, které v tahu NOVĚ přibyly — potvrzení karty dřív znovu otevřelo starý koncept (checkup 1. 10.).
+  // Rozepsanou úpravu jiného dokumentu nepřepne: jen obnoví seznam (hlídač v kontextu).
+  const { otevriDokument, obnovDokumenty, hlidac } = panel;
+  const predTahem = useRef(null); // podpisy karet dokumentů před tahem (id + stav)
+  // podpis = id dokumentu + místo karty v rozhovoru (týž dokument přepsaný v dalším tahu je nová karta);
+  // akce se počítá až provedená (potvrzení karty s přepisem dokumentu = nový podpis)
+  const podpisy = (msgs) => msgs.flatMap((m, i) => (m.karty || []).map((k, j) => (k.type === 'koncept' || k.type === 'dokument' ? `${k.doc_id}:${i}.${j}` : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'dokument' ? `${k.odkaz.doc_id}:${i}.${j}:hotovo` : ''))).filter(Boolean);
+  useEffect(() => {
+    if (A.loading) { if (!predTahem.current) predTahem.current = new Set(podpisy(zpravy)); return; }
+    if (!predTahem.current) return;
+    const pred = predTahem.current;
+    predTahem.current = null;
+    const nove = podpisy(zpravy).filter((p) => !pred.has(p));
+    if (!nove.length) return;
+    const ids = nove.map((p) => p.split(':')[0]);
+    obnovDokumenty(ids);
+    if (!mobil && !(hlidac && hlidac.current)) otevriDokument(ids[ids.length - 1]);
+  }, [A.loading, zpravy, mobil, otevriDokument, obnovDokumenty, hlidac]);
   const vratSkin = useCallback((predchozi) => {
     const id = predchozi || DEFAULT_SKIN_ID;
     const s = getBuiltinSkin(id);
@@ -370,6 +326,8 @@ export default function AsistentPanel() {
   const chips = t('chips', { returnObjects: true });
 
   return (
+    <>
+    {panel.dokOpen && <DokumentyPanel mobil={mobil} />}
     <aside
       className="fixed right-0 top-0 bottom-0 z-40 flex flex-col bg-card border-l shadow-xl w-full sm:w-auto"
       style={mobil ? undefined : { width: A.width, minWidth: MIN_W, maxWidth: MAX_W }}
@@ -387,7 +345,7 @@ export default function AsistentPanel() {
       <div className="h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {/* robot vlevo = taky minimalizace (Richard 29. 9. 2026: „zmenšit i při kliknutí vlevo nahoře na ikonku robota") */}
-          <button type="button" className="shrink-0 rounded p-1 -m-1 hover:bg-muted" title={t('close')} aria-label={t('close')} onClick={() => A.setOpen(false)} data-testid="chat-robot-zavrit"><Bot className="w-4 h-4 text-primary" /></button>
+          <button type="button" className="shrink-0 rounded p-1 -m-1 hover:bg-muted" title={t('close')} aria-label={t('close')} onClick={zavriChat} data-testid="chat-robot-zavrit"><Bot className="w-4 h-4 text-primary" /></button>
           <span className="text-sm font-semibold truncate">{(A.chat && A.chat.title) || t('title')}</span>
           {/* Nový rozhovor hned u názvu a s popiskem — mezi samotnými ikonami vpravo se hledal (Richard 17. 9. 2026) */}
           <Button variant="outline" size="sm" className="h-8 px-2 gap-1 shrink-0" title={t('newChat')} onClick={() => { setPohled('chat'); A.novy(); }} data-testid="chat-novy"><Plus className="w-4 h-4" />{t('newChatShort')}</Button>
@@ -411,16 +369,17 @@ export default function AsistentPanel() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* Dokumenty (30. 9. 2026): poznámky, e-maily a sumáře od asistenta — panel vlevo od chatu */}
+          <Button variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('dok.title')} aria-label={t('dok.title')} aria-pressed={panel.dokOpen} onClick={() => (panel.dokOpen ? panel.opatrne(() => panel.setDokOpen(false)) : panel.setDokOpen(true))} data-testid="chat-dokumenty-btn"><FolderOpen className="w-4 h-4" /></Button>
           {/* PDF mezi historií a pamětí (Richard 19. 9. 2026) */}
           <Button variant={pohled === 'pdf' ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('pdf.tab')} aria-label={t('pdf.tab')} onClick={() => setPohled((p) => (p === 'pdf' ? 'chat' : 'pdf'))} data-testid="chat-pdf-btn"><FileText className="w-4 h-4" /></Button>
-          <Button variant={pohled === 'pamet' ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('memory')} onClick={() => setPohled((p) => (p === 'pamet' ? 'chat' : 'pamet'))} data-testid="chat-pamet-btn"><Brain className="w-4 h-4" /></Button>
           <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
           {/* minimalizace, ne zavření — rozhovor zůstává (křížek sváděl k „zavírám úplně", Richard 13. 9.) */}
-          <Button variant="ghost" size="icon" className="h-8 w-8" title={t('close')} aria-label={t('close')} onClick={() => A.setOpen(false)} data-testid="chat-zavrit">{mobil ? <ChevronDown className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}</Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" title={t('close')} aria-label={t('close')} onClick={zavriChat} data-testid="chat-zavrit">{mobil ? <ChevronDown className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}</Button>
         </div>
       </div>
 
-      {pohled === 'pamet' ? <PametPohled onZpet={() => setPohled('chat')} /> : pohled === 'pdf' ? <PdfPohled onZpet={() => setPohled('chat')} onOpravit={naOpravit} loading={A.loading} soubory={pdfSeznam} setSoubory={setPdfSeznam} /> : (
+      {pohled === 'pdf' ? <PdfPohled onZpet={() => setPohled('chat')} onOpravit={naOpravit} loading={A.loading} soubory={pdfSeznam} setSoubory={setPdfSeznam} /> : (
         <>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2" data-testid="chat-zpravy">
             {nabidnoutPoradu && !A.loading && (
@@ -454,7 +413,7 @@ export default function AsistentPanel() {
             )}
             {zpravy.map((z, i) => (
               <div key={i} ref={i === prvniOdpovedIdx ? zacatekOdpovedi : undefined} className={i === prvniOdpovedIdx ? 'scroll-mt-2' : undefined}>
-                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} mapy={mapy} vychoziMapa={vychoziMapa} onUlozKoncept={ulozKoncept} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />
+                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} />
               </div>
             ))}
             {A.loading && (
@@ -549,5 +508,6 @@ export default function AsistentPanel() {
         </>
       )}
     </aside>
+    </>
   );
 }

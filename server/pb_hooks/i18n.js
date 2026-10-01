@@ -875,6 +875,12 @@ const STRINGS = {
   "err.chatNotFound": { cs: "Rozhovor nenalezen.", en: "Conversation not found." },
   "err.chatActionNotFound": { cs: "Akce už nečeká na potvrzení.", en: "This action is no longer waiting for confirmation." },
   "err.chatMemoryTooLong": { cs: "Paměť je příliš dlouhá (max {max} znaků).", en: "The memory is too long (max {max} characters)." },
+  // dokumenty asistenta (30. 9. 2026)
+  "err.docNotFound": { cs: "Dokument nenalezen.", en: "Document not found." },
+  "err.docTooLong": { cs: "Text je příliš dlouhý (max {max} znaků).", en: "The text is too long (max {max} characters)." },
+  "err.docEmpty": { cs: "Dokument je prázdný — napište název nebo text.", en: "The document is empty — write a title or some text." },
+  "err.docLimit": { cs: "Máte už {max} dokumentů — staré smažte, ať se vejdou nové.", en: "You already have {max} documents — delete old ones to make room." },
+  "err.docNoPrevious": { cs: "Předchozí verze není k dispozici.", en: "No previous version is available." },
   "err.badPurpose": {
     cs: "Neplatný účel — povolené hodnoty: team, family, solo.",
     en: "Invalid purpose — allowed values: team, family, solo.",

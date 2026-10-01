@@ -9,6 +9,44 @@ below before you jump several versions.
 
 ---
 
+## v0.67-beta — 2026-10-01
+
+**Assistant documents — notes, e-mails and summaries next to the chat**
+
+- Everything the assistant writes with `draft_text` (e-mail, meeting / call points, note, summary)
+  is now saved as a private **document** (new collection `ai_documents`, only the owner sees it).
+  A **Documents** panel opens to the left of the assistant, over the map (the page is not pushed
+  aside): list with filter All · Notes · E-mails · Summaries and search, detail with Edit, Copy,
+  Open in e-mail (`mailto:` — nothing is sent by the app), Download as text, Restore previous
+  version and Delete. Only the assistant creates documents (ideas and tasks stay in the idea
+  buffer, the prompt draws that line). On a computer the panel opens by itself on a document
+  the assistant just wrote or changed; on a phone it covers the screen with Back to chat.
+- New assistant tools `list_documents`, `get_document` (read) and `update_document` (rewrites a
+  document, keeps the previous version; in turns with an image/PDF it needs a confirmation card).
+  `draft_text` gains kinds `note` and `summary` and fields `subject` / `to`; a "Subject:" first line
+  of an e-mail is split off automatically.
+- Morning briefing and Evening planning end with "Save the notes to documents?" (a summary).
+- A document that belongs to a project shows the project in the list and an **Open project** link
+  to its map (only while you can see that map).
+- **Memory moved into Documents**: the brain button in the assistant header is gone; "What the
+  assistant remembers" is the pinned first item of the Documents panel (and "Open memory" under the
+  memory card in the chat).
+- **Drafts are no longer appended to project notes** — the "Save to project" button and the route
+  `POST /api/kb/chat/koncept-uloz` are removed; `draft_text` with `map` only links the document to
+  the project. Project notes (sent to the model in every turn on that map) keep short facts only.
+  Drafts already appended earlier stay in the notes untouched.
+- Routes `GET /api/kb/chat/dokumenty`, `GET /api/kb/chat/dokument/{id}`, `POST /api/kb/chat/dokument`
+  (edit only), `POST …/dokument/vratit`, `POST …/dokument/smazat`. Limits: 200 documents per
+  user, 20,000 characters each. Included in "Download all my data" (`documents`). Not exposed in the
+  v1 API / MCP.
+
+**Upgrade notes**: one migration (`1790801929_ai_documents.js`) adds the collection `ai_documents`;
+nothing else changes in existing data. Drafts already appended to project notes stay there. Rolling
+back to v0.66-beta is just the previous image — the new collection then sits unused (never run the
+down-migration by hand, it deletes the documents).
+
+---
+
 ## v0.66-beta — 2026-09-30
 
 **Morning briefing asks for your notes + Evening planning**

@@ -18,5 +18,16 @@ export const chatDetail = (id) => kbSend(`/api/kb/chat/detail/${encodeURICompone
 export const chatSmazat = (id) => kbSend('/api/kb/chat/smazat', { body: { chat_id: id } });
 export const chatPamet = () => kbSend('/api/kb/chat/pamet', { method: 'GET' });
 export const chatPametUloz = (text, mapId) => kbSend('/api/kb/chat/pamet', { body: mapId ? { text, map_id: mapId } : { text } });
-export const chatKonceptUloz = (payload) => kbSend('/api/kb/chat/koncept-uloz', { body: payload });
 export const chatModely = () => kbSend('/api/kb/chat/modely', { method: 'GET' });
+// Dokumenty asistenta (30. 9. 2026): soukromé poznámky, koncepty e-mailů a sumáře
+export const dokumenty = ({ skupina, q } = {}) => {
+  const p = new URLSearchParams();
+  if (skupina) p.set('skupina', skupina);
+  if (q) p.set('q', q);
+  const qs = p.toString();
+  return kbSend(`/api/kb/chat/dokumenty${qs ? `?${qs}` : ''}`, { method: 'GET' });
+};
+export const dokument = (id) => kbSend(`/api/kb/chat/dokument/${encodeURIComponent(id)}`, { method: 'GET' });
+export const dokumentUloz = (payload) => kbSend('/api/kb/chat/dokument', { body: payload });
+export const dokumentVratit = (id) => kbSend('/api/kb/chat/dokument/vratit', { body: { id } });
+export const dokumentSmazat = (id) => kbSend('/api/kb/chat/dokument/smazat', { body: { id } });

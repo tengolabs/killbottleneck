@@ -2078,18 +2078,51 @@ kbRoute("POST", "/chat/pamet", (e) => {
   return e.json(200, { text: rec.getString("text"), map_id: mid });
 }, $apis.requireAuth());
 
-// koncept z karty (e-mail / body k telefonátu) → do poznámek projektu jednou akcí
-kbRoute("POST", "/chat/koncept-uloz", (e) => {
+// ---------- Dokumenty asistenta (30. 9. 2026) ----------
+// Soukromé poznámky, koncepty e-mailů a sumáře (dokumenty.js). Vlastník se hlídá v modulu:
+// cizí id = 404 stejně jako neexistující (neprozrazovat, že dokument existuje).
+// ⚠️ pomocné funkce v modulu — handler v PB JSVM nevidí funkce deklarované v tomhle souboru.
+// ?skupina=poznamky|emaily|sumare &q=hledání → bez plného textu (náhled)
+kbRoute("GET", "/chat/dokumenty", (e) => {
+  const D = require(`${__hooks}/dokumenty.js`);
+  const q = e.requestInfo().query || {};
+  const rows = D.seznam($app, e.auth.id, { skupina: String(q.skupina || ""), q: String(q.q || "") });
+  return e.json(200, { dokumenty: D.sProjekty($app, e.auth, rows.map((r) => D.dto(r, false))), max: D.MAX_DOKUMENTU });
+}, $apis.requireAuth());
+
+kbRoute("GET", "/chat/dokument/{id}", (e) => {
+  const D = require(`${__hooks}/dokumenty.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const { pripojKoncept, mapaId } = require(`${__hooks}/chat.js`);
-  const body = e.requestInfo().body || {};
-  const L = userLang(e.auth);
-  const text = String(body.text || "").slice(0, 8000);
-  if (!text.trim()) return e.json(400, { error: t(L, "err.chatNoMessage") });
-  const mid = mapaId($app, e.auth, String(body.map_id || ""));
-  if (!mid) return e.json(404, { error: t(L, "err.mapNotFound") });
-  const rec = pripojKoncept($app, e.auth.id, mid, String(body.kind || "other"), String(body.title || "").slice(0, 80), text);
-  return e.json(200, { map_id: mid, text: rec.getString("text") });
+  const rec = D.najdi($app, e.auth.id, e.request.pathValue("id"));
+  if (!rec) return e.json(404, { error: t(userLang(e.auth), "err.docNotFound") });
+  return e.json(200, { dokument: D.sProjekty($app, e.auth, [D.dto(rec, true)])[0] });
+}, $apis.requireAuth());
+
+// {id, title?, text?, email_to?, email_subject?}: úprava (předchozí verze se schová). Nové dokumenty
+// zakládá JEN asistent (draft_text) — ruční poznámky by se tloukly se zásobníkem nápadů (Richard 1. 10. 2026)
+kbRoute("POST", "/chat/dokument", (e) => {
+  const D = require(`${__hooks}/dokumenty.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const b = e.requestInfo().body || {};
+  if (!b.id) return e.json(404, { error: t(userLang(e.auth), "err.docNotFound") });
+  const data = {};
+  for (const k of ["title", "text", "email_to", "email_subject"]) if (b[k] != null) data[k] = String(b[k]);
+  try {
+    const rec = D.uloz($app, e.auth.id, data, { id: String(b.id) });
+    return e.json(200, { dokument: D.sProjekty($app, e.auth, [D.dto(rec, true)])[0] });
+  } catch (err) { return D.odpovedChyby(e, err); }
+}, $apis.requireAuth());
+
+kbRoute("POST", "/chat/dokument/vratit", (e) => {
+  const D = require(`${__hooks}/dokumenty.js`);
+  const b = e.requestInfo().body || {};
+  try { return e.json(200, { dokument: D.sProjekty($app, e.auth, [D.dto(D.vratit($app, e.auth.id, String(b.id || "")), true)])[0] }); } catch (err) { return D.odpovedChyby(e, err); }
+}, $apis.requireAuth());
+
+kbRoute("POST", "/chat/dokument/smazat", (e) => {
+  const D = require(`${__hooks}/dokumenty.js`);
+  const b = e.requestInfo().body || {};
+  try { D.smazat($app, e.auth.id, String(b.id || "")); return e.json(200, { ok: true }); } catch (err) { return D.odpovedChyby(e, err); }
 }, $apis.requireAuth());
 
 // modely k vyzkoušení (jen správce; u ollamy seznam z /api/tags)

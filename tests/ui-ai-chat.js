@@ -139,16 +139,12 @@ H.beh(async () => {
   expect(await page.$eval('[data-testid="chat-koncept-text"]', (el) => el.textContent.includes('KONCEPT-MOCK')), 'text konceptu v poli');
   await page.click('[data-testid="chat-koncept-kopirovat"]');
   expect(await cekejText('Zkopírováno', 3000), 'tlačítko potvrdí zkopírování');
-  await page.click('[data-testid="chat-koncept-do-projektu"]');
-  expect(await cekej('[data-testid="chat-koncept-mapa"]'), 'výběr projektu pro uložení');
-  await page.click('[data-testid="chat-koncept-ulozit"]');
-  expect(await cekejText('Uloženo v poznámkách projektu Truhlářství', 5000), 'koncept uložen do poznámek projektu');
+  // „Uložit do projektu“ zrušeno 1. 10. 2026 (Richard) — koncept je v Dokumentech, poznámky projektu jen na poznatky
+  expect(!(await page.$('[data-testid="chat-koncept-do-projektu"]')) && !!(await page.$('[data-testid="chat-koncept-otevrit"]')), 'karta konceptu: místo „Uložit do projektu“ odkaz „Otevřít vedle“');
   const pamPo = (await inst.api('GET', '/api/kb/chat/pamet', { token: A })).json;
-  expect((pamPo.projekty || []).some((p) => p.title === 'Truhlářství' && /KONCEPT-MOCK/.test(p.text)), 'poznámky projektu obsahují text konceptu');
-  await page.click('[data-testid="chat-pamet-btn"]');
-  expect(await cekej('[data-testid="chat-pamet-projekt"]'), 'pohled paměti ukazuje poznámky k projektu');
-  expect(await page.$eval('[data-testid="chat-pamet-projekt-text"]', (el) => el.value.includes('KONCEPT-MOCK')), 'text konceptu je v poznámkách vidět a jde upravit');
-  await page.click('[data-testid="chat-pamet-btn"]');
+  expect(!(pamPo.projekty || []).some((p) => /KONCEPT-MOCK/.test(p.text)), 'koncept se do poznámek projektu NEpřipsal');
+  expect(await cekej('[data-testid="chat-dok-detail"][data-kind="email"]'), 'koncept se sám otevřel v Dokumentech vedle chatu');
+  await page.click('[data-testid="chat-dok-zavrit"]');
   await cekej('[data-testid="chat-input"]');
 
   console.log('== otázky s volbami ==');
@@ -255,8 +251,13 @@ H.beh(async () => {
   expect(Math.abs(box2.width - box1.width) < 4, 'šířka přežila reload');
   expect(await cekejText('VLOZENO'), 'po reloadu se rozhovor načetl ze serveru');
 
-  console.log('== paměť ==');
-  await page.click('[data-testid="chat-pamet-btn"]');
+  console.log('== paměť (od 1. 10. 2026 připnutá v Dokumentech, tlačítko v hlavičce zrušeno) ==');
+  expect(!(await page.$('[data-testid="chat-pamet-btn"]')), 'v hlavičce asistenta už tlačítko Paměť není');
+  await page.click('[data-testid="chat-dokumenty-btn"]');
+  await cekej('[data-testid="chat-dokumenty"]');
+  if (await page.$('[data-testid="chat-dok-zpet"]')) await page.click('[data-testid="chat-dok-zpet"]'); // panel si pamatuje naposledy otevřený dokument
+  expect(await cekej('[data-testid="chat-dok-pamet"]'), 'v Dokumentech je nahoře připnutá paměť');
+  await page.click('[data-testid="chat-dok-pamet"]');
   expect(await cekej('[data-testid="chat-pamet-text"]'), 'pohled paměti');
   await page.click('[data-testid="chat-pamet-text"]');
   await page.keyboard.type('- Píšu stručně');
@@ -264,8 +265,8 @@ H.beh(async () => {
   await sleep(600);
   const pamet = (await inst.api('GET', '/api/kb/chat/pamet', { token: A })).json;
   expect(/Píšu stručně/.test(pamet.text), 'paměť uložena přes UI');
-  await page.click('[data-testid="chat-pamet-btn"]');
-  expect(await cekej('[data-testid="chat-input"]'), 'zpět do rozhovoru');
+  await page.click('[data-testid="chat-dok-zavrit"]');
+  expect(await cekej('[data-testid="chat-input"]') && !(await page.$('[data-testid="chat-dokumenty"]')), 'zpět do rozhovoru');
 
   console.log('== přepínač v hlavičce, editor mapy s kontextem ==');
   await page.click('[data-testid="chat-toggle"]');

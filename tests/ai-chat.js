@@ -601,12 +601,13 @@ H.beh(async () => {
   fronta.push(nastroj('draft_text', { kind: 'call', title: 'Faktura za schody (Jana)', text: '- Pozdravit\n- Připomenout fakturu', map: 'Truhlářství' }), text('Body jsou nahoře, uložené k projektu.'));
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatRozbor.id, message: 'Body k telefonátu s Janou' } });
   const kK2 = r.json.chat.messages.slice(-3).flatMap((m) => m.karty || []).find((k) => k.type === 'koncept');
-  expect(!!kK2 && kK2.map_id === map.id, 'koncept s map → karta ví, že je uložený v projektu');
+  expect(!!kK2 && kK2.map_id === map.id, 'koncept s map → karta ví, ke kterému projektu patří');
   let pam = (await inst.api('GET', '/api/kb/chat/pamet', { token: A })).json;
   const pT = (pam.projekty || []).find((p) => p.map_id === map.id);
-  expect(!!pT && pT.title === 'Truhlářství' && /## Body k telefonátu: Faktura za schody \(Jana\)/.test(pT.text) && /Připomenout fakturu/.test(pT.text) && /Rozhoduje Petr/.test(pT.text), 'koncept připojen do poznámek projektu jako sekce, dřívější poznámky zůstaly');
+  // od 1. 10. 2026 se koncept do poznámek projektu NEpřipisuje (je v Dokumentech) — poznámky = jen poznatky
+  expect(!!pT && pT.title === 'Truhlářství' && !/Body k telefonátu/.test(pT.text) && !/Připomenout fakturu/.test(pT.text) && /Rozhoduje Petr/.test(pT.text), 'koncept se do poznámek projektu NEpřipsal, dřívější poznámky zůstaly');
   r = await inst.api('POST', '/api/kb/chat/koncept-uloz', { token: A, body: { text: 'Předmět: Ahoj', kind: 'email', title: 'Test', map_id: map.id } });
-  expect(r.status === 200 && /## E-mail: Test/.test(r.json.text), 'koncept z karty jde uložit tlačítkem (route koncept-uloz)');
+  expect(r.status === 404, `routa koncept-uloz zrušena (${r.status})`);
   r = await inst.api('POST', '/api/kb/chat/pamet', { token: A, body: { text: '- Jen Petr', map_id: map.id } });
   pam = (await inst.api('GET', '/api/kb/chat/pamet', { token: A })).json;
   expect(r.status === 200 && (pam.projekty.find((p) => p.map_id === map.id) || {}).text === '- Jen Petr', 'poznámky projektu jdou přepsat z UI');

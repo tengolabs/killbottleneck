@@ -283,8 +283,9 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   );
   const akceListy = (sekce) => akce.filter((a) => a.sekceListy === sekce && a.viditelna).map(tlacitkoListy);
 
+  // data-app-header: pod spodní hranu lišty se staví panely „fixed“ (Dokumenty asistenta, 30. 9. 2026)
   return (
-      <header className="min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
+      <header data-app-header className="min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
         <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
           {/* Značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
               U názvu projektu být nesmí — dvě loga vedle sebe by si konkurovala,
