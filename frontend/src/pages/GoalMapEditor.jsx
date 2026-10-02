@@ -641,7 +641,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // vzniknout dřív, než ho převezme useAiActions.
   const {
     layoutAllForView, alignStyle, setAlignStyle, alignStyleRef, alignLock,
-    alignPressStart, alignPressEnd, handleAlign, citelnost, handleCitelnost,
+    handleAlign, handleAlignLock, handleSrovnatVse, citelnost, handleCitelnost,
     usporadani, handleUsporadat,
   } = useMapLayout({
     nodes, edges, setNodes, loading, personalMap, activeMapId, isPublicView, canEdit, isMapOwner,
@@ -1265,8 +1265,17 @@ function EditorContent({ mapId, personalMap = false }) {
     );
   }
 
+  // Výška = VIDITELNÁ plocha (`dvh`), ne `100vh`. Na telefonu je `100vh` výška
+  // okna BEZ adresního řádku, takže s vysunutým řádkem byla stránka o jeho výšku
+  // vyšší, dala se posunout a první řada lišty (logo, zpět, akce) odjela nahoru
+  // — vypadalo to, že tlačítko Zpět chybí (Richard 1. 10. 2026: „ty dvě hlavní
+  // řádky horní bych zakotvil"). `h-screen` zůstává jako záloha pro prohlížeče
+  // bez `dvh`; lišta sama je navíc `sticky top-0` (EditorToolbar).
+  // ⚠️ Musí to být varianta `supports-[…]`, NE holé `h-screen h-dvh`: Tailwind
+  // řadí `.h-dvh` v CSS PŘED `.h-screen`, takže by vyhrálo staré 100vh a oprava
+  // by tiše nic nedělala (headless to nepozná — obě výšky jsou tam stejné).
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-screen supports-[height:100dvh]:h-dvh flex flex-col bg-background" data-testid="editor-koren">
       <ConflictBanners
         conflict={conflict}
         exporting={exporting}
@@ -1287,7 +1296,7 @@ function EditorContent({ mapId, personalMap = false }) {
         nav={{ navigate, org }}
         layout={{
           direction, setDirMode, recenterMap, kanbanAktivni, kanbanNsReady,
-          alignStyle, alignLock, handleAlign, alignPressStart, alignPressEnd,
+          alignStyle, alignLock, handleAlign, handleAlignLock, handleSrovnatVse,
           citelnost, handleCitelnost, usporadani, handleUsporadat,
         }}
         access={{

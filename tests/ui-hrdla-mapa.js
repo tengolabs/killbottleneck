@@ -72,8 +72,12 @@ H.beh(async () => {
     const text = document.body.innerText || '';
     return {
       zapnuto: btn ? btn.dataset.zapnuto : null,
-      pocitadlo: btn ? (btn.textContent || '').replace(/\D+/g, '') : '',
+      // jen VIDITELNÁ čísla: místo pro oranžové počítadlo se od 2. 10. 2026 drží
+      // i vypnuté (neviditelné), ať tlačítko zapnutím nenaroste a lišta neuskočí
+      pocitadlo: btn ? [...btn.querySelectorAll('span')].filter((x) => !x.children.length && getComputedStyle(x).visibility !== 'hidden').map((x) => (x.textContent || '').replace(/\D+/g, '')).join('') : '',
       oranzove: btn ? btn.querySelector('[data-pocet="potencialni"]') !== null : false,
+      sirka: btn ? Math.round(btn.getBoundingClientRect().width * 10) / 10 : 0,
+      vlevo: btn ? Math.round(btn.getBoundingClientRect().left * 10) / 10 : 0,
       realBadge: (text.match(/Úzké hrdlo/g) || []).length,
       potBadge: (text.match(/Potenciální hrdlo/g) || []).length,
       kritHrany: document.querySelectorAll('[data-stav-hrany="bottleneck"]').length,
@@ -100,6 +104,8 @@ H.beh(async () => {
       hotovyOznacen: /HOTOVY UZEL/.test(text),
       realna: b?.querySelector('[data-pocet="realna"]')?.textContent || '',
       potencialni: b?.querySelector('[data-pocet="potencialni"]')?.textContent || '',
+      sirka: b ? Math.round(b.getBoundingClientRect().width * 10) / 10 : 0,
+      vlevo: b ? Math.round(b.getBoundingClientRect().left * 10) / 10 : 0,
       plus: /1\s*\+\s*1/.test((b?.textContent || '').replace(/\s+/g, ' ')),
     };
   });
@@ -108,6 +114,9 @@ H.beh(async () => {
   // změnilo barvu — počet oranžových má být na tlačítku vedle červeného
   expect(stav1.realna === '1' && stav1.potencialni === '1', `zapnuté tlačítko ukazuje obě počítadla: červené ${stav1.realna}, oranžové ${stav1.potencialni} (čeká se 1 a 1)`);
   expect(stav1.plus, 'mezi počítadly je plus („1 + 1")');
+  // zapnutí NESMÍ tlačítko rozšířit ani posunout — lišta je zarovnaná doprava
+  // a všechno vlevo od něj by uskočilo (naměřeno 24 px, /checkup 2. 10. 2026)
+  expect(stav0.sirka > 0 && Math.abs(stav1.sirka - stav0.sirka) < 0.6 && Math.abs(stav1.vlevo - stav0.vlevo) < 0.6, `zapnutí tlačítkem nepohne: šířka ${stav0.sirka} → ${stav1.sirka} px, levý okraj ${stav0.vlevo} → ${stav1.vlevo}`);
   expect(stav1.potBadge === 1, `právě 1 potenciální hrdlo — větvení ≥2 (${stav1.potBadge}×)`);
   // hrany apex→real1, real1→r1a, real1→r1b se dotýkají reálného hrdla = 3;
   // k potenciálnímu (pot1) se kritická cesta NEkreslí

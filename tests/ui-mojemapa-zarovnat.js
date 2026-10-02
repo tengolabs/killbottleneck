@@ -1,6 +1,7 @@
 // Ověření: Zarovnat funguje i v „Moje mapa" (Richard 11. 8. v noci)
 const puppeteer = require('puppeteer-core');
 const { execSync } = require('child_process');
+const { vyberZListy } = require('./_harness');
 const NAME = 'kb-e2e-mojemapa', PORT = 20596, BASE = `http://127.0.0.1:${PORT}`, PW = 'testheslo123';
 let pass = 0, fail = 0;
 const ok = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
@@ -42,10 +43,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok((await tlacitko()) !== null, `Moje mapa má tlačítko Zarovnat (${await tlacitko()})`);
     ok((await page.evaluate(() => !!document.querySelector('button[data-align-lock]'))), 'a taky zámeček');
     const pred = await pomer();
-    const zarovnej = async () => { await page.evaluate(() => [...document.querySelectorAll('button')].find((x) => (x.title || '').startsWith('Zarovnat'))?.click()); await sleep(1500); };
-    await zarovnej();  // classic
+    // Zarovnat = nabídka stylů (od 1. 10. 2026), výběr přes skutečný klik
+    const zarovnej = async (styl) => { ok(await vyberZListy(page, 'zarovnat', `[data-styl="${styl}"]`), `vybrán styl ${styl}`); await sleep(1500); };
+    await zarovnej('classic');
     const poKlasice = await pomer();
-    await zarovnej();  // compact
+    await zarovnej('compact');
     const poKompaktu = await pomer();
     ok(poKompaktu > 0 && poKompaktu !== poKlasice, `kompakt s mapou pohnul (poměr ${poKlasice} → ${poKompaktu})`);
     ok(poKompaktu < poKlasice, `a zúžil ji vůči výšce (poměr ${poKlasice} → ${poKompaktu})`);
@@ -64,7 +66,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       return null;
     });
     ok(!(await prekryvNaPlatne()), `kompakt: karty se na plátně nepřekrývají${await prekryvNaPlatne() ? ' (' + await prekryvNaPlatne() + ')' : ''}`);
-    await zarovnej();  // třetí styl: kolem středu
+    await zarovnej('bands');
     ok(!(await prekryvNaPlatne()), `kolem středu: karty se na plátně nepřekrývají${await prekryvNaPlatne() ? ' (' + await prekryvNaPlatne() + ')' : ''}`);
     console.log(`  (poměr na začátku ${pred})`);
     console.log(`\nVÝSLEDEK: ${pass} OK, ${fail} FAIL`);

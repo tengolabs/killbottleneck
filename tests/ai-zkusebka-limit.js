@@ -31,16 +31,32 @@ async function api(method, path, { token, body } = {}) {
   return { status: res.status, json };
 }
 
-// Brána, která vždy hlásí vyčerpanou kvótu — přesně tou větou, kterou posílá ostrá.
+// Brána, která vždy odmítne 429 — podle `rezim` jedním ze způsobů, které instance musí rozlišit:
+//   kvota      vyčerpaná kvóta přesně tou větou, kterou posílá ostrá brána (starší verze: BEZ kódu)
+//   kvota-kod  totéž s kódem quota_exceeded (brána od 2. 10. 2026)
+//   funkce     vyčerpaný limit jedné funkce (mode_quota_exceeded)
+//   brzda      minutová brzda brány (rate_limited) — dočasné, za chvíli projde
+//   ochrana    odmítnutí, které brána vůbec nenapsala (ochrana před ní): 429 bez JSON, s Retry-After
+let rezim = 'kvota';
+const KVOTA = 'Vyčerpán měsíční limit AI operací. Kontaktujte poskytovatele.';
 function branaVycerpana() {
   return http.createServer((req, res) => {
     let telo = '';
     req.on('data', (d) => { telo += d; });
     req.on('end', () => {
+      if (rezim === 'ochrana') {
+        res.writeHead(429, { 'Content-Type': 'text/plain; charset=UTF-8', 'Retry-After': '10' });
+        res.end('error code: 1015');
+        return;
+      }
       res.writeHead(429, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        detail: { error: 'Vyčerpán měsíční limit AI operací. Kontaktujte poskytovatele.' },
-      }));
+      const detail = {
+        kvota: { error: KVOTA },
+        'kvota-kod': { error: KVOTA, code: 'quota_exceeded' },
+        funkce: { error: "Vyčerpán měsíční limit pro funkci 'expand'.", code: 'mode_quota_exceeded' },
+        brzda: { error: 'Příliš mnoho požadavků, zkuste to za chvíli.', code: 'rate_limited' },
+      }[rezim];
+      res.end(JSON.stringify({ detail }));
     });
   }).listen(BRANA_PORT, '0.0.0.0');
 }
@@ -84,6 +100,27 @@ async function main() {
       'původní věta od brány se k zákazníkovi NEDOSTANE');
     expect(r.json?.code === 'trial_quota', `nese strojově čitelný důvod (${r.json?.code})`);
 
+    console.log('== zkušebka: i brána s kódem u kvóty dostane hlášku zkušebky ==');
+    for (const jak of ['kvota-kod', 'funkce']) {
+      rezim = jak;
+      r = await api('POST', '/api/kb/advisor', { token: tok, body: { mode: 'expand', title: 'Otevřít kavárnu' } });
+      expect(r.status === 429 && r.json?.code === 'trial_quota' && /zkušebn/i.test(String(r.json?.error || '')),
+        `${jak}: vyčerpaný limit s kódem → pořád hláška zkušebky (${r.status} ${r.json?.code})`);
+    }
+
+    console.log('== zkušebka: DOČASNÁ brzda není vyčerpaná kvóta ==');
+    // Nález 2. 10. 2026: každé 429 se ve zkušebce hlásilo jako „AI je pro tento měsíc vyčerpaná" —
+    // i minutová brzda brány a jedenáctivteřinová blokace ochrany před ní. Tomu člověk uvěří.
+    for (const [jak, popis] of [['brzda', 'minutová brzda brány (rate_limited)'], ['ochrana', 'odmítnutí před bránou (429 bez JSON)']]) {
+      rezim = jak;
+      r = await api('POST', '/api/kb/advisor', { token: tok, body: { mode: 'expand', title: 'Otevřít kavárnu' } });
+      const hl = String(r.json?.error || '');
+      expect(r.status === 429 && r.json?.code === 'ai_busy', `${popis} → 429 ai_busy (${r.status} ${r.json?.code})`);
+      expect(/za chvíli/i.test(hl) && !/zkušebn|vyčerp|měsíc/i.test(hl), `…a hláška říká „za chvíli", o kvótě ani zkušebce nemluví ("${hl}")`);
+      expect(!/Příliš mnoho požadavků|1015/.test(hl), '…vlastními slovy instance (ne text brány ani ochrany)');
+    }
+    rezim = 'kvota';
+
     console.log('== vypršelá zkušebka: čtení přes POST (/mcp, výpis sdílení) projde, zápis 402 (nález S7-01) ==');
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     await start(`${AI} -e KB_TRIAL_UNTIL=2020-01-01`);
@@ -125,6 +162,18 @@ async function main() {
     const text2 = String(r.json?.error || '');
     expect(!/zkušebn/i.test(text2), `platícímu se o zkušebce NEMLUVÍ ("${text2.slice(0, 50)}…")`);
     expect(/Vyčerpán měsíční limit/i.test(text2), 'dostane původní hlášku od brány');
+    rezim = 'kvota-kod';
+    r = await api('POST', '/api/kb/advisor', { token: tok, body: { mode: 'expand', title: 'Otevřít kavárnu' } });
+    expect(r.status === 429 && r.json?.code === 'quota_exceeded' && /Vyčerpán měsíční limit/i.test(String(r.json?.error || '')),
+      `kvóta s kódem: původní hláška brány a kód quota_exceeded (${r.status} ${r.json?.code})`);
+    for (const [jak, popis] of [['brzda', 'minutová brzda brány'], ['ochrana', 'odmítnutí před bránou']]) {
+      rezim = jak;
+      r = await api('POST', '/api/kb/advisor', { token: tok, body: { mode: 'expand', title: 'Otevřít kavárnu' } });
+      const hl = String(r.json?.error || '');
+      expect(r.status === 429 && r.json?.code === 'ai_busy' && /za chvíli/i.test(hl) && !/vyčerp|odmítla/i.test(hl),
+        `${popis} → „zkuste to za chvíli", ne kvóta ani holé „odmítla" (${r.status} ${r.json?.code} "${hl}")`);
+    }
+    rezim = 'kvota';
   } finally {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     srv.close();

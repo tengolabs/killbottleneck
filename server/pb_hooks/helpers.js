@@ -133,6 +133,31 @@ function trialExpired() {
   return konec !== null && Date.now() > konec;
 }
 
+// Odmítnutí od AI brány (HTTP 403/429) → {status, body} pro uživatele.
+// 429 má dva různé významy a uživatel je musí rozlišit:
+//  · VYČERPANÁ KVÓTA (měsíční nebo pro jednu funkci). Ve zkušebce se musí říct, že je to
+//    omezení ZKUŠEBKY, ne produktu: brána o zkušebce neví — má jen kvótu — a její věta
+//    („Vyčerpán měsíční limit AI operací. Kontaktujte poskytovatele.") zní jako strop celé
+//    aplikace. Zákazník by si odnesl, že takhle killBottleneck funguje (Richard 6. 8. 2026).
+//    Vědět to může jen instance: zkušebku pozná podle KB_TRIAL_UNTIL.
+//  · DOČASNÁ BRZDA — minutový strop brány (kód `rate_limited`), nebo odmítnutí, které vůbec
+//    nenapsala brána (ochrana před ní: 429 bez vysvětlení v JSON). Za pár vteřin to projde,
+//    takže se o kvótě mlčí. Dřív zkušebka i tohle hlásila jako „AI je pro tento měsíc
+//    vyčerpaná" (nález 2. 10. 2026) — a tomu člověk uvěří a na AI už nesáhne.
+// Brána bez kódu u kvóty (starší verze) se dál bere jako kvóta: text má, kód ne.
+function odmitnutiBrany(res, L) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const j = res && res.json;
+  const d = (j && (j.detail || j)) || {};
+  const detail = typeof d === "object" ? d : {};
+  const kod = String(detail.code || "");
+  if (res.statusCode === 429) {
+    if (kod === "rate_limited" || (!detail.error && !kod)) return { status: 429, body: { error: t(L, "err.aiBusy"), code: "ai_busy" } };
+    if (trialUntil() !== null) return { status: 429, body: { error: t(L, "err.aiTrialQuota"), code: "trial_quota" } };
+  }
+  return { status: res.statusCode, body: { error: detail.error || t(L, "err.aiRejected"), code: kod } };
+}
+
 // Po vypršení zkušebky je instance JEN PRO ČTENÍ — a to musí platit i pro práci,
 // kterou si instance rozjede SAMA. Zámek na zápis je middleware nad HTTP
 // requestem, jenže crony přes něj neprocházejí: instance s vypršenou zkušebkou
@@ -7375,7 +7400,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 
 module.exports = {
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

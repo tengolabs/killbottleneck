@@ -125,11 +125,6 @@ export function nactiStupen() {
   return platnyStupen(nactiKlic(KLIC_CITELNOST));
 }
 
-export function dalsiStupen(v) {
-  const i = CITELNOST_STUPNE.indexOf(platnyStupen(v));
-  return CITELNOST_STUPNE[(i + 1) % CITELNOST_STUPNE.length];
-}
-
 // třídy pro vykreslení uzlu; vždy vrátí platný objekt, i pro nesmysl na vstupu
 export function tridyCitelnosti(v) {
   return CITELNOST[platnyStupen(v)];

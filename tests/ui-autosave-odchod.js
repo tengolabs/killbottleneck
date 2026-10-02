@@ -7,6 +7,7 @@
 // Měří se Z API (DB), ne z plátna. Na obrazu PŘED opravou musí být rudá.
 const puppeteer = require('puppeteer-core');
 const { execSync } = require('child_process');
+const { vyberZListy } = require('./_harness');
 
 const NAME = 'kb-e2e-ui-autosave-odchod';
 const PORT = 20643;
@@ -130,7 +131,8 @@ const cizihoPuvodu = (m) => /fonts\.g|favicon|ERR_NETWORK_CHANGED/.test(m.text()
       const b = [...document.querySelectorAll('button')].find((x) => (x.getAttribute('title') || '').startsWith(h) && !x.disabled && x.offsetParent !== null);
       if (!b) return false; b.click(); return true;
     }, hledany);
-    expect(await klik('Zarovnat'), 'tlačítko Zarovnat je v liště');
+    // Zarovnat je nabídka stylů (od 1. 10. 2026) — klik musí být skutečný
+    expect(await vyberZListy(page, 'zarovnat', '[data-styl="classic"]'), 'Zarovnat je v liště a styl jde vybrat z nabídky');
     await sleep(3000); // zarovnání + autosave (1,2 s)
     const poZarovnani = await poziceZApi();
     const zmenilo = ['n1', 'n2'].some((id) => Math.abs(poZarovnani[id].x - predZarovnanim[id].x) > 5 || Math.abs(poZarovnani[id].y - predZarovnanim[id].y) > 5);

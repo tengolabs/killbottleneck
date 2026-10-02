@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.69-beta": {
+    cs: [
+      "Lišta mapy drží na místě: Zarovnat, Uspořádat a Čitelnost jsou nabídky s pevným popiskem — klik otevře seznam možností a tlačítka už nemění šířku ani neposkakují při ukládání.",
+      "Kostička srovná mapu podle všeho, co máte nastavené (styl Zarovnat a Uspořádat), a oddálí ji — jde to vzít Zpět. Zámek stylu najdete dole v nabídce Zarovnat.",
+      "Na telefonu zůstávají obě řady lišty vždy nahoře — šipka zpět už neodjede pod adresní řádek prohlížeče.",
+      "Na širokém monitoru asistent lištu neodsouvá, panel leží přes její pravý konec; klik mimo otevřenou nabídku už omylem nezaloží cíl.",
+      "Úvodní dialog o účelu instance zase ukazuje popisky voleb.",
+    ],
+    en: [
+      "The map toolbar stays put: Arrange, Sort and Readability are menus with a fixed label — a click opens the list of options and the buttons no longer change width or jump when the map saves.",
+      "The frame button tidies the map by everything you have set (the Arrange style and Sort) and zooms out — Undo takes it back. The style lock is at the bottom of the Arrange menu.",
+      "On a phone both toolbar rows always stay on screen — the back arrow no longer slides under the browser's address bar.",
+      "On a wide monitor the assistant no longer pushes the toolbar, the panel lies over its right end; a click outside an open menu no longer creates a goal by accident.",
+      "The first-run dialog about what the instance is for shows the option descriptions again.",
+    ],
+  },
   "v0.68-beta": {
     cs: [
       "Hlasovky v asistentovi: mikrofon vedle sponky — namluvíte, hlasovka hned odejde, přepis vidíte v bublině a asistent z něj navrhne změny ke schválení (nejvýš 5 minut; poslat jde i hotová nahrávka, třeba z WhatsAppu).",

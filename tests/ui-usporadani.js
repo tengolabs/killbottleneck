@@ -89,8 +89,43 @@ H.beh(async () => {
   };
   const stavTlacitka = () => page.evaluate(() => {
     const b = document.querySelector('[data-testid="toolbar-usporadat"]');
-    return b ? { k: b.getAttribute('data-usporadani'), text: (b.textContent || '').replace(/\s+/g, ' ').trim() } : null;
+    return b ? { k: b.getAttribute('data-usporadani'), text: (b.textContent || '').replace(/\s+/g, ' ').trim(), title: b.title || '' } : null;
   });
+  // levé okraje a šířky tlačítek lišty — od 1. 10. 2026 se volbou NESMÍ hnout
+  // (Richard: „mění pořád velikost… pohnou se mi tlačítka a klikám jinam")
+  const rozmeryListy = () => page.evaluate(() => {
+    const ids = ['zarovnat', 'usporadat', 'citelnost', 'fit'];
+    const out = {};
+    // přepínač směru stojí VLEVO od indikátoru ukládání — na ikonové liště ho
+    // text „Ukládání…" odsouval o ~65 px a původní měření to nevidělo (/checkup 2. 10.)
+    const smer = document.querySelector('button[data-dir="vertical"]');
+    if (smer && smer.offsetParent) { const r = smer.getBoundingClientRect(); out.smer = `${Math.round(r.left)}+${Math.round(r.width)}`; }
+    for (const id of ids) {
+      const b = [...document.querySelectorAll(`[data-testid="toolbar-${id}"],[data-testid="toolbar-${id}-narrow"]`)].find((x) => x.offsetParent);
+      if (b) { const r = b.getBoundingClientRect(); out[id] = `${Math.round(r.left)}+${Math.round(r.width)}`; }
+    }
+    // nejbližší tlačítko VPRAVO od kostičky ve stejné řadě — na něm je
+    // poskakování vidět nejvíc (sem Richard klikal a trefil jiné)
+    const fit = [...document.querySelectorAll('[data-testid^="toolbar-fit"]')].find((x) => x.offsetParent)?.getBoundingClientRect();
+    if (fit) {
+      const vpravo = [...document.querySelectorAll('button')].filter((x) => x.offsetParent)
+        .map((x) => x.getBoundingClientRect())
+        .filter((r) => r.left >= fit.right && Math.abs(r.top - fit.top) < 12)
+        .sort((p, q) => p.left - q.left)[0];
+      if (vpravo) out.vpravo = Math.round(vpravo.left);
+    }
+    return JSON.stringify(out);
+  });
+  // která položka je v nabídce zaškrtnutá (otevřít skutečným klikem, přečíst, Escape)
+  const zaskrtnuto = async (co) => {
+    const id = await page.evaluate((c) => [...document.querySelectorAll(`[data-testid="toolbar-${c}"],[data-testid="toolbar-${c}-narrow"]`)].find((x) => x.offsetParent)?.getAttribute('data-testid'), co);
+    await klikHandle(`[data-testid="${id}"]`);
+    await page.waitForSelector('[role="menu"] [role="menuitemradio"]', { visible: true, timeout: 8000 });
+    const v = await page.$eval('[role="menu"]', (m) => { const e = m.querySelector('[role="menuitemradio"][aria-checked="true"]'); return e ? (e.getAttribute('data-styl') || e.getAttribute('data-stupen') || e.getAttribute('data-kriterium')) : null; });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('[role="menu"]'), { timeout: 5000 }).catch(() => {});
+    return v;
+  };
   const listyA = [N.a10, N.a1, N.a0];
   const listyB = [N.b5, N.b2];
 
@@ -109,7 +144,8 @@ H.beh(async () => {
   expect(poTerminu === `${N.a1} | ${N.a10} | ${N.a0}`, `listy A seřazené dle termínu (${poTerminu})`);
   expect((await poradi([N.A, N.B], false)) === `${N.A} | ${N.B}`, 'kategorie A (má brzký vnuk) zůstala před B');
   tl = await stavTlacitka();
-  expect(tl.k === 'deadline' && /Termín/.test(tl.text), `tlačítko ukazuje zvolené kritérium (${tl.text})`);
+  expect(tl.k === 'deadline' && /Termín/.test(tl.title), `tlačítko hlásí zvolené kritérium (ikonou + v tooltipu: ${tl.title})`);
+  expect(tl.text === 'Uspořádat', `popisek zůstává pevný „Uspořádat" (${tl.text})`);
   const ulozena = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json;
   const hranyPred = fixtura.edges.map((e) => `${e.source}>${e.target}`).sort().join(',');
   const hranyPo = (ulozena.edges || []).map((e) => `${e.source}>${e.target}`).sort().join(',');
@@ -125,8 +161,8 @@ H.beh(async () => {
 
   console.log('== Zarovnat po uspořádání pořadí drží (celý cyklus stylů) ==');
   await usporadat('deadline');
-  for (let i = 1; i <= 3; i++) {
-    await page.evaluate(() => document.querySelector('button[data-align-lock]')?.click());
+  for (const [i, styl] of [[1, 'classic'], [2, 'compact'], [3, 'bands']]) {
+    expect(await H.vyberZListy(page, 'zarovnat', `[data-styl="${styl}"]`), `Zarovnat: vybrán styl ${styl}`);
     await pockejNaUlozeni();
     const ted = await poradi(listyA, false);
     expect(ted === poTerminu, `po Zarovnat ${i}× pořadí drží (${ted})`);
@@ -166,6 +202,172 @@ H.beh(async () => {
   const updatedPo = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json.updated;
   expect(updatedPo === updatedPred, `po otevření se nic neuložilo — updated beze změny (${updatedPred} → ${updatedPo})`);
 
+  console.log('== lišta neposkakuje: volba v nabídkách nemění šířky ani pozice tlačítek ==');
+  for (const [sirka, popis] of [[1920, 'široká lišta'], [1400, 'ikonová lišta']]) {
+    await page.setViewport({ width: sirka, height: 950 });
+    await sleep(800);
+    const r0 = await rozmeryListy();
+    expect(Object.keys(JSON.parse(r0)).length === 6, `${popis}: přepínač směru, tři nabídky, kostička i pravá skupina jsou vidět (${r0})`);
+    for (const [co, polozka] of [['zarovnat', '[data-styl="compact"]'], ['zarovnat', '[data-styl="bands"]'], ['citelnost', '[data-stupen="titleOnly"]'],
+      ['citelnost', '[data-stupen="normal"]'], ['usporadat', '[data-kriterium="plannedOn"]'], ['usporadat', '[data-kriterium="owner"]']]) {
+      expect(await H.vyberZListy(page, co, polozka), `${popis}: ${co} ${polozka} vybráno`);
+      await pockejNaUlozeni();
+      const r = await rozmeryListy();
+      expect(r === r0, `${popis}: po ${co} ${polozka} tlačítka na místě (${r === r0 ? 'beze změny' : r0 + ' → ' + r})`);
+      // nabídka musí zvolenou hodnotu OZNAČIT (mutace s prázdným `value` jinak prošla)
+      expect(await zaskrtnuto(co) === polozka.match(/"([^"]+)"/)[1], `${popis}: nabídka ${co} má zaškrtnuté ${polozka}`);
+    }
+    // i BĚHEM ukládání (indikátor svítí) — vyvolat zápis a měřit hned, ne až po uložení
+    expect(await H.vyberZListy(page, 'zarovnat', '[data-styl="classic"]'), `${popis}: zarovnat classic (měření během ukládání)`);
+    let behem = r0, stavy = '';
+    for (let i = 0; i < 12; i++) {
+      await sleep(250);
+      const st = await page.evaluate(() => [...document.querySelectorAll('[data-testid="save-status"]')].find((x) => x.offsetParent)?.getAttribute('data-stav') || 'idle');
+      if (!stavy.includes(st)) stavy += st + ' ';
+      const r = await rozmeryListy();
+      if (r !== r0) behem = r;
+    }
+    expect(/saving|saved/.test(stavy), `${popis}: indikátor ukládání se během měření opravdu ukázal (${stavy.trim()})`);
+    expect(behem === r0, `${popis}: indikátor ukládání lištou nepohnul (${behem === r0 ? 'beze změny' : r0 + ' → ' + behem})`);
+    await pockejNaUlozeni();
+    expect(await H.vyberZListy(page, 'zarovnat', '[data-styl="bands"]'), `${popis}: zpět na kolem středu`);
+    await pockejNaUlozeni();
+  }
+  await page.setViewport({ width: 1920, height: 950 });
+  await sleep(800);
+
+  // KOSTIČKA (Richard 1. 10. 2026: „tlačítko kostky… by mohlo zároveň zarovnat
+  // dle všech nastavení") — ručně rozházené pořadí srovná podle Uspořádat
+  // (teď „řešitel") ve stylu Zarovnat, zapíše a jde vzít Zpět.
+  console.log('== kostička srovná mapu podle Zarovnat + Uspořádat a oddálí ==');
+  const kosticka = async () => {
+    const id = await page.evaluate(() => [...document.querySelectorAll('[data-testid="toolbar-fit"],[data-testid="toolbar-fit-narrow"]')].find((x) => x.offsetParent)?.getAttribute('data-testid'));
+    await klikHandle(`[data-testid="${id}"]`);
+    await pockejNaUlozeni();
+  };
+  expect(await page.$eval('[data-testid="toolbar-fit"]', (b) => b.getAttribute('data-srovna')) === 'ano', 'editor má kostičku, která srovnává');
+  {
+    const ulozeno = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json;
+    const uzly = ulozeno.nodes.map((n) => ({ ...n, position: { ...n.position } }));
+    const u10 = uzly.find((n) => n.id === 'a10'), u0 = uzly.find((n) => n.id === 'a0');
+    [u10.position, u0.position] = [u0.position, u10.position];   // „ruční" prohození listů
+    await inst.api('PATCH', `/api/collections/goalmaps/records/${mapa.id}`, { token: T, body: { nodes: uzly } });
+  }
+  await otevri(mapa.id, 8);
+  const rucne = await poradi(listyA, false);
+  expect(!rucne.startsWith(N.a10), `ručně rozházené pořadí, řešitel není první (${rucne})`);
+  await kosticka();
+  const poKosticce = await poradi(listyA, false);
+  expect(poKosticce.startsWith(N.a10), `kostička seřadila podle řešitele (${poKosticce})`);
+  const posKost = Object.fromEntries((((await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json.nodes) || []).map((n) => [n.id, n.position]));
+  expect(posKost.a10 && posKost.a0 && posKost.a10.x < posKost.a0.x, `a uložila to (x: a10=${posKost.a10?.x}, a0=${posKost.a0?.x})`);
+  const updKost = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json.updated;
+  await kosticka();
+  const updKost2 = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json.updated;
+  expect(updKost2 === updKost, `srovnaná mapa: další kostička nic nezapíše (updated ${updKost} → ${updKost2})`);
+  await klikHandle('button[title="Vrátit zpět"]');
+  await pockejNaUlozeni();
+  expect((await poradi(listyA, false)) === rucne, `Zpět vrátí ruční pořadí před kostičkou (${await poradi(listyA, false)})`);
+
+  console.log('== kostička na mapě, která nikdy nebyla zarovnaná: jen oddálí ==');
+  {
+    const volna = (await inst.api('POST', '/api/collections/goalmaps/records', { token: T, body: {
+      title: 'Ručně rozmístěná',
+      nodes: [
+        { id: 'apex', type: 'apexNode', position: { x: 400, y: 0 }, data: { nodeType: 'apex', apexText: 'RUČNĚ', title: 'RUČNĚ', status: 'todo' } },
+        { id: 'r1', type: 'goalNode', position: { x: -300, y: 500 }, data: { title: 'Vlevo dole', status: 'todo' } },
+        { id: 'r2', type: 'goalNode', position: { x: 1200, y: 250 }, data: { title: 'Vpravo nahoře', status: 'todo' } },
+      ],
+      edges: [{ id: 'v1', source: 'apex', target: 'r1' }, { id: 'v2', source: 'apex', target: 'r2' }],
+    } })).json;
+    await otevri(volna.id, 3);
+    const styl = await page.$eval('[data-testid="toolbar-zarovnat"]', (b) => b.getAttribute('data-align-style'));
+    expect(styl === 'none', `nová mapa nemá zvolený styl (${styl})`);
+    const updPred = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json.updated;
+    await kosticka();
+    const po = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json;
+    const r1 = (po.nodes || []).find((n) => n.id === 'r1');
+    expect(po.updated === updPred && r1 && r1.position.x === -300 && r1.position.y === 500, `ručně rozmístěné uzly zůstaly, nic se neuložilo (r1 ${JSON.stringify(r1?.position)})`);
+
+    // PŘECHOD MEZI MAPAMI UVNITŘ APLIKACE (bez načtení stránky): editor se
+    // nepřemontuje, takže mapa bez stylu dřív ZDĚDILA styl té předchozí — a
+    // kostička ji pak přerovnala a uložila (/checkup 2. 10. 2026). `page.goto`
+    // to nechytí, proto navigace přes historii prohlížeče.
+    console.log('== přechod ze zarovnané mapy na nezarovnanou uvnitř aplikace: styl se nedědí ==');
+    await otevri(mapa.id, 8);
+    expect(await page.$eval('[data-testid="toolbar-zarovnat"]', (b) => b.getAttribute('data-align-style')) !== 'none', 'výchozí mapa styl má');
+    await page.evaluate((id) => { window.history.pushState({}, '', `/map/${id}`); window.dispatchEvent(new PopStateEvent('popstate')); }, volna.id);
+    await page.waitForFunction(() => [...document.querySelectorAll('.react-flow__node')].some((e) => (e.textContent || '').includes('Vlevo dole')), { timeout: 20000 }).catch(() => {});
+    await sleep(1500);
+    expect(await page.evaluate(() => [...document.querySelectorAll('.react-flow__node')].some((e) => (e.textContent || '').includes('Vlevo dole'))), 'druhá mapa se otevřela bez načtení stránky');
+    const zdedeny = await page.$eval('[data-testid="toolbar-zarovnat"]', (b) => b.getAttribute('data-align-style'));
+    const klicVolne = await page.evaluate((id) => localStorage.getItem('kb-zarovnat-styl:' + id), volna.id);
+    expect(zdedeny === 'none' && !klicVolne, `nezarovnaná mapa styl předchozí mapy nezdědila (tlačítko ${zdedeny}, klíč ${klicVolne})`);
+    await kosticka();
+    const poPrechodu = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json;
+    const r1b = (poPrechodu.nodes || []).find((n) => n.id === 'r1');
+    expect(poPrechodu.updated === updPred && r1b && r1b.position.x === -300 && r1b.position.y === 500, `a kostička ji ani teď nepřerovnala (r1 ${JSON.stringify(r1b?.position)})`);
+  }
+
+  // KOSTIČKA NA ŠÍŘKU NESMÍ TIŠE PŘEPSAT ULOŽENÉ SVISLÉ ROZMÍSTĚNÍ (/checkup
+  // 2. 10. 2026). Layout ve vodorovném směru jako vedlejší efekt přepisuje
+  // kanonické (svislé) pozice; když se na plátně nic nehne, kostička nezapíše
+  // krok Zpět — ale přerovnaný kanon by se uložil s nejbližší jinou úpravou.
+  console.log('== kostička na šířku: když se plátno nehne, ruční svislé rozmístění zůstane i po další úpravě ==');
+  {
+    await otevri(mapa.id, 8);
+    await kosticka();   // srovnat (pořadí + styl), ať je výchozí stav „uklizeno"
+    const uklizena = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json;
+    const uzly = uklizena.nodes.map((n) => ({ ...n, position: { ...n.position } }));
+    const b5 = uzly.find((n) => n.id === 'b5');
+    const rucne = { x: b5.position.x + 60, y: b5.position.y + 45 };   // ruční doladění ve svislém směru
+    b5.position = rucne;
+    await inst.api('PATCH', `/api/collections/goalmaps/records/${mapa.id}`, { token: T, body: { nodes: uzly } });
+    await otevri(mapa.id, 8);
+    await page.evaluate(() => document.querySelector('button[data-dir="horizontal"]')?.click());
+    await sleep(1500);
+    await kosticka();   // plátno na šířku je už rozložené → nic se nehne
+    // jiná, nesouvisející úprava: přejmenování mapy → uloží se celá mapa
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((x) => (x.textContent || '') === 'Řazení sourozenců')?.click());
+    await sleep(600);
+    expect(await page.evaluate(() => { const el = [...document.querySelectorAll('input')].find((i) => i.value === 'Řazení sourozenců'); if (!el) return false; el.focus(); el.setSelectionRange(0, el.value.length); return true; }), 'pole názvu mapy je vybrané');
+    await page.keyboard.type('Řazení po kostičce');
+    await page.keyboard.press('Enter');
+    await pockejNaUlozeni();
+    await sleep(1500);
+    const poUprave = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json;
+    const b5po = (poUprave.nodes || []).find((n) => n.id === 'b5');
+    expect(poUprave.title === 'Řazení po kostičce', `nesouvisející úprava se uložila (název „${poUprave.title}")`);
+    expect(b5po && Math.abs(b5po.position.x - rucne.x) < 1 && Math.abs(b5po.position.y - rucne.y) < 1, `ruční svislá poloha uzlu přežila kostičku na šířku (${JSON.stringify(b5po?.position)} vs ${JSON.stringify(rucne)})`);
+    await page.evaluate(() => document.querySelector('button[data-dir="vertical"]')?.click());
+    await sleep(1500);
+  }
+
+  // KLIK MIMO OTEVŘENOU NABÍDKU ji jen zavře — nesmí zároveň zmáčknout tlačítko
+  // na uzlu pod kurzorem (uzly mají pointer-events: all, zámek kliků od Radixu
+  // na ně neplatí; /checkup 2. 10. 2026: 14 ze 14 pokusů založilo cíl).
+  console.log('== klik mimo otevřenou nabídku jen zavře, nezmáčkne „Přidat podcíl" na uzlu ==');
+  {
+    const uzluPred = await page.evaluate(() => document.querySelectorAll('.react-flow__node').length);
+    const idZ = await page.evaluate(() => [...document.querySelectorAll('[data-testid="toolbar-zarovnat"],[data-testid="toolbar-zarovnat-narrow"]')].find((x) => x.offsetParent)?.getAttribute('data-testid'));
+    await klikHandle(`[data-testid="${idZ}"]`);
+    await page.waitForSelector('[role="menu"]', { visible: true, timeout: 8000 });
+    const cil = await page.evaluate(() => {
+      const m = document.querySelector('[role="menu"]').getBoundingClientRect();
+      const b = [...document.querySelectorAll('.react-flow__node button')].filter((x) => (x.getAttribute('title') || '') === 'Přidat podcíl')
+        .map((x) => x.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.top > 60 && r.bottom < window.innerHeight && (r.left > m.right + 10 || r.right < m.left - 10 || r.top > m.bottom + 10))[0];
+      return b ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : null;
+    });
+    expect(!!cil, 'na plátně je tlačítko „Přidat podcíl" mimo otevřenou nabídku');
+    if (cil) await page.mouse.click(cil.x, cil.y);
+    await sleep(900);
+    const poKliku = await page.evaluate(() => ({ menu: !!document.querySelector('[role="menu"]'), dialog: !!document.querySelector('[role="dialog"]'), uzlu: document.querySelectorAll('.react-flow__node').length }));
+    expect(!poKliku.menu, 'nabídka se klikem mimo zavřela');
+    expect(!poKliku.dialog && poKliku.uzlu === uzluPred, `klik neprošel na uzel — žádný dialog ani nový cíl (dialog ${poKliku.dialog}, uzlů ${uzluPred} → ${poKliku.uzlu})`);
+    if (poKliku.dialog) { await page.keyboard.press('Escape'); await sleep(400); }
+  }
+
   console.log('== kanban: nabídka se schová, indikátor Kanban zůstává ==');
   const kanban = (await inst.api('POST', '/api/collections/goalmaps/records', { token: T, body: {
     title: 'Kanban deska',
@@ -186,6 +388,13 @@ H.beh(async () => {
   await page.waitForSelector('[data-testid="toolbar-kanban-mode"]', { timeout: 10000 }).catch(() => {});
   expect(await page.$('[data-testid="toolbar-kanban-mode"]') !== null, 'indikátor Kanban je v liště');
   expect(await page.$('[data-testid="toolbar-usporadat"]') === null, 'nabídka Uspořádat v kanbanu není');
+  // kostička v kanbanu jen oddálí — desku drží pravidla posunu (pojistka je na
+  // `kanbanAktivni`, ne na donačtení textů indikátoru)
+  expect(await page.$eval('[data-testid="toolbar-fit"]', (b) => b.getAttribute('data-srovna')) === 'ne', 'kostička v kanbanu mapu nesrovnává');
+  const kanbanPred = (await inst.api('GET', `/api/collections/goalmaps/records/${kanban.id}`, { token: T })).json;
+  await kosticka();
+  const kanbanPo = (await inst.api('GET', `/api/collections/goalmaps/records/${kanban.id}`, { token: T })).json;
+  expect(kanbanPo.updated === kanbanPred.updated && JSON.stringify((kanbanPo.nodes || []).map((n) => n.position)) === JSON.stringify((kanbanPred.nodes || []).map((n) => n.position)), 'klik na kostičku desku nepřerovnal ani neuložil');
 
   console.log('== čtenář (týmový přístup ke čtení): nabídka není ==');
   const sdil = await inst.api('POST', '/api/kb/share', { token: T, body: { mapId: mapa.id, action: 'set_team_access', access: 'read' } });
@@ -197,6 +406,13 @@ H.beh(async () => {
   const uzluCtenar = await page.evaluate(() => document.querySelectorAll('.react-flow__node').length);
   expect(uzluCtenar >= 8, `čtenář mapu vidí (${uzluCtenar} uzlů)`);
   expect(await page.$('[data-testid="toolbar-usporadat"]') === null && await page.$('[data-testid="toolbar-usporadat-narrow"]') === null, 'čtenář nabídku Uspořádat nemá');
+  expect(await page.$eval('[data-testid="toolbar-fit"]', (b) => b.getAttribute('data-srovna')).catch(() => null) === 'ne', 'čtenáři kostička jen oddálí (mapu nesrovnává)');
+  // a skutečným klikem: polohy uzlů v mapě (ne přiblížení) se nezmění
+  const polohyUzlu = () => page.evaluate(() => [...document.querySelectorAll('.react-flow__node')].map((e) => `${e.getAttribute('data-id')}:${e.style.transform}`).sort().join('|'));
+  const ctenarPred = await polohyUzlu();
+  await klikHandle('[data-testid="toolbar-fit"]');
+  await sleep(1200);
+  expect((await polohyUzlu()) === ctenarPred, 'klik čtenáře na kostičku uzly nepohnul');
 
   expect(chyby.length === 0, `konzole bez chyb (${chyby.length}${chyby.length ? ': ' + chyby[0].slice(0, 160) : ''})`);
 }, { nazev: 'UI-USPORADANI' });

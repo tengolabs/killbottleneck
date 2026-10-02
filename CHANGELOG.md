@@ -9,6 +9,48 @@ below before you jump several versions.
 
 ---
 
+## v0.69-beta — 2026-10-02
+
+**Map toolbar that stays put**
+
+- **Arrange, Sort and Readability are menus with a fixed label.** Arrange and Readability no longer cycle
+  on click (their label used to carry the current value, so the button changed width and the toolbar
+  shifted under the cursor): a click opens a list — the same pattern Sort already had — and the icon shows
+  the current value. Picking the style the map already has re-arranges it.
+- **The style lock is a menu item** ("Lock style for every map") at the bottom of the Arrange menu;
+  press-and-hold is gone. The locked button still looks pressed in.
+- **The frame button tidies the map by your settings**: it sorts by the chosen Sort key, lays the map out
+  in its Arrange style and zooms out to all of it (one Undo step; nothing is written when the map is
+  already tidy). On a map not yet arranged in this browser, on a read-only map, in the public view and in
+  kanban it only zooms out. The plain zoom-out stays in the canvas controls.
+- **Nothing shifts the toolbar any more**: the "Saving… / Saved" indicator has a reserved slot in the wide
+  toolbar (it used to push every button ~77 px to the left after each save) and is a small icon outside the
+  flow in the icon toolbar (it used to push the direction switch ~65 px); toggled buttons (Assistant,
+  Bottlenecks incl. the reserved place for the amber counter, a locked Arrange) keep their width; and with
+  the wide toolbar (≥1850 px) an open assistant panel lies over the right end of the toolbar instead of
+  squeezing it — the logo and the back arrow no longer disappear. The icon toolbar (<1850 px) still fits
+  next to the panel as before.
+- A click outside an open Arrange / Sort / Readability menu only closes it — it no longer also triggers
+  the node button under the cursor (e.g. "Add sub-goal").
+- The style a map shows is no longer inherited from the previously opened map when you move between maps
+  inside the app.
+- **Phone: both toolbar rows stay on screen.** The editor used `100vh`, which on a phone is the height
+  without the address bar, so the page could scroll by one row and the row with the logo, the back arrow
+  and the actions slid out of view. The editor now uses the visible height (`100dvh`) and the toolbar is
+  sticky.
+- Fixed: the "What will you use killBottleneck for?" dialog (shown to the administrator of a new instance)
+  showed the raw keys `teamHint` / `familyHint` / `soloHint` under the choices since v0.46.1-beta — a
+  clean-up of "unused" translation keys had removed them because the dialog builds the key dynamically.
+  The texts are back and `ui-dotaznik-ucelu.js` now guards both the source and the rendered dialog.
+
+- Fixed: a temporary throttle of the AI gateway (HTTP 429 from the per-minute limit or from the protection
+  in front of the gateway) is no longer reported as an exhausted quota. Trial instances used to say the
+  trial AI "is used up for this month" and paid ones a bare "The AI service rejected the request"; both now
+  get "The AI is busy right now. Please try again in a moment." (`429 ai_busy`, advisor route and voice-note
+  transcription; a voice note stays in the panel to retry). A really exhausted quota is reported as before.
+
+No migrations, no new environment variables.
+
 ## v0.68-beta — 2026-10-02
 
 **Meeting prep and Team meeting in the assistant**

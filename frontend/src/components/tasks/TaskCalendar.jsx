@@ -32,21 +32,11 @@ import { projectName } from '@/lib/projectColors';
 import { dateKey, parseDateKey, monthDays, weekDays, movePeriod, addDays } from './calendarDates';
 import { useKalendarDnd } from './kalendar/useKalendarDnd';
 import { DenCil, Tazitelny } from './kalendar/dnd';
+import { useMedia } from '@/lib/useMedia';
 import './TaskCalendar.css';
 
 // Mobil (< 640 px): Měsíc = tečky + klepnutí na den otevře detail dne, Týden =
 // svislý seznam dnů (CSS @media), tažení v Měsíci vypnuté (tečky se netahají).
-function useMedia(dotaz) {
-  const [m, setM] = useState(() => typeof window !== 'undefined' && window.matchMedia(dotaz).matches);
-  useEffect(() => {
-    const mq = window.matchMedia(dotaz);
-    const h = (e) => setM(e.matches);
-    mq.addEventListener('change', h);
-    return () => mq.removeEventListener('change', h);
-  }, [dotaz]);
-  return m;
-}
-
 const VIEWS = ['month', 'week', 'day', 'agenda'];
 
 // Modern status palette

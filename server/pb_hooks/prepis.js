@@ -110,11 +110,10 @@ function prepisSurovy(app, L, body, o) {
     if (!cfg.sTokenem) return { status: res.statusCode, json: res.json };
     if (res.statusCode < 200 || res.statusCode >= 300) {
       if (res.statusCode === 403 || res.statusCode === 429) {
-        const detail = (res.json && (res.json.detail || res.json)) || {};
-        // ve zkušebce říct, že je to strop ZKUŠEBKY, ne produktu (Richard 6. 8. 2026)
-        const { trialUntil } = require(`${__hooks}/helpers.js`);
-        if (res.statusCode === 429 && trialUntil() !== null) return { status: 429, json: { error: t(L, "err.aiTrialQuota"), code: "trial_quota" } };
-        return { status: res.statusCode, json: { error: detail.error || t(L, "err.aiRejected"), code: detail.code || "" } };
+        // kvóta × dočasná brzda × zkušebka: jedno místo pro obě routy (helpers.odmitnutiBrany)
+        const { odmitnutiBrany } = require(`${__hooks}/helpers.js`);
+        const o = odmitnutiBrany(res, L);
+        return { status: o.status, json: o.body };
       }
       return { status: 502, json: { error: t(L, "err.aiAdvisorError", { status: res.statusCode }) } };
     }

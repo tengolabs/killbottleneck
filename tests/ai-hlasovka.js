@@ -33,7 +33,7 @@ const whisperHandler = (req, res, telo) => {
 };
 
 // ---------- podvržená brána (provider api): náš JSON kontrakt, token v hlavičce X-KB-Token ----------
-let rezimBrany = 'ok';              // ok | kvota
+let rezimBrany = 'ok';              // ok | kvota | brzda (minutová brzda brány) | ochrana (429, které brána nenapsala)
 const branaPozadavky = [];
 const branaHandler = (req, res, body) => {
   res.setHeader('Content-Type', 'application/json');
@@ -45,6 +45,8 @@ const branaHandler = (req, res, body) => {
   if (req.headers['x-kb-token'] !== 'kb_test_token') { res.statusCode = 401; res.end('{"detail":{"error":"Neplatný token."}}'); return; }
   // FastAPI balí HTTPException do {detail: …} — stejně jako skutečná brána
   if (rezimBrany === 'kvota') { res.statusCode = 429; res.end(JSON.stringify({ detail: { error: 'Vyčerpán měsíční limit AI operací. Kontaktujte poskytovatele.' } })); return; }
+  if (rezimBrany === 'brzda') { res.statusCode = 429; res.end(JSON.stringify({ detail: { error: 'Příliš mnoho požadavků, zkuste to za chvíli.', code: 'rate_limited' } })); return; }
+  if (rezimBrany === 'ochrana') { res.statusCode = 429; res.setHeader('Content-Type', 'text/plain; charset=UTF-8'); res.setHeader('Retry-After', '10'); res.end('error code: 1015'); return; }
   if (b.mode !== 'transcribe' || !b.audio_base64) { res.statusCode = 400; res.end('{"detail":{"error":"čekal jsem transcribe"}}'); return; }
   res.end(JSON.stringify({ text: 'objednat barvy a zavolat klientovi', schema_version: 1 }));
 };
@@ -334,6 +336,14 @@ H.beh(async () => {
   rezimBrany = 'ok';
   expect(r.status === 429 && r.json.code === 'ai_hlas' && /měsíční limit/.test(r.json.error || '') && !r.json.ulozeno, `kvóta brány → 429 ai_hlas s textem brány, bez příznaku ulozeno (${JSON.stringify(r.json)})`);
   expect((await inst8.api('GET', `/api/kb/chat/detail/${chB.id}`, { token: G })).json.chat.messages.length === chB.messages.length, 'po odmítnutí bránou se do rozhovoru nic nepřidalo');
+  // dočasná brzda (minutový strop brány, ochrana před ní) není kvóta: „zkuste to za chvíli“, nahrávka zůstává k opakování
+  for (const jak of ['brzda', 'ochrana']) {
+    rezimBrany = jak;
+    r = await inst8.api('POST', '/api/kb/chat', { token: G, body: { chat_id: chB.id, message: '', audio_base64: OGG, audio_s: 5 } });
+    rezimBrany = 'ok';
+    expect(r.status === 429 && r.json.code === 'ai_hlas' && /za chvíli/i.test(r.json.error || '') && !/vyčerp|měsíční|odmítla|1015/i.test(r.json.error || '') && !r.json.ulozeno,
+      `dočasná brzda (${jak}) → 429 ai_hlas „zkuste to za chvíli“, bez příznaku ulozeno (${JSON.stringify(r.json)})`);
+  }
   // zkušební instance: strop zkušebky se řekne jako strop ZKUŠEBKY
   const inst9 = await H.startInstance({ slug: 'hlas-zkusebka', addHostGateway: true, env: Object.assign({}, CHAT, BRANA, { KB_TRIAL_UNTIL: '2099-12-31' }) });
   await inst9.register('h@example.com', { name: 'Hana' });
@@ -342,6 +352,14 @@ H.beh(async () => {
   r = await inst9.api('POST', '/api/kb/chat', { token: HN, body: { message: '', audio_base64: OGG, audio_s: 5 } });
   rezimBrany = 'ok';
   expect(r.status === 429 && r.json.code === 'ai_hlas' && /zkušeb/i.test(r.json.error || '') && !/Kontaktujte poskytovatele/.test(r.json.error || ''), `zkušebka: kvóta brány → text o zkušební verzi (${JSON.stringify(r.json)})`);
+  // …ale dočasná brzda se ve zkušebce NESMÍ hlásit jako vyčerpaná zkušební AI (nález 2. 10. 2026)
+  for (const jak of ['brzda', 'ochrana']) {
+    rezimBrany = jak;
+    r = await inst9.api('POST', '/api/kb/chat', { token: HN, body: { message: '', audio_base64: OGG, audio_s: 5 } });
+    rezimBrany = 'ok';
+    expect(r.status === 429 && r.json.code === 'ai_hlas' && /za chvíli/i.test(r.json.error || '') && !/zkušeb|vyčerp|měsíc/i.test(r.json.error || ''),
+      `zkušebka: dočasná brzda (${jak}) → „zkuste to za chvíli“, o zkušebce ani kvótě ani slovo (${JSON.stringify(r.json)})`);
+  }
 
   console.log('== příznak ulozeno: nahrávku nenabízet k opakování jen tehdy, když je přepis v rozhovoru ==');
   textyPrepisu.push('poznámka před pádem modelu');

@@ -161,10 +161,9 @@ H.beh(async () => {
   await sleep(2500);
   const stupen = () => page.evaluate(() => [...document.querySelectorAll('[data-citelnost]')].find((x) => x.offsetParent)?.getAttribute('data-citelnost') || '');
   const stupenPred = await stupen();
-  expect(await page.evaluate(() => {
-    const b = [...document.querySelectorAll('[data-citelnost]')].find((x) => x.offsetParent);
-    if (!b) return false; b.click(); return true;
-  }), 'stisk Čitelnosti');
+  // Čitelnost je nabídka (od 1. 10. 2026) — vybrat jiný stupeň, než platí
+  const jinyStupen = stupenPred === 'normal' ? 'large' : 'normal';
+  expect(await H.vyberZListy(page, 'citelnost', `[data-stupen="${jinyStupen}"]`), `volba Čitelnosti „${jinyStupen}" z nabídky`);
   await sleep(3500); // debounce autosave 1,2 s + rezerva
   page.off('request', sleduj);
   expect((await stupen()) !== stupenPred, `stupeň čitelnosti se OPRAVDU přepnul („${stupenPred}" → „${await stupen()}")`);

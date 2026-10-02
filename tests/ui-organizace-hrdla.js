@@ -160,7 +160,8 @@ H.beh(async () => {
   const mapStav = await page.evaluate(() => {
     const b = document.querySelector('[data-testid="toolbar-bottlenecks"]');
     return {
-      pocitadlo: b ? (b.textContent || '').replace(/\D+/g, '') : '',
+      // jen červené počítadlo — vypnuté tlačítko drží (neviditelné) místo i pro oranžové
+      pocitadlo: b ? (b.querySelector('[data-pocet="realna"]')?.textContent || '').replace(/\D+/g, '') : '',
       realBadge: ((document.body.innerText || '').match(/Úzké hrdlo/g) || []).length,
     };
   });

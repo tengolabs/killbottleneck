@@ -245,4 +245,25 @@ function beh(fn, { nazev } = {}) {
   })();
 }
 
-module.exports = { PW, SU, sleep, expect, ok, pocty, zkusit, waitFor, waitHealthy, startInstance, apiPathFirst, apiBaseFirst, smtpSink, httpMock, browser, cizihoPuvodu, finish, beh, MUTACE };
+// Nabídka v horní liště mapy (Zarovnat / Uspořádat / Čitelnost — od 1. 10. 2026
+// všechny tři rozbalovací, Richard: „tlačítka mění velikost a klikám jinam").
+// Otevře VIDITELNÝ trigger (široký ≥1850 px, jinak ikonový) SKUTEČNÝM klikem —
+// Radix se otevírá na pointerdown, syntetické el.click() nabídku neotevře —
+// a vybere položku. `co` = zarovnat | usporadat | citelnost, `polozka` =
+// selektor položky (např. '[data-styl="compact"]', '[data-align-lock-item]').
+// Vrací false, když trigger nebo položka chybí (nabídka se pak zavře).
+async function vyberZListy(page, co, polozka) {
+  const id = await page.evaluate((c) => {
+    const b = [...document.querySelectorAll(`[data-testid="toolbar-${c}"],[data-testid="toolbar-${c}-narrow"]`)].find((x) => x.offsetParent);
+    return b ? b.getAttribute('data-testid') : null;
+  }, co);
+  if (!id) return false;
+  await (await page.$(`[data-testid="${id}"]`)).click();
+  const sel = `[role="menu"] ${polozka}`;
+  try { await page.waitForSelector(sel, { visible: true, timeout: 8000 }); } catch { await page.keyboard.press('Escape'); return false; }
+  await (await page.$(sel)).click();
+  await page.waitForFunction(() => !document.querySelector('[role="menu"]'), { timeout: 5000 }).catch(() => {});
+  return true;
+}
+
+module.exports = { PW, SU, sleep, expect, ok, pocty, zkusit, waitFor, waitHealthy, startInstance, apiPathFirst, apiBaseFirst, smtpSink, httpMock, browser, cizihoPuvodu, finish, beh, MUTACE, vyberZListy };

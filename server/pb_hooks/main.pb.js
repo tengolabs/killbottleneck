@@ -2609,20 +2609,12 @@ kbRoute("POST", "/advisor", (e) => {
       timeout: 120,
     });
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      // tarifní odmítnutí (mimo tarif / vyčerpaný limit) propustit s vysvětlením
+      // tarifní odmítnutí (mimo tarif / vyčerpaný limit) i dočasnou brzdu propustit s vysvětlením;
+      // kdy se mluví o zkušebce a kdy jen „zkuste to za chvíli", rozhoduje helpers.odmitnutiBrany
       if (res.statusCode === 403 || res.statusCode === 429) {
-        const detail = (res.json && (res.json.detail || res.json)) || {};
-        // ⚠️ Ve zkušebce se musí říct, že je to omezení ZKUŠEBKY, ne produktu.
-        // Brána o zkušebce neví — má jen kvótu — a její hláška („Vyčerpán měsíční
-        // limit AI operací. Kontaktujte poskytovatele.") zní jako strop celé
-        // aplikace. Zákazník by si odnesl, že takhle killBottleneck funguje.
-        // (Richard 6. 8. 2026.) Vědět to může jen instance: zkušebku pozná podle
-        // KB_TRIAL_UNTIL.
-        const { trialUntil } = require(`${__hooks}/helpers.js`);
-        if (res.statusCode === 429 && trialUntil() !== null) {
-          return e.json(429, { error: t(L, "err.aiTrialQuota"), code: "trial_quota" });
-        }
-        return e.json(res.statusCode, { error: detail.error || t(L, "err.aiRejected"), code: detail.code || "" });
+        const { odmitnutiBrany } = require(`${__hooks}/helpers.js`);
+        const o = odmitnutiBrany(res, L);
+        return e.json(o.status, o.body);
       }
       return e.json(502, { error: t(L, "err.aiAdvisorError", { status: res.statusCode }) });
     }

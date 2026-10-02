@@ -529,6 +529,11 @@ const STRINGS = {
     cs: "AI služba požadavek odmítla.",
     en: "The AI service rejected the request.",
   },
+  // dočasná brzda (minutový strop brány, ochrana před ní) — NENÍ to vyčerpaná kvóta
+  "err.aiBusy": {
+    cs: "AI je teď vytížená. Zkuste to prosím za chvíli znovu.",
+    en: "The AI is busy right now. Please try again in a moment.",
+  },
   "err.aiAdvisorError": { cs: "Chyba od AI poradce: HTTP {status}", en: "AI advisor error: HTTP {status}" },
   "err.aiIncompatibleVersion": {
     cs: "AI služba používá nekompatibilní verzi kontraktu ({version} ≠ 1). Aktualizujte prosím killBottleneck.",

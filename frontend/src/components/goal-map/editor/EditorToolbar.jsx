@@ -2,17 +2,19 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Loader2, Check, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
+import { useMedia } from '@/lib/useMedia';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { KRITERIA } from '@/lib/nodeOrder';
+import { ALIGN_STYLES } from '@/lib/alignStyles';
+import { CITELNOST_STUPNE } from '@/lib/citelnost';
+import NabidkaListy from './NabidkaListy';
 import OrgLogo from '@/components/shared/OrgLogo';
 import UserMenu from '@/components/shared/UserMenu';
 import NotificationBell from '@/components/shared/NotificationBell';
@@ -30,7 +32,7 @@ const IconLandscape = (props) => (
   </svg>
 );
 
-// Tři styly Zarovnat (cyklus jedním tlačítkem): klasika (do šířky) → kompakt
+// Tři styly Zarovnat (nabídka, viz nabidkaZarovnat): klasika (do šířky) → kompakt
 // (střídavá 2 patra) → sevřít (patra + těsnější sloty a kroky — karty blíž
 // k sobě, mapa se vejde na stránku). Tři patra NEpomáhala: tidy tree je pakuje
 // stejně široko jako dvě (změřeno layout-parity), úspora přišla až z rozestupů.
@@ -40,11 +42,18 @@ const IconLandscape = (props) => (
 // ikony stylů na tlačítku Zarovnat (vzhled tlačítka = indikátor, žádné toasty)
 const ALIGN_ICONS = { classic: StretchHorizontal, compact: Shrink, bands: LayoutGrid };
 // ikony stupňů na tlačítku Čitelnost — stejná logika jako u Zarovnat:
-// tlačítko ukazuje stupeň, který PRÁVĚ platí, stisk přepne na další.
+// tlačítko ukazuje stupeň, který PRÁVĚ platí, výběr je v nabídce.
 const CITELNOST_ICONS = { normal: ALargeSmall, large: Type, titleOnly: Heading };
 // ikony kritérií nabídky „Uspořádat podle…" — na tlačítku je ikona ZVOLENÉHO
 // kritéria (stejný idiom jako Zarovnat a Čitelnost: tlačítko = indikátor)
 const USPORADAT_ICONS = { deadline: CalendarClock, plannedOn: CalendarCheck, owner: UserRound, status: CircleDot };
+// krátké názvy stylů/stupňů jsou malými (tooltip „… (do šířky)", toasty);
+// jako položka nabídky stojí samy, tak s velkým písmenem
+const velke = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+// Tlačítko, které se přepíná mezi `outline` a plným `default` (Asistent, Úzká
+// hrdla, zamčené Zarovnat), musí být v obou stavech stejně široké: outline má
+// 1px rámeček, plné žádný → o 2 px užší a celá lišta o ty 2 px uskočila.
+const RAMECEK_PLNEHO = 'border border-transparent';
 
 // Horní lišta editoru: široká varianta (≥1850 px) i ⋮ menu pro užší displeje.
 // Akce, které nesou OBĚ varianty, žijí v jednom seznamu `akce` (F1-10) a obě
@@ -62,10 +71,11 @@ const USPORADAT_ICONS = { deadline: CalendarClock, plannedOn: CalendarCheck, own
 export default function EditorToolbar({ nav, layout, access, state, actions }) {
   const { t } = useTranslation('editor');
   const asistent = useAsistent();
+  const sirokaLista = useMedia('(min-width: 1850px)');
   const { navigate, org } = nav;
   const {
     direction, setDirMode, recenterMap, kanbanAktivni, kanbanNsReady,
-    alignStyle, alignLock, handleAlign, alignPressStart, alignPressEnd,
+    alignStyle, alignLock, handleAlign, handleAlignLock, handleSrovnatVse,
     citelnost, handleCitelnost, usporadani, handleUsporadat,
   } = layout;
   const {
@@ -96,46 +106,122 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   const zobrazUsporadat = canEdit && !personalMap && !isPublicView && usporadatNsReady && !(kanbanAktivni && kanbanNsReady);
   const nabidkaUsporadat = (siroka) => {
     if (!zobrazUsporadat) return null;
-    const Ikona = USPORADAT_ICONS[usporadani] || ArrowDownWideNarrow;
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size={siroka ? 'sm' : 'icon'}
-            className={siroka ? 'hidden min-[1850px]:inline-flex' : 'min-[1850px]:hidden h-9 w-9 shrink-0'}
-            title={t('usporadat:title')}
-            data-testid={siroka ? 'toolbar-usporadat' : 'toolbar-usporadat-narrow'}
-            data-usporadani={usporadani || 'none'}
-          >
-            <Ikona className="w-4 h-4" />
-            {siroka && (
-              <span className="hidden sm:inline">
-                {usporadani ? `${t('usporadat:label')} · ${t(`usporadat:${usporadani}`)}` : t('usporadat:label')}
-              </span>
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel>{t('usporadat:podle')}</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={usporadani}>
-            {KRITERIA.map((k) => {
-              const IkonaK = USPORADAT_ICONS[k];
-              return (
-                <DropdownMenuRadioItem key={k} value={k} data-kriterium={k} onSelect={() => handleUsporadat(k)} className="items-start">
-                  <IkonaK className="w-4 h-4 mr-2 mt-0.5 shrink-0 text-muted-foreground" />
-                  <span className="flex flex-col">
-                    <span>{t(`usporadat:${k}`)}</span>
-                    <span className="text-[11px] leading-tight text-muted-foreground">{t(`usporadat:${k}Hint`)}</span>
-                  </span>
-                </DropdownMenuRadioItem>
-              );
-            })}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <NabidkaListy
+        siroka={siroka}
+        Ikona={USPORADAT_ICONS[usporadani] || ArrowDownWideNarrow}
+        popisek={t('usporadat:label')}
+        title={usporadani ? `${t('usporadat:title')} (${t(`usporadat:${usporadani}`)})` : t('usporadat:title')}
+        nadpis={t('usporadat:podle')}
+        hodnota={usporadani}
+        polozky={KRITERIA.map((k) => ({
+          value: k, label: t(`usporadat:${k}`), hint: t(`usporadat:${k}Hint`),
+          Icon: USPORADAT_ICONS[k], data: { 'data-kriterium': k },
+        }))}
+        onVyber={handleUsporadat}
+        triggerProps={{
+          'data-testid': siroka ? 'toolbar-usporadat' : 'toolbar-usporadat-narrow',
+          'data-usporadani': usporadani || 'none',
+        }}
+      />
     );
   };
+
+  // Zarovnat (jen s právem editace nebo v Mojí mapě) — nabídka tří stylů,
+  // výběr mapu hned přerovná; zámek stylu je zaškrtávací položka pod nimi.
+  // Zamčené tlačítko je plné s prstencem (Richard 12. 8.: „ikonka pořád stejná,
+  // jen při zamčení změní barvu nebo je jakoby zmáčknutá").
+  // V kanbanu stojí na jeho místě neaktivní indikátor Kanban.
+  const nabidkaZarovnat = (siroka) => {
+    if (!(canEdit || personalMap)) return null;
+    if (kanbanAktivni && kanbanNsReady) {
+      return (
+        <Button variant="outline" size={siroka ? 'sm' : 'icon'} disabled
+          className={siroka ? 'hidden min-[1850px]:inline-flex opacity-80' : 'min-[1850px]:hidden h-9 w-9 shrink-0 opacity-80'}
+          title={t('rules:rules.toolbarKanbanTitle')} data-testid={siroka ? 'toolbar-kanban-mode' : 'toolbar-kanban-mode-narrow'}>
+          <Columns3 className="w-4 h-4" />
+          {siroka && <span className="hidden sm:inline">{t('rules:rules.toolbarKanban')}</span>}
+        </Button>
+      );
+    }
+    return (
+      <NabidkaListy
+        siroka={siroka}
+        Ikona={ALIGN_ICONS[alignStyle] || AlignCenter}
+        popisek={t('toolbar.align')}
+        title={alignLock
+          ? t('toolbar.alignLockedTitle', { styl: t(`toolbar.alignShort_${alignLock}`) })
+          : (alignStyle ? `${t('toolbar.alignTitle')} (${t(`toolbar.alignShort_${alignStyle}`)})` : t('toolbar.alignTitle'))}
+        nadpis={t('toolbar.alignNadpis')}
+        hodnota={alignStyle}
+        polozky={ALIGN_STYLES.map((s) => ({
+          value: s, label: velke(t(`toolbar.alignShort_${s}`)), hint: t(`toolbar.alignHint_${s}`),
+          Icon: ALIGN_ICONS[s], data: { 'data-styl': s },
+        }))}
+        onVyber={handleAlign}
+        variant={alignLock ? 'default' : 'outline'}
+        tridy={alignLock ? `${RAMECEK_PLNEHO} ring-2 ring-primary/40 shadow-inner` : ''}
+        doplnek={(
+          <DropdownMenuCheckboxItem checked={!!alignLock} onCheckedChange={handleAlignLock} data-align-lock-item="">
+            <span className="flex flex-col">
+              <span>{t('toolbar.alignLockItem')}</span>
+              <span className="text-[11px] leading-tight text-muted-foreground">{t('toolbar.alignLockHint')}</span>
+            </span>
+          </DropdownMenuCheckboxItem>
+        )}
+        triggerProps={{
+          'data-testid': siroka ? 'toolbar-zarovnat' : 'toolbar-zarovnat-narrow',
+          'data-align-lock': alignLock || 'off',
+          'data-align-style': alignStyle || 'none',
+        }}
+      />
+    );
+  };
+
+  // Čitelnost je ZÁMĚRNĚ mimo `canEdit` — na rozdíl od Zarovnat nesahá na mapu,
+  // jen na sazbu písma. Kdo mapu jen prohlíží (veřejná, sdílená jen ke čtení),
+  // musí si ji taky umět zvětšit; na mobilu je nejpotřebnější.
+  const nabidkaCitelnost = (siroka) => (
+    <NabidkaListy
+      siroka={siroka}
+      Ikona={CITELNOST_ICONS[citelnost] || ALargeSmall}
+      popisek={t('toolbar.readability')}
+      title={`${t('toolbar.readabilityTitle')} (${t(`toolbar.readabilityShort_${citelnost}`)})`}
+      nadpis={t('toolbar.readabilityNadpis')}
+      hodnota={citelnost}
+      polozky={CITELNOST_STUPNE.map((s) => ({
+        value: s, label: velke(t(`toolbar.readabilityShort_${s}`)), hint: t(`toolbar.readabilityHint_${s}`),
+        Icon: CITELNOST_ICONS[s], data: { 'data-stupen': s },
+      }))}
+      onVyber={handleCitelnost}
+      triggerProps={{
+        'data-testid': siroka ? 'toolbar-citelnost' : 'toolbar-citelnost-narrow',
+        'data-citelnost': citelnost,
+      }}
+    />
+  );
+
+  // „Kostička" (Richard 11. 8.: oddálit na celou mapu; 1. 10. 2026: „by mohlo
+  // zároveň zarovnat dle všech nastavení"). Kdo smí Zarovnat, tomu mapu srovná
+  // podle stylu + Uspořádat a oddálí (useMapLayout.handleSrovnatVse); bez práva
+  // editace a v kanbanu jen oddálí. Čisté oddálení je i dole v ovládání plátna.
+  // (podle `kanbanAktivni` samotného — `kanbanNsReady` je jen donačtení textů
+  // indikátoru a kostička by do té doby desku přerovnala; /checkup 2. 10.)
+  const srovnaVse = (canEdit || personalMap) && !isPublicView && !kanbanAktivni;
+  const kosticka = (siroka) => (
+    <Button
+      variant="outline"
+      size={siroka ? 'sm' : 'icon'}
+      className={siroka ? 'hidden min-[1850px]:inline-flex px-2' : 'min-[1850px]:hidden h-9 w-9 shrink-0 mr-auto'}
+      onClick={srovnaVse ? handleSrovnatVse : recenterMap}
+      title={srovnaVse ? t('toolbar.fitAlignTitle') : t('toolbar.fitViewTitle')}
+      aria-label={srovnaVse ? t('toolbar.fitAlignTitle') : t('toolbar.fitViewTitle')}
+      data-testid={siroka ? 'toolbar-fit' : 'toolbar-fit-narrow'}
+      data-srovna={srovnaVse ? 'ano' : 'ne'}
+    >
+      <Maximize className="w-4 h-4" />
+    </Button>
+  );
 
   // Jediný zdroj pravdy pro akce kreslené dvakrát: širokou lištou (≥1850 px)
   // a ⋮ menu pro užší displeje (F1-10). Pořadí seznamu = pořadí v ⋮ menu;
@@ -258,7 +344,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
       key={a.klic}
       variant={a.varianta || 'outline'}
       size="sm"
-      className="hidden min-[1850px]:inline-flex"
+      className={`hidden min-[1850px]:inline-flex${a.varianta === 'default' ? ` ${RAMECEK_PLNEHO}` : ''}`}
       onClick={a.onClick}
       disabled={a.disabled}
       title={a.titulekListy}
@@ -284,8 +370,35 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   const akceListy = (sekce) => akce.filter((a) => a.sekceListy === sekce && a.viditelna).map(tlacitkoListy);
 
   // data-app-header: pod spodní hranu lišty se staví panely „fixed“ (Dokumenty asistenta, 30. 9. 2026)
+  // `sticky top-0`: obě řady lišty drží nahoře, i kdyby se stránka přece jen
+  // dala posunout (pojistka k `h-dvh` v GoalMapEditor — Richard 1. 10. 2026)
+  // Otevřený panel asistenta lištu NEPOSOUVÁ, leží PŘES ni (Richard 2. 10. 2026:
+  // „když otevřu asistenta, posune se vše a přijdu o tlačítko zpět… asistent
+  // neposouvá lištu, ale je přes ní"). Obsah stránky odsouvá AsistentHost
+  // (App.jsx, paddingRight = šířka panelu) — lišta si ten odsun záporným okrajem
+  // vezme zpět, takže zůstává přes celé okno a její pravý konec schová panel
+  // (z-40 nad z-10). Mapa pod lištou se dál zúží, ať je vedle panelu celá vidět.
+  // JEN u široké textové lišty (≥1850 px) — tam se vedle panelu nevešla a logo
+  // se šipkou Zpět zmizely. Ikonová lišta (<1850) se vedle panelu vejde celá;
+  // překrytí by jí naopak schovalo „+", zvonek a ⋮ menu (v něm Zpět a Sdílet).
+  const odsunPanelu = sirokaLista && user && asistent.dostupny && asistent.open ? asistent.width : 0;
+  // Stav ukládání v ikonové liště (640–1849 px): jen ikona, absolutně vlevo od
+  // přepínače směru — nezabírá místo, takže se při uložení nic nepohne (dřív
+  // text uprostřed řady odsouval přepínač směru o ~65 px). Text zůstává pro
+  // čtečky (a pro sady, které na „Ukládání" čekají). Na telefonu se neukazuje.
+  const stavUkladaniIkona = !sirokaLista && (saveStatus === 'saving' || saveStatus === 'saved') ? (
+    <span
+      className={`hidden sm:flex absolute right-full top-1/2 -translate-y-1/2 mr-1.5 items-center ${saveStatus === 'saving' ? 'text-muted-foreground' : 'text-green-600'}`}
+      title={saveStatus === 'saving' ? t('saveState.saving') : t('saveState.saved')}
+      data-testid="save-status"
+      data-stav={saveStatus}
+    >
+      {saveStatus === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+      <span className="sr-only">{saveStatus === 'saving' ? t('saveState.saving') : t('saveState.saved')}</span>
+    </span>
+  ) : null;
   return (
-      <header data-app-header className="min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
+      <header data-app-header style={odsunPanelu ? { marginRight: -odsunPanelu } : undefined} className="transition-[margin] sticky top-0 min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
         <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
           {/* Značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
               U názvu projektu být nesmí — dvě loga vedle sebe by si konkurovala,
@@ -337,6 +450,8 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               zásobník a časovač… moje úkoly taky, je to jen filtr") — horní
               liště se ulevilo. */}
           {/* Rozložení mapy: na výšku (svisle) / na šířku (vodorovně) / auto dle displeje */}
+          <div className="relative flex shrink-0">
+          {stavUkladaniIkona}
           <div className="flex items-center rounded-md border border-input overflow-hidden shrink-0 divide-x divide-input" role="group" aria-label={t('toolbar.directionGroup')}>
             {/* Ikonka = orientace DISPLEJE: na výšku (portrét) → strom se větví do šířky
                 (doprava); na šířku (landscape) → strom dolů. Předvybere se dle displeje;
@@ -361,74 +476,35 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               </button>
             ))}
           </div>
-          {(canEdit || personalMap) && (() => {
-            if (kanbanAktivni && kanbanNsReady) {
-              return (
-                <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex opacity-80" disabled
-                  title={t('rules:rules.toolbarKanbanTitle')} data-testid="toolbar-kanban-mode">
-                  <Columns3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('rules:rules.toolbarKanban')}</span>
-                </Button>
-              );
-            }
-            const AlignIcon = ALIGN_ICONS[alignStyle] || AlignCenter;
-            return (
-              <Button
-                variant={alignLock ? 'default' : 'outline'}
-                size="sm"
-                className={`hidden min-[1850px]:inline-flex${alignLock ? ' ring-2 ring-primary/40 shadow-inner' : ''}`}
-                onClick={handleAlign}
-                onPointerDown={alignPressStart}
-                onPointerUp={alignPressEnd}
-                onPointerLeave={alignPressEnd}
-                onPointerCancel={alignPressEnd}
-                onContextMenu={(e) => e.preventDefault()}
-                title={alignLock ? t('toolbar.alignLockedTitle', { styl: t(`toolbar.alignShort_${alignLock}`) }) : t('toolbar.alignTitle')}
-                data-align-lock={alignLock || 'off'}
-              >
-                {/* Ikona zůstává VŽDY ikonou stylu — Richard 12. 8.: „ať je
-                    ikonka pořád stejná, jen při zamčení změní barvu nebo je
-                    jakoby zmáčknutá". Zámek jako vlastní ikona bral informaci
-                    o tom, KTERÝ styl je zamčený. */}
-                <AlignIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">{alignStyle ? `${t('toolbar.align')} · ${t(`toolbar.alignShort_${alignStyle}`)}` : t('toolbar.align')}</span>
-              </Button>
-            );
-          })()}
+          </div>
+          {/* široká lišta: pevné „Zarovnat ▾ / Uspořádat ▾ / Čitelnost ▾" + kostička */}
+          {nabidkaZarovnat(true)}
           {nabidkaUsporadat(true)}
-          {/* Čitelnost je ZÁMĚRNĚ mimo `canEdit` — na rozdíl od Zarovnat nesahá
-              na mapu, jen na sazbu písma. Kdo mapu jen prohlíží (veřejná,
-              sdílená jen ke čtení), musí si ji taky umět zvětšit. */}
-          {(() => {
-            const CitIcon = CITELNOST_ICONS[citelnost] || ALargeSmall;
-            return (
-              <Button
-                variant="outline"
-                size="sm"
-                data-citelnost={citelnost}
-                className="hidden min-[1850px]:inline-flex"
-                onClick={handleCitelnost}
-                title={t('toolbar.readabilityTitle')}
-              >
-                <CitIcon className="w-4 h-4" /> <span className="hidden sm:inline">{`${t('toolbar.readability')} · ${t(`toolbar.readabilityShort_${citelnost}`)}`}</span>
-              </Button>
-            );
-          })()}
-          {/* kostička (fit) i na velké liště — hned vedle Zarovnat */}
-          <Button variant="outline" size="sm" className="hidden min-[1850px]:inline-flex px-2" onClick={recenterMap} title={t('toolbar.fitViewTitle')}>
-            <Maximize className="w-4 h-4" />
-          </Button>
+          {nabidkaCitelnost(true)}
+          {kosticka(true)}
           {/* Dashboard se přestěhoval do levé lišty pod filtr Moje úkoly
               (Richard 11. 8.: „tlačítko dashboard doleva a dolů pod filtr") */}
           {akceListy('akce1')}
-          {saveStatus === 'saving' && (
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" /> {t('saveState.saving')}
-            </span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-green-600">
-              <Check className="w-3 h-3" /> {t('saveState.saved')}
+          {/* Stav ukládání NESMÍ hýbat lištou. Lišta je zarovnaná doprava, takže
+              objevení „Ukládání… / Uloženo" po každém uložení odsunulo všechna
+              tlačítka vlevo od něj o ~77 px — klik na totéž místo pak trefil jiné
+              tlačítko (Richard 1. 10. 2026; kontrola „lišta neposkakuje"
+              v ui-usporadani). Široká lišta (≥1850 px) mu proto drží pevné místo
+              v řadě; ikonová lišta na ně nemá šířku (vedle panelu asistenta se
+              nevešla), takže tam je jen ikona MIMO tok vlevo od přepínače směru
+              — viz stavUkladaniIkona. */}
+          {sirokaLista && (
+            <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs whitespace-nowrap" data-testid="save-status" data-stav={saveStatus || 'idle'}>
+              {saveStatus === 'saving' && (
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" /> {t('saveState.saving')}
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="flex items-center gap-1.5 text-green-600">
+                  <Check className="w-3 h-3" /> {t('saveState.saved')}
+                </span>
+              )}
             </span>
           )}
           {sharedCount > 0 && (
@@ -447,56 +523,15 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
             </span>
           )}
           {akceListy('akce2')}
-          {/* Zarovnat i na malých obrazovkách (Richard 11. 8.: „na mobilu chci
-              nahoře tlačítko zarovnat… blíže k přepínání zobrazení") — ikonové,
-              ikona = aktuální styl; „+" je naopak vpravo u zvonečku.
-              Velká lišta (≥1850) má plné tlačítko s názvem stylu. */}
-          {(canEdit || personalMap) && (() => {
-            if (kanbanAktivni && kanbanNsReady) {
-              return (
-                <Button variant="outline" size="icon" className="min-[1850px]:hidden h-9 w-9 shrink-0 opacity-80" disabled
-                  title={t('rules:rules.toolbarKanbanTitle')} data-testid="toolbar-kanban-mode-narrow">
-                  <Columns3 className="w-4 h-4" />
-                </Button>
-              );
-            }
-            const AlignIcon = ALIGN_ICONS[alignStyle] || AlignCenter;
-            return (
-              <Button
-                variant={alignLock ? 'default' : 'outline'}
-                size="icon"
-                className={`min-[1850px]:hidden h-9 w-9 shrink-0${alignLock ? ' ring-2 ring-primary/40 shadow-inner' : ''}`}
-                onClick={handleAlign}
-                onPointerDown={alignPressStart}
-                onPointerUp={alignPressEnd}
-                onPointerLeave={alignPressEnd}
-                onPointerCancel={alignPressEnd}
-                onContextMenu={(e) => e.preventDefault()}
-                title={alignLock ? t('toolbar.alignLockedTitle', { styl: t(`toolbar.alignShort_${alignLock}`) }) : t('toolbar.alignTitle')}
-                data-align-lock={alignLock || 'off'}
-              >
-                {/* i na úzké liště zůstává ikona stylu, zámek dělá jen vzhled */}
-                <AlignIcon className="w-4 h-4" />
-              </Button>
-            );
-          })()}
+          {/* Zarovnat / Uspořádat / Čitelnost i na malých obrazovkách (Richard 11. 8.:
+              „na mobilu chci nahoře tlačítko zarovnat… blíže k přepínání zobrazení") —
+              ikonové, ikona = aktuální volba, klik otevře nabídku; „+" je vpravo
+              u zvonečku. Kostička s mr-auto uzavírá levou skupinu
+              [směr | zarovnat | uspořádat | čitelnost | kostička]. */}
+          {nabidkaZarovnat(false)}
           {nabidkaUsporadat(false)}
-          {/* Čitelnost — právě na mobilu je nejpotřebnější, proto v liště
-              vždycky (a i v mapě jen ke čtení, viz velká lišta výš) */}
-          {(() => {
-            const CitIcon = CITELNOST_ICONS[citelnost] || ALargeSmall;
-            return (
-              <Button variant="outline" size="icon" data-citelnost={citelnost} className="min-[1850px]:hidden h-9 w-9 shrink-0" onClick={handleCitelnost} title={t('toolbar.readabilityTitle')}>
-                <CitIcon className="w-4 h-4" />
-              </Button>
-            );
-          })()}
-          {/* „kostička" = oddálit na celou mapu (Richard 11. 8.) — táž akce jako
-              fit ve spodních ovládacích prvcích plátna, jen po ruce v liště;
-              mr-auto uzavírá levou skupinu [směr | zarovnat | čitelnost | kostička] */}
-          <Button variant="outline" size="icon" className="min-[1850px]:hidden h-9 w-9 shrink-0 mr-auto" onClick={recenterMap} title={t('toolbar.fitViewTitle')}>
-            <Maximize className="w-4 h-4" />
-          </Button>
+          {nabidkaCitelnost(false)}
+          {kosticka(false)}
           </div>
           <div className="flex items-center gap-1.5 ml-auto sm:contents" data-testid="toolbar-akce">
           <PersonalTabs personalMap={personalMap} personalView={personalView} setPersonalView={setPersonalView} navigate={navigate} />
@@ -526,7 +561,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
             <Button
               variant={showBottlenecks ? 'default' : 'outline'}
               size="sm"
-              className={`h-9 gap-1.5 text-xs font-semibold ${
+              className={`h-9 gap-1.5 text-xs font-semibold ${showBottlenecks ? `${RAMECEK_PLNEHO} ` : ''}${
                 bottleneckAnalysis.totalBottlenecks > 0 && !showBottlenecks
                   ? 'border-rose-400/60 text-rose-600 dark:border-rose-800 dark:text-rose-400'
                   : ''
@@ -548,15 +583,19 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
                   na plátně (Richard 6. 9. 2026: „dal bych tam taky počet").
                   Oranžové počítadlo se ukazuje JEN se zapnutým přepínačem, stejně
                   jako oranžové uzly; vypnuté tlačítko dál hlásí jen reálná. */}
-              {showBottlenecks && bottleneckAnalysis.potentialCount > 0 && (
-                <>
+              {/* Místo pro oranžové počítadlo se drží I VYPNUTÉ (neviditelné):
+                  jinak tlačítko po zapnutí narostlo o ~24 px a protože je lišta
+                  zarovnaná doprava, uskočilo všechno vlevo od něj (/checkup
+                  2. 10. 2026, stejná vada jako měnící se popisky Zarovnat). */}
+              {bottleneckAnalysis.potentialCount > 0 && (
+                <span className={`inline-flex items-center gap-1.5${showBottlenecks ? '' : ' invisible'}`} aria-hidden={showBottlenecks ? undefined : 'true'}>
                   {/* „1 + 3": plus mezi počítadly (Richard 6. 9. 2026) — dvě
                       barevné bublinky vedle sebe se četly jako jedno číslo */}
                   {bottleneckAnalysis.totalBottlenecks > 0 && <span className="text-[10px] font-bold opacity-80" aria-hidden="true">+</span>}
-                  <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold" data-pocet="potencialni">
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold" {...(showBottlenecks ? { 'data-pocet': 'potencialni' } : {})}>
                     {bottleneckAnalysis.potentialCount}
                   </span>
-                </>
+                </span>
               )}
             </Button>
           )}

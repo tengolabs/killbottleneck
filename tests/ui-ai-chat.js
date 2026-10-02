@@ -305,8 +305,50 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-tab"]'), 'tlačítko v hlavičce panel zavře (ouško zpět)');
   await page.goto(`${inst.base}/map/${map.id}`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-tab"]'), 'ouško i v editoru mapy');
+  // LIŠTA MAPY × PANEL ASISTENTA (Richard 2. 10. 2026: „když otevřu asistenta,
+  // posune se vše a přijdu o tlačítko zpět… asistent neposouvá lištu, ale je
+  // přes ní"). Široká textová lišta (≥1850 px) se nehne a panel leží přes její
+  // pravý konec; ikonová lišta (<1850) se vedle panelu vejde celá, takže se
+  // jen zúží — překrytí by jí schovalo „+", zvonek a ⋮ menu.
+  const polohaListy = () => page.evaluate(() => {
+    const h = document.querySelector('[data-app-header]');
+    const zpet = [...h.querySelectorAll('button')].find((b) => b.querySelector('svg.lucide-arrow-left'));
+    const r = (el) => { const x = el?.getBoundingClientRect(); return x ? `${Math.round(x.left)}+${Math.round(x.width)}` : null; };
+    const vidne = [...h.querySelectorAll('button')].filter((b) => b.offsetParent);
+    return {
+      zpet: r(zpet), smer: r(h.querySelector('button[data-dir="vertical"]')),
+      zarovnat: r(vidne.find((b) => (b.getAttribute('data-testid') || '').startsWith('toolbar-zarovnat'))),
+      lista: r(h), okno: window.innerWidth,
+      nejpravejsi: Math.round(Math.max(...vidne.map((b) => b.getBoundingClientRect().right))),
+      platno: Math.round(document.querySelector('.react-flow').getBoundingClientRect().right),
+    };
+  });
+  const panelOd = () => page.$eval('[data-testid="chat-panel"]', (p) => Math.round(p.getBoundingClientRect().left));
+  await sleep(600);
+  const uzkaPred = await polohaListy();
   await (await page.$('[data-testid="chat-tab"]')).click();
   await cekej('[data-testid="chat-panel"]');
+  await sleep(600); // doběhne přechod odsunu
+  const uzkaPo = await polohaListy();
+  let panelL = await panelOd();
+  expect(!!uzkaPred.zpet && uzkaPo.zpet === uzkaPred.zpet, `ikonová lišta (1400 px): šipka Zpět zůstala na místě (${uzkaPred.zpet} → ${uzkaPo.zpet})`);
+  expect(uzkaPo.nejpravejsi <= panelL + 1 && uzkaPo.platno <= panelL + 1, `ikonová lišta se vedle panelu vešla celá, nic pod ním (poslední tlačítko končí ${uzkaPo.nejpravejsi}, panel od ${panelL})`);
+  await page.setViewport({ width: 1920, height: 900 });
+  await sleep(800);
+  await page.click('[data-testid="chat-zavrit"]');
+  await cekej('[data-testid="chat-tab"]');
+  await sleep(600);
+  const sirokaPred = await polohaListy();
+  await (await page.$('[data-testid="chat-tab"]')).click();
+  await cekej('[data-testid="chat-panel"]');
+  await sleep(600);
+  const sirokaPo = await polohaListy();
+  panelL = await panelOd();
+  expect(!!sirokaPred.zarovnat && ['zpet', 'smer', 'zarovnat'].every((k) => sirokaPo[k] === sirokaPred[k]), `široká lišta (1920 px): otevřený asistent s ní nepohnul — Zpět, směr i Zarovnat na místě (${JSON.stringify(sirokaPred)} → ${JSON.stringify(sirokaPo)})`);
+  expect(sirokaPo.lista === '0+1920' && sirokaPo.nejpravejsi > panelL, `lišta dál vede přes celé okno a panel leží přes její pravý konec (lišta ${sirokaPo.lista}, panel od ${panelL})`);
+  expect(sirokaPo.platno <= panelL + 1 && sirokaPo.platno < sirokaPred.platno, `mapa pod lištou se zúžila vedle panelu (plátno ${sirokaPred.platno} → ${sirokaPo.platno})`);
+  await page.setViewport({ width: 1400, height: 900 });
+  await sleep(800);
   fronta.push(text('Z-MAPY.'));
   await page.click('[data-testid="chat-novy"]');
   await page.click('[data-testid="chat-input"]');

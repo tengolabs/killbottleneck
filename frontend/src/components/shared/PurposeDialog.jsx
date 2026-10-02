@@ -69,6 +69,9 @@ export default function PurposeDialog() {
                 <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${sel ? 'text-primary' : 'text-muted-foreground'}`} />
                 <span>
                   <span className="block font-medium">{t(p)}</span>
+                  {/* klíče teamHint/familyHint/soloHint — skládané dynamicky, při úklidu i18n
+                      nemazat (27. 8. 2026 je úklid „nepoužitých" klíčů smazal a dialog od
+                      v0.46.1-beta ukazoval syrové názvy; hlídá ui-dotaznik-ucelu.js) */}
                   <span className="block text-xs text-muted-foreground">{t(`${p}Hint`)}</span>
                 </span>
               </button>

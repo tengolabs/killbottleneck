@@ -42,6 +42,24 @@ const polozky = (m) => (m.nodes || []).filter((n) => n.type === 'goalNode' && (n
     expect(/K čemu budete killBottleneck používat/.test(nadpis), `nadpis dialogu („${nadpis}")`);
     const karty = await page.$$eval('[data-testid^="purpose-"][data-testid$="team"], [data-testid="purpose-family"], [data-testid="purpose-solo"]', (els) => els.map((e) => e.textContent));
     expect(karty.length === 3 && /Firma nebo tým/.test(karty[0]) && /Rodina a přátelé/.test(karty[1]) && /Jen pro sebe/.test(karty[2]), `tři karty (${karty.map((k) => k.slice(0, 16)).join(' | ')})`);
+    // POPISKY VOLEB: klíče `${ucel}Hint` skládá PurposeDialog dynamicky, takže je
+    // úklid „nepoužitých" i18n klíčů (27. 8. 2026) smazal a dialog od v0.46.1-beta
+    // ukazoval syrové teamHint / familyHint / soloHint. Hlídá se zdroj (každý účel
+    // z PURPOSES má popisek v cs i en) i to, co uživatel opravdu vidí.
+    {
+      const fs = require('fs'), path = require('path');
+      const src = path.join(__dirname, '..', 'frontend', 'src');
+      const ucely = (fs.readFileSync(path.join(src, 'lib', 'purpose.js'), 'utf8').match(/PURPOSES\s*=\s*\[([^\]]*)\]/) || [])[1].match(/'([^']+)'/g).map((x) => x.slice(1, -1));
+      expect(ucely.length === 3, `PURPOSES přečteny ze zdroje (${ucely.join(', ')})`);
+      for (const jazyk of ['cs', 'en']) {
+        const slovnik = JSON.parse(fs.readFileSync(path.join(src, 'i18n', jazyk, 'ucel.json'), 'utf8'));
+        const chybi = ucely.filter((u) => !String(slovnik[`${u}Hint`] || '').trim());
+        expect(chybi.length === 0, `${jazyk}/ucel.json má popisek pro každý účel (${chybi.length ? 'chybí ' + chybi.map((u) => u + 'Hint').join(', ') : ucely.map((u) => u + 'Hint').join(', ')})`);
+      }
+      const textDialogu = await page.$eval('[data-testid="purpose-dialog"]', (e) => e.textContent);
+      expect(!/Hint/.test(textDialogu), `dialog neukazuje syrové klíče („Hint" v textu: ${(textDialogu.match(/\w*Hint/g) || []).join(', ') || 'není'})`);
+      expect(/Kolegové, role/.test(karty[0] || '') && /Společné plány/.test(karty[1] || '') && /Vlastní cíle/.test(karty[2] || ''), 'každá karta má pod názvem svůj popisek');
+    }
     const tok = await login('zakladatel@e2e.cz');
     const pred = (await api('GET', '/api/collections/goalmaps/records', { token: tok })).json.items || [];
     const predUvodni = pred.find((m) => /Zaveden/i.test(m.title)) || {};

@@ -17,6 +17,7 @@
 //   · vodorovně ≤ 250 px = SLOT vodorovného směru (nad tím se řady překryjí).
 const puppeteer = require('puppeteer-core');
 const { execSync } = require('child_process');
+const { vyberZListy } = require('./_harness');
 
 const NAME = 'kb-e2e-citelnost';
 const PORT = 20597;
@@ -123,11 +124,12 @@ const api = async (m, p, { token, body } = {}) => {
     await sleep(1500);
 
     // ---- pomůcky ----
+    // ČISTÉ oddálení = fit v ovládání plátna. Kostička v liště od 1. 10. 2026
+    // mapu i srovnává (Zarovnat + Uspořádat) — tady se ale měří, že Čitelnost
+    // uzly NEHÝBE, takže nic jiného s pozicemi hýbat nesmí.
     const fit = async () => {
-      await page.evaluate(() => {
-        const b = [...document.querySelectorAll('button')].find((x) => (x.title || '').includes('Oddálit na celou mapu'));
-        b && b.click();
-      });
+      const b = await page.$('.react-flow__controls-fitview');
+      if (b) await b.click();
       await sleep(900);
     };
     // vše ve SVĚTĚ MAPY (pixely obrazovky vydělené přiblížením) — jinak by čísla
@@ -172,8 +174,13 @@ const api = async (m, p, { token, body } = {}) => {
     // ⚠️ v liště jsou DVĚ tlačítka Čitelnost (široká a úzká varianta) — vždy
     // klikat na VIDITELNÉ, jinak by se na mobilu mačkalo to desktopové
     // a mobilní varianta by zůstala neproklikaná (nález panelu 13. 8. 2026)
+    // Čitelnost je od 1. 10. 2026 nabídka — „přepni" vybere DALŠÍ stupeň
+    // (normální → větší → jen název → normální), ať sada prochází všechny
+    const STUPNE = ['normal', 'large', 'titleOnly'];
     const prepni = async () => {
-      await page.evaluate(() => [...document.querySelectorAll('[data-citelnost]')].find((x) => x.offsetParent)?.click());
+      const ted = await page.evaluate(() => [...document.querySelectorAll('[data-citelnost]')].find((x) => x.offsetParent)?.getAttribute('data-citelnost'));
+      const dalsi = STUPNE[(STUPNE.indexOf(ted) + 1) % STUPNE.length];
+      if (!(await vyberZListy(page, 'citelnost', `[data-stupen="${dalsi}"]`))) ok(false, `Čitelnost: stupeň ${dalsi} nejde vybrat z nabídky`);
       await sleep(700);
     };
     const smer = async (v) => {
@@ -182,10 +189,7 @@ const api = async (m, p, { token, body } = {}) => {
     };
 
     // srovnat mapu skutečným algoritmem, ať se neměří na ručně nasypaných pozicích
-    await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => (x.title || '').startsWith('Zarovnat'));
-      b && b.click();
-    });
+    ok(await vyberZListy(page, 'zarovnat', '[data-styl="classic"]'), 'mapa srovnaná stylem do šířky');
     await sleep(1500);
     await fit();
 
@@ -432,6 +436,51 @@ const api = async (m, p, { token, body } = {}) => {
     });
     ok(mobilTlacitka.vidno === 1, `na telefonu je vidět právě jedno tlačítko Čitelnost (${mobilTlacitka.vidno} z ${mobilTlacitka.celkem})`);
     ok(mobilTlacitka.sirka >= 32, `a je dost velké na prst (${Math.round(mobilTlacitka.sirka)} px)`);
+    // OBĚ ŘADY LIŠTY DRŽÍ NAHOŘE (Richard 1. 10. 2026: na telefonu první řada
+    // s logem a šipkou Zpět odjela nahoru a vypadalo to, že Zpět chybí).
+    // Příčina: výška `100vh` = okno BEZ adresního řádku → s vysunutým řádkem
+    // byla stránka vyšší než viditelná plocha. Headless adresní řádek nemá,
+    // proto se hlídá (1) že kořen má výšku v `dvh`, (2) že se stránka nedá
+    // posunout a (3) pojistka: i na uměle vyšší stránce lišta zůstane nahoře.
+    const lista = await page.evaluate(() => {
+      const h = document.querySelector('[data-app-header]');
+      const koren = document.querySelector('[data-testid="editor-koren"]');
+      const zpet = h && [...h.querySelectorAll('button')].find((b) => b.querySelector('svg.lucide-arrow-left'));
+      const nastroje = document.querySelector('[data-testid="toolbar-nastroje"]');
+      const r = (el) => { const x = el?.getBoundingClientRect(); return x ? { top: Math.round(x.top), bottom: Math.round(x.bottom) } : null; };
+      // KTERÉ pravidlo výšky na kořeni VYHRÁVÁ: poslední v pořadí CSS, které na
+      // něj sedí (všechna mají stejnou váhu — jedna třída). Jen „třída je v DOM"
+      // nestačí: holé `h-screen h-dvh` třídu mělo, a přesto vyhrálo 100vh,
+      // protože Tailwind řadí .h-dvh před .h-screen.
+      let vitez = '';
+      const projdi = (rules) => { for (const rule of rules) {
+        if (rule.cssRules && !rule.selectorText) { projdi(rule.cssRules); continue; }
+        try { if (rule.selectorText && rule.style?.height && koren.matches(rule.selectorText)) vitez = rule.style.height; } catch { /* neplatný selektor */ }
+      } };
+      for (const sh of document.styleSheets) { try { projdi(sh.cssRules); } catch { /* cizí původ */ } }
+      return {
+        vitez,
+        korenVyska: koren ? Math.round(koren.getBoundingClientRect().height) : 0,
+        okno: window.innerHeight, stranka: document.documentElement.scrollHeight,
+        poloha: h ? getComputedStyle(h).position : '', hlavicka: r(h), zpet: r(zpet), nastroje: r(nastroje),
+      };
+    });
+    ok(lista.vitez === '100dvh', `kořen editoru má výšku VIDITELNÉ plochy — vítězné pravidlo výšky je 100dvh (${lista.vitez})`);
+    ok(lista.korenVyska === lista.okno && lista.stranka <= lista.okno, `stránka se nedá posunout (kořen ${lista.korenVyska}, okno ${lista.okno}, stránka ${lista.stranka})`);
+    ok(lista.zpet && lista.nastroje && lista.zpet.top >= 0 && lista.zpet.bottom <= lista.nastroje.top + 1, `telefon: řada se šipkou Zpět je vidět NAD řadou nástrojů (zpět ${JSON.stringify(lista.zpet)}, nástroje ${JSON.stringify(lista.nastroje)})`);
+    const poPosunu = await page.evaluate(async () => {
+      const vypln = document.createElement('div');
+      vypln.style.height = '300px';
+      document.body.appendChild(vypln);
+      window.scrollTo(0, 200);
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      const h = document.querySelector('[data-app-header]');
+      const out = { posun: Math.round(window.scrollY), top: Math.round(h.getBoundingClientRect().top), poloha: getComputedStyle(h).position };
+      window.scrollTo(0, 0);
+      vypln.remove();
+      return out;
+    });
+    ok(poPosunu.posun >= 150 && poPosunu.top === 0 && poPosunu.poloha === 'sticky', `pojistka: i po posunu stránky o ${poPosunu.posun} px lišta drží nahoře (top ${poPosunu.top}, ${poPosunu.poloha})`);
     const mobilPred = (await mereni()).stupen;
     await prepni();
     const mobilPo = await mereni();

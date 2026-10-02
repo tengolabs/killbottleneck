@@ -7,6 +7,7 @@
 // Oprava: layoutAllForView pro svislý průchod prohazuje osy.
 const puppeteer = require('puppeteer-core');
 const { execSync } = require('child_process');
+const { vyberZListy } = require('./_harness');
 
 const NAME = 'kb-e2e-zarovnani-smer';
 const PORT = 20595;
@@ -61,10 +62,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       }
       return found.sort((a, b) => a.k - b.k).map((f) => f.s.split(' ')[0]).join(' ');
     }, horiz);
-    // tlačítko se hledá přes data-atribut, ne přes popisek: ten se při zamčení
-    // mění a sada by tlačítko „ztratila"
-    const zarovnat = async () => {
-      await page.evaluate(() => document.querySelector('button[data-align-lock]')?.click());
+    // Zarovnat je od 1. 10. 2026 nabídka (Richard: měnící se popisek hýbal
+    // lištou). Styl se čte z data-atributu viditelného tlačítka — popisek je
+    // pevný „Zarovnat". Bez argumentu se vybere DALŠÍ styl v původním pořadí
+    // (do šířky → kompaktně → kolem středu), ať sada dál prochází všechny styly.
+    const STYLY = ['classic', 'compact', 'bands'];
+    const stylNaListe = () => page.evaluate(() => [...document.querySelectorAll('[data-align-style]')].find((x) => x.offsetParent)?.getAttribute('data-align-style') || null);
+    const zarovnat = async (styl) => {
+      if (!styl) { const ted = await stylNaListe(); styl = STYLY.includes(ted) ? STYLY[(STYLY.indexOf(ted) + 1) % STYLY.length] : 'classic'; }
+      ok(await vyberZListy(page, 'zarovnat', `[data-styl="${styl}"]`), `Zarovnat: v nabídce vybrán styl ${styl}`);
       // ⚠️ pevných 1 200 ms = přesně debounce autosave → sada měřila plátno
       // uprostřed uložení a náhodně viděla prázdno (padalo i na v0.46.1).
       // Počkat, až „Ukládání…" zhasne, a pak ještě chvíli na překreslení.
@@ -117,11 +123,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       }
       return found.sort((a, b) => a.k - b.k).map((f) => f.s).join(' ');
     }, horiz);
-    for (let i = 0; i < 3; i++) {
-      if (/kompakt/i.test(await page.evaluate(() => document.querySelector('button[data-align-lock]')?.textContent || ''))) break;
-      await zarovnat();
-    }
-    ok(/kompakt/i.test(await page.evaluate(() => document.querySelector('button[data-align-lock]')?.textContent || '')), 'svisle nastaven styl kompaktně');
+    await zarovnat('compact');
+    ok((await stylNaListe()) === 'compact', 'svisle nastaven styl kompaktně');
     const vysky = await page.evaluate(() => new Set([...document.querySelectorAll('.react-flow__node')].filter((el) => /Karta L/.test(el.textContent || '')).map((el) => Math.round(el.getBoundingClientRect().top / 10))).size);
     ok(vysky === 2, `kompakt dal 6 karet do dvou pater (${vysky})`);
     const predSmer = await poradiListu(false);
@@ -143,10 +146,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     // konečně jmenuje správně." Příčina: styl si pamatoval JEDEN klíč pro
     // všechny mapy, takže čerstvá mapa zdědila popisek odjinud a lhala.
     console.log('== popisek Zarovnat patří mapě, ne prohlížeči ==');
-    const popisek = () => page.evaluate(() => {
-      const b = document.querySelector('button[data-align-lock]');
-      return b ? (b.textContent || '').replace(/\s+/g, ' ').trim() : null;
-    });
+    // „popisek" = styl, který tlačítko hlásí (ikonou a data-align-style)
+    const popisek = stylNaListe;
     const otevri = async () => {
       await page.goto(`${BASE}/map/${mapy.items[0].id}`, { waitUntil: 'networkidle2' });
       await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length >= 5, { timeout: 45000 }).catch(() => {});
@@ -159,10 +160,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     });
     await otevri();
     const prvni = await popisek();
-    ok(prvni && !prvni.includes('·'), `poprvé otevřená mapa nehlásí cizí styl (${prvni})`);
+    ok(prvni === 'none', `poprvé otevřená mapa nehlásí cizí styl (${prvni})`);
     await zarovnat();
     const poStisku = await popisek();
-    ok(poStisku && poStisku.includes('·'), `po stisku popisek styl uvádí (${poStisku})`);
+    ok(STYLY.includes(poStisku), `po výběru tlačítko styl hlásí (${poStisku})`);
     await otevri();
     ok((await popisek()) === poStisku, `a TAHLE mapa si ho pamatuje i po znovuotevření (${await popisek()})`);
 
@@ -177,18 +178,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     });
     await page.evaluate(() => document.querySelector('button[data-dir="vertical"]')?.click());
     await sleep(1500);
-    // dojet cyklem na „kolem středu" (bands) — ten dělá nejvýraznější tvar
-    for (let i = 0; i < 4 && !(await popisek()).includes('střed'); i++) await zarovnat();
-    ok((await popisek()).includes('střed'), `nastaven styl kolem středu (${await popisek()})`);
+    // „kolem středu" (bands) dělá nejvýraznější tvar
+    await zarovnat('bands');
+    ok((await popisek()) === 'bands', `nastaven styl kolem středu (${await popisek()})`);
     const sloupcuSvisle = await sloupcuX();
     await page.evaluate(() => document.querySelector('button[data-dir="horizontal"]')?.click());
     await sleep(2000);
-    ok((await popisek()).includes('střed'), `po přepnutí směru popisek drží (${await popisek()})`);
+    ok((await popisek()) === 'bands', `po přepnutí směru popisek drží (${await popisek()})`);
     // ⚠️ Práh „> 1" NEMĚL SÍLU — mapa má vždy aspoň tři úrovně, takže projde
     // i bez stylu (mutace jím prošla, panel /checkup 12. 8.). Porovnává se
     // proto s KLASICKÝM stylem v témže směru: musí vyjít jinak.
     const sloupcuStyl = await sloupcuX();
-    await zarovnat();  // kolem středu → do šířky (klasika)
+    await zarovnat('classic');
     const sloupcuKlasika = await sloupcuX();
     ok(sloupcuStyl !== sloupcuKlasika,
       `styl se po přepnutí směru opravdu projevil: kolem středu ${sloupcuStyl} sloupců vs klasika ${sloupcuKlasika} (svisle ${sloupcuSvisle})`);
@@ -218,11 +219,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const pozice = () => page.evaluate(() => [...document.querySelectorAll('.react-flow__node')]
         .map((e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)}`; }).join('|'));
       const pred1 = await pozice();
-      await zarovnat();
+      await zarovnat('classic');
       const po1 = await pozice();
-      ok(pred1 !== po1, 'PRVNÍ stisk na čerstvé mapě rozložení změní');
-      await zarovnat();
-      ok((await pozice()) !== po1, 'a druhý stisk taky');
+      ok(pred1 !== po1, 'PRVNÍ výběr na čerstvé mapě rozložení změní');
+      await zarovnat('compact');
+      ok((await pozice()) !== po1, 'a druhý (jiný styl) taky');
     }
 
     // ---- ZÁMEČEK: zamčený styl platí pro všechny mapy ----
@@ -235,26 +236,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const b = document.querySelector('button[data-align-lock]');
       return b ? b.getAttribute('data-align-lock') : null;
     });
-    // zámek se ovládá PODRŽENÍM tlačítka Zarovnat (Richard 11. 8. v noci:
-    // „solo tlačítko mě štve"), takže se drží myš, ne kliká
-    const podrzZarovnat = async (ms = 900) => {
-      const box = await page.evaluate(() => {
-        const b = document.querySelector('button[data-align-lock]');
-        if (!b) return null;
-        const r = b.getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-      });
-      if (!box) return;
-      await page.mouse.move(box.x, box.y);
-      await page.mouse.down();
-      await sleep(ms);
-      await page.mouse.up();
+    // zámek = zaškrtávací položka v nabídce Zarovnat (do 1. 10. 2026 podržení
+    // tlačítka; s rozbalovací nabídkou se podržení pralo)
+    const prepniZamek = async () => {
+      ok(await vyberZListy(page, 'zarovnat', '[data-align-lock-item]'), 'nabídka Zarovnat má položku zámku');
       await sleep(800);
     };
     ok((await zamekStav()) === 'off', 'zámek je ve výchozím stavu vypnutý');
     const stylKZamceni = await popisek();
-    await podrzZarovnat();
-    ok((await zamekStav()) !== 'off', `podržení tlačítka zamklo styl (${await zamekStav()})`);
+    // zamčené tlačítko je plné (bez rámečku) — musí zůstat stejně široké i na
+    // stejném místě, jinak lišta zarovnaná doprava uskočí o 2 px
+    const rozmerZarovnat = () => page.evaluate(() => { const b = [...document.querySelectorAll('[data-align-style]')].find((x) => x.offsetParent); const r = b.getBoundingClientRect(); return `${Math.round(r.left * 10) / 10}+${Math.round(r.width * 10) / 10}`; });
+    const zarovnatOdemcene = await rozmerZarovnat();
+    await prepniZamek();
+    ok((await zamekStav()) !== 'off', `položka v nabídce zamkla styl (${await zamekStav()})`);
+    ok((await rozmerZarovnat()) === zarovnatOdemcene, `zamčené Zarovnat je stejně široké a na stejném místě (${zarovnatOdemcene} → ${await rozmerZarovnat()})`);
     ok(await page.evaluate(() => !!localStorage.getItem('kb-zarovnat-zamek')), 'zamčený styl si prohlížeč pamatuje');
     // ⭐ ZÁMEK PATŘÍ ÚČTU, NE PROHLÍŽEČI (Richard 12. 8.: „udělej to stejně
     // jako skin"). Dřív žil jen v localStorage, takže na mobilu neplatil.
@@ -302,10 +298,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(velikostKarty > 30, `a přesto je na plátně srovnaná (karta ${velikostKarty} px široká)`);
 
     const stylPredPustenim = await popisek();
-    await zarovnat();   // obyčejný stisk zámek pustí a přepne na další styl
-    ok((await zamekStav()) === 'off', 'obyčejný stisk zámek zase pustí');
-    ok((await popisek()) !== stylPredPustenim, `a rovnou přepne styl dál (${stylPredPustenim} → ${await popisek()})`);
+    await zarovnat(stylPredPustenim);   // TENTÝŽ styl znovu = jen srovná, zámek drží
+    ok((await zamekStav()) === stylPredPustenim, `výběr zamčeného stylu zámek nechá (${await zamekStav()})`);
+    await zarovnat();   // JINÝ styl zámek pustí a rovnou ho použije
+    ok((await zamekStav()) === 'off', 'výběr jiného stylu zámek pustí');
+    ok((await popisek()) !== stylPredPustenim, `a rovnou přepne styl (${stylPredPustenim} → ${await popisek()})`);
     ok(!(await page.evaluate(() => localStorage.getItem('kb-zarovnat-zamek'))), 'po vypnutí se zamčený styl nepamatuje');
+    // a odškrtnutím v nabídce: zámek pryč, styl na mapě zůstane
+    await prepniZamek();
+    ok((await zamekStav()) !== 'off', 'znovu zamčeno');
+    const stylPredOdskrtnutim = await popisek();
+    await prepniZamek();
+    ok((await zamekStav()) === 'off', 'odškrtnutí položky zámek vypne');
+    ok((await popisek()) === stylPredOdskrtnutim, `a styl na mapě nechá (${await popisek()})`);
 
     console.log(`\nVÝSLEDEK: ${pass} OK, ${fail} FAIL`);
     process.exitCode = fail ? 1 : 0;
