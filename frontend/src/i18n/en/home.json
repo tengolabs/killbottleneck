@@ -47,7 +47,9 @@
     "backToProjects": "Back to projects",
     "otherHeading": "Other archived projects",
     "seriesFallback": "Series",
-    "seriesNumberTitle": "Sequence number in the series",
+    "projectNumberTitle": "Project number",
+    "searchPlaceholder": "Search the archive (title or #number)",
+    "searchEmpty": "Nothing in the archive matches \"{{q}}\".",
     "archivedOn": "archived {{date}}"
   },
   "dashboard": {
@@ -81,7 +83,9 @@
     "noUpcoming": "No upcoming deadlines.",
     "pdf": "Save PDF",
     "pdfTitle": "Download the project overview as PDF",
-    "pdfFailed": "Couldn't create the PDF"
+    "pdfFailed": "Couldn't create the PDF",
+    "projectNumber": "Project number",
+    "projectNumberHint": "Sequential project number — tell the assistant “open {{number}}” or type it into the Archive search"
   },
   "templates": {
     "confirmDelete": "Do you really want to delete the template \"{{title}}\"?",

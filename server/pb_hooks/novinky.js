@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.70-beta": {
+    cs: [
+      "Každý projekt má své pořadové číslo (#12): přiděluje ho server, nemění se a po smazání se nepoužije znovu. Najdete ho v dashboardu projektu, po najetí myší na název mapy a v Archivu; nese ho i API, MCP a export.",
+      "Asistent hledá napříč všemi projekty včetně archivovaných: „Kde jsme řešili fakturu za pletivo?“, „Co bylo loni s veletrhem?“ nebo prostě „Otevři #12“ — najde projekt podle čísla, názvu i podle jednotlivých kroků a archivovaný projekt umí otevřít a přečíst.",
+      "Archiv má hledací políčko — podle názvu nebo čísla projektu; odznak # u archivovaného projektu nově znamená číslo projektu (pořadí v řadě zůstává v názvu).",
+    ],
+    en: [
+      "Every project has its sequential number (#12): the server assigns it, it never changes and is never reused after a deletion. You find it in the project dashboard, when hovering over the map title and in the Archive; the API, MCP and the export carry it too.",
+      "The assistant searches across all projects, archived ones included: \"Where did we deal with the fencing invoice?\", \"What was last year's trade fair about?\" or simply \"Open #12\" — it finds a project by number, title or by its individual steps and can open and read an archived project.",
+      "The Archive has a search box — by title or project number; the # badge on an archived project now means the project number (the position in a series stays in the title).",
+    ],
+  },
   "v0.69-beta": {
     cs: [
       "Lišta mapy drží na místě: Zarovnat, Uspořádat a Čitelnost jsou nabídky s pevným popiskem — klik otevře seznam možností a tlačítka už nemění šířku ani neposkakují při ukládání.",

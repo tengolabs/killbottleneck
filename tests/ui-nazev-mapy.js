@@ -87,6 +87,15 @@ const api = async (method, path, { token, body } = {}) => {
     console.log('== název je vidět, velký a na vlastním řádku ==');
     const p = await poleNazvu();
     ok(!!p, 'název projektu je v mapě k nalezení');
+    // Číslo projektu (#12) se u názvu NEUKAZUJE — Richard 3. 10. 2026 („nelíbí se mi to číslo
+    // u názvu nahoře v mapě"): je to sériové označení pro asistenta/API/Archiv. Mapa číslo má, pruh ne.
+    // Najde ho jen v nápovědě po najetí myší (atribut title) a v dashboardu projektu.
+    const cisloVPruhu = await page.evaluate((t) => {
+      const b = [...document.querySelectorAll('button')].find((x) => (x.textContent || '') === t);
+      return b ? { text: b.textContent, napoveda: b.getAttribute('title') } : null;
+    }, DLOUHY);
+    ok(map.project_number > 0 && !!cisloVPruhu && !/#\d+/.test(cisloVPruhu.text), `mapa má číslo #${map.project_number}, ale pruh s názvem ho NEukazuje nikde v textu (${JSON.stringify(cisloVPruhu && cisloVPruhu.text)})`);
+    ok(!!cisloVPruhu && cisloVPruhu.napoveda === `${DLOUHY} (#${map.project_number})`, `číslo je v nápovědě po najetí na název (${cisloVPruhu && cisloVPruhu.napoveda})`);
     ok(p && p.pismo >= 16, `písmo názvu je čitelné, ne drobné (${p && p.pismo} px; v liště bývalo 14)`);
     ok(p && p.sirka >= 600, `dlouhý název má kam růst (${p && p.sirka} px místo úzké mezery v liště)`);
 

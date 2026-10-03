@@ -9,6 +9,7 @@ import { useAiModes } from '@/hooks/useAiEnabled';
 import { useAuth } from '@/lib/AuthContext';
 import { advisor } from '@/api/kb';
 import { statusConfig } from '@/lib/statusMeta';
+import { cisloProjektu } from '@/lib/projectColors';
 import ChangesSection from '@/components/goal-map/ChangesSection';
 import { saveDashboardPdf } from '@/lib/dashboardPdf';
 import { useToast } from '@/components/ui/use-toast';
@@ -44,8 +45,11 @@ function StatusDot({ status }) {
 // je uzel s řešitelem nebo termínem (slovník v0.34/v0.35). Kolekce `tasks` je od
 // 17. 8. 2026 prázdná legacy; dashboard ji četl a u projektu s osmi úkoly hlásil
 // „Zatím žádné úkoly" (nález P2-01, analýza 20. 8. 2026).
-export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId = '' }) {
+export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId = '', projectNumber = 0 }) {
   const { t } = useTranslation('home');
+  // Číslo projektu (#12) — Richard 3. 10. 2026: NE u názvu na kartě ani v hlavičce mapy („není
+  // dominanta“), ale schované tady, ať ho člověk najde; v PDF se pak hodí příjemci.
+  const cislo = cisloProjektu({ project_number: projectNumber });
   const ai = useAiModes();
   const { user } = useAuth();
   const [summary, setSummary] = useState(null);
@@ -267,13 +271,18 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
             <p className="font-heading text-xl font-bold">{mapTitle}</p>
             <p className="text-xs text-muted-foreground">
               {new Date().toLocaleDateString(intlLocale(), { day: 'numeric', month: 'long', year: 'numeric' })}
+              {cislo && <> · {t('dashboard.projectNumber')} {cislo}</>}
             </p>
           </div>
         )}
         {/* Stav projektu k poslání dál — přesně to, co se jinak opisuje ručně
             do chatu a na poradu. Tlačítko je vidět vždy (na dotyku hover není)
-            a do samotného PDF se nedostane (export-ignore). */}
-        <div className="flex justify-end export-ignore">
+            a do samotného PDF se nedostane (export-ignore). Vlevo tlumeně číslo
+            projektu — jediné místo v mapě, kde ho člověk najde (do PDF jde přes hlavičku výš). */}
+        <div className="flex items-center justify-between gap-3 export-ignore">
+          <p className="text-xs text-muted-foreground" title={cislo ? t('dashboard.projectNumberHint', { number: cislo }) : undefined} data-testid="dashboard-project-number">
+            {cislo && <>{t('dashboard.projectNumber')} <span className="font-mono font-medium">{cislo}</span></>}
+          </p>
           <Button variant="outline" size="sm" onClick={handlePdf} disabled={pdfBusy} title={t('dashboard.pdfTitle')}>
             {pdfBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
             {t('dashboard.pdf')}

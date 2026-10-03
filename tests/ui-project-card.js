@@ -147,6 +147,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     console.log('== informace nahoře, akce dole ==');
     const info = await cardInfo();
     expect(!!info, 'karta projektu je na titulce');
+    // Číslo projektu (#12) na kartě NENÍ — Richard 3. 10. 2026 („nelíbí se mi … stejně tak moje
+    // projekty"): sériové označení pro asistenta/API/Archiv. Projekt číslo má (API), karta ho neukazuje.
+    const cisloKarty = await page.evaluate((title) => {
+      const els = [...document.querySelectorAll('div')].filter((e) => (e.innerText || '').includes(title) && e.className.includes('rounded-xl'));
+      const card = els[els.length - 1];
+      const h = card && card.querySelector('h3');
+      return { cisloVKarte: /#\d+/.test((card && card.innerText) || ''), nadpis: h ? h.textContent : null };
+    }, 'PROJEKT-KARTA');
+    const zApi = await page.evaluate(async () => {
+      const tok = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}').token;
+      const r = await fetch('/api/collections/goalmaps/records?filter=' + encodeURIComponent('title="PROJEKT-KARTA"'), { headers: { Authorization: tok } });
+      const j = await r.json(); return j.items && j.items[0] ? j.items[0].project_number : null;
+    });
+    expect(zApi > 0 && !cisloKarty.cisloVKarte && cisloKarty.nadpis === 'PROJEKT-KARTA', `projekt má číslo #${zApi} (API), karta ho NEukazuje nikde (nadpis „${cisloKarty.nadpis}“)`);
     const dash = info.btns.find((b) => /Dashboard/i.test(b.label));
     const trash = info.btns.find((b) => /Smazat|Delete/i.test(b.label));
     const arch = info.btns.find((b) => /rchiv/i.test(b.label));

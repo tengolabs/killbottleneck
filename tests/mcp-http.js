@@ -140,6 +140,11 @@ let mcp = null;
     expect(/Added 1 node/.test(toolText(an)), 'add_nodes přidal uzel (base_updated si server načetl sám)');
     const gm = await mcpPost(keyRW, 'tools/call', { name: 'get_map', arguments: { map_id: mapId } });
     expect(/Krok 3/.test(toolText(gm)) && /user DATA/.test(toolText(gm)), 'get_map vrací strom i DATA_FENCE');
+    // list_maps S MAPOU (3. 10. 2026: helper čísla mimo rozsah shodil list_maps, a tahle sada to nechytila —
+    // kontrolovala jen prázdný seznam a špatný typ argumentu); řádek nese číslo projektu před názvem
+    const lmHttp = await mcpPost(keyRW, 'tools/call', { name: 'list_maps', arguments: {} });
+    expect(lmHttp.json && lmHttp.json.result && !lmHttp.json.result.isError && /• #\d+ HTTP mapa \(id: /.test(toolText(lmHttp)),
+      `list_maps přes HTTP vypíše mapu s číslem projektu (${toolText(lmHttp).split('\n').find((l) => /HTTP mapa/.test(l)) || toolText(lmHttp).slice(0, 80)})`);
     // typy argumentů: HTTP dřív koercoval `archived:"false"` na true (nález S9-03) — stdio (zod) odmítá
     const spatnyTyp = await mcpPost(keyRW, 'tools/call', { name: 'list_maps', arguments: { archived: 'false' } });
     expect(spatnyTyp.json && spatnyTyp.json.error && spatnyTyp.json.error.code === -32602 && /archived/.test(spatnyTyp.json.error.message || ''),

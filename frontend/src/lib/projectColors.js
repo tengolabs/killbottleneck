@@ -70,6 +70,15 @@ export function projectName(map) {
   return setTitleEmoji(t, '') || t;
 }
 
+// Číslo projektu „#12“ (Richard 2. 10. 2026) — JEDEN zdroj tvaru na frontendu
+// (server: helpers.formatProjectNumber). Prázdný řetězec = bez čísla (org mapa).
+// ⚠️ Richard 3. 10. 2026: číslo NENÍ dominanta — ne na kartě ani u názvu v mapě;
+// jen dashboard projektu, nápověda názvu (title) a Archiv.
+export function cisloProjektu(map) {
+  const n = Number(map?.project_number) || 0;
+  return n > 0 ? `#${n}` : '';
+}
+
 // Text vrcholového uzlu = HLAVNÍ CÍL projektu. V mapě ho člověk vidí ve špičce,
 // na kartě projektu chyběl (Richard 18. 8. 2026). Název projektu bývá zkratka
 // („FMEA — kanban"), kdežto hlavní cíl je věta, která říká, o co doopravdy jde.

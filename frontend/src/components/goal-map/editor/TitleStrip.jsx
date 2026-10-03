@@ -1,9 +1,14 @@
 import { useTranslation } from 'react-i18next';
+import { cisloProjektu } from '@/lib/projectColors';
 
 // Pruh s názvem projektu nad levou lištou ikon (text; klikem přejmenování).
 // Čistě prezentační: JSX přesunuto 1:1 z GoalMapEditor (F1-07).
-export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevEditace, canEdit, title, setTitle, setNazevEditace }) {
+// ⚠️ Číslo projektu (#12) se tu NEPÍŠE — Richard 3. 10. 2026: je to sériové označení pro
+// asistenta, API a Archiv, poroste do velkých čísel a u názvu by rušilo („není dominanta“).
+// Člověk ho najde jen v nápovědě po najetí na název a v dashboardu projektu.
+export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevEditace, canEdit, title, projectNumber, setTitle, setNazevEditace }) {
   const { t } = useTranslation('editor');
+  const cislo = cisloProjektu({ project_number: projectNumber });
   return (
     <>
         {/* NÁZEV PROJEKTU — volný pruh nad levou lištou ikon (ta začíná na top-16).
@@ -39,7 +44,7 @@ export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevE
               <button
                 type="button"
                 onClick={() => canEdit && setNazevEditace(true)}
-                title={title}
+                title={cislo ? `${title} (${cislo})` : title}
                 className={`block max-w-full truncate rounded-lg px-2 py-1 text-left
                   font-heading text-lg sm:text-xl font-bold tracking-tight
                   border border-transparent transition-colors

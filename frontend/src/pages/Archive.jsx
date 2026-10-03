@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Archive as ArchiveIcon, ArchiveRestore, Loader2, Target, Hash, FolderOpen } from 'lucide-react';
+import { Archive as ArchiveIcon, ArchiveRestore, Loader2, Target, Hash, FolderOpen, Search } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import AppHeader from '@/components/shared/AppHeader';
 import MapCard from '@/components/home/MapCard';
@@ -14,12 +14,24 @@ import { PAGE_CONTAINER } from '@/lib/layout';
 // Archiv dokončených projektů. Mapy z číslované šablony se seskupují do sérií
 // (Nabídka 1, 2, 3…) podle pole `series`; nadpis skupiny drží snapshot
 // `series_title`, takže série drží pohromadě i po smazání šablony.
+// Hledání (Richard 2. 10. 2026): políčko filtruje podle názvu (bez diakritiky
+// a velikosti písmen) nebo čísla projektu („#12“ / „12“); skupina řady zůstane,
+// když vyhoví aspoň jedna její položka. Čistě v klientu — seznam je už načtený.
+const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+function vyhovuje(m, q) {
+  const qn = norm(q);
+  if (!qn) return true;
+  const cislo = /^#?(\d{1,9})$/.exec(qn);
+  if (cislo) return (m.project_number || 0) === Number(cislo[1]);
+  return norm(m.title).includes(qn) || norm(m.series_title).includes(qn);
+}
 export default function Archive() {
   const navigate = useNavigate();
   const { t } = useTranslation('home');
   const { toast } = useToast();
   const { user } = useAuth();
   const [maps, setMaps] = useState(null);
+  const [dotaz, setDotaz] = useState('');
 
   const load = () => {
     base44.entities.GoalMap.filter({ archived: true }, '-updated_date', 200)
@@ -33,6 +45,7 @@ export default function Archive() {
     const bySeries = {};
     const loose = [];
     for (const m of maps || []) {
+      if (!vyhovuje(m, dotaz)) continue;
       if (m.series) {
         const key = `${m.series}|${m.series_year || 0}`;
         (bySeries[key] = bySeries[key] || []).push(m);
@@ -50,7 +63,7 @@ export default function Archive() {
       };
     }).sort((a, b) => compareLocale(b.title, a.title)); // novější rok nahoře
     return { series: grouped, other: loose };
-  }, [maps, t]);
+  }, [maps, t, dotaz]);
 
   const handleRestore = async (m) => {
     try {
@@ -65,9 +78,10 @@ export default function Archive() {
 
   const cardBadges = (m) => (
     <div className="flex items-center gap-0.5">
-      {m.series_number > 0 && (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium" title={t('archive.seriesNumberTitle')}>
-          <Hash className="w-3 h-3" />{m.series_number}
+      {/* odznak = ČÍSLO PROJEKTU (od 2. 10. 2026; dřív pořadí v řadě — to zůstává v názvu přes formatSeriesTitle) */}
+      {m.project_number > 0 && (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium" title={t('archive.projectNumberTitle')} data-testid="archive-project-number">
+          <Hash className="w-3 h-3" />{m.project_number}
         </span>
       )}
       {m.created_by_id === user?.id && (
@@ -115,6 +129,20 @@ export default function Archive() {
           </div>
         </div>
 
+        {maps !== null && maps.length > 0 && (
+          <div className="relative mb-6 max-w-md">
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+            <input
+              type="search"
+              value={dotaz}
+              onChange={(e) => setDotaz(e.target.value)}
+              placeholder={t('archive.searchPlaceholder')}
+              aria-label={t('archive.searchPlaceholder')}
+              data-testid="archive-search"
+              className="w-full h-10 rounded-md border border-input bg-card pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        )}
         {maps === null ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -130,6 +158,8 @@ export default function Archive() {
             </p>
             <Button variant="outline" onClick={() => navigate('/')}>{t('archive.backToProjects')}</Button>
           </div>
+        ) : series.length === 0 && other.length === 0 ? (
+          <p className="text-muted-foreground text-sm py-10 text-center" data-testid="archive-search-empty">{t('archive.searchEmpty', { q: dotaz })}</p>
         ) : (
           <div className="space-y-10">
             {series.map((g) => (

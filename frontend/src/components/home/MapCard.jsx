@@ -24,6 +24,8 @@ export default function MapCard({ map, icon: Icon, iconWrapClass = 'bg-primary/1
   // NEUKAZUJE — dvakrát totéž pod sebou je šum, ne informace.
   const hlavniCil = apexTitle(map);
   const stejne = hlavniCil.toLocaleLowerCase() === nazev.toLocaleLowerCase();
+  // ⚠️ Číslo projektu (#12) na kartě NENÍ — Richard 3. 10. 2026: sériové označení pro
+  // asistenta/API/Archiv, ne věc na očích; poroste a u názvu by rušilo.
   return (
     <div
       onClick={onClick}

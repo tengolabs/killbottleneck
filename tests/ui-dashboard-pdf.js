@@ -84,6 +84,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     expect(await page.evaluate(() => document.documentElement.classList.contains('dark')),
       'test běží v tmavém režimu');
 
+    // Číslo projektu (Richard 3. 10. 2026): karta ani hlavička mapy ho neukazují („není dominanta“),
+    // dashboard je místo, kde ho člověk najde — tlumeně, s nápovědou, co s ním.
+    const cislo = await page.evaluate(async (id) => {
+      const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
+      const m = await (await fetch('/api/collections/goalmaps/records/' + id, { headers: { Authorization: auth.token } })).json();
+      const el = document.querySelector('[data-testid="dashboard-project-number"]');
+      return { api: m.project_number, text: el ? el.textContent.trim() : null, napoveda: el ? el.getAttribute('title') : null, mala: el ? parseFloat(getComputedStyle(el).fontSize) : 0 };
+    }, mapId);
+    expect(cislo.api > 0 && cislo.text === `Číslo projektu #${cislo.api}` && cislo.mala <= 12 && /otevři #\d+/.test(cislo.napoveda || ''),
+      `dashboard nese číslo projektu drobně a s nápovědou (${JSON.stringify(cislo)})`);
     const clicked = await page.evaluate(() => {
       const b = [...document.querySelectorAll('button')].find((x) => /Uložit PDF/.test(x.innerText || ''));
       if (b) { b.click(); return true; }

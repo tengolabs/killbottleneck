@@ -47,7 +47,9 @@
     "backToProjects": "Zpět na projekty",
     "otherHeading": "Ostatní archivované projekty",
     "seriesFallback": "Řada",
-    "seriesNumberTitle": "Pořadové číslo v řadě",
+    "projectNumberTitle": "Číslo projektu",
+    "searchPlaceholder": "Hledat v archivu (název nebo #číslo)",
+    "searchEmpty": "Nic v archivu neodpovídá „{{q}}“.",
     "archivedOn": "archivováno {{date}}"
   },
   "dashboard": {
@@ -81,7 +83,9 @@
     "noUpcoming": "Žádné blížící se termíny.",
     "pdf": "Uložit PDF",
     "pdfTitle": "Stáhnout přehled projektu jako PDF",
-    "pdfFailed": "PDF se nepodařilo vytvořit"
+    "pdfFailed": "PDF se nepodařilo vytvořit",
+    "projectNumber": "Číslo projektu",
+    "projectNumberHint": "Pořadové číslo projektu — řekněte asistentovi „otevři {{number}}“ nebo ho zadejte do hledání v Archivu"
   },
   "templates": {
     "confirmDelete": "Opravdu smazat šablonu „{{title}}\"?",

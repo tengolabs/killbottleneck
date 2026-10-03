@@ -98,11 +98,14 @@ function renderNode(n, depth) {
   for (const c of n.children || []) lines.push(renderNode(c, depth + 1));
   return lines.join('\n');
 }
+// číslo projektu (#12) + archivovaná mapa v hlavičce — 1:1 s mcp-tools.js
 function renderMap(m) {
   const acc = m.access ? `, access: ${m.access}` : '';
+  const num = m.project_number > 0 ? `#${m.project_number}, ` : '';
+  const arch = m.archived ? ', ARCHIVED' : '';
   const head = m.title
-    ? `Map "${m.title}" (id: ${m.id}, updated: ${m.updated}${acc})`
-    : `Map (id: ${m.id}, updated: ${m.updated}${acc})`;
+    ? `Map "${m.title}" (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`
+    : `Map (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`;
   const body = (m.tree || []).map((r) => renderNode(r, 0)).join('\n');
   const notes = (m.notes || []).length
     ? '\nNotes:\n' + m.notes.map((n) => `  • ${n.text.slice(0, 200)} (id: ${n.id})`).join('\n')
@@ -119,7 +122,7 @@ function renderPortfolio(p) {
   const projects = s.projects || [];
   out.push('', projects.length ? 'Projects:' : 'Projects: none (no team or shared maps visible to the key owner).');
   for (const pr of projects) {
-    out.push(`• ${pr.title} (id: ${pr.id}, ${pr.access}) — ${pr.pct}% done (${pr.done}/${pr.total}), open ${pr.open}, overdue ${pr.overdue}, stuck ${pr.stuck}, owner @${pr.owner_email || '?'}`);
+    out.push(`• ${pr.project_number > 0 ? `#${pr.project_number} ` : ''}${pr.title} (id: ${pr.id}, ${pr.access}) — ${pr.pct}% done (${pr.done}/${pr.total}), open ${pr.open}, overdue ${pr.overdue}, stuck ${pr.stuck}, owner @${pr.owner_email || '?'}`);
   }
   const overdue = (s.overdue || []).slice(0, 20);
   if (overdue.length) {
@@ -212,7 +215,7 @@ server.registerTool('list_maps', {
     const r = await call('GET', `/api/kb/v1/maps${archived ? '?archived=1' : ''}`);
     if (!r.maps.length) return text(archived ? 'No archived maps.' : 'No maps.');
     return text(DATA_FENCE + '\n\n'
-      + r.maps.map((m) => `• ${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || 'owner'})`).join('\n'));
+      + r.maps.map((m) => `• ${m.project_number > 0 ? `#${m.project_number} ` : ''}${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || 'owner'})`).join('\n'));
   } catch (e) { return errText(e.message); }
 });
 

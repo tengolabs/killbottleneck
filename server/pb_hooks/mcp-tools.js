@@ -309,11 +309,16 @@ function renderNode(n, depth) {
   for (const c of n.children || []) lines.push(renderNode(c, depth + 1));
   return lines.join("\n");
 }
+// číslo projektu (#12) jedním helperem (helpers.formatProjectNumber — stdio server product/mcp/index.js ho
+// zrcadlí inline, parita hlídá mcp-e2e.js); archivovaná mapa to v hlavičce říká
 function renderMap(m) {
+  const { formatProjectNumber } = require(`${__hooks}/helpers.js`);
   const acc = m.access ? `, access: ${m.access}` : "";
+  const num = m.project_number > 0 ? `${formatProjectNumber(m.project_number)}, ` : "";
+  const arch = m.archived ? ", ARCHIVED" : "";
   const head = m.title
-    ? `Map "${m.title}" (id: ${m.id}, updated: ${m.updated}${acc})`
-    : `Map (id: ${m.id}, updated: ${m.updated}${acc})`;
+    ? `Map "${m.title}" (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`
+    : `Map (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`;
   const body = (m.tree || []).map((r) => renderNode(r, 0)).join("\n");
   const notes = (m.notes || []).length
     ? "\nNotes:\n" + m.notes.map((n) => `  • ${n.text.slice(0, 200)} (id: ${n.id})`).join("\n")
@@ -342,6 +347,7 @@ function renderRule(r) {
 
 // souhrn Organizace (get_portfolio) — 1:1 se stdio serverem (product/mcp/index.js)
 function renderPortfolio(p) {
+  const { prefixProjectNumber } = require(`${__hooks}/helpers.js`);
   const c = p.counts || {};
   const sc = p.scope || {};
   const s = p.sections || {};
@@ -350,7 +356,7 @@ function renderPortfolio(p) {
   const projects = s.projects || [];
   out.push("", projects.length ? "Projects:" : "Projects: none (no team or shared maps visible to the key owner).");
   for (const pr of projects) {
-    out.push(`• ${pr.title} (id: ${pr.id}, ${pr.access}) — ${pr.pct}% done (${pr.done}/${pr.total}), open ${pr.open}, overdue ${pr.overdue}, stuck ${pr.stuck}, owner @${pr.owner_email || "?"}`);
+    out.push(`• ${prefixProjectNumber(pr.project_number)}${pr.title} (id: ${pr.id}, ${pr.access}) — ${pr.pct}% done (${pr.done}/${pr.total}), open ${pr.open}, overdue ${pr.overdue}, stuck ${pr.stuck}, owner @${pr.owner_email || "?"}`);
   }
   const overdue = (s.overdue || []).slice(0, 20);
   if (overdue.length) {
@@ -422,10 +428,11 @@ function mapWrite(auth, mapId, fn) {
 // výkonná část nástrojů — 1:1 chování stdio serveru (product/mcp/index.js)
 const EXEC = {
   list_maps: (auth, a) => {
+    const { prefixProjectNumber } = require(`${__hooks}/helpers.js`);
     const r = vcall(auth, "GET", `/api/kb/v1/maps${a.archived ? "?archived=1" : ""}`);
     if (!r.maps.length) return text(a.archived ? "No archived maps." : "No maps.");
     return text(DATA_FENCE + "\n\n"
-      + r.maps.map((m) => `• ${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || "owner"})`).join("\n"));
+      + r.maps.map((m) => `• ${prefixProjectNumber(m.project_number)}${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || "owner"})`).join("\n"));
   },
   get_map: (auth, a) => text(renderMap(freshMap(auth, a.map_id))),
   create_map: (auth, a) => {

@@ -64,7 +64,8 @@
     "get_week_review": "week review",
     "get_project_changes": "project changes",
     "get_person_work": "a colleague's work",
-    "get_team_work": "team overview"
+    "get_team_work": "team overview",
+    "search_projects": "project and archive search"
   },
   "errorGeneric": "The assistant did not respond. Please try again.",
   "errorRate": "You have used up the hourly AI cap. Try again in a while.",

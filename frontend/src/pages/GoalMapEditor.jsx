@@ -141,6 +141,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // projektu na titulce („šéf se ptá, v jaké fázi to je" → jeden klik).
   // Tlačítko v liště je pod 1850 px schované v ⋮ menu, takže tohle není zdvojení,
   // ale jediná rychlá cesta na běžném notebooku.
+  const [projectNumber, setProjectNumber] = useState(0); // číslo projektu (#12) — jen do dashboardu a nápovědy názvu (Richard 3. 10. 2026: není dominanta)
   const [dashboardOpen, setDashboardOpen] = useState(
     () => new URLSearchParams(location.search).get('view') === 'dashboard');
   // odznaky uzlů (komentáře, přílohy, úkoly, běžící agenti) — hooks/useMapCounts.js (F1-07)
@@ -477,6 +478,7 @@ function EditorContent({ mapId, personalMap = false }) {
             setCanWork(!isOwner && !hasEdit && (m.shared_with_work || []).includes(user?.email));
             setIsMapOwner(isOwner);
             setArchived(!!m.archived);
+            setProjectNumber(m.project_number || 0);
             setMapKind(m.kind || '');
             archiveOfferShown.current = false;
             setActiveMapId(mapId);
@@ -1335,11 +1337,12 @@ function EditorContent({ mapId, personalMap = false }) {
           nazevEditace={nazevEditace}
           canEdit={canEdit}
           title={title}
+          projectNumber={projectNumber}
           setTitle={setTitle}
           setNazevEditace={setNazevEditace}
         />
         {dashboardOpen ? (
-          <ProgressDashboard nodes={nodes} edges={edges} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} />
+          <ProgressDashboard nodes={nodes} edges={edges} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} projectNumber={projectNumber} />
         ) : (
         <GoalMapContext.Provider value={contextValue}>
         {/* adresář členů pro uzly: iniciály a bublina garanta ze ZOBRAZOVANÉHO

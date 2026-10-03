@@ -492,9 +492,20 @@ onRecordAfterUpdateSuccess((e) => {
   e.next();
 }, "goalmaps");
 
+// goalmaps: číslo projektu (#12) přiděluje MODEL hook — chytá i $app.save, tedy
+// všech ~9 cest vzniku mapy (REST, v1 API/MCP/asistent, cron šablon, úvodní mapy,
+// import, org mapa), ne jen REST create. Request hooky níž číslo jen nulují (obrana
+// v hloubce, klient si ho nevybírá). Logika v helpers.assignProjectNumber.
+onRecordCreate((e) => {
+  const { assignProjectNumber } = require(`${__hooks}/helpers.js`);
+  assignProjectNumber(e.app, e.record);
+  e.next();
+}, "goalmaps");
+
 // goalmaps: owner se bere z přihlášení, ne z requestu
 // ⚠️ Nové server-spravované pole goalmaps? Zkontroluj i POST /api/flowmap/v1/maps
-// (v1 API replikuje tenhle hook ručně — request hooky se u $app.save nespustí).
+// (v1 API replikuje tenhle hook ručně — request hooky se u $app.save nespustí;
+// výjimka = project_number, ten řeší model hook výš).
 onRecordCreateRequest((e) => {
   const { syncShares, jsonList, jsonVal, notify, validateMapData, strukturaZhorsena, assignSeriesNumber, notifyAssignedFromNodes, notifyAutomationRequests, stampAutomationRequesters, normalizeNodeShapes } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
@@ -524,6 +535,7 @@ onRecordCreateRequest((e) => {
   e.record.set("series_number", 0);
   e.record.set("series_title", "");
   e.record.set("series_year", 0);
+  e.record.set("project_number", 0); // přidělí model hook onRecordCreate, klient ho neposílá
   e.record.set("archived", false); // archivace i razítko jen přes update (owner-only)
   e.record.set("archived_at", "");
   e.record.set("kind", ""); // typ mapy je server-spravovaný — org mapu zakládá jen /api/kb/org-map
@@ -576,8 +588,8 @@ onRecordUpdateRequest((e) => {
       e.record.set(f, orig.get(f));
     }
   }
-  // pole série spravuje výhradně server (create hook) — nejde přepsat ani vlastníkem
-  for (const f of ["series", "series_number", "series_title", "series_year"]) {
+  // pole série a číslo projektu spravuje výhradně server (create hook) — nejde přepsat ani vlastníkem
+  for (const f of ["series", "series_number", "series_title", "series_year", "project_number"]) {
     e.record.set(f, orig.get(f));
   }
   // typ mapy (org struktura) drží server — běžná mapa se nesmí „prohlásit" za org
@@ -4751,6 +4763,7 @@ kbRoute("GET", "/v1/maps", (e) => {
     if (!level) continue;
     maps.push({
       id: mp.id, title: mp.getString("title"),
+      project_number: Number(mp.get("project_number")) || 0,
       node_count: jsonVal(mp, "nodes", []).length,
       updated: mp.getString("updated"),
       access: mp.getString("owner") === a.user.id ? "owner" : level,
@@ -4840,6 +4853,7 @@ kbRoute("GET", "/v1/maps/{id}", (e) => {
   return e.json(200, {
     id: map.id,
     title: map.getString("title"),
+    project_number: Number(map.get("project_number")) || 0,
     description: map.getString("description"),
     archived: map.getBool("archived"),
     updated: map.getString("updated"),
@@ -4921,6 +4935,7 @@ kbRoute("POST", "/v1/maps", (e) => {
   rec.set("series_number", 0);
   rec.set("series_title", "");
   rec.set("series_year", 0);
+  rec.set("project_number", 0); // přidělí model hook onRecordCreate
   rec.set("kind", ""); // org mapu zakládá jen /api/kb/org-map
   const saved = v1SaveMapData($app, rec, nodes, edges, a.lang, true, a.user.email(), { isOwner: true, via: a.via });
   if (saved.error) return e.json(saved.status, { error: saved.error });

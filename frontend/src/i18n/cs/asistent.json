@@ -64,7 +64,8 @@
     "get_week_review": "přehled týdne",
     "get_project_changes": "změny v projektu",
     "get_person_work": "práce kolegy",
-    "get_team_work": "přehled týmu"
+    "get_team_work": "přehled týmu",
+    "search_projects": "hledání v projektech a archivu"
   },
   "errorGeneric": "Asistent neodpověděl. Zkuste to prosím znovu.",
   "errorRate": "Vyčerpali jste hodinový strop AI. Zkuste to za chvíli.",

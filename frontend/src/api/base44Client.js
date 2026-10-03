@@ -66,6 +66,7 @@ const toDto = (name, r) => {
         series_number: r.series_number || 0,
         series_title: r.series_title || '',
         series_year: r.series_year || 0,
+        project_number: r.project_number || 0, // číslo projektu (#12), server-spravované; 0 = bez čísla (org mapa)
         archived: !!r.archived,
         archived_at: r.archived_at || '',
         client_id: r.client || '',

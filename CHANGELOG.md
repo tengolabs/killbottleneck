@@ -9,6 +9,33 @@ below before you jump several versions.
 
 ---
 
+## v0.70-beta — 2026-10-03
+
+**Project numbers and an assistant that searches the archive**
+
+- **Every project has a number** (`#12`): one sequence per instance, assigned by the server when a map is
+  created (a model hook — so it covers the app, the REST and v1 API, MCP, the assistant, templates, the
+  welcome maps and imports alike), never changed, never reused. It is a serial identifier for lookup, not
+  a label next to the title: shown in the project dashboard (and its PDF), in the tooltip of the map title,
+  in the Archive (the `#` badge there now means the project number — the position in a numbered series
+  stays in the title), by the assistant, and in `GET /v1/maps`, `GET /v1/maps/{id}`, the portfolio, MCP
+  `list_maps` / `get_map` and the data export (`project_number`). Project cards and the map header do not
+  show it. The organization map has no number. A number sent by a client is ignored; `PATCH` cannot change it.
+- **Assistant: `search_projects`** — searches active **and archived** projects by project number, project
+  title and the titles, descriptions and owners of their steps (case- and accent-insensitive, word stems);
+  results are grouped by project with its number, state, open steps and deadlines (capped: 10 projects,
+  40 step lines). `get_map` accepts the project number (`"#12"`) and finds archived maps by title as well
+  (active ones take precedence). The map list in the system prompt carries the numbers; the prompt explains
+  when to search.
+- **Archive page**: a search box filters the archived projects by title (accent-insensitive) or `#number`.
+
+**Upgrade notes**
+
+- The migration numbers existing maps by creation date (oldest = `#1`) with plain SQL — `updated` stays
+  untouched, open editors see no conflict. It also creates the `instance_settings` row with the counter when
+  missing. Numbers are not carried over by import; an imported map gets the next number of the instance.
+- The system prompt of the assistant changes once (numbers in the map list, a sentence about the archive) —
+  the prompt cache of running conversations is rebuilt on the next turn.
 ## v0.69-beta — 2026-10-02
 
 **Map toolbar that stays put**

@@ -62,6 +62,8 @@ function mapToDto(m) {
     // typ mapy: "" = běžná, "org" = organizační struktura (jedna na instanci,
     // server-spravované pole — nastavuje jen routa /api/kb/org-map)
     kind: m.getString("kind"),
+    // číslo projektu (#12) — server-spravované, 0 = bez čísla (org mapa)
+    project_number: Number(m.get("project_number")) || 0,
     created_by_id: m.getString("owner"),
     created_by: m.getString("owner_email"),
     created_date: m.getString("created"),
@@ -2468,6 +2470,65 @@ function assignSeriesNumber(app, record, tpl) {
   record.set("series_year", y);
   record.set("title", formatSeriesTitle(fmt, n, record.getString("title") || tpl.getString("title")));
   return true;
+}
+
+// ---------- číslo projektu (Richard 2. 10. 2026: „každý projekt musí mít specifické číslo“) ----------
+// Jedna celočíselná řada na instanci (#1, #2, …), číslo se nikdy nemění ani nerecykluje.
+// Formát na JEDNOM místě (server: chat.js, mcp-tools.js) — frontend má zrcadlo cisloProjektu() v
+// lib/projectColors.js, stdio MCP (samostatný proces bez helpers) v product/mcp/index.js.
+// Změna tvaru (prefix, rok) = změna helperu + obou zrcadel, ne dat.
+function formatProjectNumber(n) {
+  const x = Number(n) || 0;
+  return x > 0 ? "#" + x : "";
+}
+// „#12 “ před názvem v seznamech (prázdné bez čísla — org mapa, mapa z doby před migrací)
+function prefixProjectNumber(n) {
+  const f = formatProjectNumber(n);
+  return f ? f + " " : "";
+}
+
+// Přidělení čísla NOVÉ mapě — volá se z model hooku onRecordCreate("goalmaps") v
+// main.pb.js, takže platí pro všech ~9 cest vzniku (REST, v1 API/MCP/asistent, cron
+// šablon, úvodní mapy, import, org mapa…). Příchozí hodnotu VŽDY přepíše: jediné
+// autoritativní místo, žádná cesta si číslo nevybírá. Org mapa (kind = "org") číslo
+// nemá (0) — není to projekt a v seznamech projektů není.
+// Čítač instance_settings.next_project_number = PŘÍŠTÍ přidělované (jako
+// templates.next_number). Jeden atomický UPDATE … RETURNING = souběh nedá duplicitu;
+// pád uložení nechá nanejvýš díru. Samooprava MAX(čítač, max(project_number)+1) kryje
+// obnovu zálohy nastavení nebo ruční zásah do čítače — nikdy se nevrátí pod už
+// přidělené číslo (pojistka navíc = částečný unikátní index idx_goalmaps_project_number).
+function assignProjectNumber(app, record) {
+  if (record.getString("kind") === "org") {
+    record.set("project_number", 0);
+    return 0;
+  }
+  const dalsi = () => {
+    const row = new DynamicModel({ next_project_number: 0 });
+    app.db()
+      .newQuery(
+        "UPDATE instance_settings SET next_project_number = " +
+        "MAX(IFNULL(next_project_number, 0), (SELECT IFNULL(MAX(project_number), 0) FROM goalmaps WHERE project_number > 0) + 1) + 1 " +
+        "WHERE id = (SELECT id FROM instance_settings LIMIT 1) RETURNING next_project_number"
+      )
+      .one(row);
+    return Number(row.next_project_number) - 1;
+  };
+  let n;
+  try {
+    n = dalsi();
+  } catch (err) {
+    // `UPDATE … RETURNING` nic nevrátí, když řádek nastavení ještě neexistuje (čerstvá instance před prvním
+    // uložením skinu) → založit a zopakovat. Ale JEN tehdy: jakákoli jiná chyba (zamčená DB, SQL) musí propadnout —
+    // druhý řádek instance_settings by rozbil skin/fakturaci, které čtou „první“ řádek (nález kontroly 3. 10. 2026).
+    let existuje = true;
+    try { app.findFirstRecordByFilter("instance_settings", "id != ''"); } catch (e2) { existuje = false; }
+    if (existuje) throw err;
+    const rec = new Record(app.findCollectionByNameOrId("instance_settings"));
+    app.save(rec);
+    n = dalsi();
+  }
+  record.set("project_number", n);
+  return n;
 }
 
 // Souhrnná notifikace node_assigned per přiřazená osoba (počet uzlů + nejbližší
@@ -6057,6 +6118,7 @@ function buildExport(app, userId, email, opts) {
         color: m.getString("color"), kind: m.getString("kind"), client: m.getString("client"),
         archived: m.getBool("archived"), archived_at: m.getString("archived_at"),
         series: m.getString("series"), series_number: m.get("series_number"), series_title: m.getString("series_title"), series_year: m.get("series_year"),
+        project_number: Number(m.get("project_number")) || 0, // informativní — import přiděluje nové
         created: m.getString("created"), updated: m.getString("updated"),
       },
       access: { owner_email: m.getString("owner_email"), team_access: m.getString("team_access"), is_public: m.getBool("is_public"), shares: shares },
@@ -6288,6 +6350,7 @@ function importJednuMapu(app, auth, L, info, opts) {
   rec.set("series_number", 0);
   rec.set("series_title", "");
   rec.set("series_year", 0);
+  rec.set("project_number", 0); // číslo ze souboru se nepřenáší — přidělí model hook (nová řada této instance)
   rec.set("client", "");
   rec.set("kind", ""); // import nikdy nezakládá org mapu
   app.save(rec);
@@ -6932,7 +6995,8 @@ function buildPortfolio(app, userId, email, opts) {
     }
     projectById[m.id] = projects.length;
     projects.push({
-      id: m.id, title: titleByMap[m.id], access: sm.access, team_access: m.getString("team_access"),
+      id: m.id, title: titleByMap[m.id], project_number: Number(m.get("project_number")) || 0,
+      access: sm.access, team_access: m.getString("team_access"),
       owner_email: m.getString("owner_email"), updated: m.getString("updated"),
       pct: c.pct, done: c.done, total: c.total, open: open, overdue: 0, stuck: 0,
     });
@@ -7400,7 +7464,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 
 module.exports = {
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

@@ -236,6 +236,117 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'A tady?', context: { route: `/map/${cizi.id}`, map_id: cizi.id, node_id: 'root' } } });
   expect(!/vybraný uzel/.test(posledniVolani().messages.filter((m) => m.role === 'user').pop().content), 'uzel z cizí (nečitelné) mapy se do kontextu nedostane');
 
+  console.log('== hledání napříč projekty a ARCHIVEM (search_projects, číslo projektu) ==');
+  // Richard 2. 10. 2026: „asistent musí umět vyhledávat v archivu projektu a úkolů, každý projekt musí mít
+  // specifické číslo“. Truhlářství = #1, Soukromá Jany = #2 (pořadí vzniku v této sadě).
+  expect(/- #1 Truhlářství · owner/.test(sysU) && !/Soukromá Jany/.test(sysU), 'systém nese seznam map S ČÍSLEM projektu (#1 Truhlářství), cizí mapu ne');
+  const plot = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {
+    title: 'Zahradní plot', nodes: [
+      { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Plot kolem zahrady', title: 'Plot kolem zahrady', status: 'done' } },
+      { id: 'p1', type: 'goalNode', position: { x: 0, y: 200 }, data: { title: 'Faktura za pletivo', description: 'Zaplatit do konce měsíce dodavateli Pletiva s.r.o.', status: 'done', owner: 'admin@example.com' } },
+      { id: 'p2', type: 'goalNode', position: { x: 200, y: 200 }, data: { title: 'Poptávka plotových dílců', status: 'todo', deadline: '2026-03-01' } },
+    ], edges: [{ id: 'e1', source: 'root', target: 'p1' }, { id: 'e2', source: 'root', target: 'p2' }] } })).json;
+  await inst.api('PATCH', `/api/collections/goalmaps/records/${plot.id}`, { token: A, body: { archived: true } }); // create archivaci vynuluje
+  const plotArch = (await inst.api('GET', `/api/collections/goalmaps/records/${plot.id}`, { token: A })).json;
+  expect(plotArch.archived === true && plotArch.project_number > 2, `archivovaná mapa #${plotArch.project_number} (číslo přidělil server)`);
+  const N = plotArch.project_number;
+  const plotJany = (await inst.api('POST', '/api/collections/goalmaps/records', { token: B, body: {
+    title: 'Plot Jany', nodes: [{ id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Pletivo pro Janu', title: 'Pletivo pro Janu', status: 'todo' } },
+      { id: 'j1', type: 'goalNode', position: { x: 0, y: 200 }, data: { title: 'Koupit pletivo', status: 'todo' } }], edges: [{ id: 'e1', source: 'root', target: 'j1' }] } })).json;
+  await inst.api('PATCH', `/api/collections/goalmaps/records/${plotJany.id}`, { token: B, body: { archived: true } });
+  const poslNastroj = (n) => toolZ(posledniVolani()).filter((m) => m.tool_name === n).at(-1); // historie nese i starší (zkrácené) výsledky → vždy poslední
+  let predH = volani.length;
+  fronta.push(nastroj('search_projects', { query: 'pletiv' }), text('HLEDANI-OK.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Najdi mi, kde jsme řešili pletivo' } });
+  expect(r.status === 200 && volani.length - predH === 2 && (volani[predH].tools || []).some((t) => t.function.name === 'search_projects'), 'klíčové slovo „najdi“ otevře skupinu hledání → nástroj nabídnut hned');
+  let hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /user DATA/.test(hl[0].content) && new RegExp(`• #${N} Zahradní plot — ARCHIVED`).test(hl[0].content) && /\[✓\] Faktura za pletivo \(@admin@example\.com\)\n\s+↳ .*Pletiva s\.r\.o\./.test(hl[0].content), `výsledek: archivovaný projekt s číslem, hotový krok s řešitelem a úryvkem popisu (${hl[0] && hl[0].content.slice(0, 220).replace(/\n/g, ' ⏎ ')})`);
+  expect(hl.length === 1 && !/Plot Jany|Pletivo pro Janu|Koupit pletivo/.test(hl[0].content) && !/\(id:/.test(hl[0].content), 'cizí soukromá (archivovaná) mapa ve výsledku NENÍ; žádná id');
+  expect(hl.length === 1 && /1 project, 1 matching step/.test(hl[0].content) && /get_map\(map_id: "#<number>"\)/.test(hl[0].content), 'hlavička s počty + nápověda, jak projekt otevřít číslem');
+  expect(r.json.chat.messages.some((m) => m.role === 'assistant' && (m.karty || []).some((k) => k.type === 'nastroje' && k.jmena.includes('search_projects'))), 'karta „nahlédl do“: search_projects');
+  expect(systemZ(volani[volani.length - 2]) === systemZ(posledniVolani()), 'systémová zpráva se ani s hledáním mezi koly nemění (cache prefixu)');
+  // scope: „poptávk“ sedí v aktivním Truhlářství (Poslat poptávku…) i archivovaném plotu (Poptávka plotových dílců)
+  fronta.push(nastroj('search_projects', { query: 'poptavk', scope: 'active' }), text('A.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Hledej poptávky v aktivních' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /#1 Truhlářství — active/.test(hl[0].content) && /Poslat poptávku na spárovky/.test(hl[0].content) && !/Zahradní plot/.test(hl[0].content), 'scope active: bez diakritiky najde „poptávku“ jen v aktivním projektu');
+  fronta.push(nastroj('search_projects', { query: 'poptavk', scope: 'archived' }), text('B.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'A v archivu?' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /Zahradní plot — ARCHIVED/.test(hl[0].content) && /\[ \] Poptávka plotových dílců \(deadline 2026-03-01\)/.test(hl[0].content) && !/Truhlářství/.test(hl[0].content), 'scope archived: jen archiv, otevřený krok s termínem');
+  fronta.push(nastroj('search_projects', { query: `#${N}` }), text('C.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: `Co je projekt #${N}?` } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /1 project, 0 matching steps/.test(hl[0].content) && /\[matched: number\]/.test(hl[0].content) && /Zahradní plot/.test(hl[0].content), 'dotaz číslem → ten jeden projekt (matched: number)');
+  fronta.push(nastroj('search_projects', { query: 'xyzneexistuje' }), text('D.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Najdi xyzneexistuje' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /^.*No matches for "xyzneexistuje" \(searched: all projects\)\.$/m.test(hl[0].content), 'nic → „No matches“');
+  fronta.push(nastroj('search_projects', { query: 'a' }), text('E.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Najdi a' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /^Error: query too short/.test(hl[0].content), 'jednoznakový dotaz → chyba pro model, ne sken všeho');
+  // nález kontroly 3. 10.: holé jednociferné číslo („7“ = projekt #7) není krátký dotaz
+  fronta.push(nastroj('search_projects', { query: String(N) }), text('E2.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: `Najdi projekt ${N}` } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && N < 10 && /\[matched: number\]/.test(hl[0].content) && /Zahradní plot/.test(hl[0].content), `holé jednociferné číslo „${N}“ = číslo projektu, ne „too short“ (${hl[0] && hl[0].content.slice(0, 80)})`);
+
+  console.log('== get_map podle čísla a podle názvu ARCHIVOVANÉ mapy ==');
+  fronta.push(nastroj('get_map', { map_id: `#${N}` }), text('F.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: `Otevři #${N}` } });
+  let gm = [poslNastroj('get_map')].filter(Boolean);
+  expect(gm.length === 1 && new RegExp(`Map "Zahradní plot" \\(#${N}, updated: .*, access: owner, ARCHIVED\\)`).test(gm[0].content) && /Faktura za pletivo/.test(gm[0].content), `get_map("#${N}") otevře archivovanou mapu, hlavička nese číslo a ARCHIVED (${gm[0] && gm[0].content.split('\n')[2]})`);
+  fronta.push(nastroj('get_map', { map_id: 'zahradni plot' }), text('G.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Otevři zahradní plot' } });
+  gm = [poslNastroj('get_map')].filter(Boolean);
+  expect(gm.length === 1 && /Map "Zahradní plot"/.test(gm[0].content), 'get_map podle názvu najde archivovanou mapu jako zálohu (aktivní má přednost)');
+  fronta.push(nastroj('get_map', { map_id: '#9999' }), text('H.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Otevři #9999' } });
+  gm = [poslNastroj('get_map')].filter(Boolean);
+  expect(gm.length === 1 && /^Error: map not found.*search_projects/.test(gm[0].content), 'neznámé číslo → chyba s nápovědou na search_projects');
+  // cizí (neviditelné) číslo = totéž „not found“ jako neexistující — žádná věštírna existence
+  fronta.push(nastroj('get_map', { map_id: `#${plotJany.project_number}` }), text('H2.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: `Otevři #${plotJany.project_number}` } });
+  gm = [poslNastroj('get_map')].filter(Boolean);
+  expect(gm.length === 1 && /^Error: map not found/.test(gm[0].content) && !/Jany/.test(gm[0].content), 'číslo cizí soukromé mapy → stejná chyba jako u neexistující');
+  // mapa s čistě číselným NÁZVEM („2027“) zůstává dosažitelná podle názvu, když takové číslo projektu není
+  const rok = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: { title: '2027', nodes: [{ id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Plán 2027', title: 'Plán 2027', status: 'todo' } }], edges: [] } })).json;
+  fronta.push(nastroj('get_map', { map_id: '2027' }), text('H3.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Otevři 2027' } });
+  gm = [poslNastroj('get_map')].filter(Boolean);
+  expect(gm.length === 1 && rok.id && new RegExp(`Map "2027" \\(#${rok.project_number},`).test(gm[0].content), `číselný název mapy „2027“ se otevře podle názvu, když projekt #2027 neexistuje (${gm[0] && gm[0].content.split('\n')[2]})`);
+  await inst.api('DELETE', `/api/collections/goalmaps/records/${rok.id}`, { token: A });
+  fronta.push(nastroj('list_maps', { archived: true }), text('I.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Vypiš archiv' } });
+  const lm = [poslNastroj('list_maps')].filter(Boolean);
+  expect(lm.length === 1 && new RegExp(`^• #${N} Zahradní plot \\(access: owner, 3 nodes, 1 open, updated \\d{4}-\\d{2}-\\d{2}, ARCHIVED\\)$`, 'm').test(lm[0].content) && !/Plot Jany/.test(lm[0].content), `list_maps archived: řádek s číslem a ARCHIVED (${lm[0] && lm[0].content.slice(0, 120)})`);
+
+  console.log('== pojistka: bez klíčového slova se search_projects dovolá přes opakování kola (nový rozhovor) ==');
+  predH = volani.length;
+  const hledej = nastroj('search_projects', { query: 'pletiv' });
+  fronta.push(hledej, hledej, text('J.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Co máme s pletivem?' } });
+  expect(r.status === 200 && volani.length - predH === 3 && !(volani[predH].tools || []).some((t) => t.function.name === 'search_projects') && (volani[predH + 1].tools || []).some((t) => t.function.name === 'search_projects'), 'nenabídnutý search_projects → skupina hledani přidána, kolo zopakováno');
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /Zahradní plot — ARCHIVED/.test(hl[0].content), 'výsledek hledání dorazil i touhle cestou');
+  const chatHledani = r.json.chat;
+
+  console.log('== strop výsledku: 50 shod v jednom projektu → 6 řádků + „and 44 more“ ==');
+  const hodne = Array.from({ length: 50 }, (_, i) => ({ id: `h${i}`, type: 'goalNode', position: { x: i, y: 200 }, data: { title: `Pletivo role ${i + 1}`, status: i % 2 ? 'done' : 'todo' } }));
+  const velka = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {
+    title: 'Sklad pletiva', nodes: [{ id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Sklad', title: 'Sklad', status: 'todo' } }].concat(hodne),
+    edges: hodne.map((n) => ({ id: 'e' + n.id, source: 'root', target: n.id })) } })).json;
+  expect(!!velka.id, 'mapa s 50 shodami založena');
+  fronta.push(hledej, text('K.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chatHledani.id, message: 'Najdi pletivo znovu' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  // jen řádky sekce Skladu (po další odrážce „• #“ začíná Zahradní plot)
+  const radkyVelke = hl.length ? ((hl[0].content.split(`#${velka.project_number} Sklad pletiva`)[1] || '').split('\n• ')[0]).split('\n').filter((l) => /^\s+\[[ ✓]\] /.test(l)).length : -1;
+  expect(hl.length === 1 && /2 projects, 51 matching steps/.test(hl[0].content) && /… and 44 more matching steps in this project/.test(hl[0].content) && radkyVelke === 6 && hl[0].content.length < 2500, `strop drží: 6 řádků + přiznaný zbytek, výsledek ${hl[0] && hl[0].content.length} znaků`);
+  expect(hl.length === 1 && hl[0].content.indexOf('Sklad pletiva') < hl[0].content.indexOf('Zahradní plot') && /\[ \] Pletivo role 1\b/.test(hl[0].content) && !/\[✓\] Pletivo role/.test(hl[0].content), 'řazení: projekt s vyšší shodou (název) první, 6 ukázaných kroků = otevřené (hotové až za nimi)');
+  await inst.api('DELETE', `/api/collections/goalmaps/records/${velka.id}`, { token: A }); // ať nerozhodí další kontroly (počty map)
+
   console.log('== nový projekt z nápadů ==');
   // „Udělej … projekt“ nemá klíčové slovo skupiny `projekt` (SKUPINY_KLICE) → server nástroj
   // nenabídne, model ho přesto zavolá, pojistka skupinu přidá a volání ZOPAKUJE → mock musí

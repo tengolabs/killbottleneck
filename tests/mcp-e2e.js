@@ -95,6 +95,7 @@ let mcp = null;
     expect(!!mapId, `z odpovědi jde vyčíst id mapy (${mapId})`);
     r = await callTool('list_maps', {});
     expect(!r.isError && /MCP demo projekt/.test(r.text), 'list_maps mapu vidí');
+    expect(/• #\d+ MCP demo projekt \(id: /.test(r.text), `list_maps nese číslo projektu před názvem (${(r.text.match(/• [^\n]*MCP demo projekt[^\n]*/) || [''])[0].slice(0, 80)})`);
     r = await callTool('get_map', { map_id: mapId });
     expect(!r.isError && /\[ \] Fáze A .*deadline: 2026-09-01/.test(r.text) && /Krok A2/.test(r.text),
       'get_map vrací odsazený strom s termínem');
