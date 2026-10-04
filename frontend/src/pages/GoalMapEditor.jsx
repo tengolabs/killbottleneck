@@ -810,6 +810,36 @@ function EditorContent({ mapId, personalMap = false }) {
     toast({ title: t('node.assignedNoDelete'), description: t('node.assignedNoDeleteHint', { email: assigner }) });
   }, [toast, t, effectiveMapAccess.ownerEmail]);
 
+  // Tažení uzlu ve VODOROVNÉM (mobilním) zobrazení. Do 4. 10. 2026 bylo vodorovné
+  // view jen náhled (uzly nešly tahat), protože se ukládají jen svislé (kanonické)
+  // pozice — tah na telefonu by se tiše zahodil. Richard to zrušil: na telefonu
+  // se má posouvat prstem i propojovat. Proto se posun PROMÍTNE do kanonických
+  // pozic: osy jsou prohozené (hloubka = x vodorovně / y svisle, řada sourozenců
+  // = y vodorovně / x svisle), takže se na kanonickou pozici přičte PŘEVRÁCENÝ
+  // rozdíl (dx→y, dy→x). Pořadí v řadě, které člověk vidí na telefonu, tak sedí
+  // i na počítači; autosave (cleanMapData) čte canonicalPosRef. Ve svislém view
+  // se nic nepřepočítává — pozice uzlu je rovnou kanonická.
+  const dragStartRef = useRef(new Map());
+  const onNodeDragStart = useCallback((_e, _node, tazene) => {
+    if (directionRef.current !== 'horizontal') return;
+    dragStartRef.current = new Map((tazene || []).map((n) => [n.id, { ...n.position }]));
+  }, [directionRef]);
+  const onNodeDragStop = useCallback((_e, _node, tazene) => {
+    if (directionRef.current !== 'horizontal') return;
+    const canon = canonicalPosRef.current;
+    for (const n of tazene || []) {
+      if (n.type === 'note') continue;
+      const start = dragStartRef.current.get(n.id);
+      if (!start) continue;
+      const dx = n.position.x - start.x, dy = n.position.y - start.y;
+      if (!dx && !dy) continue;
+      // bez kanonické pozice (uzel vzniklý ve vodorovném view) se vezme prohozená výchozí
+      const puv = canon.get(n.id) || { x: start.y, y: start.x };
+      canon.set(n.id, { x: puv.x + dy, y: puv.y + dx });
+    }
+    dragStartRef.current = new Map();
+  }, [directionRef, canonicalPosRef]);
+
   const handleNodesChange = useCallback(
     (changes) => {
       let filtered = !canEdit ? changes.filter((c) => c.type !== 'remove') : changes;
@@ -1372,8 +1402,10 @@ function EditorContent({ mapId, personalMap = false }) {
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             edgesFocusable
-            nodesDraggable={canEdit && !locked && direction === 'vertical'}
-            nodesConnectable={canEdit && !locked && direction === 'vertical'}
+            nodesDraggable={canEdit && !locked}
+            nodesConnectable={canEdit && !locked}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDragStop={onNodeDragStop}
             elementsSelectable={canEdit}
             selectionOnDrag
             selectionActivationKeyCode="Shift"

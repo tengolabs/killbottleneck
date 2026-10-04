@@ -17,6 +17,14 @@ const CENA_CACHE = KOSMIK_CACHE_USD * KURZ * NASOBEK / 1e6;   // vstup vzatý z 
 const KREDIT_KC = UNIT_IN * CENA_IN + UNIT_OUT * CENA_OUT;
 const PODIL_ADMIN_VYCHOZI = 30;
 
+// PODÍL SPRÁVCŮ = REZERVA, ne strop (Richard 4. 10. 2026, upřesnění původního záměru
+// ze 14. 9.): správci smějí čerpat CELOU kvótu organizace, ale jejich podíl jim nikdo
+// nevezme — ostatní členové mají strop `kvota − rezerva`. Dřív byl podíl stropem
+// správců (30 % z 20 kreditů zkušebky = 6 → správce zkušebky narazil po 3 zprávách,
+// hostovaná zkušebka 4. 10.). 100 % = ostatní nemají nic, 0 % = bez rezervy (společný balík).
+// Brzda: správce narazí, až je vyčerpaná celá kvóta (součet všech); člen narazí na
+// strop ostatních NEBO na celou kvótu (správci směli čerpat i z „jeho" části).
+
 function kreditu(tokensIn, tokensOut, tokensCached) {
   const tin = Number(tokensIn) || 0, tc = Math.min(tin, Number(tokensCached) || 0);
   return ((tin - tc) * CENA_IN + tc * CENA_CACHE + (Number(tokensOut) || 0) * CENA_OUT) / KREDIT_KC;
@@ -48,7 +56,8 @@ function nastaveni(app) {
   else { kvota = vlastni; zdroj = vlastni > 0 ? "nastaveni" : "none"; }
   let podil = (j.podil_admin === undefined || j.podil_admin === null) ? PODIL_ADMIN_VYCHOZI : Number(j.podil_admin);
   if (!(podil >= 0 && podil <= 100)) podil = PODIL_ADMIN_VYCHOZI;
-  return { kvota: kvota, podil_admin: podil, zdroj: zdroj, strop_env: strop, vlastni: vlastni };
+  const rezerva = kvota > 0 ? kvota * podil / 100 : 0;
+  return { kvota: kvota, podil_admin: podil, rezerva_admin: rezerva, zdroj: zdroj, strop_env: strop, vlastni: vlastni };
 }
 
 // spotřeba po lidech od data (SQL nad ai_chat_log)
@@ -85,10 +94,11 @@ function stavTydne(app, ted, nast) {
     return { kredity: kr, tokens_in: tin, tokens_out: tout, tokens_cached: tc, n: nn, lidi: lide.filter((u) => (u.role === "admin") === jeAdmin).length };
   };
   const admin = skupina(true), ostatni = skupina(false);
-  admin.kvota = n.kvota > 0 ? n.kvota * n.podil_admin / 100 : 0;
-  ostatni.kvota = n.kvota > 0 ? n.kvota - admin.kvota : 0;
+  // správci smějí až celou kvótu (podíl je jen jejich rezerva); ostatní nejvýš kvóta − rezerva
+  admin.kvota = n.kvota > 0 ? n.kvota : 0;
+  ostatni.kvota = n.kvota > 0 ? n.kvota - n.rezerva_admin : 0;
   return {
-    tyden_od: od.toISOString(), tyden_do: doo.toISOString(), kvota: n.kvota, podil_admin: n.podil_admin, zdroj: n.zdroj, strop_env: n.strop_env, vlastni: n.vlastni, kredit_kc: KREDIT_KC,
+    tyden_od: od.toISOString(), tyden_do: doo.toISOString(), kvota: n.kvota, podil_admin: n.podil_admin, rezerva_admin: n.rezerva_admin, zdroj: n.zdroj, strop_env: n.strop_env, vlastni: n.vlastni, kredit_kc: KREDIT_KC,
     admin: admin, ostatni: ostatni,
     celkem: { kredity: admin.kredity + ostatni.kredity, tokens_in: admin.tokens_in + ostatni.tokens_in, tokens_out: admin.tokens_out + ostatni.tokens_out, tokens_cached: admin.tokens_cached + ostatni.tokens_cached, n: admin.n + ostatni.n },
     lide: lide.sort((a, b) => b.kredity - a.kredity),
@@ -127,17 +137,24 @@ function kvotaBrzda(app, auth, L) {
   const n = nastaveni(app);
   if (!(n.kvota > 0)) return null;
   const admin = jeAdmin(auth);
-  const kvota = admin ? n.kvota * n.podil_admin / 100 : n.kvota - n.kvota * n.podil_admin / 100;
   const od = zacatekTydne(); const doo = new Date(od.getTime() + 7 * 86400000);
-  const rows = arrayOf(new DynamicModel({ tin: 0, tout: 0, tc: 0 }));
+  // JEDEN dotaz: spotřeba správců i ostatních zvlášť (brzda potřebuje obě: celek i strop ostatních)
+  const rows = arrayOf(new DynamicModel({ tin_a: 0, tout_a: 0, tc_a: 0, tin_o: 0, tout_o: 0, tc_o: 0 }));
   try {
-    app.db().newQuery("SELECT COALESCE(SUM(l.tokens_in),0) AS tin, COALESCE(SUM(l.tokens_out),0) AS tout, COALESCE(SUM(l.tokens_cached),0) AS tc FROM ai_chat_log l LEFT JOIN users u ON u.id = l.user WHERE l.created >= {:od} AND l.created < {:do} AND (CASE WHEN u.role = 'admin' THEN 1 ELSE 0 END) = {:adm}")
-      .bind({ od: sql(od), do: sql(doo), adm: admin ? 1 : 0 }).all(rows);
+    app.db().newQuery("SELECT COALESCE(SUM(CASE WHEN u.role = 'admin' THEN l.tokens_in ELSE 0 END),0) AS tin_a, COALESCE(SUM(CASE WHEN u.role = 'admin' THEN l.tokens_out ELSE 0 END),0) AS tout_a, COALESCE(SUM(CASE WHEN u.role = 'admin' THEN l.tokens_cached ELSE 0 END),0) AS tc_a, COALESCE(SUM(CASE WHEN u.role = 'admin' THEN 0 ELSE l.tokens_in END),0) AS tin_o, COALESCE(SUM(CASE WHEN u.role = 'admin' THEN 0 ELSE l.tokens_out END),0) AS tout_o, COALESCE(SUM(CASE WHEN u.role = 'admin' THEN 0 ELSE l.tokens_cached END),0) AS tc_o FROM ai_chat_log l LEFT JOIN users u ON u.id = l.user WHERE l.created >= {:od} AND l.created < {:do}")
+      .bind({ od: sql(od), do: sql(doo) }).all(rows);
   } catch (err) { return null; /* bez součtu nebrzdit — chyba logu nesmí zastavit chat */ }
-  const pouzito = rows.length ? kreditu(rows[0].tin, rows[0].tout, rows[0].tc) : 0;
-  if (pouzito < kvota) return null;
-  const klic = admin ? "err.aiKvotaAdmin" : "err.aiKvotaOstatni";
-  return { status: 429, body: { error: t(L, klic, { pouzito: zaokrouhli(pouzito), kvota: zaokrouhli(kvota) }), code: "ai_kvota", kvota: zaokrouhli(kvota), pouzito: zaokrouhli(pouzito) } };
+  const r = rows.length ? rows[0] : {};
+  const spravci = kreditu(r.tin_a, r.tout_a, r.tc_a), ostatni = kreditu(r.tin_o, r.tout_o, r.tc_o);
+  const celkem = spravci + ostatni;
+  const odpoved = (klic, pouzito, kvota) => ({ status: 429, body: { error: t(L, klic, { pouzito: zaokrouhli(pouzito), kvota: zaokrouhli(kvota) }), code: "ai_kvota", kvota: zaokrouhli(kvota), pouzito: zaokrouhli(pouzito) } });
+  // strop ostatních = kvóta bez rezervy správců; správci až celá kvóta
+  if (!admin) {
+    const strop = n.kvota - n.rezerva_admin;
+    if (ostatni >= strop) return odpoved("err.aiKvotaOstatni", ostatni, strop);
+  }
+  if (celkem >= n.kvota) return odpoved("err.aiKvotaCelek", celkem, n.kvota);
+  return null;
 }
 
 // zaokrouhlený výstup pro API
@@ -145,7 +162,7 @@ function proApi(app, kolikTydnu) {
   const st = stavTydne(app);
   const z = (o) => Object.assign({}, o, { kredity: zaokrouhli(o.kredity), kvota: o.kvota !== undefined ? zaokrouhli(o.kvota) : undefined });
   return {
-    tyden_od: st.tyden_od, tyden_do: st.tyden_do, kvota: st.kvota, podil_admin: st.podil_admin, zdroj: st.zdroj, strop_env: st.strop_env, vlastni: st.vlastni, kredit_kc: Math.round(st.kredit_kc * 10000) / 10000,
+    tyden_od: st.tyden_od, tyden_do: st.tyden_do, kvota: st.kvota, podil_admin: st.podil_admin, rezerva_admin: zaokrouhli(st.rezerva_admin), zdroj: st.zdroj, strop_env: st.strop_env, vlastni: st.vlastni, kredit_kc: Math.round(st.kredit_kc * 10000) / 10000,
     admin: z(st.admin), ostatni: z(st.ostatni), celkem: z(st.celkem),
     lide: st.lide.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, kredity: zaokrouhli(u.kredity), n: u.n, calls: u.calls, tokens_in: u.tokens_in, tokens_out: u.tokens_out, tokens_cached: u.tokens_cached, posledni: u.posledni })),
     tydny: tydny(app, Math.min(12, Math.max(1, kolikTydnu || 4))),

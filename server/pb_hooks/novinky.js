@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.71-beta": {
+    cs: [
+      "Mapa na telefonu je odemčená: uzly posunete prstem a propojíte tažením z konektoru, i když se strom větví do šířky. Posun se uloží a na počítači sedí pořadí i pozice. Zámek zůstává jako ruční volba.",
+      "AI kredity: podíl správců je rezerva, ne strop. Správci mohou čerpat celou týdenní kvótu organizace; jejich rezervu jim ostatní členové nevyčerpají. Karta ve Správě organizace to říká rovnou a hláška při vyčerpání rozlišuje kvótu organizace a strop členů.",
+      "Čeština zůstává češtinou: stránka prohlížeči hlásí správný jazyk hned od začátku, takže už nenabízí „překlad“ české aplikace do češtiny (výhled místo vzhledu, tím místo týmu).",
+    ],
+    en: [
+      "The map on a phone is unlocked: move nodes with a finger and connect them by dragging from a connector, even when the tree branches sideways. The move is saved and the order and positions match on a computer. The lock stays as a manual option.",
+      "AI credits: the administrators' share is a reserve, not a cap. Administrators may use the whole weekly quota of the organization; their reserve cannot be used up by other members. The card in Organization admin says so directly and the message when the quota runs out distinguishes the organization's quota from the members' cap.",
+      "Your language stays your language: the page tells the browser the right language from the first byte, so the browser no longer offers to \"translate\" the app into the language it is already in.",
+    ],
+  },
   "v0.70-beta": {
     cs: [
       "Každý projekt má své pořadové číslo (#12): přiděluje ho server, nemění se a po smazání se nepoužije znovu. Najdete ho v dashboardu projektu, po najetí myší na název mapy a v Archivu; nese ho i API, MCP a export.",

@@ -61,21 +61,29 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A, body: { kvota_tyden: 1.5, podil_admin: 30 } });
   expect(r.status === 400, 'kvóta 1,5 odmítnuta (celé číslo)');
   r = await inst.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A, body: { kvota_tyden: 1, podil_admin: 30 } });
-  expect(r.status === 200 && r.json.kvota === 1 && r.json.zdroj === 'nastaveni' && Math.abs(r.json.admin.kvota - 0.3) < 0.001 && Math.abs(r.json.ostatni.kvota - 0.7) < 0.001, `kvóta 1 kredit: správci 0,3 · ostatní 0,7 (${r.json.admin.kvota}/${r.json.ostatni.kvota})`);
+  expect(r.status === 200 && r.json.kvota === 1 && r.json.zdroj === 'nastaveni' && r.json.admin.kvota === 1 && Math.abs(r.json.ostatni.kvota - 0.7) < 0.001 && Math.abs(r.json.rezerva_admin - 0.3) < 0.001,
+    `kvóta 1 kredit, rezerva 30 %: správci mohou až 1 (rezerva 0,3) · ostatní nejvýš 0,7 (${r.json.admin.kvota}/${r.json.ostatni.kvota}/${r.json.rezerva_admin})`);
 
-  console.log('== brzda: správci vyčerpají svůj podíl, ostatní jedou dál ==');
+  console.log('== brzda: podíl = REZERVA správců (Richard 4. 10. 2026) — ostatní narazí na 0,7, správce jede dál až do celé kvóty ==');
   let blok = null, tahu = 0;
-  for (let i = 0; i < 12 && !blok; i++) {
-    r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Dál ' + i, context: { route: '/' } } });
+  for (let i = 0; i < 30 && !blok; i++) {   // Jana má 0,09; strop ostatních 0,7 ≈ dalších 13 volání
+    r = await inst.api('POST', '/api/kb/chat', { token: B, body: { message: 'Dál ' + i, context: { route: '/' } } });
     if (r.status === 429) blok = r.json; else tahu++;
   }
-  expect(!!blok && blok.code === 'ai_kvota', `správce po ${tahu} tazích narazil na 429 ai_kvota`);
-  expect(!!blok && /správce/i.test(blok.error) && /0,3|0\.3/.test(blok.error), `hláška říká komu a kolik (${blok && blok.error})`);
-  expect(!!blok && blok.pouzito >= blok.kvota, 'pouzito ≥ kvota skupiny');
+  expect(!!blok && blok.code === 'ai_kvota' && tahu >= 10 && tahu <= 16, `člen po ${tahu} tazích narazil na 429 ai_kvota (strop ostatních)`);
+  expect(!!blok && /členy týmu/i.test(blok.error) && /rezerva/i.test(blok.error) && /0,7|0\.7/.test(blok.error), `hláška říká komu, kolik a proč (${blok && blok.error})`);
+  expect(!!blok && blok.pouzito >= blok.kvota, 'pouzito ≥ strop ostatních');
   r = await inst.api('GET', '/api/kb/ai-kredity', { token: A });
-  expect(r.json.admin.kredity >= 0.3 && r.json.ostatni.kredity < 0.7, 'přehled: správci nad podílem, ostatní pod ním');
-  r = await inst.api('POST', '/api/kb/chat', { token: B, body: { message: 'Jedu dál', context: { route: '/' } } });
-  expect(r.status === 200, 'člen (skupina ostatní) může dál');
+  expect(r.json.ostatni.kredity >= 0.7 && r.json.admin.kredity < 0.3, 'přehled: ostatní na stropu, správci hluboko pod kvótou');
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Správce jede dál', context: { route: '/' } } });
+  expect(r.status === 200, 'správce může dál (rezerva 0,3 mu zůstala, čerpá až do celé kvóty)');
+  blok = null; let tahuA = 0;
+  for (let i = 0; i < 30 && !blok; i++) {   // celkem je ~0,8 → celá kvóta 1 ≈ dalších 4–5 volání správce
+    r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Ještě ' + i, context: { route: '/' } } });
+    if (r.status === 429) blok = r.json; else tahuA++;
+  }
+  expect(!!blok && blok.code === 'ai_kvota' && tahuA >= 2 && tahuA <= 8, `správce narazil až na CELOU kvótu organizace po ${tahuA} dalších tazích`);
+  expect(!!blok && /organizace/i.test(blok.error) && /z 1\b|of 1\b/.test(blok.error), `hláška správci: kvóta organizace vyčerpána (${blok && blok.error})`);
   r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: 'x', action_id: 'y', ok: true } });
   expect(r.status === 429 && r.json.code === 'ai_kvota', 'brzda platí i pro potvrzení akce');
 
@@ -91,13 +99,27 @@ H.beh(async () => {
   await inst2.register('a2@example.com', { name: 'Eva' });
   const A2 = await inst2.login('a2@example.com');
   r = await inst2.api('GET', '/api/kb/ai-kredity', { token: A2 });
-  expect(r.status === 200 && r.json.kvota === 200 && r.json.zdroj === 'env' && Math.abs(r.json.admin.kvota - 60) < 0.001, `env KB_AI_KVOTA_TYDEN=200 → správci 60 (${r.json.kvota}/${r.json.zdroj}/${r.json.admin.kvota})`);
+  expect(r.status === 200 && r.json.kvota === 200 && r.json.zdroj === 'env' && r.json.admin.kvota === 200 && Math.abs(r.json.rezerva_admin - 60) < 0.001 && r.json.ostatni.kvota === 140, `env KB_AI_KVOTA_TYDEN=200 → správci až 200 (rezerva 60), ostatní 140 (${r.json.kvota}/${r.json.zdroj}/${r.json.admin.kvota}/${r.json.rezerva_admin})`);
   r = await inst2.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A2, body: { kvota_tyden: 5000, podil_admin: 30 } });
   expect(r.status === 200 && r.json.kvota === 200 && r.json.zdroj === 'env' && r.json.strop_env === 200 && r.json.vlastni === 5000, `env je TVRDÝ STROP: vlastní 5000 → platí 200 (${r.json.kvota}/${r.json.zdroj})`);
   r = await inst2.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A2, body: { kvota_tyden: 50, podil_admin: 0 } });
-  expect(r.status === 200 && r.json.kvota === 50 && r.json.zdroj === 'nastaveni' && r.json.podil_admin === 0 && r.json.admin.kvota === 0, 'vlastní hodnota env jen SNÍŽÍ (50 < 200); podíl 0 % zůstane 0 (ne výchozích 30)');
+  expect(r.status === 200 && r.json.kvota === 50 && r.json.zdroj === 'nastaveni' && r.json.podil_admin === 0 && r.json.rezerva_admin === 0 && r.json.admin.kvota === 50 && r.json.ostatni.kvota === 50, 'vlastní hodnota env jen SNÍŽÍ (50 < 200); rezerva 0 % zůstane 0 (ne výchozích 30) = společný balík');
   r = await inst2.api('POST', '/api/kb/chat', { token: A2, body: { message: 'Ahoj', context: { route: '/' } } });
-  expect(r.status === 429 && r.json.code === 'ai_kvota', 'podíl správců 0 % = správce nemá kredity (429)');
+  expect(r.status === 200, 'rezerva 0 % správce NEblokuje (čerpá ze společného balíku)');
+  r = await inst2.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A2, body: { kvota_tyden: 50, podil_admin: 100 } });
+  expect(r.status === 200 && r.json.admin.kvota === 50 && r.json.ostatni.kvota === 0, 'rezerva 100 % = ostatní nemají nic, správci celá kvóta');
+
+  console.log('== zkušebka (KB_TRIAL_UNTIL): správce může celou kvótu 20, rezerva 6, ostatní 14 ==');
+  // 4. 10. 2026: správce hostované zkušebky narazil po 3 zprávách, protože podíl 30 % byl strop (6 z 20)
+  const inst3 = await H.startInstance({ slug: 'kredity-trial', addHostGateway: true, env: {
+    KB_CHAT_PROVIDER: 'ollama', KB_CHAT_URL: mock.base, KB_CHAT_MODEL: 'm-a', KB_UVODNI_MAPA: 0, KB_AI_KVOTA_TYDEN: 20, KB_TRIAL_UNTIL: '2099-01-01',
+  } });
+  await inst3.register('a3@example.com', { name: 'Olga' });
+  const A3 = await inst3.login('a3@example.com');
+  r = await inst3.api('GET', '/api/kb/ai-kredity', { token: A3 });
+  expect(r.status === 200 && r.json.podil_admin === 30 && r.json.admin.kvota === 20 && r.json.rezerva_admin === 6 && r.json.ostatni.kvota === 14,
+    `zkušebka: správce až 20 (rezerva 6), ostatní 14 (${JSON.stringify({ podil: r.json.podil_admin, a: r.json.admin.kvota, rez: r.json.rezerva_admin, o: r.json.ostatni.kvota })})`);
+  await inst3.stop();
 
   console.log('== karta add_nodes: celkový počet uzlů včetně vnořených ==');
   const map = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {

@@ -792,17 +792,17 @@ const STRINGS = {
     cs: "Ollama běží. Doplňte název modelu.",
     en: "Ollama is running. Add the model name.",
   },
-  "err.aiKvotaAdmin": {
-    cs: "Týdenní kvóta AI kreditů pro správce je vyčerpána ({pouzito} z {kvota}). Obnoví se v pondělí; správce může kvótu nebo podíl upravit ve Správě organizace.",
-    en: "The weekly AI credit quota for administrators is used up ({pouzito} of {kvota}). It resets on Monday; an administrator can change the quota or the split in Organization admin.",
+  "err.aiKvotaCelek": {
+    cs: "Týdenní kvóta AI kreditů organizace je vyčerpána ({pouzito} z {kvota}). Obnoví se v pondělí; správce může kvótu upravit ve Správě organizace.",
+    en: "The organization's weekly AI credit quota is used up ({pouzito} of {kvota}). It resets on Monday; an administrator can change the quota in Organization admin.",
   },
   "err.aiKvotaOstatni": {
-    cs: "Týdenní kvóta AI kreditů pro členy týmu je vyčerpána ({pouzito} z {kvota}). Obnoví se v pondělí; správce může kvótu nebo podíl upravit ve Správě organizace.",
-    en: "The weekly AI credit quota for team members is used up ({pouzito} of {kvota}). It resets on Monday; an administrator can change the quota or the split in Organization admin.",
+    cs: "Týdenní kvóta AI kreditů pro členy týmu je vyčerpána ({pouzito} z {kvota}); zbytek je rezerva správců. Obnoví se v pondělí; správce může kvótu nebo rezervu upravit ve Správě organizace.",
+    en: "The weekly AI credit quota for team members is used up ({pouzito} of {kvota}); the rest is reserved for administrators. It resets on Monday; an administrator can change the quota or the reserve in Organization admin.",
   },
   "err.aiKvotaNeplatna": {
-    cs: "Kvóta musí být celé číslo 0–1 000 000 kreditů a podíl správců 0–100 %.",
-    en: "The quota must be a whole number 0–1,000,000 credits and the administrators' share 0–100 %.",
+    cs: "Kvóta musí být celé číslo 0–1 000 000 kreditů a rezerva správců 0–100 %.",
+    en: "The quota must be a whole number 0–1,000,000 credits and the administrators' reserve 0–100 %.",
   },
   "err.aiRateLimited": {
     cs: "Vyčerpali jste hodinový strop AI operací ({limit}). Zkuste to za chvíli — strop chrání kredit u vašeho poskytovatele.",

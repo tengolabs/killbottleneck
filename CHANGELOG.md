@@ -9,6 +9,35 @@ below before you jump several versions.
 
 ---
 
+## v0.71-beta — 2026-10-04
+
+**Map unlocked on the phone, administrators' credit reserve, right page language**
+
+- **Map on a phone: nodes can be dragged with a finger and connected**, also in the horizontal (phone)
+  layout, which used to be view-only. The lock is no longer on by default on small screens; the red lock
+  button stays as a manual choice. Positions are still stored in the vertical (canonical) layout: a move
+  made in the horizontal view is applied to the stored position with the axes swapped (down the row on the
+  phone = right along the row on a computer), so the order you see on the phone matches the computer. The
+  horizontal view itself is still laid out automatically when the map is opened.
+- **AI credits: the administrators' share is a reserve, not a cap.** Administrators may use the whole
+  weekly quota of the organization; other members are capped at *quota − reserve*. A member is stopped at
+  the members' cap or when the whole quota is used; an administrator only when the whole quota is used.
+  `100 %` = other members get nothing, `0 %` = no reserve (one shared pool). The card in Organization admin
+  is labelled "Administrators' reserve (%)" and shows "reserved X, may use up to K · others at most Y";
+  `GET /api/kb/ai-kredity` returns `rezerva_admin`, the admin group's `kvota` is the whole quota.
+- **`<html lang>` follows the real language** from the first byte (`cs` default, the stored or browser
+  choice via an inline script) instead of a hard-coded `en`. With `lang="en"` over a Czech UI some browsers
+  offered to "translate" the page into Czech and mangled the texts (reported by a trial user).
+
+**Upgrade notes**
+
+- No migration, no new environment variable. The saved "administrators' share" value is now read as a
+  reserve: administrators can use more than before (the whole quota), members at most *quota − share*.
+  `0 %` used to leave administrators without credits; it now means no reserve. Hosted trials keep
+  `KB_AI_KVOTA_TYDEN` as the hard cap.
+- Server message key `err.aiKvotaAdmin` is replaced by `err.aiKvotaCelek` (organization quota used up);
+  `err.aiKvotaOstatni` now mentions the administrators' reserve.
+
 ## v0.70-beta — 2026-10-03
 
 **Project numbers and an assistant that searches the archive**

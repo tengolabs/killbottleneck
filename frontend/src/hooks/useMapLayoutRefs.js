@@ -18,8 +18,10 @@ export function useMapLayoutRefs({ nodes, rfInstance, nodesNow, edgesNow, locati
   // směr rozložení mapy (na výšku/na šířku); na mobilu se v režimu auto překlopí
   const { setMode: setDirMode, direction, narrow } = useMapDirection();
   const updateNodeInternals = useUpdateNodeInternals(); // přeměřit konektory po změně strany (jinak hrany vedou ke staré pozici)
-  // zámek proti omylnému posunu uzlu (hlavně na mobilu) — default zamčeno na malém displeji
-  const [locked, setLocked] = useState(narrow);
+  // zámek proti omylnému posunu uzlu — výchozí ODEMČENO i na mobilu (Richard 4. 10. 2026
+  // zrušil své rozhodnutí z 23. 7. „na malém displeji zamčeno“: uzly mají jít na telefonu
+  // posouvat prstem a propojovat). Zámek zůstává jako ruční volba (červený ControlButton).
+  const [locked, setLocked] = useState(false);
   // Stupeň Čitelnosti přes ref: rozestupy „Mojí mapy" ho potřebují v callbacích,
   // které vznikají DŘÍV, než se stav deklaruje (viz PERSONAL_LAYOUT). Výchozí
   // hodnota se čte z prohlížeče, ať první vykreslení nesedí vedle.

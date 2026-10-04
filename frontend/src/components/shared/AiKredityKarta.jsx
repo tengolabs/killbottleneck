@@ -14,8 +14,9 @@ import { Coins, Loader2, Check } from 'lucide-react';
 // (kredity.js). Texty v líném balíku `admin` (mimo lite rozpočet).
 const fmtN = (x, d = 2) => Number(x || 0).toLocaleString(intlLocale(), { maximumFractionDigits: d });
 
-// `celkem` = kvóta organizace: skupina s podílem 0 % má kvota 0 a server ji BLOKUJE — nesmí
-// vypadat jako „bez stropu“ (checkup 15. 9. 2026)
+// `celkem` = kvóta organizace: ostatní s rezervou správců 100 % mají kvota 0 a server je BLOKUJE —
+// nesmí to vypadat jako „bez stropu“ (checkup 15. 9. 2026). Správci mají strop = celá kvóta
+// (podíl je jejich rezerva, ne strop — Richard 4. 10. 2026).
 function Skupina({ t, nazev, s, celkem, testid }) {
   const maStrop = celkem > 0;
   const podil = !maStrop ? 0 : s.kvota > 0 ? Math.min(100, Math.round((s.kredity / s.kvota) * 100)) : 100;
@@ -143,7 +144,7 @@ export default function AiKredityKarta() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1.5" data-testid="ai-kredity-rozdeleni">
-              {kv > 0 ? t('split', { admin: fmtN(kv * pd / 100), ostatni: fmtN(kv - kv * pd / 100) }) : t('noLimit')}
+              {kv > 0 ? t('split', { admin: fmtN(kv * pd / 100), kvota: fmtN(kv), ostatni: fmtN(kv - kv * pd / 100) }) : t('noLimit')}
             </p>
             {error && <p className="text-xs text-destructive mt-1" data-testid="ai-kredity-chyba-ulozeni">{error}</p>}
           </div>

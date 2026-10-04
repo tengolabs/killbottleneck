@@ -1,7 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="cs">
   <head>
     <meta charset="UTF-8" />
+    <!-- Jazyk dokumentu MUSÍ sedět s obsahem už od prvního bajtu: natvrdo „en" nad českou
+         aplikací vedlo k tomu, že prohlížeč nabídl/spustil překlad „z angličtiny do češtiny"
+         a český text „přeložil" (Vzhled → výhled, tým → tím, Pozvat do týmu → povolat k týmu;
+         stížnost uživatele zkušebky 4. 10. 2026). Výchozí jazyk aplikace je čeština
+         (lib/lang.js: cs/sk prohlížeč → cs, jinak en), tady se stejná volba nastaví
+         ještě PŘED načtením skriptů, aby detekce jazyka v prohlížeči nic nepředběhla.
+         i18n/index.js pak atribut drží v kroku s přepnutím jazyka. -->
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem('kb-lang') || localStorage.getItem('flowmap-lang');
+          if (v !== 'cs' && v !== 'en') {
+            var n = (navigator.language || '').toLowerCase();
+            v = (n.indexOf('cs') === 0 || n.indexOf('sk') === 0) ? 'cs' : 'en';
+          }
+          document.documentElement.lang = v;
+        } catch (e) { /* zakázané úložiště → zůstane cs */ }
+      })();
+    </script>
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png" />
