@@ -188,6 +188,18 @@ H.beh(async () => {
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   pravidla = (await inst.api('GET', `/api/kb/rules?map=${map.id}`, { token: A })).json.rules || [];
   expect(kartaPodleId(chat, k.id).stav === 'hotovo' && pravidla.length === 1 && pravidla[0].name === 'Hotovo → oznámit vlastníkovi' && pravidla[0].actions[0].message === 'Krok je hotový', `pravidlo změněno (${JSON.stringify(pravidla.map((p) => p.name))})`);
+  // vypnout pravidlo (panel 4. 10.: set_rule_enabled nikde netestován; podle názvu dřív neprošel a karta neřekla které)
+  fronta.push(nastroj('set_rule_enabled', { map_id: 'Truhlářství', rule_id: 'neexistuje', enabled: false }), text('x'));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Vypni pravidlo neexistuje' });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => /rule "neexistuje" not found/.test(m.content)), 'neznámé pravidlo → chyba před kartou, žádná karta');
+  fronta.push(nastroj('set_rule_enabled', { map_id: 'Truhlářství', rule_id: 'Hotovo → oznámit vlastníkovi', enabled: false }));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Vypni pravidlo Hotovo → oznámit vlastníkovi' });
+  chat = r.json.chat; k = posledniKarta(chat, 'akce');
+  expect(!!k && k.stav === 'ceka' && k.popis === 'Vypnout pravidlo „Hotovo → oznámit vlastníkovi“ v projektu „Truhlářství“', `karta vypnutí pravidla s názvem pravidla (${k && k.popis})`);
+  fronta.push(text('x'));
+  r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
+  pravidla = (await inst.api('GET', `/api/kb/rules?map=${map.id}`, { token: A })).json.rules || [];
+  expect(kartaPodleId(chat, k.id).stav === 'hotovo' && pravidla.length === 1 && pravidla[0].enabled === false && toolZ(posledniVolani()).some((m) => /^Rule disabled/.test(m.content)), `pravidlo vypnuto (${JSON.stringify(pravidla.map((p) => [p.name, p.enabled]))})`);
   fronta.push(nastroj('update_rule', { map_id: 'Truhlářství', rule_id: 'neexistuje', name: 'x', trigger: { type: 'node_status_changed', status: 'done' }, actions: [{ type: 'notify', to: 'map_owner', message: 'x' }] }), text('x'));
   r = await chatuj(A, { chat_id: chat.id, message: 'Změň pravidlo neexistuje' });
   expect(toolZ(posledniVolani()).some((m) => /rule "neexistuje" not found/.test(m.content)), 'neznámé pravidlo → chyba, bez karty');
@@ -202,6 +214,9 @@ H.beh(async () => {
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   let sablony = (await inst.api('GET', '/api/kb/rule-templates', { token: A })).json.templates || [];
   expect(kartaPodleId(chat, k.id).stav === 'hotovo' && sablony.length === 1 && sablony[0].name === 'Hotovo → oznámit (šablona)', 'šablona uložena');
+  fronta.push(nastroj('list_rule_templates', {}), text('x'));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Jaké mám šablony pravidel?' });
+  expect(toolZ(posledniVolani()).some((m) => /Hotovo → oznámit \(šablona\)/.test(m.content)), 'list_rule_templates vypíše uloženou šablonu (čtení, bez karty)');
   fronta.push(nastroj('save_rule_template', { name: 'Hotovo → oznámit (šablona)', trigger: { type: 'node_status_changed', status: 'done' }, actions: [{ type: 'notify', to: 'map_owner', message: 'x' }] }), text('x'));
   r = await chatuj(A, { chat_id: chat.id, message: 'Ulož šablonu znovu' });
   expect(toolZ(posledniVolani()).some((m) => /already exists — pass its template_id/.test(m.content)), 'stejný název → chyba s radou template_id');
@@ -223,6 +238,14 @@ H.beh(async () => {
   r = await chatuj(A, { chat_id: chat.id, message: 'Smaž to pravidlo' });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
   expect(!!k && k.popis === 'Smazat pravidlo „Hotovo → oznámit vlastníkovi“ z projektu „Truhlářství“ — nejde vrátit', `karta smazání pravidla (${k && k.popis})`);
+  // Ne u destruktivní karty: stav zamitnuto, pravidlo zůstává, model dostal „zamítl“ (panel 4. 10.: odmítnutí u nových funkcí netestované)
+  fronta.push(text('Nechám ho.'));
+  r = await potvrd(A, chat.id, k.id, false); chat = r.json.chat;
+  expect(kartaPodleId(chat, k.id).stav === 'zamitnuto' && ((await inst.api('GET', `/api/kb/rules?map=${map.id}`, { token: A })).json.rules || []).length === 1 && toolZ(posledniVolani()).some((m) => /zamítl/.test(m.content)), 'Ne → pravidlo zůstalo, model dostal „uživatel zamítl“');
+  fronta.push(nastroj('delete_rule', { map_id: 'Truhlářství', rule_id: 'Hotovo → oznámit vlastníkovi' }));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Ne, fakt ho smaž' });
+  chat = r.json.chat; k = posledniKarta(chat, 'akce');
+  expect(!!k && k.stav === 'ceka', 'nová karta smazání pravidla');
   fronta.push(text('x'));
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   expect(kartaPodleId(chat, k.id).stav === 'hotovo' && ((await inst.api('GET', `/api/kb/rules?map=${map.id}`, { token: A })).json.rules || []).length === 0, 'pravidlo smazáno');
@@ -276,6 +299,8 @@ H.beh(async () => {
   fronta.push(text('x'));
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   expect(kartaPodleId(chat, k.id).stav === 'hotovo' && (await rodic('c')) === 'b' && ((await mapaZ(mapaP.id)).edges || []).length === 3, `Gama je pod Betou, hran stále 3 (${await rodic('c')})`);
+  const hranaC = ((await mapaZ(mapaP.id)).edges || []).find((e) => e.target === 'c');
+  expect(!!hranaC && hranaC.type === 'deletable' && /^edge-/.test(hranaC.id), `nová hrana jako z editoru: type deletable (tlačítko smazání), id edge-… (${JSON.stringify(hranaC)})`);
   fronta.push(nastroj('move_node', { map_id: 'Přesuny', node_id: 'Gama', parent_id: 'apex' }));
   r = await chatuj(A, { chat_id: chat.id, message: 'Dej Gamu zpět nahoru' });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
@@ -409,8 +434,22 @@ H.beh(async () => {
   r = await chatuj(A, { chat_id: chat.id, message: 'Smaž projekt Truhlářství 2026 úplně' });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
   expect(!!k && k.popis === 'Smazat projekt „Truhlářství 2026“ se všemi kroky — nejde vrátit', `karta smazání projektu (${k && k.popis})`);
-  fronta.push(text('x'));
-  r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
-  expect(kartaPodleId(chat, k.id).stav === 'hotovo' && (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).status === 404, 'projekt smazán');
+  fronta.push(text('Dobře, nechám ho.'));
+  r = await potvrd(A, chat.id, k.id, false); chat = r.json.chat;
+  expect(kartaPodleId(chat, k.id).stav === 'zamitnuto' && (await mapaZ(map.id)).id === map.id && toolZ(posledniVolani()).some((m) => /zamítl/.test(m.content)), 'Ne → projekt zůstal, model dostal „uživatel zamítl“');
+  // ⚠️ MUTAČNÍ JÁDRO (panel 4. 10.): dvě SOUBĚŽNÁ potvrzení téže karty (druhé okno / opakování po timeoutu) — akce jen jednou,
+  // druhý požadavek 404 ještě před vykonáním (pending se odebírá atomicky). Dřív obě prošla a smazání běželo dvakrát.
+  fronta.push(nastroj('delete_project', { map_id: 'Truhlářství 2026' }));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Ne, fakt ho smaž' });
+  chat = r.json.chat; k = posledniKarta(chat, 'akce');
+  expect(!!k && k.stav === 'ceka', 'nová karta smazání projektu');
+  fronta.push(text('x'), text('x'));
+  const dvoji = await Promise.all([potvrd(A, chat.id, k.id, true), potvrd(A, chat.id, k.id, true)]);
+  const stavy = dvoji.map((x) => x.status).sort();
+  expect(stavy.join(',') === '200,404', `dvojí potvrzení téže karty: jedno 200, druhé 404 (${stavy.join(',')})`);
+  chat = ((dvoji.find((x) => x.status === 200) || {}).json || {}).chat;
+  expect(!!chat && kartaPodleId(chat, k.id).stav === 'hotovo' && (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).status === 404, 'projekt smazán (jednou)');
+  expect(fronta.length === 1, `model dopověděl jen jednou — druhý požadavek skončil před vykonáním (ve frontě zbylo ${fronta.length})`);
+  fronta.length = 0;
   expect((await inst.api('GET', '/api/collections/api_keys/records', { token: A })).json.totalItems === 0, 'dočasné klíče po zápisech smazány');
 }, { nazev: 'AI-CHAT-FUNKCE' });

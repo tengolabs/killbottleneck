@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { shareMap } from '@/api/kb';
 import { memberLabel } from '@/lib/memberLabel';
@@ -24,7 +24,12 @@ import InviteDialog from '@/components/tasks/InviteDialog';
 
 // isOwner: spolusprávce (jmenované „Upravovat") spravuje jen jmenovitý seznam —
 // týmový přístup a zveřejnění vidí a mění jen vlastník (server je stejně odmítne).
-export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped }) {
+// orgMembers: adresář instance (members + externí kontakty) z editoru — dialog
+// z něj nabízí VIDITELNÝ výběr kolegů (Richard 3. 10. 2026: „nemohu vybírat lidi
+// v organizaci" — dřív tu bylo jen holé pole na e-mail a adresu bylo nutné znát
+// zpaměti). Výběr jen předvyplní e-mail; sdílení jde dál stejnou cestou (Pozvat).
+const PRAZDNE = []; // stabilní default, ať se useMemo kandidátů nepřepočítává při každém renderu bez prop
+export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped, orgMembers = PRAZDNE }) {
   const { t } = useTranslation('editor');
   // každá mutace sdílení bumpne `updated` mapy — poslat editoru, ať si posune
   // base_updated a další autosave nespadne na falešný 409
@@ -51,6 +56,18 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
   const f = useDialogForm({ open, onClose, submit: () => handleShare() });
   const { setError } = f;
 
+  // Kandidáti do výběru: členové týmu (ne externí kontakty — nemají účet, nemají
+  // co vidět), bez mě a bez těch, kdo už v jmenovitém seznamu jsou.
+  const kandidati = useMemo(() => {
+    const uz = new Set(members.map((m) => String(m.email || '').toLowerCase()));
+    const ja = String(user?.email || '').toLowerCase();
+    return orgMembers
+      .filter((m) => !m.external && m.email)
+      .filter((m) => { const e = String(m.email).toLowerCase(); return e !== ja && !uz.has(e); })
+      .sort((a, b) => (memberLabel(a) || '').localeCompare(memberLabel(b) || '', undefined, { sensitivity: 'base' }));
+  }, [orgMembers, members, user?.email]);
+  const vybranyClen = kandidati.find((m) => m.email.toLowerCase() === email.trim().toLowerCase())?.email || '';
+
   const loadMembers = useCallback(async () => {
     if (!mapId) return;
     setLoading(true);
@@ -61,7 +78,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
       setTeamWorkers(res.team_workers || []);
       setIsPublic(res.is_public || false);
       setTeamAccess(res.team_access || '');
-    } catch (e) {
+    } catch {
       setError(t('shareDialog.loadFailed'));
     } finally {
       setLoading(false);
@@ -127,7 +144,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
           m.email === memberEmail ? { ...m, permission: res.permission } : m
         ));
       }
-    } catch (e) {
+    } catch {
       setError(t('shareDialog.permissionFailed'));
     }
   });
@@ -141,7 +158,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
         bump(res);
         setMembers(prev => prev.filter(m => m.email !== memberEmail));
       }
-    } catch (e) {
+    } catch {
       setError(t('shareDialog.removeFailed'));
     }
   });
@@ -155,7 +172,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
         bump(res);
         setTeamAccess(res.team_access);
       }
-    } catch (e) {
+    } catch {
       setError(t('shareDialog.teamFailed'));
     }
   });
@@ -169,7 +186,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
         bump(res);
         setIsPublic(res.is_public);
       }
-    } catch (e) {
+    } catch {
       setError(t('shareDialog.publicFailed'));
     }
   });
@@ -206,10 +223,27 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
+            {kandidati.length > 0 && (
+              <select
+                data-testid="share-member-select"
+                aria-label={t('shareDialog.pickMember')}
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={vybranyClen}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={f.busy}
+              >
+                <option value="">{t('shareDialog.pickMember')}</option>
+                {kandidati.map((m) => (
+                  <option key={m.email} value={m.email}>
+                    {memberLabel(m) !== m.email ? `${memberLabel(m)} (${m.email})` : m.email}
+                  </option>
+                ))}
+              </select>
+            )}
             <div className="flex gap-2">
               <Input
                 type="email"
-                placeholder={t('shareDialog.emailPlaceholder')}
+                placeholder={kandidati.length > 0 ? t('shareDialog.emailPlaceholderOr') : t('shareDialog.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={f.onEnter}

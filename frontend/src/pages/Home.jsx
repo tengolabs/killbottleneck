@@ -21,6 +21,7 @@ import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { useSidePanels } from '@/hooks/useSidePanels';
 import SkinPattern from '@/components/shared/SkinPattern';
 import { PAGE_CONTAINER } from '@/lib/layout';
+import { useMembersWithContacts } from '@/lib/externalContacts';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ export default function Home() {
   const view = searchParams.get('view') === 'templates' ? 'templates' : 'maps'; // taby řídí URL (naviguje se sem i z /tasks)
   const [org, setOrg] = useState(null);
   const buffer = useBufferNodes(user);
+  const [orgMembers] = useMembersWithContacts(user); // výběr člena v dialogu Sdílet i z úvodní stránky (panel 4. 10. 2026)
   const { items: taskItems, refresh: refreshTasks } = useTasks(user);
   const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
 
@@ -269,6 +271,7 @@ export default function Home() {
                             <button
                               onClick={(e) => { e.stopPropagation(); setShareMapId(m.id); }}
                               className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                              data-testid="home-share"
                               title={t('editor:toolbar.share')}
                               aria-label={t('editor:toolbar.share')}
                             >
@@ -381,6 +384,7 @@ export default function Home() {
         open={!!shareMapId}
         mapId={shareMapId}
         onClose={() => setShareMapId(null)}
+        orgMembers={orgMembers}
       />
       {mapCreationDialogs}
     </div>

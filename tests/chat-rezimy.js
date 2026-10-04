@@ -97,8 +97,7 @@ const nastaveni = NASTROJE.filter((n) => n.skupina === 'nastaveni');
 expect(nastaveni.length === N.NASTROJE_NASTAVENI.length && nastaveni.every((n) => N.NASTROJE_NASTAVENI.includes(n.name)), `skupina nastaveni v chat.js = registr modulu (${nastaveni.length} nástrojů)`);
 // role: každý jenRole má kontrolu v modulu (neznámá role = nástroj by nikdo nedostal) — roleOk s falešným auth
 const falesnyAdmin = { getString: (k) => (k === 'role' ? 'admin' : ''), getBool: () => false };
-for (const n of nastaveni.filter((x) => x.jenRole)) expect(N.roleOk(n.jenRole, faleznyAdminNebo(falesnyAdmin)), `${n.name}: role „${n.jenRole}“ je známá (admin ji má)`);
-function faleznyAdminNebo(a) { return a; }
+for (const n of nastaveni.filter((x) => x.jenRole)) expect(N.roleOk(n.jenRole, falesnyAdmin), `${n.name}: role „${n.jenRole}“ je známá (admin ji má)`);
 // typy upozornění: modul = helpers NOTIFY_TYPES bez NOTIFY_ALWAYS (jinak by model nabízel typ, který server nezná, nebo šlo vypnout poplach o účtu)
 const ocekavane = helpers.NOTIFY_TYPES.filter((t) => !helpers.NOTIFY_ALWAYS.includes(t));
 expect(JSON.stringify(N.NOTIFY_NASTAVITELNE.slice().sort()) === JSON.stringify(ocekavane.slice().sort()), `NOTIFY_NASTAVITELNE = NOTIFY_TYPES − NOTIFY_ALWAYS (${N.NOTIFY_NASTAVITELNE.length} typů, password_reset chybí: ${!N.NOTIFY_NASTAVITELNE.includes('password_reset')})`);
@@ -115,6 +114,27 @@ expect(!('secret' in (NASTROJE.find((n) => n.name === 'save_ai_agent') || { para
 expect(['cs', 'en'].every((L) => new RegExp(L === 'cs' ? 'Nastavení aplikace měníš nástroji' : 'You change the app settings with tools').test(P[L].system) && new RegExp(L === 'cs' ? '„Můj účet“' : '"My account"').test(P[L].system)), 'prompt cs/en: řádek o nastavení a kam poslat u hesla');
 // nález z klik-testu 4. 10.: model položil dvě upřesňující otázky a pak teprve řekl, že sdílení neumí
 expect(['cs', 'en'].every((L) => /share_map/.test(P[L].system) && new RegExp(L === 'cs' ? 'nedoptávej se napřed' : 'do not ask clarifying questions first').test(P[L].system)), 'prompt cs/en: sdílení projektu + „bez nástroje to řekni hned, neptej se napřed“');
+
+console.log('== karta vždy u jazyka, režimu e-mailů, lite a vypnutí e-mailů/všeho (panel 4. 10.: pokyn ze sdílené mapy) ==');
+const sp = NASTROJE.find((n) => n.name === 'set_preference'); const sn = NASTROJE.find((n) => n.name === 'set_notification');
+expect(!!sp.kartaKdyz({ co: 'language', hodnota: 'en' }) && !!sp.kartaKdyz({ co: 'notify_email_mode', hodnota: 'none' }) && !!sp.kartaKdyz({ co: 'mode', hodnota: 'lite' }) && !sp.kartaKdyz({ co: 'theme', hodnota: 'dark' }) && !sp.kartaKdyz({ co: 'readability', hodnota: 'large' }) && !sp.kartaKdyz({ co: 'mode', hodnota: 'full' }), 'set_preference: jazyk, režim e-mailů a lite přes kartu; motiv, čitelnost, plná verze hned s Vrátit');
+expect(!!sn.kartaKdyz({ type: 'reminder', email: false }) && !!sn.kartaKdyz({ type: 'all', in_app: false }) && !sn.kartaKdyz({ type: 'reminder', in_app: false }) && !sn.kartaKdyz({ type: 'all', in_app: true }) && !sn.kartaKdyz({ type: 'deadline', email: true }), 'set_notification: vypnutí e-mailu nebo všeho přes kartu; jeden typ v aplikaci / zapnutí hned s Vrátit');
+
+console.log('== parita cs/en promptu: stejné klíče, stejné značky, jména nástrojů v promptu existují (panel 4. 10.: drift hlídala jen disciplína) ==');
+const ploche = (o, pre = '') => Object.entries(o || {}).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? ploche(v, `${pre}${k}.`) : [[`${pre}${k}`, Array.isArray(v) ? v.join('\n') : String(v)]]));
+const pCs = ploche(P.cs); const pEn = Object.fromEntries(ploche(P.en));
+expect(JSON.stringify(pCs.map(([k]) => k).sort()) === JSON.stringify(Object.keys(pEn).sort()), `P.cs a P.en mají stejné klíče (${pCs.length})`);
+const vety = (L) => String(P[L].system).split('\n').filter((l) => /^- /.test(l)).length;
+expect(vety('cs') === vety('en'), `systémový prompt cs/en: stejný počet pravidel „- …“ (${vety('cs')} / ${vety('en')})`);
+const spatneZnacky = pCs.filter(([k, v]) => k in pEn && znacky(v) !== znacky(pEn[k])).map(([k]) => k);
+expect(spatneZnacky.length === 0, `zástupné značky {x} sedí ve všech větách cs/en (${spatneZnacky.join(', ') || 'ok'})`);
+const jmenaNastroju = new Set(NASTROJE.map((n) => n.name));
+const schemaTxt = JSON.stringify(NASTROJE.map((n) => n.parameters));
+for (const L of ['cs', 'en']) {
+  const slova = [...new Set([...String(P[L].system).matchAll(/\b([a-z]+(?:_[a-z]+)+)\b/g)].map((m) => m[1]))];
+  const neznama = slova.filter((x) => !jmenaNastroju.has(x) && !schemaTxt.includes(`"${x}"`));
+  expect(neznama.length === 0, `prompt ${L}: každé jméno nástroje/pole v promptu existuje (${neznama.join(', ') || 'ok'})`);
+}
 
 console.log(`\n${fail ? '🔴' : '🟢'} CHAT-REZIMY PASS ${ok} / FAIL ${fail}`);
 process.exitCode = fail ? 1 : 0;

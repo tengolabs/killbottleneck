@@ -42,9 +42,7 @@ function ocisti(s, max) {
 function radek(s, max) {
   return ocisti(s, max * 2).replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
-function norm(s) {
-  return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
-}
+function norm(s) { return require(`${__hooks}/helpers.js`).normText(s); }
 function jsonPole(rec, pole) {
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   return jsonVal(rec, pole, null);

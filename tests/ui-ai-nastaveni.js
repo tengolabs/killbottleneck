@@ -94,10 +94,17 @@ H.beh(async () => {
   await sleep(700);
   expect((await uzivatel()).align_lock === '' && !(await ls('kb-zarovnat-zamek')), 'Vrátit → zámek pryč na účtu i v prohlížeči');
 
-  console.log('== jazyk: UI se přepne do angličtiny; Vrátit zpět ==');
-  fronta.push(nastroj('set_preference', { co: 'language', hodnota: 'en' }), text('SWITCHED-MOCK.'));
-  await napis('Přepni mě na angličtinu');
-  expect(await cekej('[data-testid="chat-nastaveni"][data-co="language"]'), 'karta jazyka');
+  console.log('== jazyk: přes kartu (Ano) → UI anglicky; Vrátit; potvrzení DALŠÍ karty v témže tahu Vrátit nepřebije ==');
+  // panel 4. 10. 2026: dřív se při každém potvrzení znovu projevily VŠECHNY karty nastavení z tahu → po Vrátit u jazyka
+  // a potvrzení druhé karty bylo UI zase anglicky, účet česky. Dvě karty v jednom tahu: jazyk + vypnutí upozornění v aplikaci.
+  fronta.push({ tool_calls: [{ function: { name: 'set_preference', arguments: { co: 'language', hodnota: 'en' } } }, { function: { name: 'set_notification', arguments: { type: 'all', in_app: false } } }] });
+  await napis('Přepni mě na angličtinu a vypni mi upozornění v aplikaci');
+  expect(await cekej('[data-testid="chat-akce"][data-stav="ceka"]'), 'karta jazyka k potvrzení (jazyk se bez Ano nemění)');
+  await sleep(300);
+  expect((await page.$$('[data-testid="chat-akce"][data-stav="ceka"]')).length === 2 && (await uzivatel()).language !== 'en' && (await page.evaluate(() => document.documentElement.lang)) === 'cs', 'dvě karty čekají; před potvrzením účet i UI česky');
+  const anoJ = await page.$$('[data-testid="chat-akce-ano"]');
+  await anoJ[0].click(); // první karta = jazyk (druhá karta ještě čeká → model teď nedopovídá)
+  expect(await cekej('[data-testid="chat-nastaveni"][data-co="language"]'), 'po Ano karta jazyka s výsledkem a Vrátit');
   expect(await cekejText('Language: English', 8000), 'karta přeložená anglicky (UI přepnuto)');
   expect(await page.evaluate(() => document.documentElement.lang) === 'en' && (await ls('kb-lang')) === 'en' && (await uzivatel()).language === 'en', 'html lang, localStorage i účet = en');
   expect(await page.evaluate(() => document.querySelector('[data-testid="chat-input"]').getAttribute('placeholder')) === 'What can I help with…', 'políčko chatu anglicky');
@@ -107,6 +114,15 @@ H.beh(async () => {
   expect(await cekejText('Jazyk: angličtina', 8000), 'Vrátit → UI zpět česky (karta přeložená česky)');
   await sleep(500);
   expect((await uzivatel()).language === 'cs' && (await ls('kb-lang')) === 'cs', 'účet i prohlížeč zpět cs');
+  expect((await page.$('[data-testid="chat-nastaveni-vraceno"]')) !== null && (await page.$$('[data-testid="chat-nastaveni"][data-co="language"] [data-testid="chat-nastaveni-vratit"]')).length === 0, 'karta ukazuje „Vráceno“ a tlačítko Vrátit zmizelo');
+  fronta.push(text('UPOZORNENI-MOCK.'));
+  const anoN = await page.$$('[data-testid="chat-akce-ano"]');
+  await anoN[anoN.length - 1].click(); // druhá karta = upozornění
+  expect(await cekejText('UPOZORNENI-MOCK.', 10000), 'druhá karta potvrzena, model dopověděl');
+  await sleep(500);
+  expect((await page.evaluate(() => document.documentElement.lang)) === 'cs' && (await ls('kb-lang')) === 'cs' && (await uzivatel()).language === 'cs', 'potvrzení druhé karty NEvrátilo UI do angličtiny (vrácená karta se znovu neprojeví)');
+  const prefsPo = (await uzivatel()).notify_prefs || {};
+  expect(Object.keys(prefsPo).length >= 10 && Object.values(prefsPo).every((p) => p.in_app === false), `upozornění v aplikaci vypnutá (${Object.keys(prefsPo).length} typů)`);
 
   console.log('== výchozí skin instance: prohlížeč uloží JSON skinu, server dostane výsledek ==');
   fronta.push(nastroj('set_instance_skin', { builtin_id: 'sepia' }));

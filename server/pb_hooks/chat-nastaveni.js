@@ -86,9 +86,7 @@ function jenKdyz(jenKdy, app) {
 function ocisti(s, max) {
   return String(s == null ? "" : s).replace(/\u0000/g, "").trim().slice(0, max);
 }
-function norm(s) {
-  return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
-}
+function norm(s) { return require(`${__hooks}/helpers.js`).normText(s); }
 const uvoz = (text, L) => (L === "en" ? `"${text}"` : `„${text}“`);
 function sVlastnimTokenem(ktx) {
   const token = ktx && ktx.sessionAuth ? String(ktx.sessionAuth) : "";
@@ -501,6 +499,7 @@ function overNastaveni(app, auth, name, a) {
       const ex = agent(app, name);
       const url = a.webhook_url !== undefined ? String(a.webhook_url || "").trim() : (ex ? ex.getString("webhook_url") : "");
       if (!/^https?:\/\/.+/i.test(url)) return ex ? "Error: webhook_url must start with http:// or https://." : `Error: agent "${name}" does not exist yet — pass webhook_url (http(s) address of the agent) to create it.`;
+      if (H.aiHostBlocked(url)) return "Error: this address is not allowed (private or local host). Tell the user plainly.";
       if (a.allowed_emails !== undefined && !Array.isArray(a.allowed_emails)) return "Error: allowed_emails must be an array of e-mails (empty = anyone on the instance).";
       return null;
     }
@@ -612,7 +611,7 @@ function provedNastaveni(app, auth, L, name, a, ktx) {
       const co = String(a.co);
       const h = hodnotaPredvolby(co, a.hodnota);
       const u = uzivatel(app, auth);
-      const karta = { type: "nastaveni", co: co, hodnota: h.v, predchozi: "", klient: KLIENTSKE.indexOf(co) >= 0 };
+      const karta = { id: "n_" + $security.randomString(10), type: "nastaveni", co: co, hodnota: h.v, predchozi: "", klient: KLIENTSKE.indexOf(co) >= 0 };
       if (karta.klient) {
         karta.predchozi = klientskaHodnota(ktx, co);
         const navic = co === "mode" && h.v === "lite" ? " The simplified view has NO assistant panel — tell the user they can come back via the user menu (avatar) → \"Switch to the full version\"." : "";
@@ -646,7 +645,7 @@ function provedNastaveni(app, auth, L, name, a, ktx) {
       }
       const r = uloz({ notify_prefs: nove });
       if (r.status !== 200) return { text: chybaHttp(r) };
-      const karta = { type: "nastaveni", co: "notify", typ: a.type === "all" ? "all" : String(a.type), in_app: a.in_app !== undefined ? !!a.in_app : undefined, email: a.email !== undefined ? !!a.email : undefined, prefs: nove, predchozi_prefs: stare, klient: false };
+      const karta = { id: "n_" + $security.randomString(10), type: "nastaveni", co: "notify", typ: a.type === "all" ? "all" : String(a.type), in_app: a.in_app !== undefined ? !!a.in_app : undefined, email: a.email !== undefined ? !!a.email : undefined, prefs: nove, predchozi_prefs: stare, klient: false };
       const mode = u.getString("notify_email_mode");
       const pozn = mode === "none" && a.email ? " Note: the user's notification e-mail mode is \"none\", so no e-mails are sent until they change it (set_preference notify_email_mode)." : mode === "digest" && a.email ? " Note: the e-mail mode is \"digest\" — most types arrive in one daily digest." : "";
       return { text: `Notification settings saved (${typy.length === 1 ? popis[0] : typy.length + " types updated"}). The card has an undo link.${pozn}`, karta: karta };
@@ -779,14 +778,12 @@ function provedNastaveni(app, auth, L, name, a, ktx) {
       const r = http("POST", "/api/kb/org-structure/assign", body);
       if (r.status !== 200) return { text: chybaHttp(r) };
       const row = (r.json && r.json.position) || {};
-      const p = pozice(app);
       return { text: `Position "${row.title || pz.title}" updated: holder ${row.holder || "vacant"}${row.deputy ? `, deputy ${row.deputy}` : ""} [${row.position_kind || pz.position_kind}].` };
     }
     case "remove_org_position": {
       const pz = poziceDle(app, a.position);
       const r = http("POST", "/api/kb/org-structure/remove", { node_id: pz.node_id });
       if (r.status !== 200) return { text: chybaHttp(r) };
-      const p = pozice(app);
       return { text: `Position "${pz.title}" removed from the org structure.` };
     }
     case "order_membership": {

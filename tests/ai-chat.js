@@ -423,6 +423,7 @@ H.beh(async () => {
     const sysD = systemZ(posledniVolani());
     expect(/Krok, který je PODMÍNKOU existujícího kroku .* dej POD ten krok/.test(sysD) && /NÁSLEDKEM nebo další fází, dej VEDLE/.test(sysD), 'systém: podmínka POD krok, následek VEDLE (ne podle tématu)');
     expect(/Neřaď jen podle tématu/.test(sysD) && /zeptej se jednou otázkou přes ask_user/.test(sysD), 'systém: nejasné → jedna otázka přes ask_user, ne tiché zařazení podle tématu');
+    expect(/TÁŽ VĚTEV/.test(sysD) && /Stejný název pod JINÝM rodičem/.test(sysD), 'systém: duplicita jen v téže větvi, stejný název pod jiným rodičem bez otázky (sladěno se serverem, panel 4. 10.)');
     expect(rd.json.chat.pending.length === 0, 'duplicitní název (bez diakritiky, jiná velikost, interpunkce) → žádná karta');
     const chD = toolZ(posledniVolani()).find((m) => m.tool_name === 'add_nodes');
     expect(!!chD && /already has a node titled "poslat poptavku na SPAROVKY!"/.test(chD.content) && /Nothing was added/.test(chD.content), `model dostal chybu duplicity (${chD && chD.content.slice(0, 90)})`);
@@ -437,6 +438,32 @@ H.beh(async () => {
     const kD = rd3.json.chat.pending[0];
     expect(!!kD && /Vybrat dodavatele spárovek/.test(kD.popis || ''), `nový název pod existujícím krokem → karta jako dřív (${kD && kD.popis})`);
     await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kD.id, ok: false } });
+    // Duplicita platí jen v JEDNÉ VĚTVI (panel 4. 10. 2026): stejnojmenný podkrok pod jinou zakázkou je legitimní.
+    // Samostatná mapa: Zakázka A (s „Objednat materiál“) a Zakázka B vedle sebe.
+    const dve = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {
+      title: 'Dvě zakázky', nodes: [
+        { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Dvě zakázky', title: 'Dvě zakázky', status: 'todo' } },
+        { id: 'za', type: 'goalNode', position: { x: -200, y: 200 }, data: { title: 'Zakázka A', status: 'todo' } },
+        { id: 'zb', type: 'goalNode', position: { x: 200, y: 200 }, data: { title: 'Zakázka B', status: 'todo' } },
+        { id: 'ma', type: 'goalNode', position: { x: -200, y: 400 }, data: { title: 'Objednat materiál', status: 'todo' } },
+      ], edges: [{ id: 'e1', source: 'root', target: 'za' }, { id: 'e2', source: 'root', target: 'zb' }, { id: 'e3', source: 'za', target: 'ma' }] } })).json;
+    expect(!!dve.id, 'mapa Dvě zakázky založena');
+    fronta.push(nastroj('add_nodes', { map_id: 'Dvě zakázky', parent_id: 'Zakázka B', items: [{ title: 'Objednat materiál' }] }));
+    const rd4 = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Pod zakázku B dej objednat materiál' } });
+    const kD4 = rd4.json.chat.pending[0];
+    expect(!!kD4 && /Objednat materiál/.test(kD4.popis || ''), `stejný název pod JINOU zakázkou → karta (celomapový zákaz by legitimní podkrok zakázal) (${kD4 && kD4.popis})`);
+    await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kD4.id, ok: false } });
+    fronta.push(nastroj('add_nodes', { map_id: 'Dvě zakázky', parent_id: 'Zakázka A', items: [{ title: 'objednat material' }] }), text('Už tam je.'));
+    const rd5 = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Pod zakázku A dej objednat materiál' } });
+    expect(rd5.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => m.tool_name === 'add_nodes' && /already has a node titled "objednat material" in this branch/.test(m.content)), 'stejný název pod TOUTÉŽ zakázkou → chyba, žádná karta');
+    // nápad do mapy: tatáž kontrola (instrukce ji slibuje i pro add_idea_to_map — dřív platila jen pro add_nodes)
+    const napadDup = (await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Objednat materiál', owner: meA.id } })).json;
+    fronta.push(nastroj('add_idea_to_map', { idea_id: napadDup.id, map_id: 'Dvě zakázky', parent_id: 'Zakázka A' }), text('Už tam je.'));
+    const rd6 = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Nápad objednat materiál dej pod zakázku A' } });
+    expect(rd6.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => m.tool_name === 'add_idea_to_map' && /already has a node titled "Objednat materiál"/.test(m.content)), 'nápad se jménem kroku v té větvi → chyba, žádná karta; nápad zůstal v zásobníku');
+    expect((await inst.api('GET', `/api/collections/buffer_nodes/records/${napadDup.id}`, { token: A })).status === 200, 'nápad nebyl smazán ze zásobníku');
+    await inst.api('DELETE', `/api/collections/buffer_nodes/records/${napadDup.id}`, { token: A });
+    await inst.api('DELETE', `/api/collections/goalmaps/records/${dve.id}`, { token: A });
   }
 
   console.log('== neznámé pole (priority) a neznámý nástroj = chyba modelu, ne zápis ==');

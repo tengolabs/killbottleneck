@@ -9,6 +9,57 @@ below before you jump several versions.
 
 ---
 
+## v0.73-beta — 2026-10-04
+
+**Share dialog with a member picker; fixes from the review panel after v0.72**
+
+- **Share map: pick a colleague from the organization.** The dialog has a select of the instance's members above
+  the e-mail field — only people with an account who do not have the map yet, never yourself. Picking one fills
+  the e-mail; Invite and the rights work as before and typing an e-mail still works (also for addresses outside
+  the organization). Available from the editor and from the map cards on the home page (the home page used to open
+  the dialog without the member list). `ui-sdileni-vyber-clenu.js` covers both.
+- **Assistant: language, the e-mail mode and turning e-mails or all notifications off go through a confirmation
+  card first** (`set_preference`, `set_notification`). An instruction hidden in a step description of a shared map
+  or in a document the assistant reads could otherwise change your language or silence deadline e-mails without a
+  click — the same reason the card already applied to turns with an attachment. Theme, readability, alignment
+  lock, names, turning a notification on and turning one type off in-app are still applied right away with
+  Revert; the card of a confirmed setting now carries Revert too.
+- **Assistant: Revert sticks.** A reverted setting (language, lite mode, readability, notifications) was applied
+  again when another card from the same turn was confirmed — every settings card of the turn was re-applied on
+  each confirmation — so the browser ended up in English while the account was Czech. Each card is applied once
+  and never after Revert; the card shows "Reverted"; and when the revert does not reach the server the panel says
+  so instead of silently diverging. Settings cards now carry an id for this.
+- **Assistant: confirming a card is one-shot even for two concurrent requests** (a second window, a retry after a
+  timeout). The pending card is removed atomically (`UPDATE … WHERE pending = <what was read>`) before the action
+  runs; the loser gets 404 and an invitation, a comment or a deletion is not performed twice. A batch containing a
+  browser-side card is rejected before any card of the batch runs (it used to fail in the middle).
+- **Assistant: `move_node` creates the edge like the editor does** (`type: deletable`, so the delete button shows,
+  id `edge-…`) and sends `base_updated`, so a concurrent autosave of the open editor is detected (409) instead of
+  silently overwritten.
+- **Assistant: the duplicate-title check is per branch, not per map.** The same step title under a different
+  parent ("Order material" under two orders) is legitimate; the parent, the steps above it and its whole subtree
+  still refuse a second node with the same title. The check now also covers `add_idea_to_map`, as the system
+  instructions promised.
+- **Hosted instances: an AI agent webhook cannot point at a private or local address** (same rule as the AI
+  settings), both in the UI route and through the assistant's `save_ai_agent`.
+- **Cloud chat proxy: health checks answer 401 without a token for unknown upstream names too** — the 401/404
+  difference allowed guessing upstream names anonymously. `cloud/tests/chat-proxy-tokens.sh` is now part of
+  `tests/run-all.sh` (cloud suites are listed by hand and this one was missing).
+- Fixed: Organization admin → **Instance purpose** showed the raw keys `userAdmin.purposeTeam/Family/Solo` (the
+  dialog builds the key dynamically, so the unused-key clean-up had removed the texts); the texts are back.
+- Tests: declining destructive cards (delete project, delete rule) leaves the data and tells the model; double
+  confirmation; `set_rule_enabled` and `list_rule_templates` (never called before); the per-branch duplicate rule
+  and the idea variant; the member picker on the home page; and a docker-free parity test of the CS/EN system
+  prompt (same keys, same `{placeholders}`, every tool name mentioned in the prompt exists).
+- Housekeeping: one `normText` helper in `helpers.js` instead of three copies, dead org-structure reads removed,
+  lint warnings in the share dialog, the share dialog's member memo no longer recomputes on every render.
+
+**Upgrade notes**
+
+- No migration and no new variable. One new route, `POST /api/kb/chat/vratit` (the assistant panel records a
+  reverted settings card). The assistant's system prompt and two tool descriptions change, so the prompt-prefix
+  cache is rebuilt on the first turn after the upgrade.
+
 ## v0.72-beta — 2026-10-04
 
 **The assistant handles every setting of the app**

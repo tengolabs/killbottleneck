@@ -22,7 +22,8 @@ import AsistentZprava from './AsistentZprava';
 import AiBlok from './AiBlok';
 import PdfPohled from './PdfPohled';
 import DokumentyPanel from './DokumentyPanel';
-import { useAsistentChat, aplikujKlienta, poleProVraceni } from './useAsistentChat';
+import { useAsistentChat } from './useAsistentChat';
+import { useToast } from '@/components/ui/use-toast';
 import { savedMode } from '@/lib/liteMode';
 import { nactiStupen } from '@/lib/citelnost';
 import { pb } from '@/api/pb';
@@ -61,6 +62,7 @@ export default function AsistentPanel() {
   const { setDostupny } = panel;
   useEffect(() => { if (setDostupny) setDostupny(dostupny); }, [dostupny, setDostupny]);
   const navigate = useNavigate();
+  const { toast } = useToast();
   const rozhovor = useAsistentChat({ open: panel.open && dostupny, klient: { navigate } });
   // jedno „A" pro zbytek komponenty: stav panelu + rozhovor
   const A = useMemo(() => ({ ...panel, ...rozhovor }), [panel, rozhovor]);
@@ -290,13 +292,12 @@ export default function AsistentPanel() {
     } catch (e) { vysledek = { ok: false, chyba: (e && e.response && e.response.error) || (e && e.message) || 'save failed' }; }
     return potvrd(karta.id, true, vysledek);
   }, [potvrd]);
-  // Vrátit u karty nastavení: tatáž cesta s předchozí hodnotou; serverová pole zapíše prohlížeč (vzor persistSkin)
-  const vratNastaveni = useCallback((karta) => {
-    const predchozi = karta.co === 'notify' ? (karta.predchozi_prefs || {}) : (karta.predchozi || '');
-    aplikujKlienta(karta, patchUser, { navigate }, predchozi);
-    const pole = poleProVraceni(karta);
-    if (pole && user?.id) base44.entities.User.update(user.id, pole).catch(() => {});
-  }, [patchUser, navigate, user]);
+  // Vrátit u karty nastavení (logika v hooku): když se zápis na účet nepovede, řekneme to — jinak by prohlížeč byl
+  // vrácený a účet ne, beze slova (panel 4. 10. 2026)
+  const vratNastaveni = useCallback(async (karta) => {
+    const ok = await A.vratNastaveni(karta, patchUser, user?.id);
+    if (!ok) toast({ title: t('nastaveni.revertFailed'), variant: 'destructive' });
+  }, [A, patchUser, user, toast, t]);
   // na telefonu panel kryje celou obrazovku → po „Ukázat v mapě" ho schovat (Richard 13. 9.)
   const poOdkazu = useCallback(() => { if (mobil) zavriChat(); }, [mobil, zavriChat]);
   // Toasty (vpravo dole) zakrývaly políčko chatu, dokud nezmizely — např. „mapa sloučena“

@@ -124,7 +124,7 @@ function KartaStrom({ strom }) {
   );
 }
 
-function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument }) {
+function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, onRevertNastaveni }) {
   const { t } = useTranslation('asistent');
   const stav = karta.stav || 'ceka';
   // výchozí skin instance vykoná prohlížeč (má JSON vestavěných skinů) — Ano jde přes panel, ne rovnou na server
@@ -165,6 +165,10 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
             </Link>
           )}
         </div>
+      )}
+      {/* nastavení provedené přes kartu (jazyk, režim e-mailů, vypnutí upozornění): výsledek s Vrátit jako u přímé karty */}
+      {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'nastaveni' && karta.odkaz.co !== 'mode' && (
+        <KartaNastaveni karta={karta.odkaz} onRevert={onRevertNastaveni} />
       )}
     </div>
   );
@@ -210,7 +214,9 @@ function KartaNastaveni({ karta, onRevert }) {
   return (
     <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs" data-testid="chat-nastaveni" data-co={karta.co}>
       <span>{text}</span>
-      {onRevert && (
+      {karta.vraceno ? (
+        <span className="text-muted-foreground" data-testid="chat-nastaveni-vraceno">{t('nastaveni.reverted')}</span>
+      ) : onRevert && (
         <button type="button" className="inline-flex items-center gap-1 text-primary hover:underline" onClick={() => onRevert(karta)} data-testid="chat-nastaveni-vratit">
           <Undo2 className="w-3 h-3" />{t('nastaveni.revert')}
         </button>
@@ -540,7 +546,7 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
                   </Button>
                 </div>
               )}
-              <KartaAkce karta={k} onPotvrd={onPotvrd} onKlientSkin={onKlientSkin} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={onOtevriDokument} />
+              <KartaAkce karta={k} onPotvrd={onPotvrd} onKlientSkin={onKlientSkin} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={onOtevriDokument} onRevertNastaveni={onRevertNastaveni} />
             </Fragment>
           );
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;

@@ -2024,6 +2024,19 @@ kbRoute("POST", "/chat/potvrdit", (e) => {
   return e.json(200, { chat: vysledek });
 }, $apis.requireAuth(), $apis.bodyLimit(64 * 1024));
 
+// Vrátit u karty nastavení: zapsat do rozhovoru, ať se vrácené nastavení už znovu neprojeví (viz chat.js chatVratit)
+kbRoute("POST", "/chat/vratit", (e) => {
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const { chatVratit, chatChyba } = require(`${__hooks}/chat.js`);
+  const L = userLang(e.auth);
+  try {
+    return e.json(200, { chat: chatVratit($app, e.auth, e.requestInfo().body || {}, L) });
+  } catch (err) {
+    const ch = chatChyba(e, err, L);
+    return e.json(ch.status, ch.body);
+  }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024));
+
 kbRoute("GET", "/chat/seznam", (e) => {
   const { seznamChatu } = require(`${__hooks}/chat.js`);
   return e.json(200, { chats: seznamChatu($app, e.auth) });
@@ -4218,6 +4231,8 @@ kbRoute("POST", "/ai-agents/save", (e) => {
   if (!name) return e.json(400, { error: t(L, "err.agentNameRequired") });
   const url = String(info.webhook_url || "").trim();
   if (!/^https?:\/\/.+/i.test(url)) return e.json(400, { error: t(L, "err.agentUrlRequired") });
+  // hostovaná instance: webhook agenta nesmí mířit na privátní/lokální adresu (server na ni POSTuje běhy) — stejně jako AI nastavení
+  if (require(`${__hooks}/helpers.js`).aiHostBlocked(url)) return e.json(400, { error: t(L, "err.aiHostPrivate") });
 
   let rec;
   if (info.id) {

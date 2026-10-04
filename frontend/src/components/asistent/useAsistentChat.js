@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chat as chatApi, chatPotvrdit, chatOprav, chatDetail, chatSeznam, chatSmazat } from '@/api/asistentApi';
+import { chat as chatApi, chatPotvrdit, chatOprav, chatDetail, chatSeznam, chatSmazat, chatVratit } from '@/api/asistentApi';
+import { base44 } from '@/api/base44Client';
 import { nahradPrepis } from '@/lib/prepisZpravy';
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
 import { setSkin, setTheme } from '@/lib/theme';
@@ -20,22 +21,33 @@ const KEY_MODEL = 'kb-chat-model';
 // Server už skin_id uložil; tady se jen aplikuje (SkinDialog dělá totéž).
 // Karta skinu visí na TÉ zprávě asistenta, která nástroj zavolala — v jednom
 // kole jich může být víc (nástroj → dopověď), proto se projde celý poslední tah.
-function projevKarty(dto, patchUser, klient) {
+// Každá karta se projeví JEDNOU (aplikovane = klíče už projevených karet) a vrácená (Vrátit) už nikdy:
+// dřív se při každém potvrzení další karty v témže tahu znovu aplikovaly všechny karty nastavení od poslední
+// zprávy uživatele, takže Vrátit u jazyka a potvrzení pozvánky vrátilo UI do angličtiny, zatímco účet byl česky
+// (panel 4. 10. 2026).
+const klicKarty = (dto, mi, ki, k) => `${(dto && dto.id) || ''}:${k.id || `${mi}:${ki}:${k.type}:${k.co || ''}`}`;
+function projevKarty(dto, patchUser, klient, aplikovane) {
   const msgs = (dto && dto.messages) || [];
   const odUser = msgs.map((m) => m.role).lastIndexOf('user');
-  const karty = msgs.slice(odUser + 1).filter((m) => m.role === 'assistant').flatMap((m) => m.karty || []);
-  for (const k of karty) {
+  const karty = [];
+  msgs.forEach((m, mi) => { if (mi > odUser && m.role === 'assistant') (m.karty || []).forEach((k, ki) => karty.push([k, klicKarty(dto, mi, ki, k)])); });
+  for (const [k, klic] of karty) {
+    if (k.vraceno) continue;
+    let projev = null;
     if (k.type === 'skin') {
       const s = getBuiltinSkin(k.skin_id);
-      if (s) { setSkin(s); if (patchUser) patchUser({ skin_id: k.skin_id }); }
+      if (s) projev = () => { setSkin(s); if (patchUser) patchUser({ skin_id: k.skin_id }); };
     } else if (k.type === 'theme') {
-      setTheme(k.theme === 'dark' ? 'dark' : 'light');
+      projev = () => setTheme(k.theme === 'dark' ? 'dark' : 'light');
     } else if (k.type === 'nastaveni') {
-      aplikujKlienta(k, patchUser, klient);
-    } else if (k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'nastaveni') {
-      // nastavení, které šlo přes kartu (přepnutí do lite, jazyk v tahu s přílohou): výsledek visí na kartě akce
-      aplikujKlienta(k.odkaz, patchUser, klient);
+      projev = () => aplikujKlienta(k, patchUser, klient);
+    } else if (k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'nastaveni' && !k.odkaz.vraceno) {
+      // nastavení, které šlo přes kartu (jazyk, režim e-mailů, vypnutí upozornění, přepnutí do lite): výsledek visí na kartě akce
+      projev = () => aplikujKlienta(k.odkaz, patchUser, klient);
     }
+    if (!projev) continue; // karta „ceka“ se nezapisuje — projeví se až po Ano
+    if (aplikovane) { if (aplikovane.has(klic)) continue; aplikovane.add(klic); }
+    projev();
   }
 }
 // Nastavení z karty `nastaveni` (3. 10. 2026): serverová pole už server uložil (jen se propíší do uživatele
@@ -106,6 +118,7 @@ const prevedChybu = (e) => {
 export function useAsistentChat({ open, klient }) {
   const klientRef = useRef(klient); // { navigate } — projevení karet nastavení (přechod do /lite)
   klientRef.current = klient;
+  const aplikovane = useRef(new Set()); // klíče karet, které se v prohlížeči už projevily (viz projevKarty)
   const [chatId, setChatIdState] = useState(() => nactiKlic(KEY_CHAT) || '');
   const [chat, setChat] = useState(null);      // DTO ze serveru {id,title,messages,pending,model}
   const [seznam, setSeznam] = useState([]);
@@ -166,7 +179,7 @@ export function useAsistentChat({ open, klient }) {
       const r = await chatApi({ mode, target: target || {}, message: '', context: context || {}, model: model || undefined });
       if (!zivy.current) return;
       setChat(r.chat); setChatId(r.chat.id);
-      projevKarty(r.chat, patchUser, klientRef.current);
+      projevKarty(r.chat, patchUser, klientRef.current, aplikovane.current);
       nactiSeznam();
     } catch (e) {
       if (!zivy.current) return;
@@ -212,7 +225,7 @@ export function useAsistentChat({ open, klient }) {
       }
       if (!zivy.current) return { ok: true, vratit: false };
       setChat(r.chat); setChatId(r.chat.id);
-      projevKarty(r.chat, patchUser, klientRef.current);
+      projevKarty(r.chat, patchUser, klientRef.current, aplikovane.current);
       ohlasZmenuMapy(r.chat);
       nactiSeznam();
       return { ok: true, vratit: false };
@@ -248,7 +261,7 @@ export function useAsistentChat({ open, klient }) {
       ohlasZmenuMapy(r.chat); // změna v mapě platí, i když uživatel mezitím otevřel jiný rozhovor
       if (aktualni.current !== chatId) { nactiSeznam(); return; }
       setChat(r.chat);
-      projevKarty(r.chat, patchUser, klientRef.current);
+      projevKarty(r.chat, patchUser, klientRef.current, aplikovane.current);
     } catch (e) {
       if (!zivy.current || aktualni.current !== chatId) return;
       setError(prevedChybu(e));
@@ -257,6 +270,23 @@ export function useAsistentChat({ open, klient }) {
       if (zivy.current) setLoading(false);
     }
   }, [chatId, loading, model, otevriChat, nactiSeznam]);
+
+  // Vrátit u karty nastavení: tatáž cesta s předchozí hodnotou; serverová pole zapíše prohlížeč (vzor persistSkin).
+  // Karta se označí `vraceno` (už se znovu neprojeví, tlačítko zmizí); když zápis na server selže, vrátí false
+  // a panel to řekne — dřív se chyba spolkla a prohlížeč byl vrácený, účet ne.
+  const vratNastaveni = useCallback(async (karta, patchUser, userId) => {
+    const predchozi = karta.co === 'notify' ? (karta.predchozi_prefs || {}) : (karta.predchozi || '');
+    const stejna = (k) => k === karta || (karta.id && k.id === karta.id);
+    setChat((c) => (!c ? c : { ...c, messages: (c.messages || []).map((m) => (!m.karty ? m : { ...m, karty: m.karty.map((k) => (stejna(k) ? { ...k, vraceno: true } : (k.odkaz && stejna(k.odkaz) ? { ...k, odkaz: { ...k.odkaz, vraceno: true } } : k))) })) }));
+    // server: karta je vrácená (přežije přemontování aplikace při změně jazyka — Router key = jazyk)
+    let ok = true;
+    if (karta.id && chatId) { try { await chatVratit({ chat_id: chatId, karta_id: karta.id }); } catch { ok = false; } }
+    const pole = poleProVraceni(karta);
+    if (pole && userId) { try { await base44.entities.User.update(userId, pole); } catch { ok = false; } }
+    // až nakonec: změna jazyka přemontuje aplikaci a rozhovor se načte znovu ze serveru — ten už kartu zná jako vrácenou
+    aplikujKlienta(karta, patchUser, klientRef.current, predchozi);
+    return ok;
+  }, [chatId]);
 
   // Oprava přepisu POSLEDNÍ hlasovky / fotky (tužka v bublině, 1. 10. 2026): server nahradí text pod značkou, zahodí
   // odpověď a nepotvrzené návrhy z toho tahu a asistent odpoví znovu. Opravený text i zmizelá odpověď jsou vidět hned.
@@ -277,7 +307,7 @@ export function useAsistentChat({ open, klient }) {
       nactiSeznam();
       if (aktualni.current !== chatId) return true; // mezitím otevřen jiný rozhovor — odpověď patří tomu původnímu
       setChat(r.chat);
-      projevKarty(r.chat, patchUser, klientRef.current);
+      projevKarty(r.chat, patchUser, klientRef.current, aplikovane.current);
       ohlasZmenuMapy(r.chat);
       return true;
     } catch (e) {
@@ -297,5 +327,5 @@ export function useAsistentChat({ open, klient }) {
     nactiSeznam();
   }, [chatId, novy, nactiSeznam]);
 
-  return { chat, chatId, seznam, loading, error, model, setModel, send, potvrd, oprav, novy, smaz, otevriChat, zacniRezim };
+  return { chat, chatId, seznam, loading, error, model, setModel, send, potvrd, oprav, novy, smaz, otevriChat, zacniRezim, vratNastaveni };
 }

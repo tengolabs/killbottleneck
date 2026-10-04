@@ -617,7 +617,7 @@ const P = {
       "- Termín (deadline) = dohodnuté datum s někým dalším (jednání, dodávka, odevzdání). Když takové datum plyne z podkladů nebo od uživatele („zítřejší jednání“, „dodat do pátku“), navrhni termín: u nových uzlů pole deadline v outline/items, u existujícího uzlu update_node s deadline (i změnu nebo zrušení termínu; prázdný řetězec termín ruší). Uživatel všechno potvrdí kartou. Kdy se úkol bude ŘEŠIT, je plán (planned_on): jakmile uživatel řekne „dnes / zítra / v pondělí / tento týden“ u konkrétního úkolu, HNED zavolej update_node s planned_on (datum YYYY-MM-DD, do 7 dnů; uživatel potvrdí kartou) — nepiš o tom, zapiš to.",
       "- Připomínka S ČASEM k úkolu („připomeň mi to den předem v 9“, „ráno v den termínu“) = create_reminder (termín se tím nemění; uzel MUSÍ mít termín — když ho nemá, nejdřív update_node s deadline a po potvrzení create_reminder). Volná událost bez projektu (schůzka, zubař, telekonference, hovor) s datem a časem = create_event; kolegy pozvi přes participants (e-maily z list_people), připomínku dej do remind_before_min. Když chybí den nebo čas, zeptej se přes ask_user. Hotovou událost měníš přes update_event (přesun, přejmenování, pozvaní, připomínka — „připomeň mi zubaře hodinu předem“ = update_event s remind_before_min 60; NIKDY ji kvůli tomu nemaž a nezakládej znovu) a mažeš přes delete_event. Pravidlo deadline_approaching je jen pro upozornění bez času nebo pro celou mapu. Kdy připomínka přijde, říkej JEN podle výsledku nástroje.",
       "- Řešitel kroků s termínem: když nové kroky (create_project, add_nodes) nesou termín, zeptej se PŘED zápisem VŽDY (i když se zdá, že je řeší uživatel; neptej se jen, když je má řešit někdo jiný) jedinou otázkou přes ask_user: „Chcete být řešitelem kroků s termínem? Pak je uvidíte v Můj den.“ s volbami „Ano, řeším je já“ a „Ne, nechat bez řešitele“. Při Ano dej těm krokům owner \"me\", při Ne owner \"none\" (krok s termínem bez ownera aplikace nezapíše). Slovo „me“ je jen hodnota pro nástroj — do textu pro uživatele ho nikdy nepiš (piš „vy“ / „řešitelem budete vy“). Tahle otázka platí i u projektu z obrázku a je výjimkou z pravidla „rovnou zavolej create_project“.",
-      "- Kam nový krok patří (add_nodes, add_idea_to_map): co je POD uzlem, to je potřeba udělat, aby se ten uzel splnil. Krok, který je PODMÍNKOU existujícího kroku (nakoupit suroviny → upéct cukroví, objednat díly → smontovat, získat souhlas → podepsat), dej POD ten krok (parent_id = jeho přesný název), ne vedle něj. Krok, který je NÁSLEDKEM nebo další fází, dej VEDLE něj (pod téhož rodiče). Neřaď jen podle tématu („cukroví k cukroví“) — řaď podle toho, co musí být hotové dřív. Když z věty nejde poznat, zda jde o podmínku, zeptej se jednou otázkou přes ask_user (např. „Je nákup surovin podmínkou pečení? Pak ho dám pod krok Upéct cukroví.“ s volbami „Ano, pod něj“ / „Ne, vedle něj“). Když už mapa má uzel se stejným nebo skoro stejným názvem, nepřidávej ho znovu — řekni to a nabídni použít ten stávající (update_node), nebo se zeptej, co přesně má vzniknout.",
+      "- Kam nový krok patří (add_nodes, add_idea_to_map): co je POD uzlem, to je potřeba udělat, aby se ten uzel splnil. Krok, který je PODMÍNKOU existujícího kroku (nakoupit suroviny → upéct cukroví, objednat díly → smontovat, získat souhlas → podepsat), dej POD ten krok (parent_id = jeho přesný název), ne vedle něj. Krok, který je NÁSLEDKEM nebo další fází, dej VEDLE něj (pod téhož rodiče). Neřaď jen podle tématu („cukroví k cukroví“) — řaď podle toho, co musí být hotové dřív. Když z věty nejde poznat, zda jde o podmínku, zeptej se jednou otázkou přes ask_user (např. „Je nákup surovin podmínkou pečení? Pak ho dám pod krok Upéct cukroví.“ s volbami „Ano, pod něj“ / „Ne, vedle něj“). Když už TÁŽ VĚTEV (cílový rodič, kroky nad ním nebo pod ním) má uzel se stejným nebo skoro stejným názvem, nepřidávej ho znovu — řekni to a nabídni použít ten stávající (update_node), nebo se zeptej, co přesně má vzniknout. Stejný název pod JINÝM rodičem (např. „Objednat materiál“ pod dvěma zakázkami) je v pořádku — přidej ho bez otázky.",
       "- Neslibuj, co aplikace neumí, a nedomýšlej podrobnosti. Kdy a komu přijde upozornění z pravidla, říkej JEN podle výsledku nástroje create_rule (žádné „večer“, žádný čas navíc). Když nástroj vrátí chybu, řekni ji uživateli po lidsku a nabídni opravu (např. nejdřív nastavit termín nebo vlastníka).",
       "- E-mail, body k poradě, body k telefonátu, poznámku, souhrn nebo jiný text k použití NIKDY nepiš do odpovědi — pošli ho nástrojem draft_text: uloží se uživateli do Dokumentů (panel vedle chatu, kde ho čte, upravuje a kopíruje), v textu jen jednu větu komentáře. U e-mailu dej předmět do `subject` a adresáta do `to` (jen když ho znáš), do `text` jen tělo. Když chce uživatel upravit dřívější dokument („udělej ten e-mail formálnější“, „doplň do poznámky cenu“), najdi ho přes list_documents, přečti get_document a pošli CELÝ nový text přes update_document — nový dokument nezakládej. Hranice: nápady a úkoly (věci k udělání) do draft_text NIKDY nedávej — patří do zásobníku nápadů (add_idea / add_ideas) nebo do projektu, odkud se dostanou do plánu a porad. Dokument je jen delší text ke čtení nebo odeslání (e-mail, zápis, sumář, podklady). Když text dokumentu obsahuje úkoly nebo nápady, nabídni v suggest_next dát je do zásobníku nebo do projektu. Když se koncept týká projektu (zakázka, zákazník, dodavatel, sumář projektu), dej do draft_text i `map` = název projektu — dokument pak odkazuje na mapu projektu. Do paměti projektu (remember s map) patří jen krátké poznatky (kdo rozhoduje, na co se čeká, dohody), NIKDY celé texty e-mailů nebo sumářů — ty jsou v Dokumentech. Takové koncepty aktivně nabízej v suggest_next („Napiš e-mail dodavatelům“, „Připrav body k poradě“, „Body k telefonátu s …“).",
       "- Vzhled přepínáš nástrojem set_skin. Co si máš o uživateli pamatovat (styl, preference, souvislosti), ulož nástrojem remember — pošli CELÝ nový text paměti, stručně, v odrážkách.",
@@ -825,7 +825,7 @@ const P = {
       "- A deadline = a date agreed with someone else (a meeting, a delivery, a hand-over). When such a date follows from the material or from the user (\"tomorrow's meeting\", \"deliver by Friday\"), propose the deadline: for new nodes the deadline field in outline/items, for an existing node update_node with deadline (changing or removing it too; an empty string removes it). The user confirms everything with a card. WHEN a task will be worked on is the plan (planned_on): as soon as the user says \"today / tomorrow / on Monday / this week\" about a specific task, IMMEDIATELY call update_node with planned_on (YYYY-MM-DD, within 7 days; the user confirms with a card) — do not talk about it, write it.",
       "- A TIMED reminder for a task (\"remind me the day before at 9\", \"on the deadline morning\") = create_reminder (the deadline stays unchanged; the node MUST have a deadline — if it has none, first update_node with deadline and after confirmation create_reminder). A free-standing event outside projects (meeting, dentist, video call, phone call) with a date and time = create_event; invite colleagues via participants (e-mails from list_people), put the reminder into remind_before_min. When the day or time is missing, ask via ask_user. An existing event is changed with update_event (move, rename, invitees, reminder — \"remind me an hour before the dentist\" = update_event with remind_before_min 60; NEVER delete and re-create it for that) and deleted with delete_event. A deadline_approaching rule is only for untimed alerts or a whole map. Say WHEN the reminder arrives ONLY according to the tool result.",
       "- Assignee of steps with a deadline: when new steps (create_project, add_nodes) carry a deadline, ALWAYS ask BEFORE writing (even if the user seems to handle them; skip only when someone else is to handle them) with a single ask_user question: \"Do you want to be the assignee of the steps with a deadline? Then you will see them in My day.\" with the options \"Yes, I handle them\" and \"No, leave them unassigned\". On Yes give those steps owner \"me\", on No owner \"none\" (the app refuses a step with a deadline and no owner). \"me\" is only a tool value — never write it in text for the user (say \"you\"). This question applies to a project from an image too and is an exception to the rule \"call create_project right away\".",
-      "- Where a new step belongs (add_nodes, add_idea_to_map): what is UNDER a node is what has to be done for that node to be achieved. A step that is a PREREQUISITE of an existing step (buy ingredients → bake the cookies, order parts → assemble, get approval → sign) goes UNDER that step (parent_id = its exact title), not next to it. A step that is a CONSEQUENCE or the next phase goes NEXT to it (under the same parent). Do not place by topic alone (\"cookies with cookies\") — place by what must be finished first. When the sentence does not tell whether it is a prerequisite, ask once via ask_user (e.g. \"Is buying the ingredients a prerequisite of baking? Then I put it under Bake the cookies.\" with options \"Yes, under it\" / \"No, next to it\"). When the map already has a node with the same or nearly the same title, do not add it again — say so and offer to use the existing one (update_node), or ask what exactly should be created.",
+      "- Where a new step belongs (add_nodes, add_idea_to_map): what is UNDER a node is what has to be done for that node to be achieved. A step that is a PREREQUISITE of an existing step (buy ingredients → bake the cookies, order parts → assemble, get approval → sign) goes UNDER that step (parent_id = its exact title), not next to it. A step that is a CONSEQUENCE or the next phase goes NEXT to it (under the same parent). Do not place by topic alone (\"cookies with cookies\") — place by what must be finished first. When the sentence does not tell whether it is a prerequisite, ask once via ask_user (e.g. \"Is buying the ingredients a prerequisite of baking? Then I put it under Bake the cookies.\" with options \"Yes, under it\" / \"No, next to it\"). When the SAME BRANCH (the target parent, the steps above it or below it) already has a node with the same or nearly the same title, do not add it again — say so and offer to use the existing one (update_node), or ask what exactly should be created. The same title under a DIFFERENT parent (e.g. \"Order material\" under two orders) is fine — add it without asking.",
       "- Do not promise what the app cannot do and do not invent details. When and to whom a rule notification arrives, say ONLY according to the create_rule tool result (no \"in the evening\", no extra time). When a tool returns an error, tell the user plainly and offer a fix (e.g. set the deadline or the owner first).",
       "- An e-mail, meeting points, phone-call points, a note, a summary or any other text to be used NEVER goes into the reply — send it with draft_text: it is saved to the user's Documents (a panel next to the chat where they read, edit and copy it). For an e-mail put the subject into `subject` and the recipient into `to` (only when known), only the body into `text`. When the user wants to change an earlier document (\"make that e-mail more formal\", \"add the price to the note\"), find it with list_documents, read it with get_document and send the WHOLE new text via update_document — do not create a new document. Boundary: NEVER put ideas or tasks (things to do) into draft_text — they belong in the idea buffer (add_idea / add_ideas) or a project, from where they reach the plan and the briefings. A document is only a longer text to read or send (e-mail, minutes, summary, background). When a document's text contains tasks or ideas, offer in suggest_next to put them into the buffer or a project. In the text only a one-line comment. When the draft concerns a project (an order, a customer, a supplier, a project summary), pass `map` = the project title in draft_text — the document then links to the project's map. Project memory (remember with map) holds only short facts (who decides, what is awaited, agreements), NEVER whole e-mails or summaries — those live in Documents. Offer such drafts actively in suggest_next (\"Write the e-mail to the suppliers\", \"Prepare meeting points\", \"Points for the call with …\").",
       "- Switch the look with set_skin. What you should remember about the user (style, preferences, context) store with remember — send the WHOLE new memory text, brief, as bullets.",
@@ -1253,9 +1253,11 @@ const NASTROJE = [
   // `kartaKdyz` = přímý nástroj, který v daném případě jde přes kartu (přepnutí do lite bez asistenta)
   { name: "get_settings", skupina: "nastaveni", kind: "read", description: "The user's current settings (name, language, skin, theme, view, map readability, alignment lock, notification preferences) and — for administrators and managers — the organization settings (name, purpose, members with roles, AI settings without the token, AI credit quota, default skin, billing, AI agents). Call it BEFORE changing any setting and when the user asks where a setting is.",
     parameters: { type: "object", properties: {}, required: [], additionalProperties: false } },
-  { name: "set_preference", skupina: "nastaveni", kind: "direct", kartaKdyz: (a) => a && a.co === "mode" && /^lite$/i.test(String(a.hodnota || "")), description: "Change ONE personal preference of the user: language (cs|en), theme (light|dark), mode = view (auto|lite|full; lite = simplified view WITHOUT the assistant — the user confirms on a card), readability of the map (normal|large|titleOnly), align_lock (none|classic|compact|bands), notify_email_mode (instant|digest|none; only when e-mail is configured), full_name, display_name. Applied right away with an undo link on the card. For the skin use set_skin.",
+  // karta vždy u jazyka, režimu e-mailů a přepnutí do lite (panel 4. 10. 2026: pokyn vložený do SDÍLENÉ mapy nebo dokumentu
+  // by jinak bez potvrzení přepnul jazyk / vypnul e-maily — stejný důvod jako karta po příloze); ostatní předvolby hned s Vrátit
+  { name: "set_preference", skupina: "nastaveni", kind: "direct", kartaKdyz: (a) => a && (/^(language|notify_email_mode)$/.test(String(a.co || "")) || (a.co === "mode" && /^lite$/i.test(String(a.hodnota || "")))), description: "Change ONE personal preference of the user: language (cs|en), theme (light|dark), mode = view (auto|lite|full; lite = simplified view WITHOUT the assistant), readability of the map (normal|large|titleOnly), align_lock (none|classic|compact|bands), notify_email_mode (instant|digest|none; only when e-mail is configured), full_name, display_name. Theme, readability, align_lock and names are applied right away with an undo link on the card; language, notify_email_mode and mode = lite go through a confirmation card first. For the skin use set_skin.",
     parameters: { type: "object", properties: { co: { type: "string", enum: ["language", "theme", "mode", "readability", "align_lock", "notify_email_mode", "full_name", "display_name"] }, hodnota: { type: "string", description: "the new value (see the allowed values per preference)" } }, required: ["co", "hodnota"], additionalProperties: false } },
-  { name: "set_notification", skupina: "nastaveni", kind: "direct", description: "Turn a notification type on or off for the user: in-app and/or e-mail (e-mail only when the instance has e-mail configured). type = one notification type (as listed by get_settings) or \"all\". Pass only the channels to change. Applied right away with an undo link on the card.",
+  { name: "set_notification", skupina: "nastaveni", kind: "direct", kartaKdyz: (a) => a && (a.email === false || (String(a.type || "") === "all" && a.in_app === false)), description: "Turn a notification type on or off for the user: in-app and/or e-mail (e-mail only when the instance has e-mail configured). type = one notification type (as listed by get_settings) or \"all\". Pass only the channels to change. Applied right away with an undo link on the card; turning e-mail off or turning everything off goes through a confirmation card first.",
     parameters: { type: "object", properties: { type: { type: "string", description: "notification type (e.g. task_assigned, deadline, reminder) or \"all\"" }, in_app: { type: "boolean" }, email: { type: "boolean" } }, required: ["type"], additionalProperties: false } },
   { name: "invite_member", skupina: "nastaveni", jenRole: "pozvat", kind: "write", description: "Invite a new member to this instance by e-mail (creates the account; with e-mail configured the invitation is sent, otherwise a temporary password is shown ONCE to the user on the card). Role admin/manager only an administrator can grant. The user confirms first.",
     parameters: { type: "object", properties: { email: { type: "string" }, role: { type: "string", enum: ["admin", "manager", "user"], description: "default user (member)" } }, required: ["email"], additionalProperties: false } },
@@ -1582,9 +1584,7 @@ function chybaV1(r) {
 // vymýšlejí (Richard 13. 9.: „34iccqosxr5t7h"), názvy drží spolehlivě —
 // proto každý odkaz na nápad/mapu/uzel bere obojí. Název se porovnává bez
 // ohledu na velikost písmen a diakritiku; při nejednoznačnosti null.
-function norm(s) {
-  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
-}
+function norm(s) { return require(`${__hooks}/helpers.js`).normText(s); }
 function podleNazvu(rows, ref, nazev) {
   const n = norm(ref);
   if (!n) return null;
@@ -2185,8 +2185,11 @@ function vykonej(app, auth, L, name, args, ktx) {
       const pid = !pref || pref.toLowerCase() === "apex" ? apex : uzelId(app, auth, p.map.id, pref);
       if (!nid || !pid) return { text: "Error: node or parent not found." };
       let nove = edges.filter((e) => e.target !== nid);
-      nove.push({ id: `e-${nid}-${Date.now()}`, source: pid, target: nid });
-      const r = http("PATCH", `/api/collections/goalmaps/records/${encodeURIComponent(p.map.id)}`, { edges: nove });
+      // hrana jako všude jinde v aplikaci (type deletable = tlačítko smazání v editoru) a base_updated = ochrana 409 proti
+      // souběžné úpravě v otevřeném editoru (panel 4. 10. 2026: dřív bez obojího, autosave editoru mohl přesun tiše přepsat)
+      nove.push({ id: `edge-${Date.now()}-${nid}`, source: pid, target: nid, type: "deletable" });
+      const r = http("PATCH", `/api/collections/goalmaps/records/${encodeURIComponent(p.map.id)}`, { edges: nove, base_updated: p.map.getString("updated") });
+      if (r.status === 409) return { text: "Error: the map was changed by someone else meanwhile — nothing was moved; ask the user to try again." };
       if (r.status !== 200) return { text: `Error ${r.status}: ${((r.json || {}).message) || "update failed"}` };
       const pn = nodes.find((n) => n.id === pid) || { data: {} };
       return { text: `Step "${titulUzlu(app, auth, a.map_id, a.node_id)}" moved under "${pid === apex ? "the apex" : ((pn.data || {}).title || pid)}" in "${p.map.getString("title")}" (with its subtree).`, karta: { type: "vysledek", map_id: p.map.id, map_title: p.map.getString("title"), node_id: nid } };
@@ -2355,8 +2358,11 @@ function vykonej(app, auth, L, name, args, ktx) {
       });
     }
     case "set_rule_enabled": {
+      const midE = mapaId(app, auth, a.map_id);
+      const ridE = pravidloId(app, midE, a.rule_id);
+      if (!midE || !ridE) return { text: "Error: map or rule not found." };
       return sDocasnymKlicem(app, auth, (v1) => {
-        const r = v1("POST", `/v1/maps/${encodeURIComponent(mapaId(app, auth, a.map_id) || "-")}/rules/${encodeURIComponent(String(a.rule_id || ""))}`, { enabled: !!a.enabled });
+        const r = v1("POST", `/v1/maps/${encodeURIComponent(midE)}/rules/${encodeURIComponent(ridE)}`, { enabled: !!a.enabled });
         if (r.status !== 200) return { text: chybaV1(r) };
         return { text: `Rule ${a.enabled ? "enabled" : "disabled"}: ${M.renderRule(r.json.rule || {})}` };
       });
@@ -2450,20 +2456,42 @@ function chybaBezRodice(app, auth, mapRef, parentRef) {
 // „Nakoupit suroviny a naplánovat pečení“ — dvakrát totéž v jedné větvi). Stejný název (bez diakritiky,
 // velikosti a interpunkce) už v mapě JE → model dostane chybu místo karty a má se zeptat / použít stávající uzel.
 // Jen přesná shoda názvu — „skoro stejné“ hlídá instrukce, heuristika by zakazovala legitimní podkroky.
+// Jen v JEDNÉ VĚTVI (panel 4. 10. 2026): rodič, jeho předci a celý jeho podstrom. Stejnojmenný krok pod JINÝM rodičem
+// („Objednat materiál“ pod dvěma zakázkami) je legitimní — celomapová kontrola ho zakazovala.
 const klicNazvu = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-function chybaDuplicity(app, auth, mapRef, items) {
+function chybaDuplicity(app, auth, mapRef, parentRef, items) {
   try {
     const { v1ReadableMap, jsonVal } = require(`${__hooks}/helpers.js`);
-    const r = v1ReadableMap(app, mapaId(app, auth, mapRef), auth);
+    const mid = mapaId(app, auth, mapRef);
+    const r = v1ReadableMap(app, mid, auth);
     if (!r) return null;
+    const nodes = jsonVal(r.map, "nodes", []); const edges = jsonVal(r.map, "edges", []);
+    const apex = (nodes.find((n) => n.type === "apexNode") || {}).id || "";
+    const pref = String(parentRef || "").trim();
+    const pid = !pref || pref.toLowerCase() === "apex" ? apex : uzelId(app, auth, mid, pref);
+    let vetev = null; // null = rodiče nejde určit → celá mapa (chybaUzlu to ohlásí zvlášť)
+    if (pid) {
+      vetev = new Set([pid]);
+      const fronta = [pid];
+      while (fronta.length) { const x = fronta.shift(); for (const e of edges) if (e.source === x && !vetev.has(e.target)) { vetev.add(e.target); fronta.push(e.target); } }
+      let cur = pid; const videno = new Set();
+      while (cur && !videno.has(cur)) { videno.add(cur); const e = edges.find((h) => h.target === cur); if (!e) break; vetev.add(e.source); cur = e.source; }
+    }
     const mapa = new Map();
-    for (const n of jsonVal(r.map, "nodes", [])) { if (n.type !== "goalNode") continue; const k = klicNazvu((n.data || {}).title); if (k && !mapa.has(k)) mapa.set(k, (n.data || {}).title || ""); }
-    if (!mapa.size) return null;
+    for (const n of nodes) { if (n.type !== "goalNode" || (vetev && !vetev.has(n.id))) continue; const k = klicNazvu((n.data || {}).title); if (k && !mapa.has(k)) mapa.set(k, (n.data || {}).title || ""); }
     const nove = []; const dupl = [];
     const projdi = (arr) => { for (const it of (Array.isArray(arr) ? arr : [])) { if (!it || !it.title) continue; const k = klicNazvu(it.title); if (k && mapa.has(k)) dupl.push(`"${String(it.title).slice(0, 80)}"`); else if (k && nove.includes(k)) dupl.push(`"${String(it.title).slice(0, 80)}" (twice in this request)`); else if (k) nove.push(k); projdi(it.children); } };
     projdi(items);
     if (!dupl.length) return null;
-    return `Error: the map "${r.map.getString("title")}" already has a node titled ${dupl.join(", ")} — do not add it again. Tell the user it already exists and offer to use the existing node (update_node, or move it under another step via a rule/move), or ask what exactly should be created. Nothing was added.`;
+    return `Error: the map "${r.map.getString("title")}" already has a node titled ${dupl.join(", ")} in this branch (the parent, the steps above it or below it) — do not add it again. Tell the user it already exists and offer to use the existing node (update_node, or move it under another step via a rule/move), or ask what exactly should be created. Nothing was added.`;
+  } catch (err) { return null; }
+}
+// Nápad do mapy: tatáž kontrola nad názvem nápadu (instrukce slibuje pravidlo i pro add_idea_to_map — dřív platilo jen pro add_nodes)
+function chybaDuplicityNapadu(app, auth, ideaRef, mapRef, parentRef) {
+  try {
+    const idea = napadZaznam(app, auth, ideaRef);
+    if (!idea) return null;
+    return chybaDuplicity(app, auth, mapRef, parentRef, [{ title: idea.getString("title") }]);
   } catch (err) { return null; }
 }
 // Práva se ověří PŘED kartou: řešitel (work) / čtenář (read) smí přes API jen stav
@@ -2819,7 +2847,7 @@ function overZapisZaklad(app, auth, name, a) {
       if (bajtu(JSON.stringify(a)) > 12000) return "Error: this rewrite is too long to confirm in a turn with an image or PDF. Tell the user to ask for it again in a new message without the attachment.";
       return null;
     }
-    case "add_idea_to_map": return chybaNapadu(a.idea_id) || chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.parent_id) || chybaBezRodice(app, auth, a.map_id, a.parent_id);
+    case "add_idea_to_map": return chybaNapadu(a.idea_id) || chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.parent_id) || chybaBezRodice(app, auth, a.map_id, a.parent_id) || chybaDuplicityNapadu(app, auth, a.idea_id, a.map_id, a.parent_id);
     case "delete_ideas": {
       if (a.all === true) return napadyUzivatele(app, auth.id).length ? null : "Error: the idea buffer is already empty. Tell the user plainly.";
       const ids = Array.isArray(a.idea_ids) ? a.idea_ids : [];
@@ -2830,7 +2858,7 @@ function overZapisZaklad(app, auth, name, a) {
     // položky z obrázku/rozhovoru v zásobníku nejsou — model je pak dával nejdřív do zásobníku
     // a uživatel potvrzoval dvakrát (Richard 16. 9. 2026) → chyba mu rovnou řekne správnou cestu
     case "create_project_from_ideas": { for (const id of (Array.isArray(a.idea_ids) ? a.idea_ids : [])) { const e = chybaNapadu(id); if (e) return e + " If these items come from an image transcript or from the conversation, call create_project with them as outline instead — do NOT save them to the buffer first."; } return null; }
-    case "add_nodes": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.parent_id) || chybaBezRodice(app, auth, a.map_id, a.parent_id) || chybaDuplicity(app, auth, a.map_id, a.items);
+    case "add_nodes": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.parent_id) || chybaBezRodice(app, auth, a.map_id, a.parent_id) || chybaDuplicity(app, auth, a.map_id, a.parent_id, a.items);
     case "update_node": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.node_id) || (a.node_id ? null : "Error: node_id is required.");
     case "create_rule": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.node_id) || chybaTvaruPravidla(app, auth, a) || chybaTerminovehoPravidla(app, auth, a);
     case "delete_node": {
@@ -2977,7 +3005,7 @@ function overZapisZaklad(app, auth, name, a) {
       return null;
     }
     case "delete_rule_template": return sablonaDto(app, a.template_id) ? null : `Error: template "${String(a.template_id || "")}" not found (list_rule_templates; pass the id or the exact name).`;
-    case "set_rule_enabled": return chybaMapy(a.map_id);
+    case "set_rule_enabled": return chybaMapy(a.map_id) || (pravidloId(app, mapaId(app, auth, a.map_id), a.rule_id) ? null : `Error: rule "${String(a.rule_id || "")}" not found in "${titulMapy(app, auth, a.map_id)}" (use list_rules; pass the id or the exact name).`);
     // událost: tvar i účastníci se ověří PŘED kartou — model dostane chybu hned (neznámý
     // e-mail, špatný čas), uživatel nepotvrzuje něco, co server stejně odmítne
     case "create_event": {
@@ -3320,9 +3348,15 @@ function popisAkce(app, auth, L, name, a) {
     case "create_rule": return cs
       ? `Vytvořit pravidlo „${a.name}“ v projektu „${nazevMapy(a.map_id)}“ (${(a.trigger || {}).type} → ${(a.actions || []).map((x) => x.type).join(", ")})`
       : `Create the rule "${a.name}" in "${nazevMapy(a.map_id)}" (${(a.trigger || {}).type} → ${(a.actions || []).map((x) => x.type).join(", ")})`;
-    case "set_rule_enabled": return cs
-      ? `${a.enabled ? "Zapnout" : "Vypnout"} pravidlo v projektu „${nazevMapy(a.map_id)}“`
-      : `${a.enabled ? "Enable" : "Disable"} a rule in "${nazevMapy(a.map_id)}"`;
+    case "set_rule_enabled": {
+      // název pravidla na kartě (podle id i názvu) — dřív karta říkala jen „Vypnout pravidlo v projektu“ (panel 4. 10. 2026)
+      const R = require(`${__hooks}/rules-api.js`);
+      let nazev = String(a.rule_id || "");
+      try { const mid = mapaId(app, auth, a.map_id); const rules = ((R.listRules(app, app.findRecordById("goalmaps", mid)) || {}).body || {}).rules || []; const r = rules.find((x) => x.id === pravidloId(app, mid, a.rule_id)); if (r) nazev = r.name; } catch (err) { /* název = odkaz modelu */ }
+      return cs
+        ? `${a.enabled ? "Zapnout" : "Vypnout"} pravidlo „${ocisti(nazev, 120)}“ v projektu „${nazevMapy(a.map_id)}“`
+        : `${a.enabled ? "Enable" : "Disable"} the rule "${ocisti(nazev, 120)}" in "${nazevMapy(a.map_id)}"`;
+    }
     case "move_node": {
       const pref = String(a.parent_id || "").trim();
       const rodic = !pref || pref.toLowerCase() === "apex" ? (cs ? "vrchol projektu" : "the apex") : `„${nazevUzlu(a.map_id, pref)}“`;
@@ -4116,6 +4150,28 @@ function pdfPosledni(msgs) {
   return null;
 }
 
+// POST /chat/vratit — {chat_id, karta_id}: Vrátit u karty nastavení (jazyk, motiv, upozornění…) se zapíše do uložených
+// zpráv (`vraceno: true` na kartě `nastaveni`, nebo na `odkaz` karty akce). Přepnutí jazyka přemontuje celou aplikaci
+// (Router key = jazyk), takže stav držený jen v prohlížeči by se ztratil a vrácená karta by se po dalším potvrzení
+// znovu projevila (panel 4. 10. 2026). Samotné hodnoty vrací prohlížeč (users PATCH / localStorage) jako dřív.
+function chatVratit(app, auth, body, L) {
+  const { jsonVal } = require(`${__hooks}/helpers.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
+  const rec = nactiChat(app, auth, body && body.chat_id);
+  if (!rec) { const e = new Error(t(L, "err.chatNotFound")); e.status = 404; throw e; }
+  const id = String((body && body.karta_id) || "");
+  const msgs = jsonVal(rec, "messages", []);
+  let nalezeno = false;
+  if (id) for (const m of msgs) for (const k of (m.karty || [])) {
+    if (k.type === "nastaveni" && k.id === id) { k.vraceno = true; nalezeno = true; }
+    else if (k.type === "akce" && k.odkaz && k.odkaz.type === "nastaveni" && k.odkaz.id === id) { k.odkaz.vraceno = true; nalezeno = true; }
+  }
+  if (!nalezeno) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 404; throw e; }
+  rec.set("messages", msgs);
+  app.save(rec);
+  return chatDto(rec);
+}
+
 // POST /chat/potvrdit — {chat_id, action_id, ok} nebo {chat_id, action_ids: [...], ok}.
 // Vykoná (ok) nebo zamítne akci; když už žádná nečeká, model dostane výsledky a dopoví.
 // Dávka (action_ids, Richard 29. 9. 2026: „označit všechny najednou" u změny termínu
@@ -4136,6 +4192,14 @@ function chatPotvrdit(app, auth, body, cfg, L) {
   // pořadí = pořadí v pending (= pořadí karet), ne pořadí v požadavku; neznámé id = 404
   const vybrane = pend.filter((p) => ids.includes(p.id));
   if (!vybrane.length || (davka && vybrane.length !== new Set(ids).size)) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 404; throw e; }
+  // Dávka s kartou pro prohlížeč (kind client) se odmítne PŘED cyklem — dřív až uprostřed, kdy předchozí karty dávky už byly vykonané
+  if (davka && body.ok && vybrane.some((p) => (NASTROJ[p.name] || {}).kind === "client")) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 400; throw e; }
+  // Potvrzení je jednorázové i při DVOU SOUBĚŽNÝCH požadavcích (druhé okno, opakování po timeoutu): karty se z pending odeberou
+  // atomicky (UPDATE … WHERE pending = přesně to, co jsme četli). Kdo prohraje, dostane 404 a akce (pozvánka, komentář,
+  // kroky…) se neprovede dvakrát (panel 4. 10. 2026 — dřív se pending ukládalo až PO vykonání).
+  const zbyva = pend.filter((p) => !ids.includes(p.id));
+  const cas = app.db().newQuery("UPDATE ai_chats SET pending = {:nove} WHERE id = {:id} AND pending = {:stare}").bind({ nove: JSON.stringify(zbyva), id: rec.id, stare: rec.getString("pending") }).execute();
+  if (!cas || Number(cas.rowsAffected()) !== 1) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 404; throw e; }
   const msgs = jsonVal(rec, "messages", []);
   const stats = { calls: 0, in: 0, out: 0, cached: 0, tools: [], model: "" };
   const t0 = Date.now();
@@ -4151,7 +4215,6 @@ function chatPotvrdit(app, auth, body, cfg, L) {
       vysledek = { text: "Error: this action is not available in this conversation." };
       stav = "chyba";
     } else if (body && body.ok && defAkce && defAkce.kind === "client") {
-      if (davka) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 400; throw e; }
       // vykonal prohlížeč (oprava PDF, výchozí skin instance) — server jen zapíše, co se povedlo, a model dopoví
       vysledek = defAkce.klient === "instance_skin" ? require(`${__hooks}/chat-nastaveni.js`).vysledekKlientaSkin(body.vysledek, akce.args) : vysledekKlienta(body.vysledek, akce.args);
       stav = vysledek.chyba ? "chyba" : "hotovo";
@@ -4328,4 +4391,4 @@ function chatChyba(e, err, L) {
 }
 
 
-module.exports = { REZIM, jeRezim, ROZSAH, chybaRozsahu, otestujObrazek, zkontrolujObrazek, zkontrolujPdf, visionAiConfig, orezNahledy, zpravyProModel, pametProjektu, mapaId, chatCfg, chatBrzda, chatChyba, chatAiConfig, chatRun, chatOprav, opravaPrepisu, chatPotvrdit, chatDto, nactiChat, seznamChatu, pametText, ulozPamet, NASTROJE, MAX_PAMET, P };
+module.exports = { REZIM, jeRezim, ROZSAH, chybaRozsahu, otestujObrazek, zkontrolujObrazek, zkontrolujPdf, visionAiConfig, orezNahledy, zpravyProModel, pametProjektu, mapaId, chatCfg, chatBrzda, chatChyba, chatAiConfig, chatRun, chatOprav, opravaPrepisu, chatPotvrdit, chatVratit, chatDto, nactiChat, seznamChatu, pametText, ulozPamet, NASTROJE, MAX_PAMET, P };

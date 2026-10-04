@@ -325,6 +325,8 @@
     "title": "Share map",
     "description": "Access is tied to the e-mail. People without an account get an invitation and see the map after signing up with the same address.",
     "emailPlaceholder": "email@example.com",
+    "emailPlaceholderOr": "… or type an e-mail",
+    "pickMember": "Pick an organization member…",
     "permRead": "View",
     "permWork": "Collaborate",
     "permWorkTitle": "Additionally opens the detail of every step and can ask for a due-date change even on others' work. Still switches status only on their own work.",

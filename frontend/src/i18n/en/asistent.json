@@ -49,6 +49,8 @@
   "nastaveni": {
     "changed": "{{name}}: {{value}}",
     "revert": "Revert",
+    "reverted": "Reverted",
+    "revertFailed": "The revert did not reach your account — try Revert again.",
     "notify": "Notifications “{{type}}”: {{channels}}",
     "allTypes": "all types",
     "inApp": "in-app",

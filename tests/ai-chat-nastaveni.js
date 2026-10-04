@@ -93,20 +93,35 @@ H.beh(async () => {
   uB = await uzivatel(meB.id);
   expect(Object.keys(uB.notify_prefs).length >= 20 && uB.notify_prefs.deadline.in_app === true && !('password_reset' in uB.notify_prefs), `type all → všechny typy, password_reset se neuloží (${Object.keys(uB.notify_prefs).length})`);
 
-  console.log('== set_preference: jazyk na účet (další tah EN), jméno, zámek; klientské jen karta ==');
-  fronta.push(nastroj('set_preference', { co: 'language', hodnota: 'en' }), text('SWITCHED.'));
+  console.log('== set_preference: jazyk VŽDY přes kartu (panel 4. 10.: pokyn ze sdílené mapy nesmí přepnout jazyk bez potvrzení), na účet až po Ano; jméno, zámek; klientské jen karta ==');
+  // ⚠️ MUTAČNÍ JÁDRO: na image bez kartaKdyz pro language se jazyk přepne hned (karta nastaveni, users.language = en bez potvrzení)
+  fronta.push(nastroj('set_preference', { co: 'language', hodnota: 'en' }));
   r = await chatuj(B, { chat_id: chatB.id, message: 'Přepni mě na angličtinu' });
   chatB = r.json.chat;
-  kN = posledniKarta(chatB, 'nastaveni');
-  expect(!!kN && kN.co === 'language' && kN.hodnota === 'en' && kN.predchozi === 'cs' && kN.klient === false, `karta jazyk cs → en (${JSON.stringify(kN)})`);
-  expect((await uzivatel(meB.id)).language === 'en', 'users.language = en');
+  let kJ = posledniKarta(chatB, 'akce');
+  expect(!!kJ && kJ.stav === 'ceka' && /Nastavit jazyk: angličtina/.test(kJ.popis) && !posledniKarta(chatB, 'nastaveni') && (await uzivatel(meB.id)).language !== 'en', `jazyk jde přes kartu i bez přílohy, nic se nezměnilo (${kJ && kJ.popis}, účet: „${(await uzivatel(meB.id)).language}“)`);
+  fronta.push(text('SWITCHED.'));
+  r = await potvrd(B, chatB.id, kJ.id, true);
+  chatB = r.json.chat;
+  kJ = kartaPodleId(chatB, kJ.id);
+  expect(kJ.stav === 'hotovo' && kJ.odkaz && kJ.odkaz.type === 'nastaveni' && kJ.odkaz.co === 'language' && kJ.odkaz.hodnota === 'en' && kJ.odkaz.predchozi === 'cs' && kJ.odkaz.klient === false && /^n_/.test(kJ.odkaz.id || ''), `po Ano karta hotovo s výsledkem jazyka (id karty pro Vrátit) (${JSON.stringify(kJ.odkaz)})`);
+  expect((await uzivatel(meB.id)).language === 'en', 'users.language = en až po potvrzení');
   expect(toolZ(posledniVolani()).some((m) => /From now on write in English/.test(m.content)), 'model dostal pokyn psát anglicky');
   fronta.push(text('Hello.'));
   r = await chatuj(B, { chat_id: chatB.id, message: 'Hi' });
   expect(/^Today is/m.test(systemZ(posledniVolani())) && /You change the app settings with tools/.test(systemZ(posledniVolani())), 'další tah: systém v angličtině (jazyk účtu)');
-  fronta.push(nastroj('set_preference', { co: 'language', hodnota: 'czech' }), text('Zpět.'));
+  fronta.push(nastroj('set_preference', { co: 'language', hodnota: 'czech' }));
   r = await chatuj(B, { chat_id: chatB.id, message: 'Switch me back to Czech' });
-  expect((await uzivatel(meB.id)).language === 'cs' && posledniKarta(r.json.chat, 'nastaveni').hodnota === 'cs', 'hodnota „czech“ se normalizuje na cs');
+  chatB = r.json.chat; kJ = posledniKarta(chatB, 'akce');
+  expect(!!kJ && kJ.stav === 'ceka' && /^Set /.test(kJ.popis), `EN karta jazyka (uživatel je teď anglicky) (${kJ && kJ.popis})`);
+  fronta.push(text('Zpět.'));
+  r = await potvrd(B, chatB.id, kJ.id, true); chatB = r.json.chat;
+  expect((await uzivatel(meB.id)).language === 'cs' && kartaPodleId(chatB, kJ.id).odkaz.hodnota === 'cs', 'hodnota „czech“ se normalizuje na cs');
+  // Vrátit se zapíše do rozhovoru (přežije přemontování aplikace při změně jazyka): odkaz karty akce i karta nastaveni
+  r = await inst.api('POST', '/api/kb/chat/vratit', { token: B, body: { chat_id: chatB.id, karta_id: kartaPodleId(chatB, kJ.id).odkaz.id } });
+  expect(r.status === 200 && kartaPodleId(r.json.chat, kJ.id).odkaz.vraceno === true, '/chat/vratit označí výsledek karty akce jako vrácený');
+  expect((await inst.api('POST', '/api/kb/chat/vratit', { token: B, body: { chat_id: chatB.id, karta_id: 'n_neexistuje' } })).status === 404, 'neznámá karta → 404');
+  expect((await inst.api('POST', '/api/kb/chat/vratit', { token: A, body: { chat_id: chatB.id, karta_id: kartaPodleId(chatB, kJ.id).odkaz.id } })).status === 404, 'cizí rozhovor → 404');
   fronta.push(nastroj('set_preference', { co: 'full_name', hodnota: 'Jana Dvořáková' }), nastroj('set_preference', { co: 'align_lock', hodnota: 'compact' }), text('x'));
   r = await chatuj(B, { chat_id: chatB.id, message: 'Změň mi celé jméno na Jana Dvořáková a zamkni zarovnání na kompakt' });
   uB = await uzivatel(meB.id);
@@ -379,9 +394,14 @@ H.beh(async () => {
   const kEn = posledniKarta(r.json.chat, 'akce');
   expect(!!kEn && /^Switch to the simplified view — the assistant is not available there/.test(kEn.popis), `EN lite karta (${kEn && kEn.popis})`);
   r = await potvrd(EN, r.json.chat.id, kEn.id, false);
-  fronta.push(nastroj('set_notification', { type: 'reminder', email: false }), text('x'));
+  // vypnutí e-mailu jde VŽDY přes kartu (panel 4. 10.: pokyn vložený do sdílené mapy nesmí vypnout e-maily bez potvrzení)
+  fronta.push(nastroj('set_notification', { type: 'reminder', email: false }));
   r = await chatuj(EN, { chat_id: r.json.chat.id, message: 'No e-mails for reminders' });
-  expect(toolZ(posledniVolani()).some((m) => /Notification settings saved \(reminder: in-app on, e-mail off\)/.test(m.content)), 'EN: výchozí e-mail u připomínky vypnut, in-app zůstal');
+  const kEnN = posledniKarta(r.json.chat, 'akce');
+  expect(!!kEnN && kEnN.stav === 'ceka' && /^Notifications "reminder": e-mail off/.test(kEnN.popis) && !posledniKarta(r.json.chat, 'nastaveni'), `EN: vypnutí e-mailu přes kartu (${kEnN && kEnN.popis})`);
+  fronta.push(text('x'));
+  r = await potvrd(EN, r.json.chat.id, kEnN.id, true);
+  expect(toolZ(posledniVolani()).some((m) => /Notification settings saved \(reminder: in-app on, e-mail off\)/.test(m.content)) && kartaPodleId(r.json.chat, kEnN.id).odkaz && kartaPodleId(r.json.chat, kEnN.id).odkaz.co === 'notify', 'EN: po Ano výchozí e-mail u připomínky vypnut, in-app zůstal, karta nese výsledek s Vrátit');
 
   console.log('== hostovaná instance: fakturace a objednávka; AI nastavení nejde ==');
   console.log('== e-mailový kanál se ukládá jako v UI (bez režimu e-mailů) — panel 4. 10. ==');

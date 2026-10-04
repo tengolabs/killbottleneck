@@ -647,10 +647,11 @@ H.beh(async () => {
   await page.keyboard.type('Ahoj z mobilu');
   await page.keyboard.press('Enter');
   expect(await cekejText('MOBIL-MOCK'), 'odpověď v panelu na mobilu');
-  fronta.push(nastroj('add_idea_to_map', { idea_id: 'Koupit novou pilu', map_id: 'Truhlářství', parent_id: 'apex' }));
-  await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Koupit novou pilu', owner: me.id } });
+  // jiný název než „Koupit novou pilu“ — ten už v mapě JE (krok výš) a od v0.73 server duplicitu ve větvi odmítne před kartou
+  fronta.push(nastroj('add_idea_to_map', { idea_id: 'Koupit hoblík', map_id: 'Truhlářství', parent_id: 'apex' }));
+  await inst.api('POST', '/api/collections/buffer_nodes/records', { token: A, body: { title: 'Koupit hoblík', owner: me.id } });
   await page.click('[data-testid="chat-input"]');
-  await page.keyboard.type('Vlož pilu');
+  await page.keyboard.type('Vlož hoblík');
   await page.keyboard.press('Enter');
   expect(await cekej('[data-testid="chat-akce"][data-stav="ceka"]'), 'karta akce na mobilu');
   fronta.push(text('VLOZENO-MOBIL.'));

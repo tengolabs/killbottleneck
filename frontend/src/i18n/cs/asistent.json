@@ -49,6 +49,8 @@
   "nastaveni": {
     "changed": "{{name}}: {{value}}",
     "revert": "Vrátit",
+    "reverted": "Vráceno",
+    "revertFailed": "Vrácení se na účet neuložilo — zkuste Vrátit znovu.",
     "notify": "Upozornění „{{type}}“: {{channels}}",
     "allTypes": "všechny typy",
     "inApp": "v aplikaci",

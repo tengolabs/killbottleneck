@@ -111,6 +111,7 @@ export default function EditorDialogs({ mapa, access, node, dialogs }) {
         open={shareOpen}
         mapId={mapId}
         isOwner={isMapOwner}
+        orgMembers={members}
         onClose={() => setShareOpen(false)}
         onMapBumped={(u) => { baseUpdated.current = u; }}
       />

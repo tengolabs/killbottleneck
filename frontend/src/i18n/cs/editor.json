@@ -325,6 +325,8 @@
     "title": "Sdílet mapu",
     "description": "Přístup se váže na e-mail. Kdo ještě nemá účet, dostane pozvánku a mapu uvidí po registraci se stejnou adresou.",
     "emailPlaceholder": "email@example.com",
+    "emailPlaceholderOr": "… nebo napište e-mail",
+    "pickMember": "Vybrat člena organizace…",
     "permRead": "Číst",
     "permWork": "Spolupracovat",
     "permWorkTitle": "Navíc otevře detail každého kroku a o jiný termín smí požádat i u cizí práce. Stav přepíná dál jen u své.",

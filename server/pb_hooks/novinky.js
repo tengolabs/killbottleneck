@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.73-beta": {
+    cs: [
+      "Sdílet mapu: kolegu vyberete ze seznamu členů organizace (nabízí jen ty, kdo mapu ještě nemají), nebo dál napíšete e-mail — v editoru i na úvodní stránce.",
+      "Asistent: změnu jazyka, režimu e-mailů a vypnutí e-mailů či všech upozornění nejdřív potvrdíte na kartě; po potvrzení má karta Vrátit a vrácené nastavení už se samo znovu nezapne.",
+      "Asistent: potvrzení karty proběhne jen jednou i ze dvou oken, přesunutý krok má hranu jako z editoru a stejnojmenný krok pod jinou zakázkou už přidat jde.",
+      "Správa organizace: volby Účel instance mají zpět české a anglické texty místo syrových klíčů.",
+    ],
+    en: [
+      "Share map: pick a colleague from the list of the organization's members (only those who do not have the map yet are offered) or keep typing an e-mail — in the editor and on the home page.",
+      "Assistant: changing the language, the e-mail mode and turning e-mails or all notifications off is confirmed on a card first; after confirmation the card has Revert and a reverted setting never switches itself back on.",
+      "Assistant: confirming a card runs once even from two windows, a moved step gets an edge like the editor's, and a step with the same title under another order can be added again.",
+      "Organization admin: the Instance purpose options have their Czech and English texts back instead of raw keys.",
+    ],
+  },
   "v0.72-beta": {
     cs: [
       "Asistent umí nastavení aplikace: „Přepni mě na angličtinu“, „Vypni mi e-maily k termínům“, „Zamkni zarovnání na kompakt“ — provede hned a na kartě nechá Vrátit; „Jaké mám nastavení?“ vypíše všechno najednou.",

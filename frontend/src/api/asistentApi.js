@@ -16,6 +16,8 @@ export const chatPotvrdit = (payload) => kbSend('/api/kb/chat/potvrdit', { body:
 // oprava přepisu poslední hlasovky / fotky: zahodí nepotvrzené návrhy a asistent odpoví znovu (běžný tah)
 export const chatOprav = (payload) => kbSend('/api/kb/chat/oprav', { body: payload, timeoutMs: overrideMs() || CHAT_TIMEOUT_MS });
 export const chatSeznam = () => kbSend('/api/kb/chat/seznam', { method: 'GET' });
+// Vrátit u karty nastavení: server si kartu označí `vraceno` (přežije přemontování při změně jazyka)
+export const chatVratit = (payload) => kbSend('/api/kb/chat/vratit', { body: payload });
 export const chatDetail = (id) => kbSend(`/api/kb/chat/detail/${encodeURIComponent(id)}`, { method: 'GET' });
 export const chatSmazat = (id) => kbSend('/api/kb/chat/smazat', { body: { chat_id: id } });
 export const chatPamet = () => kbSend('/api/kb/chat/pamet', { method: 'GET' });
