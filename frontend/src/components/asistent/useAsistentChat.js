@@ -4,6 +4,10 @@ import { nahradPrepis } from '@/lib/prepisZpravy';
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
 import { setSkin, setTheme } from '@/lib/theme';
 import { getBuiltinSkin } from '@/lib/skins';
+import { setLang } from '@/lib/lang';
+import { saveMode, MODE_AUTO, MODE_LITE, MODE_FULL } from '@/lib/liteMode';
+import { KLIC_CITELNOST, platnyStupen } from '@/lib/citelnost';
+import { KLIC_ZAMEK } from '@/lib/alignStyles';
 
 // Logika rozhovoru chatu na boku — v líném chunku panelu (ne v hlavním balíku).
 // Aktivní rozhovor (kb-chat-id) a model (kb-chat-model) přežívají v localStorage,
@@ -16,7 +20,7 @@ const KEY_MODEL = 'kb-chat-model';
 // Server už skin_id uložil; tady se jen aplikuje (SkinDialog dělá totéž).
 // Karta skinu visí na TÉ zprávě asistenta, která nástroj zavolala — v jednom
 // kole jich může být víc (nástroj → dopověď), proto se projde celý poslední tah.
-function projevKarty(dto, patchUser) {
+function projevKarty(dto, patchUser, klient) {
   const msgs = (dto && dto.messages) || [];
   const odUser = msgs.map((m) => m.role).lastIndexOf('user');
   const karty = msgs.slice(odUser + 1).filter((m) => m.role === 'assistant').flatMap((m) => m.karty || []);
@@ -26,7 +30,51 @@ function projevKarty(dto, patchUser) {
       if (s) { setSkin(s); if (patchUser) patchUser({ skin_id: k.skin_id }); }
     } else if (k.type === 'theme') {
       setTheme(k.theme === 'dark' ? 'dark' : 'light');
+    } else if (k.type === 'nastaveni') {
+      aplikujKlienta(k, patchUser, klient);
+    } else if (k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'nastaveni') {
+      // nastavení, které šlo přes kartu (přepnutí do lite, jazyk v tahu s přílohou): výsledek visí na kartě akce
+      aplikujKlienta(k.odkaz, patchUser, klient);
     }
+  }
+}
+// Nastavení z karty `nastaveni` (3. 10. 2026): serverová pole už server uložil (jen se propíší do uživatele
+// v paměti), klientské předvolby (motiv, zjednodušené zobrazení, čitelnost) se ukládají TADY do prohlížeče.
+// `hodnota` přebíjí k.hodnota (Vrátit = tatáž cesta s předchozí hodnotou). klient = { navigate } z panelu.
+export function aplikujKlienta(k, patchUser, klient, hodnota) {
+  const v = hodnota !== undefined ? hodnota : k.hodnota;
+  const pu = (f) => { if (patchUser) patchUser(f); };
+  switch (k.co) {
+    case 'language': setLang(v === 'en' ? 'en' : 'cs'); pu({ language: v === 'en' ? 'en' : 'cs' }); break;
+    case 'theme': setTheme(v === 'dark' ? 'dark' : 'light'); break;
+    case 'mode':
+      saveMode(v === 'lite' ? MODE_LITE : v === 'full' ? MODE_FULL : MODE_AUTO);
+      // zjednodušené zobrazení nemá panel asistenta → rovnou tam (karta uživatele varovala a potvrdil ji)
+      if (v === 'lite' && klient && klient.navigate) klient.navigate('/lite');
+      break;
+    case 'readability':
+      ulozKlic(KLIC_CITELNOST, platnyStupen(v));
+      try { window.dispatchEvent(new Event('kb-citelnost-changed')); } catch { /* SSR/test */ }
+      break;
+    case 'align_lock': { const z = !v || v === 'none' ? '' : v; ulozKlic(KLIC_ZAMEK, z); pu({ align_lock: z }); break; }
+    case 'full_name': pu({ full_name: v || '' }); break;
+    case 'display_name': pu({ name: v || '' }); break;
+    case 'notify_email_mode': pu({ notify_email_mode: v || '' }); break;
+    case 'notify': pu({ notify_prefs: hodnota !== undefined ? hodnota : (k.prefs || {}) }); break;
+    default: break;
+  }
+}
+// Pole účtu, která musí při Vrátit zapsat prohlížeč (server už původní hodnotu přepsal); null = jen prohlížeč
+export function poleProVraceni(k) {
+  const p = k.predchozi;
+  switch (k.co) {
+    case 'language': return { language: p === 'en' ? 'en' : 'cs' };
+    case 'align_lock': return { align_lock: !p || p === 'none' ? '' : p };
+    case 'full_name': return { full_name: p || '' };
+    case 'display_name': return { name: p || '' };
+    case 'notify_email_mode': return { notify_email_mode: p || '' };
+    case 'notify': return { notify_prefs: k.predchozi_prefs || {} };
+    default: return null;
   }
 }
 // Potvrzená akce změnila mapu → otevřený editor si ji slije hned
@@ -55,7 +103,9 @@ const prevedChybu = (e) => {
   return (e && e.response && (e.response.error || e.response.message)) || 'generic';
 };
 
-export function useAsistentChat({ open }) {
+export function useAsistentChat({ open, klient }) {
+  const klientRef = useRef(klient); // { navigate } — projevení karet nastavení (přechod do /lite)
+  klientRef.current = klient;
   const [chatId, setChatIdState] = useState(() => nactiKlic(KEY_CHAT) || '');
   const [chat, setChat] = useState(null);      // DTO ze serveru {id,title,messages,pending,model}
   const [seznam, setSeznam] = useState([]);
@@ -116,7 +166,7 @@ export function useAsistentChat({ open }) {
       const r = await chatApi({ mode, target: target || {}, message: '', context: context || {}, model: model || undefined });
       if (!zivy.current) return;
       setChat(r.chat); setChatId(r.chat.id);
-      projevKarty(r.chat, patchUser);
+      projevKarty(r.chat, patchUser, klientRef.current);
       nactiSeznam();
     } catch (e) {
       if (!zivy.current) return;
@@ -162,7 +212,7 @@ export function useAsistentChat({ open }) {
       }
       if (!zivy.current) return { ok: true, vratit: false };
       setChat(r.chat); setChatId(r.chat.id);
-      projevKarty(r.chat, patchUser);
+      projevKarty(r.chat, patchUser, klientRef.current);
       ohlasZmenuMapy(r.chat);
       nactiSeznam();
       return { ok: true, vratit: false };
@@ -198,7 +248,7 @@ export function useAsistentChat({ open }) {
       ohlasZmenuMapy(r.chat); // změna v mapě platí, i když uživatel mezitím otevřel jiný rozhovor
       if (aktualni.current !== chatId) { nactiSeznam(); return; }
       setChat(r.chat);
-      projevKarty(r.chat, patchUser);
+      projevKarty(r.chat, patchUser, klientRef.current);
     } catch (e) {
       if (!zivy.current || aktualni.current !== chatId) return;
       setError(prevedChybu(e));
@@ -227,7 +277,7 @@ export function useAsistentChat({ open }) {
       nactiSeznam();
       if (aktualni.current !== chatId) return true; // mezitím otevřen jiný rozhovor — odpověď patří tomu původnímu
       setChat(r.chat);
-      projevKarty(r.chat, patchUser);
+      projevKarty(r.chat, patchUser, klientRef.current);
       ohlasZmenuMapy(r.chat);
       return true;
     } catch (e) {

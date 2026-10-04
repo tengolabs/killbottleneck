@@ -46,6 +46,61 @@
   "themeDark": "dark",
   "memorySaved": "I will remember:",
   "ideaSaved": "Into the idea buffer: {{title}}",
+  "nastaveni": {
+    "changed": "{{name}}: {{value}}",
+    "revert": "Revert",
+    "notify": "Notifications “{{type}}”: {{channels}}",
+    "allTypes": "all types",
+    "inApp": "in-app",
+    "email": "e-mail",
+    "on": "on",
+    "off": "off",
+    "tempPassword": "Temporary password for {{email}} (shown only once):",
+    "tempPasswordHint": "Hand it over in person. The colleague changes it at the first sign-in.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "pole": {
+      "language": "Language",
+      "theme": "Theme",
+      "mode": "View",
+      "readability": "Map readability",
+      "align_lock": "Alignment lock",
+      "notify_email_mode": "Notification e-mails",
+      "full_name": "Full name",
+      "display_name": "Display name"
+    },
+    "hodnoty": {
+      "language": {
+        "cs": "Czech",
+        "en": "English"
+      },
+      "theme": {
+        "light": "light",
+        "dark": "dark"
+      },
+      "mode": {
+        "auto": "automatic by screen width",
+        "lite": "simplified view",
+        "full": "full version"
+      },
+      "readability": {
+        "normal": "normal",
+        "large": "larger",
+        "titleOnly": "title only"
+      },
+      "align_lock": {
+        "none": "off",
+        "classic": "classic",
+        "compact": "compact",
+        "bands": "bands"
+      },
+      "notify_email_mode": {
+        "instant": "each right away",
+        "digest": "one daily digest",
+        "none": "none"
+      }
+    }
+  },
   "toolsLooked": "Looked at: {{names}}",
   "toolNames": {
     "list_maps": "project list",
@@ -65,7 +120,12 @@
     "get_project_changes": "project changes",
     "get_person_work": "a colleague's work",
     "get_team_work": "team overview",
-    "search_projects": "project and archive search"
+    "search_projects": "project and archive search",
+    "get_settings": "settings",
+    "get_org_structure": "org structure",
+    "get_map_sharing": "project sharing",
+    "list_reminders": "step reminders",
+    "get_timer": "timer status"
   },
   "errorGeneric": "The assistant did not respond. Please try again.",
   "errorRate": "You have used up the hourly AI cap. Try again in a while.",

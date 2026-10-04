@@ -9,6 +9,82 @@ below before you jump several versions.
 
 ---
 
+## v0.72-beta — 2026-10-04
+
+**The assistant handles every setting of the app**
+
+- **The rest of the app's functions through the assistant** (`delete_node`, `archive_project`, `rename_project`,
+  `delete_project`, `set_map_public`, `update_rule`, `delete_rule`, `save_rule_template`, `delete_rule_template`,
+  `list_reminders`, `delete_reminder`, `request_deadline_change`, `decline_deadline_request`,
+  `mark_notifications_read`, `report_problem`): an inventory of every route and UI write against the assistant's
+  tools showed these gaps (the user's rule: everything except the security exclusions). Map/rule/reminder writes go
+  through the v1 API with a temporary key like the existing tools; project archive/rename/delete, the public link,
+  deadline requests, read-all and reports go through the app's own routes with the user's session token, so the
+  dialogs' permission rules apply (owner archives/deletes, editor renames, co-manager shares, assigner declines).
+  Every tool checks before the card (unknown rule, apex node, already archived, own project, no reminder…).
+  Second inventory pass added `add_comment`, `start_timer` / `stop_timer` / `get_timer`, `move_node` (with cycle
+  check), `update_idea`, `delete_document` and `revert_document`.
+- **Review panel fixes before the release:** a direct settings tool now goes through a card in the whole conversation
+  that contains an image, voice or PDF transcript, not only in that turn (an instruction hidden in an attachment could
+  otherwise be executed one turn later); turning a notification channel off through the assistant keeps the e-mail
+  channel exactly as the app's own dialog does (the e-mail mode no longer leaks into the stored preference); the
+  keyword groups for settings were narrowed so "add a step to the project" or "order parts" no longer load 24 settings
+  schemas, and the deadline-request tools moved into their own keyword group; the share lookup uses one query instead
+  of one per map.
+- **Assistant: a condition step goes under its step; no duplicate titles** (`feat/asistent-podkrok-podminka`): "before we
+  order we must measure" puts Measure under Order instead of beside it, and a step whose title already exists in the
+  map is not added again.
+- **Cloud chat proxy: health check only with the tenant token** (`fix/chat-proxy-healthz-token`): the health endpoint
+  no longer reveals machine or vendor addresses, and the result is cached for 30 s.
+- **Calendar events: update and delete through the assistant** (`update_event`, `delete_event`): move, rename, change
+  invitees, set/change/remove the reminder ("remind me an hour before" on an existing event), cancel; an invitee can
+  only leave the event. Found in the klik-test: "add a reminder" to an existing event ended in "I can't" and an offer
+  to delete and re-create it. The prompt now also says: a suggestion chip must be something the assistant can do, and
+  a click on it acts right away instead of asking again.
+- **Project sharing through the assistant** (`get_map_sharing`, `share_map`, `unshare_map`, `set_team_access`):
+  "Add Petr to the Kitchen project", "Remove Karel's access", "Give the whole team edit access", "Who sees the
+  Kitchen project?". Same rules as the Share dialog — the owner or a co-manager (edit) shares by name, team access
+  is the owner's only, the org map is never shared this way; writes go through `/api/kb/share` with the user's
+  own session token, so every guard of the dialog applies. The prompt now tells the model to say right away when
+  it has no tool for a request instead of asking clarifying questions first (found in the klik-test: two
+  questions, then "I can't").
+
+- **Personal settings through the assistant** (`set_preference`, `set_notification`, `get_settings`): language,
+  light/dark theme, simplified view, map readability, alignment lock, full and display name, notification
+  preferences per type or all at once, and the notification e-mail mode. Applied right away with a **Revert**
+  link on the card; the browser-only ones (theme, view, readability) are applied by the browser from the card
+  and reported to the server with each request so the assistant can read them. Switching to the simplified
+  view (no assistant there) always goes through a confirmation card that says how to come back; in a turn
+  with an image, PDF or voice note the language and notification changes go through a card as well
+  (instructions embedded in an attachment must not change them silently).
+- **Organization settings through the assistant**, only for the roles that have them in the UI and always
+  through a **Yes, do it** card: `invite_member`, `update_member` (role, AI agents / org structure manager
+  flags, deputy — never the user's own role), `update_organization` (name, purpose), `set_ai_settings`
+  (own server only; a partial change is merged with the stored settings, the token is never sent),
+  `set_ai_credits`, `set_instance_skin` (performed by the browser, which holds the built-in skins),
+  `set_billing` and `order_membership` (hosted only), `save_ai_agent` / `delete_ai_agent` (no secret),
+  `get_org_structure`, `add_org_position`, `update_org_position`, `remove_org_position`. Members never
+  receive the administrator tools (their schemas are not even sent to the model); the role is checked again
+  when a card is confirmed.
+- **Writes go through the same routes as the UI** with the user's own session token (`/api/kb/invite`,
+  `/purpose`, `/ai-settings`, `/billing`, `/member-deputy`, `/ai-agents/*`, `/org-structure/*`, the
+  `users` and `org_settings` records), so permissions, hooks (role lock, sanitised notification
+  preferences) and validation are shared — nothing is duplicated.
+- **Deliberately not available**: password and e-mail change, API keys, the AI provider token, deleting an
+  account, resetting a colleague's password, the agent secret and the logo — the assistant points to the
+  menu item instead. An invitation on an instance without SMTP shows the temporary password **once** on
+  the card (with Copy); it is not stored in the conversation nor sent to the model.
+- Docs: new section *App and organization settings* in the assistant guide (cs/en).
+
+**Upgrade notes**
+
+- The system prompt of the assistant changes once (a sentence about settings and where the excluded things
+  live); the prompt cache of running conversations is rebuilt on the next turn.
+- New tools are offered by keywords (settings, language, notifications, invite, role, quota, agent,
+  structure…) and always on the Organization settings page; `KB_CHAT_TOOLS=all` offers them regardless.
+
+---
+
 ## v0.71-beta — 2026-10-04
 
 **Map unlocked on the phone, administrators' credit reserve, right page language**

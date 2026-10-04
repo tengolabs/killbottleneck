@@ -124,9 +124,11 @@ function KartaStrom({ strom }) {
   );
 }
 
-function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument }) {
+function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument }) {
   const { t } = useTranslation('asistent');
   const stav = karta.stav || 'ceka';
+  // výchozí skin instance vykoná prohlížeč (má JSON vestavěných skinů) — Ano jde přes panel, ne rovnou na server
+  const ano = () => (karta.klient === 'instance_skin' && onKlientSkin ? onKlientSkin(karta) : onPotvrd(karta.id, true));
   if (karta.klient === 'pdf_nahrada') return <KartaPdfOprava karta={karta} onPotvrd={onPotvrd} loading={loading} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} />;
   const popisek = { ceka: t('actionWaiting'), hotovo: t('actionDone'), zamitnuto: t('actionDeclined'), chyba: t('actionError') }[stav];
   return (
@@ -134,9 +136,10 @@ function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drive
       <p className="font-medium leading-snug">{karta.popis}</p>
       {karta.detail && <p className="text-xs text-muted-foreground mt-0.5" data-testid="chat-akce-detail">{karta.detail}</p>}
       {Array.isArray(karta.strom) && karta.strom.length > 0 && <KartaStrom strom={karta.strom} />}
+      {karta.jednorazove && karta.jednorazove.temp_password && <DocasneHeslo udaj={karta.jednorazove} />}
       {stav === 'ceka' ? (
         <div className="mt-2 flex gap-2">
-          <Button size="sm" disabled={loading} onClick={() => onPotvrd(karta.id, true)} data-testid="chat-akce-ano">
+          <Button size="sm" disabled={loading} onClick={ano} data-testid="chat-akce-ano">
             <Check className="w-3.5 h-3.5 mr-1" />{t('actionYes')}
           </Button>
           <Button size="sm" variant="outline" disabled={loading} onClick={() => onPotvrd(karta.id, false)} data-testid="chat-akce-ne">
@@ -162,6 +165,55 @@ function KartaAkce({ karta, onPotvrd, loading, onOdkaz, najdiPdf, ulozPdf, drive
             </Link>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Dočasné heslo pozvánky bez SMTP: přijde JEN v odpovědi na potvrzení (server ho do rozhovoru neukládá) —
+// po obnovení stránky už není; uživatel ho zkopíruje a předá osobně (vzor InviteDialog)
+function DocasneHeslo({ udaj }) {
+  const { t } = useTranslation('asistent');
+  const [ok, setOk] = useState(false);
+  const kopiruj = async () => { try { await copyToClipboard(`${udaj.email}\n${udaj.temp_password}`); setOk(true); } catch { setOk(false); } };
+  return (
+    <div className="mt-2 rounded-md border border-amber-500/60 bg-amber-50/70 dark:bg-amber-950/30 p-2 text-xs" data-testid="chat-akce-heslo">
+      <p className="text-muted-foreground">{t('nastaveni.tempPassword', { email: udaj.email })}</p>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <code className="font-mono text-sm select-all" data-testid="chat-akce-heslo-text">{udaj.temp_password}</code>
+        <button type="button" onClick={kopiruj} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-heslo-kopirovat">
+          <Copy className="w-3 h-3" />{ok ? t('nastaveni.copied') : t('nastaveni.copy')}
+        </button>
+      </div>
+      <p className="mt-1 text-muted-foreground">{t('nastaveni.tempPasswordHint')}</p>
+    </div>
+  );
+}
+
+// Nastavení provedené hned (jazyk, motiv, zjednodušené zobrazení, čitelnost, zámek, jméno, upozornění) s Vrátit —
+// vzor KartaSkin. Vrátit = tatáž cesta s předchozí hodnotou (panel.vratNastaveni).
+function KartaNastaveni({ karta, onRevert }) {
+  const { t } = useTranslation('asistent');
+  const { t: tn } = useTranslation('notify');
+  let text;
+  if (karta.co === 'notify') {
+    const typ = karta.typ === 'all' ? t('nastaveni.allTypes') : tn(`type.${karta.typ}`, { defaultValue: karta.typ });
+    const kanaly = [];
+    if (karta.in_app !== undefined && karta.in_app !== null) kanaly.push(`${t('nastaveni.inApp')} ${karta.in_app ? t('nastaveni.on') : t('nastaveni.off')}`);
+    if (karta.email !== undefined && karta.email !== null) kanaly.push(`${t('nastaveni.email')} ${karta.email ? t('nastaveni.on') : t('nastaveni.off')}`);
+    text = t('nastaveni.notify', { type: typ, channels: kanaly.join(', ') });
+  } else {
+    const nazev = t(`nastaveni.pole.${karta.co}`, { defaultValue: karta.co });
+    const hodnota = ['full_name', 'display_name'].includes(karta.co) ? (karta.hodnota || '—') : t(`nastaveni.hodnoty.${karta.co}.${karta.hodnota}`, { defaultValue: karta.hodnota });
+    text = t('nastaveni.changed', { name: nazev, value: hodnota });
+  }
+  return (
+    <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs" data-testid="chat-nastaveni" data-co={karta.co}>
+      <span>{text}</span>
+      {onRevert && (
+        <button type="button" className="inline-flex items-center gap-1 text-primary hover:underline" onClick={() => onRevert(karta)} data-testid="chat-nastaveni-vratit">
+          <Undo2 className="w-3 h-3" />{t('nastaveni.revert')}
+        </button>
       )}
     </div>
   );
@@ -456,7 +508,7 @@ function ZpravaUzivatele({ zprava, lzeOpravit, onOprav, loading }) {
   );
 }
 
-export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, lzeOpravit, onOprav }) {
+export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onRevertNastaveni, onKlientSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, lzeOpravit, onOprav }) {
   const { t } = useTranslation('asistent');
   if (zprava.role === 'tool') return null;
   const jaUzivatel = zprava.role === 'user';
@@ -488,7 +540,7 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
                   </Button>
                 </div>
               )}
-              <KartaAkce karta={k} onPotvrd={onPotvrd} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={onOtevriDokument} />
+              <KartaAkce karta={k} onPotvrd={onPotvrd} onKlientSkin={onKlientSkin} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={onOtevriDokument} />
             </Fragment>
           );
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
@@ -499,6 +551,7 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
             </button>
           );
           if (k.type === 'skin') return <KartaSkin key={i} karta={k} onRevert={onRevertSkin} />;
+          if (k.type === 'nastaveni') return <KartaNastaveni key={i} karta={k} onRevert={onRevertNastaveni} />;
           if (k.type === 'theme') return <p key={i} className="mt-1.5 text-xs text-muted-foreground">{t('themeChanged', { name: k.theme === 'dark' ? t('themeDark') : t('themeLight') })}</p>;
           if (k.type === 'pamet') return (
             <div key={i} className="mt-2 rounded-lg border border-border bg-background/60 p-2 text-xs" data-testid="chat-pamet-karta">

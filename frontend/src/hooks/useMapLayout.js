@@ -360,6 +360,12 @@ export function useMapLayout({
   // a do 1,2 s zvolil Čitelnost, spolkla by se mu skutečná změna.
   const [citelnost, setCitelnost] = useState(nactiStupen);
   citelnostRef.current = citelnost;
+  // asistent (karta nastavení) zapsal stupeň do prohlížeče → překreslit otevřenou mapu bez reloadu
+  useEffect(() => {
+    const zAsistenta = () => setCitelnost(nactiStupen());
+    window.addEventListener('kb-citelnost-changed', zAsistenta);
+    return () => window.removeEventListener('kb-citelnost-changed', zAsistenta);
+  }, []);
   const handleCitelnost = useCallback((stupen) => {
     if (!CITELNOST_STUPNE.includes(stupen)) return;
     ulozKlic(KLIC_CITELNOST, stupen);

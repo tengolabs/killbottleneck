@@ -415,6 +415,30 @@ H.beh(async () => {
   const zm = (zmeny.items || []).find((z) => z.item_id === 'n1' && z.field === 'status');
   expect(!!zm && zm.via === 'asistent:admin@example.com' && zm.actor_email === 'admin@example.com', `životopis uzlu: změna z chatu má via asistent:<e-mail> (${zm && zm.via})`);
 
+  console.log('== kam nový krok patří: podmínka POD krok (Richard 3. 10. 2026, Vánoce: nákup surovin vedle pečení) + duplicita názvu ==');
+  {
+    // ⚠️ MUTAČNÍ JÁDRO: na image bez pravidla systém větu o PODMÍNCE nemá a duplicitní add_nodes projde do karty.
+    fronta.push(nastroj('add_nodes', { map_id: 'Truhlářství', parent_id: 'apex', items: [{ title: 'poslat poptavku na SPAROVKY!' }] }), text('Ten krok už v mapě je.'));
+    const rd = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Přidej krok poslat poptávku na spárovky' } });
+    const sysD = systemZ(posledniVolani());
+    expect(/Krok, který je PODMÍNKOU existujícího kroku .* dej POD ten krok/.test(sysD) && /NÁSLEDKEM nebo další fází, dej VEDLE/.test(sysD), 'systém: podmínka POD krok, následek VEDLE (ne podle tématu)');
+    expect(/Neřaď jen podle tématu/.test(sysD) && /zeptej se jednou otázkou přes ask_user/.test(sysD), 'systém: nejasné → jedna otázka přes ask_user, ne tiché zařazení podle tématu');
+    expect(rd.json.chat.pending.length === 0, 'duplicitní název (bez diakritiky, jiná velikost, interpunkce) → žádná karta');
+    const chD = toolZ(posledniVolani()).find((m) => m.tool_name === 'add_nodes');
+    expect(!!chD && /already has a node titled "poslat poptavku na SPAROVKY!"/.test(chD.content) && /Nothing was added/.test(chD.content), `model dostal chybu duplicity (${chD && chD.content.slice(0, 90)})`);
+    const mapD = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
+    expect(mapD.nodes.filter((n) => /popt/i.test((n.data || {}).title || '')).length === 1, 'uzel s poptávkou je v mapě dál jen jednou');
+    // tentýž název dvakrát v jednom požadavku (podstrom) = taky chyba; jiný název projde do karty jako dřív
+    fronta.push(nastroj('add_nodes', { map_id: 'Truhlářství', parent_id: 'apex', items: [{ title: 'Objednat kování', children: [{ title: 'Objednat kování' }] }] }), text('Dvakrát totéž nedám.'));
+    const rd2 = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Přidej objednání kování' } });
+    expect(rd2.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => m.tool_name === 'add_nodes' && /twice in this request/.test(m.content)), 'stejný název dvakrát v jednom podstromu → chyba, žádná karta');
+    fronta.push(nastroj('add_nodes', { map_id: 'Truhlářství', parent_id: 'Poslat poptávku na spárovky', items: [{ title: 'Vybrat dodavatele spárovek' }] }));
+    const rd3 = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Nejdřív vybrat dodavatele' } });
+    const kD = rd3.json.chat.pending[0];
+    expect(!!kD && /Vybrat dodavatele spárovek/.test(kD.popis || ''), `nový název pod existujícím krokem → karta jako dřív (${kD && kD.popis})`);
+    await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kD.id, ok: false } });
+  }
+
   console.log('== neznámé pole (priority) a neznámý nástroj = chyba modelu, ne zápis ==');
   fronta.push(nastroj('update_node', { map_id: map.id, node_id: 'n1', priority: 'high' }), text('Prioritu nastavit nemůžu.'));
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Dej poptávce vysokou prioritu' } });
@@ -1199,6 +1223,54 @@ H.beh(async () => {
   fronta.push(nastroj('list_events', {}), text('Máš zubaře.'));
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Co mám v kalendáři?' } });
   expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'list_events' && /Zubař/.test(m.content) && /participants: clen@example.com/.test(m.content)), 'list_events vrací seznam s účastníky');
+
+  // úprava a smazání události (4. 10. 2026 — klik-test: „přidat připomínku“ k hotové události vedlo k „neumím“ a návrhu smazat+založit)
+  const kartaTahu = (ch, typ) => { const i = ch.messages.map((m) => m.role).lastIndexOf('user'); return ch.messages.slice(i + 1).flatMap((m) => m.karty || []).reverse().find((k) => k.type === typ); };
+  fronta.push(nastroj('update_event', { event_id: 'Zubař', remind_before_min: 60 }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Přidat připomínku na hodinu předem' } });
+  chat = r.json.chat;
+  expect(posledniVolani().tools.some((t) => t.function.name === 'update_event') && posledniVolani().tools.some((t) => t.function.name === 'delete_event'), 'skupina udalosti nabízí update_event a delete_event');
+  expect(/update_event/.test(systemZ(posledniVolani())) && /ROVNOU/.test(systemZ(posledniVolani())), 'prompt: hotovou událost měnit přes update_event; klik na čip = provést rovnou, neptat se znovu');
+  let kU = kartaTahu(chat, 'akce');
+  expect(!!kU && new RegExp(`^Změnit událost „Zubař“ \\(.*14:00\\): připomenout 60 min předem$`).test(kU.popis), `karta úpravy události podle názvu (${kU && kU.popis})`);
+  fronta.push(text('Připomínka hodinu předem.'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kU.id, ok: true } });
+  chat = r.json.chat;
+  let evU = (await inst.api('GET', '/api/kb/events', { token: A })).json.events || [];
+  expect(evU.length === 1 && evU[0].id === evs[0].id && evU[0].remind === true && evU[0].remind_before_min === 60 && evU[0].time === '14:00' && evU[0].participants[0] === 'clen@example.com', `připomínka změněna na 60 min, zbytek události zůstal (${JSON.stringify(evU[0])})`);
+  expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'update_event' && /Reminder fires 60 min before start/.test(m.content)), 'model dostal výsledek s novým časem připomínky');
+  // přesun podle id + zrušení připomínky; stejná poznámka zůstává
+  fronta.push(nastroj('update_event', { event_id: evs[0].id, time: '15:30', remind: false }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Zubaře posuň na půl čtvrté a připomínku zruš' } });
+  chat = r.json.chat; kU = kartaTahu(chat, 'akce');
+  expect(!!kU && /^Změnit událost „Zubař“ \(.*14:00\): přesunout na .*15:30 · zrušit připomínku$/.test(kU.popis), `karta přesunu + zrušení připomínky (${kU && kU.popis})`);
+  fronta.push(text('x'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kU.id, ok: true } });
+  evU = (await inst.api('GET', '/api/kb/events', { token: A })).json.events || [];
+  expect(evU[0].time === '15:30' && evU[0].remind === false && evU[0].note === 'vzít kartičku', `přesunuto, připomínka pryč, poznámka zůstala (${JSON.stringify(evU[0])})`);
+  // pozvaný událost nemění; delete_event ji u něj = opustit
+  fronta.push(nastroj('update_event', { event_id: 'Zubař', time: '16:00' }), text('x'));
+  r = await inst.api('POST', '/api/kb/chat', { token: B, body: { message: 'Posuň zubaře na 16' } });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => /not found among the user's own events/.test(m.content)), 'pozvaná kolegyně událost neupraví → chyba před kartou');
+  fronta.push(nastroj('delete_event', { event_id: 'Zubař' }));
+  r = await inst.api('POST', '/api/kb/chat', { token: B, body: { chat_id: r.json.chat.id, message: 'Zubaře z kalendáře pryč' } });
+  let kL = kartaTahu(r.json.chat, 'akce');
+  expect(!!kL && /^Odhlásit se z události „Zubař“ .*15:30 \(pořadateli zůstane\)$/.test(kL.popis), `pozvaný: karta „odhlásit se“ (${kL && kL.popis})`);
+  fronta.push(text('x'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: B, body: { chat_id: r.json.chat.id, action_id: kL.id, ok: true } });
+  evU = (await inst.api('GET', '/api/kb/events', { token: A })).json.events || [];
+  expect(evU.length === 1 && evU[0].participants.length === 0 && (await inst.api('GET', '/api/kb/events', { token: B })).json.events.length === 0, 'pozvaná se odhlásila: vlastníkovi zůstala bez účastníků, jí zmizela');
+  fronta.push(nastroj('delete_event', { event_id: 'nic takového' }), text('x'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Smaž nic takového' } });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => /not found/.test(m.content)), 'neznámá událost → chyba, bez karty');
+  fronta.push(nastroj('delete_event', { event_id: 'Zubař' }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Zruš zubaře' } });
+  chat = r.json.chat; kL = kartaTahu(chat, 'akce');
+  expect(!!kL && /^Smazat událost „Zubař“ .*15:30 — nejde vrátit, zmizí i pozvaným$/.test(kL.popis), `karta smazání (${kL && kL.popis})`);
+  fronta.push(text('x'));
+  r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kL.id, ok: true } });
+  expect((await inst.api('GET', '/api/kb/events', { token: A })).json.events.length === 0, 'událost smazána');
+  expect((await inst.api('GET', '/api/collections/api_keys/records', { token: A })).json.totalItems === 0, 'dočasné klíče po úpravách smazány');
 
   // připomínka k uzlu: bez termínu = chyba s radou; s termínem = karta „den před termínem v 16:00 — termín se nemění"
   const mapaR = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {

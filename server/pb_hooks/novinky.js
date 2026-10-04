@@ -10,6 +10,26 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.72-beta": {
+    cs: [
+      "Asistent umí nastavení aplikace: „Přepni mě na angličtinu“, „Vypni mi e-maily k termínům“, „Zamkni zarovnání na kompakt“ — provede hned a na kartě nechá Vrátit; „Jaké mám nastavení?“ vypíše všechno najednou.",
+      "Správce vyřídí přes asistenta i Správu organizace: pozvání člena, role a zástupce, název a účel firmy, nastavení AI, kvótu AI kreditů, výchozí vzhled instance, fakturační údaje, registr AI agentů i organizační strukturu — vždy přes kartu Ano, provést a jen s právy, která má.",
+      "Hesla, API klíče, klíč poskytovatele AI, mazání účtů a reset hesla kolegy asistent schválně nemění — poradí, kde to v menu najdete. Dočasné heslo pozvánky bez e-mailu se ukáže jednou na kartě a do rozhovoru se neukládá.",
+      "Událost v kalendáři asistent i upraví nebo zruší: „Připomeň mi zubaře hodinu předem“, „Posuň zubaře na půl čtvrté“, „Zruš zubaře“ — dřív uměl událost jen založit. Klik na jeho vlastní nabídku (čip) provede rovnou, bez další otázky.",
+      "Asistent dává nový krok POD krok, jehož je podmínkou („než objednáme, musíme změřit“ → Změřit pod Objednat), a krok se stejným názvem už nepřidá podruhé.",
+      "Asistent pokrývá i zbytek nabídek aplikace: komentář ke kroku, stopky práce, přesun kroku pod jiný, úprava nápadu, vrácení a smazání dokumentu, smazání kroku, archivace, obnova, přejmenování a smazání projektu, veřejný odkaz, úprava a smazání pravidla a šablony pravidel, zrušení připomínky ke kroku, žádost o jiný termín u cizí práce a její zamítnutí, všechna upozornění jako přečtená, hlášení chyby vývojářům — vždy přes kartu a jen s právy, která máte.",
+      "Sdílení projektu přes asistenta: „Přidej Petra do projektu Kuchyň“, „Odeber Karlovi přístup“, „Dej celému týmu projekt k úpravám“, „Kdo vidí projekt Kuchyň?“ — stejná pravidla jako dialog Sdílet (sdílí vlastník nebo spolusprávce). Když asistent na něco nástroj nemá, řekne to hned a nevyptává se napřed.",
+    ],
+    en: [
+      "The assistant handles app settings: \"Switch me to English\", \"Turn off deadline e-mails\", \"Lock the alignment to compact\" — applied right away with Revert on the card; \"What are my settings?\" lists everything at once.",
+      "Administrators manage the organization through the assistant too: inviting a member, roles and deputies, organization name and purpose, AI settings, the AI credit quota, the default skin of the instance, billing details, the AI agent registry and the org structure — always through a Yes, do it card and only with the permissions they have.",
+      "Passwords, API keys, the AI provider token, deleting accounts and resetting a colleague's password are deliberately left out — the assistant tells you where to find them. The temporary password of an invitation without e-mail is shown once on the card and is not stored in the conversation.",
+      "The assistant now changes or cancels a calendar event too: \"Remind me an hour before the dentist\", \"Move the dentist to 3:30\", \"Cancel the dentist\" — before it could only create one. Clicking one of its own suggestion chips acts right away, without another question.",
+      "The assistant puts a new step UNDER the step it is a condition of (\"before we order we must measure\" → Measure under Order), and no longer adds a step with the same title twice.",
+      "The assistant now covers the rest of the app's menus too: a comment on a step, the work timer, moving a step under another, editing an idea, reverting and deleting a document, deleting a step, archiving, restoring, renaming and deleting a project, the public link, changing and deleting rules and rule templates, removing a step reminder, asking for a different deadline on someone else's work and declining it, marking all notifications read, reporting a bug to the developers — always through a card and only with the permissions you have.",
+      "Project sharing through the assistant: \"Add Petr to the Kitchen project\", \"Remove Karel's access\", \"Give the whole team edit access\", \"Who sees the Kitchen project?\" — same rules as the Share dialog (the owner or a co-manager shares). When the assistant has no tool for something, it says so right away instead of asking first.",
+    ],
+  },
   "v0.71-beta": {
     cs: [
       "Mapa na telefonu je odemčená: uzly posunete prstem a propojíte tažením z konektoru, i když se strom větví do šířky. Posun se uloží a na počítači sedí pořadí i pozice. Zámek zůstává jako ruční volba.",

@@ -90,5 +90,31 @@ for (const L of ['cs', 'en']) {
   expect(cteci.length >= 16 && chybi.length === 0, `${L}: ${cteci.length} čtecích nástrojů má název (${chybi.join(', ') || 'žádný nechybí'})`);
 }
 
+console.log('== nástroje nastavení (3. 10. 2026): výčet, role, karty, typy upozornění v syncu se serverem ==');
+const N = require(path.join(global.__hooks, 'chat-nastaveni.js'));
+const helpers = require(path.join(global.__hooks, 'helpers.js'));
+const nastaveni = NASTROJE.filter((n) => n.skupina === 'nastaveni');
+expect(nastaveni.length === N.NASTROJE_NASTAVENI.length && nastaveni.every((n) => N.NASTROJE_NASTAVENI.includes(n.name)), `skupina nastaveni v chat.js = registr modulu (${nastaveni.length} nástrojů)`);
+// role: každý jenRole má kontrolu v modulu (neznámá role = nástroj by nikdo nedostal) — roleOk s falešným auth
+const falesnyAdmin = { getString: (k) => (k === 'role' ? 'admin' : ''), getBool: () => false };
+for (const n of nastaveni.filter((x) => x.jenRole)) expect(N.roleOk(n.jenRole, faleznyAdminNebo(falesnyAdmin)), `${n.name}: role „${n.jenRole}“ je známá (admin ji má)`);
+function faleznyAdminNebo(a) { return a; }
+// typy upozornění: modul = helpers NOTIFY_TYPES bez NOTIFY_ALWAYS (jinak by model nabízel typ, který server nezná, nebo šlo vypnout poplach o účtu)
+const ocekavane = helpers.NOTIFY_TYPES.filter((t) => !helpers.NOTIFY_ALWAYS.includes(t));
+expect(JSON.stringify(N.NOTIFY_NASTAVITELNE.slice().sort()) === JSON.stringify(ocekavane.slice().sort()), `NOTIFY_NASTAVITELNE = NOTIFY_TYPES − NOTIFY_ALWAYS (${N.NOTIFY_NASTAVITELNE.length} typů, password_reset chybí: ${!N.NOTIFY_NASTAVITELNE.includes('password_reset')})`);
+// karty: každý write/client/kartaKdyz nástroj má větev v popisNastaveni (jinak by karta ukázala holé jméno nástroje)
+const zdroj = fs.readFileSync(path.join(global.__hooks, 'chat-nastaveni.js'), 'utf8');
+const popisZdroj = zdroj.slice(zdroj.indexOf('function popisNastaveni('), zdroj.indexOf('function detailNastaveni('));
+for (const n of nastaveni.filter((x) => x.kind === 'write' || x.kind === 'client' || x.kartaKdyz)) expect(popisZdroj.includes(`case "${n.name}"`), `${n.name}: text karty cs/en`);
+// kontroly před kartou a provedení: tytéž nástroje mají větev v overNastaveni a provedNastaveni
+const overZdroj = zdroj.slice(zdroj.indexOf('function overNastaveni('), zdroj.indexOf('function provedNastaveni('));
+const provedZdroj = zdroj.slice(zdroj.indexOf('function provedNastaveni('), zdroj.indexOf('function vysledekKlientaSkin('));
+// kind client (výchozí skin instance) vykoná prohlížeč — server má jen kontrolu před kartou a zpracování výsledku
+for (const n of nastaveni.filter((x) => x.kind !== 'read')) expect(overZdroj.includes(`case "${n.name}"`) && (n.kind === 'client' || provedZdroj.includes(`case "${n.name}"`)), `${n.name}: kontrola před kartou + provedení${n.kind === 'client' ? ' (prohlížečem)' : ''}`);
+expect(!('secret' in (NASTROJE.find((n) => n.name === 'save_ai_agent') || { parameters: { properties: {} } }).parameters.properties) && !nastaveni.some((n) => /password|token|secret/.test(Object.keys(n.parameters.properties || {}).join(','))), 'žádný nástroj nastavení nebere heslo, token ani tajemství');
+expect(['cs', 'en'].every((L) => new RegExp(L === 'cs' ? 'Nastavení aplikace měníš nástroji' : 'You change the app settings with tools').test(P[L].system) && new RegExp(L === 'cs' ? '„Můj účet“' : '"My account"').test(P[L].system)), 'prompt cs/en: řádek o nastavení a kam poslat u hesla');
+// nález z klik-testu 4. 10.: model položil dvě upřesňující otázky a pak teprve řekl, že sdílení neumí
+expect(['cs', 'en'].every((L) => /share_map/.test(P[L].system) && new RegExp(L === 'cs' ? 'nedoptávej se napřed' : 'do not ask clarifying questions first').test(P[L].system)), 'prompt cs/en: sdílení projektu + „bez nástroje to řekni hned, neptej se napřed“');
+
 console.log(`\n${fail ? '🔴' : '🟢'} CHAT-REZIMY PASS ${ok} / FAIL ${fail}`);
 process.exitCode = fail ? 1 : 0;

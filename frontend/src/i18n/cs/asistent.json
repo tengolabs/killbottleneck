@@ -46,6 +46,61 @@
   "themeDark": "tmavý",
   "memorySaved": "Zapamatoval jsem si:",
   "ideaSaved": "Do zásobníku nápadů: {{title}}",
+  "nastaveni": {
+    "changed": "{{name}}: {{value}}",
+    "revert": "Vrátit",
+    "notify": "Upozornění „{{type}}“: {{channels}}",
+    "allTypes": "všechny typy",
+    "inApp": "v aplikaci",
+    "email": "e-mail",
+    "on": "zapnuto",
+    "off": "vypnuto",
+    "tempPassword": "Dočasné heslo pro {{email}} (ukáže se jen jednou):",
+    "tempPasswordHint": "Předejte ho osobně. Při prvním přihlášení si ho kolega změní.",
+    "copy": "Kopírovat",
+    "copied": "Zkopírováno",
+    "pole": {
+      "language": "Jazyk",
+      "theme": "Motiv",
+      "mode": "Zobrazení",
+      "readability": "Čitelnost mapy",
+      "align_lock": "Zámek zarovnání",
+      "notify_email_mode": "E-maily s upozorněními",
+      "full_name": "Celé jméno",
+      "display_name": "Zobrazované jméno"
+    },
+    "hodnoty": {
+      "language": {
+        "cs": "čeština",
+        "en": "angličtina"
+      },
+      "theme": {
+        "light": "světlý",
+        "dark": "tmavý"
+      },
+      "mode": {
+        "auto": "automaticky podle šířky",
+        "lite": "zjednodušené zobrazení",
+        "full": "plná verze"
+      },
+      "readability": {
+        "normal": "normální",
+        "large": "větší",
+        "titleOnly": "jen název"
+      },
+      "align_lock": {
+        "none": "vypnutý",
+        "classic": "klasika",
+        "compact": "kompakt",
+        "bands": "pásy"
+      },
+      "notify_email_mode": {
+        "instant": "každé hned",
+        "digest": "jeden denní souhrn",
+        "none": "žádné"
+      }
+    }
+  },
   "toolsLooked": "Nahlédl do: {{names}}",
   "toolNames": {
     "list_maps": "seznam projektů",
@@ -65,7 +120,12 @@
     "get_project_changes": "změny v projektu",
     "get_person_work": "práce kolegy",
     "get_team_work": "přehled týmu",
-    "search_projects": "hledání v projektech a archivu"
+    "search_projects": "hledání v projektech a archivu",
+    "get_settings": "nastavení",
+    "get_org_structure": "organizační struktura",
+    "get_map_sharing": "sdílení projektu",
+    "list_reminders": "připomínky ke krokům",
+    "get_timer": "běží stopky?"
   },
   "errorGeneric": "Asistent neodpověděl. Zkuste to prosím znovu.",
   "errorRate": "Vyčerpali jste hodinový strop AI. Zkuste to za chvíli.",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bot, ChevronDown, ChevronUp, FileText, FolderOpen, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Moon, Trash2, X } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA } from '@/lib/storageKeys';
@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useAsistent, MIN_W, MAX_W, sirkaDokumentu } from '@/lib/AsistentContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAiModes } from '@/hooks/useAiEnabled';
-import { setSkin } from '@/lib/theme';
+import { setSkin, effectiveTheme } from '@/lib/theme';
 import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
 import { base44 } from '@/api/base44Client';
 import { pripravObrazek, obrazekZeSchranky } from '@/lib/obrazek';
@@ -22,11 +22,17 @@ import AsistentZprava from './AsistentZprava';
 import AiBlok from './AiBlok';
 import PdfPohled from './PdfPohled';
 import DokumentyPanel from './DokumentyPanel';
-import { useAsistentChat } from './useAsistentChat';
+import { useAsistentChat, aplikujKlienta, poleProVraceni } from './useAsistentChat';
+import { savedMode } from '@/lib/liteMode';
+import { nactiStupen } from '@/lib/citelnost';
+import { pb } from '@/api/pb';
 
 // AI chat na boku (13. 9. 2026): vpravo, přes celou výšku, minimalizovatelný na
 // ouško. Rozhovor drží AsistentContext (nad Routerem); tahle komponenta jen
 // kreslí a posílá kontext „kde uživatel je" (cesta + otevřená mapa).
+// + klientské předvolby (motiv, zjednodušené zobrazení, čitelnost) žijí jen v prohlížeči → jdou serveru s každým
+// požadavkem v `context.klient`, ať je get_settings umí přečíst (server je do promptu nedává — cache prefixu)
+const sKlientem = (kontext) => ({ ...kontext, klient: { theme: effectiveTheme(), mode: savedMode() || 'auto', readability: nactiStupen() } });
 
 // Přepínač modelu v UI byl odstraněn 13. 9. 2026 (Richard: „to budeme dělat my v pozadí,
 // teď to zabírá místo"). Model se řídí KB_CHAT_MODEL; routa /chat/modely a `model`
@@ -54,7 +60,8 @@ export default function AsistentPanel() {
   useEffect(() => { loadKbConfig().then((c) => { if (c && c.chat_voice_max_s) setMaxHlas(c.chat_voice_max_s); if (c && c.chat_voice_max_mb) setMaxHlasMb(c.chat_voice_max_mb); }).catch(() => {}); }, []);
   const { setDostupny } = panel;
   useEffect(() => { if (setDostupny) setDostupny(dostupny); }, [dostupny, setDostupny]);
-  const rozhovor = useAsistentChat({ open: panel.open && dostupny });
+  const navigate = useNavigate();
+  const rozhovor = useAsistentChat({ open: panel.open && dostupny, klient: { navigate } });
   // jedno „A" pro zbytek komponenty: stav panelu + rozhovor
   const A = useMemo(() => ({ ...panel, ...rozhovor }), [panel, rozhovor]);
   const location = useLocation();
@@ -248,7 +255,7 @@ export default function AsistentPanel() {
     // přílohu NEmazat, jinak rozepsaný text tiše zmizí (analýza kódu 2, F3-01)
     if (A.loading || pdfCte) return;
     if (zPolicka) { setText(''); setObrazek(null); setPdf(null); }
-    const vysl = await A.send(v, kontext, patchUser, obr || undefined, prilohaPdf || undefined);
+    const vysl = await A.send(v, sKlientem(kontext), patchUser, obr || undefined, prilohaPdf || undefined);
     if (!obr && !prilohaPdf) return;
     // server zprávu nezpracoval (přepis selhal, vadný obrázek, brzda) → příloha i text zpátky do políčka
     if (vysl && vysl.vratit) {
@@ -258,7 +265,7 @@ export default function AsistentPanel() {
     } else if (obr) URL.revokeObjectURL(obr.url);
   }, [A, text, obrazek, pdf, pdfCte, kontext, patchUser]);
   // hlasovka odejde hned (rozhodnutí 30. 9.); když ji server nezpracuje (přepis selhal), zůstane v pruhu k opakování
-  const odesliHlas = useCallback(async (h) => (A.loading ? { ok: false, vratit: true } : A.send('', kontext, patchUser, undefined, undefined, h)), [A, kontext, patchUser]);
+  const odesliHlas = useCallback(async (h) => (A.loading ? { ok: false, vratit: true } : A.send('', sKlientem(kontext), patchUser, undefined, undefined, h)), [A, kontext, patchUser]);
   const hlas = useHlasovka({ maxS: maxHlas, maxMb: maxHlasMb, onOdeslat: odesliHlas });
   hlasRef.current = hlas;
   // Pruh nahrávání (● 0:42 · Zrušit · Odeslat) je vidět jen v otevřeném chatu a na telefonu ve spodní liště.
@@ -268,9 +275,28 @@ export default function AsistentPanel() {
   const pruhVidet = ready && dostupny && (A.open ? pohled === 'chat' : mobil);
   const podrzHlas = hlas.podrz;
   useEffect(() => { if (!pruhVidet) podrzHlas(); }, [pruhVidet, podrzHlas]);
-  const potvrd = useCallback((id, ok, vysledek) => A.potvrd(id, ok, kontext, patchUser, vysledek), [A, kontext, patchUser]);
+  const potvrd = useCallback((id, ok, vysledek) => A.potvrd(id, ok, sKlientem(kontext), patchUser, vysledek), [A, kontext, patchUser]);
   // oprava přepisu poslední hlasovky / fotky (tužka v bublině): server zahodí nepotvrzené návrhy a asistent odpoví znovu
-  const opravPrepis = useCallback((txt) => A.oprav(txt, kontext, patchUser), [A, kontext, patchUser]);
+  const opravPrepis = useCallback((txt) => A.oprav(txt, sKlientem(kontext), patchUser), [A, kontext, patchUser]);
+  // výchozí skin instance (nástroj set_instance_skin, kind client): JSON vestavěných skinů má jen prohlížeč — po Ano
+  // uloží přes tutéž routu jako Správa organizace a serveru pošle výsledek, ať model dopoví pravdu
+  const potvrdKlientaSkin = useCallback(async (karta) => {
+    const id = String((karta.args && karta.args.builtin_id) || '');
+    let vysledek;
+    try {
+      const skin = id ? getBuiltinSkin(id) : null;
+      if (id && !skin) vysledek = { ok: false, chyba: 'unknown skin' };
+      else { await pb.send('/api/kb/instance-skin', { method: 'POST', body: { skin, builtin_id: id } }); vysledek = { ok: true, builtin_id: id }; }
+    } catch (e) { vysledek = { ok: false, chyba: (e && e.response && e.response.error) || (e && e.message) || 'save failed' }; }
+    return potvrd(karta.id, true, vysledek);
+  }, [potvrd]);
+  // Vrátit u karty nastavení: tatáž cesta s předchozí hodnotou; serverová pole zapíše prohlížeč (vzor persistSkin)
+  const vratNastaveni = useCallback((karta) => {
+    const predchozi = karta.co === 'notify' ? (karta.predchozi_prefs || {}) : (karta.predchozi || '');
+    aplikujKlienta(karta, patchUser, { navigate }, predchozi);
+    const pole = poleProVraceni(karta);
+    if (pole && user?.id) base44.entities.User.update(user.id, pole).catch(() => {});
+  }, [patchUser, navigate, user]);
   // na telefonu panel kryje celou obrazovku → po „Ukázat v mapě" ho schovat (Richard 13. 9.)
   const poOdkazu = useCallback(() => { if (mobil) zavriChat(); }, [mobil, zavriChat]);
   // Toasty (vpravo dole) zakrývaly políčko chatu, dokud nezmizely — např. „mapa sloučena“
@@ -331,7 +357,7 @@ export default function AsistentPanel() {
     if (!zadost || !ready || !dostupny || A.loading) return;
     vyridZadost();
     setPohled('chat');
-    A.zacniRezim(zadost.mode, zadost.target, kontext, patchUser);
+    A.zacniRezim(zadost.mode, zadost.target, sKlientem(kontext), patchUser);
   }, [zadost, ready, dostupny, A, kontext, patchUser, vyridZadost]);
 
   if (!ready || !dostupny) return null;
@@ -491,7 +517,7 @@ export default function AsistentPanel() {
               // klíč nese i rozhovor: jinak stav karet (rozepsaná odpověď, otevřená úprava přepisu) přežil přepnutí
               // rozhovoru z historie a karta s jiným počtem otázek pak při odeslání spadla
               <div key={`${(A.chat && A.chat.id) || 'novy'}:${i}`} ref={i === prvniOdpovedIdx ? zacatekOdpovedi : undefined} className={i === prvniOdpovedIdx ? 'scroll-mt-2' : undefined}>
-                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} lzeOpravit={i === posledniUzivatelIdx && !!(A.chat && A.chat.lze_opravit)} onOprav={opravPrepis} />
+                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onRevertNastaveni={vratNastaveni} onKlientSkin={potvrdKlientaSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} lzeOpravit={i === posledniUzivatelIdx && !!(A.chat && A.chat.lze_opravit)} onOprav={opravPrepis} />
               </div>
             ))}
             {A.loading && (
