@@ -7,14 +7,15 @@
 // archiv ani export. Nic z toho tu není nedodělek — je to záměr.
 //
 // ⚠️ TVRDÁ PODMÍNKA: tenhle strom NESMÍ importovat ReactFlow ani @radix-ui/*.
-// Celý smysl lite režimu je malý balík pro telefon (změřeno: první načtení plné
-// appky na 4G ze studené cache trvalo 11,5 s — viz product/tests/scale-limits.js).
+// Celý smysl lite režimu je malý balík pro telefon (změřeno 4. 10. 2026 bez SW
+// cache, 1,6 Mb/s, bez komprese: první načtení lite 4,2 s, plné appky 11,5 s —
+// viz product/tests/scale-limits.js; za komprimující proxy zhruba třetina).
 // Hlídá to product/tests/lite-bundle.js; když sáhnete po hotové komponentě
 // z components/ui/, ověřte si, co za sebou táhne.
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Send, Bell, Plus, ExternalLink, Palette, ArrowDown, X } from 'lucide-react';
+import { Sun, Moon, Send, Bell, Plus, ExternalLink, Palette, ArrowDown, X, Bot } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { fetchMyDay } from '@/api/myDay';
@@ -23,6 +24,8 @@ import { base44 } from '@/api/base44Client';
 import { BUILTIN_SKINS, DEFAULT_SKIN_ID, getBuiltinSkin } from '@/lib/skins';
 import { validateSkin } from '@/lib/skinValidator';
 import { setSkin, setTheme, effectiveTheme } from '@/lib/theme';
+import { useAsistent } from '@/lib/AsistentContext';
+import { useAiModes } from '@/hooks/useAiEnabled';
 import LiteList from './LiteList';
 import SkinPattern from '@/components/shared/SkinPattern';
 import LiteNotifications from './LiteNotifications';
@@ -40,7 +43,13 @@ export default function LiteApp() {
   });
   const { t } = useTranslation('lite');
   const { t: tCommon } = useTranslation('common');
+  const { t: tNav } = useTranslation('nav'); // „Asistent" = tentýž nápis jako v hlavičce plné appky (nav je v hlavním balíku)
   const { user, isLoadingAuth, patchUser } = useAuth();
+  // Asistent i v lite (Richard 4. 10. 2026). Tlačítko jen když server chat nabízí (chat_panel);
+  // /api/kb/config se na /lite volá už kvůli skinu, takže žádný požadavek navíc. Panel sám je
+  // líný chunk a stáhne se až po klepnutí — proto se tu nic z components/asistent NEimportuje.
+  const asistent = useAsistent();
+  const ai = useAiModes();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [day, setDay] = useState(null);
@@ -130,6 +139,49 @@ export default function LiteApp() {
     // y=840..868 při výšce okna 844. (Nález kontrolního panelu 6. 8. 2026.)
     <div className="min-h-screen bg-background text-foreground pb-32">
       <SkinPattern position="fixed inset-x-0 bottom-14" />
+      {/* JEDNA hlavička pro všechny tři obrazovky (4. 10. 2026). Logo = zkratka domů
+          (Richard 6.–7. 8. 2026: „v lite není logo vůbec a to je taky škoda"; světlá a tmavá
+          verze, kolečko s hadem má natvrdo tmavé pozadí). Vpravo cesta do celé aplikace —
+          dole za seznamem ji na telefonu nikdo nenašel a nápis „plná verze" si jeden uživatel
+          vyložil jako nákup placené verze (ceník má tarif „Cloud Lite"), proto „Celá aplikace".
+          Prosté <button>, ne shadcn — Radix by rozbil lite-bundle.js. */}
+      <header className="max-w-xl mx-auto px-4 pt-4 pb-1 flex items-center gap-2" data-testid="lite-hlavicka">
+        <button
+          type="button"
+          onClick={() => navigate('/lite')}
+          title={t('homeLink')}
+          aria-label={t('homeLink')}
+          className="mr-auto flex items-center rounded-md outline-none hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="flex items-center" aria-hidden="true">
+            <img src="/znak-tmavy.webp" alt="" width="525" height="320"
+                 className="hidden dark:block h-6 w-auto" />
+            <img src="/znak-svetly.webp" alt="" width="493" height="320"
+                 className="dark:hidden h-6 w-auto" />
+          </span>
+        </button>
+        {ai.has('chat_panel') && (
+          <button
+            type="button"
+            onClick={() => asistent.setLiteOpen(true)}
+            title={tNav('nav.aiChat')}
+            aria-label={tNav('nav.aiChat')}
+            data-testid="lite-asistent"
+            className="inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+          >
+            <Bot className="w-4 h-4" /> {tNav('nav.aiChat')}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={toFull}
+          title={t('switch.hint')}
+          data-testid="lite-to-full-top"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-secondary"
+        >
+          <ExternalLink className="w-4 h-4" /> {t('switch.toFullShort')}
+        </button>
+      </header>
       <Routes>
         <Route index element={
           <LiteList kind="today" day={day} failed={failed} onReload={reload} onChanged={changed} onFailed={failedAction} />
@@ -142,9 +194,11 @@ export default function LiteApp() {
       </Routes>
 
       <div className="max-w-xl mx-auto px-4">
-        {/* Přepnutí do plné verze musí být VIDĚT jako tlačítko, ne šedý text —
+        {/* Přepnutí do celé aplikace musí být VIDĚT jako tlačítko, ne šedý text —
             pro spoustu lidí je tohle první obrazovka a mysleli by si, že
-            zjednodušený seznam je celá aplikace (Richard 6. 8. 2026 večer). */}
+            zjednodušený seznam je celá aplikace (Richard 6. 8. 2026 večer).
+            Zůstává i po přidání tlačítka do hlavičky: pod dlouhým seznamem je
+            po ruce, hlavička už odrolovala. */}
         <button
           onClick={toFull}
           className="w-full mt-6 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-sm hover:bg-secondary"

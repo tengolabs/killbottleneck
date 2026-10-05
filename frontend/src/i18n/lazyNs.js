@@ -75,13 +75,13 @@ const LOADERS = {
   },
   // kalendář na stránce Úkoly (Měsíc/Týden/Agenda, přetažení termínu s
   // potvrzením, 7. 9. 2026) — jen plná stránka /tasks, lite ho nemá; do
-  // tasks.json nepatří, ten se veze do lite celý (strop 510 kB)
+  // tasks.json nepatří, ten se veze do lite celý (strop hlídá lite-bundle.js)
   kalendar: {
     cs: () => import('./cs/kalendar.json'),
     en: () => import('./en/kalendar.json'),
   },
-  // AI chat na boku (13. 9. 2026) — jen plná aplikace na počítači, lite ho
-  // nemá; texty mimo jazykový balík kvůli rozpočtu lite (lite-bundle.js)
+  // AI chat na boku (13. 9. 2026) — texty mimo jazykový balík kvůli rozpočtu lite
+  // (lite-bundle.js); v lite se načtou až s panelem po klepnutí (4. 10. 2026)
   asistent: {
     cs: () => import('./cs/asistent.json'),
     en: () => import('./en/asistent.json'),

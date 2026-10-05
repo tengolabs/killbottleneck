@@ -409,7 +409,7 @@ In the avatar menu → **Appearance** everyone picks one of twelve built-in skin
 Indigo (default), High contrast, Terminal, Paper, Ocean, Forest, Midnight, Plum,
 Peach, Graphite, Ruby or Rose. The choice is saved to the account, so it
 applies on every device, in both light and dark mode, and in the simplified
-lite view too (the picker there sits in the footer).
+lite view too (the picker there sits below the list).
 
 **Custom skins:** a skin is a small JSON file (`kb-skin` v1 format) — a set of
 colors (HSL), fonts and corner radius. The Appearance dialog can **export** the

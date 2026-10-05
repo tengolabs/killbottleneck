@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.74-beta": {
+    cs: [
+      "Asistent je i ve zjednodušeném zobrazení pro telefon: tlačítko Asistent nahoře otevře chat přes celou obrazovku, rozhovor pokračuje stejný jako na počítači a panel se stahuje až po klepnutí, takže načtení zůstává rychlé.",
+      "Cesta do celé aplikace je nově i nahoře v hlavičce (tlačítko „Celá aplikace“), ne jen pod seznamem.",
+      "„Přepnout na plnou verzi“ se jmenuje „Otevřít celou aplikaci“ — nejde o placenou verzi, jen o přepnutí zobrazení; slovo „verze“ zmizelo i z nápovědy a karet asistenta.",
+    ],
+    en: [
+      "The assistant is also in the simplified phone view: the Assistant button at the top opens the chat full-screen, the conversation continues from the computer, and the panel downloads only after the tap, so loading stays fast.",
+      "The way to the full app is now at the top of the header too (the \"Full app\" button), not only below the list.",
+      "\"Switch to the full version\" is now \"Open the full app\" — it is not a paid edition, just a view switch; the word \"version\" is gone from the hints and the assistant's cards as well.",
+    ],
+  },
   "v0.73-beta": {
     cs: [
       "Sdílet mapu: kolegu vyberete ze seznamu členů organizace (nabízí jen ty, kdo mapu ještě nemají), nebo dál napíšete e-mail — v editoru i na úvodní stránce.",

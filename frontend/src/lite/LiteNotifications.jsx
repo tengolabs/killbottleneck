@@ -48,7 +48,7 @@ export default function LiteNotifications() {
 
   return (
     <div className="max-w-xl mx-auto">
-      <header className="px-4 pt-5 pb-3 flex items-center gap-3">
+      <header className="px-4 pt-2 pb-3 flex items-center gap-3">
         <h1 className="font-heading text-xl font-bold flex-1">{t('notifications.title')}</h1>
         {unread > 0 && (
           <button onClick={markAll} className="inline-flex items-center gap-1 text-xs font-medium text-primary">

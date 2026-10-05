@@ -39,7 +39,7 @@
     "name": "Co je potřeba udělat",
     "deadline": "Termín (nepovinný)",
     "project": "Projekt",
-    "noProject": "Nejdřív si založte projekt v plné verzi.",
+    "noProject": "Nejdřív si založte projekt v celé aplikaci.",
     "save": "Přidat",
     "failed": "Úkol se nepodařilo přidat",
     "toBuffer": "Bez projektu (do zásobníku nápadů)",
@@ -47,16 +47,17 @@
     "asIdea": "Uloží se jako váš nápad do zásobníku — do projektu ho zařadíte později."
   },
   "switch": {
-    "toFull": "Přepnout na plnou verzi",
+    "toFull": "Otevřít celou aplikaci",
+    "toFullShort": "Celá aplikace",
     "toLite": "Zjednodušené zobrazení",
-    "hint": "Mapy, sdílení a nastavení najdete v plné verzi."
+    "hint": "Mapy, sdílení a nastavení jsou v celé aplikaci."
   },
   "loadFailed": "Nepodařilo se načíst data.",
   "retry": "Zkusit znovu",
   "error": {
     "actionFailed": "Akci se nepodařilo provést"
   },
-  "truncated": "Přehled je zkrácený — máš víc práce, než se sem vejde. Otevři plnou verzi.",
+  "truncated": "Přehled je zkrácený — máš víc práce, než se sem vejde. Otevři celou aplikaci.",
   "skins": {
     "label": "Vzhled",
     "custom": "Vlastní",

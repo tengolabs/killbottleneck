@@ -140,13 +140,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     // Doba do POUŽITELNÉ stránky: čeká se na skutečný obsah, ne na networkidle
     // (ten u SPA nastane dřív, než se dopočítá „Můj den" z dat v prohlížeči).
-    const timeTo = async (path, marker, label) => {
+    const timeTo = async (path, marker, label, pg = page) => {
       errors.length = 0;
       const t0 = Date.now();
-      await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
+      await pg.goto(BASE + path, { waitUntil: 'domcontentloaded' });
       let ok = false;
       for (let i = 0; i < 120; i++) {
-        ok = await page.evaluate((m) => (document.body.innerText || '').includes(m), marker).catch(() => false);
+        ok = await pg.evaluate((m) => (document.body.innerText || '').includes(m), marker).catch(() => false);
         if (ok) break;
         await sleep(250);
       }
@@ -183,7 +183,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     // (netechnický člověk s telefonem). Na localhostu je všechno rychlé; teprve
     // s reálnou linkou je vidět, co stojí stahování celých map a úkolů.
     console.log('== telefon na pomalé lince (4× CPU, ~1,6 Mb/s, 150 ms RTT) ==');
-    const cdp = await page.createCDPSession();
+    // ⚠️ Do 4. 10. 2026 tohle měřilo NESMYSL: service worker (public/sw.js) servíruje
+    // /assets/* cache-first a `Network.setCacheDisabled` se ho netýká — po předchozích
+    // návštěvách výše byl celý JS v SW cache a „lite na 3G" vycházel na 364 ms
+    // (513 kB při 1,6 Mb/s nejde fyzicky stáhnout pod 2,6 s). Po opravě: lite 4,2 s,
+    // plná appka 11,5 s (4. 10. 2026) — číslo pro plnou appku z července tedy platí dál.
+    // První návštěva = NOVÝ anonymní kontext s vypnutým SW (stejný trik jako
+    // lite-bundle.js), přihlášení se přenese tokenem.
+    const authToken = await page.evaluate(() => localStorage.getItem('pocketbase_auth'));
+    const ctx3g = await browser.createBrowserContext();
+    const page3g = await ctx3g.newPage();
+    await page3g.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+    await page3g.evaluateOnNewDocument((token) => {
+      localStorage.setItem('pocketbase_auth', token);
+      // main.jsx dělá `'serviceWorker' in navigator && navigator.serviceWorker.register(...)` — `undefined`
+      // by hodil TypeError do konzole (a sada hlídá konzoli), proto atrapa, jejíž register tiše selže
+      try { Object.defineProperty(navigator, 'serviceWorker', { get: () => ({ register: () => Promise.reject(new Error('SW vypnut: měření první návštěvy')) }) }); } catch (e) { /* starší Chrome */ }
+    }, authToken);
+    page3g.on('console', (m) => { if (m.type() === 'error' && !cizihoPuvodu(m)) errors.push(m.text()); });
+    page3g.on('pageerror', (e) => errors.push(String(e)));
+    const cdp = await page3g.createCDPSession();
     await cdp.send('Network.enable');
     await cdp.send('Network.emulateNetworkConditions', {
       offline: false, latency: 150,
@@ -196,16 +215,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
     // Přesně scénář platícího zákazníka z byznys plánu: netechnický člověk,
     // telefon, mobilní data, poprvé.
-    await timeTo('/lite', 'Co mám dnes dělat', 'light-mobile-3g');
-    await page.evaluate(() => localStorage.setItem('kb-mode', 'full'));
-    await timeTo('/', 'Můj den', 'home-mobile-3g');
-    await timeTo('/tasks', 'Úkoly', 'tasks-mobile-3g');
-    await page.evaluate(() => localStorage.removeItem('kb-mode'));
+    // každá stránka = vlastní čistý kontext, jinak by druhá už měla sdílené chunky v paměti
+    const prvniNavsteva = async (path, marker, label, mode) => {
+      await page3g.evaluateOnNewDocument((m) => { if (m) localStorage.setItem('kb-mode', m); else localStorage.removeItem('kb-mode'); }, mode);
+      await timeTo(path, marker, label, page3g);
+      // ⚠️ pod CDP brzdou (Network.emulateNetworkConditions) hlásí Resource Timing transferSize 0
+      // u všeho, takže „z cache" se pozná jen podle deliveryType (Chrome 118+); objem = decodedBodySize
+      const js = await page3g.evaluate(() => performance.getEntriesByType('resource').filter((r) => /\.js(\?|$)/.test(r.name)).map((r) => ({ d: r.decodedBodySize || 0, cache: r.deliveryType === 'cache' })));
+      const objem = Math.round(js.reduce((a, r) => a + r.d, 0) / 1024);
+      const zCache = js.filter((r) => r.cache).length;
+      console.log(`      ${label}: ${js.length} JS souborů, ${objem} kB JS po rozbalení, ${zCache} z cache`);
+      expect(zCache === 0, `${label}: měřena PRVNÍ návštěva, nic z cache (${zCache} souborů z cache)`);
+    };
+    await prvniNavsteva('/lite', 'Co mám dnes dělat', 'light-mobile-3g', '');
+    await prvniNavsteva('/', 'Můj den', 'home-mobile-3g', 'full');
+    await prvniNavsteva('/tasks', 'Úkoly', 'tasks-mobile-3g', 'full');
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     await cdp.send('Network.setCacheDisabled', { cacheDisabled: false });
     await cdp.send('Network.emulateNetworkConditions', {
       offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1,
     });
+    await ctx3g.close();
 
     // Kolik dat si stránka vůbec stáhne — tohle je ta skutečná mobilní bolest,
     // ne velikost JS bundlu. Limity výpisů: mapy 200, úkoly 1000 (base44Client).

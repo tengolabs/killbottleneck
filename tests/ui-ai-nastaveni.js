@@ -153,11 +153,11 @@ H.beh(async () => {
   await cekej('[data-testid="chat-panel"]');
   expect((await page.$('[data-testid="chat-akce-heslo"]')) === null && !(await textPanelu()).includes(heslo), 'po reloadu heslo v rozhovoru není (server ho neuložil)');
 
-  console.log('== lite přes kartu: potvrzení → /lite ==');
+  console.log('== lite přes kartu: potvrzení → /lite; asistent tam je, ale až po klepnutí ==');
   fronta.push(nastroj('set_preference', { co: 'mode', hodnota: 'lite' }));
   await napis('Přepni mě do zjednodušeného zobrazení');
   expect(await cekej('[data-testid="chat-akce"][data-stav="ceka"]'), 'karta lite k potvrzení');
-  expect((await textPanelu()).includes('asistent tam není k dispozici'), 'karta varuje, že v lite asistent není');
+  expect((await textPanelu()).includes('asistent zůstane po ruce'), 'karta říká, že asistent v lite zůstává');
   fronta.push(text('LITE-MOCK.'));
   const anoTl3 = await page.$$('[data-testid="chat-akce-ano"]');
   await anoTl3[anoTl3.length - 1].click();
@@ -165,8 +165,15 @@ H.beh(async () => {
   while (Date.now() - t0 < 10000 && !/\/lite/.test(page.url())) await sleep(200);
   expect(/\/lite/.test(page.url()) && (await ls('kb-mode')) === 'lite', `po potvrzení aplikace přešla na /lite (${page.url()}, kb-mode ${await ls('kb-mode')})`);
   const t1 = Date.now(); let liteText = '';
-  while (Date.now() - t1 < 10000 && !/Přepnout na plnou verzi/.test(liteText)) { liteText = await page.evaluate(() => document.body.innerText); await sleep(300); }
-  expect(/Přepnout na plnou verzi/.test(liteText) && (await page.$('[data-testid="chat-panel"]')) === null, 'lite se vykreslilo (s cestou zpět) a panel asistenta tam není');
+  while (Date.now() - t1 < 10000 && !/Otevřít celou aplikaci/.test(liteText)) { liteText = await page.evaluate(() => document.body.innerText); await sleep(300); }
+  expect(/Otevřít celou aplikaci/.test(liteText) && (await page.$('[data-testid="chat-panel"]')) === null, 'lite se vykreslilo (s cestou zpět) a panel se sám neotevřel (v lite až po klepnutí)');
+  // 4. 10. 2026: asistent v lite JE — tlačítko v hlavičce, panel přes celou obrazovku, tentýž rozhovor
+  expect(await cekej('[data-testid="lite-asistent"]'), 'v hlavičce lite je tlačítko Asistent');
+  await page.click('[data-testid="lite-asistent"]');
+  expect(await cekej('[data-testid="chat-panel"]') && (await cekejText('LITE-MOCK')), 'klepnutí otevře panel se stejným rozhovorem (načte se ze serveru)');
+  await page.click('[data-testid="chat-zavrit"]');
+  await sleep(500);
+  expect((await page.$('[data-testid="chat-panel"]')) === null && (await page.$('[data-testid="chat-bar"]')) === null, 'zavření v lite = žádný panel ani lišta (seznam je vidět)');
 
   expect(chyby.length === 0, `konzole bez chyb (${chyby.slice(0, 3).join(' | ')})`);
 }, { nazev: 'UI-AI-NASTAVENI' });

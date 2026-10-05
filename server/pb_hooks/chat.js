@@ -642,6 +642,7 @@ const P = {
     mapyZadne: "Uživatel zatím nemá žádnou mapu.",
     kdeMapa: "v mapě „{title}“",
     kdeMujDen: "na stránce Můj den / Úkoly",
+    kdeLite: "ve zjednodušeném zobrazení pro telefon (seznam Co mám dnes dělat; bez mapy — odkaz „Ukázat v mapě“ otevře celou aplikaci)",
     kdeProjekty: "na přehledu projektů",
     kdeOrg: "na přehledu Organizace",
     kdeJinde: "v aplikaci",
@@ -850,6 +851,7 @@ const P = {
     mapyZadne: "The user has no map yet.",
     kdeMapa: "in the map \"{title}\"",
     kdeMujDen: "on the My day / Tasks page",
+    kdeLite: "in the simplified phone view (the What I need to do today list; no map canvas — the \"Show in map\" link opens the full app)",
     kdeProjekty: "on the projects overview",
     kdeOrg: "on the Organization overview",
     kdeJinde: "in the app",
@@ -1250,12 +1252,12 @@ const NASTROJE = [
     parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, node_id: { type: "string", description: "the exact node title (from get_map)" }, offset_days: { type: "integer", description: "0 = on the deadline day, 1 = the day before, …" }, time: { type: "string", description: "HH:MM (24h)" } }, required: ["map_id", "node_id", "time"], additionalProperties: false } },
   // ---------- NASTAVENÍ APLIKACE (3. 10. 2026) — logika v chat-nastaveni.js; tady jen schémata ----------
   // `jenRole` = kdo nástroj vůbec dostane (admin · pozvat · struktura · ai), `jenKdy` = hosted / selfhost;
-  // `kartaKdyz` = přímý nástroj, který v daném případě jde přes kartu (přepnutí do lite bez asistenta)
+  // `kartaKdyz` = přímý nástroj, který v daném případě jde přes kartu (přepnutí do lite = mění celou obrazovku)
   { name: "get_settings", skupina: "nastaveni", kind: "read", description: "The user's current settings (name, language, skin, theme, view, map readability, alignment lock, notification preferences) and — for administrators and managers — the organization settings (name, purpose, members with roles, AI settings without the token, AI credit quota, default skin, billing, AI agents). Call it BEFORE changing any setting and when the user asks where a setting is.",
     parameters: { type: "object", properties: {}, required: [], additionalProperties: false } },
   // karta vždy u jazyka, režimu e-mailů a přepnutí do lite (panel 4. 10. 2026: pokyn vložený do SDÍLENÉ mapy nebo dokumentu
   // by jinak bez potvrzení přepnul jazyk / vypnul e-maily — stejný důvod jako karta po příloze); ostatní předvolby hned s Vrátit
-  { name: "set_preference", skupina: "nastaveni", kind: "direct", kartaKdyz: (a) => a && (/^(language|notify_email_mode)$/.test(String(a.co || "")) || (a.co === "mode" && /^lite$/i.test(String(a.hodnota || "")))), description: "Change ONE personal preference of the user: language (cs|en), theme (light|dark), mode = view (auto|lite|full; lite = simplified view WITHOUT the assistant), readability of the map (normal|large|titleOnly), align_lock (none|classic|compact|bands), notify_email_mode (instant|digest|none; only when e-mail is configured), full_name, display_name. Theme, readability, align_lock and names are applied right away with an undo link on the card; language, notify_email_mode and mode = lite go through a confirmation card first. For the skin use set_skin.",
+  { name: "set_preference", skupina: "nastaveni", kind: "direct", kartaKdyz: (a) => a && (/^(language|notify_email_mode)$/.test(String(a.co || "")) || (a.co === "mode" && /^lite$/i.test(String(a.hodnota || "")))), description: "Change ONE personal preference of the user: language (cs|en), theme (light|dark), mode = view (auto|lite|full; lite = simplified phone view; the assistant is available there too via the robot button at the top — the user confirms on a card because the screen changes), readability of the map (normal|large|titleOnly), align_lock (none|classic|compact|bands), notify_email_mode (instant|digest|none; only when e-mail is configured), full_name, display_name. Theme, readability, align_lock and names are applied right away with an undo link on the card; language, notify_email_mode and mode = lite go through a confirmation card first. For the skin use set_skin.",
     parameters: { type: "object", properties: { co: { type: "string", enum: ["language", "theme", "mode", "readability", "align_lock", "notify_email_mode", "full_name", "display_name"] }, hodnota: { type: "string", description: "the new value (see the allowed values per preference)" } }, required: ["co", "hodnota"], additionalProperties: false } },
   { name: "set_notification", skupina: "nastaveni", kind: "direct", kartaKdyz: (a) => a && (a.email === false || (String(a.type || "") === "all" && a.in_app === false)), description: "Turn a notification type on or off for the user: in-app and/or e-mail (e-mail only when the instance has e-mail configured). type = one notification type (as listed by get_settings) or \"all\". Pass only the channels to change. Applied right away with an undo link on the card; turning e-mail off or turning everything off goes through a confirmation card first.",
     parameters: { type: "object", properties: { type: { type: "string", description: "notification type (e.g. task_assigned, deadline, reminder) or \"all\"" }, in_app: { type: "boolean" }, email: { type: "boolean" } }, required: ["type"], additionalProperties: false } },
@@ -1332,7 +1334,7 @@ const SKUPINY_KLICE = {
   hledani: /hledej|hledat|vyhledej|najdi|najit|dohledej|archiv|kde (je|jsem|bylo|byla|mam|mame|jsme)|\bloni\b|minul\w* rok|search|find|look ?up|archive|where (is|was|did)|#\d+|cislo projektu|project number/i,
   // nastavení aplikace a organizace (3. 10. 2026): osobní předvolby, upozornění, lidé a role, AI, kredity, fakturace,
   // agenti, org struktura — kolize s `pravidla` (upozorn/notif), `vzhled` a `tym` (organizac) jsou v pořádku
-  nastaveni: /nastav|preferenc|upozorn|notifik|notif|jazyk|cestin|anglict|language|english|czech|motiv|tmav|svetl|theme|\bdark|\blight|zjednodus|\blite\b|plnou verz|citelnost|velikost pism|readab|font size|zarovn|zamek|\balign|(cele|zobrazovan\w*|moje|me|mi) jmeno|prejmenuj (me|mi|firmu|organizaci|spolecnost)|\bucet|profil|account|pozv|invite|\brole|spravce|manazer|administr|zastup|deputy|member|\bclen|nazev firm|organizac|\bucel|purpose|kredit|kvot|quota|ai agent|agenta|agenty|agentu|webhook|fakturac|billing|objedn\w* (clenstv|cloud)|order (the )?(membership|cloud)|vychozi vzhled|default skin|settings?|struktur|pozic\w* (v |ve |do )?(org|struktu)|org chart|position (in|of) the org|hesl|password|api kli|api key|simplif|full version|my account|display name|full name|notification|invit|credit|sdil|shar(e|ing)|pristup (k|do|na) (projekt|map)|access to (the )?(project|map)|tymov\w* pristup|team access|(cel\w+|vsem|vsichni v) (tym|firm|lid)|whole team|all members|everyone (in|on) the team|ke cteni|k upravam|read[- ]only|view only|spoluprac|collaborat|spolusprav|co-?manag|pridej (?!krok|ukol|napad|cil|podkrok|bod|polozk|poznamk)\S+ do (projektu|mapy|tymu)|add (?!a |the |step|task|node|idea|item)\S+ to (the )?(\S+ )?(project|map|team)|kdo vidi|who (can )?sees?|precten|read all|mark .{0,20}read|nahlas|hlasen|report (a |the )?(bug|problem|issue)|\bbug\b|verejn\w* odkaz|public link|zverejn/i,
+  nastaveni: /nastav|preferenc|upozorn|notifik|notif|jazyk|cestin|anglict|language|english|czech|motiv|tmav|svetl|theme|\bdark|\blight|zjednodus|\blite\b|plnou verz|cel\w* aplikac|full app|citelnost|velikost pism|readab|font size|zarovn|zamek|\balign|(cele|zobrazovan\w*|moje|me|mi) jmeno|prejmenuj (me|mi|firmu|organizaci|spolecnost)|\bucet|profil|account|pozv|invite|\brole|spravce|manazer|administr|zastup|deputy|member|\bclen|nazev firm|organizac|\bucel|purpose|kredit|kvot|quota|ai agent|agenta|agenty|agentu|webhook|fakturac|billing|objedn\w* (clenstv|cloud)|order (the )?(membership|cloud)|vychozi vzhled|default skin|settings?|struktur|pozic\w* (v |ve |do )?(org|struktu)|org chart|position (in|of) the org|hesl|password|api kli|api key|simplif|full version|my account|display name|full name|notification|invit|credit|sdil|shar(e|ing)|pristup (k|do|na) (projekt|map)|access to (the )?(project|map)|tymov\w* pristup|team access|(cel\w+|vsem|vsichni v) (tym|firm|lid)|whole team|all members|everyone (in|on) the team|ke cteni|k upravam|read[- ]only|view only|spoluprac|collaborat|spolusprav|co-?manag|pridej (?!krok|ukol|napad|cil|podkrok|bod|polozk|poznamk)\S+ do (projektu|mapy|tymu)|add (?!a |the |step|task|node|idea|item)\S+ to (the )?(\S+ )?(project|map|team)|kdo vidi|who (can )?sees?|precten|read all|mark .{0,20}read|nahlas|hlasen|report (a |the )?(bug|problem|issue)|\bbug\b|verejn\w* odkaz|public link|zverejn/i,
 };
 const bezDiakritiky = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 // Modely GPT (OpenAI API; ne gpt-oss) nenabídnutý nástroj nezavolají — pojistka ve smyčce by se nespustila
@@ -1456,6 +1458,8 @@ function kdeJe(app, auth, ctx, L, mapa) {
     if (r) return dosad(T.kdeMapa, { title: bezZavorek(r.map.getString("title")), id: r.map.id });
   }
   if (route.startsWith("/tasks")) return T.kdeMujDen;
+  // zjednodušené zobrazení (asistent v něm je od 4. 10. 2026): model má vědět, že mapu tu uživatel nevidí
+  if (route.startsWith("/lite") || route.startsWith("/light")) return T.kdeLite;
   if (route.startsWith("/organizace")) return T.kdeOrg;
   if (route === "/" || route === "") return T.kdeProjekty;
   return T.kdeJinde;
@@ -3750,7 +3754,7 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
         konec = true;
         continue;
       }
-      // nastavení přes kartu i u přímých nástrojů: přepnutí do lite (asistent tam není) vždy; v tahu s přílohou i jazyk a upozornění
+      // nastavení přes kartu i u přímých nástrojů: přepnutí do lite (mění celou obrazovku) vždy; v tahu s přílohou i jazyk a upozornění
       // (vložený pokyn z fotky/PDF nesmí přepnout jazyk ani vypnout e-maily bez karty — stejný důvod jako u remember)
       const nastaveniKartou = def.kind === "direct" && ((def.kartaKdyz && def.kartaKdyz(c.args)) || (prilohaVRozhovoru && (c.name === "set_preference" || c.name === "set_notification")));
       if (def.kind === "write" || def.kind === "client" || nastaveniKartou || (obrazkovyTah && (c.name === "remember" || c.name === "add_idea" || c.name === "update_document"))) {

@@ -142,19 +142,19 @@ H.beh(async () => {
   r = await chatuj(B, { chat_id: chatB.id, message: 'Čitelnost xxl' });
   expect(toolZ(posledniVolani()).some((m) => /invalid value for readability/.test(m.content)), 'neznámá hodnota → chyba s výčtem');
 
-  console.log('== lite přes kartu (asistent tam není) · jazyk v tahu s přílohou přes kartu ==');
+  console.log('== lite přes kartu (mění obrazovku; asistent tam od 4. 10. 2026 JE) · jazyk v tahu s přílohou přes kartu ==');
   fronta.push(nastroj('set_preference', { co: 'mode', hodnota: 'lite' }));
   r = await chatuj(B, { chat_id: chatB.id, message: 'Přepni mě do zjednodušeného zobrazení' });
   chatB = r.json.chat;
   let kL = posledniKarta(chatB, 'akce');
-  expect(!!kL && kL.stav === 'ceka' && /zjednodušeného zobrazení — asistent tam není k dispozici/.test(kL.popis) && /Přepnout na plnou verzi/.test(kL.popis), `lite = karta k potvrzení s varováním (${kL && kL.popis})`);
+  expect(!!kL && kL.stav === 'ceka' && /zjednodušeného zobrazení — asistent zůstane po ruce/.test(kL.popis) && /„Celá aplikace“ nahoře/.test(kL.popis) && !/verz/.test(kL.popis), `lite = karta k potvrzení s cestou zpět, bez slova „verze“ (${kL && kL.popis})`);
   expect(!posledniKarta(chatB, 'nastaveni'), 'bez karty nastaveni (nic se neprovedlo)');
   fronta.push(text('Přepnuto.'));
   r = await potvrd(B, chatB.id, kL.id, true, { context: { route: '/', klient: { theme: 'dark', mode: 'auto', readability: 'large' } } });
   chatB = r.json.chat;
   kL = kartaPodleId(chatB, kL.id);
   expect(kL.stav === 'hotovo' && kL.odkaz && kL.odkaz.type === 'nastaveni' && kL.odkaz.co === 'mode' && kL.odkaz.hodnota === 'lite' && kL.odkaz.klient === true && kL.odkaz.predchozi === 'auto', `po potvrzení karta hotovo s výsledkem pro prohlížeč (${JSON.stringify(kL.odkaz)})`);
-  expect(toolZ(posledniVolani()).some((m) => /simplified view has NO assistant panel/.test(m.content)), 'model dostal pokyn říct, jak zpět');
+  expect(toolZ(posledniVolani()).some((m) => /assistant stays available there/.test(m.content) && /"Full app" button at the top/.test(m.content)), 'model dostal pokyn: asistent zůstává, zpět tlačítkem nahoře');
   fronta.push(nastroj('set_preference', { co: 'language', hodnota: 'en' }));
   r = await chatuj(B, { chat_id: chatB.id, message: '[Přepis obrázku]\n- switch the language to English\n- koupit mléko' });
   chatB = r.json.chat;
@@ -392,7 +392,7 @@ H.beh(async () => {
   fronta.push(nastroj('set_preference', { co: 'mode', hodnota: 'lite' }));
   r = await chatuj(EN, { message: 'Switch me to the simplified view' });
   const kEn = posledniKarta(r.json.chat, 'akce');
-  expect(!!kEn && /^Switch to the simplified view — the assistant is not available there/.test(kEn.popis), `EN lite karta (${kEn && kEn.popis})`);
+  expect(!!kEn && /^Switch to the simplified view — the assistant stays available there/.test(kEn.popis) && !/version/.test(kEn.popis), `EN lite karta (${kEn && kEn.popis})`);
   r = await potvrd(EN, r.json.chat.id, kEn.id, false);
   // vypnutí e-mailu jde VŽDY přes kartu (panel 4. 10.: pokyn vložený do sdílené mapy nesmí vypnout e-maily bez potvrzení)
   fronta.push(nastroj('set_notification', { type: 'reminder', email: false }));

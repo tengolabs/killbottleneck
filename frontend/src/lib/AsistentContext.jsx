@@ -5,7 +5,7 @@ import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 // `Router key={i18n.language}` v App.jsx přemontuje všechno pod sebou, proto
 // tenhle provider sedí NAD Routerem. Drží jen otevřeno/šířku/dostupnost —
 // logika rozhovoru (useAsistentChat) žije v líném panelu, aby hlavní balík
-// (veze se i do /lite, strop 510 kB) nenarostl. Rozhovor sám je na serveru.
+// (veze se i do /lite, hlídá tests/lite-bundle.js) nenarostl. Rozhovor sám je na serveru.
 const KEY_OPEN = 'kb-chat-open';
 const KEY_WIDTH = 'kb-chat-width';
 export const MIN_W = 320;
@@ -35,6 +35,12 @@ export function AsistentProvider({ children }) {
   const [open, setOpenState] = useState(() => nactiKlic(KEY_OPEN) === '1');
   const [width, setWidthState] = useState(ctiSirku);
   const [dostupny, setDostupny] = useState(false); // server hlásí mód chat_panel (zjistí líný panel)
+  // Zjednodušené zobrazení (4. 10. 2026): VLASTNÍ, NEperzistentní stav otevření. `kb-chat-open`
+  // patří plné aplikaci — kdo tam nechal panel otevřený, nesmí na telefonu v lite dostat chat
+  // přes celou obrazovku místo seznamu (a chunk panelu by jel hned při startu, lite-bundle.js).
+  // Zavřený panel se v lite ODMONTUJE; rozhovor je na serveru (kb-chat-id ho po otevření vrátí).
+  // Sedí tady (nad Routerem), ne v LiteApp: přepnutí jazyka kartou asistenta LiteApp přemontuje.
+  const [liteOpen, setLiteOpen] = useState(false);
   // vybraný uzel v editoru mapy {map_id, node_id, title} — editor ho hlásí, panel ho
   // posílá v kontextu (Richard 14. 9. 2026: „tenhle krok“ = vybraný uzel)
   const [uzel, setUzel] = useState(null);
@@ -86,16 +92,16 @@ export function AsistentProvider({ children }) {
   const spust = useCallback((mode, target) => { setZadost({ mode, target: target || {} }); setOpen(true); }, [setOpen]);
   const vyridZadost = useCallback(() => setZadost(null), []);
   const value = useMemo(() => ({
-    open, setOpen, width, setWidth, dostupny, setDostupny, uzel, setUzel,
+    open, setOpen, width, setWidth, dostupny, setDostupny, uzel, setUzel, liteOpen, setLiteOpen,
     dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
     zadost, spust, vyridZadost,
-  }), [open, setOpen, width, setWidth, dostupny, uzel, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost]);
+  }), [open, setOpen, width, setWidth, dostupny, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, dostupny: false, uzel: null, setUzel: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {} };
+const PRAZDNO = { open: false, width: 0, dostupny: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }

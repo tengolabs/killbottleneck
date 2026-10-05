@@ -367,10 +367,14 @@ const clickText = async (page, text, sel = 'button, a') => {
     expect(deleg && !/@/.test(deleg.text), `v řádku není celý e-mail (${(deleg && deleg.text || '').replace(/\n/g, ' ')})`);
     expect(deleg && deleg.title === 'kolega@e2e.cz', `celý e-mail zůstal v title (${deleg && deleg.title})`);
 
-    console.log('== odchod do plné verze a zpět (nikoho neuvěznit) ==');
-    expect(await clickText(page, 'Přepnout na plnou verzi'), 'klik na Přepnout na plnou verzi');
+    console.log('== odchod do celé aplikace a zpět (nikoho neuvěznit) ==');
+    // 4. 10. 2026: „Přepnout na plnou verzi" → „Otevřít celou aplikaci". Jeden uživatel si
+    // myslel, že tím KUPUJE plnou verzi (ceník má tarif „Cloud Lite"). Slovo „verze" tu nesmí být.
+    const dolni = await page.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.innerText.trim()).filter((x) => /verz/i.test(x)));
+    expect(dolni.length === 0, `žádné tlačítko neříká „verze" (${dolni.join(' | ') || 'žádné'})`);
+    expect(await clickText(page, 'Otevřít celou aplikaci'), 'klik na Otevřít celou aplikaci (dole za seznamem)');
     await sleep(2500);
-    expect(!page.url().includes('/lite'), `jsme v plné verzi (${page.url().replace(BASE, '')})`);
+    expect(!page.url().includes('/lite'), `jsme v celé aplikaci (${page.url().replace(BASE, '')})`);
     // volba se pamatuje — další načtení „/" na telefonu už NEsmí přehodit zpět
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
     await sleep(2000);
@@ -389,6 +393,33 @@ const clickText = async (page, text, sel = 'button, a') => {
     await sleep(2500);
     expect(page.url().endsWith('/lite'), `jedním klikem zpět v lite režimu (${page.url().replace(BASE, '')})`);
 
+    console.log('== cesta do celé aplikace je i NAHOŘE (Richard 4. 10. 2026) ==');
+    // Dolní tlačítko je až za seznamem — na telefonu se k němu musí odrolovat a lidi ho
+    // nenašli. Horní je v pevné hlavičce lite nad všemi třemi obrazovkami.
+    const horni = await page.$('header [data-testid="lite-to-full-top"]');
+    expect(!!horni, 'v hlavičce lite je tlačítko „Celá aplikace"');
+    const horniText = horni ? await horni.evaluate((el) => el.innerText.trim()) : '';
+    expect(horniText === 'Celá aplikace', `nápis horního tlačítka: „${horniText}"`);
+    const horniBox = horni ? await horni.boundingBox() : null;
+    expect(horniBox && horniBox.y >= 0 && horniBox.y + horniBox.height <= 120, `horní tlačítko je vidět bez rolování (y=${horniBox && Math.round(horniBox.y)})`);
+    await page.evaluate(() => localStorage.removeItem('kb-mode'));
+    await horni.click();
+    await sleep(2500);
+    expect(!page.url().includes('/lite'), `horní tlačítko vede do celé aplikace (${page.url().replace(BASE, '')})`);
+    expect((await page.evaluate(() => localStorage.getItem('kb-mode'))) === 'full', 'horní tlačítko volbu uloží (kb-mode=full)');
+    await (await page.$('header button[aria-label="Zjednodušené zobrazení"]')).click();
+    await sleep(2500);
+    expect(page.url().endsWith('/lite'), 'a zpět do lite jedním klikem');
+    // horní lišta je i na obrazovce Zprávy (sdílená hlavička)
+    await page.goto(`${BASE}/lite/inbox`, { waitUntil: 'networkidle2' });
+    await sleep(1500);
+    expect(!!(await page.$('header [data-testid="lite-to-full-top"]')), 'tlačítko „Celá aplikace" je i na obrazovce Zprávy');
+    expect(!!(await page.$('header button[aria-label="Zpět na dnešní seznam"]')), 'logo (zkratka domů) je i na obrazovce Zprávy');
+    // bez AI (kontejner nemá chat providera) tlačítko Asistent NENÍ — ověřuje se v ui-lite-asistent.js
+    expect(!(await page.$('[data-testid="lite-asistent"]')), 'bez chat providera není v lite tlačítko Asistent');
+    await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
+    await sleep(1500);
+
     console.log('== v hlavičce je svátek (Richard 18. 8. 2026) ==');
     // ⚠️ Nesmí to být natvrdo „Helena" — sada by fungovala jeden den v roce.
     // Očekávaná hodnota se bere ze stejného kalendáře jako appka a dny BEZ
@@ -400,7 +431,7 @@ const clickText = async (page, text, sel = 'button, a') => {
     await page.evaluateOnNewDocument(() => localStorage.setItem('kb-lang', 'cs'));
     await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
     await sleep(2000);
-    const hlavicka = await page.evaluate(() => (document.querySelector('header')?.innerText || ''));
+    const hlavicka = await page.evaluate(() => ([...document.querySelectorAll('header')].map((h) => h.innerText).join('\n')));
     if (dnesniSvatek) {
       expect(hlavicka.includes(`svátek má ${dnesniSvatek}`),
         `hlavička lite ukazuje „svátek má ${dnesniSvatek}" („${hlavicka.split('\n').pop()}")`);
@@ -424,7 +455,7 @@ const clickText = async (page, text, sel = 'button, a') => {
     }, PEVNE.getTime());
     await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
     await sleep(2000);
-    const hlavickaPevna = await page.evaluate(() => (document.querySelector('header')?.innerText || ''));
+    const hlavickaPevna = await page.evaluate(() => ([...document.querySelectorAll('header')].map((h) => h.innerText).join('\n')));
     expect(hlavickaPevna.includes(`svátek má ${ocekavany}`),
       `s podvrženým 21. 7. hlavička hlásí „svátek má ${ocekavany}" („${hlavickaPevna.split('\n').pop()}")`);
 

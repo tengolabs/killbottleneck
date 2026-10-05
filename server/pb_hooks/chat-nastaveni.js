@@ -247,7 +247,7 @@ function hodnotaNazev(co, v, L) {
   const T = {
     language: { cs: en ? "Czech" : "čeština", en: en ? "English" : "angličtina" },
     theme: { light: en ? "light" : "světlý", dark: en ? "dark" : "tmavý" },
-    mode: { auto: en ? "automatic (by screen width)" : "automaticky (podle šířky obrazovky)", lite: en ? "simplified view" : "zjednodušené zobrazení", full: en ? "full version" : "plná verze" },
+    mode: { auto: en ? "automatic (by screen width)" : "automaticky (podle šířky obrazovky)", lite: en ? "simplified view" : "zjednodušené zobrazení", full: en ? "full app" : "celá aplikace" },
     readability: { normal: en ? "normal" : "normální", large: en ? "larger" : "větší", titleOnly: en ? "title only" : "jen název" },
     align_lock: { none: en ? "off" : "vypnutý", classic: en ? "classic" : "klasika", compact: en ? "compact" : "kompakt", bands: en ? "bands" : "pásy" },
     notify_email_mode: { instant: en ? "each right away" : "každé hned", digest: en ? "one daily digest" : "jeden denní souhrn", none: en ? "no e-mails" : "žádné e-maily" },
@@ -301,7 +301,7 @@ function ctiNastaveni(app, auth, ktx, L) {
   const maSmtp = smtp(app);
   const out = ["User settings (the assistant can change these with set_preference / set_notification; the user confirms or can revert):"];
   out.push(`- display name: ${u.getString("name") || "(none)"}; full name: ${u.getString("full_name") || "(none)"}; e-mail: ${u.getString("email")} (e-mail and password cannot be changed by the assistant — user menu → "My account")`);
-  out.push(`- language: ${ulozenaPredvolba("language", u)} · skin: ${u.getString("skin_id") || "default"} (set_skin) · light/dark theme: ${klient("theme")} (this device) · view: ${klient("mode")} (this device; "lite" = simplified view without the assistant) · map readability: ${klient("readability")} (this device) · alignment lock: ${ulozenaPredvolba("align_lock", u)}`);
+  out.push(`- language: ${ulozenaPredvolba("language", u)} · skin: ${u.getString("skin_id") || "default"} (set_skin) · light/dark theme: ${klient("theme")} (this device) · view: ${klient("mode")} (this device; "lite" = simplified phone view; the assistant is there too) · map readability: ${klient("readability")} (this device) · alignment lock: ${ulozenaPredvolba("align_lock", u)}`);
   out.push(`- notification e-mails: ${maSmtp ? ulozenaPredvolba("notify_email_mode", u) + " (instant | digest | none)" : "e-mail is NOT configured on this instance (notifications are in-app only; the operator sets SMTP)"}`);
   out.push("- notifications (type: in-app / e-mail):");
   for (const typ of NOTIFY_NASTAVITELNE) { const p = predvolbyUpozorneni(u, typ); out.push(`  · ${typ}: ${en(p.in_app)} / ${maSmtp ? en(p.email) : "n/a"}`); }
@@ -614,7 +614,7 @@ function provedNastaveni(app, auth, L, name, a, ktx) {
       const karta = { id: "n_" + $security.randomString(10), type: "nastaveni", co: co, hodnota: h.v, predchozi: "", klient: KLIENTSKE.indexOf(co) >= 0 };
       if (karta.klient) {
         karta.predchozi = klientskaHodnota(ktx, co);
-        const navic = co === "mode" && h.v === "lite" ? " The simplified view has NO assistant panel — tell the user they can come back via the user menu (avatar) → \"Switch to the full version\"." : "";
+        const navic = co === "mode" && h.v === "lite" ? " The simplified view opens now; the assistant stays available there (robot button at the top). Back to the full app: the \"Full app\" button at the top of the simplified view." : "";
         return { text: `${predvolbaNazev(co, "en")} switched to ${h.v} on this device (the browser applied it; the card has an undo link).${navic}`, karta: karta };
       }
       karta.predchozi = ulozenaPredvolba(co, u);
@@ -833,8 +833,8 @@ function popisNastaveni(app, auth, L, name, a) {
       const co = String(a.co || "");
       const h = hodnotaPredvolby(co, a.hodnota);
       if (co === "mode" && h.v === "lite") return cs
-        ? "Přepnout do zjednodušeného zobrazení — asistent tam není k dispozici; zpět přes menu pod panáčkem → „Přepnout na plnou verzi“"
-        : "Switch to the simplified view — the assistant is not available there; back via the user menu (avatar) → \"Switch to the full version\"";
+        ? "Přepnout do zjednodušeného zobrazení — asistent zůstane po ruce (tlačítko nahoře); zpět tlačítkem „Celá aplikace“ nahoře"
+        : "Switch to the simplified view — the assistant stays available there (button at the top); back via the \"Full app\" button at the top";
       return cs ? `Nastavit ${predvolbaNazev(co, L)}: ${hodnotaNazev(co, h.v, L)}` : `Set ${predvolbaNazev(co, L)}: ${hodnotaNazev(co, h.v, L)}`;
     }
     case "set_notification": {

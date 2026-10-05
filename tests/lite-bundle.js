@@ -1,7 +1,8 @@
 // Zjednodušený (lite) režim MUSÍ ZŮSTAT LEHKÝ.
 //
-// Celý jeho smysl je telefon: první načtení plné appky na 4G ze studené cache
-// trvalo 11,5 s (product/tests/scale-limits.js). Lehkost je aktivum, které se
+// Celý jeho smysl je telefon: první načtení na 1,6 Mb/s bez cache a bez komprese
+// trvá u plné appky 11,5 s, u lite 4,2 s (scale-limits.js, 4. 10. 2026; za
+// komprimující proxy zhruba třetina). Lehkost je aktivum, které se
 // ztrácí nepozorovaně — stačí v lite komponentě sáhnout po hotovém dialogu
 // z components/ui/ a přiteče s ním Radix, nebo po náhledu mapy a přiteče
 // ReactFlow. Tenhle test to nedovolí.
@@ -21,50 +22,27 @@ const SRC = path.join(__dirname, '../frontend/src');
 // Strop se měří na ROZBALENÉM JS — to je práce, kterou telefon musí odvést
 // bez ohledu na to, jestli je vpředu komprimující proxy. (Přenesené bajty se
 // vypisují taky, ale samotný PocketBase nekomprimuje — viz poznámka
-// v server/pb_hooks/main.pb.js.) Po dietě 4. 8. 2026 ~453 kB, strop drží
-// úsporu zamčenou: s původními 560 by balík mohl tiše vyrůst zpátky o 100+ kB
-// a test by mlčel. Rezerva je na růst lite režimu, ne na přilepení knihoven
-// plné verze — samotný ReactFlow má 670 kB.
-// 11. 8. 2026: 480 → 490. Vlna externích kontaktů + tří stylů zarovnání přidala
-// ~3 kB ČISTĚ i18n textů do sdíleného jazykového balíku (žádná knihovna —
-// všechny kontroly těžkých závislostí výše drží; naměřeno 483). Strop záměrně
-// jen o 10 kB, ať tlak na dietu zůstává.
-// 18. 8. 2026: 490 → 495. Svátek v hlavičce lite (Richard: „v režimu lite se
-// nezobrazuje svátek") přinesl do balíku český jmenný kalendář. Cena se nejdřív
-// osekala: data se přepsala z klíčů '1-15' na dvanáct řádků po měsících, což
-// ušetřilo ~3 kB — plná appka díky tomu ZHUBLA 898 → 895 kB. Zbylé +3 kB jsou
-// holá data kalendáře, levněji to nejde bez druhé kopie na serveru (= drift).
-// Naměřeno 494 (opakovaně, stabilně) → do stropu zbývá 1 kB, ne 5. Jedna delší
-// věta v hlavním jazykovém balíku sadu zase shodí; nové texty patří do lazy ns.
-// 19. 8. 2026: 495 → 500. Barva čar podle stavu cíle (hotovo / po termínu) přidala
-// do KAŽDÉHO z 11 vestavěných skinů dva tokeny × light/dark = 44 položek,
-// tj. +1,6 kB HOLÝCH DAT v skins.js (naměřeno 496). Texty funkce se do lite
-// nedostaly vůbec — hromadné akce i životopis mají vlastní lazy namespace
-// (hromadne, historie), protože plátno mapy v lite není. Cena je čistě za skiny.
-// ⚠️ Zvažováno a ZAMÍTNUTO: definovat tokeny jen u skinů, kde generická zelená
-// a červená nesedí (Terminál, Les, Rubín, Vysoký kontrast, Broskev, Grafit),
-// a zbytek nechat spadnout na index.css. Ušetřilo by to ~0,7 kB, tedy pořád
-// přes strop — a rozbilo by to jednotnost („skin buď barvy má, nebo ne").
-// Strop opět jen +5 kB, ať tlak na dietu zůstává.
-// 1. 9. 2026: 500 → 505. v0.53 přidal do rychlých akcí zámek verze (ulozDoMapy v lib/mapNodes
-// + taskActions) — a lite ho POUŽÍVÁ (LiteQuickAdd → addNodeToMap), takže +1 kB je funkce, ne
-// balast (naměřeno 501; ušlo pozornosti, protože cílená sada lowercase lite-bundle neobsahovala —
-// příště: každá změna v lib/, které se lite dotýká, = lite-bundle do cílené sady).
-// Strop opět jen +5 kB, ať tlak na dietu zůstává.
-// 6. 9. 2026: 505 → 510. Dvanáctý vestavěný skin „Růže" (Richard) = jedna položka
-// v skins.js (~1,7 kB holých dat: 2 × 37 tokenů + fonty) + 2 řádky v common.json
-// + NOVÁ malůvka `rose` (~1,3 kB SVG v components/shared/SkinPattern.jsx, který
-// lite importuje). Naměřeno: 504 před skinem → 507 se skinem → 508 s malůvkou.
-// Žádná knihovna, žádné texty funkcí. Rozhodnutí Richarda 6. 9.: další vestavěný
-// skin už nebude — při případném dalším NEzvedat strop, ale načítat skiny líně.
-// Strop opět jen +5 kB, ať tlak na dietu zůstává.
-// 14. 9. 2026: 510 → 515. Naměřeno 510 → 511 (~0,5 kB). Dvě funkce ve sdílených modulech, které
-// lite veze, ale nepoužívá: AsistentContext drží vybraný uzel editoru (pro AI chat „tenhle krok“)
-// a toast.jsx čte CSS proměnnou, aby toasty nezakrývaly políčko chatu vedle otevřeného panelu.
-// Žádná knihovna, žádné texty. Kandidát na dietu při příštím tlaku: vytáhnout AsistentContext
-// z lite stromu úplně (lite chat nemá).
-// Strop opět jen +5 kB, ať tlak na dietu zůstává.
-const MAX_KB = Number(process.env.LITE_MAX_KB || 515);
+// v server/pb_hooks/main.pb.js; v produkci komprimuje Cloudflare/nginx a po drátě
+// jde zhruba třetina: 513 kB → ~165 kB.)
+//
+// CO STROP CHRÁNÍ (prověrka 4. 10. 2026, rozhodnutí Richarda):
+//   - jen PRVNÍ návštěvu — od druhé jde všechno ze service workeru (0 B);
+//   - skutečnou ochranou proti „přilepení" plné appky je zákaz knihoven níže
+//     (FORBIDDEN) + podmínka lite < 70 % plné appky; číselný strop je rezerva
+//     pro FUNKCE lite režimu, ne pro knihovny.
+// HISTORIE: po dietě 4. 8. 2026 ~453 kB; strop 480 a pak „ráčna" +5 kB s každou
+// funkcí (11. 8. 490 texty; 18. 8. 495 jmenný kalendář; 19. 8. 500 tokeny čar ve
+// skinech; 1. 9. 505 zámek verze v rychlém zápisu; 6. 9. 510 skin Růže — další
+// vestavěný skin už NEzvedat strop, ale načítat skiny líně; 14. 9. 515 AsistentContext
+// + toast). Šest zvednutí za pět týdnů znamenalo, že každá věta v lite.json shodila
+// sadu. Přeměřeno 4. 10. 2026 (scale-limits.js s vypnutým SW): plná appka 11,5 s,
+// lite 4,2 s na 1,6 Mb/s — rozdíl je skutečný, strop má smysl; ale rozdíl dělá
+// zákaz knihoven, ne ±5 kB. Proto 4. 10. 2026 strop 515 → 560 = stav před dietou,
+// s rezervou na funkce. Nové funkce lite (asistent = tlačítko
+// v hlavičce + useAiEnabled; panel sám je LÍNÝ chunk, který se stáhne až po
+// klepnutí a sem se nepočítá) se do rezervy vejdou bez dalšího zvedání.
+// Naměřeno 4. 10. 2026 po přidání hlavičky a asistenta: viz výpis sady.
+const MAX_KB = Number(process.env.LITE_MAX_KB || 560);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.

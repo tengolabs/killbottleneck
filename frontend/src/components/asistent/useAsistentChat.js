@@ -61,8 +61,12 @@ export function aplikujKlienta(k, patchUser, klient, hodnota) {
     case 'theme': setTheme(v === 'dark' ? 'dark' : 'light'); break;
     case 'mode':
       saveMode(v === 'lite' ? MODE_LITE : v === 'full' ? MODE_FULL : MODE_AUTO);
-      // zjednodušené zobrazení nemá panel asistenta → rovnou tam (karta uživatele varovala a potvrdil ji)
-      if (v === 'lite' && klient && klient.navigate) klient.navigate('/lite');
+      // přepnutí zobrazení se má projevit hned (karta mění obrazovku a uživatel ji potvrdil);
+      // asistent je od 4. 10. 2026 v obou zobrazeních
+      if (klient && klient.navigate) {
+        if (v === 'lite') klient.navigate('/lite');
+        else if (v === 'full' && /^\/(lite|light)(\/|$)/.test(window.location.pathname)) klient.navigate('/');
+      }
       break;
     case 'readability':
       ulozKlic(KLIC_CITELNOST, platnyStupen(v));

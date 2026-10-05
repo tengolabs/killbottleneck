@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
@@ -26,7 +26,8 @@ import { useLocation } from 'react-router-dom';
 // Stránky se načítají AŽ KDYŽ jsou potřeba. Bez toho by si telefon
 // v zjednodušeném (lite) režimu stáhl i mapový editor s ReactFlow a všechny
 // dialogy plné verze — a právě objem prvního načtení je změřená bolest
-// (11,5 s na 4G ze studené cache, viz product/tests/scale-limits.js).
+// (1,6 Mb/s bez cache a bez komprese: lite 4,2 s, plná appka 11,5 s, měřeno
+// 4. 10. 2026, viz product/tests/scale-limits.js).
 const Home = lazy(() => import('./pages/Home'));
 const OAuthAuthorize = lazy(() => import('./pages/OAuthAuthorize'));
 const GoalMapEditor = lazy(() => import('./pages/GoalMapEditor'));
@@ -36,7 +37,7 @@ const UserAdmin = lazy(() => import('./pages/UserAdmin'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Organizace = lazy(() => import('./pages/Organizace'));
 const LiteApp = lazy(() => import('./lite/LiteApp'));
-// AI chat na boku — líně: do hlavního balíku nepatří a v lite není vůbec
+// AI chat na boku — líně: do hlavního balíku nepatří; v lite se stáhne až po klepnutí
 const AsistentPanel = lazy(() => import('./components/asistent/AsistentPanel'));
 
 const Spinner = () => (
@@ -56,21 +57,30 @@ const HomeOrLite = () => {
 };
 
 // AI chat na boku (13. 9. 2026): trvalý panel vpravo přes všechny stránky plné
-// aplikace; v lite a na přihlašovacích stránkách není. Obsah stránek se
+// aplikace; na přihlašovacích stránkách není. Obsah stránek se
 // odsune o šířku otevřeného panelu (na telefonu panel překryje celou šířku).
 // Zda server chat vůbec nabízí (mód chat_panel) zjišťuje až líný panel — do
 // hlavního balíku (ten se veze i do lite) tak nepřibývá nic než tenhle obal.
+// Zjednodušené zobrazení (4. 10. 2026, Richard: „asistenta tam potřebujeme"): panel se
+// montuje AŽ po klepnutí na tlačítko v hlavičce lite (A.liteOpen) — chunk panelu ani
+// jazykový balík asistenta nesmí jet se studeným /lite (tests/lite-bundle.js). Zavřený
+// = odmontovaný; rozhovor je na serveru a po dalším klepnutí se vrátí tentýž.
 const AsistentHost = ({ children }) => {
   const { user } = useAuth();
   const A = useAsistent();
   const location = useLocation();
   const lite = location.pathname.startsWith('/lite') || location.pathname.startsWith('/light');
   const zobrazit = !!user && !lite;
+  const liteOtevren = lite && !!user && A.liteOpen;
   const odsun = zobrazit && A.dostupny && A.open && typeof window !== 'undefined' && window.innerWidth >= 640 ? A.width : 0;
+  // odchod z lite (odkaz z karty do mapy, karta „celá aplikace") → příště v lite nenaskočí panel sám
+  const { setLiteOpen } = A;
+  useEffect(() => { if (!lite && A.liteOpen && setLiteOpen) setLiteOpen(false); }, [lite, A.liteOpen, setLiteOpen]);
   return (
     <>
       <div style={odsun ? { paddingRight: odsun } : undefined} className="transition-[padding]">{children}</div>
       {zobrazit && <Suspense fallback={null}><AsistentPanel /></Suspense>}
+      {liteOtevren && <Suspense fallback={null}><AsistentPanel lite /></Suspense>}
     </>
   );
 };

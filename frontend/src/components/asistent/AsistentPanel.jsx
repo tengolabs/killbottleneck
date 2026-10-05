@@ -44,11 +44,17 @@ const IKONA_REZIMU = { porada: '☀ ', nocni: '☾ ', rozbor: '⚒ ', trideni: '
 const MAX_TEXT = 8000; // strop zprávy na serveru (chat.js)
 const CHYBA_TEXTU = { textDlouhy: 'textTooLong', textPrazdny: 'textEmpty', textChyba: 'textError', zvukVelky: 'voiceTooBig' };
 
-export default function AsistentPanel() {
+// `lite` (4. 10. 2026): panel ve zjednodušeném zobrazení — otevřeno/zavřeno drží vlastní stav
+// kontextu (liteOpen; zavřít = host panel odmontuje), kreslí se vždy přes celou obrazovku
+// jako na telefonu (rozhodnutí Richarda: lite je produkt pro telefon i v širokém okně) a nemá
+// minimalizovanou lištu ani ouško — ty by kolidovaly se spodní navigací a tlačítkem + v lite;
+// tlačítko k otevření je v hlavičce lite (LiteApp).
+export default function AsistentPanel({ lite = false }) {
   const ready = useLazyNs('asistent');
   const { t } = useTranslation('asistent');
   const { user, patchUser } = useAuth();
-  const panel = useAsistent();
+  const ctx = useAsistent();
+  const panel = useMemo(() => (lite ? { ...ctx, open: ctx.liteOpen, setOpen: ctx.setLiteOpen } : ctx), [ctx, lite]);
   const ai = useAiModes();
   const dostupny = ai.has('chat_panel');
   // obrázky jen s modelem, který je vidí (server hlásí chat_image, 30. 9. 2026) — jinak sponka bere jen
@@ -168,12 +174,14 @@ export default function AsistentPanel() {
   const naOpravit = useCallback((priloha) => { ulozPdf(priloha.name, priloha.pages, priloha.bytes); setPdf(priloha); setObrazekChyba(false); setPohled('chat'); }, [ulozPdf]);
   const konec = useRef(null);
   const vstup = useRef(null);
-  const [mobil, setMobil] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  const [uzkeOkno, setUzkeOkno] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   useEffect(() => {
-    const f = () => setMobil(window.innerWidth < 640);
+    const f = () => setUzkeOkno(window.innerWidth < 640);
     window.addEventListener('resize', f);
     return () => window.removeEventListener('resize', f);
   }, []);
+  // lite = telefonní rozvržení vždy (sloupec max-w-xl se neodsouvá, Dokumenty nemají hlavičku plné appky)
+  const mobil = lite || uzkeOkno;
 
   // Nabídka ranní porady (Richard 13. 9. 2026: „ráno otevřu a zeptá se mě"):
   // ukáže se při prvním otevření aplikace v daném dni nebo po víc než 8 h
@@ -362,6 +370,8 @@ export default function AsistentPanel() {
   }, [zadost, ready, dostupny, A, kontext, patchUser, vyridZadost]);
 
   if (!ready || !dostupny) return null;
+  // lite: zavřený panel nekreslí nic (host ho stejně odmontuje) — žádná lišta dole ani ouško
+  if (lite && !A.open) return null;
 
   if (!A.open && mobil) {
     // telefon: minimalizovaný chat = lišta dole (poslední věta asistenta + políčko),
@@ -427,7 +437,7 @@ export default function AsistentPanel() {
     <>
     {panel.dokOpen && <DokumentyPanel mobil={mobil} />}
     <aside
-      className="fixed right-0 top-0 bottom-0 z-40 flex flex-col bg-card border-l shadow-xl w-full sm:w-auto"
+      className={`fixed right-0 top-0 bottom-0 z-40 flex flex-col bg-card border-l shadow-xl w-full ${mobil ? '' : 'sm:w-auto'}`}
       style={mobil ? undefined : { width: A.width, minWidth: MIN_W, maxWidth: MAX_W }}
       data-testid="chat-panel"
       aria-label={t('title')}

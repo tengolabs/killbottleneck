@@ -39,7 +39,7 @@
     "name": "What needs doing",
     "deadline": "Due date (optional)",
     "project": "Project",
-    "noProject": "Create a project in the full version first.",
+    "noProject": "Create a project in the full app first.",
     "save": "Add",
     "failed": "Couldn't add the task",
     "toBuffer": "No project (to the idea inbox)",
@@ -47,16 +47,17 @@
     "asIdea": "Saved as your idea in the inbox — file it into a project later."
   },
   "switch": {
-    "toFull": "Switch to the full version",
+    "toFull": "Open the full app",
+    "toFullShort": "Full app",
     "toLite": "Simplified view",
-    "hint": "Maps, sharing and settings live in the full version."
+    "hint": "Maps, sharing and settings are in the full app."
   },
   "loadFailed": "Couldn't load your data.",
   "retry": "Try again",
   "error": {
     "actionFailed": "The action could not be completed"
   },
-  "truncated": "This overview is truncated — you have more work than fits here. Open the full version.",
+  "truncated": "This overview is truncated — you have more work than fits here. Open the full app.",
   "skins": {
     "label": "Appearance",
     "custom": "Custom",

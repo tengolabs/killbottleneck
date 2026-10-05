@@ -9,6 +9,35 @@ below before you jump several versions.
 
 ---
 
+## v0.74-beta — 2026-10-05
+
+**The assistant in the simplified phone view; "Open the full app" instead of "full version"**
+
+- **AI assistant in the simplified view (`/lite`)**: an **Assistant** button in a new shared header
+  (logo · Assistant · Full app) on all three screens. The panel opens full-screen (also in a wide
+  window — the simplified view is a phone product), the down arrow closes it, and the same
+  conversation continues on the computer. The panel's chunk and its texts download only on the
+  first tap, so a cold `/lite` load costs nothing extra (`tests/lite-bundle.js`, new
+  `tests/ui-lite-asistent.js`). The server tells the model where the user is ("in the simplified
+  phone view… no map canvas"); the "Show in map" link opens the map in the full app without
+  changing the remembered view. The confirmation card for switching to the simplified view no
+  longer claims the assistant is missing there, and the way back it describes is now correct
+  (the view has no user menu).
+- **"Full app" at the top too**: the way back to the full app used to be only below the list;
+  on a phone nobody found it. Now it is in the header on every screen, and the button below the
+  list stays.
+- **Renamed "Switch to the full version" → "Open the full app"** (header: "Full app"). A user read
+  "full version" as buying a paid edition — the pricing page has a "Cloud Lite" plan. All texts
+  (hint, truncated overview, quick add without a project, the assistant's settings values and
+  cards, docs cs/en, README) drop the word "version". Internal names (`/lite`, `kb-mode`) are unchanged.
+- **Lite size budget 515 → 560 kB** (`tests/lite-bundle.js`), rewritten from a +5 kB ratchet (raised
+  six times in five weeks) into a reserve with a stated purpose; the library ban and the
+  "lite < 70 % of the full app" rule remain the real protection. **`tests/scale-limits.js` measured
+  the slow-link ("3G") first visit through the service-worker cache** (cache-first for `/assets/`,
+  which `Network.setCacheDisabled` does not touch) — it now opens a fresh context with the service
+  worker disabled, so the numbers are a real first visit: the simplified view 4.2 s, the full app
+  11.5 s at 1.6 Mb/s without compression (the lite figure of 0.4 s was the cached one).
+
 ## v0.73-beta — 2026-10-04
 
 **Share dialog with a member picker; fixes from the review panel after v0.72**

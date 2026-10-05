@@ -90,7 +90,7 @@ po 12 h. **Inbox logika:** nepřiřazené měření zastavené s poznámkou (nap
 
 Táž instance otevřená na mobilu se přepne do **zjednodušeného zobrazení**: dnešní úkoly,
 odškrtávání, přidání úkolu a zprávy — žádné plátno mapy, se kterým by se člověk na malém
-displeji pral. Zpátky do plné verze se dá přepnout kdykoli a appka jde (přes HTTPS) přidat
+displeji pral. Zpátky do celé aplikace se dá přepnout kdykoli a appka jde (přes HTTPS) přidat
 na plochu telefonu, kde se chová jako nativní.
 
 Víc v [návodu ke zjednodušenému zobrazení](https://killbottleneck.cz/funkce/zjednodusene-zobrazeni).
@@ -398,7 +398,7 @@ V menu pod avatarem → **Vzhled** si každý vybere jeden z dvanácti vestavěn
 Indigo (výchozí), Vysoký kontrast, Terminál, Papír, Oceán, Les, Půlnoc, Švestka,
 Broskev, Grafit, Rubín nebo Růže. Volba se ukládá k účtu, takže platí na
 všech zařízeních, ve světlém i tmavém režimu a i ve zjednodušeném lite zobrazení
-(tam je výběr v patičce).
+(tam je výběr pod seznamem).
 
 **Vlastní skiny:** skin je malý JSON soubor (formát `kb-skin` v1) — sada barev
 (HSL), písem a kulatosti rohů. V dialogu Vzhled jde **exportovat** aktuální skin

@@ -4,7 +4,6 @@
 // Řádek umí právě to, co se dělá každý den: hotovo / odložit / připnout.
 // Nic se tu nenastavuje a na detail se neproklikává — od toho je plná verze.
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Calendar, CheckSquare, Target, Lightbulb, Send, TriangleAlert, Flame, CalendarClock, Clock, Pause, Inbox, Sunrise, CalendarCheck, CalendarDays, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-react';
 import TaskRowActions from '@/components/shared/TaskRowActions';
@@ -115,7 +114,6 @@ function Row({ item, onChanged, onFailed }) {
 
 export default function LiteList({ kind, day, failed, onReload, onChanged, onFailed }) {
   const { t, i18n } = useTranslation('lite');
-  const navigate = useNavigate();
   // Hotová práce se ze seznamu schovává schválně — ale úplně zmizet nesmí.
   // Richard 27. 7. 2026: „ať si v hlavě potvrdím, že to mám a někde to nevisí,
   // například důležitý úkol pro šéfa." Sbalené, ať to nezabírá místo.
@@ -129,27 +127,9 @@ export default function LiteList({ kind, day, failed, onReload, onChanged, onFai
 
   return (
     <div className="max-w-xl mx-auto">
-      <header className="px-4 pt-5 pb-3">
-        {/* Značka i v lite režimu — doteď tu nebyla vůbec (Richard 6. 8. 2026:
-            „v lite není logo vůbec a to je taky škoda"). Světlá a tmavá verze,
-            kolečko s hadem má natvrdo tmavé pozadí a ve světlém režimu by
-            působilo jako flek. */}
-        {/* Logo = zkratka domů i v lite (Richard 7. 8. 2026). Zůstává v lite
-            režimu (na /lite = dnešní seznam), neopouští ho. */}
-        <button
-          type="button"
-          onClick={() => navigate('/lite')}
-          title={t('homeLink')}
-          aria-label={t('homeLink')}
-          className="flex items-center gap-2 mb-1.5 rounded-md outline-none hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <span className="flex items-center" aria-hidden="true">
-            <img src="/znak-tmavy.webp" alt="" width="525" height="320"
-                 className="hidden dark:block h-6 w-auto" />
-            <img src="/znak-svetly.webp" alt="" width="493" height="320"
-                 className="dark:hidden h-6 w-auto" />
-          </span>
-        </button>
+      {/* Logo a tlačítka (Celá aplikace, Asistent) jsou od 4. 10. 2026 ve SDÍLENÉ hlavičce
+          LiteApp nad všemi třemi obrazovkami — tady zůstává jen titulek a datum. */}
+      <header className="px-4 pt-2 pb-3">
         <h1 className="font-heading text-xl font-bold">{t(kind === 'today' ? 'today.title' : 'delegated.title')}</h1>
         {/* Svátek chyběl jen v lite (Richard 18. 8. 2026) — v plné verzi ho
             hlavička „Můj den" má odjakživa. Stejná podmínka i pořadí jako tam:
