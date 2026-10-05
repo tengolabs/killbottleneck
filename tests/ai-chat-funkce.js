@@ -59,7 +59,8 @@ H.beh(async () => {
   let r = await chatuj(A, { message: 'Archivuj projekt Truhlářství', context: { route: '/' } });
   let jm = jmenaNastroju(posledniVolani());
   expect(jm.includes('archive_project') && jm.includes('delete_project') && jm.includes('rename_project') && jm.includes('delete_node'), `„archivuj“ nabídne nástroje projektu (+ delete_node je stálý) (${jm.filter((n) => /project|node/.test(n)).join(', ')})`);
-  expect(/delete_node/.test(systemZ(posledniVolani())) && /archive_project/.test(systemZ(posledniVolani())) && /report_problem/.test(systemZ(posledniVolani())), 'prompt zná další úpravy (smazání kroku, archivace, hlášení chyby…)');
+  // etapa 3 (5. 10. 2026): archive_project je ve fragmentu skupiny projekt (otevřená „archivuj“), report_problem ve fragmentu nastaveni (zavřená) → základ o něm ví jen katalogem „hlášení chyby (nastaveni)“
+  expect(/delete_node/.test(systemZ(posledniVolani())) && /archive_project/.test(systemZ(posledniVolani())) && /hlášení chyby \(nastaveni\)/.test(systemZ(posledniVolani())) && !/report_problem/.test(systemZ(posledniVolani())), 'prompt zná další úpravy (smazání kroku v základu, archivace ve fragmentu projekt, hlášení chyby jen katalogem)');
   fronta.push(text('x'));
   r = await chatuj(A, { message: 'Smaž šablonu pravidla Hotovo', context: { route: '/' } });
   jm = jmenaNastroju(posledniVolani());

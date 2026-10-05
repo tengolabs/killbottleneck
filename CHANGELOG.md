@@ -9,6 +9,39 @@ below before you jump several versions.
 
 ---
 
+## v0.75-beta — 2026-10-05
+
+**Assistant sends the model less data; AI quota counted in real turns**
+
+- **Assistant: fewer tokens per call, prompt cache holds.** The map list in the system prompt is ordered by project
+  number instead of last change, so a confirmed write no longer reshuffles it and the provider's prompt cache keeps
+  the whole history. Tool results have caps (`get_settings` lists 30 members, `list_people` 150, `get_memory` 5
+  projects × 1 500 chars). Messages longer than 5 000 chars and tool arguments over 3 000 chars (a long draft, a
+  project outline) are shortened in the history once they are older than 3 turns; the guided modes (sorting, briefings,
+  new project) keep the full history. Tool groups open on narrower keywords — "objednání" no longer opens meetings,
+  "osvětlení" the look, a bare "uprav/změň" the documents, a bare "upozornění" the rules. New measurement suite
+  `ai-tokeny.js` and log columns `skupiny`, `prepis_ms`.
+- **Assistant: slimmer system prompt, tools can be opened by the model.** The system prompt keeps only the general
+  rules (about 40 % shorter); the instructions for rules, projects, events, deadlines, comments/timer, documents, PDF,
+  transcripts, look, archive search and settings travel as fragments appended at the end of the prompt only when that
+  tool group is open, so the cached prefix survives. New base tool `open_tools` lets the model unlock a group itself
+  when no keyword opened it (no wasted retry). Env knobs `KB_CHAT_MAX_TAHU` and `KB_CHAT_MAX_TOOL_STARE` for
+  measurement only.
+- **Assistant: confirming a simple card no longer calls the model.** After "Yes" on adding/changing/deleting steps,
+  ideas, sharing, preferences and similar actions in a free conversation, the app itself replies "Done." with the
+  "What next?" chips. The model still finishes after projects, rules, events, invitations, deadlines and in every
+  guide. `KB_CHAT_POTVRZENI=model` restores the old behaviour.
+- **AI quota: 1 turn = one ordinary message.** The weekly quota is counted in turns where 1 turn is the average real
+  turn (≈ 17 600 input tokens, 65 % from cache, 284 output, priced as DeepSeek V4.1 at AKI); prices and the reference
+  turn live in one file, `pb_hooks/kredity-ceny.json`. Work of local models costs nothing; a discarded light-model
+  attempt, a failed turn and an app-side confirmation cost nothing. Credits are stored with each log row
+  (`ai_chat_log.kredity`, per-call breakdown in `volani`); older rows are recomputed from their token totals. The
+  Organization admin card and the quota messages say "turns" and "messages". Weekly usage shown to customers drops to
+  roughly half; the plan quotas are unchanged.
+
+**Upgrade notes:** migrations add `ai_chat_log.skupiny`, `prepis_ms`, `kredity`, `volani` and recompute `kredity` for
+existing rows. Nothing to configure; `KB_CHAT_POTVRZENI` is optional.
+
 ## v0.74-beta — 2026-10-05
 
 **The assistant in the simplified phone view; "Open the full app" instead of "full version"**

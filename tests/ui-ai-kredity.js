@@ -37,13 +37,13 @@ H.beh(async () => {
   await page.goto(`${inst.base}/admin/users`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="ai-kredity"]'), 'sekce AI kredity je na stránce');
   expect(await cekej('[data-testid="ai-kredity-lide"]'), 'tabulka po lidech');
-  expect(await cekejText('[data-testid="ai-kredity-celkem-n"]', /0[,.]19/), `celek organizace 4 tahy ≈ 0,19 kreditu (${await txt('[data-testid="ai-kredity-celkem-n"]')})`);
+  expect(await cekejText('[data-testid="ai-kredity-celkem-n"]', /0[,.]07/), `celek organizace 4 zprávy ≈ 0,07 tahu (4 × 111/22 tokenů za ceny z kredity-ceny.json) (${await txt('[data-testid="ai-kredity-celkem-n"]')})`);
   const radky = await page.$$('[data-testid="ai-kredity-clovek"]');
   expect(radky.length === 2, `dva lidé v tabulce (${radky.length})`);
   const prvni = await page.evaluate(() => document.querySelector('[data-testid="ai-kredity-clovek"]')?.getAttribute('data-email'));
   expect(prvni === 'clen@example.com', 'Jana (3 tahy) je první');
   const janaKr = await page.evaluate(() => document.querySelector('[data-testid="ai-kredity-clovek"] [data-testid="ai-kredity-clovek-kredity"]')?.innerText);
-  expect(/0[,.]14/.test(janaKr), `Jana 3 tahy ≈ 0,14 kreditu (${janaKr})`);
+  expect(/0[,.]05/.test(janaKr), `Jana 3 zprávy ≈ 0,05 tahu — 1 tah = průměrný skutečný tah z kredity-ceny.json, mock je levný (${janaKr})`);
   expect(/bez stropu|no limit/i.test(await txt('[data-testid="ai-kredity-rozdeleni"]')), 'výchozí = bez stropu');
   expect(/1 lidí|1 people/.test(await txt('[data-testid="ai-kredity-admin"]')) && /1 lidí|1 people/.test(await txt('[data-testid="ai-kredity-ostatni"]')), 'skupiny správci 1 · ostatní 1');
 
@@ -67,11 +67,11 @@ H.beh(async () => {
   console.log('== rezerva správců 100 % = ostatní blokovaní, karta to ukáže (ne „bez stropu“) ==');
   await inst.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A, body: { kvota_tyden: 100, podil_admin: 100 } });
   await page.reload({ waitUntil: 'networkidle2' });
-  expect(await cekejText('[data-testid="ai-kredity-ostatni-n"]', /z 0 kreditů|of 0 credits/), `ostatní s rezervou správců 100 % ukazují „x z 0“, ne bez stropu (${await txt('[data-testid="ai-kredity-ostatni-n"]')})`);
+  expect(await cekejText('[data-testid="ai-kredity-ostatni-n"]', /z 0 tahů|of 0 turns/), `ostatní s rezervou správců 100 % ukazují „x z 0“, ne bez stropu (${await txt('[data-testid="ai-kredity-ostatni-n"]')})`);
 
   console.log('== vyčerpaná kvóta v panelu asistenta = lidská hláška ==');
   await inst.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A, body: { kvota_tyden: 1, podil_admin: 30 } });
-  for (let i = 0, st = 200; i < 30 && st === 200; i++) st = (await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Vyčerpat ' + i, context: { route: '/' } } })).status;   // správce vyčerpá CELOU kvótu 1 (≈ 21 volání)
+  for (let i = 0, st = 200; i < 80 && st === 200; i++) st = (await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Vyčerpat ' + i, context: { route: '/' } } })).status;   // správce vyčerpá CELOU kvótu 1 (≈ 60 levných volání mocku)
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-tab"]'), 'ouško asistenta');
   await page.click('[data-testid="chat-tab"]');
@@ -80,7 +80,7 @@ H.beh(async () => {
   await page.click('[data-testid="chat-input"]');
   await page.keyboard.type('Ahoj');
   await page.keyboard.press('Enter');
-  expect(await cekejText('[data-testid="chat-panel"]', /kvóta AI kreditů organizace je vyčerpána/, 10000), 'panel ukáže hlášku o vyčerpané kvótě organizace (ne obecný hodinový strop)');
+  expect(await cekejText('[data-testid="chat-panel"]', /kvóta AI asistenta organizace je vyčerpána/, 10000), 'panel ukáže hlášku o vyčerpané kvótě organizace (ne obecný hodinový strop)');
 
   // 429 z vyčerpané kvóty je záměr téhle sady — prohlížeč ho hlásí jako „Failed to load resource“
   const cizi = chyby.filter((c) => !/429/.test(c));

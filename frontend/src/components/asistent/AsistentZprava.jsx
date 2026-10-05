@@ -159,7 +159,13 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
               {t('dok.open')} <PanelLeftOpen className="w-3 h-3" />
             </button>
           )}
-          {stav === 'hotovo' && karta.odkaz && karta.odkaz.map_id && (
+          {/* připomínka ke kroku žije v kalendáři (klik-test 5. 10. 2026: „Ukázat v mapě“ u připomínky mátlo) */}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.pripominka && (
+            <Link to="/tasks?view=calendar" onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
+              {t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
+            </Link>
+          )}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.map_id && !karta.odkaz.pripominka && (
             <Link to={`/map/${karta.odkaz.map_id}${karta.odkaz.node_id ? `?node=${encodeURIComponent(karta.odkaz.node_id)}` : ''}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
               {karta.odkaz.node_id ? t('actionOpenNode') : t('actionOpen')} <ExternalLink className="w-3 h-3" />
             </Link>

@@ -6,18 +6,25 @@ const H = require('./_harness');
 const { expect } = H;
 
 const fronta = [];
+let selhani = 0;   // kolikrát má mock vrátit HTTP 500
+let l0;
 const nastroj = (name, args) => ({ tool_calls: [{ function: { name, arguments: args } }] });
 const text = (s) => ({ content: s });
 const mockHandler = (req, res, body) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url.startsWith('/api/tags')) { res.end(JSON.stringify({ models: [{ name: 'm-a' }] })); return; }
   JSON.parse(body);
+  if (selhani > 0) { selhani--; res.statusCode = 500; res.end('{"error":"boom"}'); return; }
   const o = fronta.shift() || text('ODPOVED.');
   const message = { role: 'assistant', content: o.content || '' };
   if (o.tool_calls) message.tool_calls = o.tool_calls;
   res.end(JSON.stringify({ message, prompt_eval_count: 111, eval_count: 22, done: true }));
 };
-const KREDIT_NA_VOLANI = (111 * 0.35 + 22 * 2.20) * 20.74 * 2 / 1e6 / ((2410 * 0.35 + 454 * 2.20) * 20.74 * 2 / 1e6);
+// ceny a referenční tah z JEDINÉHO zdroje (kredity-ceny.json): mock hlásí 111 vstupních / 22 výstupních tokenů bez cache, model m-a není lokální
+const CENY = require('../server/pb_hooks/kredity-ceny.json');
+const KC = (i, c, o) => ((i - c) * CENY.aki.in + c * CENY.aki.cache + o * CENY.aki.out) / 1e6 * CENY.eur_kc;
+const KREDIT_KC = KC(CENY.referencni_tah.in, CENY.referencni_tah.cached, CENY.referencni_tah.out);
+const KREDIT_NA_VOLANI = KC(111, 0, 22) / KREDIT_KC;
 
 H.beh(async () => {
   const mock = await H.httpMock(mockHandler);
@@ -35,7 +42,7 @@ H.beh(async () => {
   r = await inst.api('GET', '/api/kb/ai-kredity', { token: A });
   expect(r.status === 200 && r.json.kvota === 0 && r.json.zdroj === 'none' && r.json.podil_admin === 30, `výchozí: bez stropu, podíl správců 30 % (${JSON.stringify({ kvota: r.json.kvota, zdroj: r.json.zdroj, podil: r.json.podil_admin })})`);
   expect(r.json.lide.length === 2 && r.json.celkem.kredity === 0 && r.json.admin.lidi === 1 && r.json.ostatni.lidi === 1, 'dva lidé, nula spotřeby, skupiny 1 + 1');
-  expect(Math.abs(r.json.kredit_kc - 0.0764) < 0.001, `1 kredit ≈ 0,0764 Kč (${r.json.kredit_kc})`);
+  expect(Math.abs(r.json.kredit_kc - KREDIT_KC) < 0.0005 && Math.abs(KREDIT_KC - 0.0722) < 0.001, `1 kredit = 1 referenční tah ≈ 0,072 Kč podle kredity-ceny.json (${r.json.kredit_kc})`);
   expect(r.json.tydny.length === 4 && /T00:00:00/.test(r.json.tyden_od) && new Date(r.json.tyden_od).getUTCDay() === 1, 'týden začíná pondělím 00:00 UTC, 4 týdny historie');
 
   console.log('== spotřeba po lidech ==');
@@ -53,6 +60,22 @@ H.beh(async () => {
   expect(Math.abs(r.json.admin.kredity - petr.kredity) < 0.011 && Math.abs(r.json.ostatni.kredity - jana.kredity) < 0.011, 'skupiny správci × ostatní sedí');
   expect(r.json.tydny[0].n === 3 && !!jana.posledni, 'tento týden v historii 3 tahy, „naposledy“ vyplněno');
 
+  console.log('== lokální model se účtuje jako koupený (Richard 5. 10. 2026), chybový tah = 0, kredity uložené u řádku ==');
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Lokálně', model: 'm-local', context: { route: '/' } } });
+  expect(r.status === 200, `správce zvolil model m-local (lokální podle kredity-ceny.json) (${r.status})`);
+  selhani = 3; // mock vrátí 500 → tah skončí chybou
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Spadni', context: { route: '/' } } });
+  expect(r.status >= 500, `chybový tah (${r.status})`);
+  const su = await inst.superuser();
+  const log = (await inst.api('GET', '/api/collections/ai_chat_log/records?perPage=50&sort=created', { token: su })).json.items || [];
+  const lok = log.find((l) => /m-local/.test(l.model)), chyb = log.find((l) => l.stav === 'chyba');
+  expect(!!lok && Math.abs(lok.kredity - KREDIT_NA_VOLANI) < 0.0002 && lok.tokens_in > 0, `řádek lokálního modelu: kredity jako u AKI, „vše jako koupeno“ (${lok && lok.kredity})`);
+  expect(!!chyb && chyb.kredity === 0, `chybový řádek: kredity 0 (${chyb && chyb.kredity})`);
+  const okRadky = log.filter((l) => l.stav === 'ok' && !/m-local/.test(l.model));
+  expect(okRadky.length === 3 && okRadky.every((l) => Math.abs(l.kredity - KREDIT_NA_VOLANI) < 0.0002) && Array.isArray(l0 = okRadky[0].volani) && l0.length === 1 && l0[0].in === 111, `každý řádek nese kredity (${okRadky.map((l) => l.kredity).join(', ')}) a rozpad po voláních`);
+  r = await inst.api('GET', '/api/kb/ai-kredity', { token: A });
+  expect(Math.abs(r.json.celkem.kredity - 4 * KREDIT_NA_VOLANI) < 0.02 && r.json.celkem.n === 5, `celek = součet kreditů řádků vč. lokálního (${r.json.celkem.kredity}), zpráv 5 vč. chybové`);
+
   console.log('== nastavení kvóty ==');
   r = await inst.api('POST', '/api/kb/ai-kredity/nastaveni', { token: B, body: { kvota_tyden: 10, podil_admin: 30 } });
   expect(r.status === 403, 'člen kvótu nenastaví');
@@ -66,11 +89,13 @@ H.beh(async () => {
 
   console.log('== brzda: podíl = REZERVA správců (Richard 4. 10. 2026) — ostatní narazí na 0,7, správce jede dál až do celé kvóty ==');
   let blok = null, tahu = 0;
-  for (let i = 0; i < 30 && !blok; i++) {   // Jana má 0,09; strop ostatních 0,7 ≈ dalších 13 volání
+  // Jana má 2 volání; strop ostatních 0,7 kreditu → zbývá ≈ 0,7/KREDIT_NA_VOLANI − 2 volání (kredit = průměrný skutečný tah, mock je levný)
+  const cekaneJana = Math.floor(0.7 / KREDIT_NA_VOLANI) - 2;
+  for (let i = 0; i < cekaneJana + 10 && !blok; i++) {
     r = await inst.api('POST', '/api/kb/chat', { token: B, body: { message: 'Dál ' + i, context: { route: '/' } } });
     if (r.status === 429) blok = r.json; else tahu++;
   }
-  expect(!!blok && blok.code === 'ai_kvota' && tahu >= 10 && tahu <= 16, `člen po ${tahu} tazích narazil na 429 ai_kvota (strop ostatních)`);
+  expect(!!blok && blok.code === 'ai_kvota' && tahu >= cekaneJana - 3 && tahu <= cekaneJana + 4, `člen po ${tahu} tazích narazil na 429 ai_kvota (strop ostatních; čekáno ≈ ${cekaneJana})`);
   expect(!!blok && /členy týmu/i.test(blok.error) && /rezerva/i.test(blok.error) && /0,7|0\.7/.test(blok.error), `hláška říká komu, kolik a proč (${blok && blok.error})`);
   expect(!!blok && blok.pouzito >= blok.kvota, 'pouzito ≥ strop ostatních');
   r = await inst.api('GET', '/api/kb/ai-kredity', { token: A });
@@ -78,11 +103,13 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Správce jede dál', context: { route: '/' } } });
   expect(r.status === 200, 'správce může dál (rezerva 0,3 mu zůstala, čerpá až do celé kvóty)');
   blok = null; let tahuA = 0;
-  for (let i = 0; i < 30 && !blok; i++) {   // celkem je ~0,8 → celá kvóta 1 ≈ dalších 4–5 volání správce
+  // celkem je ≈ 0,7 + 2 volání správce → do celé kvóty 1 zbývá ≈ 0,3/KREDIT_NA_VOLANI − 2 volání
+  const cekanePetr = Math.floor(0.3 / KREDIT_NA_VOLANI) - 2;
+  for (let i = 0; i < cekanePetr + 10 && !blok; i++) {
     r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Ještě ' + i, context: { route: '/' } } });
     if (r.status === 429) blok = r.json; else tahuA++;
   }
-  expect(!!blok && blok.code === 'ai_kvota' && tahuA >= 2 && tahuA <= 8, `správce narazil až na CELOU kvótu organizace po ${tahuA} dalších tazích`);
+  expect(!!blok && blok.code === 'ai_kvota' && tahuA >= cekanePetr - 4 && tahuA <= cekanePetr + 4, `správce narazil až na CELOU kvótu organizace po ${tahuA} dalších tazích (čekáno ≈ ${cekanePetr})`);
   expect(!!blok && /organizace/i.test(blok.error) && /z 1\b|of 1\b/.test(blok.error), `hláška správci: kvóta organizace vyčerpána (${blok && blok.error})`);
   r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: 'x', action_id: 'y', ok: true } });
   expect(r.status === 429 && r.json.code === 'ai_kvota', 'brzda platí i pro potvrzení akce');

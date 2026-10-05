@@ -339,13 +339,15 @@ function ctiNastaveni(app, auth, ktx, L) {
     if (H.smiEditovatOrgStrukturu(auth) || H.jeAdminNeboManazer(auth)) {
       const rows = clenove(app);
       out.push(`- members (${rows.length}):`);
-      for (const m of rows.slice(0, 200)) {
+      // 30 členů stačí modelu k orientaci; celý seznam = list_people (výsledek get_settings jde v tahu znovu v každém volání)
+      const MAX_CLENU = 30;
+      for (const m of rows.slice(0, MAX_CLENU)) {
         const pr = [];
         if (m.is_ai_manager) pr.push("AI agents manager");
         if (m.is_org_manager) pr.push("org structure manager");
         out.push(`  · ${m.email}${m.name || m.full_name ? ` — ${m.name || m.full_name}` : ""} [${m.role || "user"}${pr.length ? "; " + pr.join(", ") : ""}]${m.deputy ? ` deputy: ${m.deputy}` : ""}`);
       }
-      if (rows.length > 200) out.push(`  · … and ${rows.length - 200} more`);
+      if (rows.length > MAX_CLENU) out.push(`  · … and ${rows.length - MAX_CLENU} more (list_people shows everyone)`);
       out.push(`  (invite_member${admin ? "; update_member changes role, flags and deputy" : (H.smiEditovatOrgStrukturu(auth) ? "; deputy via update_member" : "; a deputy is set by an administrator or the org structure manager")}; deleting an account or resetting a colleague's password is done only in Organization settings)`);
     }
   }

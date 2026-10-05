@@ -82,7 +82,9 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
   const name = `kb-e2e-${slug}-${otiskImage(img)}`;
   // KB_PURPOSE_ASK=0 je výchozí (dotazník účelu by blokoval klikací sady);
   // sada, která ho testuje, dá env: { KB_PURPOSE_ASK: null }
-  const envAll = Object.assign({ KB_PURPOSE_ASK: 0 }, env);
+  // KB_CHAT_POTVRZENI=model je výchozí pro sady (ověřené chování „model dopoví po potvrzení“ zůstává testované);
+  // produkční výchozí je app (aplikace dopoví „Hotovo.“) — sada, která to testuje, dá env: { KB_CHAT_POTVRZENI: null }
+  const envAll = Object.assign({ KB_PURPOSE_ASK: 0, KB_CHAT_POTVRZENI: 'model' }, env);
   const envArgs = Object.entries(envAll).filter(([, v]) => v !== null && v !== undefined)
     // hodnota v apostrofech (escapování apostrofu uvnitř): mezera, `;`, `$` ani uvozovky
     // (JSON v KB_*_OPENAI_EXTRA) tak nerozbijí docker run (T1-02, 27. 9. 2026)

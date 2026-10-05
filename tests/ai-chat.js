@@ -639,6 +639,11 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'A dál?' } });
   const poslT2 = r.json.chat.messages[r.json.chat.messages.length - 1];
   expect(poslT2.content === 'Hotovo.' && (poslT2.karty || []).filter((k) => k.type === 'navrhy').length === 1 && poslT2.karty.find((k) => k.type === 'navrhy').items[0] === 'Z nástroje', 'při skutečném volání má přednost nástroj, karta je jen jedna');
+  // velké S (gpt-oss, kouřový tah 5. 10. 2026): „Suggest_next: [...]“ se musí vyjmout z textu stejně jako malé
+  fronta.push(text('Shrnutí dne.\n\nSuggest_next: ["Velké S"]'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'A ještě?' } });
+  const poslT3 = r.json.chat.messages[r.json.chat.messages.length - 1];
+  expect(poslT3.content === 'Shrnutí dne.' && (poslT3.karty || []).some((k) => k.type === 'navrhy' && k.items[0] === 'Velké S'), `„Suggest_next“ s velkým S: text bez řádku, čip z textu (${JSON.stringify(poslT3.content)})`);
   chat = r.json.chat;
 
   console.log('== režimy: ranní porada a rozbor projektu, koncept ke zkopírování ==');
@@ -1321,7 +1326,7 @@ H.beh(async () => {
   const rems = (await inst.api('GET', `/api/kb/node-reminders?map=${mapaR.id}`, { token: A })).json.reminders || [];
   expect(rems.length === 1 && rems[0].node_id === 'p1' && rems[0].day === den(4) && rems[0].time === '16:00', `připomínka zapsána (${JSON.stringify(rems[0])})`);
   const kRpo = chat.messages.flatMap((m) => m.karty || []).find((k) => k.id === kR.id);
-  expect(kRpo && kRpo.stav === 'hotovo' && kRpo.odkaz && kRpo.odkaz.map_id === mapaR.id && kRpo.odkaz.node_id === 'p1', 'karta hotovo s odkazem na uzel');
+  expect(kRpo && kRpo.stav === 'hotovo' && kRpo.odkaz && kRpo.odkaz.map_id === mapaR.id && kRpo.odkaz.node_id === 'p1' && kRpo.odkaz.pripominka === true && kRpo.odkaz.den === den(5), `karta hotovo: odkaz na uzel + příznak připomínky s termínem → UI vede do kalendáře (${JSON.stringify(kRpo && kRpo.odkaz)})`);
   expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'create_reminder' && new RegExp(`fires on ${den(4)} 16:00`).test(m.content) && /deadline is unchanged/.test(m.content)), 'model dostal čas výstřelu a „termín se nemění"');
   const mapaRpo = (await inst.api('GET', `/api/collections/goalmaps/records/${mapaR.id}`, { token: A })).json;
   expect(mapaRpo.nodes.find((n) => n.id === 'p1').data.deadline === den(5), 'termín uzlu se nezměnil');

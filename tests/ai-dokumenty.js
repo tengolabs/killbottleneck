@@ -55,7 +55,8 @@ H.beh(async () => {
   expect(!!k1 && !!k1.doc_id && k1.subject === 'Poptávka – spárovky dub' && k1.to === 'drevo@example.com', `karta konceptu nese doc_id, předmět a adresáta (${JSON.stringify(k1 || {}).slice(0, 160)})`);
   expect(/saved to the user's Documents/.test(toolZ(posledniVolani()).pop().content), 'model ví, že text je uložený v Dokumentech');
   const sys = systemZ(posledniVolani());
-  expect(/uloží se uživateli do Dokumentů/.test(sys) && /update_document/.test(sys) && /list_documents/.test(sys), 'systém: draft_text → Dokumenty, úprava přes update_document');
+  // etapa 3 (5. 10. 2026): pokyn k úpravě dřívějšího dokumentu (list_documents/get_document/update_document) je ve fragmentu skupiny dokumenty — u „Napiš poptávku“ zavřené; základ ho zná jen katalogem
+  expect(/uloží se uživateli do Dokumentů/.test(sys) && !/update_document/.test(sys) && /úpravy dřívějších dokumentů \(dokumenty\)/.test(sys), 'systém: draft_text → Dokumenty; úprava dokumentu jen v katalogu (fragment zavřený)');
   expect(/nápady a úkoly \(věci k udělání\) do draft_text NIKDY nedávej/.test(sys) && /zásobníku nápadů \(add_idea \/ add_ideas\)/.test(sys), 'systém: hranice — nápady a úkoly do zásobníku, ne do dokumentů (Richard 1. 10. 2026)');
   expect(/NOT for ideas or tasks/.test(volani[0].tools.find((t) => t.function.name === 'draft_text').function.description), 'popis draft_text: ne pro nápady a úkoly');
   expect(volani[0].tools.some((t) => t.function.name === 'draft_text') && !volani[0].tools.some((t) => t.function.name === 'update_document'), 'draft_text jde vždy, nástroje dokumentů jen když o ně rozhovor stojí (úspora tokenů)');
@@ -136,6 +137,7 @@ H.beh(async () => {
   chat = r.json.chat;
   const tt = toolZ(posledniVolani());
   expect(posledniVolani().tools.some((t) => t.function.name === 'update_document'), 'v rozhovoru s konceptem dostane model nástroje dokumentů');
+  expect(/update_document/.test(systemZ(posledniVolani())) && /list_documents/.test(systemZ(posledniVolani())) && /Pokyny k dalším nástrojům/.test(systemZ(posledniVolani())), 'etapa 3: s otevřenou skupinou dokumenty má systém i fragment (list_documents/get_document/update_document)');
   expect(tt.some((m) => m.tool_name === 'list_documents' && /Poptávka spárovek \(e-mail/.test(m.content) && !new RegExp(k1.doc_id).test(m.content)), 'list_documents: názvy a druhy BEZ id (modely id přepisují)');
   expect(tt.some((m) => m.tool_name === 'get_document' && /Subject: Poptávka – spárovky dub/.test(m.content) && /DOK-EMAIL-1/.test(m.content) && /user DATA/.test(m.content)), 'get_document: celý text s hlavičkou a plotem dat');
   const kU = karty(chat, 'dokument').pop();

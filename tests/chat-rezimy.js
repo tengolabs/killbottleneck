@@ -111,9 +111,9 @@ const provedZdroj = zdroj.slice(zdroj.indexOf('function provedNastaveni('), zdro
 // kind client (výchozí skin instance) vykoná prohlížeč — server má jen kontrolu před kartou a zpracování výsledku
 for (const n of nastaveni.filter((x) => x.kind !== 'read')) expect(overZdroj.includes(`case "${n.name}"`) && (n.kind === 'client' || provedZdroj.includes(`case "${n.name}"`)), `${n.name}: kontrola před kartou + provedení${n.kind === 'client' ? ' (prohlížečem)' : ''}`);
 expect(!('secret' in (NASTROJE.find((n) => n.name === 'save_ai_agent') || { parameters: { properties: {} } }).parameters.properties) && !nastaveni.some((n) => /password|token|secret/.test(Object.keys(n.parameters.properties || {}).join(','))), 'žádný nástroj nastavení nebere heslo, token ani tajemství');
-expect(['cs', 'en'].every((L) => new RegExp(L === 'cs' ? 'Nastavení aplikace měníš nástroji' : 'You change the app settings with tools').test(P[L].system) && new RegExp(L === 'cs' ? '„Můj účet“' : '"My account"').test(P[L].system)), 'prompt cs/en: řádek o nastavení a kam poslat u hesla');
+expect(['cs', 'en'].every((L) => new RegExp(L === 'cs' ? 'Nastavení aplikace měníš nástroji' : 'You change the app settings with tools').test(P[L].systemSkupiny.nastaveni) && new RegExp(L === 'cs' ? '„Můj účet“' : '"My account"').test(P[L].systemSkupiny.nastaveni)), 'prompt cs/en: řádek o nastavení a kam poslat u hesla');
 // nález z klik-testu 4. 10.: model položil dvě upřesňující otázky a pak teprve řekl, že sdílení neumí
-expect(['cs', 'en'].every((L) => /share_map/.test(P[L].system) && new RegExp(L === 'cs' ? 'nedoptávej se napřed' : 'do not ask clarifying questions first').test(P[L].system)), 'prompt cs/en: sdílení projektu + „bez nástroje to řekni hned, neptej se napřed“');
+expect(['cs', 'en'].every((L) => /share_map/.test(P[L].systemSkupiny.nastaveni) && new RegExp(L === 'cs' ? 'nedoptávej se napřed' : 'do not ask clarifying questions first').test(P[L].systemSkupiny.nastaveni)), 'prompt cs/en: sdílení projektu + „bez nástroje to řekni hned, neptej se napřed“');
 
 console.log('== karta vždy u jazyka, režimu e-mailů, lite a vypnutí e-mailů/všeho (panel 4. 10.: pokyn ze sdílené mapy) ==');
 const sp = NASTROJE.find((n) => n.name === 'set_preference'); const sn = NASTROJE.find((n) => n.name === 'set_notification');

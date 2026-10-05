@@ -145,7 +145,15 @@ H.beh(async () => {
   const su = await inst.superuser();
   const log = (await inst.api('GET', `/api/collections/ai_chat_log/records?perPage=50&sort=-created&filter=${encodeURIComponent(`chat='${chat.id}'`)}`, { token: su })).json.items || [];
   expect(log.some((l) => Number(l.audio_ms) === 42000 && /#hlas/.test(l.model)), `ai_chat_log: audio_ms 42000 a značka #hlas (${log.map((l) => l.audio_ms + ' ' + l.model).join(' | ')})`);
+  expect(log.some((l) => /#hlas/.test(l.model) && Number.isInteger(l.prepis_ms) && l.prepis_ms >= 0), `ai_chat_log: prepis_ms = doba přepisu Whisperem (${log.map((l) => l.prepis_ms).join(' | ')})`);
   expect(log.some((l) => /#hlas-fail/.test(l.model) && l.stav === 'chyba'), 'nepovedený přepis je v logu jako #hlas-fail / chyba');
+  // přepis „jako koupeno“ (Richard 5. 10. 2026): 42 s × referenční cena za minutu (kredity-ceny.json `prepis`) navíc k tokenům modelu
+  const CENY = require('../server/pb_hooks/kredity-ceny.json');
+  const KC = (i, c, o) => ((i - c) * CENY.aki.in + c * CENY.aki.cache + o * CENY.aki.out) / 1e6 * CENY.eur_kc;
+  const kreditKc = KC(CENY.referencni_tah.in, CENY.referencni_tah.cached, CENY.referencni_tah.out);
+  const prepisKr = 42 * CENY.prepis.usd_min * CENY.prepis.usd_kc / 60 / kreditKc;
+  const l42 = log.find((l) => Number(l.audio_ms) === 42000 && l.stav === 'ok');
+  expect(!!l42 && l42.kredity > prepisKr && l42.kredity < prepisKr + 1, `hlasovkový řádek nese kredity za přepis (${prepisKr.toFixed(2)}) + tokeny modelu (celkem ${l42 && l42.kredity})`);
 
   console.log('== oprava přepisu (tužka v bublině): text se nahradí, nepotvrzené návrhy zmizí, model odpoví znovu ==');
   textyPrepisu.push('koupit pylu a zavolat Nováčkovi');

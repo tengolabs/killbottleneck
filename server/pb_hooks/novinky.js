@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.75-beta": {
+    cs: [
+      "Týdenní kvóta asistenta se počítá ve skutečných tazích: jedna běžná zpráva ≈ 1 tah, takže se do stejné kvóty vejde zhruba dvakrát víc zpráv než dřív.",
+      "Po potvrzení jednoduché karty (přidání, úprava, přesun nebo smazání kroku, sdílení, vzhled) odpoví aplikace hned „Hotovo.“ a nabídne „Co dál?“ — bez čekání na model.",
+      "Asistent posílá modelu méně dat (kratší pokyny, pokyny k nástrojům jen když je potřebuje, zkrácená starší historie) — odpovědi jsou rychlejší a levnější, umí pořád totéž.",
+      "Karta připomínky ke kroku vede do kalendáře, ne do mapy.",
+    ],
+    en: [
+      "The weekly assistant quota is counted in real turns: one ordinary message ≈ 1 turn, so roughly twice as many messages fit into the same quota as before.",
+      "After confirming a simple card (adding, editing, moving or deleting a step, sharing, the look) the app replies \"Done.\" right away and offers \"What next?\" — no waiting for the model.",
+      "The assistant sends the model less data (shorter instructions, tool guidance only when needed, trimmed older history) — replies are faster and cheaper, the abilities stay the same.",
+      "The reminder card on a step now links to the calendar, not the map.",
+    ],
+  },
   "v0.74-beta": {
     cs: [
       "Asistent je i ve zjednodušeném zobrazení pro telefon: tlačítko Asistent nahoře otevře chat přes celou obrazovku, rozhovor pokračuje stejný jako na počítači a panel se stahuje až po klepnutí, takže načtení zůstává rychlé.",

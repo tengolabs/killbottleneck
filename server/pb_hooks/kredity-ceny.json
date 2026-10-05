@@ -1,0 +1,29 @@
+{
+  "_": "JEDINÝ zdroj cen pro AI kredity asistenta — čte ho kredity.js (instance), cloud/admin/app.py (odhad v super adminu) i testy. 1 kredit = 1 referenční tah = PRŮMĚRNÝ TAH skutečného provozu (tengo + pobrislova + duve + bossikus, 13. 9.–4. 10. 2026, 203 tahů s modelem); průměrná zpráva asistentovi tak stojí 1 kredit. Ceny = AKI.IO DeepSeek V4.1 Flash, EUR za 1 M tokenů. VŠECHNA volání se účtují jako koupená za ceny AKI, i lokální modely (Richard 5. 10. 2026: „vše jako koupeno“ — rezerva z vlastního hardwaru zůstává viditelná u nás); seznam `lokalni` (podřetězec jména modelu) slouží jen k vyčíslení té rezervy, ne ke slevě.",
+  "eur_kc": 24.3,
+  "aki": {
+    "in": 0.25,
+    "cache": 0.1,
+    "out": 1.0
+  },
+  "lokalni": [
+    "gpt-oss",
+    "gptoss",
+    "rig",
+    "qwen",
+    "gemma4:",
+    "ollama",
+    "llama",
+    "m-local"
+  ],
+  "referencni_tah": {
+    "in": 17618,
+    "cached": 11452,
+    "out": 284
+  },
+  "prepis": {
+    "usd_min": 0.006,
+    "usd_kc": 20.8,
+    "_": "přepis hlasovky „jako koupeno“ (Richard 5. 10. 2026): referenční nákupní cena OpenAI whisper-1 0,006 USD za minutu, účtuje se po sekundách z audio_ms; vlastní Whisper na našem hardwaru je skutečná rezerva"
+  }
+}
