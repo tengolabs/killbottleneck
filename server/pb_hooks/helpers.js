@@ -578,7 +578,7 @@ function externalContactRows(app, userId) {
 // plurals = { paramName: { count, key } } → server dopočte správný tvar podle jazyka.
 // dedupKey (volitelný) = idempotence: partial UNIQUE index nad notifications.dedup_key
 // zaručí, že se stejná notifikace nepošle dvakrát ani při souběhu (termínový cron).
-function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, textKey, params, plurals, dedupKey, bezVychozihoEmailu }) {
+function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, textKey, params, plurals, dedupKey, bezVychozihoEmailu, extra }) {
   if (!email || email === actorEmail) return;
   let user;
   try {
@@ -680,6 +680,7 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, 
     if (mapId) rec.set("map", mapId);
     if (nodeId) rec.set("node_id", nodeId);
     if (eventId) rec.set("event_id", eventId);
+    if (extra && typeof extra === "object") rec.set("extra", extra); // {asistent: režim} → klient otevře asistenta v balíčku
     rec.set("text", text);
     rec.set("count", 1);
     rec.set("read", false);
@@ -4213,7 +4214,11 @@ function failStaleAgentRuns(app) {
 // Výčty drží server (NE databáze) — v2 typy přibudou bez migrace. Sdílí je
 // vyhodnocovač i validace v routách save (M3) a popisy MCP tools.
 const RULE_TRIGGERS = ["node_status_changed", "node_unblocked", "deadline_approaching", "node_created", "file_uploaded", "schedule"];
-const RULE_ACTIONS = ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent"];
+const RULE_ACTIONS = ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant"];
+// offer_assistant (5. 10. 2026, bod 4 prověrky): pravidlo NEspouští AI — jen pošle notifikaci s odkazem, který otevře
+// asistenta v daném balíčku (úvod skládá aplikace, 0 kreditů do kliknutí; člověk vždy potvrzuje kartou). Režimy = klíče
+// REZIM v chat.js bez týmové porady (jen vedoucí) a nového projektu (potřebuje cíl z dialogu) — hlídá test ai-chat.
+const ASSIST_MODES = ["porada", "nocni", "rozbor", "trideni", "po_schuzce", "revize", "priprava"];
 const RULE_CONDITION_FIELDS = ["status", "owner", "deadline", "executor_kind", "parent"];
 const RULE_CONDITION_OPS = ["eq", "ne", "empty", "not_empty", "before", "after"];
 const MAX_RULES_PER_MAP = 50;   // strukturální limit à la Asana (v pořádku)
@@ -4616,6 +4621,34 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         });
       }
       done.push({ type: a.type, to: emails.join(", ") }); // rozřešené adresy, ne spec
+    } else if (a.type === "offer_assistant") {
+      // pobídka: notifikace s odkazem do asistenta (balíček) — stejné rozřešení adresáta jako notify, žádné volání modelu
+      const d = (node && node.data) || {};
+      const mode = ASSIST_MODES.includes(String(a.mode)) ? String(a.mode) : "rozbor";
+      let emails = [];
+      const to = String(a.to || "node_owner");
+      if (to === "node_owner") { const e1 = String(d.owner || ""); if (e1) emails = [e1]; }
+      else if (to === "map_owner") emails = [map.getString("owner_email")];
+      else {
+        const dyn = resolveDynamicTarget(app, map, node, to);
+        if (dyn) {
+          if (dyn.skip) { skips.push({ type: a.type, reason: dyn.skip }); continue; }
+          emails = dyn.emails;
+        } else if (to) emails = [to];
+      }
+      for (const email of emails) {
+        notify(app, {
+          email: email,
+          actorEmail: "",
+          type: "rule_notice",
+          mapId: map.id,
+          nodeId: node ? node.id : "",
+          textKey: "notify.ruleAssist." + mode,
+          params: { rule: rule.getString("name"), title: String(d.title || map.getString("title") || ""), project: map.getString("title") },
+          extra: { asistent: mode },
+        });
+      }
+      done.push({ type: a.type, mode: mode, to: emails.join(", ") });
     } else if (a.type === "run_agent") {
       const tn = needTarget(a.type);
       const agentName = String(a.agent_name || "").trim();
@@ -5149,6 +5182,17 @@ function validateRuleInput(app, map, body, opts) {
       const toRefErr = validatePositionRef(app, to);
       if (toRefErr) return { error: toRefErr };
       actions.push({ type: a.type, to: to, message: String(a.message || "").slice(0, 500) });
+    } else if (a.type === "offer_assistant") {
+      const mode = String(a.mode || "").trim();
+      if (!ASSIST_MODES.includes(mode)) return { error: "offer_assistant.mode must be one of " + ASSIST_MODES.join(", ") };
+      const to = String(a.to || "node_owner");
+      if (to !== "node_owner" && to !== "map_owner" && !DYNAMIC_RULE_TARGETS.includes(to) && !positionRef(to) && !to.includes("@")) {
+        return { error: "offer_assistant.to must be node_owner, map_owner, " + DYNAMIC_RULE_TARGETS.join(", ") + ", position:<id>, deputy_of_position:<id> or an e-mail" };
+      }
+      if ((to === "node_owner" || DYNAMIC_RULE_TARGETS.includes(to)) && mapLevelSchedule) return { error: "offer_assistant.to=" + to + " needs a node scope" };
+      const toRefErr = validatePositionRef(app, to);
+      if (toRefErr) return { error: toRefErr };
+      actions.push({ type: a.type, mode: mode, to: to });
     } else { // run_agent
       const agentName = String(a.agent_name || "").trim().slice(0, 100);
       if (!agentName) return { error: "run_agent.agent_name is required" };
@@ -7468,7 +7512,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
   return out;
 }
 
-module.exports = {
+module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,

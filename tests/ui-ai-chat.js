@@ -94,11 +94,53 @@ H.beh(async () => {
   expect(await page.evaluate(() => document.querySelector('[data-testid="chat-panel"]').innerText.includes('Ahoj, co umíš?')) && (await page.$('[data-testid="chat-chip"]')) === null, 'čipy zmizely po první zprávě');
   expect(/Truhlářství/.test(systemZ(volani[0])) && /^\[Uživatel je právě na přehledu projektů\]/.test(volani[0].messages.filter((m) => m.role === 'user').pop().content), 'server dostal kontext: seznam map + „na přehledu projektů"');
 
+  console.log('== deep-link ?asistent=rozbor (pobídka z pravidla) otevře asistenta rovnou v balíčku a parametr z adresy zmizí ==');
+  fronta.push(text('ROZBOR-Z-ODKAZU: projekt Truhlářství má jeden otevřený krok.'));
+  await page.goto(`${inst.base}/map/${map.id}?asistent=rozbor&node=n1`, { waitUntil: 'networkidle2' });
+  expect(await cekejText('ROZBOR-Z-ODKAZU', 20000), 'balíček Rozbor se spustil z adresy (odpověď modelu v panelu)');
+  const adresaPo = await page.evaluate(() => location.search);
+  expect(!/asistent=/.test(adresaPo), `parametr asistent z adresy zmizel („${adresaPo}")`);
+  const posledniTelo = volani[volani.length - 1] && JSON.stringify(volani[volani.length - 1].messages || []);
+  expect(/rozbor|Rozeb|review/i.test(posledniTelo || ''), 'tah šel modelu jako režim rozbor (kickoff v promptu)');
+  const volaniPredReloadem = volani.length;
+  await page.reload({ waitUntil: 'networkidle2' });
+  await sleep(1500);
+  expect(volani.length === volaniPredReloadem && !(await page.evaluate(() => location.search)).includes('asistent='), 'reload balíček nespustí znovu (parametr pryč, žádné další volání modelu)');
+  // zpět na úvodní stránku s otevřeným panelem — další kroky počítají s přepínačem v hlavičce (chat-toggle), který editor nemá
+  await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  if (!(await page.$('[data-testid="chat-input"]'))) await page.click('[data-testid="chat-toggle"]');
+  expect(await cekej('[data-testid="chat-input"]'), 'po deep-linku zpět na úvod s otevřeným panelem');
+
+  console.log('== karta rizik (map_risks) → „Zvýraznit v mapě“ obarví uzly v editoru, „Zrušit“ zvýraznění sundá ==');
+  await inst.api('PATCH', `/api/collections/goalmaps/records/${map.id}`, { token: A, body: { nodes: map.nodes.map((n) => (n.id === 'n1' ? { ...n, data: { ...n.data, deadline: '2026-01-01' } } : n)) } });
+  await page.click('[data-testid="chat-novy"]'); // nový rozhovor: další krok (Enter) počítá bubliny od téhle zprávy
+  await sleep(300);
+  fronta.push(nastroj('map_risks', { map_id: map.id }), text('RIZIKA-MOCK: Poslat poptávku je po termínu.'));
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('Kde mám úzké hrdlo?');
+  await page.keyboard.press('Enter');
+  expect(await cekej('[data-testid="chat-rizika-karta"]', 20000), 'karta rizik v panelu');
+  expect(await cekej('[data-testid="chat-rizika-po_terminu"]', 3000), 'karta ukazuje počet po termínu');
+  expect(await cekejText('RIZIKA-MOCK'), 'odpověď modelu k rizikům dorazila (až pak navigace — jinak přerušený fetch v konzoli)');
+  await sleep(600);
+  await page.click('[data-testid="chat-rizika-zvyraznit"]');
+  expect(await cekej('[data-testid="mapa-rizika"]', 15000), 'editor mapy ukazuje lištu rizik');
+  const css = await page.evaluate(() => document.querySelector('[data-testid="mapa-rizika-css"]')?.textContent || '');
+  expect(css.includes('[data-id="n1"]') && /outline:3px solid/.test(css), `zvýraznění cílí na uzel n1 přes data-id („${css.slice(0, 80)}")`);
+  const barva = await page.evaluate(() => getComputedStyle(document.querySelector('.react-flow__node[data-id="n1"]')).outlineStyle);
+  expect(barva === 'solid', `uzel n1 má outline (${barva})`);
+  await page.click('[data-testid="mapa-rizika-zrusit"]');
+  await sleep(300);
+  expect((await page.$('[data-testid="mapa-rizika"]')) === null && (await page.$('[data-testid="mapa-rizika-css"]')) === null, 'Zrušit zvýraznění sundá lištu i styl');
+  await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  if (!(await page.$('[data-testid="chat-input"]'))) await page.click('[data-testid="chat-toggle"]');
+  expect(await cekej('[data-testid="chat-input"]'), 'zpět na úvod s otevřeným panelem');
+
   console.log('== Enter během čekání na odpověď nesmí vyprázdnit políčko (F3-01) ==');
   // model odpoví až za 4 s; mezitím rozepsaná věta + Enter → text musí zůstat
   // (před opravou `odesli` políčko smazal DŘÍV, než A.send zprávu při loading odmítl)
   zpozdeni = 4000;
-  fronta.push(text('POMALA-MOCK.'));
+  fronta.push(nastroj('get_map', { map_id: map.id }), text('POMALA-MOCK.'));
   await page.click('[data-testid="chat-input"]');
   await page.keyboard.type('První věta');
   await page.keyboard.press('Enter');
@@ -108,6 +150,11 @@ H.beh(async () => {
   const behemCekani = await page.$eval('[data-testid="chat-input"]', (el) => el.value);
   expect(await page.$('[data-testid="chat-send"] .animate-spin') !== null, 'Enter přišel ještě během čekání (spinner stále běží)');
   expect(behemCekani === 'Rozepsaná druhá věta', `Enter během čekání nechal text v políčku („${behemCekani}")`);
+  // průběh tahu (5. 10. 2026): první (zpožděné) volání vrátí get_map, mapa se přečte a při druhém čekání musí
+  // bublina „Přemýšlím…“ přes realtime ukázat, co asistent přečetl — s názvem mapy, od aplikace, ne od modelu
+  const prubehText = async (ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const t = await page.evaluate(() => document.querySelector('[data-testid="chat-prubeh"]')?.innerText || ''); if (t.includes('Přečteno: mapa projektu „Truhlářství“')) return t; await sleep(150); } return await page.evaluate(() => document.querySelector('[data-testid="chat-prubeh"]')?.innerText || ''); };
+  const pt = await prubehText(9000);
+  expect(pt.includes('Přečteno: mapa projektu „Truhlářství“') && pt.includes('Přemýšlím'), `bublina čekání ukazuje průběh tahu („${pt}")`);
   zpozdeni = 0;
   expect(await cekejText('POMALA-MOCK'), 'zpožděná odpověď dorazila');
   expect(await page.evaluate(() => document.querySelectorAll('[data-testid="chat-msg"][data-role="user"]').length) === 2, 'druhá věta se neodeslala (2 bubliny uživatele)');

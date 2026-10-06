@@ -83,6 +83,29 @@ H.beh(async () => {
     let na = await notifs(A, 'rule_notice');
     expect(na.length === 1 && na[0].text.includes('uzel dokončen'), 'akce notify doručila map_owner notifikaci s textem');
 
+    console.log('== akce offer_assistant: notifikace s odkazem do asistenta, bez volání modelu (5. 10. 2026) ==');
+    await api('PATCH', `/api/collections/automation_rules/records/${r1.id}`, { token: ST, body: { enabled: false } });
+    const rOA = await mkRule({
+      name: 'Po schůzce', trigger: { type: 'node_status_changed', status: 'done' },
+      actions: [{ type: 'offer_assistant', mode: 'po_schuzce', to: 'map_owner' }],
+    });
+    expect(!!rOA.id, 'pravidlo s offer_assistant založeno');
+    nodes = NODES.map((n) => (n.id === 'Y' ? node('Y', Object.assign({}, n.data, { status: 'done' })) : n));
+    r = await patchMap(A, map, nodes, EDGES);
+    expect(r.status === 200, `uložení mapy prošlo (${r.status})`);
+    rr = await runs(`rule = "${rOA.id}"`);
+    expect(rr.length === 1 && rr[0].status === 'ok', `běh offer_assistant zapsán jako ok (${rr.length} ${rr[0] && rr[0].status})`);
+    na = await notifs(A, 'rule_notice');
+    const oa = na.find((n) => n.extra && n.extra.asistent === 'po_schuzce');
+    expect(!!oa && /Po schůzce|After the meeting/.test(oa.text) && oa.map === map.id && oa.node_id === 'Y', `notifikace nese extra.asistent=po_schuzce, mapu a uzel (${oa && oa.text})`);
+    const sr = await api('POST', '/api/kb/rules/save', { token: A, body: { map: map.id, name: 'Špatný režim', trigger: { type: 'node_status_changed', status: 'done' }, actions: [{ type: 'offer_assistant', mode: 'tymova_porada', to: 'map_owner' }] } });
+    expect(sr.status >= 400 && /offer_assistant\.mode/.test(JSON.stringify(sr.json)), `neznámý/nepovolený režim pravidlo odmítne (${sr.status})`);
+    const sr2 = await api('POST', '/api/kb/rules/save', { token: A, body: { map: map.id, name: 'Revize v pátek', trigger: { type: 'schedule', freq: 'weekly', weekday: 5, hour: 16 }, actions: [{ type: 'offer_assistant', mode: 'revize', to: 'map_owner' }] } });
+    expect(sr2.status === 200 && sr2.json.rule && sr2.json.rule.actions[0].mode === 'revize', `plánované pravidlo s nabídkou revize se uloží (${sr2.status})`);
+    await api('PATCH', `/api/collections/automation_rules/records/${rOA.id}`, { token: ST, body: { enabled: false } });
+    if (sr2.json && sr2.json.rule) await api('PATCH', `/api/collections/automation_rules/records/${sr2.json.rule.id}`, { token: ST, body: { enabled: false } });
+    await api('PATCH', `/api/collections/automation_rules/records/${r1.id}`, { token: ST, body: { enabled: true } });
+
     console.log('== vypnuté pravidlo nefiruje; AND podmínka filtruje ==');
     await api('PATCH', `/api/collections/automation_rules/records/${r1.id}`, { token: ST, body: { enabled: false } });
     const r2 = await mkRule({

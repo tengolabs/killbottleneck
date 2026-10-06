@@ -1,13 +1,14 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Check, CheckCheck, ClipboardList, Copy, Download, ExternalLink, FileText, Loader2, Mail, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { BookOpen, Check, CheckCheck, ClipboardList, Copy, Download, ExternalLink, FileText, Loader2, Mail, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
 import { copyToClipboard } from '@/lib/clipboard';
 import { PAMET } from '@/lib/AsistentContext';
 import { ZNACKA_PREPISU, ZNACKA_PDF, ZNACKA_HLASU } from '@/lib/prepisZpravy';
+import { ulozRizika, zrusRizika, nactiRizika, BARVY, PORADI_DRUHU } from '@/lib/rizika';
 
 // Jedna zpráva chatu + její karty (otázky s volbami, akce k potvrzení, skin,
 // paměť, nápad, „nahlédl do"). Zprávy nástrojů (role tool) se nekreslí —
@@ -367,6 +368,41 @@ function KartaSkin({ karta, onRevert }) {
 
 // Nabídka „co dál" (nástroj suggest_next): čipy, klik pošle text jako zprávu.
 // Aktivní jen u poslední zprávy — starší nabídky zůstávají jako muted text.
+// Rizika v mapě (nástroj map_risks): počty podle druhu + „Zvýraznit v mapě“ (dočasné obarvení uzlů v editoru,
+// jen v prohlížeči) / „Zrušit zvýraznění“. Bez položek jen věta, že mapa nemá rizika.
+function KartaRizika({ karta, onOdkaz }) {
+  const { t } = useTranslation('asistent');
+  const [aktivni, setAktivni] = useState(() => !!nactiRizika(karta.map_id));
+  useEffect(() => {
+    const f = (e) => { if (!e.detail || e.detail.mapId === karta.map_id) setAktivni(!!nactiRizika(karta.map_id)); };
+    window.addEventListener('kb-rizika', f);
+    return () => window.removeEventListener('kb-rizika', f);
+  }, [karta.map_id]);
+  const pocty = karta.pocty || {};
+  const items = Array.isArray(karta.items) ? karta.items : [];
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-background/60 px-2.5 py-2 text-xs" data-testid="chat-rizika-karta">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{t('rizika.titulek', { title: karta.map_title || '' })}</span>
+        {items.length === 0 && <span className="text-muted-foreground">{t('rizika.nic')}</span>}
+        {PORADI_DRUHU.filter((d) => pocty[d] > 0).map((d) => (
+          <span key={d} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5" data-testid={`chat-rizika-${d}`}>
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: BARVY[d] }} />{t(`rizika.${d}`, { n: pocty[d] })}
+          </span>
+        ))}
+      </div>
+      {items.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <Link to={`/map/${karta.map_id}`} onClick={() => { ulozRizika(karta.map_id, { items, pocty }); if (onOdkaz) onOdkaz(); }} className="inline-flex items-center gap-1 rounded-lg border border-primary/60 px-2 py-1 font-medium text-primary hover:bg-primary hover:text-primary-foreground" data-testid="chat-rizika-zvyraznit">
+            {t('rizika.zvyraznit')} <ExternalLink className="w-3 h-3" />
+          </Link>
+          {aktivni && <button type="button" onClick={() => zrusRizika(karta.map_id)} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-muted-foreground hover:text-foreground" data-testid="chat-rizika-zrusit">{t('rizika.zrusit')}</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KartaNavrhy({ karta, aktivni, onSend, loading }) {
   return (
     <div className="mt-2 flex flex-wrap gap-1.5" data-testid="chat-navrhy">
@@ -577,10 +613,22 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
               )}
             </div>
           );
+          if (k.type === 'rizika') return <KartaRizika key={i} karta={k} onOdkaz={onOdkaz} />;
           if (k.type === 'otevrit') return (
             <Link key={i} to={`/map/${k.map_id}`} onClick={onOdkaz} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-secondary" data-testid="chat-otevrit-projekt">
               {k.map_title ? t('openProjectNamed', { title: k.map_title }) : t('actionOpen')} <ExternalLink className="w-3 h-3" />
             </Link>
+          );
+          {/* nápověda z dokumentace (nástroj help): odkazy na sekce návodu jdou do karty — text zprávy je prostý, URL by nebyla klikatelná */}
+          if (k.type === 'napoveda') return (
+            <div key={i} className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="chat-napoveda-karta">
+              <span className="text-[11px] text-muted-foreground">{t('helpLinks')}</span>
+              {(k.polozky || []).map((p, j) => (
+                <a key={j} href={p.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-primary/60 bg-background/60 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10" data-testid="chat-napoveda-odkaz">
+                  <BookOpen className="w-3 h-3" />{p.h ? `${p.title} › ${p.h}` : p.title}
+                </a>
+              ))}
+            </div>
           );
           if (k.type === 'napad') return <p key={i} className="mt-1.5 text-xs text-muted-foreground" data-testid="chat-napad-karta">{t('ideaSaved', { title: k.title })}</p>;
           return null;

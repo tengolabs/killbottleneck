@@ -255,6 +255,14 @@ const STRINGS = {
     cs: "Všechny podřízené cíle uzlu „{title}\" v projektu „{project}\" jsou hotové — můžete začít",
     en: "All sub-goals of node \"{title}\" in project \"{project}\" are done — you can start",
   },
+  // pobídka asistenta z pravidla (akce offer_assistant): klik na notifikaci otevře asistenta v balíčku
+  "notify.ruleAssist.porada": { cs: "Pravidlo „{rule}\": uděláme ranní poradu? — {title}", en: "Rule \"{rule}\": shall we do the morning briefing? — {title}" },
+  "notify.ruleAssist.nocni": { cs: "Pravidlo „{rule}\": uděláme noční plánování? — {title}", en: "Rule \"{rule}\": shall we do the evening planning? — {title}" },
+  "notify.ruleAssist.rozbor": { cs: "Pravidlo „{rule}\": rozebereme s asistentem „{title}\"?", en: "Rule \"{rule}\": shall we review \"{title}\" with the assistant?" },
+  "notify.ruleAssist.trideni": { cs: "Pravidlo „{rule}\": roztřídíme poznámky? — {title}", en: "Rule \"{rule}\": shall we sort the notes? — {title}" },
+  "notify.ruleAssist.po_schuzce": { cs: "Pravidlo „{rule}\": zapíšeme, jak dopadlo „{title}\"? (Po schůzce)", en: "Rule \"{rule}\": shall we write up how \"{title}\" went? (After the meeting)" },
+  "notify.ruleAssist.revize": { cs: "Pravidlo „{rule}\": uděláme týdenní revizi? — {project}", en: "Rule \"{rule}\": shall we do the weekly review? — {project}" },
+  "notify.ruleAssist.priprava": { cs: "Pravidlo „{rule}\": připravíme se na „{title}\"?", en: "Rule \"{rule}\": shall we prepare for \"{title}\"?" },
   "notify.ruleNotice": {
     cs: "Pravidlo „{rule}\": {message} — {title}",
     en: "Rule \"{rule}\": {message} — {title}",

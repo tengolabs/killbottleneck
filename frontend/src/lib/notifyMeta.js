@@ -78,6 +78,8 @@ export const notifyMeta = (type) => META[type] || { icon: UserPlus, className: '
 // Kam notifikace vede po kliknutí. Typy vázané na uzel/mapu otevírají mapu
 // s vybraným uzlem, ostatní úkoly.
 export const notifyTarget = (n) => {
+  // pobídka asistenta z pravidla (akce offer_assistant): otevřít mapu a rovnou spustit balíček asistenta
+  if (n.extra && n.extra.asistent && n.map_id) return `/map/${n.map_id}?asistent=${encodeURIComponent(n.extra.asistent)}${n.node_id ? `&node=${n.node_id}` : ''}`;
   const nodeBound = n.type?.startsWith('node_') || n.type?.startsWith('agent_') ||
     n.type === 'map_created' || n.type === 'map_shared' || n.type === 'ai_request' ||
     n.type === 'automation_ready' || n.type?.startsWith('deadline_request') ||

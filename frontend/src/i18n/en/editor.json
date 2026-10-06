@@ -500,5 +500,13 @@
       "monthly": "Recurrence (monthly): {{title}}"
     },
     "saveFailed": "Couldn't save the recurrence"
+  },
+  "rizika": {
+    "titulek": "Risks",
+    "po_terminu": "{{n}} overdue",
+    "blokuje": "{{n}} blocking",
+    "nehybe": "{{n}} idle",
+    "ceka": "{{n}} waiting",
+    "zrusit": "Clear highlight"
   }
 }

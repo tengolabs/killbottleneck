@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chat as chatApi, chatPotvrdit, chatOprav, chatDetail, chatSeznam, chatSmazat, chatVratit } from '@/api/asistentApi';
 import { base44 } from '@/api/base44Client';
+import { pb } from '@/api/pb';
 import { nahradPrepis } from '@/lib/prepisZpravy';
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
 import { setSkin, setTheme } from '@/lib/theme';
@@ -127,6 +128,18 @@ export function useAsistentChat({ open, klient }) {
   const [chat, setChat] = useState(null);      // DTO ze serveru {id,title,messages,pending,model}
   const [seznam, setSeznam] = useState([]);
   const [loading, setLoading] = useState(false);
+  // Průběh tahu (5. 10. 2026): server během tahu píše do ai_chat_prubeh (jeden záznam na uživatele), co právě dělá;
+  // odběr přes PocketBase realtime jen po dobu tahu. null = nic neběží. Text skládá panel (textPrubehu).
+  const [prubeh, setPrubeh] = useState(null);
+  useEffect(() => {
+    if (!loading) { setPrubeh(null); return undefined; }
+    let zivyOdber = true; let unsub;
+    const prijmi = (e) => { if (zivyOdber && e && e.record) setPrubeh(e.record.stav || null); };
+    pb.collection('ai_chat_prubeh').subscribe('*', prijmi).then((u) => { if (zivyOdber) unsub = u; else u(); }).catch(() => {});
+    // stav zapsaný ještě před navázáním odběru (rychlý první nástroj) → jednorázově dočíst
+    pb.collection('ai_chat_prubeh').getList(1, 1).then((r) => { const z = r && r.items && r.items[0]; if (zivyOdber && z && z.stav) setPrubeh((p) => p || z.stav); }).catch(() => {});
+    return () => { zivyOdber = false; if (unsub) unsub(); };
+  }, [loading]);
   const [error, setError] = useState(null);
   const [model, setModelState] = useState(() => nactiKlic(KEY_MODEL) || '');
   const zivy = useRef(true);
@@ -331,5 +344,5 @@ export function useAsistentChat({ open, klient }) {
     nactiSeznam();
   }, [chatId, novy, nactiSeznam]);
 
-  return { chat, chatId, seznam, loading, error, model, setModel, send, potvrd, oprav, novy, smaz, otevriChat, zacniRezim, vratNastaveni };
+  return { chat, chatId, seznam, loading, prubeh, error, model, setModel, send, potvrd, oprav, novy, smaz, otevriChat, zacniRezim, vratNastaveni };
 }

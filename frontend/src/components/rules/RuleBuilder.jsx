@@ -21,7 +21,9 @@ const isDynamicTarget = (v) => v === 'deputy_of_node_owner'
 // Výčty a limity drží server (validateRuleInput) — builder nabízí totéž a chybu
 // serveru ukáže doslova. Žádný měsíční metr na běhy neexistuje (závazné).
 const TRIGGERS = ['node_status_changed', 'node_unblocked', 'deadline_approaching', 'node_created', 'file_uploaded', 'schedule'];
-const ACTIONS = ['set_status', 'set_owner', 'set_deadline', 'move_node', 'create_subnodes', 'notify', 'run_agent'];
+const ACTIONS = ['set_status', 'set_owner', 'set_deadline', 'move_node', 'create_subnodes', 'notify', 'offer_assistant', 'run_agent'];
+// balíčky asistenta, které jde nabídnout pravidlem (= ASSIST_MODES v helpers.js; týmová porada a nový projekt ne)
+const ASSIST_MODES = ['rozbor', 'po_schuzce', 'priprava', 'revize', 'trideni', 'porada', 'nocni'];
 const COND_FIELDS = ['status', 'owner', 'deadline', 'executor_kind', 'parent'];
 const COND_OPS = ['eq', 'ne', 'empty', 'not_empty', 'before', 'after'];
 // podmínka „nadřazený uzel" (kanban: karta POD sloupcem) umí jen je/není
@@ -327,7 +329,8 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
                       : type === 'move_node' ? { type, to: '' }
                         : type === 'create_subnodes' ? { type, _outline: '' }
                           : type === 'notify' ? { type, to: 'map_owner', message: '' }
-                            : { type, agent_name: '' };
+                            : type === 'offer_assistant' ? { type, mode: 'rozbor', to: 'node_owner' }
+                              : { type, agent_name: '' };
                 setActions((p) => p.map((x, xi) => (xi === i ? fresh : x)));
               }}>
                 {ACTIONS.map((ac) => <option key={ac} value={ac}>{t(`rules.actions.${ac}`)}</option>)}
@@ -460,6 +463,31 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
                 )}
                 <Input value={a.message || ''} maxLength={500} placeholder={t('rules.messagePlaceholder')} onChange={(e) => setAct(i, { message: e.target.value })} />
                 <p className="text-xs text-muted-foreground">{t('rules.notifyHint')}</p>
+              </div>
+            )}
+            {a.type === 'offer_assistant' && (
+              <div className="space-y-2" data-testid="rule-offer-assistant">
+                <select className={selectCls} value={ASSIST_MODES.includes(a.mode) ? a.mode : 'rozbor'} onChange={(e) => setAct(i, { mode: e.target.value })} data-testid="rule-assist-mode">
+                  {ASSIST_MODES.map((m) => <option key={m} value={m}>{t(`rules.assistModes.${m}`)}</option>)}
+                </select>
+                <select className={selectCls} value={['node_owner', 'map_owner'].includes(a.to) || isDynamicTarget(a.to) ? a.to : 'custom'}
+                  onChange={(e) => setAct(i, { to: e.target.value === 'custom' ? '' : e.target.value })}>
+                  <option value="node_owner">{t('rules.toNodeOwner')}</option>
+                  <option value="deputy_of_node_owner">{t('rules.toDeputyOfOwner')}</option>
+                  <option value="map_owner">{t('rules.toMapOwner')}</option>
+                  <option value="custom">{t('rules.toEmail')}</option>
+                  {positionOptGroups}
+                  {dynFallbackOption(a.to)}
+                </select>
+                {!(['node_owner', 'map_owner'].includes(a.to) || isDynamicTarget(a.to)) && (
+                  <select className={selectCls} value={a.to || ''} onChange={(e) => setAct(i, { to: e.target.value })}>
+                    <option value="">{t('rules.pickMember')}</option>
+                    {members.filter((m) => !m.external).map((m) => (
+                      <option key={m.email} value={m.email}>{m.full_name ? `${m.full_name} (${m.email})` : m.email}</option>
+                    ))}
+                  </select>
+                )}
+                <p className="text-xs text-muted-foreground">{t('rules.assistHint')}</p>
               </div>
             )}
             {a.type === 'run_agent' && (

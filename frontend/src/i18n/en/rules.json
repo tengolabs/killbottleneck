@@ -64,7 +64,8 @@
       "create_subnodes": "create sub-nodes",
       "notify": "send a notification",
       "run_agent": "run an agent",
-      "move_node": "move the node"
+      "move_node": "move the node",
+      "offer_assistant": "offer the assistant"
     },
     "dlRelative": "in N days from today",
     "dlFixed": "fixed date",
@@ -165,6 +166,16 @@
     "dlAdvanceDaily": "daily",
     "dlAdvanceWeekly": "weekly",
     "dlAdvanceMonthly": "monthly",
-    "dlAdvanceHint": "from the goal's original deadline (rhythm holds; from today when unset)"
+    "dlAdvanceHint": "from the goal's original deadline (rhythm holds; from today when unset)",
+    "assistHint": "Sends a notification whose link opens the assistant right in this package for the goal. Nothing runs until someone clicks the link (no extra AI turns); changes then go through a confirmation card as always.",
+    "assistModes": {
+      "rozbor": "Review the project / goal",
+      "po_schuzce": "After the meeting (notes → tasks)",
+      "priprava": "Meeting prep",
+      "revize": "Weekly review",
+      "trideni": "Sort notes",
+      "porada": "Morning briefing",
+      "nocni": "Evening planning"
+    }
   }
 }

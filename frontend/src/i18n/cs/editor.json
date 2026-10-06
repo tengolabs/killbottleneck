@@ -500,5 +500,13 @@
       "monthly": "Opakování (měsíčně): {{title}}"
     },
     "saveFailed": "Opakování se nepodařilo uložit"
+  },
+  "rizika": {
+    "titulek": "Rizika",
+    "po_terminu": "{{n}} po termínu",
+    "blokuje": "{{n}} blokuje",
+    "nehybe": "{{n}} se nehýbe",
+    "ceka": "{{n}} čeká",
+    "zrusit": "Zrušit zvýraznění"
   }
 }

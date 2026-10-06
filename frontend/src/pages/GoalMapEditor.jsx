@@ -19,6 +19,7 @@ import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import { useAsistent } from '@/lib/AsistentContext';
+import { nactiRizika, zrusRizika, barvaRizika, PORADI_DRUHU, BARVY } from '@/lib/rizika';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Loader2, Target, Trash2, Lock, Unlock, Sun, Moon, ChevronDown, Map as MapIcon, Palette, SlidersHorizontal } from 'lucide-react';
 import { detectBottlenecks } from '@/lib/bottlenecks';
@@ -161,6 +162,16 @@ function EditorContent({ mapId, personalMap = false }) {
   const [canWork, setCanWork] = useState(false);
   const archiveOfferShown = useRef(false); // auto-nabídka archivace max 1× za otevření mapy
   const highlightDone = useRef(''); // id uzlu, na který se už najelo — nový ?node= (z chatu při otevřené mapě) najede znovu
+  const asistentDone = useRef(''); // ?asistent=<režim> (pobídka z pravidla) — spustit jednou, pak parametr z adresy odebrat
+  // Rizika z asistenta (karta map_risks): dočasné zvýraznění uzlů — outline přes data-id, nic v datech mapy (žádný autosave)
+  const [rizika, setRizika] = useState(() => (mapId ? nactiRizika(mapId) : null));
+  useEffect(() => {
+    if (!mapId) return undefined;
+    const f = (e) => { if (!e.detail || e.detail.mapId === mapId) setRizika(nactiRizika(mapId)); };
+    window.addEventListener('kb-rizika', f);
+    setRizika(nactiRizika(mapId));
+    return () => window.removeEventListener('kb-rizika', f);
+  }, [mapId]);
 
   const skipNextSave = useRef(true);
   // „latest ref" aktuálních uzlů/hran: callbacky s dlouhým životem (letící
@@ -276,7 +287,7 @@ function EditorContent({ mapId, personalMap = false }) {
   }, [activeMapId, toast]);
   // vybraný uzel → AI asistent („tenhle krok“ = vybraný uzel; Richard 14. 9. 2026).
   // Jen id + název (ne poloha), ať se kontext nemění při tažení uzlu.
-  const { setUzel: hlasUzelAsistentovi } = useAsistent();
+  const { setUzel: hlasUzelAsistentovi, spust: spustAsistenta } = useAsistent();
   const vybranyUzelId = useMemo(() => { const n = nodes.find((x) => x.selected); return n ? n.id : ''; }, [nodes]);
   const vybranyUzelNazev = useMemo(() => { const n = vybranyUzelId ? nodes.find((x) => x.id === vybranyUzelId) : null; return n ? String((n.data && (n.data.title || n.data.apexText)) || '') : ''; }, [nodes, vybranyUzelId]);
   useEffect(() => {
@@ -619,6 +630,21 @@ function EditorContent({ mapId, personalMap = false }) {
     skipNextSave.current = true;
     setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === highlightId })));
   }, [loading, rfInstance, nodes, location.search, setNodes, narrow, centerOnNode]);
+
+  // Deep-link /map/:id?asistent=<režim>[&node=<id>] — pobídka z pravidla (notifikace akce offer_assistant):
+  // otevře asistenta rovnou v balíčku pro tuhle mapu/uzel. Jednou na adresu; parametr pak z adresy zmizí,
+  // ať reload ani krok zpět balíček nespustí znovu (= nový rozhovor, tah modelu).
+  useEffect(() => {
+    if (loading) return;
+    const q = new URLSearchParams(location.search);
+    const mode = q.get('asistent');
+    if (!mode || asistentDone.current === `${mode}:${location.search}`) return;
+    asistentDone.current = `${mode}:${location.search}`;
+    const nodeId = q.get('node') || '';
+    spustAsistenta(mode, nodeId ? { map: mapId, node: nodeId } : { map: mapId });
+    q.delete('asistent');
+    navigate({ pathname: location.pathname, search: q.toString() ? `?${q.toString()}` : '' }, { replace: true });
+  }, [loading, location.search, location.pathname, mapId, navigate, spustAsistenta]);
 
   // Ukládání mapy (konflikt/pruh cizí změny, základna merge + zapamatujServer,
   // saveStatus, debounced autosave vč. návrhu, nasadNaPlatno, tiché slití,
@@ -1484,6 +1510,18 @@ function EditorContent({ mapId, personalMap = false }) {
               </button>
             )}
           </ReactFlow>
+          {rizika && Array.isArray(rizika.items) && rizika.items.length > 0 && (
+            <>
+              <style data-testid="mapa-rizika-css">{rizika.items.map((it) => `.react-flow__node[data-id="${String(it.node_id).replace(/["\\]/g, '')}"]{outline:3px solid ${barvaRizika(it.druhy)};outline-offset:3px;border-radius:16px;}`).join('\n')}</style>
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl border bg-card shadow-lg text-xs" data-testid="mapa-rizika">
+                <span className="font-medium">{t('rizika.titulek')}</span>
+                {PORADI_DRUHU.filter((d) => (rizika.pocty || {})[d] > 0).map((d) => (
+                  <span key={d} className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: BARVY[d] }} />{t(`rizika.${d}`, { n: rizika.pocty[d] })}</span>
+                ))}
+                <button type="button" onClick={() => zrusRizika(mapId)} className="rounded-md border px-2 py-0.5 text-muted-foreground hover:text-foreground" data-testid="mapa-rizika-zrusit">{t('rizika.zrusit')}</button>
+              </div>
+            </>
+          )}
           {canEdit && selectedNodeCount > 0 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 px-4 py-2 rounded-xl border bg-card shadow-lg">
               <span className="text-sm font-medium text-muted-foreground">

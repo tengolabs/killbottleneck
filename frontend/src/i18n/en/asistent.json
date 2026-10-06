@@ -7,6 +7,15 @@
   "placeholder": "What can I help with…",
   "send": "Send",
   "thinking": "Thinking…",
+  "prubeh": {
+    "ctu": "Reading: {{co}}…",
+    "provadim": "Running: {{co}}…",
+    "navrh": "Preparing a proposal to confirm…",
+    "precteno1": "Read: {{co}}",
+    "precteno": "Read: {{co}} (+{{count}})",
+    "neznamy": "the data",
+    "zapis": "the change"
+  },
   "newChat": "New conversation",
   "newChatShort": "New",
   "history": "Previous conversations",
@@ -104,6 +113,7 @@
     }
   },
   "toolsLooked": "Looked at: {{names}}",
+  "helpLinks": "More in the guide:",
   "toolNames": {
     "list_maps": "project list",
     "get_map": "project map",
@@ -123,6 +133,7 @@
     "get_person_work": "a colleague's work",
     "get_team_work": "team overview",
     "search_projects": "project and archive search",
+    "help": "the user guide",
     "get_settings": "settings",
     "get_org_structure": "org structure",
     "get_map_sharing": "project sharing",
@@ -351,5 +362,15 @@
     "mailtoLongNoCopy": "The text is too long for an e-mail link and copying failed — use Copy or copy it by hand.",
     "copyFailed": "Copying failed — select the text and copy it by hand.",
     "saveOverwrites": "Saving will overwrite it (restorable)."
+  },
+  "rizika": {
+    "titulek": "Risks in “{{title}}”",
+    "nic": "nothing overdue, waiting or idle",
+    "po_terminu": "{{n}} overdue",
+    "blokuje": "{{n}} blocking others",
+    "nehybe": "{{n}} idle",
+    "ceka": "{{n}} waiting for sub-steps",
+    "zvyraznit": "Highlight in the map",
+    "zrusit": "Clear highlight"
   }
 }

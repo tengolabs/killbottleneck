@@ -10,6 +10,23 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.76-beta": {
+    cs: [
+      "Při čekání na odpověď asistent říká, co právě dělá: „Přečteno: mapa projektu „Dílna“ · Přemýšlím…“, „Čtu: Můj den…“ nebo „Připravuji návrh k potvrzení…“ — místo pouhého kolečka.",
+      "Asistent odpovídá i na otázky, jak se co v aplikaci dělá: „Jak se přepíná tmavý motiv?“, „Kde najdu zásobník nápadů?“, „Jak pozvu kolegu?“ — nahlédne do návodů na webu, odpoví s přesnými názvy tlačítek a pod odpovědí nabídne odkazy Víc v návodu.",
+      "Hledání v asistentovi rozumí tvarům slov („fakturami“ najde Fakturu), řadí výsledky podle shody a prohledá i vaše Dokumenty (koncepty, zápisy z porad).",
+      "„Jaká jsou rizika v projektu X?“ — asistent vypíše kroky po termínu, kroky, které blokují ostatní, a kroky, co se nehýbou, a tlačítkem Zvýraznit v mapě je na chvíli obarví přímo v mapě.",
+      "Pravidla umí novou akci „nabídni asistenta“: po splnění cíle nebo v pátek odpoledne přijde upozornění, jehož odkaz rovnou otevře Po schůzce, Týdenní revizi nebo jinou poradu — nic se nespustí, dokud nekliknete.",
+    ],
+    en: [
+      "While you wait, the assistant says what it is doing: \"Read: project map „Workshop“ · Thinking…\", \"Reading: My day…\" or \"Preparing a proposal to confirm…\" — instead of a bare spinner.",
+      "The assistant now answers how-to questions about the app: \"How do I switch to the dark theme?\", \"Where do I find the idea stash?\", \"How do I invite a colleague?\" — it looks them up in the online guide, answers with the exact button names and offers More in the guide links under the reply.",
+      "The assistant's search understands word forms (\"invoices\" finds Invoice), ranks results by fit and covers your Documents too (drafts, meeting notes).",
+      "\"What are the risks in project X?\" — the assistant lists overdue steps, steps blocking others and steps that have not moved, and the Highlight in the map button colours them in the map for a while.",
+      "Rules have a new action \"offer the assistant\": when a goal is done or on Friday afternoon you get a notification whose link opens After the meeting, the Weekly review or another briefing — nothing runs until you click.",
+    ],
+  },
   "v0.75-beta": {
     cs: [
       "Týdenní kvóta asistenta se počítá ve skutečných tazích: jedna běžná zpráva ≈ 1 tah, takže se do stejné kvóty vejde zhruba dvakrát víc zpráv než dřív.",

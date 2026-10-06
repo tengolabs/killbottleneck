@@ -64,7 +64,8 @@
       "create_subnodes": "založ pod-uzly",
       "notify": "pošli notifikaci",
       "run_agent": "spusť agenta",
-      "move_node": "přesuň uzel"
+      "move_node": "přesuň uzel",
+      "offer_assistant": "nabídni asistenta"
     },
     "dlRelative": "za N dní ode dneška",
     "dlFixed": "pevné datum",
@@ -165,6 +166,16 @@
     "dlAdvanceDaily": "denně",
     "dlAdvanceWeekly": "týdně",
     "dlAdvanceMonthly": "měsíčně",
-    "dlAdvanceHint": "od původního termínu cíle (rytmus drží; bez termínu ode dneška)"
+    "dlAdvanceHint": "od původního termínu cíle (rytmus drží; bez termínu ode dneška)",
+    "assistHint": "Pošle notifikaci s odkazem, který otevře asistenta rovnou v tomto balíčku pro daný cíl. Nic se nespustí, dokud na odkaz nikdo neklikne (žádné tahy AI navíc); změny pak jdou jako vždy přes kartu k potvrzení.",
+    "assistModes": {
+      "rozbor": "Rozebrat projekt / cíl",
+      "po_schuzce": "Po schůzce (zápis → úkoly)",
+      "priprava": "Příprava na schůzku",
+      "revize": "Týdenní revize",
+      "trideni": "Roztřídit poznámky",
+      "porada": "Ranní porada",
+      "nocni": "Noční plánování"
+    }
   }
 }

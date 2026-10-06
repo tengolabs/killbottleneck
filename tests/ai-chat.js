@@ -15,6 +15,7 @@ const nastroj = (name, args) => ({ tool_calls: [{ function: { name, arguments: a
 const text = (s) => ({ content: s });
 
 let selhani = 0;            // kolikrát má mock vrátit HTTP 500
+let zpozdeni = 0;           // ms čekání před odpovědí (průběh tahu musí být vidět, než model odpoví)
 const mockHandler = (req, res, body) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url.startsWith('/api/tags')) { res.end(JSON.stringify({ models: [{ name: 'm-a' }, { name: 'm-b' }] })); return; }
@@ -35,7 +36,8 @@ const mockHandler = (req, res, body) => {
   const o = fronta.shift() || text('(fronta prázdná)');
   const message = { role: 'assistant', content: o.content || '' };
   if (o.tool_calls) message.tool_calls = o.tool_calls;
-  res.end(JSON.stringify({ message, prompt_eval_count: 111, eval_count: 22, done: true }));
+  const odpoved = JSON.stringify({ message, prompt_eval_count: 111, eval_count: 22, done: true });
+  if (zpozdeni > 0) setTimeout(() => res.end(odpoved), zpozdeni); else res.end(odpoved);
 };
 
 const posledniVolani = () => volani[volani.length - 1];
@@ -100,6 +102,32 @@ H.beh(async () => {
   const posl = chat.messages[chat.messages.length - 1];
   expect(posl.role === 'assistant' && /jeden otevřený/.test(posl.content), 'uložená odpověď = text modelu');
   expect(chat.messages.some((m) => m.role === 'assistant' && (m.karty || []).some((k) => k.type === 'nastroje' && k.jmena.includes('get_map'))), 'karta „nahlédl do": get_map');
+
+  console.log('== průběh tahu: záznam ai_chat_prubeh během tahu, null po něm, jen vlastní (5. 10. 2026) ==');
+  // model odpovídá se zpožděním → mezi čtením mapy a druhým voláním je okno, ve kterém musí být vidět
+  // faze „model“ + přečtená mapa s NÁZVEM (ne id); po skončení tahu stav null; člen B cizí průběh nevidí
+  const volaniPredPrubehem = volani.length; // následující kroky počítají volání absolutně → po bloku vrátit
+  zpozdeni = 700;
+  fronta.push(nastroj('get_map', { map_id: map.id }), text('Truhlářství má jeden otevřený krok.'));
+  const prubehCtu = async (tk) => (await inst.api('GET', '/api/collections/ai_chat_prubeh/records', { token: tk })).json;
+  const bezi = inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Co je v Truhlářství?' } });
+  let videno = null; let videnoModel = false;
+  for (const t0 = Date.now(); Date.now() - t0 < 6000 && !videno; await H.sleep(40)) {
+    const z = ((await prubehCtu(A)).items || [])[0];
+    if (z && z.stav && z.stav.faze === 'model') videnoModel = true;
+    if (z && z.stav && Array.isArray(z.stav.hotovo) && z.stav.hotovo.some((k) => k.nastroj === 'get_map')) videno = z.stav;
+  }
+  expect(videnoModel, 'během tahu je vidět fáze „model“');
+  expect(!!videno && videno.faze === 'model' && videno.hotovo[0].kind === 'read' && videno.hotovo[0].nazev === 'Truhlářství', `po přečtení mapy nese průběh název mapy a čeká na model (${JSON.stringify(videno)})`);
+  expect(!!videno && !JSON.stringify(videno).includes(map.id), 'průběh neprozrazuje id mapy');
+  const prubehOdp = await bezi;
+  expect(prubehOdp.status === 200, 'tah s průběhem doběhl');
+  zpozdeni = 0;
+  const poTahu = ((await prubehCtu(A)).items || [])[0];
+  expect(!!poTahu && poTahu.stav === null, 'po skončení tahu je stav průběhu null');
+  expect(((await prubehCtu(B)).items || []).length === 0, 'člen B cizí průběh nevidí (listRule user = auth)');
+  expect((await inst.api('PATCH', `/api/collections/ai_chat_prubeh/records/${poTahu.id}`, { token: A, body: { stav: { faze: 'model' } } })).status >= 400, 'průběh nejde přepsat zvenku (updateRule null)');
+  volani.length = volaniPredPrubehem;
 
   console.log('== ask_user → čipy → odpověď jako výsledek nástroje ==');
   fronta.push(nastroj('ask_user', { questions: [{ text: 'Kam to patří?', options: ['Truhlářství', 'Nový projekt'] }] }));
@@ -291,6 +319,69 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: `Najdi projekt ${N}` } });
   hl = [poslNastroj('search_projects')].filter(Boolean);
   expect(hl.length === 1 && N < 10 && /\[matched: number\]/.test(hl[0].content) && /Zahradní plot/.test(hl[0].content), `holé jednociferné číslo „${N}“ = číslo projektu, ne „too short“ (${hl[0] && hl[0].content.slice(0, 80)})`);
+
+  console.log('== offer_assistant: režimy nabízené pravidlem existují v asistentovi ==');
+  {
+    const { REZIM } = require('../server/pb_hooks/chat.js');
+    const hsrc = require('fs').readFileSync(require('path').join(__dirname, '../server/pb_hooks/helpers.js'), 'utf8');
+    const am = JSON.parse((hsrc.match(/const ASSIST_MODES = (\[[^\]]*\]);/) || [])[1] || '[]');
+    expect(am.length === 7 && am.every((m) => REZIM[m]) && !am.includes('tymova_porada') && !am.includes('novy_projekt'), `ASSIST_MODES ⊆ REZIM, bez týmové porady a nového projektu (${am.join(', ')})`);
+  }
+
+  console.log('== rizika v mapě (map_risks, 5. 10. 2026): po termínu / čeká / blokuje + karta pro zvýraznění ==');
+  const rizMap = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {
+    title: 'Rekonstrukce dílny', nodes: [
+      { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Dílna hotová', title: 'Dílna hotová', status: 'todo' } },
+      { id: 'r1', type: 'goalNode', position: { x: 0, y: 200 }, data: { title: 'Elektroinstalace', status: 'todo', deadline: '2026-01-10', owner: 'admin@example.com' } },
+      { id: 'r1a', type: 'goalNode', position: { x: 0, y: 400 }, data: { title: 'Revize elektro', status: 'todo' } },
+      { id: 'r2', type: 'goalNode', position: { x: 300, y: 200 }, data: { title: 'Podlaha', status: 'todo', waitForChildren: true } },
+      { id: 'r2a', type: 'goalNode', position: { x: 300, y: 400 }, data: { title: 'Vyrovnat beton', status: 'todo' } },
+      { id: 'r3', type: 'goalNode', position: { x: 600, y: 200 }, data: { title: 'Nábytek', status: 'done', deadline: '2026-01-01' } },
+    ], edges: [{ id: 'e1', source: 'root', target: 'r1' }, { id: 'e2', source: 'r1', target: 'r1a' }, { id: 'e3', source: 'root', target: 'r2' }, { id: 'e4', source: 'r2', target: 'r2a' }, { id: 'e5', source: 'root', target: 'r3' }] } })).json;
+  expect(!!rizMap.id, 'mapa s riziky založena');
+  predH = volani.length;
+  fronta.push(nastroj('map_risks', { map_id: 'Rekonstrukce dílny' }), text('RIZIKA-OK.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Kde mám v Rekonstrukci dílny úzké hrdlo?' } });
+  expect(r.status === 200 && (volani[predH].tools || []).some((t) => t.function.name === 'map_risks'), 'klíčové slovo „hrdlo“ nabídne map_risks hned v prvním volání');
+  const rz = [poslNastroj('map_risks')].filter(Boolean);
+  expect(rz.length === 1 && /Blocking others \(1\):\n  • Elektroinstalace \(@admin@example\.com\), deadline 2026-01-10 — blocks 1 open sub-step/.test(rz[0].content), `propadlá Elektroinstalace s otevřeným podkrokem = blokuje (${(rz[0] || {}).content && rz[0].content.split('\n').slice(0, 3).join(' | ')})`);
+  expect(rz.length === 1 && /Waiting for sub-steps \(1\):\n  • Podlaha/.test(rz[0].content) && !/Nábytek/.test(rz[0].content) && !/Dílna hotová/.test(rz[0].content), 'Podlaha čeká na podkroky; hotový Nábytek ani vrchol v rizicích nejsou');
+  const kRiz = r.json.chat.messages.flatMap((m) => m.karty || []).find((k) => k.type === 'rizika');
+  expect(!!kRiz && kRiz.map_id === rizMap.id && kRiz.pocty.po_terminu === 1 && kRiz.pocty.blokuje === 1 && kRiz.pocty.ceka === 1 && kRiz.items.some((it) => it.node_id === 'r1' && it.druhy.includes('po_terminu') && it.blokuje === 1), `karta rizika nese počty a uzly pro zvýraznění (${JSON.stringify(kRiz && kRiz.pocty)})`);
+  fronta.push(nastroj('map_risks', { map_id: 'Soukromá Jany' }), text('CIZI.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'A kde stojí Soukromá Jany?' } });
+  const rz2 = [poslNastroj('map_risks')].filter(Boolean);
+  expect(rz2.length === 1 && /^Error: map .* not found or not accessible/.test(rz2[0].content), 'cizí soukromá mapa → chyba, žádná rizika ven');
+
+  console.log('== vážené hledání (5. 10. 2026): tvary slov, částečná shoda, Dokumenty — jen vlastní ==');
+  // tvar slova: „fakturami“ musí najít krok „Faktura za pletivo“ (kmen oběma směry), bez nutnosti psát kmen
+  fronta.push(nastroj('search_projects', { query: 'fakturami' }), text('F1.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Najdi, kde jsme řešili fakturami' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /Faktura za pletivo/.test(hl[0].content) && new RegExp(`• #${N} Zahradní plot`).test(hl[0].content), `tvar slova „fakturami“ najde „Faktura za pletivo“ (${(hl[0] || {}).content && hl[0].content.split('\n')[2]})`);
+  // víceslovný dotaz nemusí sedět celý: 3 slova, 2 sedí v plotu (faktura + dodavatel v popisu), nic v Truhlářství → jen plot
+  fronta.push(nastroj('search_projects', { query: 'faktura dodavatel kvartál' }), text('F2.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Najdi fakturu dodavateli za minulý kvartál' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /1 project, 1 matching step/.test(hl[0].content) && /Faktura za pletivo/.test(hl[0].content) && !/Truhlářství/.test(hl[0].content), 'tři slova, dvě sedí (faktura + dodavatel v popisu) → plot ano, Truhlářství ne');
+  // dokument: koncept z draft_text se najde podle slova z textu; člen B ho NEvidí (jen vlastní dokumenty)
+  fronta.push(nastroj('draft_text', { kind: 'email', title: 'Nabídka Dvořákovým', text: 'Dobrý den, posílám nabídku na kuchyň: masiv dub, dodání 6 týdnů.' }), text('Koncept je v Dokumentech.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Napiš nabídku pro Dvořákovy' } });
+  expect(r.status === 200, 'koncept uložen do Dokumentů');
+  fronta.push(nastroj('search_projects', { query: 'nabídka dub' }), text('F3.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Najdi tu nabídku s dubem' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /, 1 document\./.test(hl[0].content) && /Documents \(the user's own/.test(hl[0].content) && /"Nabídka Dvořákovým" — email/.test(hl[0].content) && /↳ .*masiv dub/.test(hl[0].content), `dokument nalezen podle slov z názvu i textu (${(hl[0] || {}).content && hl[0].content.split('\n').slice(-3).join(' | ')})`);
+  fronta.push(nastroj('search_projects', { query: 'nabídka dub' }), text('F4.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: B, body: { message: 'Najdi nabídku s dubem' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /No matches for "nabídka dub"/.test(hl[0].content), 'člen B cizí dokument nenajde (jen vlastní Dokumenty)');
+  await inst.api('POST', '/api/kb/chat/smazat', { token: B, body: { chat_id: r.json.chat.id } }); // B má dál 0 rozhovorů (kontrola seznamu níž)
+  // „věta“ místo kmenů: slova bez vazby (stop-slova) se nepočítají, dotaz z prvních slov uživatele projde
+  fronta.push(nastroj('search_projects', { query: 'kde je ta poptávka na dílce' }), text('F5.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Kde je ta poptávka na dílce?' } });
+  hl = [poslNastroj('search_projects')].filter(Boolean);
+  expect(hl.length === 1 && /Poptávka plotových dílců/.test(hl[0].content), 'věta s předložkami najde „Poptávka plotových dílců“ (stop-slova se nepočítají)');
 
   console.log('== get_map podle čísla a podle názvu ARCHIVOVANÉ mapy ==');
   fronta.push(nastroj('get_map', { map_id: `#${N}` }), text('F.'));
@@ -644,6 +735,11 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'A ještě?' } });
   const poslT3 = r.json.chat.messages[r.json.chat.messages.length - 1];
   expect(poslT3.content === 'Shrnutí dne.' && (poslT3.karty || []).some((k) => k.type === 'navrhy' && k.items[0] === 'Velké S'), `„Suggest_next“ s velkým S: text bez řádku, čip z textu (${JSON.stringify(poslT3.content)})`);
+  // holé argumenty bez jména nástroje + únik uvažování na začátku (gpt-oss, klik-test 6. 10. 2026)
+  fronta.push(text('Need to respond.Rizika v projektu.\n\n{"suggestions":["Z JSONu","Druhý"]}'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'A rizika?' } });
+  const poslT4 = r.json.chat.messages[r.json.chat.messages.length - 1];
+  expect(poslT4.content === 'Rizika v projektu.' && (poslT4.karty || []).some((k) => k.type === 'navrhy' && k.items.join('|') === 'Z JSONu|Druhý'), `řádek {"suggestions":[...]} pryč z textu → čipy; „Need to respond.“ na začátku pryč (${JSON.stringify(poslT4.content)})`);
   chat = r.json.chat;
 
   console.log('== režimy: ranní porada a rozbor projektu, koncept ke zkopírování ==');

@@ -7,6 +7,15 @@
   "placeholder": "Napište, s čím pomoct…",
   "send": "Odeslat",
   "thinking": "Přemýšlím…",
+  "prubeh": {
+    "ctu": "Čtu: {{co}}…",
+    "provadim": "Provádím: {{co}}…",
+    "navrh": "Připravuji návrh k potvrzení…",
+    "precteno1": "Přečteno: {{co}}",
+    "precteno": "Přečteno: {{co}} (+{{count}})",
+    "neznamy": "podklady",
+    "zapis": "zápis"
+  },
   "newChat": "Nový rozhovor",
   "newChatShort": "Nový",
   "history": "Předchozí rozhovory",
@@ -104,6 +113,7 @@
     }
   },
   "toolsLooked": "Nahlédl do: {{names}}",
+  "helpLinks": "Víc v návodu:",
   "toolNames": {
     "list_maps": "seznam projektů",
     "get_map": "mapa projektu",
@@ -123,6 +133,7 @@
     "get_person_work": "práce kolegy",
     "get_team_work": "přehled týmu",
     "search_projects": "hledání v projektech a archivu",
+    "help": "nápověda z návodů",
     "get_settings": "nastavení",
     "get_org_structure": "organizační struktura",
     "get_map_sharing": "sdílení projektu",
@@ -351,5 +362,15 @@
     "mailtoLongNoCopy": "Text je na odkaz do pošty moc dlouhý a zkopírovat se nepodařilo — zkopírujte ho tlačítkem Kopírovat nebo ručně.",
     "copyFailed": "Zkopírovat se nepodařilo — označte text a zkopírujte ho ručně.",
     "saveOverwrites": "Uložením ji přepíšete (půjde vrátit)."
+  },
+  "rizika": {
+    "titulek": "Rizika v projektu „{{title}}“",
+    "nic": "nic po termínu, nic nečeká, nic nestojí",
+    "po_terminu": "{{n}} po termínu",
+    "blokuje": "{{n}} blokuje ostatní",
+    "nehybe": "{{n}} se nehýbe",
+    "ceka": "{{n}} čeká na podkroky",
+    "zvyraznit": "Zvýraznit v mapě",
+    "zrusit": "Zrušit zvýraznění"
   }
 }

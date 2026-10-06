@@ -49,6 +49,21 @@ const CHYBA_TEXTU = { textDlouhy: 'textTooLong', textPrazdny: 'textEmpty', textC
 // jako na telefonu (rozhodnutí Richarda: lite je produkt pro telefon i v širokém okně) a nemá
 // minimalizovanou lištu ani ouško — ty by kolidovaly se spodní navigací a tlačítkem + v lite;
 // tlačítko k otevření je v hlavičce lite (LiteApp).
+// Text průběhu tahu (5. 10. 2026): ze záznamu ai_chat_prubeh skládá APLIKACE — jméno nástroje přes toolNames,
+// název mapy ze serveru. „Přečetl jsem mapu projektu „Dílna“ · Přemýšlím…“. Bez průběhu vrací '' (panel ukáže obecný text).
+function textPrubehu(p, t) {
+  if (!p || typeof p !== 'object') return '';
+  const jmeno = (k) => { const n = k && k.nastroj ? t(`toolNames.${k.nastroj}`, { defaultValue: '' }) : ''; const z = n || t(k && k.kind === 'write' ? 'prubeh.zapis' : 'prubeh.neznamy'); return k && k.nazev ? `${z} „${k.nazev}“` : z; };
+  const hotovo = Array.isArray(p.hotovo) ? p.hotovo.filter((k) => k && k.kind !== 'write') : [];
+  const posledni = hotovo.length ? hotovo[hotovo.length - 1] : null;
+  const casti = [];
+  if (posledni) casti.push(t(hotovo.length > 1 ? 'prubeh.precteno' : 'prubeh.precteno1', { co: jmeno(posledni), count: hotovo.length - 1 }));
+  if (p.faze === 'nastroj') casti.push(t(p.kind === 'read' ? 'prubeh.ctu' : 'prubeh.provadim', { co: jmeno(p) }));
+  else if (p.faze === 'navrh') casti.push(t('prubeh.navrh'));
+  else casti.push(t('thinking'));
+  return casti.join(' · ');
+}
+
 export default function AsistentPanel({ lite = false }) {
   const ready = useLazyNs('asistent');
   const { t } = useTranslation('asistent');
@@ -385,7 +400,7 @@ export default function AsistentPanel({ lite = false }) {
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-card shadow-lg" data-testid="chat-bar">
         <button type="button" onClick={() => A.setOpen(true)} className="w-full px-3 pt-1.5 text-left text-xs text-muted-foreground inline-flex items-center gap-1.5" data-testid="chat-bar-otevrit">
           {A.loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" /> : <Bot className="w-3.5 h-3.5 text-primary shrink-0" />}
-          <span className="truncate" data-testid="chat-bar-text">{A.loading ? t('thinking') : nabidnoutPoradu ? t('poradaOffer') : (posledniA ? posledniA.content.replace(/\s+/g, ' ').slice(0, 120) : t('emptyTitle'))}</span>
+          <span className="truncate" data-testid="chat-bar-text">{A.loading ? (textPrubehu(A.prubeh, t) || t('thinking')) : nabidnoutPoradu ? t('poradaOffer') : (posledniA ? posledniA.content.replace(/\s+/g, ' ').slice(0, 120) : t('emptyTitle'))}</span>
           {(nabidnoutPoradu || cekaKarta) && <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" data-testid={cekaKarta ? 'chat-bar-karta' : 'chat-tab-porada'} />}
         </button>
         <form className="p-2 pt-1 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); odesli(); }}>
@@ -534,7 +549,9 @@ export default function AsistentPanel({ lite = false }) {
             {A.loading && (
               <div className="flex justify-start" data-testid="chat-thinking">
                 <div className="rounded-2xl rounded-bl-md bg-secondary px-3 py-2 text-xs text-muted-foreground inline-flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].obrazek ? t('imageReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].hlas ? t('voiceReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].pdf ? t('pdf.thinking') : t('thinking')}
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  {/* průběh tahu ze serveru (co asistent právě čte / připravuje) má přednost před obecným „Přemýšlím…“ */}
+                  <span data-testid="chat-prubeh" data-faze={(A.prubeh && A.prubeh.faze) || ''}>{textPrubehu(A.prubeh, t) || (zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].obrazek ? t('imageReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].hlas ? t('voiceReading') : zpravy.length && zpravy[zpravy.length - 1].docasna && zpravy[zpravy.length - 1].pdf ? t('pdf.thinking') : t('thinking'))}</span>
                 </div>
               </div>
             )}

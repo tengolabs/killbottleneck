@@ -55,7 +55,7 @@ const RULE_CONDITION = {
 const RULE_ACTION = {
   type: "object",
   properties: {
-    type: { type: "string", enum: ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent"], description: "What to do. run_agent and move_node target the trigger node; set_status/set_owner/set_deadline target the trigger node by default but accept `target` (a schedule rule needs node_id unless `target` is an explicit node id)." },
+    type: { type: "string", enum: ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant"], description: "What to do. offer_assistant = send the recipient a notification whose link opens the AI assistant in the given package (mode) for the trigger node/map — nothing runs until they click. run_agent and move_node target the trigger node; set_status/set_owner/set_deadline target the trigger node by default but accept `target` (a schedule rule needs node_id unless `target` is an explicit node id)." },
     status: { type: "string", enum: ["todo", "in_progress", "done"], description: "set_status only" },
     target: { type: "string", description: "set_status/set_owner/set_deadline only: which node the action modifies — \"trigger_node\" (default), \"parent\" (one level up), or a node id. A missing parent / vanished node is logged as a skipped action" },
     owner: { type: "string", description: "set_owner only: e-mail of an instance member (empty string clears), or a dynamic target resolved when the rule runs: \"deputy_of_node_owner\", \"position:<nodeId>\" (holder of an org-structure position), \"deputy_of_position:<nodeId>\". An unresolvable target is logged as a skipped action" },
@@ -67,6 +67,7 @@ const RULE_ACTION = {
     to: { type: "string", description: "notify: \"node_owner\", \"deputy_of_node_owner\", \"position:<nodeId>\", \"deputy_of_position:<nodeId>\" (resolved at run time), \"map_owner\" or an e-mail. move_node (kanban): id of the new parent node the trigger node moves under — appended at the end of the new siblings row; moving the apex, a vanished target or a move creating a cycle is logged as a skipped action" },
     message: { type: "string", description: "notify only: message text (max 500 chars)" },
     agent_name: { type: "string", description: "run_agent only: name of an agent from the AI agent registry; the run is queued and dispatched within a minute" },
+    mode: { type: "string", enum: ["porada", "nocni", "rozbor", "trideni", "po_schuzce", "revize", "priprava"], description: "offer_assistant only: assistant package to open — rozbor (review the project/step), po_schuzce (write up after a meeting), priprava (meeting prep), revize (weekly review), trideni (sort notes), porada (morning briefing), nocni (evening planning); `to` as in notify (default node_owner)" },
   },
   required: ["type"],
   additionalProperties: false,
