@@ -11,6 +11,18 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.77-beta": {
+    cs: [
+      "V mapě je vlevo nová ikona ☑ „Úkoly tohoto projektu“: otevře seznam úkolů jen tohoto projektu — na telefonu se už nemusí hledat v nabídce ⋮.",
+      "Nad seznamem úkolů svítí pruh „Úkoly projektu: název“ s tlačítkem Zpět do mapy; šipka vlevo v hlavičce vede také zpátky do mapy, křížek vrátí seznam na všechny projekty.",
+      "Zúžení na projekt se drží v adrese, takže po obnovení stránky nebo ze sdíleného odkazu zůstane seznam na stejném projektu.",
+    ],
+    en: [
+      "The map has a new ☑ \"Tasks of this project\" icon on the left: it opens the task list for this project only — no more digging through the ⋮ menu on the phone.",
+      "Above the task list a \"Project tasks: name\" strip shows a Back to map button; the arrow at the top left also returns to the map, and the × widens the list to all projects again.",
+      "The project filter is kept in the address, so a page reload or a shared link stays on the same project.",
+    ],
+  },
   "v0.76-beta": {
     cs: [
       "Při čekání na odpověď asistent říká, co právě dělá: „Přečteno: mapa projektu „Dílna“ · Přemýšlím…“, „Čtu: Můj den…“ nebo „Připravuji návrh k potvrzení…“ — místo pouhého kolečka.",

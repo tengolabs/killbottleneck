@@ -1594,6 +1594,7 @@ function EditorContent({ mapId, personalMap = false }) {
           setRulesDefaults={setRulesDefaults}
           setRulesOpen={setRulesOpen}
           setDashboardOpen={setDashboardOpen}
+          mapTaskCount={mapTaskCount}
         />
         {canEdit && nodes.length === 0 && !dashboardOpen && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { Search, X, Filter, Zap, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, X, Filter, Zap, BarChart3, CheckSquare } from 'lucide-react';
 import BufferPanel from '@/components/goal-map/BufferPanel';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ReportRailButton from '@/components/shared/ReportRailButton';
 
 // Levá lišta plátna shora: lupa (top-4), zásobník (top-16), časovač (top-28),
-// filtr Moje úkoly (top-40), pravidla (top-52), dashboard (top-64), nahlásit
-// chybu (19rem). Čistě prezentační: JSX přesunuto 1:1 z GoalMapEditor (F1-07).
+// filtr Moje úkoly (top-40), pravidla (top-52), dashboard (top-64), úkoly
+// projektu (19rem), nahlásit chybu (22rem). Čistě prezentační: JSX přesunuto 1:1 z GoalMapEditor (F1-07).
 // 15. 9. 2026 (Richard): lupa nahoru NAD zásobník; Pravidla z horní lišty sem,
 // mezi filtr a dashboard — horní lišta se uvolnila (logo bylo vytlačené).
 export default function LeftRail({
@@ -14,8 +15,10 @@ export default function LeftRail({
   timeLogOpen, user, isPublicView, isTemplatePreview, activeMapId, mapId, nodes, toggleTimeLog,
   railLeft, searchOpen, setSearchOpen, searchQuery, setSearchQuery,
   myTasksOnly, setMyTasksOnly, mapRules, setRulesDefaults, setRulesOpen, setDashboardOpen,
+  mapTaskCount = 0,
 }) {
   const { t } = useTranslation('editor');
+  const navigate = useNavigate();
   return (
     <>
         {bufferEnabled && !dashboardOpen && (
@@ -125,9 +128,32 @@ export default function LeftRail({
         >
           <BarChart3 className="w-4 h-4" />
         </button>
-        {/* Nahlásit chybu rovnou z mapy — pod dashboardem (Richard 18. 8. 2026).
-            Stránku si aplikace vezme sama, takže hlášení odsud nese mapu. */}
-        {user && <ReportRailButton top="top-[19rem]" leftOffset={railLeft} />}
+        {/* Úkoly projektu — seznam úkolů JEN téhle mapy (/tasks?map=<id>), odkud
+            vede cesta zpět. Dosud jen v ⋮ menu horní lišty (pod 1850 px), kde ho
+            na telefonu nikdo nenašel; hledalo se pod panáčkem a ze seznamu se
+            nešlo vrátit (Richard 10. 10. 2026). Pod Dashboardem: oba jsou pohled
+            na CELÝ projekt. Stejná podmínka jako položka v ⋮ menu. */}
+        {user && activeMapId && !isPublicView && !dashboardOpen && (
+          <button
+            onClick={() => navigate(`/tasks?map=${activeMapId}`)}
+            style={{ left: railLeft }}
+            title={`${t('toolbar.railTasksTitle')}${mapTaskCount > 0 ? ` (${mapTaskCount})` : ''}`}
+            aria-label={t('toolbar.railTasksTitle')}
+            data-testid="rail-ukoly-projektu"
+            className={`absolute top-[19rem] z-30 flex items-center rounded-r-lg border ${railLeft ? '' : 'border-l-0'} bg-card px-2 py-2.5 shadow-md text-muted-foreground hover:bg-secondary transition-all`}
+          >
+            <CheckSquare className="w-4 h-4" />
+            {mapTaskCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-[1.1rem] text-center font-semibold">
+                {mapTaskCount}
+              </span>
+            )}
+          </button>
+        )}
+        {/* Nahlásit chybu rovnou z mapy — pod dashboardem (Richard 18. 8. 2026),
+            od 10. 10. 2026 pod Úkoly projektu. Stránku si aplikace vezme sama,
+            takže hlášení odsud nese mapu. */}
+        {user && <ReportRailButton top="top-[22rem]" leftOffset={railLeft} />}
     </>
   );
 }

@@ -45,7 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Loader2, CheckSquare, Search, X, LayoutList, Columns3, CalendarDays, CalendarRange, Download, CircleUser, Send } from 'lucide-react';
+import { Plus, Loader2, CheckSquare, Search, X, LayoutList, Columns3, CalendarDays, CalendarRange, Download, CircleUser, Send, ArrowLeft, Map as MapIcon } from 'lucide-react';
 import { exportTasksCsv, exportMarkdownReport } from '@/lib/taskExport';
 import { useToast } from '@/components/ui/use-toast';
 import { STATUSES } from '@/lib/statusMeta';
@@ -170,6 +170,11 @@ export default function Tasks() {
   });
 
   const openNodeInMap = (item) => navigate(`/map/${item.map_id}?node=${item.node_id}`);
+  // Projekt, na který je seznam zúžený (?map=<id> z mapy nebo volba v nabídce).
+  // Hledá se ve VŠECH mapách, ne jen v aktivních — z archivované mapy sem vede
+  // stejná ikona a cesta zpět musí platit i tam.
+  const projektFiltru = mapFilter !== ALL && mapFilter !== NONE ? maps.find((m) => m.id === mapFilter) : null;
+  const zpetDoMapy = () => navigate(`/map/${projektFiltru.id}`);
 
   // události + připomínky k uzlům — jen když je kalendář otevřený
   const { items: udalostiItems, udalosti, pripominkyPodleUzlu, nacteno: udalostiNacteny } = useUdalosti({ aktivni: view === 'calendar', userEmail: user?.email });
@@ -386,6 +391,7 @@ export default function Tasks() {
       <SkinPattern />
       <AppHeader
         active="tasks"
+        backTo={projektFiltru ? `/map/${projektFiltru.id}` : undefined}
         org={org}
         onInvited={reloadMembers}
         actions={
@@ -432,6 +438,35 @@ export default function Tasks() {
             setStatusFilter(kind === 'done' ? 'done' : ALL);
           }}
         />
+
+        {/* Pruh „Úkoly projektu": sem vede ikona Úkoly z levé lišty mapy
+            (/tasks?map=<id>). Na telefonu se člověk ze seznamu neuměl vrátit do
+            mapy — šipka hlavičky vedla na titulku a seznam pak ukazoval všechny
+            projekty (Richard 10. 10. 2026: „neměl bych se ztratit z toho
+            projektu"). Zpět do mapy je proto tady (hlavní tlačítko) i jako
+            šipka v hlavičce (backTo); × vrátí seznam na všechny projekty. */}
+        {projektFiltru && (
+          <div data-testid="tasks-projekt-pruh" className="flex flex-wrap items-center gap-2 px-3 py-2 mb-4 rounded-md border border-primary/30 bg-primary/5">
+            <MapIcon className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-sm min-w-0 truncate">
+              <span className="text-muted-foreground">{t('tasksPage.projektPruh')} </span>
+              <span className="font-semibold" data-testid="tasks-projekt-nazev">{projektFiltru.title || t('common:misc.untitled')}</span>
+            </span>
+            <Button size="sm" className="h-8 ml-auto" data-testid="tasks-zpet-do-mapy" onClick={zpetDoMapy}>
+              <ArrowLeft className="w-4 h-4" /> {t('tasksPage.zpetDoMapy')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8"
+              title={t('tasksPage.vsechnyProjektyTitle')}
+              data-testid="tasks-vsechny-projekty"
+              onClick={() => { setMapFilter(ALL); clearNodeFilter(); }}
+            >
+              <X className="w-4 h-4" /> <span className="hidden sm:inline">{t('tasksPage.vsechnyProjekty')}</span>
+            </Button>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2 mb-5">
           <Tabs value={view} onValueChange={changeView} className="max-w-full">

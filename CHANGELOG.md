@@ -9,6 +9,22 @@ below before you jump several versions.
 
 ---
 
+## v0.77-beta — 2026-10-12
+
+**From the map to the tasks of this project only — and back (the phone got lost in the task list)**
+
+- **New ☑ "Tasks of this project" icon in the map's left rail** (below the progress dashboard): opens the task list
+  narrowed to this project (`/tasks?map=<id>`). The same entry stays in the toolbar's ⋮ menu; on the phone nobody
+  found it there, and from the task list there was no way back — the header arrow led to the home page and the list
+  then showed every project. The "Report a bug" rail button moved one slot down.
+- **Project strip on the Tasks page**: "Project tasks: *name*" with a **Back to map** button and a × that widens the
+  list to all projects again; the header's back arrow also returns to that map.
+- The project filter is written to the address (`?map=`) when chosen in the dropdown too, so a reload or a shared link
+  stays on the same project.
+- New click-test `ui-ukoly-projektu` (phone + desktop). No migration, nothing to configure.
+
+---
+
 ## v0.76-beta — 2026-10-06
 
 **The assistant shows what it is doing while you wait; smarter search across projects and documents; risks highlighted in the map; rule action "offer the assistant"**

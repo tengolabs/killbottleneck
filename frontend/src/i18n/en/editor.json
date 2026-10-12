@@ -39,6 +39,7 @@
     "dashboardTitle": "Progress dashboard",
     "tasks": "Tasks",
     "tasksTitle": "Tasks for this map",
+    "railTasksTitle": "Tasks of this project",
     "undoShort": "Undo",
     "undoTitle": "Undo",
     "align": "Arrange",

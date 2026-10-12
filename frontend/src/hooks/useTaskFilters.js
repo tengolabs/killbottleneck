@@ -28,7 +28,17 @@ export const NONE = '__none__'; // „Bez mapy" / „Nepřiřazené" (Radix Sele
 // (otevírají dialogy, jejich stav filtrům nepatří); relativní pořadí efektů
 // nad searchParams drží pořadí volání hooků na stránce.
 export function useTaskFilters({ user, searchParams, setSearchParams, maps, t }) {
-  const [mapFilter, setMapFilter] = useState(searchParams.get('map') || ALL);
+  const [mapFilter, setMapFilterStav] = useState(searchParams.get('map') || ALL);
+  // Filtr mapy se drží i v ADRESE (?map=<id>): ikona Úkoly v levé liště mapy sem
+  // vede s ním, stránka pak nabízí „Zpět do mapy" a po reloadu/sdílení odkazu
+  // zůstane seznam na témže projektu. Volba v nabídce adresu dorovná — jinak by
+  // po přepnutí na jiný projekt a reloadu zase vyhrál ten z odkazu
+  // (Richard 10. 10. 2026: „neměl bych se ztratit z toho projektu").
+  const setMapFilter = (v) => {
+    setMapFilterStav(v);
+    if (v && v !== ALL && v !== NONE) searchParams.set('map', v); else searchParams.delete('map');
+    setSearchParams(searchParams, { replace: true });
+  };
   const [nodeFilter, setNodeFilter] = useState(searchParams.get('node') || '');
   const [assigneeFilter, setAssigneeFilter] = useState(ALL);
   // ownerFilter: ALL | 'delegated' (úkoly, které jsem zadal někomu jinému)
