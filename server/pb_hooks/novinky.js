@@ -11,6 +11,20 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.79-beta": {
+    cs: [
+      "Připojte si AI agenta jedním řádkem: po přihlášení (a kdykoli v menu pod jménem → Připojit AI agenta) zkopírujete větu do Claude Code, Codexu nebo Cursoru, agent si killBottleneck nastaví sám a vy se jen přihlásíte v prohlížeči — žádné heslo ani klíč se do agenta nevkládá.",
+      "Pak s agentem stavíte mapy rozhovorem: „udělej mapu z tohohle zápisu z porady“, „co mám po termínu?“.",
+      "Každá instance má svůj návod pro agenty na adrese /agent-setup.md — funguje pro cloud i pro instanci u vás.",
+      "Přihlášení agenta (OAuth) opraveno pro instance u vás a pro editory Cursor a VS Code.",
+    ],
+    en: [
+      "Connect your AI agent with one line: after signing in (and any time under your name → Connect AI agent) copy a sentence into Claude Code, Codex or Cursor, the agent sets killBottleneck up by itself and you only sign in in the browser — no password or key ever goes into the agent.",
+      "Then you build maps by talking to the agent: \"make a map out of these meeting notes\", \"what is overdue?\".",
+      "Every instance serves its own guide for agents at /agent-setup.md — works for the cloud and for an instance of your own.",
+      "Agent sign-in (OAuth) fixed for self-hosted instances and for the Cursor and VS Code editors.",
+    ],
+  },
   "v0.78-beta": {
     cs: [
       "Asistent umí od třetí zprávy rozhovoru předat slovo druhému, místnímu modelu (zapíná správce instance) — první odpověď zůstává rychlá z cloudu.",

@@ -93,6 +93,7 @@ const toDto = (name, r) => {
         align_lock: r.align_lock || '',
         skin_custom: r.skin_custom || null,
         focus: r.focus || null,
+        agent_setup_seen: !!r.agent_setup_seen,
       };
     case 'LoginLog':
       return { ...base, user_id: r.user, email: r.email };
@@ -526,8 +527,11 @@ export const base44 = {
 
   // OAuth consent pro MCP konektory (claude.ai apod.) — viz OAuthAuthorize.jsx
   oauth: {
-    async clientInfo(clientId) {
-      return await pb.send(`/oauth/client-info?client_id=${encodeURIComponent(clientId)}`, { method: 'GET' });
+    // redirectUri navíc: server vrátí `redirect_ok` (vč. loopback výjimky na port
+    // podle RFC 8252 — Claude Code mění port), ať consent nemá vlastní kopii logiky
+    async clientInfo(clientId, redirectUri) {
+      const q = `client_id=${encodeURIComponent(clientId)}` + (redirectUri ? `&redirect_uri=${encodeURIComponent(redirectUri)}` : '');
+      return await pb.send(`/oauth/client-info?${q}`, { method: 'GET' });
     },
     async approve(params) {
       try {

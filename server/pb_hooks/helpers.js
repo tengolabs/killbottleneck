@@ -3625,6 +3625,49 @@ function publicBaseUrl(app) {
   }
 }
 
+// Veřejná adresa instance PRO ODPOVĚĎ NA POŽADAVEK (OAuth metadata, WWW-Authenticate,
+// návod pro agenta /agent-setup.md). Rozdíl proti publicBaseUrl: „Application URL"
+// PocketBase má každá čerstvá instalace nastavenou na http://localhost:8090 — pro
+// webhook je to jen varování, ale v OAuth metadatech by to znamenalo, že Claude Code
+// na jiném stroji dostane resource „localhost" (neshoda → odmítne) a consent se otevře
+// na adrese, která na jeho stroji neexistuje (nález 10. 10. 2026). Localhost se proto
+// bere jako „nenastaveno" a padá se na Host + X-Forwarded-Proto požadavku — tedy na
+// adresu, kterou klient opravdu použil (self-host na LAN bez KB_PUBLIC_URL).
+function publicBaseUrlFromRequest(app, e) {
+  const zCfg = publicBaseUrl(app);
+  if (zCfg && !/^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:|\/|$)/i.test(zCfg)) return zCfg;
+  let host = "", proto = "";
+  try {
+    // ⚠️ Go přesouvá hlavičku Host z mapy hlaviček do request.host — header.get("Host")
+    // je VŽDY prázdné (přesně proto starý zaklad() v oauth-lib padal na „localhost")
+    host = e.request.header.get("X-Forwarded-Host") || e.request.host || "";
+    proto = e.request.header.get("X-Forwarded-Proto") || "";
+  } catch (err) { /* bez požadavku (cron) */ }
+  // Hlavičky jsou vstup od klienta: jen hostname[:port] / [ipv6][:port] a http(s) —
+  // cokoli jiného (mezery, uvozovky, cizí schéma) se do metadat/návodu nedostane.
+  host = String(host).split(",")[0].trim();
+  proto = String(proto).split(",")[0].trim().toLowerCase();
+  if (!/^([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/i.test(host)) host = "";
+  if (proto !== "http" && proto !== "https") proto = "";
+  if (!host) return zCfg || "http://localhost:8090";
+  if (!proto) { try { proto = e.request.tls ? "https" : "http"; } catch (err) { proto = "http"; } }
+  return `${proto}://${host}`;
+}
+
+// Textový soubor vedle hooků (šablony, ceník). $os.readFile vrací podle prostředí
+// string nebo pole bajtů — bajty je nutné dekódovat jako UTF-8, jinak se ✓/⚠/✗ a
+// diakritika rozsypou (vytaženo z kredity.js, sdílí agent-setup-lib.js).
+function readHooksText(name) {
+  // jen prosté jméno vedle hooků — žádné cesty (budoucí volající s cizím vstupem)
+  if (!/^[A-Za-z0-9._-]+$/.test(String(name))) throw new Error("readHooksText: invalid name");
+  const raw = $os.readFile(`${__hooks}/${name}`);
+  if (typeof raw === "string") return raw;
+  if (!raw || !raw.length) return "";
+  let a = "";
+  for (let i = 0; i < raw.length; i++) a += String.fromCharCode(raw[i]);
+  try { return decodeURIComponent(escape(a)); } catch (err) { return a; }
+}
+
 // Webhook agenta volá SERVER, takže adresa je klasický SSRF vektor: nastavit ji smí
 // správce AI agentů, což je záměrně NE-admin role. Blokujeme loopback, privátní
 // a link-local rozsahy (vč. cloud metadat 169.254.169.254) — jinak by šlo přes
@@ -7516,7 +7559,7 @@ module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

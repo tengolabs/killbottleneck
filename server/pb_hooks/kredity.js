@@ -16,10 +16,8 @@
 const CENY_VYCHOZI = { eur_kc: 24.3, aki: { in: 0.25, cache: 0.10, out: 1.00 }, lokalni: ["gpt-oss", "gptoss", "rig", "qwen", "gemma4:", "ollama", "llama", "m-local"], referencni_tah: { in: 17618, cached: 11452, out: 284 }, prepis: { usd_min: 0.006, usd_kc: 20.8 } };
 function nactiCeny() {
   try {
-    const raw = $os.readFile(`${__hooks}/kredity-ceny.json`);
-    let txt = typeof raw === "string" ? raw : "";
-    if (!txt && raw && raw.length) { let a = ""; for (let i = 0; i < raw.length; i++) a += String.fromCharCode(raw[i]); txt = decodeURIComponent(escape(a)); }
-    const c = JSON.parse(txt);
+    const { readHooksText } = require(`${__hooks}/helpers.js`);
+    const c = JSON.parse(readHooksText("kredity-ceny.json"));
     if (c && c.aki && c.referencni_tah && c.eur_kc) return c;
   } catch (err) { /* záloha níže */ }
   return CENY_VYCHOZI;

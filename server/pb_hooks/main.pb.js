@@ -2482,6 +2482,11 @@ kbRoute("GET", "/config", (e) => {
     // smí se prvního admina ptát na účel? KB_PURPOSE_ASK=0 vypne (testy, obnova
     // ze zálohy); bez úvodní mapy (KB_UVODNI_MAPA=0) není co skládat → neptat se
     purpose_ask: (env("PURPOSE_ASK") || "").trim() !== "0" && (env("UVODNI_MAPA") || "").trim() !== "0",
+    // smí se po prvním přihlášení nabídnout „Připoj svého AI agenta"? KB_AGENT_SETUP_ASK=0
+    // vypne (provozovatel, který MCP nechce nabízet); KB_PURPOSE_ASK=0 vypíná OBOJÍ —
+    // testovací sady ho posílají všechny (harness i staré docker run), takže nový dialog
+    // žádné kliky neblokuje bez úprav sad.
+    agent_setup_ask: (env("AGENT_SETUP_ASK") || "").trim() !== "0" && (env("PURPOSE_ASK") || "").trim() !== "0",
     over_user_limit: (() => { const { userLimitExceeded } = require(`${__hooks}/helpers.js`);
       return userLimitExceeded($app); })(),
     // strop tarifu, na který zkušebka překlápí — ať jde varovat před nákupem

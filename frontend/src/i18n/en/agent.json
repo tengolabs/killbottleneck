@@ -1,0 +1,14 @@
+{
+  "title": "Connect your AI agent",
+  "description": "Paste one line into Claude Code, Cursor or Codex. The agent sets killBottleneck up by itself, and from then on you build maps by talking to it – “make a map out of these meeting notes”.",
+  "copyLabel": "Copy this into your agent",
+  "line": "Set up killBottleneck for me: fetch and follow this guide {{url}}/agent-setup.md",
+  "copy": "Copy",
+  "copied": "Copied. Now paste it to your agent.",
+  "copyManual": "Copying failed – select the text and copy it by hand.",
+  "afterCopy": "When the agent is done, you sign in in your browser and approve the access. No password or key ever goes into the agent.",
+  "docs": "How it works",
+  "skip": "Skip for now",
+  "later": "You can find this any time in the menu under your name.",
+  "done": "Done"
+}

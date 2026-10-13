@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { safeNext } from "@/lib/safeNext";
 import PasswordInput from "@/components/shared/PasswordInput";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,10 @@ export default function Register() {
     try {
       // lokální verze: registrace rovnou přihlásí (bez e-mailového ověření)
       await base44.auth.register({ email, password, setupCode });
-      window.location.href = "/";
+      // ?next= (Login sem posílá nezaložený box i s query): první uživatel, který přišel
+      // z OAuth consentu agenta, se musí vrátit na /oauth/authorize, ne na titulku —
+      // jinak callback agenta propadne. Stejná ochrana originu jako v Login.jsx.
+      window.location.href = safeNext(new URLSearchParams(window.location.search).get("next"));
     } catch (err) {
       setError(err.message || t("register.error"));
     } finally {

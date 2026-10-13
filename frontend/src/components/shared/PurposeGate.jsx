@@ -8,12 +8,19 @@ import { useAuth } from '@/lib/AuthContext';
 // (product/tests/lite-bundle.js: strop 500 kB).
 const PurposeDialog = lazy(() => import('./PurposeDialog'));
 
+// Jediná pravda o tom, kdy se ptáme na účel — sdílí ji AgentSetupGate (nikdy dva
+// dialogy přes sebe): první admin, instance bez účelu, dotaz nevypnutý.
+export function ucelCeka(user, config) {
+  return !!user && user.role === 'admin' && !!config
+    && config.purpose_ask !== false && !config.purpose && config.user_count === 1;
+}
+
 export default function PurposeGate() {
   const { user } = useAuth();
   const jeAdmin = !!user && user.role === 'admin';
   const { config } = useKbConfig(jeAdmin);
   // po uložení účelu PurposeDialog config invaliduje → brána se schová sama
-  const show = jeAdmin && !!config && config.purpose_ask !== false && !config.purpose && config.user_count === 1;
+  const show = ucelCeka(user, config);
   if (!show) return null;
   return (
     <Suspense fallback={null}>

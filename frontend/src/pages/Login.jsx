@@ -73,7 +73,7 @@ export default function Login() {
       footer={
         <>
           {t("login.noAccount")}{" "}
-          <Link to="/register" className="text-primary font-medium hover:underline">
+          <Link to={"/register" + window.location.search} className="text-primary font-medium hover:underline">
             {t("login.createAccount")}
           </Link>
           {isNativeShell() && (

@@ -35,14 +35,16 @@ export default function OAuthAuthorize() {
   useEffect(() => {
     if (!prihlasen || !clientId || !redirectUri) { setStav("invalid"); return; }
     let alive = true;
-    base44.oauth.clientInfo(clientId)
+    base44.oauth.clientInfo(clientId, redirectUri)
       .then((info) => {
         if (!alive) return;
         setClientName(info?.client_name || "");
-        // KLÍČOVÉ: redirect_uri z URL musí PŘESNĚ sedět na některou registrovanou
-        // adresu klienta. Bez toho by šlo prohlížeč navigovat kamkoli (open
-        // redirect / javascript:) přes ?redirect_uri= — a to i tlačítkem Odmítnout.
-        const ok = Array.isArray(info?.redirect_uris) && info.redirect_uris.includes(redirectUri);
+        // KLÍČOVÉ: redirect_uri z URL musí sedět na některou registrovanou adresu
+        // klienta. Bez toho by šlo prohlížeč navigovat kamkoli (open redirect /
+        // javascript:) přes ?redirect_uri= — a to i tlačítkem Odmítnout. Verdikt
+        // dává SERVER (`redirect_ok`: přesná shoda, u loopback adres bez portu —
+        // Claude Code si port volí náhodně, RFC 8252 §7.3); approve kontroluje totéž.
+        const ok = info?.redirect_ok === true;
         setStav(ok ? "ok" : "invalid");
       })
       .catch(() => { if (alive) setStav("invalid"); });
@@ -76,9 +78,14 @@ export default function OAuthAuthorize() {
     );
   }
 
-  // doména, kam se přístup předává — jediné, co může uživatel posoudit
+  // doména, kam se přístup předává — jediné, co může uživatel posoudit. U adres
+  // editorů (cursor://, vscode://) „host" nic neříká (vscode://vscode.git/clone?url=…
+  // by vypadal jako neškodný „vscode.git") → ukázat celou URI (audit 13. 10. 2026).
   let cilovaDomena = redirectUri;
-  try { cilovaDomena = new URL(redirectUri).host || redirectUri; } catch (err) { /* nezvalidní necháme celé */ }
+  try {
+    const u = new URL(redirectUri);
+    cilovaDomena = /^https?:$/.test(u.protocol) ? (u.host || redirectUri) : redirectUri;
+  } catch (err) { /* nezvalidní necháme celé */ }
 
   const approve = async () => {
     setBusy(true);

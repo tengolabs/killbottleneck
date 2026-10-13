@@ -76,6 +76,13 @@ const catcher = http.createServer((req, res) => {
     const CID = reg.json.client_id;
     const spatna = await api('POST', '/oauth/register', { body: { redirect_uris: ['http://evil.example.com/cb'] } });
     expect(spatna.status === 400, 'http redirect mimo localhost se odmítne');
+    // editory s MCP klientem (Cursor, VS Code, Windsurf) registrují VLASTNÍ schéma
+    // (RFC 8252 §7.1) — bez něj v nich OAuth nejde vůbec (nález 10. 10. 2026)
+    const cursor = await api('POST', '/oauth/register', { body: { redirect_uris: ['cursor://anysphere.cursor-retrieval/oauth/user-kb/callback'], client_name: 'Cursor' } });
+    expect(cursor.status === 201, 'cursor:// redirect (editor) se registruje');
+    const js = await api('POST', '/oauth/register', { body: { redirect_uris: ['javascript://x/alert(1)'] } });
+    const data = await api('POST', '/oauth/register', { body: { redirect_uris: ['data:text/html,hi'] } });
+    expect(js.status === 400 && data.status === 400, 'javascript:/data: schéma se odmítne (allowlist, ne hvězdička)');
     // consent MUSÍ vědět, kam kód poletí → client-info vrací redirect_uris
     const ci = await api('GET', `/oauth/client-info?client_id=${CID}`);
     expect(ci.status === 200 && Array.isArray(ci.json.redirect_uris) && ci.json.redirect_uris.includes(CB),
@@ -96,6 +103,19 @@ const catcher = http.createServer((req, res) => {
       client_id: CID, redirect_uri: 'http://127.0.0.1:9/jinam', code_challenge: S256(verifier), code_challenge_method: 'S256',
     } });
     expect(ciziRedirect.status === 400, 'neregistrovaná redirect_uri → 400 (žádný redirect s kódem)');
+    // RFC 8252 §7.3: Claude Code si při KAŽDÉM přihlášení otevře náhodný loopback port a
+    // znovu použije uložený client_id → port se u loopback adres netoleruje = re-auth padá
+    const jinyPort = await api('POST', '/api/kb/oauth/approve', { token: U, body: {
+      client_id: CID, redirect_uri: `http://127.0.0.1:${CB_PORT + 1000}/callback`, code_challenge: S256(verifier), code_challenge_method: 'S256', scope: 'read_write',
+    } });
+    expect(jinyPort.status === 200 && String(jinyPort.json.redirect).startsWith(`http://127.0.0.1:${CB_PORT + 1000}/callback?code=`), 'loopback redirect na JINÉM portu projde (Claude Code re-auth)');
+    const jinaCesta = await api('POST', '/api/kb/oauth/approve', { token: U, body: {
+      client_id: CID, redirect_uri: `http://127.0.0.1:${CB_PORT}/jinam`, code_challenge: S256(verifier), code_challenge_method: 'S256', scope: 'read_write',
+    } });
+    expect(jinaCesta.status === 400, 'loopback s jinou CESTOU se odmítne (tolerance je jen na port)');
+    const ciOk = await api('GET', `/oauth/client-info?client_id=${CID}&redirect_uri=${encodeURIComponent(`http://127.0.0.1:${CB_PORT + 2000}/callback`)}`);
+    const ciNe = await api('GET', `/oauth/client-info?client_id=${CID}&redirect_uri=${encodeURIComponent('https://evil.example.com/cb')}`);
+    expect(ciOk.json.redirect_ok === true && ciNe.json.redirect_ok === false, 'client-info dává consentu verdikt redirect_ok (jedna logika se serverem)');
     const bezChallenge = await api('POST', '/api/kb/oauth/approve', { token: U, body: { client_id: CID, redirect_uri: CB } });
     expect(bezChallenge.status === 400, 'chybějící code_challenge → 400 (PKCE povinné)');
     // scope fail-CLOSED: neznámá hodnota se NEsmí tiše povýšit na read_write
@@ -119,6 +139,7 @@ const catcher = http.createServer((req, res) => {
     } });
     expect(tok.status === 200 && /^kb_user_/.test(tok.json.access_token), 'token endpoint vydal kb_user_ access token');
     expect(tok.json.token_type === 'Bearer' && tok.json.scope === 'read_write' && tok.json.expires_in > 0, 'odpověď nese type/scope/expiraci');
+    expect(tok.headers.get('cache-control') === 'no-store', 'token endpoint: Cache-Control: no-store (RFC 6749 §5.1)');
     const znovu = await api('POST', '/oauth/token', { form: true, body: {
       grant_type: 'authorization_code', code: kod2, redirect_uri: CB, client_id: CID, code_verifier: verifier,
     } });

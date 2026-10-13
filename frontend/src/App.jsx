@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import PurposeGate from '@/components/shared/PurposeGate';
+import AgentSetupGate from '@/components/shared/AgentSetupGate';
 import { TimerProvider } from '@/lib/TimerContext';
 import { useTranslation } from 'react-i18next';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -101,6 +102,8 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<Spinner />}>
       {/* dotazník účelu — jednou, prvnímu adminovi; líně (viz PurposeGate) */}
       <PurposeGate />
+      {/* „Připoj svého AI agenta" — jednou každému po prvním přihlášení, až po účelu; líně */}
+      <AgentSetupGate />
       <AsistentHost>
       <Routes>
         <Route path="/login" element={<Login />} />

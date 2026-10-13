@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getOrgStructure, createOrgMap } from '@/api/kb';
@@ -22,8 +22,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User as UserIcon, LogOut, Shield, UserPlus, Info, BookOpen, KeyRound, Clock, Languages, Bot, Smartphone, Palette, UserCog, Network, Bug } from 'lucide-react';
+import { User as UserIcon, LogOut, Shield, UserPlus, Info, BookOpen, KeyRound, Clock, Languages, Bot, Cable, Smartphone, Palette, UserCog, Network, Bug } from 'lucide-react';
 import { useLanguageSwitch } from '@/components/LanguageToggle';
+// líně — dialog i jeho texty jsou mimo hlavní balík (viz AgentSetupGate)
+const AgentSetupDialog = lazy(() => import('@/components/shared/AgentSetupDialog'));
 
 /**
  * Nabídka pod panáčkem — JEDNO menu pro celou aplikaci, včetně editoru mapy.
@@ -49,6 +51,7 @@ export default function UserMenu({ onInvited }) {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [skinOpen, setSkinOpen] = useState(false);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
+  const [agentSetupOpen, setAgentSetupOpen] = useState(false);
   const [aiAgentsOpen, setAiAgentsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
@@ -146,6 +149,9 @@ export default function UserMenu({ onInvited }) {
           <DropdownMenuItem onClick={() => setTimeOpen(true)}>
             <Clock className="w-4 h-4 mr-2" /> {t('menu.workedTime')}
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setAgentSetupOpen(true)} data-testid="menu-connect-agent">
+            <Cable className="w-4 h-4 mr-2" /> {t('menu.connectAgent')}
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setApiKeysOpen(true)}>
             <KeyRound className="w-4 h-4 mr-2" /> {t('menu.apiKeys')}
           </DropdownMenuItem>
@@ -195,6 +201,11 @@ export default function UserMenu({ onInvited }) {
       <SkinDialog open={skinOpen} onClose={() => setSkinOpen(false)} />
       <AiAgentsDialog open={aiAgentsOpen} onClose={() => setAiAgentsOpen(false)} />
       <ApiKeysDialog open={apiKeysOpen} onClose={() => setApiKeysOpen(false)} />
+      {agentSetupOpen && (
+        <Suspense fallback={null}>
+          <AgentSetupDialog fromMenu onClose={() => setAgentSetupOpen(false)} />
+        </Suspense>
+      )}
       <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
       <TimeOverviewDialog open={timeOpen} onClose={() => setTimeOpen(false)} />
       <ReportDialog

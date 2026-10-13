@@ -35,8 +35,9 @@ routerAdd("POST", "/oauth/token", (e) => {
 });
 
 // preflight pro browser-based MCP klienty (inspector apod.)
-for (const cesta of ["/oauth/register", "/oauth/token", "/mcp",
-  "/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"]) {
+for (const cesta of ["/oauth/register", "/oauth/token", "/oauth/client-info", "/mcp",
+  "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp",
+  "/.well-known/oauth-authorization-server", "/.well-known/oauth-authorization-server/mcp"]) {
   routerAdd("OPTIONS", cesta, (e) => {
     const lib = require(`${__hooks}/oauth-lib.js`);
     return lib.options(e);

@@ -14,6 +14,12 @@ const LOADERS = {
     cs: () => import('./cs/ucel.json'),
     en: () => import('./en/ucel.json'),
   },
+  // „Připoj svého AI agenta" — dialog po prvním přihlášení + položka v menu; líně
+  // ze stejného důvodu (AgentSetupGate, strop lite 500 kB)
+  agent: {
+    cs: () => import('./cs/agent.json'),
+    en: () => import('./en/agent.json'),
+  },
   billing: {
     cs: () => import('./cs/billing.json'),
     en: () => import('./en/billing.json'),

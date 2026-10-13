@@ -9,6 +9,41 @@ below before you jump several versions.
 
 ---
 
+## v0.79-beta — 2026-10-13
+
+**Connect your AI agent with one line; OAuth fixes for self-hosted instances and editor clients**
+
+- **"Connect your AI agent" after the first sign-in.** The full app shows a dialog with one line to paste into
+  Claude Code, Codex or Cursor (`Set up killBottleneck for me: fetch and follow this guide
+  https://YOUR-DOMAIN/agent-setup.md`; the Czech app shows the Czech sentence). The agent fetches the guide, registers the instance's
+  remote MCP server (`/mcp`) by itself and asks the user to sign in in the browser (OAuth) — no password or key goes
+  into the agent. The dialog shows once per user (also to existing users after this update), then stays in the user
+  menu as **Connect AI agent**. Not shown in the simplified view. `KB_AGENT_SETUP_ASK=0` turns it off; `KB_PURPOSE_ASK=0`
+  turns it off too.
+- **Every instance serves its own agent guide at `/agent-setup.md`** (public, English, instance address and version
+  filled in): rules for the agent, steps for Claude Code / Codex / Cursor / other clients, the user's sign-in step,
+  verification via `list_maps`, the API-key fallback and a ✓/⚠/✗ report format. Over plain `http://` on a non-localhost
+  address the guide sends the agent straight to the API key, because MCP clients only send OAuth credentials to HTTPS
+  or localhost. Also linked from the OAuth resource metadata (`resource_documentation`).
+- **OAuth works on a fresh self-host.** The instance address in the OAuth metadata, `WWW-Authenticate` and the guide
+  no longer falls back to PocketBase's default `http://localhost:8090`: a localhost value counts as unset and the address
+  the request came in on (`Host`, `X-Forwarded-Host`, `X-Forwarded-Proto`) is used. Set `KB_PUBLIC_URL` behind a proxy
+  that does not send `X-Forwarded-Proto`.
+- **OAuth for Claude Code re-authentication and editor clients.** Loopback redirect URIs are accepted on any port
+  (RFC 8252 §7.3 — Claude Code picks a random one; host and path still have to match exactly), and clients may register
+  `cursor://`, `cursor-insiders://`, `vscode://`, `vscode-insiders://` and `windsurf://` redirect URIs. The consent page
+  takes the redirect verdict from the server and shows the full redirect URI for editor schemes. Token responses carry
+  `Cache-Control: no-store`; `scopes_supported` is in the resource metadata.
+- **Fixed:** `?next=` after registration now works (the first user of a new instance coming from an OAuth consent is
+  sent back to it), and `next=https://YOUR-DOMAIN//evil.com` no longer redirects off-site after sign-in.
+- Docs: MCP reference has a new "Let your agent set it up" section; `KB_AGENT_SETUP_ASK` and `KB_PUBLIC_URL` notes in
+  the environment reference.
+
+**Upgrade notes:** a migration adds `users.agent_setup_seen` (no backfill — every existing user sees the dialog once;
+set `KB_AGENT_SETUP_ASK=0` before updating if you do not want that). The MCP npm package did not change.
+
+---
+
 ## v0.78-beta — 2026-10-13
 
 **Maintenance release**

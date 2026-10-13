@@ -13,6 +13,15 @@ s instancí přes HTTP(S) s vaším API klíčem.
 to your killBottleneck instance via its authenticated `/api/kb/v1/*` REST API. Runs
 locally next to the assistant; works identically for self-hosted and hosted instances.*
 
+## Nejrychleji: jeden řádek do agenta
+
+Aplikace po prvním přihlášení (a kdykoli v menu u jména → **Připojit AI agenta**) ukáže
+řádek `Nastav mi killBottleneck: stáhni si a postupuj podle tohoto návodu https://VASE-DOMENA/agent-setup.md`
+(v jazyce uživatele — agent pak odpovídá česky; anglická appka ukáže anglický řádek).
+Vložíte ho do Claude Code / Codexu / Cursoru, agent si návod z instance stáhne, zaregistruje
+vzdálený MCP (`/mcp`) a požádá vás o přihlášení v prohlížeči (OAuth) — žádný klíč se nikam
+neopisuje. Návod (anglicky) vystavuje každá instance sama na `/agent-setup.md`.
+
 ## Instalace
 
 Nic — balíček je na npm (`killbottleneck-mcp`, verze sleduje verzi aplikace) a v MCP Registry

@@ -17,13 +17,11 @@ const MAX_KLIENTU = 200;                // strop registrací (nejstarší se ukl
 
 function zaklad(e) {
   // absolutní adresa instance: KB_PUBLIC_URL (hosted ji má vždy) → nastavení PB
-  // → nouzově z požadavku (self-host bez configu za reverzní proxy)
-  const { publicBaseUrl } = require(`${__hooks}/helpers.js`);
-  const zCfg = publicBaseUrl($app);
-  if (zCfg) return zCfg;
-  const host = e.request.header.get("Host") || "localhost";
-  const proto = e.request.header.get("X-Forwarded-Proto") || "http";
-  return `${proto}://${host}`;
+  // (ale localhost = nenastaveno) → z požadavku (self-host bez configu). Jedna
+  // funkce pro metadata, WWW-Authenticate i /agent-setup.md — všechno musí říkat
+  // TUTÉŽ adresu, jinak MCP SDK odmítne „resource" jako cizí.
+  const { publicBaseUrlFromRequest } = require(`${__hooks}/helpers.js`);
+  return publicBaseUrlFromRequest($app, e);
 }
 
 function cors(e) {
@@ -50,10 +48,38 @@ function hexToB64url(hex) {
   return out.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+// Soukromá URI schémata editorů s MCP klientem (RFC 8252 §7.1): Cursor registruje
+// cursor://anysphere.cursor-retrieval/oauth/…/callback, VS Code vscode://…, Windsurf
+// windsurf://…. Bez nich registrace spadne na 400 a OAuth v Cursoru nejde vůbec
+// (zbyl by jen klíč v configu). PKCE je povinné, takže zachycení kódu cizí appkou
+// se stejným schématem nic nevydá. Hvězdička NE: javascript:, data:, file: zůstávají venku.
+const SOUKROMA_SCHEMATA = ["cursor", "cursor-insiders", "vscode", "vscode-insiders", "windsurf"];
+
 function redirectUriOk(u) {
-  // https kamkoli; http JEN na loopback (mcp-remote, vývoj) — OAuth 2.1
+  // https kamkoli; http JEN na loopback (mcp-remote, vývoj, Claude Code) — OAuth 2.1
   if (/^https:\/\/[^\s]+$/.test(u)) return true;
-  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[^\s]*)?$/.test(u);
+  if (/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/[^\s]*)?$/.test(u)) return true;
+  const m = /^([a-z][a-z0-9+.-]*):\/\/[^\s]+$/i.exec(u);
+  return !!m && SOUKROMA_SCHEMATA.includes(m[1].toLowerCase());
+}
+
+// Sedí požadovaná redirect_uri na některou REGISTROVANOU? Přesná shoda, s jedinou
+// výjimkou podle RFC 8252 §7.3: u loopback adres (http://localhost|127.0.0.1|[::1])
+// se PORT nebere v úvahu — Claude Code si při každém přihlášení otevře náhodný port
+// a při dalším přihlášení (po 90 dnech, po /mcp → reconnect) použije uloženou
+// registraci (client_id) → bez výjimky „invalid_redirect_uri" (nález 10. 10. 2026).
+// Schéma, host i CESTA musí sedět dál; cizí host nikdy.
+function redirectUriRegistered(registered, requested) {
+  const req = String(requested || "");
+  if (!req) return false;
+  if (registered.includes(req)) return true;
+  const loop = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(\/.*)?$/;
+  const r = loop.exec(req);
+  if (!r) return false;
+  return registered.some((u) => {
+    const g = loop.exec(String(u));
+    return !!g && g[1] === r[1] && (g[2] || "/") === (r[2] || "/");
+  });
 }
 
 // ---------- discovery ----------
@@ -64,7 +90,9 @@ function metadataProtectedResource(e) {
     resource: base + "/mcp",
     authorization_servers: [base],
     bearer_methods_supported: ["header"],
+    scopes_supported: ["read", "read_write"],
     resource_name: "killBottleneck MCP",
+    resource_documentation: base + "/agent-setup.md",
   });
 }
 function metadataAuthServer(e) {
@@ -100,7 +128,7 @@ function register(e) {
   const info = e.requestInfo().body || {};
   const uris = Array.isArray(info.redirect_uris) ? info.redirect_uris.map(String) : [];
   if (!uris.length || uris.length > 10 || !uris.every(redirectUriOk)) {
-    return e.json(400, { error: "invalid_redirect_uri", error_description: "redirect_uris must be https:// URLs (http only on localhost)." });
+    return e.json(400, { error: "invalid_redirect_uri", error_description: "redirect_uris must be https:// URLs, http://localhost (any port) or an editor scheme (cursor://, vscode://, windsurf://)." });
   }
   const name = String(info.client_name || "").slice(0, 200);
 
@@ -146,11 +174,16 @@ function klientoveUri(rec) {
 // nic nedokazuje; doména redirect_uri je to jediné, co uživatel může posoudit.
 function clientInfo(e) {
   cors(e);
-  const rec = najdiKlienta(e.request.url.query().get("client_id"));
+  const q = e.request.url.query();
+  const rec = najdiKlienta(q.get("client_id"));
   if (!rec) return e.json(404, { error: "unknown_client" });
+  // consent posílá i redirect_uri z adresy: verdikt „sedí na registraci" dává
+  // SERVER (vč. loopback výjimky na port), frontend ho jen převezme — jedna logika
+  const chce = q.get("redirect_uri") || "";
   return e.json(200, {
     client_name: rec.getString("client_name") || "",
     redirect_uris: klientoveUri(rec),
+    redirect_ok: chce ? redirectUriRegistered(klientoveUri(rec), chce) : null,
   });
 }
 
@@ -160,7 +193,7 @@ function approve(e) {
   const rec = najdiKlienta(info.client_id);
   if (!rec) return e.json(400, { error: "unknown_client" });
   const redirect = String(info.redirect_uri || "");
-  if (!klientoveUri(rec).includes(redirect)) {
+  if (!redirectUriRegistered(klientoveUri(rec), redirect)) {
     // NIKDY nepřesměrovat na neregistrovanou adresu — kód by odtekl útočníkovi
     return e.json(400, { error: "invalid_redirect_uri" });
   }
@@ -209,6 +242,9 @@ function approve(e) {
 // ---------- token endpoint ----------
 function token(e) {
   cors(e);
+  // RFC 6749 §5.1: odpověď s tokenem se nesmí cachovat (ani v proxy po cestě)
+  e.response.header().set("Cache-Control", "no-store");
+  e.response.header().set("Pragma", "no-cache");
   const info = e.requestInfo().body || {}; // PB parsuje i application/x-www-form-urlencoded
   if (String(info.grant_type || "") !== "authorization_code") {
     return e.json(400, { error: "unsupported_grant_type" });
@@ -278,4 +314,4 @@ function options(e) {
   return e.noContent(204);
 }
 
-module.exports = { metadataProtectedResource, metadataAuthServer, register, clientInfo, approve, token, options, hexToB64url };
+module.exports = { metadataProtectedResource, metadataAuthServer, register, clientInfo, approve, token, options, hexToB64url, redirectUriOk, redirectUriRegistered };

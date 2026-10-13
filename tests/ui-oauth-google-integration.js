@@ -64,10 +64,11 @@ const api = async (m, p, b) => {
       // stejná logika jako lib/safeNext.js — ověříme chování v reálném prohlížeči
       const safe = (raw) => {
         const next = String(raw || ''); if (!next) return '/';
-        try { const u = new URL(next, window.location.origin); if (u.origin !== window.location.origin) return '/'; return u.pathname + u.search + u.hash; } catch { return '/'; }
+        try { const u = new URL(next, window.location.origin); if (u.origin !== window.location.origin) return '/'; if (u.pathname.startsWith('//')) return '/'; return u.pathname + u.search + u.hash; } catch { return '/'; }
       };
       return {
         evil: safe('https://evil.com/x'),
+        ownOriginDoubleSlash: safe(window.location.origin + '//evil.com'),
         proto: safe('//evil.com'),
         backslash: safe('/\\evil.com'),
         good: safe('/oauth/authorize?client_id=abc'),
@@ -75,6 +76,7 @@ const api = async (m, p, b) => {
     });
     ok(res.evil === '/', 'absolutní cizí URL → "/"');
     ok(res.proto === '/', 'protocol-relative //evil.com → "/"');
+    ok(res.ownOriginDoubleSlash === '/', 'https://VLASTNÍ-ORIGIN//evil.com → "/" (pathname //evil.com = protocol-relative po navigaci; audit 13. 10.)');
     ok(res.backslash === '/', String.raw`/\evil.com → "/" (bez normalizace na //evil.com)`);
     ok(res.good === '/oauth/authorize?client_id=abc', 'legitimní relativní cesta projde');
     await p2.close();

@@ -558,8 +558,10 @@ function zpracujMcpPost(e) {
   const odmitni401 = () => {
     // absolutní adresa metadata dokumentu → OAuth klienti (claude.ai) si z ní
     // najdou authorization server a spustí OAuth flow (oauth.pb.js)
+    // Tatáž adresa jako v OAuth metadatech (localhost z nastavení PB = nenastaveno →
+    // Host požadavku); RFC 9728 chce ABSOLUTNÍ adresu, relativní by klient zahodil
     let base = "";
-    try { base = require(`${__hooks}/helpers.js`).publicBaseUrl($app); } catch (err) { /* relativní fallback */ }
+    try { base = require(`${__hooks}/helpers.js`).publicBaseUrlFromRequest($app, e); } catch (err) { /* nouzově relativní */ }
     e.response.header().set("WWW-Authenticate", `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`);
     return e.json(401, { error: "Missing or invalid API key. Pass 'Authorization: Bearer kb_user_…' — create a key in the app under \"API keys\", or connect via OAuth." });
   };
