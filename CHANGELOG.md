@@ -11,19 +11,16 @@ below before you jump several versions.
 
 ## v0.78-beta — 2026-10-13
 
-**One release for every hosted instance again — the assistant's "warm-up handoff" moves from a side build into main**
+**Maintenance release**
 
-- **Assistant: optional second main model ("warm-up handoff")** — `KB_CHAT_ROZJEZD=N` + `KB_CHAT2_*`. The first N turns of
-  a conversation are answered by the primary (fast cloud) model, later turns by a second (typically local) model when it
-  has a free slot; one user at a time (`KB_CHAT2_JEDEN`), text drafts (e-mails, letters, talking points) always stay
-  with the primary model, writes can too (`KB_CHAT_ROZJEZD_CO=cteni`), tool groups for the second model come from the
-  conversation history (`KB_CHAT2_TOOLS=historie`) so its prompt cache holds, the client pre-warms the second model
-  after every reply (`POST /api/kb/chat/predehrat`), and a failing second model falls back to the primary within the
-  same turn. `KB_CHAT2_STIN=1` returns a shadow answer of the second model for comparison (read-only tools, nothing
-  stored). Without `KB_CHAT_ROZJEZD` nothing changes. New test `ai-rozjezd`.
-- Hosted boxes: `fleet-update.sh` now refuses to replace an instance that runs a build without a release version
-  (e.g. a side build from a branch) unless `FORCE=1` — a plain fleet update can no longer silently take such a feature
-  away. Per-instance assistant settings live in the instance's `.env` and survive every update as before.
+- **Self-host admins: optional second assistant model.** `KB_CHAT_ROZJEZD=N` hands a conversation from the primary
+  model to a second one (`KB_CHAT2_*`) from the N-th turn on, when it has a free slot; text drafts (e-mails, letters,
+  talking points) always stay with the primary model, writes can too (`KB_CHAT_ROZJEZD_CO=cteni`), tool groups for the
+  second model come from the conversation history (`KB_CHAT2_TOOLS=historie`), the client pre-warms it after every reply
+  (`POST /api/kb/chat/predehrat`), and a failing second model falls back to the primary within the same turn.
+  `KB_CHAT2_STIN=1` returns a shadow answer for comparison. Without `KB_CHAT_ROZJEZD` nothing changes. New test `ai-rozjezd`.
+- Test harness waits for the container's network to settle before opening the browser (random `ERR_NETWORK_CHANGED`
+  on the first page of a click suite).
 - No migration, nothing to configure.
 
 ---
