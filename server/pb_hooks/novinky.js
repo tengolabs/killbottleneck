@@ -11,6 +11,18 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.78-beta": {
+    cs: [
+      "Asistent umí od třetí zprávy rozhovoru předat slovo druhému, místnímu modelu (zapíná správce instance) — první odpověď zůstává rychlá z cloudu.",
+      "Koncepty e-mailů, dopisů a bodů k hovoru píše vždy první model; když je druhý model zaneprázdněný nebo selže, odpoví první model ve stejném tahu.",
+      "Druhý model se po každé odpovědi předehřívá, takže další odpověď přijde dřív.",
+    ],
+    en: [
+      "From the third message of a conversation the assistant can hand over to a second, local model (enabled by the instance admin) — the first reply stays fast from the cloud.",
+      "Drafts of e-mails, letters and talking points are always written by the primary model; when the second model is busy or fails, the primary model answers within the same turn.",
+      "The second model is pre-warmed after every reply, so the next answer arrives sooner.",
+    ],
+  },
   "v0.77-beta": {
     cs: [
       "V mapě je vlevo nová ikona ☑ „Úkoly tohoto projektu“: otevře seznam úkolů jen tohoto projektu — na telefonu se už nemusí hledat v nabídce ⋮.",

@@ -95,8 +95,15 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
   // -v: s kontejnerem zmizí i jeho ANONYMNÍ volume (obraz má VOLUME /app/pb_data) — jinak po každé instanci zůstane
   // viset (1. 10. 2026: 34 tisíc visících volume, 75 GB); pojmenovaný volume (`volume:`) -v nemaže
   execSync(`docker rm -f -v ${name} 2>/dev/null; true`, { stdio: 'ignore' });
+  let startAt = Date.now();
   execSync(`docker run -d --name ${name} ${envArgs} ${hosts} ${vol} ${extraArgs} -p 127.0.0.1::8090 ${img}`, { stdio: 'ignore' });
   const inst = { name, port: 0, base: '', image: img };
+  // ⚠️ USAZENÍ SÍTĚ (13. 10. 2026): start kontejneru přidá hostiteli rozhraní veth a jeho IPv6 link-local
+  // adresa se stane platnou až po DAD (~1,4 s po startu), zatímco healthz je 200 už po ~1,3 s. Chrome
+  // tu změnu adres bere jako „změna sítě“ a rozběhnuté požadavky zahodí → ERR_NETWORK_CHANGED hned na
+  // první stránce (ui-ai-chat 13. 10., ui-dokumenty 12. 10. — náhodně, okno ~100 ms). Po healthz proto
+  // počkáme, ať od startu kontejneru uběhlo aspoň 2 s; stejně po resume/restart (nový veth).
+  const usazeniSite = async () => { const zbyva = 2000 - (Date.now() - startAt); if (zbyva > 0) await sleep(zbyva); };
   const ctiPort = () => {
     inst.port = Number(execSync(`docker port ${name} 8090`).toString().trim().split('\n')[0].split(':').pop());
     inst.base = `http://127.0.0.1:${inst.port}`;
@@ -130,12 +137,12 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
     // po stop/start (i restart) je jiný → base se musí přečíst znovu. Sady, které
     // si base uložily do proměnné, ji po resume() přepíšou (vrací nový base).
     pause: () => { execSync(`docker stop ${name}`, { stdio: 'ignore' }); },
-    resume: async () => { execSync(`docker start ${name}`, { stdio: 'ignore' }); ctiPort(); await waitHealthy(inst); return inst.base; },
-    restart: async () => { execSync(`docker restart ${name}`, { stdio: 'ignore' }); ctiPort(); await waitHealthy(inst); return inst.base; },
+    resume: async () => { startAt = Date.now(); execSync(`docker start ${name}`, { stdio: 'ignore' }); ctiPort(); await waitHealthy(inst); await usazeniSite(); return inst.base; },
+    restart: async () => { startAt = Date.now(); execSync(`docker restart ${name}`, { stdio: 'ignore' }); ctiPort(); await waitHealthy(inst); await usazeniSite(); return inst.base; },
     stop: () => { execSync(`docker rm -f -v ${name} 2>/dev/null; true`, { stdio: 'ignore' }); if (inst.volume) execSync(`docker volume rm -f ${inst.volume} 2>/dev/null; true`, { stdio: 'ignore' }); },
   });
   instance.push(inst);
-  return waitHealthy(inst).then(() => inst);
+  return waitHealthy(inst).then(usazeniSite).then(() => inst);
 }
 
 // adaptéry pro převod sad s jinou signaturou api() (7 sad path-first, 5 sad base-first)

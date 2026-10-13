@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chat as chatApi, chatPotvrdit, chatOprav, chatDetail, chatSeznam, chatSmazat, chatVratit } from '@/api/asistentApi';
+import { chat as chatApi, chatPotvrdit, chatPredehrat, chatOprav, chatDetail, chatSeznam, chatSmazat, chatVratit } from '@/api/asistentApi';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
 import { nahradPrepis } from '@/lib/prepisZpravy';
@@ -245,6 +245,7 @@ export function useAsistentChat({ open, klient }) {
       projevKarty(r.chat, patchUser, klientRef.current, aplikovane.current);
       ohlasZmenuMapy(r.chat);
       nactiSeznam();
+      chatPredehrat({ chat_id: r.chat.id, context: context || {} }).catch(() => {}); // rozjezd: druhý model si načte historii, než uživatel dopíše
       return { ok: true, vratit: false };
     } catch (e) {
       const kod = e && e.response && e.response.code;
@@ -279,6 +280,7 @@ export function useAsistentChat({ open, klient }) {
       if (aktualni.current !== chatId) { nactiSeznam(); return; }
       setChat(r.chat);
       projevKarty(r.chat, patchUser, klientRef.current, aplikovane.current);
+      chatPredehrat({ chat_id: chatId, context: context || {} }).catch(() => {}); // rozjezd (po potvrzení se historie změnila)
     } catch (e) {
       if (!zivy.current || aktualni.current !== chatId) return;
       setError(prevedChybu(e));

@@ -13,6 +13,8 @@ const overrideMs = () => {
 // tah s textem PDF = dlouhý prompt (desítky tisíc znaků) → stejný strop jako obrázek
 export const chat = (payload) => kbSend('/api/kb/chat', { body: payload, timeoutMs: overrideMs() || (payload && (payload.image_base64 || payload.pdf_text || payload.audio_base64) ? CHAT_IMG_TIMEOUT_MS : CHAT_TIMEOUT_MS) });
 export const chatPotvrdit = (payload) => kbSend('/api/kb/chat/potvrdit', { body: payload, timeoutMs: overrideMs() || CHAT_TIMEOUT_MS });
+// rozjezd: po odpovědi předehřát druhý hlavní model (server sám pozná, zda je co předehřívat); bez čekání, bez UI
+export const chatPredehrat = (payload) => kbSend('/api/kb/chat/predehrat', { body: payload, timeoutMs: 180000 });
 // oprava přepisu poslední hlasovky / fotky: zahodí nepotvrzené návrhy a asistent odpoví znovu (běžný tah)
 export const chatOprav = (payload) => kbSend('/api/kb/chat/oprav', { body: payload, timeoutMs: overrideMs() || CHAT_TIMEOUT_MS });
 export const chatSeznam = () => kbSend('/api/kb/chat/seznam', { method: 'GET' });

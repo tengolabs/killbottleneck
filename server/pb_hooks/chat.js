@@ -176,7 +176,68 @@ function chatAiConfig(app, modelOverride) {
       think: parseThink(env("CHAT_LIGHT_THINK") || "low"), numCtx: Number(env("CHAT_LIGHT_NUM_CTX") || 0) || 0, extra: extraJson(env("CHAT_LIGHT_OPENAI_EXTRA")), tier: "light" };
   }
   cfg.tier = "heavy";
+  // Rozjezd (Richard 10. 10. 2026): první tahy rozhovoru dělá rychlý cloudový model (na první odpověď uživatel nesmí čekat, jinak
+  // to vypne), od KB_CHAT_ROZJEZD-tého tahu přebírá druhý hlavní model (KB_CHAT2_*, typicky lokální Qwen — 0 Kč za tah) — ale jen
+  // když má volný slot (KB_CHAT2_SLOTS_URL = /slots llama-serveru; bez adresy se slot nehlídá). Obsazeno → tah zůstane u prvního
+  // modelu, nikdo nečeká ve frontě. Klient po každé odpovědi volá /chat/predehrat, ať má druhý model historii v cache (chatPredehrat).
+  const roz = String(env("CHAT_ROZJEZD") || ""); const p2 = String(env("CHAT2_PROVIDER") || "").toLowerCase();
+  if (/^\d+$/.test(roz) && ["ollama", "openai"].includes(p2) && env("CHAT2_URL") && env("CHAT2_MODEL")) {
+    // KB_CHAT_ROZJEZD_CO = vse | cteni (zápisy zůstávají prvnímu modelu — Richard 10. 10. 2026: „jen některé úkoly“)
+    // KB_CHAT2_JEDEN=1 → druhý model obsluhuje v jednu chvíli JEDEN rozhovor (zápůjčka na KB_CHAT2_JEDEN_MIN minut od posledního tahu)
+    // KB_CHAT2_TOOLS=all (výchozí) → druhý model dostane všechny nástroje: prompt se mezi tahy nemění → cache (a předehřátí) drží
+    // KB_CHAT2_STIN=1 → /chat/predehrat vrátí i celou odpověď druhého modelu (porovnání s prvním na živém rozhovoru; nic se neukládá)
+    cfg.rozjezd = { po: Number(roz), slots: env("CHAT2_SLOTS_URL") || "", co: String(env("CHAT_ROZJEZD_CO") || "vse").toLowerCase() === "cteni" ? "cteni" : "vse",
+      jeden: String(env("CHAT2_JEDEN") || "") === "1", jedenMin: Number(env("CHAT2_JEDEN_MIN") || 0) || 10, stin: String(env("CHAT2_STIN") || "") === "1",
+      koncepty: String(env("CHAT_ROZJEZD_KONCEPTY") || "prvni").toLowerCase() !== "druhy", // výchozí: koncepty textů píše první model
+      druhy: { provider: p2, url: env("CHAT2_URL") || "", model: env("CHAT2_MODEL") || "", token: env("CHAT2_TOKEN") || "", think: parseThink(env("CHAT2_THINK")),
+        numCtx: Number(env("CHAT2_NUM_CTX") || 0) || 0, extra: extraJson(env("CHAT2_OPENAI_EXTRA")) || null, tier: "heavy", druhy: true,
+        nastroje: ["all", "historie", "skupiny"].indexOf(String(env("CHAT2_TOOLS") || "all").toLowerCase()) >= 0 ? String(env("CHAT2_TOOLS") || "all").toLowerCase() : "all" } };
+    // KB_CHAT2_TOOLS: all = všechny nástroje (stabilní prompt ~24k tok.) · historie = skupiny podle klíčových slov jen ze STARŠÍCH zpráv
+    // (nová zpráva prompt nemění → cache drží, prompt ~12k; chybějící skupinu si model otevře open_tools / pojistkou) · skupiny = jako první model
+  }
   return cfg;
+}
+
+// Rozjezd: od N-tého tahu rozhovoru druhý hlavní model, když má volný slot (viz chatAiConfig). stats.rozjezd = druhy | plno | brzy.
+function druhyHlavni(app, auth, cfg, rec, stats, text) {
+  if (!cfg.rozjezd) return null;
+  const { jsonVal } = require(`${__hooks}/helpers.js`);
+  const predchozich = jsonVal(rec, "messages", []).filter((m) => m.role === "user").length - 1; // aktuální zpráva už je v historii
+  if (predchozich < cfg.rozjezd.po) { stats.rozjezd = "brzy"; return null; }
+  // jen čtení: zpráva, která vypadá jako zápis (hotovo, naplánuj, připomeň, přidej, založ, smaž, pozvi…), zůstává prvnímu modelu
+  if (cfg.rozjezd.co === "cteni" && ZAPIS_KLICE.test(bezDiakritiky(String(text || "")))) { stats.rozjezd = "zapis"; return null; }
+  // koncepty textů (e-mail, dopis, zpráva, body k telefonátu…) píše vždy první model — čeština (Richard 10. 10. 2026)
+  if (cfg.rozjezd.koncepty && KONCEPT_KLICE.test(bezDiakritiky(String(text || "")))) { stats.rozjezd = "koncept"; return null; }
+  if (cfg.rozjezd.jeden && !zapujckaCloveka(auth.id, cfg.rozjezd.jedenMin)) { stats.rozjezd = "obsazeno"; return null; }
+  if (cfg.rozjezd.slots && !volnySlot(cfg.rozjezd.slots)) { stats.rozjezd = "plno"; return null; }
+  stats.rozjezd = "druhy";
+  return Object.assign({}, cfg.rozjezd.druhy, { sessionAuth: cfg.sessionAuth || "", podrobneChyby: cfg.podrobneChyby, modelOverride: false, potvrzeni: cfg.potvrzeni });
+}
+// zpráva, která chce TEXT pro lidi (e-mail, dopis, zpráva, SMS, body k hovoru/poradě, oznámení, pozvánka, nabídka jako text) — čeština = první model
+const KONCEPT_KLICE = /\b(e-?mail\w*|mail\w*|dopis\w*|sms|zpravu (pro|zakaznik\w*|dodavatel\w*|tymu|kolegovi)|body k (telefon\w*|hovoru|porad\w*|schuzc\w*|jednani)|podklady (k|pro|na)|oznamen\w*|pozvank\w*|omluv\w*|pod[e]kovan\w*|napis(te)? (mi )?(text|zpravu|odpoved|nabidku|dopis|e-?mail)|koncept\w*|draft|letter|write (me )?(an? )?(email|message|note|reply)|talking points)\b/i;
+// zpráva, která chce ZMĚNIT data (stejný význam jako klasifikátor hybridu, jen bez modelu): hotovo/udělám/naplánuj/připomeň/přidej/založ/smaž/pozvi/přejmenuj/archivuj/přepni/potvrď
+const ZAPIS_KLICE = /\b(hotovo|hotove|vyrizen|zavolal|poslal|udelam|udelame|vyresim|naplanuj|naplanovat|presun|pripomen|pripominku|dej (mi )?vedet|upozorni|pravidlo|pridej|pridat|vloz|zaloz|zalozit|vytvor|smaz|smazat|odstran|prejmenuj|zmen|nastav|pozvi|pozvat|archivuj|obnov|prepni|potvrd|ano,? udelej|udelej to|zapis|zapsat|ulozit do (mapy|projektu))\b/i;
+// Jeden člověk na druhém modelu v jednu chvíli (Richard 10. 10. 2026: „vždy jen jeden souběžný člověk“): zápůjčka v $app.store —
+// drží ji uživatel, který na druhém modelu naposled mluvil, do vypršení (minuty od posledního tahu); cizí živá zápůjčka → první model.
+// Podle uživatele, ne rozhovoru: nový rozhovor nemá v prvním tahu ještě id. Napříč instancemi (víc zákazníků na jednom llama-serveru)
+// to navíc hlídá /slots s jedním slotem. Do Go store jen řetězec „uživatel|ts“ (objekt se přes most nevrátí spolehlivě).
+function zapujckaCloveka(userId, minut) {
+  const store = $app.store(); const ted = Date.now();
+  const z = String(store.get("rozjezd:zapujcka") || "").split("|");
+  if (z[0] && z[0] !== String(userId) && ted - Number(z[1] || 0) < minut * 60000) return false;
+  store.set("rozjezd:zapujcka", String(userId) + "|" + ted);
+  return true;
+}
+// llama-server GET /slots: pole slotů, is_processing = obsazený. Nedostupný server = obsazeno (tah zůstane u rychlého cloudu).
+// Sloty obsazené jen předehříváním z téhle instance (počítadlo $app.store) se berou jako volné: llama-server požadavek
+// zařadí za ně a předehřátí končí za pár sekund — bez toho předehřívání vytlačilo ostré tahy k cloudu (měření 10. 10. 2026, N=4).
+function volnySlot(url) {
+  try {
+    const res = $http.send({ url: url, method: "GET", timeout: 3 });
+    if (res.statusCode < 200 || res.statusCode >= 300 || !Array.isArray(res.json)) return false;
+    const obsazene = res.json.filter((sl) => sl.is_processing).length;
+    return obsazene < res.json.length || obsazene <= Number($app.store().get("rozjezd:predehrivani") || 0);
+  } catch (err) { return false; }
 }
 
 // Přepis obrázku (16. 9. 2026): vlastní model, protože hlavní i lehký chat model
@@ -1152,11 +1213,13 @@ const SKUPINY_PORADI = ["projekt", "pravidla", "udalosti", "terminy", "prace", "
 // a funkce bez klíčového slova by tiše zmizela. Dostanou proto všechny nástroje hned (KB_CHAT_TOOLS=auto,
 // výchozí); stálá sada zároveň drží cache promptu u OpenAI. Qwen/DeepSeek/gpt-oss dál po skupinách.
 const jeGpt = (model) => /(^|\/)(gpt-(?!oss)|o\d|chatgpt)/i.test(String(model || ""));
-function skupinyNastroju(msgs, ctx, rec, cfg) {
+function skupinyNastroju(msgs, ctx, rec, cfg, bezPosledni) {
   const { env } = require(`${__hooks}/helpers.js`);
   const out = new Set();
   const volba = String(env("CHAT_TOOLS") || "auto").toLowerCase();
-  if (volba === "all" || (volba === "auto" && cfg && jeGpt(cfg.model))) { for (const n of NASTROJE) if (n.skupina) out.add(n.skupina); return out; }
+  if (volba === "all" || (volba === "auto" && cfg && jeGpt(cfg.model)) || (cfg && cfg.druhy && cfg.nastroje === "all")) { for (const n of NASTROJE) if (n.skupina) out.add(n.skupina); return out; }
+  // druhý model „historie“: klíčová slova jen ze starších zpráv uživatele (poslední = právě přišlá) — prompt stejný jako při předehřátí
+  if (bezPosledni) { const i = (msgs || []).map((m) => m.role).lastIndexOf("user"); if (i >= 0) msgs = msgs.slice(0, i); }
   const mode = rec ? rec.getString("mode") : "";
   if (jeRezim(mode)) for (const g of REZIM[mode].skupiny) out.add(g);
   if (jeBalicek(mode)) { out.add("projekt"); out.add("obrazek"); } // třídění s doporučením zakládá projekty a plní zásobník (add_ideas) i z nápadů napsaných textem, bez klíčových slov (30. 9. 2026)
@@ -2707,7 +2770,7 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
   const M = require(`${__hooks}/mcp-tools.js`);
   const msgs = jsonVal(rec, "messages", []);
   const pending = [];
-  const skupiny = skupinyNastroju(msgs, ctx, rec, cfg);
+  const skupiny = skupinyNastroju(msgs, ctx, rec, cfg, !!(cfg.druhy && cfg.nastroje === "historie"));
   stats.skupiny = Array.from(skupiny);
   let sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) };
   const vseOtevreno = () => SKUPINY_OTEVIRATELNE.every((g) => skupiny.has(g));
@@ -2947,7 +3010,22 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
 // že levnější model nezvládl to, co by hlavní zvládl.
 function smyckaHybrid(app, auth, L, cfg, rec, stats, ctx, text) {
   const volba = zvolCfg(app, auth, L, cfg, rec, text, stats);
-  if (volba === cfg) return smycka(app, auth, L, cfg, rec, stats, ctx);
+  // rozjezd: od N-tého tahu druhý hlavní model (když má volný slot). Spadne-li (server dole, 502), tah jede znovu na prvním —
+  // zápisy čekají na kartu až na konci tahu a dokumenty se vrátí (jako při předání od lehkého), takže se nic neprovede dvakrát.
+  const sDruhym = (c) => {
+    const d = druhyHlavni(app, auth, cfg, rec, stats, text);
+    if (!d) return smycka(app, auth, L, c, rec, stats, ctx);
+    if (!stats.dok) stats.dok = [];
+    const dokPred = stats.dok.length;
+    try { return smycka(app, auth, L, d, rec, stats, ctx); }
+    catch (err) {
+      try { app.logger().warn("chat: druhý model selhal, tah přebírá první", "user", auth.id, "error", String(err && err.message ? err.message : err)); } catch (e2) { /* log je bonus */ }
+      require(`${__hooks}/dokumenty.js`).vratitTah(app, stats.dok.splice(dokPred));
+      stats.rozjezd = "pad"; stats.volaniDruhy = stats.volaniDruhy || 0;
+      return smycka(app, auth, L, c, rec, stats, ctx);
+    }
+  };
+  if (volba === cfg) return sDruhym(cfg);
   if (!stats.dok) stats.dok = [];
   const dokPred = stats.dok.length;
   let vysl;
@@ -2963,9 +3041,110 @@ function smyckaHybrid(app, auth, L, cfg, rec, stats, ctx, text) {
     D.vratitTah(app, stats.dok.splice(dokPred));
     // zahozená volání lehkého modelu uživatel neplatí (Richard 4. 10. 2026) — kredity je přeskočí, tokeny v logu zůstávají
     for (const v of (stats.volani || [])) if (v.tier === "light" && !v.zahozeno) v.zahozeno = true;
-    stats.tier = "heavy"; return smycka(app, auth, L, cfg, rec, stats, ctx);
+    stats.tier = "heavy"; return sDruhym(cfg);
   }
   return vysl;
+}
+
+// Stínová smyčka (Richard 10. 10. 2026 „ano“): zrcadlo `smycka` pro druhý model nad kopií historie po poslední zprávu uživatele.
+// Čtecí nástroje (kind read) se vykonají doopravdy (stejná data jako měl první model), suggest_next dostane obvyklý výsledek,
+// otázka (ask) a zápisy (write/direct/client) se NEvykonají — model dostane „nevykonáno (stín)“ a dopoví textem. Do rozhovoru,
+// dokumentů ani logu se nic nezapíše; vrací text, pořadí volaných nástrojů a tokeny (stats).
+function stinSmycka(app, auth, L, cfg, rec, ctx, msgsIn, stats) {
+  const M = require(`${__hooks}/mcp-tools.js`);
+  const msgs = msgsIn.map((m) => Object.assign({}, m));
+  const rezimRec = rec.getString("mode");
+  const skupiny = skupinyNastroju(msgs, ctx, rec, cfg, !!(cfg.druhy && cfg.nastroje === "historie"));
+  let sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) };
+  const ktx = { chatId: rec.id, dok: [], sessionAuth: cfg.sessionAuth || "", ctx: ctx, text: String((msgs.slice().reverse().find((m) => m.role === "user") || {}).content || "") };
+  const vseOtevreno = () => SKUPINY_OTEVIRATELNE.every((g) => skupiny.has(g));
+  const nastroje = []; let text = "";
+  for (let kolo = 0; kolo < MAX_KOL + 1; kolo++) {
+    const posledni = kolo >= MAX_KOL;
+    const zpravy = [sys].concat(zpravyProModel(msgs, L, rezimRec));
+    if (posledni) zpravy.push({ role: "user", content: P[L].dokonci });
+    const nabidka = posledni ? [] : proModel(skupiny, auth, app).filter((n) => nastrojVRezimu(n.name, rezimRec) && (n.name !== "open_tools" || !vseOtevreno()));
+    const r = zavolejModel(cfg, zpravy, nabidka, L, stats);
+    const otevrit = posledni ? [] : r.toolCalls.filter((c) => c.name === "open_tools");
+    if (otevrit.length) {
+      const pred = skupiny.size;
+      for (const c of otevrit) { const g = String((c.args || {}).group || "").toLowerCase(); if (SKUPINY_OTEVIRATELNE.indexOf(g) >= 0) skupiny.add(g); }
+      r.toolCalls = r.toolCalls.filter((c) => c.name !== "open_tools");
+      if (skupiny.size > pred) { sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) }; continue; }
+      if (!r.toolCalls.length && !String(r.content || "").trim()) continue;
+    }
+    const chybi = posledni ? [] : r.toolCalls.filter((c) => NASTROJ[c.name] && NASTROJ[c.name].skupina && !nabidka.some((n) => n.name === c.name) && nastrojDostupny(c.name, rezimRec, auth, app));
+    if (chybi.length) { for (const c of chybi) skupiny.add(NASTROJ[c.name].skupina); sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) }; continue; }
+    const sv = suggestVTextu(r.content);
+    if (String(sv.text || "").trim()) text = bezMarkdownu(sv.text);
+    const am = { role: "assistant", content: bezMarkdownu(sv.text), ts: new Date().toISOString(), karty: [] };
+    if (r.toolCalls.length && !posledni) am.toolCalls = r.toolCalls;
+    msgs.push(am);
+    if (!r.toolCalls.length || posledni) break;
+    if (String(r.content || "").trim() && r.toolCalls.every((c) => c.name === "suggest_next")) { for (const c of r.toolCalls) nastroje.push(c.name); break; }
+    for (const c of r.toolCalls) {
+      nastroje.push(c.name);
+      const def = NASTROJ[c.name]; let obsah;
+      if (!def || !nastrojDostupny(c.name, rezimRec, auth, app)) obsah = "Error: this tool is not available.";
+      else if (def.kind === "read") {
+        c.args = bezNull(def.parameters, rozbalRetezce(def.parameters, c.args || {}));
+        const chyba = M.validujArgumenty(def.parameters, c.args, c.name);
+        if (chyba) obsah = "Error: " + chyba;
+        else { try { obsah = vykonej(app, auth, L, c.name, c.args, ktx).text; } catch (err) { obsah = "Error: " + String(err && err.message ? err.message : err).slice(0, 300); } }
+      }
+      else if (c.name === "suggest_next") obsah = "Suggestions shown to the user as chips.";
+      else if (def.kind === "ask") obsah = "(shadow run) The question was shown to the user; there is no answer yet. Finish with text.";
+      else obsah = "Not executed (shadow run): this change would wait for the user's confirmation. Assume it is prepared and finish with text.";
+      msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: obsah });
+    }
+  }
+  return { text: text, nastroje: nastroje };
+}
+
+// Předehřátí druhého hlavního modelu (rozjezd, 10. 10. 2026): klient zavolá po každé odpovědi. Když příští tah půjde druhému modelu,
+// pošle se mu systém + historie + nástroje přesně jako v ostrém tahu, jen s 1 tokenem výstupu → llama-server má prompt v cache a první
+// lokální tah nečeká na přežvýkání 10–20k tokenů historie (RTX 3090 ≈ 10–20 s). Nic se neukládá ani neúčtuje; výsledek jen pro měření.
+// Past: skupiny nástrojů (a tím systémová zpráva) se volí i podle textu NOVÉ zprávy — když ta otevře další skupinu, cache od začátku propadne.
+function chatPredehrat(app, auth, body, cfg, L) {
+  const { jsonVal } = require(`${__hooks}/helpers.js`);
+  const { llmPredehrej } = require(`${__hooks}/llm.js`);
+  if (!cfg.rozjezd) return { stav: "vypnuto" };
+  const rec = nactiChat(app, auth, body && body.chat_id);
+  if (!rec) return { stav: "neni" };
+  const msgs = jsonVal(rec, "messages", []);
+  // stín běží od prvního tahu (porovnání), předehřátí jen když příští tah půjde druhému modelu
+  if (!cfg.rozjezd.stin && msgs.filter((m) => m.role === "user").length < cfg.rozjezd.po) return { stav: "brzy" };
+  if (jsonVal(rec, "pending", []).length) return { stav: "ceka-karta" }; // po potvrzení se historie změní → předehřát až pak
+  const rezimRec = rec.getString("mode");
+  const ctx = jeVedouciRezim(rezimRec) ? { route: "-" } : ((body && body.context) || {});
+  const druhy = Object.assign({}, cfg.rozjezd.druhy, { sessionAuth: cfg.sessionAuth || "" });
+  const skupiny = skupinyNastroju(msgs, ctx, rec, druhy, false); // historie = všechny dosavadní zprávy (příští tah tu novou vynechá → stejné skupiny)
+  const sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) };
+  const vseOtevreno = SKUPINY_OTEVIRATELNE.every((g) => skupiny.has(g));
+  const nabidka = proModel(skupiny, auth, app).filter((n) => nastrojVRezimu(n.name, rezimRec) && (n.name !== "open_tools" || !vseOtevreno));
+  // Historie PŘESNĚ jako v příštím tahu: za poslední odpověď přidat prázdnou zprávu uživatele (jen s kontextem) — ořez starých
+  // výsledků nástrojů a okno historie se počítají podle stáří v tazích, bez ní by se prompt lišil už od minulého tahu a cache
+  // propadla (měření 10. 10. 2026: první lokální tah měl 0 tokenů z cache i po předehřátí).
+  const dalsi = msgs.concat([{ role: "user", content: "", ts: new Date().toISOString(), kontext: kontextTahu(app, auth, ctx, L) }]);
+  // sloty: když jsou všechny obsazené ostrou prací, předehřátí vynechat (zařadilo by se za ně a zdrželo ostré tahy)
+  if (cfg.rozjezd.slots && !volnySlot(cfg.rozjezd.slots)) return { stav: "plno" };
+  const store = $app.store(); const klic = "rozjezd:predehrivani";
+  store.set(klic, Number(store.get(klic) || 0) + 1);
+  let r;
+  try {
+    r = llmPredehrej(druhy, [sys].concat(zpravyProModel(dalsi, L, rezimRec)), nabidka, { lang: L, think: druhy.think === undefined ? false : druhy.think, temperature: 0.3 });
+    // stín: druhý model odpoví na POSLEDNÍ zprávu uživatele vlastní smyčkou nad historií BEZ odpovědi prvního modelu —
+    // čtecí nástroje se vykonají, zápisy ne (nic se neuloží, žádná karta) → porovnání s prvním modelem na živém rozhovoru
+    if (cfg.rozjezd.stin && body && body.stin !== false) {
+      const t0 = Date.now(); const st = { calls: 0, in: 0, out: 0, cached: 0, tools: [] };
+      try {
+        const doUser = msgs.slice(0, msgs.map((m) => m.role).lastIndexOf("user") + 1);
+        const o = stinSmycka(app, auth, L, druhy, rec, ctx, doUser, st);
+        r.stin = { ms: Date.now() - t0, text: String(o.text || "").slice(0, 4000), nastroje: o.nastroje, volani: st.calls, in: st.in || 0, cached: st.cached || 0, out: st.out || 0 };
+      } catch (err) { r.stin = { ms: Date.now() - t0, chyba: String(err && err.message ? err.message : err).slice(0, 200), volani: st.calls, in: st.in || 0, out: st.out || 0 }; }
+    }
+  } finally { store.set(klic, Math.max(0, Number(store.get(klic) || 0) - 1)); }
+  return Object.assign({ stav: r.ok ? "ok" : "chyba" }, r);
 }
 
 // `chyba` = text výjimky, když tah selhal (502/timeout) — měření „kdy to nestíhalo“ (Richard 14. 9.):
@@ -2974,8 +3153,10 @@ function zapisLog(app, auth, rec, cfg, stats, ms, chyba) {
   try {
     const l = new Record(app.findCollectionByNameOrId("ai_chat_log"));
     l.set("stav", chyba ? "chyba" : "ok"); l.set("chyba", chyba ? String(chyba).slice(0, 300) : "");
-    const modely = (stats.modely && stats.modely.length ? stats.modely.join("+") : (stats.model || cfg.model || "")) + (cfg.think ? "#think-" + cfg.think : "")
+    const think = stats.rozjezd === "druhy" && cfg.rozjezd ? cfg.rozjezd.druhy.think : cfg.think;
+    const modely = (stats.modely && stats.modely.length ? stats.modely.join("+") : (stats.model || cfg.model || "")) + (think ? "#think-" + think : "")
       + (cfg.hybrid ? "#" + (stats.tier || "heavy") + (stats.klas ? "+klas" : "") + (stats.predano ? "+predano" : "") : "")
+      + (stats.rozjezd ? "#" + stats.rozjezd : "")
       + (stats.vize ? "#vision-" + stats.vize : "") + (stats.hlas ? "#hlas" + (stats.hlas.fail ? "-fail" : "") : "") + (stats.app ? "#app" : "");
     l.set("user", auth.id); l.set("chat", rec.id); l.set("provider", cfg.provider || ""); l.set("model", modely.slice(0, 120));
     l.set("tokens_in", stats.in); l.set("tokens_out", stats.out); l.set("tokens_cached", stats.cached || 0); l.set("ms", ms); l.set("calls", stats.calls);
@@ -3496,4 +3677,4 @@ function chatChyba(e, err, L) {
 }
 
 
-module.exports = { REZIM, jeRezim, ROZSAH, chybaRozsahu, otestujObrazek, zkontrolujObrazek, zkontrolujPdf, visionAiConfig, orezNahledy, zpravyProModel, pametProjektu, mapaId, chatCfg, chatBrzda, chatChyba, chatAiConfig, chatRun, chatOprav, opravaPrepisu, chatPotvrdit, chatVratit, chatDto, nactiChat, seznamChatu, pametText, ulozPamet, NASTROJE, MAX_PAMET, P };
+module.exports = { REZIM, jeRezim, ROZSAH, chybaRozsahu, otestujObrazek, zkontrolujObrazek, zkontrolujPdf, visionAiConfig, orezNahledy, zpravyProModel, pametProjektu, mapaId, chatCfg, chatBrzda, chatChyba, chatAiConfig, chatRun, chatOprav, opravaPrepisu, chatPotvrdit, chatPredehrat, chatVratit, chatDto, nactiChat, seznamChatu, pametText, ulozPamet, NASTROJE, MAX_PAMET, P };

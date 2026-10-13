@@ -501,4 +501,33 @@ function llmVision(retez, system, user, obrazky, opts) {
   throw e;
 }
 
-module.exports = { llmChat, llmChatTools, llmTranscribe, llmVision, openaiBase, MAX_AUDIO_MB };
+// Předehřátí (10. 10. 2026, strategie „rozjezd“, chat.js chatPredehrat): stejné tělo jako ostrý tah (systém + historie + nástroje),
+// ale výstup 1 token — llama-server si prompt uloží do slotu / paměti (--cache-ram) a první ostrý tah lokálního modelu pak dočítá
+// jen novou zprávu místo 10–20k tokenů historie. Vrací délku a kolik tokenů už bylo z cache; chyby polyká (předehřátí je bonus).
+function llmPredehrej(cfg, zpravyIn, nastroje, opts) {
+  const o = opts || {}; const t0 = Date.now();
+  const provider = String((cfg && cfg.provider) || "ollama").toLowerCase();
+  const tools = (nastroje || []).map((n) => ({ type: "function", function: { name: n.name, description: n.description, parameters: n.parameters } }));
+  try {
+    if (provider === "openai") {
+      const base = openaiBase(cfg && cfg.url); const model = (cfg && cfg.model) || "";
+      const messages = zpravyIn.map(naDratOpenAI);
+      const bohate = { model: model, messages: messages, stream: false, temperature: teplota(o), max_tokens: 1 };
+      const hole = { model: model, messages: messages, stream: false, max_completion_tokens: 1 };
+      if (tools.length) { bohate.tools = tools; hole.tools = tools; }
+      const res = posliOpenAI(cfg, base, bohate, hole, 1, Number(o.timeout) || 120);
+      const u = (res.json && res.json.usage) || {}; const tim = (res.json && res.json.timings) || {};
+      return { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, ms: Date.now() - t0, in: u.prompt_tokens || 0,
+        cached: Number((u.prompt_tokens_details || {}).cached_tokens || tim.cache_n || 0) || 0 };
+    }
+    const { env } = require(`${__hooks}/helpers.js`);
+    const base = trimSlashes((cfg && cfg.url) || env("AI_URL") || "http://localhost:11434");
+    const payload = { model: (cfg && cfg.model) || env("AI_MODEL") || "gpt-oss:20b", stream: false, messages: zpravyIn.map(naDratOllama), tools: tools,
+      options: volbyOllama(cfg, { temperature: teplota(o), num_predict: 1 }) };
+    if (o.think !== undefined) payload.think = o.think;
+    const res = $http.send({ url: base + "/api/chat", method: "POST", body: JSON.stringify(payload), headers: hlavickyOllama(cfg), timeout: Number(o.timeout) || 120 });
+    return { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, ms: Date.now() - t0, in: (res.json && res.json.prompt_eval_count) || 0, cached: 0 };
+  } catch (err) { return { ok: false, ms: Date.now() - t0, chyba: String(err && err.message ? err.message : err).slice(0, 200) }; }
+}
+
+module.exports = { llmChat, llmChatTools, llmTranscribe, llmVision, openaiBase, MAX_AUDIO_MB, llmPredehrej };

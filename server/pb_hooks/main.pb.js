@@ -2024,6 +2024,18 @@ kbRoute("POST", "/chat/potvrdit", (e) => {
   return e.json(200, { chat: vysledek });
 }, $apis.requireAuth(), $apis.bodyLimit(64 * 1024));
 
+// Předehřátí druhého hlavního modelu (rozjezd, 10. 10. 2026): klient volá po každé odpovědi; nic se neukládá, odpověď jen pro měření
+kbRoute("POST", "/chat/predehrat", (e) => {
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const { chatPredehrat, chatCfg } = require(`${__hooks}/chat.js`);
+  const L = userLang(e.auth);
+  const body = e.requestInfo().body || {};
+  const c = chatCfg(e, body, L);
+  if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
+  try { return e.json(200, chatPredehrat($app, e.auth, body, c.cfg, L)); }
+  catch (err) { return e.json(200, { stav: "chyba", chyba: String(err && err.message ? err.message : err).slice(0, 200) }); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024));
+
 // Vrátit u karty nastavení: zapsat do rozhovoru, ať se vrácené nastavení už znovu neprojeví (viz chat.js chatVratit)
 kbRoute("POST", "/chat/vratit", (e) => {
   const { userLang } = require(`${__hooks}/i18n.js`);
