@@ -358,10 +358,20 @@
       "already_sent": "{{email}} zatím nemá účet. Pozvánka k tomuto projektu už odešla dřív, znovu se neposílá.",
       "no_smtp": "{{email}} zatím nemá účet a pozvánka neodešla — instance nemá nastavenou mailovou bránu. Dejte mu vědět jinak.",
       "limit": "{{email}} zatím nemá účet a pozvánka neodešla — dnešní limit pozvánek je vyčerpaný. Dejte mu vědět jinak.",
-      "failed": "{{email}} zatím nemá účet a pozvánku se nepodařilo odeslat. Dejte mu vědět jinak."
+      "failed": "{{email}} zatím nemá účet a pozvánku se nepodařilo odeslat. Dejte mu vědět jinak.",
+      "org_invited": "{{email}} zatím neměl účet — založili jsme mu ho a poslali pozvánku s odkazem na nastavení hesla. Projekt uvidí hned po přihlášení.",
+      "org_invited_password": "{{email}} zatím neměl účet — založili jsme mu ho. Instance nemá mailovou bránu, předejte mu přihlašovací údaje:"
     },
-    "inviteClosedCanInvite": "Sám se tu zaregistrovat nemůže — účet mu musí založit správce. Můžete ho pozvat rovnou.",
+    "inviteClosedCanInvite": "Sám se tu zaregistrovat nemůže — účet mu musí založit správce. Dostal e-mail, ať se vám ozve; pozvat ho můžete i teď.",
     "inviteClosedAskAdmin": "Sám se tu zaregistrovat nemůže — požádejte správce organizace, ať ho pozve.",
+    "inviteClosedAdminAsked": "Sám se tu zaregistrovat nemůže — účet mu musí založit správce. Správce dostal žádost přímo v aplikaci.",
+    "confirm": {
+      "title": "{{email}} není v organizaci a sám se tu zaregistrovat nemůže. Co chcete udělat?",
+      "orgInfo": "Pozvaný člen organizace uvidí i projekty sdílené celé organizaci a seznam lidí a zabírá jeden účet. Pokud má jen nahlédnout, stačí veřejný odkaz.",
+      "invite": "Pozvat do organizace a sdílet",
+      "publicLink": "Jen k nahlédnutí: zapnout veřejný odkaz",
+      "cancel": "Zrušit"
+    },
     "inviteToOrg": "Pozvat do organizace",
     "copyRegisterLink": "Kopírovat odkaz na registraci"
   },

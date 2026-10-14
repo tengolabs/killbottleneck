@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '@/lib/clipboard';
 import { base44 } from '@/api/base44Client';
@@ -76,6 +76,19 @@ export default function UserAdmin() {
   // výsledek pozvánky (dočasné heslo) — kopírovatelný panel místo window.alert
   const [inviteResult, setInviteResult] = useState(null);
   const [inviteCopied, setInviteCopied] = useState(false);
+  // Zvoneček „pozvěte X do organizace" (člen sdílel projekt s adresou bez
+  // účtu) vede sem s ?pozvat=adresa → rovnou otevřený pozvánkový dialog
+  // s předvyplněnou adresou; parametr hned sundat, ať reload dialog neotvírá znovu.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const pozvat = searchParams.get('pozvat');
+    if (!pozvat) return;
+    setInviteEmail(pozvat);
+    setInviteOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('pozvat');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [org, setOrg] = useState(null);
   const [orgName, setOrgName] = useState('');
   const [orgLogoFile, setOrgLogoFile] = useState(null);

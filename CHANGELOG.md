@@ -9,6 +9,28 @@ below before you jump several versions.
 
 ---
 
+## v0.80-beta — 2026-10-14
+
+**Sharing with an address that has no account: invite to the organization right from the Share dialog, or a request to the administrators**
+
+- **Share dialog asks before it sends anything** when the address has no account and self sign-up is closed
+  (registration key, cloud). Someone allowed to invite (administrator, manager, structure manager) gets
+  **Invite to the organization and share**: the account is created as a Member (`invited_by` set), a password-setup
+  e-mail goes out (without SMTP the dialog shows the temporary password once) and the project is shared — one e-mail,
+  which names the project. The second option is **turn on the public link** for a look only. Nothing is created without
+  that confirmation; the quiet share from the owner selector and the assistant's `share_map` never create accounts.
+- **A member who may not invite** shares as before; the recipient's e-mail now says the administrators were asked
+  (instead of "reply to this e-mail"), and the instance administrators and structure managers get an in-app
+  **request** in the bell — one per address regardless of the number of projects, and only when the invitation itself
+  passed the daily caps. Clicking it opens Organization settings with the invite dialog pre-filled.
+- `POST /api/kb/share` has a new read-only action `check` (`registered`, `external`, `registration_open`,
+  `can_invite_to_org`, `needs_confirm`) and `share` takes `invite_to_org: true`; the response carries `invite`,
+  `registration_open`, `can_invite_to_org`, `admin_asked`. `POST /invite` and the share path create accounts through
+  one shared function.
+- **Fixed:** the notification DTO dropped `extra`, so notifications that carry a payload (the "offer the assistant" action
+  since v0.76, the new request) did not open their target.
+- The "new version" notice in the bell is sent only for an exact release tag, not for interim builds between releases.
+
 ## v0.79-beta — 2026-10-13
 
 **Connect your AI agent with one line; OAuth fixes for self-hosted instances and editor clients**

@@ -572,7 +572,7 @@ function provedNastaveni(app, auth, L, name, a, ktx) {
       if (j.member && j.member.registered === false) {
         navic = j.invite === "sent"
           ? ` ${email} has no account yet — an invitation e-mail was sent; they will see the project after registering with this address.`
-          : ` ${email} has no account on this instance yet — they will see the project once they register with this address${j.registration_open === false ? " (registration is closed: an administrator invites them first, invite_member)" : ""}.`;
+          : ` ${email} has no account on this instance yet — they will see the project once they register with this address${j.registration_open === false ? (j.admin_asked ? " (registration is closed: the administrators were asked in the app to invite them)" : " (registration is closed: an administrator invites them first — invite_member, the user confirms)") : ""}.`;
       }
       return { text: `Project "${m.getString("title")}" shared with ${email}: ${soucasne ? `${soucasne} → ${perm}` : perm}.${navic}` };
     }

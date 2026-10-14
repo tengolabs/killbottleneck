@@ -116,6 +116,11 @@ const STRINGS = {
     cs: "Do týmu vás zve {inviter}.",
     en: "You were invited by {inviter}.",
   },
+  // pozvánka vzniklá sdílením projektu (sdílení s adresou bez účtu na zavřené instanci)
+  "sysmail.inviteFromProject": {
+    cs: "Do týmu vás zve {inviter} a hned s vámi sdílí projekt „{project}“ — po přihlášení ho najdete mezi projekty.",
+    en: "{inviter} invites you to the team and shares the project “{project}” with you right away — you will find it among your projects after signing in.",
+  },
   // Nález z ostrého provozu 8. 8. 2026: pozvaná kolegyně se z aplikace omylem
   // odklikala a zpátky už netrefila. Mail byl jediná stopa, kterou po nás měla —
   // a neříkal ani JMÉNO ORGANIZACE, ani adresu; uměl jen znovu nastavit heslo.
@@ -184,6 +189,11 @@ const STRINGS = {
   "sharemail.howClosed": {
     cs: "Na této instanci si účet nezaložíte sami — zakládá ho správce organizace. Odpovězte na tento e-mail a {actorEmail} vám pozvánku zařídí. Jakmile budete mít účet s adresou {email}, projekt uvidíte.",
     en: "You cannot create an account on this instance yourself — accounts are set up by the organization admin. Reply to this e-mail and {actorEmail} will arrange an invitation. Once you have an account with the address {email}, you will see the project.",
+  },
+  // zavřená instance, sdílející zvát nesmí: správci dostali žádost přímo v aplikaci
+  "sharemail.howClosedAsked": {
+    cs: "Na této instanci si účet nezaložíte sami — zakládá ho správce organizace. Správcům jsme poslali žádost, aby vám účet s adresou {email} založili; jakmile vznikne, přijde vám pozvánka e-mailem a projekt uvidíte hned po přihlášení.",
+    en: "You cannot create an account on this instance yourself — accounts are set up by the organization admin. The admins have been asked to create an account for {email}; once it exists, you will receive an invitation e-mail and see the project right after signing in.",
   },
   "sharemail.button": { cs: "Zaregistrovat se", en: "Sign up" },
   "sharemail.ignore": {
@@ -322,6 +332,11 @@ const STRINGS = {
   "notify.mapShared": {
     cs: "{actor} vám nasdílel projekt „{project}\"",
     en: "{actor} shared the project \"{project}\" with you",
+  },
+  // žádost správci: člen sdílel projekt s adresou bez účtu na zavřené instanci
+  "notify.inviteRequest": {
+    cs: "{actor} sdílí projekt „{project}\" s {email} — ten zatím nemá účet. Pozvěte ho do organizace.",
+    en: "{actor} shared the project \"{project}\" with {email}, who has no account yet. Invite them to the organization.",
   },
   "notify.mapShareUpgraded": {
     cs: "{actor} vám rozšířil přístup k projektu „{project}\"",
@@ -645,10 +660,10 @@ const STRINGS = {
   "err.userLimitExceeded": {
     cs: "Máte {count} účtů, ale váš tarif je pro {max}. Odeberte prosím "
       + "přebývající účty v Nastavení → Tým; do té doby nejde nic ukládat. "
-      + "Potřebujete-li víc lidí, přejděte na tarif Privát.",
+      + "Za lidi se v placených tarifech neplatí — stačí zvolit tarif v Nastavení organizace.",
     en: "You have {count} accounts but your plan covers {max}. Please remove "
       + "the extra accounts in Settings → Team; until then nothing can be saved. "
-      + "If you need more people, move to the Private plan.",
+      + "Paid plans don't charge per person — just pick a plan in Organization settings.",
   },
   "err.aiTrialQuota": {
     cs: "Ve zkušební verzi je AI omezená a pro tento měsíc je vyčerpaná. "

@@ -43,7 +43,13 @@ onMailerRecordPasswordResetSend((e) => {
       const jmeno = zvouci.getString("full_name");
       if (jmeno) kdo = jmeno + " (" + zvouciEmail + ")";
     } catch (err) { /* zvoucí už neexistuje → stačí e-mail */ }
-    uvod = { key: "sysmail.inviteFrom", params: { inviter: kdo } };
+    // Pozvánka vzniklá SDÍLENÍM projektu řekne, o jaký projekt jde — jinak
+    // příjemce dostane „kolega vás zve do týmu" a netuší, proč (14. 10. 2026).
+    const { vyzvedniProjektPozvanky } = require(`${__hooks}/pozvaniDoOrganizace.js`);
+    const projekt = vyzvedniProjektPozvanky(e.app, e.record.getString("email"));
+    uvod = projekt
+      ? { key: "sysmail.inviteFromProject", params: { inviter: kdo, project: projekt } }
+      : { key: "sysmail.inviteFrom", params: { inviter: kdo } };
   }
   // Nález z ostrého provozu 8. 8. 2026: pozvaná kolegyně vypadla z aplikace
   // (tlačítko zpět) a zpátky netrefila — mail uměl JEN znovu nastavit heslo.
@@ -2759,26 +2765,94 @@ kbRoute("POST", "/share", (e) => {
   // které quiet existuje, člověku bez účtu taky nepřijde. Vrací pole pro dialog:
   //   invite               stav pozvánky (pozvankaSdileni.js; "external" = kontakt bez adresy)
   //   registration_open    smí se adresát zaregistrovat sám (jinak mu účet musí založit správce)
-  //   can_invite_to_org    smí sdílející rovnou pozvat do organizace (/invite)
+  //   can_invite_to_org    smí sdílející rovnou pozvat do organizace (/invite, nebo share s invite_to_org)
+  //   admin_asked          sdílející zvát nesmí → správci dostali žádost ve zvonečku
+  // ⚠️ Účet se tu NIKDY nezakládá. Člen organizace vidí týmové projekty i seznam
+  // lidí a zabírá křeslo — sdílení jedné mapy to nesmí udělat potichu (Richard
+  // 14. 10. 2026). Založení jde jen na výslovné potvrzení z dialogu (invite_to_org výš).
   const pozvatBezUctu = (adresa) => {
     const { posliPozvankuKeSdileni, registraceOtevrena } = require(`${__hooks}/pozvankaSdileni.js`);
-    const { isExternalOwner, smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
-    const role = e.auth.getString("role");
-    let stav = "external";
-    if (!isExternalOwner(adresa)) {
+    const { isExternalOwner, orgManagerEmails } = require(`${__hooks}/helpers.js`);
+    const { smiZvatDoOrganizace } = require(`${__hooks}/pozvaniDoOrganizace.js`);
+    const otevrena = registraceOtevrena($app);
+    const smiZvat = smiZvatDoOrganizace(e.auth);
+    const vysledek = (stav, extra) => Object.assign({
+      invite: stav,
+      registration_open: otevrena,
+      can_invite_to_org: smiZvat,
+    }, extra || {});
+    if (isExternalOwner(adresa)) return vysledek("external");
+
+    // Zavřená registrace a sdílející zvát nesmí → správci dostanou žádost přímo
+    // v aplikaci (dřív mail „odpovězte na e-mail", a správce byl často ten, kdo
+    // sdílel — 14. 10. 2026). Mail adresátovi to říká rovnou.
+    const zadostSpravcum = !otevrena && !smiZvat;
+    let stav = "failed";
+    try {
+      stav = posliPozvankuKeSdileni($app, { komu: adresa, odesilatel: e.auth, mapa: map, lang: L, spravceDostalZadost: zadostSpravcum });
+    } catch (err) {
+      stav = "failed";
+      try { $app.logger().warn("share: pozvánka neregistrovanému selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+
+    // Brzda (nález /checkup 14. 10.): žádost jde jen tam, kde prošla i pozvánka
+    // adresátovi (denní stropy sdílejícího a instance), nebo kde mail nemá jak
+    // odejít (bez brány je zvoneček jediný kanál). „limit"/„failed" = žádná žádost,
+    // jinak by jeden člen smyšlenými adresami ohlušil všechny správce. Dedup bez
+    // mapy: jedna žádost na adresu a správce, ne za každý projekt. Adresáti =
+    // ti, kdo pozvánkový dialog ve Správě organizace skutečně otevřou
+    // (admin + správce struktury), ne manažer, kterého tam stránka nepustí.
+    let zadost = false;
+    if (zadostSpravcum && ["sent", "already_sent", "no_smtp"].includes(stav)) {
       try {
-        stav = posliPozvankuKeSdileni($app, { komu: adresa, odesilatel: e.auth, mapa: map, lang: L });
+        const spravci = orgManagerEmails($app);
+        const klice = [];
+        spravci.forEach((komu) => {
+          // dedup_key má strop 200 znaků a dvě dlouhé adresy by ho přelezly → otisk
+          const klic = "invite_request:" + $security.md5(komu + ":" + adresa).slice(0, 24);
+          klice.push(klic);
+          notify($app, {
+            email: komu,
+            actorEmail: e.auth.email(),
+            type: "org_notice",
+            mapId: map.id,
+            textKey: "notify.inviteRequest",
+            params: { actor: e.auth.email(), email: adresa, project: map.getString("title") },
+            dedupKey: klic,
+            extra: { pozvat: adresa },
+          });
+        });
+        // „žádost odešla" = záznam opravdu existuje (dnešní nebo dřívější), ne počet správců
+        zadost = klice.some((k) => {
+          try { return $app.findRecordsByFilter("notifications", "dedup_key = {:k}", "", 1, 0, { k: k }).length > 0; } catch (err) { return false; }
+        });
       } catch (err) {
-        stav = "failed";
-        try { $app.logger().warn("share: pozvánka neregistrovanému selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+        try { $app.logger().warn("share: žádost správci selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
       }
     }
-    return {
-      invite: stav,
-      registration_open: registraceOtevrena($app),
-      can_invite_to_org: role === "admin" || role === "manager" || smiEditovatOrgStrukturu(e.auth),
-    };
+    return vysledek(stav, { admin_asked: zadost });
   };
+
+  // Předběžná otázka dialogu PŘED sdílením: má adresa účet, je registrace zavřená
+  // a smí sdílející zvát? Když ano, dialog se zeptá, jestli člověka pozvat do
+  // organizace (vidí pak týmové projekty, seznam lidí, zabírá křeslo), jen
+  // sdílet, nebo mu dát veřejný odkaz k nahlédnutí. Nic nezapisuje, nic neposílá.
+  if (action === "check") {
+    const email = String(info.email || "").trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return e.json(400, { error: t(L, "err.emailInvalid") });
+    const { registraceOtevrena } = require(`${__hooks}/pozvankaSdileni.js`);
+    const { smiZvatDoOrganizace } = require(`${__hooks}/pozvaniDoOrganizace.js`);
+    const { isExternalOwner } = require(`${__hooks}/helpers.js`);
+    let registrovan = false;
+    try { $app.findFirstRecordByFilter("users", "email = {:email}", { email: email }); registrovan = true; } catch (err) { /* bez účtu */ }
+    const externi = isExternalOwner(email);
+    const otevrena = registraceOtevrena($app);
+    const smiZvat = smiZvatDoOrganizace(e.auth);
+    return e.json(200, {
+      registered: registrovan, external: externi, registration_open: otevrena, can_invite_to_org: smiZvat,
+      needs_confirm: !registrovan && !externi && !otevrena && smiZvat,
+    });
+  }
 
   if (action === "list") {
     // `has_work`: člen má na mapě SVOU práci (garant uzlu / řešitel legacy
@@ -2866,9 +2940,36 @@ kbRoute("POST", "/share", (e) => {
     // druhá o sdílení by byla duplikát (Richard 21. 8.: „nesmí chodit 2
     // notifikace"). Jen doručení — autorizace se flagem nemění.
     const quiet = !!info.quiet;
+    // Pozvání do organizace jde JEN na výslovné potvrzení z dialogu (Richard
+    // 14. 10. 2026): člen organizace vidí týmové projekty i seznam lidí a zabírá
+    // křeslo — sdílení jedné mapy to nesmí udělat potichu. Zadání práce (quiet)
+    // ani asistent (share_map) příznak neposílají; asistent zve přes
+    // invite_member s potvrzením karty. Účet vzniká PŘED sdílením, takže
+    // oznámení o nasdílení níž už dojde registrovanému.
+    let zalozeni = null;
+    if (info.invite_to_org === true && !quiet) {
+      const { registraceOtevrena } = require(`${__hooks}/pozvankaSdileni.js`);
+      const { pozviDoOrganizace, smiZvatDoOrganizace } = require(`${__hooks}/pozvaniDoOrganizace.js`);
+      const { isExternalOwner } = require(`${__hooks}/helpers.js`);
+      if (!smiZvatDoOrganizace(e.auth)) return e.json(403, { error: t(L, "err.inviteAdminManagerOnly") });
+      if (!isExternalOwner(email) && !registraceOtevrena($app)) {
+        const v = pozviDoOrganizace($app, { zvouci: e.auth, email: email, role: "user", projekt: map.getString("title") });
+        if (v.ok) {
+          zalozeni = Object.assign({ invite: "org_invited" }, v.invited_via_email ? { invited_via_email: true } : { temp_password: v.temp_password });
+        } else if (v.errorKey !== "err.userAlreadyExists") {
+          // strop křesel apod. — nic nesdílet, dialog ukáže důvod; závod
+          // (účet mezitím vznikl) je v pořádku, sdílí se registrovanému
+          return e.json(v.status, { error: t(L, v.errorKey) });
+        }
+      }
+    }
     const RANK = { read: 0, work: 1, edit: 2 };
     if (maILc(sharedWith, email)) {
-      if (RANK[perm] <= RANK[permOf(email)]) {
+      // Stejné/nižší právo = „už je sdílena" — ledaže právě vznikl účet
+      // (invite_to_org nad dřív nasdílenou adresou bez účtu): pak je odpověď
+      // úspěch s pozvánkou, ne 400 (nález /checkup 14. 10.: dorovnání lidí,
+      // kterým dřív přišel jen mail „odpovězte správci").
+      if (RANK[perm] <= RANK[permOf(email)] && !zalozeni) {
         return e.json(400, { error: t(L, "err.alreadyShared") });
       }
       setPermLists(email, perm);
@@ -2900,7 +3001,7 @@ kbRoute("POST", "/share", (e) => {
       return e.json(200, Object.assign({
         success: true, upgraded: true, updated: map.getString("updated"),
         member: { email: email, full_name: jmeno, permission: perm, registered: registrovan },
-      }, registrovan ? {} : pozvatBezUctu(email)));
+      }, registrovan ? (zalozeni || {}) : pozvatBezUctu(email)));
     }
     // Přístup se váže na e-mail — adresát bez účtu ho získá, jakmile se s ním
     // zaregistruje. O sdílení se dozví pozvánkou e-mailem (pozvatBezUctu výš).
@@ -2935,7 +3036,7 @@ kbRoute("POST", "/share", (e) => {
     // mapy (owner+termín uzlu) nespadlo na 409 „mapa změněna" po tomto sdílení
     return e.json(200, Object.assign(
       { success: true, updated: map.getString("updated"), member: { email: email, full_name: fullName, permission: perm, registered: registrovan } },
-      registrovan ? {} : pozvatBezUctu(email)
+      registrovan ? (zalozeni || {}) : pozvatBezUctu(email)
     ));
   }
 
@@ -3537,78 +3638,16 @@ kbRoute("POST", "/ai-test", (e) => {
 kbRoute("POST", "/invite", (e) => {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
-  // Zve admin, manažer — a nově i správce struktury: je to personální práce
-  // a bez ní by musel o každý nový účet žádat admina (Richard 17. 8.).
-  const { smiEditovatOrgStrukturu } = require(`${__hooks}/helpers.js`);
-  const myRole = e.auth.getString("role");
-  if (myRole !== "admin" && myRole !== "manager" && !smiEditovatOrgStrukturu(e.auth)) {
-    return e.json(403, { error: t(L, "err.inviteAdminManagerOnly") });
-  }
+  // Zve admin, manažer — a správce struktury: je to personální práce a bez ní
+  // by musel o každý nový účet žádat admina (Richard 17. 8.). Logika (role,
+  // strop křesel, úvodní mapa, pozvánkový mail) žije v pozvaniDoOrganizace.js,
+  // protože tutéž cestu používá i sdílení projektu s adresou bez účtu.
+  const { pozviDoOrganizace } = require(`${__hooks}/pozvaniDoOrganizace.js`);
   const info = e.requestInfo().body || {};
-  const email = (info.email || "").trim().toLowerCase();
-  if (!email) return e.json(400, { error: t(L, "err.emailRequired") });
-  // pseudo-adresa externího kontaktu nesmí dostat účet (viz guard v users hooku —
-  // tohle je druhá cesta do users přes $app.save, hook ji nechytí)
-  {
-    const { isExternalOwner } = require(`${__hooks}/helpers.js`);
-    if (isExternalOwner(email)) return e.json(400, { error: t(L, "err.extEmailReserved") });
-  }
-  // ⚠️ Vyšší roli než člen smí udělit VÝHRADNĚ admin. Dřív se degradace vázala
-  // na jméno role („manager"), takže kdokoli další, kdo směl zvát, si mohl
-  // pozvánkou založit administrátorský účet — a na instanci bez SMTP dostal
-  // heslo rovnou v odpovědi. Vyrobil to správce struktury (role `user`),
-  // ověřeno živě 17. 8. Podmínka proto NESMÍ vyjmenovávat role, které srazit;
-  // musí vyjmenovat tu jedinou, která smí povyšovat.
-  let role = ["admin", "manager", "user"].includes(info.role) ? info.role : "user";
-  if (myRole !== "admin") role = "user";
-  try {
-    $app.findFirstRecordByFilter("users", "email = {:email}", { email: email });
-    return e.json(400, { error: t(L, "err.userAlreadyExists") });
-  } catch (err) { /* neexistuje — pokračujeme */ }
-
-  // ⚠️ Pozvánka jde přes $app.save, takže record hook nad users se NESPUSTÍ —
-  // strop se proto musí ověřit i tady, jinak by ho admin obešel zvaním.
-  const { userLimitReached } = require(`${__hooks}/helpers.js`);
-  if (userLimitReached($app)) {
-    return e.json(403, { error: t(L, "err.userLimitReached") });
-  }
-
-  const tempPassword = $security.randomString(12);
-  const users = $app.findCollectionByNameOrId("users");
-  const rec = new Record(users);
-  rec.set("email", email);
-  rec.set("emailVisibility", true);
-  rec.set("role", role);
-  // značka pozvánky: mailer podle ní pošle uvítací pozvánku místo „resetu
-  // hesla" (samoregistrovaný účet značku nemá a reset dostane resetem)
-  rec.set("invited_by", e.auth.email());
-  rec.setPassword(tempPassword);
-  $app.save(rec);
-
-  // ⚠️ Úvodní mapu musíme založit i TADY. Pozvánka jde přes $app.save, takže
-  // record hook nad `users` (kde se mapa zakládá při self-registraci) se
-  // NESPUSTÍ — pozvaný kolega by zůstal s prázdnou obrazovkou, přestože
-  // Richard chtěl mapu pro každého. Je to tatáž past „dvě cesty do users",
-  // kvůli které se tu už jednou musel duplikovat strop křesel.
-  // (Nález kontrolního panelu 6. 8. 2026.)
-  try {
-    const { zalozUvodniMapu } = require(`${__hooks}/helpers.js`);
-    zalozUvodniMapu($app, rec);
-  } catch (err) {
-    try { $app.logger().warn("uvodni_mapa: pozvánka", "error", String(err)); } catch (e2) { /* log je bonus */ }
-  }
-
-  // s nakonfigurovaným SMTP jde pozvánka e-mailem (reset hesla) a dočasné
-  // heslo se NEvrací v odpovědi; bez SMTP zůstává ruční předání hesla
-  if ($app.settings().smtp.enabled) {
-    try {
-      $mails.sendRecordPasswordReset($app, rec);
-      return e.json(200, { success: true, email: email, role: role, invited_via_email: true });
-    } catch (err) {
-      // e-mail selhal — spadneme na ruční předání, účet už existuje
-    }
-  }
-  return e.json(200, { success: true, email: email, role: role, temp_password: tempPassword });
+  const v = pozviDoOrganizace($app, { zvouci: e.auth, email: info.email, role: info.role });
+  if (!v.ok) return e.json(v.status, { error: t(L, v.errorKey) });
+  return e.json(200, Object.assign({ success: true, email: v.email, role: v.role },
+    v.invited_via_email ? { invited_via_email: true } : { temp_password: v.temp_password }));
 }, $apis.requireAuth());
 
 // Nahlásit chybu nebo nápad provozovateli.

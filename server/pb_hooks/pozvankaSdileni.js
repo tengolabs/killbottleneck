@@ -53,7 +53,8 @@ function registraceOtevrena(app) {
  *   "limit"         denní strop (odesílatel nebo instance)
  *   "failed"        odeslání selhalo (zalogováno)
  *
- * @param {object} o { komu, odesilatel (users record), mapa (goalmaps record), lang }
+ * @param {object} o { komu, odesilatel (users record), mapa (goalmaps record), lang,
+ *                     spravceDostalZadost (zavřená instance: správci už dostali žádost v aplikaci) }
  */
 function posliPozvankuKeSdileni(app, o) {
   const { env } = require(`${__hooks}/helpers.js`);
@@ -106,7 +107,10 @@ function posliPozvankuKeSdileni(app, o) {
     nadpis: t(lang, "sharemail.heading"),
     odstavce: [
       t(lang, "sharemail.body", p),
-      t(lang, otevrena ? "sharemail.howOpen" : "sharemail.howClosed", p),
+      // zavřená instance: buď správce dostal žádost v aplikaci (sdílející zvát
+      // nesmí), nebo zbývá odpovědět sdílejícímu (nouzová cesta, když založení
+      // účtu selhalo — typicky strop křesel)
+      t(lang, otevrena ? "sharemail.howOpen" : (o.spravceDostalZadost ? "sharemail.howClosedAsked" : "sharemail.howClosed"), p),
       t(lang, "sharemail.ignore"),
     ],
     paticka: patickaRadky(t, lang, info.base, adresaOdesilatele),

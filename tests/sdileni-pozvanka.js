@@ -11,8 +11,14 @@
 //   - registrovaný adresát pozvánku nedostane,
 //   - denní strop odesílatele,
 //   - `quiet` (zadání práce) pozvánku neregistrovanému POŠLE,
-//   - instance s registračním klíčem: text „účet zakládá správce", bez odkazu
-//     na registraci; can_invite_to_org jen admin/manažer.
+//   - instance s registračním klíčem (14. 10. 2026, systémové řešení „sestra mi
+//     nasdílela mapu a nemám se jak přihlásit"):
+//       · ČLEN sdílí → pozvánka říká „správce dostal žádost" (bez „odpovězte"),
+//         admin dostane notifikaci org_notice s extra.pozvat, člen nesmí zvát;
+//       · ADMIN sdílí → účet vznikne ROVNOU (invited_by, role user), odpověď
+//         org_invited + registered:true, pozvánkový mail s nastavením hesla
+//         jmenuje projekt; mail „účet zakládá správce" NEodchází;
+//       · pozvaný si přes odkaz nastaví heslo a mapu vidí.
 // Zprávy se NEPOSÍLAJÍ ven — vlastní SMTP jímka (vzor notify-email-dedup.js).
 const { execSync } = require('child_process');
 const net = require('net');
@@ -194,26 +200,121 @@ const sdilej = (token, body) => api('POST', '/api/kb/share', { token, body: { ac
 
     console.log('== B: registrace na klíč ==');
     maily.length = 0;
-    ST = await spust('-e KB_SETUP_CODE=e2e-kod');
+    ST = await spust('-e KB_SETUP_CODE=e2e-kod -e KB_SHARE_INVITE_DAILY_CAP=4'); // strop 4: pátá pozvánka člena = limit
     await zapniSmtp(ST);
     const ADM = await ucet('adm@example.com', { setup_code: 'e2e-kod' });
     const U = await ucet('u@example.com', { setup_code: 'e2e-kod' });
     expect(ADM.record?.role === 'admin' && U.record?.role === 'user', 'admin a člen založeni');
     const MA = await mapa(ADM.token, 'Adminův');
     const MU = await mapa(U.token, 'Členův');
+    const ucty = async (email) => (await api('GET', `/api/collections/users/records?filter=${encodeURIComponent(`email="${email}"`)}`, { token: ST })).json?.items || [];
+
+    console.log('-- check: dialog se ptá jen tam, kde to dává smysl --');
+    r = await api('POST', '/api/kb/share', { token: ADM.token, body: { action: 'check', mapId: MA.id, email: 'cizi2@example.com' } });
+    expect(r.json.needs_confirm === true && r.json.registered === false && r.json.can_invite_to_org === true, `admin + adresa bez účtu → ptát se (${JSON.stringify(r.json)})`);
+    r = await api('POST', '/api/kb/share', { token: U.token, body: { action: 'check', mapId: MU.id, email: 'cizi@example.com' } });
+    expect(r.json.needs_confirm === false && r.json.can_invite_to_org === false, 'člen → neptat se (zvát nesmí)');
+    r = await api('POST', '/api/kb/share', { token: ADM.token, body: { action: 'check', mapId: MA.id, email: 'u@example.com' } });
+    expect(r.json.needs_confirm === false && r.json.registered === true, 'adresa s účtem → neptat se');
+
+    console.log('-- člen sdílí → správce dostane žádost, účet NEvzniká --');
     r = await sdilej(U.token, { mapId: MU.id, email: 'cizi@example.com' });
     expect(r.json.invite === 'sent' && r.json.registration_open === false && r.json.can_invite_to_org === false,
       `člen: pozvánka odešla, registrace zavřená, pozvat do organizace nesmí (${JSON.stringify([r.json.invite, r.json.registration_open, r.json.can_invite_to_org])})`);
-    r = await sdilej(ADM.token, { mapId: MA.id, email: 'cizi2@example.com' });
-    expect(r.json.can_invite_to_org === true, 'admin: smí pozvat do organizace');
+    expect(r.json.admin_asked === true, 'člen: správce dostal žádost v aplikaci');
+    expect((await ucty('cizi@example.com')).length === 0, 'člen: účet NEvznikl');
     await sleep(1500);
     const zav = pro('cizi@example.com');
     expect(zav.length === 1, `pozvánka doručena (${zav.length})`);
     if (zav[0]) {
       const txt = dekoduj(zav[0].raw);
       expect(/nezaložíte sami/.test(txt), 'text vysvětluje, že účet zakládá správce');
+      expect(/poslali žádost/.test(txt), 'text říká, že správci dostali žádost');
+      expect(!/Odpovězte na tento e-mail/.test(txt), 'bez „odpovězte na e-mail" — žádost šla v aplikaci');
       expect(!/\/register\?email=/.test(txt), 'bez odkazu na registraci, která by stejně nešla');
     }
+    r = await api('GET', `/api/collections/notifications/records?perPage=5&sort=-created&filter=${encodeURIComponent('type="org_notice"')}`, { token: ADM.token });
+    const zadost = (r.json?.items || [])[0];
+    expect(!!zadost && /cizi@example\.com/.test(zadost.text || '') && zadost.extra?.pozvat === 'cizi@example.com' && zadost.map === MU.id,
+      `admin dostal žádost „pozvěte cizi@example.com" s vazbou na mapu (${JSON.stringify(zadost && [zadost.type, zadost.text, zadost.extra, zadost.map])})`);
+    r = await api('GET', `/api/collections/notifications/records?perPage=5&filter=${encodeURIComponent('type="org_notice"')}`, { token: U.token });
+    expect((r.json?.totalItems || 0) === 0, 'člen žádost nedostal (jen správci)');
+    const MU2 = await mapa(U.token, 'Členův druhý');
+    r = await sdilej(U.token, { mapId: MU2.id, email: 'cizi@example.com' });
+    r = await api('GET', `/api/collections/notifications/records?perPage=5&filter=${encodeURIComponent('type="org_notice"')}`, { token: ADM.token });
+    expect((r.json?.totalItems || 0) === 1, `druhý projekt s touž adresou → žádost se neopakuje (${r.json?.totalItems})`);
+    r = await sdilej(U.token, { mapId: MU.id, email: 'xx@example.com' });
+    r = await sdilej(U.token, { mapId: MU.id, email: 'xy@example.com' });
+    r = await sdilej(U.token, { mapId: MU.id, email: 'xz@example.com' });
+    expect(r.json.invite === 'limit' && r.json.admin_asked === false, `nad denním stropem pozvánek žádná žádost správci (${JSON.stringify([r.json.invite, r.json.admin_asked])})`);
+
+    console.log('-- admin sdílí BEZ potvrzení → jen mail, účet NEvzniká --');
+    maily.length = 0;
+    r = await sdilej(ADM.token, { mapId: MA.id, email: 'cizi2@example.com' });
+    expect(r.json.invite === 'sent' && r.json.can_invite_to_org === true && r.json.member?.registered === false && !r.json.temp_password,
+      `admin bez invite_to_org: pozvánka, bez účtu (${JSON.stringify([r.json.invite, r.json.can_invite_to_org, r.json.member?.registered])})`);
+    expect((await ucty('cizi2@example.com')).length === 0, 'admin bez potvrzení: účet NEvznikl');
+    await sleep(1200);
+    if (pro('cizi2@example.com')[0]) {
+      const txt = dekoduj(pro('cizi2@example.com')[0].raw);
+      expect(/Odpovězte na tento e-mail/.test(txt), 'mail: „odpovězte sdílejícímu" (ten zvát umí)');
+    }
+
+    console.log('-- quiet (zadání práce) na zavřené instanci NIKDY nezakládá účet --');
+    r = await sdilej(ADM.token, { mapId: MA.id, email: 'tichy@example.com', permission: 'work', quiet: true, invite_to_org: true });
+    expect(r.json.invite === 'sent' && (await ucty('tichy@example.com')).length === 0, `quiet + invite_to_org → jen pozvánka, bez účtu (${r.json.invite})`);
+
+    console.log('-- admin potvrdí „pozvat do organizace" → účet vzniká, i nad dřív nasdílenou adresou --');
+    maily.length = 0;
+    r = await sdilej(ADM.token, { mapId: MA.id, email: 'cizi2@example.com', invite_to_org: true });
+    expect(r.json.success === true && r.json.invite === 'org_invited' && r.json.invited_via_email === true && r.json.member?.registered === true,
+      `invite_to_org nad už sdílenou adresou: účet + pozvánka místo 400 (${JSON.stringify([r.status, r.json.invite, r.json.invited_via_email, r.json.member?.registered, r.json.error])})`);
+    expect(!r.json.temp_password, 'dočasné heslo se s mailovou bránou NEvrací');
+    const novy = (await ucty('cizi2@example.com'))[0];
+    expect(!!novy && novy.role === 'user' && novy.invited_by === 'adm@example.com',
+      `účet existuje, role user, invited_by = admin (${JSON.stringify(novy && [novy.role, novy.invited_by])})`);
+    await sleep(1500);
+    const poz = pro('cizi2@example.com');
+    expect(poz.length === 1, `přišel přesně JEDEN mail — pozvánka, ne navíc „účet zakládá správce" (${poz.length})`);
+    let resetToken = '';
+    if (poz[0]) {
+      const txt = dekoduj(poz[0].raw);
+      expect(/Adminův/.test(txt), 'pozvánka jmenuje sdílený projekt');
+      expect(/sdílí s vámi projekt|sdílí projekt/.test(txt), 'pozvánka říká, že jde o sdílení projektu');
+      expect(/nastav/i.test(txt) && /reset-password\?token=/.test(txt), 'pozvánka nese odkaz na nastavení hesla');
+      expect(!/nezaložíte sami/.test(txt), 'mail NEříká „účet zakládá správce"');
+      // dekoduj() vrací raw + dekódované části; v raw je QP „token=3D…" → brát NEJDELŠÍ nález
+      resetToken = [...txt.matchAll(/reset-password\?token=(?:3D)?([A-Za-z0-9._-]+)/g)].map((m) => m[1]).sort((a, b) => b.length - a.length)[0] || '';
+    }
+    r = await sdilej(ADM.token, { mapId: MA.id, email: 'cizi2@example.com', permission: 'edit' });
+    expect(r.json.upgraded === true && r.json.invite === undefined, 'povýšení už založeného účtu nezve podruhé');
+    if (resetToken) {
+      r = await api('POST', '/api/collections/users/confirm-password-reset', { body: { token: resetToken, password: PW, passwordConfirm: PW } });
+      expect(r.status === 204 || r.status === 200, `pozvaný si odkazem nastavil heslo (${r.status})`);
+      const C2 = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'cizi2@example.com', password: PW } })).json;
+      r = await api('GET', `/api/collections/goalmaps/records/${MA.id}`, { token: C2.token });
+      expect(r.status === 200, `pozvaný po přihlášení sdílenou mapu otevře (${r.status})`);
+      r = await api('GET', `/api/collections/notifications/records?perPage=5&filter=${encodeURIComponent('type="map_shared"')}`, { token: C2.token });
+      expect((r.json?.totalItems || 0) >= 1, `pozvaný má v aplikaci oznámení o nasdílení (${r.json?.totalItems})`);
+    }
+
+    console.log('-- kdo smí: správce struktury ano (jen role user), člen ne --');
+    const OM = await ucet('om@example.com', { setup_code: 'e2e-kod' });
+    await api('PATCH', `/api/collections/users/records/${OM.record.id}`, { token: ST, body: { is_org_manager: true } });
+    const MO = await mapa(OM.token, 'Strukturní');
+    r = await sdilej(OM.token, { mapId: MO.id, email: 'cizi5@example.com', invite_to_org: true, role: 'admin' });
+    const u5 = (await ucty('cizi5@example.com'))[0];
+    expect(r.json.invite === 'org_invited' && !!u5 && u5.role === 'user', `správce struktury založil účet, role user i s podstrčeným role:admin (${JSON.stringify([r.json.invite, u5 && u5.role])})`);
+    r = await sdilej(U.token, { mapId: MU.id, email: 'cizi6@example.com', invite_to_org: true });
+    expect(r.status === 403 && (await ucty('cizi6@example.com')).length === 0, `člen s invite_to_org → 403, bez účtu (${r.status})`);
+
+    console.log('-- admin potvrdí BEZ mailové brány → dočasné heslo v odpovědi --');
+    await api('PATCH', '/api/settings', { token: ST, body: { smtp: { enabled: false } } });
+    r = await sdilej(ADM.token, { mapId: MA.id, email: 'cizi3@example.com', invite_to_org: true });
+    expect(r.json.invite === 'org_invited' && typeof r.json.temp_password === 'string' && r.json.temp_password.length >= 8 && r.json.member?.registered === true,
+      `bez SMTP: účet založen, dočasné heslo k předání (${JSON.stringify([r.json.invite, !!r.json.temp_password])})`);
+    const C3 = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'cizi3@example.com', password: r.json.temp_password || 'x' } })).json;
+    expect(!!C3.token, 'dočasné heslo funguje');
   } catch (e) {
     fail++; console.log('  ❌ výjimka', e.stack || e.message);
   } finally {

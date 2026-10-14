@@ -358,10 +358,20 @@
       "already_sent": "{{email}} has no account yet. An invitation to this project was already sent earlier and is not sent again.",
       "no_smtp": "{{email}} has no account yet and no invitation was sent — this instance has no mail server set up. Let them know another way.",
       "limit": "{{email}} has no account yet and no invitation was sent — today's invitation limit is used up. Let them know another way.",
-      "failed": "{{email}} has no account yet and the invitation could not be sent. Let them know another way."
+      "failed": "{{email}} has no account yet and the invitation could not be sent. Let them know another way.",
+      "org_invited": "{{email}} had no account yet — we created one and sent an invitation with a link to set a password. They will see the project right after signing in.",
+      "org_invited_password": "{{email}} had no account yet — we created one. This instance has no mail server, so hand over the sign-in details:"
     },
-    "inviteClosedCanInvite": "They cannot sign up here on their own — an admin has to create the account. You can invite them right away.",
+    "inviteClosedCanInvite": "They cannot sign up here on their own — an admin has to create the account. They got an e-mail asking them to contact you; you can still invite them now.",
     "inviteClosedAskAdmin": "They cannot sign up here on their own — ask your organization admin to invite them.",
+    "inviteClosedAdminAsked": "They cannot sign up here on their own — an admin has to create the account. The admin has been asked directly in the app.",
+    "confirm": {
+      "title": "{{email}} is not in the organization and cannot sign up here on their own. What do you want to do?",
+      "orgInfo": "An invited member of the organization also sees projects shared with the whole organization and the people list, and takes up one seat. If they only need a look, a public link is enough.",
+      "invite": "Invite to the organization and share",
+      "publicLink": "Just a look: turn on the public link",
+      "cancel": "Cancel"
+    },
     "inviteToOrg": "Invite to organization",
     "copyRegisterLink": "Copy sign-up link"
   },

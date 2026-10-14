@@ -346,12 +346,16 @@ const NOTIFY_NIKDY_MAILEM = ["new_version"];
  * takže ani restart kontejneru nikoho nezasype podruhé. Žádné další pole
  * s „poslední oznámenou verzí" proto není potřeba.
  *
- * Vývojové buildy (`dev`, `-dirty`) se neoznamují: instance se během ladění
- * restartuje pořád dokola a zvoneček by z toho byl k nepoužití.
+ * Oznamuje se jen VYDÁNÍ (přesný tag: v0.80, v0.80-beta, v1.2-rc1). Vývojové
+ * buildy (`dev`, `-dirty`) i průběžné buildy mezi vydáními (`v0.79-beta-7-g8c346b4`
+ * z `git describe`) mlčí: instance se během ladění restartuje pořád dokola a
+ * průběžná aktualizace (třeba jen cloudová oprava bez nové verze, Richard
+ * 14. 10. 2026) by všem poslala holé „aktualizováno na v0.79-beta-7-g…".
  */
+const VERZE_VYDANI = /^v\d[\d.]*(-(beta|rc|alpha)[\d.]*)?$/;   // shodně s cloud/build-image.sh
 function oznamNovouVerzi(app) {
   const verze = String(env("VERSION") || "").trim();
-  if (!verze || verze === "dev" || verze.indexOf("-dirty") !== -1) return 0;
+  if (!VERZE_VYDANI.test(verze)) return 0;
 
   // Už oznámeno? Jeden dotaz místo procházení všech účtů. Drží to i přes
   // restart procesu, protože se ptáme DAT, ne paměti.

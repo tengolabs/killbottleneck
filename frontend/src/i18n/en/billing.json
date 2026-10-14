@@ -14,27 +14,58 @@
   },
   "membership": {
     "heading": "Plan & payment",
-    "hint": "Choose a plan and payment method.",
+    "hintActive": "Your membership is active. The plans are listed below; we'll arrange a plan change with you by e-mail.",
     "hintTrial": "Your trial runs until {{date}}. Choose a plan and payment method — your data and address stay unchanged.",
+    "planLabel": "Plan",
     "plan": {
-      "cloud-lite-year": "Cloud Lite — yearly",
-      "cloud-lite-quarter": "Cloud Lite — quarterly",
-      "privat-standard-month": "Private Standard",
-      "privat-business-month": "Private Business"
+      "cloud-lite": "KB Cloud Lite",
+      "cloud-pro": "KB Cloud Pro",
+      "cloud-ai-agent": "KB Cloud AI Agent"
     },
-    "planHint": {
-      "cloud-lite-year": "shared server, 2 users, AI included",
-      "cloud-lite-quarter": "shared server, 2 users, AI included",
-      "privat-standard-month": "your own server, unlimited users",
-      "privat-business-month": "your own server, priority support"
+    "features": {
+      "cloud-lite": [
+        "Shared server in Germany, HTTPS",
+        "Unlimited people",
+        "AI assistant: 50 turns a week",
+        "Backups and updates handled by us",
+        "Self-service: help and guides"
+      ],
+      "cloud-pro": [
+        "A dedicated server just for you",
+        "Separate data, your own backups",
+        "Task attachments up to 5 GB",
+        "AI assistant: 200 turns a week",
+        "E-mail support"
+      ],
+      "cloud-ai-agent": [
+        "Everything in KB Cloud Pro on a stronger server",
+        "Hermes agent works through tasks from your map (on your AI key)",
+        "AI assistant: 550 turns a week",
+        "Priority support"
+      ]
     },
+    "compareLink": "Compare plans on the website",
+    "pricingUrl": "https://killbottleneck.com/pricing",
+    "periodLabel": "Billing period",
     "period": {
       "year": "year",
       "quarter": "3 months",
       "month": "month"
     },
+    "periodPick": {
+      "month": "Monthly",
+      "quarter": "Quarterly",
+      "year": "Yearly"
+    },
+    "yearFree": "A year = 10 monthly payments, 2 months free.",
     "payByCard": "Pay by card",
     "cardUnavailable": "Card payment is coming soon — please use bank transfer (yearly) or contact support@killbottleneck.com.",
+    "cardUnavailableNoTransfer": "Card payment is coming soon — choose yearly payment by bank transfer or contact support@killbottleneck.com.",
+    "payerEmail": "When paying by card, use the e-mail you created the instance with — we activate your membership based on it.",
+    "writeUs": "Write to us",
+    "mailSubject": "Plan change: {{plan}} ({{period}}) — instance {{slug}}",
+    "ownServerByMail": "We'll arrange the move to your own server with you by e-mail — we set up the server and move your data. In the app, card payment is currently available for KB Cloud Lite.",
+    "changeByMail": "We'll arrange a change of plan or billing period with you by e-mail so you don't pay twice — we adjust your existing subscription instead of adding a second one.",
     "orderByTransfer": "Order via bank transfer (invoice)",
     "transferYearlyOnly": "Bank transfer is only available for the yearly plan.",
     "billingFirst": "Please fill in and save the billing details above first.",

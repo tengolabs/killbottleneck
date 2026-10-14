@@ -49,6 +49,7 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
   // nepoznal, že se adresát nic nedozví (nález z bety 16. 9. 2026).
   const [pozvanka, setPozvanka] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [potvrzeni, setPotvrzeni] = useState(null); // adresa bez účtu na zavřené instanci čeká na volbu
   const [linkCopied, setLinkCopied] = useState(false);
   const { user } = useAuth();
   // jeden `busy` pro všech pět mutací (jako dřív jeden `submitting`); texty chyb
@@ -93,44 +94,72 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
       setNewPermission('read');
       setCopied(false);
       setPozvanka(null);
+      setPotvrzeni(null);
       setLinkCopied(false);
     }
   }, [open, mapId, loadMembers]);
 
-  const handleShare = () => {
-    if (!email.trim()) return;
-    return f.run(async () => {
-      try {
-        setPozvanka(null);
-        setLinkCopied(false);
-        const res = await shareMap({ action: 'share', mapId, email: email.trim(), permission: newPermission });
-        if (res?.error) {
-          setError(res.error);
-        } else {
-          bump(res);
-          // povýšení existujícího člena (server vrací `upgraded`) mění ŘÁDEK,
-          // nepřidává nový — jinak byl e-mail v seznamu dvakrát, se dvěma
-          // úrovněmi a duplicitním React key (nález panelu 20. 8. 2026)
-          setMembers(prev => (res.upgraded
-            ? prev.map((m) => (m.email === res.member.email
-              ? { ...m, permission: res.member.permission }
-              : m))
-            : [...prev, res.member]));
-          if (res.member?.registered === false && res.invite && res.invite !== 'external') {
-            setPozvanka({
-              email: res.member.email,
-              invite: res.invite,
-              registrationOpen: !!res.registration_open,
-              canInviteToOrg: !!res.can_invite_to_org,
-            });
-          }
-          setEmail('');
+  // Sdílení s adresou bez účtu na zavřené instanci se NEJDŘÍV zeptá (akce
+  // `check`): pozvat do organizace (vidí pak týmové projekty, seznam lidí,
+  // zabírá křeslo), nebo dát veřejný odkaz k nahlédnutí. „Jen sdílet" tu
+  // schválně NENÍ: adresát se sám zaregistrovat nemůže a sdílející je ten,
+  // kdo ho pozvat umí — byl by to jen odložený krok (Richard 14. 10. 2026).
+  // Účet vznikne jen s příznakem invite_to_org po té volbě.
+  const sdilejTelo = async (adresa, inviteToOrg) => {
+    try {
+      setPozvanka(null);
+      setLinkCopied(false);
+      const res = await shareMap({ action: 'share', mapId, email: adresa, permission: newPermission, ...(inviteToOrg ? { invite_to_org: true } : {}) });
+      if (res?.error) {
+        setError(res.error);
+      } else {
+        bump(res);
+        // povýšení existujícího člena (server vrací `upgraded`) mění ŘÁDEK,
+        // nepřidává nový — jinak byl e-mail v seznamu dvakrát, se dvěma
+        // úrovněmi a duplicitním React key (nález panelu 20. 8. 2026)
+        setMembers(prev => (res.upgraded
+          ? prev.map((m) => (m.email === res.member.email
+            ? { ...m, permission: res.member.permission, registered: res.member.registered }
+            : m))
+          : [...prev, res.member]));
+        // `org_invited`: sdílení na potvrzení založilo účet — člen už JE
+        // registrovaný, ale oznámení (příp. dočasné heslo bez brány) musí zůstat vidět
+        if (res.invite && res.invite !== 'external' && (res.member?.registered === false || res.invite === 'org_invited')) {
+          setPozvanka({
+            email: res.member.email,
+            invite: res.invite === 'org_invited' && res.temp_password ? 'org_invited_password' : res.invite,
+            tempPassword: res.temp_password || '',
+            adminAsked: !!res.admin_asked,
+            registrationOpen: !!res.registration_open,
+            canInviteToOrg: !!res.can_invite_to_org,
+          });
         }
-      } catch (e) {
-        const msg = e.response?.error || e.response?.message;
-        setError(msg || t('shareDialog.addFailed'));
+        setEmail('');
       }
+    } catch (e) {
+      const msg = e.response?.error || e.response?.message;
+      setError(msg || t('shareDialog.addFailed'));
+    }
+  };
+
+  const handleShare = () => {
+    const adresa = email.trim();
+    if (!adresa) return;
+    return f.run(async () => {
+      setPotvrzeni(null);
+      try {
+        const c = await shareMap({ action: 'check', mapId, email: adresa });
+        if (c?.needs_confirm) { setPotvrzeni({ email: adresa }); return; }
+      } catch { /* kontrola je bonus — sdílení poběží jako dřív */ }
+      await sdilejTelo(adresa, false);
     });
+  };
+
+  const potvrdit = (inviteToOrg) => {
+    const adresa = potvrzeni?.email;
+    setPotvrzeni(null);
+    if (!adresa) return;
+    return f.run(() => sdilejTelo(adresa, inviteToOrg));
   };
 
   const handlePermissionChange = (memberEmail, permission) => f.run(async () => {
@@ -191,6 +220,13 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
     }
   });
 
+  const handleCopyCredentials = async () => {
+    if (!pozvanka?.tempPassword) return;
+    if (await copyToClipboard(t('tasks:inviteDialog.credentialsCopy', { origin: serverOrigin(), email: pozvanka.email, password: pozvanka.tempPassword }))) {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
   const handleCopyRegisterLink = async () => {
     if (!pozvanka) return;
     const url = `${serverOrigin()}/register?email=${encodeURIComponent(pozvanka.email)}`;
@@ -295,30 +331,70 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
             <p className="text-sm text-destructive">{f.error}</p>
           )}
 
+          {potvrzeni && (
+            <div data-testid="share-confirm-org" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-2">
+              <div className="flex gap-2">
+                <MailWarning className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
+                <div className="space-y-1">
+                  <p className="font-medium">{t('shareDialog.confirm.title', { email: potvrzeni.email })}</p>
+                  <p className="text-muted-foreground">{t('shareDialog.confirm.orgInfo')}</p>
+                </div>
+              </div>
+              <Button size="sm" className="w-full" disabled={f.busy} onClick={() => potvrdit(true)} data-testid="share-confirm-invite">
+                <UserPlus className="w-4 h-4" />
+                {t('shareDialog.confirm.invite')}
+              </Button>
+              {!isPublic && (
+                <Button size="sm" variant="outline" className="w-full" disabled={f.busy} onClick={() => { setPotvrzeni(null); setEmail(''); handleTogglePublic(); }} data-testid="share-confirm-public">
+                  <Globe className="w-4 h-4" />
+                  {t('shareDialog.confirm.publicLink')}
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="w-full" onClick={() => setPotvrzeni(null)}>
+                {t('shareDialog.confirm.cancel')}
+              </Button>
+            </div>
+          )}
+
           {pozvanka && (
             <div
               data-testid="share-invite-notice"
               data-invite={pozvanka.invite}
               className={`rounded-lg border p-3 text-sm space-y-2 ${
-                ['sent', 'already_sent'].includes(pozvanka.invite)
+                ['sent', 'already_sent', 'org_invited', 'org_invited_password'].includes(pozvanka.invite)
                   ? 'border-primary/30 bg-primary/5'
                   : 'border-amber-500/40 bg-amber-500/10'
               }`}
             >
               <div className="flex gap-2">
-                {['sent', 'already_sent'].includes(pozvanka.invite)
+                {['sent', 'already_sent', 'org_invited', 'org_invited_password'].includes(pozvanka.invite)
                   ? <MailCheck className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
                   : <MailWarning className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />}
                 <div className="space-y-1">
                   <p>{t(`shareDialog.invite.${pozvanka.invite}`, { email: pozvanka.email })}</p>
-                  {!pozvanka.registrationOpen && (
+                  {!pozvanka.registrationOpen && !['org_invited', 'org_invited_password'].includes(pozvanka.invite) && (
                     <p className="text-muted-foreground">
-                      {pozvanka.canInviteToOrg ? t('shareDialog.inviteClosedCanInvite') : t('shareDialog.inviteClosedAskAdmin')}
+                      {pozvanka.canInviteToOrg
+                        ? t('shareDialog.inviteClosedCanInvite')
+                        : (pozvanka.adminAsked ? t('shareDialog.inviteClosedAdminAsked') : t('shareDialog.inviteClosedAskAdmin'))}
                     </p>
                   )}
                 </div>
               </div>
-              {!pozvanka.registrationOpen && pozvanka.canInviteToOrg && (
+              {pozvanka.invite === 'org_invited_password' && (
+                <div className="space-y-2" data-testid="share-temp-password">
+                  <div className="rounded-lg border bg-secondary/30 p-2 text-sm space-y-1">
+                    <p><span className="text-muted-foreground">{t('tasks:inviteDialog.emailColon')}</span> {pozvanka.email}</p>
+                    <p><span className="text-muted-foreground">{t('tasks:inviteDialog.tempPasswordColon')}</span> <code className="font-mono">{pozvanka.tempPassword}</code></p>
+                  </div>
+                  <Button size="sm" variant="outline" className="w-full" onClick={handleCopyCredentials}>
+                    {linkCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    {linkCopied ? t('tasks:inviteDialog.copied') : t('tasks:inviteDialog.copyButton')}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">{t('tasks:inviteDialog.passwordOnce')}</p>
+                </div>
+              )}
+              {!pozvanka.registrationOpen && pozvanka.canInviteToOrg && !['org_invited', 'org_invited_password'].includes(pozvanka.invite) && (
                 <Button size="sm" variant="outline" className="w-full" onClick={() => setInviteOpen(true)}>
                   <UserPlus className="w-4 h-4" />
                   {t('shareDialog.inviteToOrg')}

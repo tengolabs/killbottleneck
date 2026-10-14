@@ -88,6 +88,15 @@ const zvonecek = async (token) => {
     const poDirty = await zvonecek(token);
     ok(poDirty.length === 2, `rozdělaná práce zvoneček nebudí (${poDirty.length})`);
 
+    console.log('== průběžný build mezi vydáními (git describe) se neoznamuje ==');
+    // Richard 14. 10. 2026: cloudová oprava bez nové verze = bez zvonečku. Bez téhle
+    // podmínky by všichni dostali holé „aktualizováno na v0.42-3-gabc1234".
+    restartuj('-e KB_VERSION=v0.42-3-gabc1234');
+    ok(await pockej(), 'instance na průběžném buildu naběhla');
+    await sleep(2500);
+    const poDescribe = await zvonecek(token);
+    ok(poDescribe.length === 2, `průběžný build zvoneček nebudí (${poDescribe.length})`);
+
     console.log('== body novinek pro známou verzi ==');
     // v0.38-beta má body v pb_hooks/novinky.js; ostatní verze dostanou holé
     // oznámení. Nikdy se nic nedomýšlí — co není zapsané, se neposílá.

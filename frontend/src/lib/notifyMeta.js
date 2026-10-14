@@ -89,6 +89,9 @@ export const notifyTarget = (n) => {
   // nebo Správa organizace — tam žije tabulka struktury i seznam lidí.
   // ⚠️ Bez tohohle spadl klik na oznámení „jste správcem struktury" do TABULKY
   // ÚKOLŮ (výchozí větev níž) — Richardův nález 17. 8.
+  // žádost „pozvěte X do organizace" (člen sdílel projekt s adresou bez účtu):
+  // rovnou pozvánkový dialog s předvyplněnou adresou, ne mapa
+  if (n.type === 'org_notice' && n.extra && n.extra.pozvat) return `/admin/users?pozvat=${encodeURIComponent(n.extra.pozvat)}`;
   if (n.type === 'org_notice') return n.map_id ? `/map/${n.map_id}` : '/admin/users';
   // připomínka: událost → kalendář s otevřeným detailem; uzel → mapa s uzlem
   if (n.type === 'reminder' || n.type === 'event_invited') {

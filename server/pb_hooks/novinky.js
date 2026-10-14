@@ -11,6 +11,20 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.80-beta": {
+    cs: [
+      "Sdílíte projekt s někým, kdo tu ještě nemá účet a sám se zaregistrovat nemůže? Dialog Sdílet se zeptá: Pozvat do organizace a sdílet (účet vznikne hned, pozvánka odejde e-mailem), nebo jen zapnout veřejný odkaz k nahlédnutí.",
+      "Kdo zvát do organizace nesmí, nasdílí projekt na adresu jako dřív — správci dostanou do zvonečku žádost s připravenou pozvánkou a účet založí jedním kliknutím.",
+      "Pozvánka e-mailem už neříká „odpovězte na tento e-mail“, ale komu vznikla žádost a co bude dál.",
+      "Upozornění na novou verzi přijde jen u skutečného vydání, ne u průběžných sestavení.",
+    ],
+    en: [
+      "Sharing a project with someone who has no account here yet and cannot sign up on their own? The Share dialog asks: Invite to the organization and share (the account is created right away and the invitation goes out by e-mail), or just turn on the public link for a look.",
+      "Those who may not invite to the organization share the project with the address as before — the administrators get a request in the bell with a prepared invitation and create the account with one click.",
+      "The e-mail invitation no longer says \"reply to this e-mail\" but who received the request and what happens next.",
+      "The new-version notice now arrives only for a real release, not for interim builds.",
+    ],
+  },
   "v0.79-beta": {
     cs: [
       "Připojte si AI agenta jedním řádkem: po přihlášení (a kdykoli v menu pod jménem → Připojit AI agenta) zkopírujete větu do Claude Code, Codexu nebo Cursoru, agent si killBottleneck nastaví sám a vy se jen přihlásíte v prohlížeči — žádné heslo ani klíč se do agenta nevkládá.",
