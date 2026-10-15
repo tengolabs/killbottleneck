@@ -26,6 +26,8 @@ const KEY_MODEL = 'kb-chat-model';
 // dřív se při každém potvrzení další karty v témže tahu znovu aplikovaly všechny karty nastavení od poslední
 // zprávy uživatele, takže Vrátit u jazyka a potvrzení pozvánky vrátilo UI do angličtiny, zatímco účet byl česky
 // (panel 4. 10. 2026).
+// scéna z nástroje start_relax (chat.js enum) → id scény v aplikaci
+const SCENA_Z_KARTY = { aquarium: 'akvarium', beehive: 'ul', ants: 'mraveniste' };
 const klicKarty = (dto, mi, ki, k) => `${(dto && dto.id) || ''}:${k.id || `${mi}:${ki}:${k.type}:${k.co || ''}`}`;
 function projevKarty(dto, patchUser, klient, aplikovane) {
   const msgs = (dto && dto.messages) || [];
@@ -40,6 +42,9 @@ function projevKarty(dto, patchUser, klient, aplikovane) {
       if (s) projev = () => { setSkin(s); if (patchUser) patchUser({ skin_id: k.skin_id }); };
     } else if (k.type === 'theme') {
       projev = () => setTheme(k.theme === 'dark' ? 'dark' : 'light');
+    } else if (k.type === 'relax') {
+      // nástroj start_relax (14. 10. 2026): pauzu spustí prohlížeč (AsistentContext.spustRelax přes klient z panelu)
+      projev = () => { if (klient && klient.spustRelax) klient.spustRelax({ minut: k.minutes, scena: SCENA_Z_KARTY[k.scene] }); };
     } else if (k.type === 'nastaveni') {
       projev = () => aplikujKlienta(k, patchUser, klient);
     } else if (k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'nastaveni' && !k.odkaz.vraceno) {

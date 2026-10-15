@@ -40,6 +40,9 @@ const Organizace = lazy(() => import('./pages/Organizace'));
 const LiteApp = lazy(() => import('./lite/LiteApp'));
 // AI chat na boku — líně: do hlavního balíku nepatří; v lite se stáhne až po klepnutí
 const AsistentPanel = lazy(() => import('./components/asistent/AsistentPanel'));
+// Relax (14. 10. 2026): vrstva s akváriem / úlem — montuje se JEN když pauza běží (AsistentContext.relax),
+// jinak nulová zátěž; líný chunk, do lite rozpočtu nejde
+const RelaxVrstva = lazy(() => import('./components/relax/RelaxVrstva'));
 
 const Spinner = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -82,6 +85,12 @@ const AsistentHost = ({ children }) => {
       <div style={odsun ? { paddingRight: odsun } : undefined} className="transition-[padding]">{children}</div>
       {zobrazit && <Suspense fallback={null}><AsistentPanel /></Suspense>}
       {liteOtevren && <Suspense fallback={null}><AsistentPanel lite /></Suspense>}
+      {/* zamčený relax po F5: tmavý závoj z hlavního balíku zakryje mapu, než dojede chunk vrstvy */}
+      {!!user && !!A.relax && (
+        <Suspense fallback={A.relax.zamek ? <div className="fixed inset-0 z-[60] bg-[#06151a]" data-testid="relax-zavoj" /> : null}>
+          <RelaxVrstva lite={lite} />
+        </Suspense>
+      )}
     </>
   );
 };

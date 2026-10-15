@@ -9,6 +9,33 @@ below before you jump several versions.
 
 ---
 
+## v0.82-beta — 2026-10-15
+
+**Relax: a guarded break with an aquarium, a beehive or an ant colony, right next to the assistant**
+
+- **The fish button in the assistant's header swaps the map for the scene** and back; **type `relax`** to the
+  assistant, pick the chip in an empty chat, or let the assistant offer a break when you write that you are
+  tired — a calm **aquarium**, **beehive** or **ant colony** scene starts (scene picker on the right edge). A countdown
+  is optional: `relax 15`, the **5 · 15 · 30 min** presets next to "Relax running", or the assistant's offer; **+5** extends it. Nothing goes to the AI model for the word itself; the assistant's
+  `start_relax` tool only appears when the conversation is about tiredness or a break, and only after you agreed.
+- **Two layouts:** full screen, or **next to the chat** (the scene takes the whole left side, the chat stays on
+  the right and keeps working); enlarging temporarily from there returns next to the chat with ✕ or Esc. On phones
+  always full screen. The toolbar fades when the mouse rests, the countdown stays readable.
+- **Lock the screen with a 4-digit PIN** and step away: the lock survives a page reload and covers the app
+  before anything else is shown; five wrong PINs pause input for 30 s. It is a curtain for passers-by, not
+  security — the dialog says so and points to the system lock (Win+L).
+- **When the countdown ends** a soft chime plays, the scene dims and both the scene and the chat offer
+  **Back to work** / **5 more min** / **Keep relaxing**; a locked screen stays locked until the PIN is entered.
+- **The first time you open the assistant each day** the aquarium starts next to the chat by itself (once a day).
+  The assistant also offers a break **after ~50 minutes of continuous work** (at most once an hour) and adds a
+  **Relax 5 min** chip after a bigger turn (a guide or three or more tools). The scenes are self-contained
+  static files (`/relax/*.html`, English copies for the English UI), loaded only while a break runs; they are never
+  cached by the offline service worker.
+
+Upgrade notes: no configuration changes.
+
+---
+
 ## v0.81-beta — 2026-10-15
 
 **killBottleneck for Windows, and a server outage no longer signs you out**

@@ -11,6 +11,7 @@ import { dokumenty as apiSeznam, dokument as apiDokument, dokumentUloz, dokument
 import { saveBlob, safeFilename } from '@/lib/saveFile';
 import PametPohled from './PametPohled';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
+import { zacniTah } from '@/lib/tahSirky';
 
 // Dokumenty asistenta (30. 9. 2026) — poznámky, koncepty e-mailů a sumáře, které
 // asistent napsal (draft_text) nebo si uživatel založil sám. Richard: „jako když
@@ -334,15 +335,8 @@ export default function DokumentyPanel({ mobil }) {
   const naProjekt = useCallback(() => { if (mobil) { A.setDokOpen(false); A.setOpen(false); } }, [mobil, A]);
 
   // tažení za levou hranu = šířka (stejně jako panel chatu)
-  const tah = useRef(null);
-  const naTah = useCallback((e) => {
-    e.preventDefault();
-    tah.current = { x: e.clientX, w: A.dokWidth };
-    const move = (ev) => { if (tah.current) A.setDokWidth(tah.current.w + (tah.current.x - ev.clientX)); };
-    const up = () => { tah.current = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }, [A]);
+  // tažení šířky: pointer capture + úklid i nad iframe relaxu (lib/tahSirky.js, 15. 10. 2026)
+  const naTah = useCallback((e) => zacniTah(e, { sirka: A.dokWidth, nastav: A.setDokWidth }), [A]);
   // na úzkém okně se vejde, co zbude vedle chatu (48 px mapy vlevo nechat vidět)
   const sirka = sirkaDokumentu(okno, A.width, A.dokWidth);
 

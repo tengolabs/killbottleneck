@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Bot, ChevronDown, ChevronUp, FileText, FolderOpen, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Moon, Trash2, X } from 'lucide-react';
-import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA } from '@/lib/storageKeys';
+import { Bot, ChevronDown, ChevronUp, FileText, Fish, FolderOpen, History, ImagePlus, Loader2, PanelRightClose, Plus, Send, Sunrise, Moon, Trash2, X } from 'lucide-react';
+import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA, KEY_RELAX_AKTIVITA, KEY_RELAX_RANO } from '@/lib/storageKeys';
+import { useRelaxOdpocet, formatOdpocet } from '@/components/relax/useRelaxOdpocet';
+import { NAD_PODIL } from '@/components/relax/RelaxVrstva';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/lib/AuthContext';
-import { useAsistent, MIN_W, MAX_W, sirkaDokumentu } from '@/lib/AsistentContext';
+import { useAsistent, MIN_W, MAX_W, sirkaDokumentu, RELAX_SABLONY } from '@/lib/AsistentContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAiModes } from '@/hooks/useAiEnabled';
 import { setSkin, effectiveTheme } from '@/lib/theme';
@@ -27,6 +29,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { savedMode } from '@/lib/liteMode';
 import { nactiStupen } from '@/lib/citelnost';
 import { pb } from '@/api/pb';
+import { zacniTah } from '@/lib/tahSirky';
 
 // AI chat na boku (13. 9. 2026): vpravo, přes celou výšku, minimalizovatelný na
 // ouško. Rozhovor drží AsistentContext (nad Routerem); tahle komponenta jen
@@ -43,6 +46,71 @@ const sKlientem = (kontext) => ({ ...kontext, klient: { theme: effectiveTheme(),
 const IKONA_REZIMU = { porada: '☀ ', nocni: '☾ ', rozbor: '⚒ ', trideni: '☰ ', novy_projekt: '✦ ', po_schuzce: '✎ ', revize: '↻ ', priprava: '☷ ', tymova_porada: '⚑ ' };
 const MAX_TEXT = 8000; // strop zprávy na serveru (chat.js)
 const CHYBA_TEXTU = { textDlouhy: 'textTooLong', textPrazdny: 'textEmpty', textChyba: 'textError', zvukVelky: 'voiceTooBig' };
+
+// ---- Relax (Richard 14. 10. 2026) ----
+// Slovo „relax“ / „relax 15“ (i čip „🐟 Relax 5 min“) spustí pauzu v PROHLÍŽEČI, bez modelu — 0 tokenů, žádný tah.
+const RX_RELAX = /^\s*(?:🐟\s*)?relax(?:\s+(\d{1,3}))?(?:\s*min(?:ut|uty|utes|s)?\.?)?\s*[.!]?\s*$/iu;
+// Hlídač pauzy: po ~50 minutách souvislé práce (psaní, kliky; mezera > 10 min = nový blok) nabídne relax,
+// nejvýš 1× za hodinu a ne do hodiny po pauze. Stav per účet v localStorage, ať reload nezačíná od nuly.
+const HLIDAC_BLOK_MS = 50 * 60000;
+const HLIDAC_MEZERA_MS = 10 * 60000;
+const HLIDAC_ZNOVU_MS = 60 * 60000;
+const HLIDAC_KROK_MS = 30000; // zápis nejvýš jednou za 30 s
+const ctiAktivitu = (klic) => { try { return JSON.parse(nactiKlic(klic) || '{}') || {}; } catch { return {}; } };
+function useHlidacPauzy(klic, aktivni) {
+  const [nabidka, setNabidka] = useState(false);
+  useEffect(() => {
+    if (!aktivni) return undefined;
+    let posledniZapis = 0;
+    const f = () => {
+      const ted = Date.now();
+      if (ted - posledniZapis < HLIDAC_KROK_MS) return;
+      posledniZapis = ted;
+      const s = ctiAktivitu(klic);
+      const start = !s.posledni || ted - s.posledni > HLIDAC_MEZERA_MS ? ted : (s.start || ted);
+      const n = { ...s, start, posledni: ted };
+      if (ted - start >= HLIDAC_BLOK_MS && ted - (s.nabidnuto || 0) >= HLIDAC_ZNOVU_MS && ted - (s.posledniRelax || 0) >= HLIDAC_ZNOVU_MS) { n.nabidnuto = ted; setNabidka(true); }
+      ulozKlic(klic, JSON.stringify(n));
+    };
+    document.addEventListener('keydown', f, true);
+    document.addEventListener('pointerdown', f, true);
+    return () => { document.removeEventListener('keydown', f, true); document.removeEventListener('pointerdown', f, true); };
+  }, [klic, aktivni]);
+  return [nabidka, setNabidka];
+}
+// Stav pauzy v panelu (relax běží / skončila): v rozložení „vedle“ je to jediné místo s odpočtem u chatu
+function RelaxStav({ relax, t, onKonec, onProdluz, onDal }) {
+  const sOdpoctem = Number(relax.konecV) > 0;
+  const zbyva = useRelaxOdpocet(relax.konecV, sOdpoctem && !relax.hotovo);
+  return (
+    <div className="mx-3 mb-2 rounded-lg border border-primary/50 bg-background/70 px-2.5 py-1.5 text-xs flex items-center gap-1.5 whitespace-nowrap overflow-x-auto" data-testid="chat-relax-stav" data-hotovo={relax.hotovo ? '1' : '0'}>
+      <Fish className="w-4 h-4 text-primary shrink-0" />
+      {relax.hotovo ? (
+        <>
+          <span className="font-medium">{t('relaxHotovo')}</span>
+          <Button size="sm" className="h-7" onClick={onKonec} data-testid="chat-relax-pokracuji">{t('relaxPokracuji')}</Button>
+          <Button size="sm" variant="outline" className="h-7" onClick={() => onProdluz(5)} data-testid="chat-relax-jeste">{t('relaxJeste')}</Button>
+          <Button size="sm" variant="ghost" className="h-7" onClick={onDal} data-testid="chat-relax-dal">{t('relaxDal')}</Button>
+        </>
+      ) : (
+        <>
+          {/* jeden řádek (Richard 15. 10.: „zbytečně na dva řádky“): stav · 5 15 30 min · ✕ */}
+          <span className="font-medium tabular-nums" data-testid="chat-relax-odpocet" data-odpocet={sOdpoctem ? '1' : '0'}>{sOdpoctem ? t('relaxBezi', { cas: formatOdpocet(zbyva) }) : t('relaxBeziVolne')}</span>
+          <span className="h-4 w-px bg-border" aria-hidden="true" />
+          {sOdpoctem
+            ? <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onProdluz(5)} data-testid="chat-relax-plus5">{t('relaxPlus5')}</Button>
+            : (
+              <>
+                {RELAX_SABLONY.map((m) => <Button key={m} size="sm" variant="ghost" className="h-7 px-1.5 tabular-nums" onClick={() => onProdluz(m)} title={t('relaxSablona', { count: m })} data-testid={`chat-relax-sablona-${m}`}>{m}</Button>)}
+                <span className="text-muted-foreground">{t('relaxMin')}</span>
+              </>
+            )}
+          <Button size="icon" variant="outline" className="h-7 w-7 ml-auto shrink-0" onClick={onKonec} title={t('relaxKonec')} aria-label={t('relaxKonec')} data-testid="chat-relax-konec"><X className="w-3.5 h-3.5" /></Button>
+        </>
+      )}
+    </div>
+  );
+}
 
 // `lite` (4. 10. 2026): panel ve zjednodušeném zobrazení — otevřeno/zavřeno drží vlastní stav
 // kontextu (liteOpen; zavřít = host panel odmontuje), kreslí se vždy přes celou obrazovku
@@ -84,7 +152,7 @@ export default function AsistentPanel({ lite = false }) {
   useEffect(() => { if (setDostupny) setDostupny(dostupny); }, [dostupny, setDostupny]);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const rozhovor = useAsistentChat({ open: panel.open && dostupny, klient: { navigate } });
+  const rozhovor = useAsistentChat({ open: panel.open && dostupny, klient: { navigate, spustRelax: ctx.spustRelax } });
   // jedno „A" pro zbytek komponenty: stav panelu + rozhovor
   const A = useMemo(() => ({ ...panel, ...rozhovor }), [panel, rozhovor]);
   const location = useLocation();
@@ -220,6 +288,24 @@ export default function AsistentPanel({ lite = false }) {
   const poradaDnes = (A.seznam || []).some((c) => c.mode === 'porada' && String(c.updated || '').slice(0, 10) === dnes);
   const nabidnoutPoradu = dostupny && poradaNabidka && !poradaOdmitnuta && !poradaDnes;
   const odmitniPoradu = () => { ulozKlic(klicUctu(KEY_PORADA_NE), dnes); setPoradaOdmitnuta(true); };
+  // Relax: hlídač 50 minut práce (nabídka v panelu + tečka na oušku) a jednotné spuštění (zapíše čas pauzy pro hlídač)
+  const klicRelax = `${KEY_RELAX_AKTIVITA}:${user?.id || ''}`;
+  const [relaxNabidka, setRelaxNabidka] = useHlidacPauzy(klicRelax, dostupny && !panel.relax);
+  // čas pauzy pro hlídač zapisuje AsistentContext.spustRelax (i pro relax od modelu); obal jen schová nabídku
+  const spustRelax = useCallback((o) => { setRelaxNabidka(false); panel.spustRelax(o || {}); }, [setRelaxNabidka, panel]);
+  const odmitniRelax = () => setRelaxNabidka(false); // `nabidnuto` už je zapsané → příště nejdřív za hodinu
+  // Ráno (Richard 15. 10. 2026: „když ráno poprvé otevřu asistenta, otevři relax akvárium“): první otevření v daném dni
+  // (= stejná podmínka jako nabídka porady: nový den / víc než 8 h od poslední aktivity) spustí akvárium vedle chatu bez
+  // odpočtu, jednou za den (kb-relax-rano:<uid>); jen v plné aplikaci s otevřeným panelem, ne když už relax běží
+  const ranoRef = useRef(false);
+  useEffect(() => {
+    if (ranoRef.current || lite || !ready || !dostupny || !A.open || !poradaNabidka || panel.relax) return;
+    if (nactiKlic(klicUctu(KEY_RELAX_RANO)) === dnes) return;
+    ranoRef.current = true;
+    ulozKlic(klicUctu(KEY_RELAX_RANO), dnes);
+    spustRelax({ scena: 'akvarium', minut: 0, rozlozeni: 'vedle' });
+    // závislosti záměrně jen stráže: běží nejvýš jednou (ranoRef), spustRelax/mobil/klicUctu/dnes se čtou až v tom běhu
+  }, [lite, ready, dostupny, A.open, poradaNabidka, panel.relax]);
 
   // kontext pro server: cesta + otevřená mapa (/map/:id) — „kde uživatel je"
   // + vybraný uzel z editoru (panel.uzel), jen když patří k otevřené mapě; server z toho
@@ -247,9 +333,12 @@ export default function AsistentPanel({ lite = false }) {
   // fokus do políčka: na počítači vždy; na telefonu jen když panel otevřelo
   // klepnutí do lišty dole (jinak by vyskakovala klávesnice při každém otevření)
   const zListy = useRef(false);
+  // (Richard 15. 10.: telefon na ležato je širší než 640 px = „počítač“, a fokus pak vyvolal klávesnici — dotyková
+  // zařízení (pointer: coarse) se berou jako telefon bez ohledu na šířku)
   useEffect(() => {
     if (!A.open || pohled !== 'chat' || !vstup.current) return;
-    if (!mobil || zListy.current) { vstup.current.focus(); zListy.current = false; }
+    let dotyk = false; try { dotyk = window.matchMedia('(pointer: coarse)').matches; } catch { dotyk = false; }
+    if ((!mobil && !dotyk) || zListy.current) { vstup.current.focus(); zListy.current = false; }
   }, [A.open, pohled, mobil]);
   // zmenšení z panelu do lišty (tlačítko u políčka): fokus přejde do políčka lišty,
   // ať klávesnice zůstane a rozepsaný text taky (sdílený stav `text`)
@@ -262,7 +351,15 @@ export default function AsistentPanel({ lite = false }) {
   }, [A.open, mobil]);
   // zavření/zmenšení chatu zavře i Dokumenty → přes hlídač neuložených změn (checkup 1. 10.)
   const zavriChat = useCallback(() => A.opatrne(() => A.setOpen(false)), [A]);
-  const zmensit = useCallback(() => A.opatrne(() => { doListy.current = true; A.setOpen(false); }), [A]);
+  // fokus do lišty jen když uživatel v políčku právě psal (klávesnice byla otevřená) — jinak zmenšení samo otevíralo
+  // klávesnici (Richard 15. 10. 2026, z telefonu při relaxu)
+  // (klepnutí na tlačítko políčku sebere fokus těsně PŘED onClick → bere se i blur z posledních 800 ms)
+  const psalDo = useRef(0);
+  const zmensit = useCallback(() => A.opatrne(() => {
+    const vPolicku = typeof document !== 'undefined' && !!vstup.current && document.activeElement === vstup.current;
+    doListy.current = vPolicku || Date.now() - psalDo.current < 800;
+    A.setOpen(false);
+  }), [A]);
 
   const persistSkin = useCallback((fields) => {
     if (!user?.id) return;
@@ -276,6 +373,9 @@ export default function AsistentPanel({ lite = false }) {
     const obr = zPolicka ? obrazek : null;
     const prilohaPdf = zPolicka ? pdf : null;
     if (!v && !obr && !prilohaPdf) return;
+    // „relax“ / „relax 15“ / čip: pauza v prohlížeči bez modelu (jde i během odpovědi — model k tomu není potřeba)
+    const rel = !obr && !prilohaPdf && v.match(RX_RELAX);
+    if (rel) { if (zPolicka) setText(''); spustRelax({ minut: rel[1] ? Number(rel[1]) : 0 }); return; }
     // Enter během odpovědi / čtení PDF: A.send by zprávu odmítl (loading) — políčko ani
     // přílohu NEmazat, jinak rozepsaný text tiše zmizí (analýza kódu 2, F3-01)
     if (A.loading || pdfCte) return;
@@ -288,7 +388,7 @@ export default function AsistentPanel({ lite = false }) {
       if (prilohaPdf) setPdf((p) => p || prilohaPdf);
       setText((p) => p || v);
     } else if (obr) URL.revokeObjectURL(obr.url);
-  }, [A, text, obrazek, pdf, pdfCte, kontext, patchUser]);
+  }, [A, text, obrazek, pdf, pdfCte, kontext, patchUser, spustRelax]);
   // hlasovka odejde hned (rozhodnutí 30. 9.); když ji server nezpracuje (přepis selhal), zůstane v pruhu k opakování
   const odesliHlas = useCallback(async (h) => (A.loading ? { ok: false, vratit: true } : A.send('', sKlientem(kontext), patchUser, undefined, undefined, h)), [A, kontext, patchUser]);
   const hlas = useHlasovka({ maxS: maxHlas, maxMb: maxHlasMb, onOdeslat: odesliHlas });
@@ -364,15 +464,8 @@ export default function AsistentPanel({ lite = false }) {
   }, [persistSkin]);
 
   // tažení za levou hranu = šířka (bez knihovny; primitiv resizable v ui/ není)
-  const tah = useRef(null);
-  const naTah = useCallback((e) => {
-    e.preventDefault();
-    tah.current = { x: e.clientX, w: A.width };
-    const move = (ev) => { if (tah.current) A.setWidth(tah.current.w + (tah.current.x - ev.clientX)); };
-    const up = () => { tah.current = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }, [A]);
+  // tažení šířky: pointer capture + úklid i nad iframe relaxu (lib/tahSirky.js, 15. 10. 2026)
+  const naTah = useCallback((e) => zacniTah(e, { sirka: A.width, nastav: A.setWidth }), [A]);
 
   // balíček spuštěný odjinud (Nový projekt → „Navrhnout s AI“, zásobník → „Roztřídit s AI“): vyřídit, až je
   // panel volný — během odpovědi by zacniRezim žádost tiše zahodil
@@ -405,6 +498,7 @@ export default function AsistentPanel({ lite = false }) {
         </button>
         <form className="p-2 pt-1 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); odesli(); }}>
           {hlas.aktivni ? <HlasovkaPruh h={hlas} kompaktni /> : (<>
+          {umiHlas && <HlasovkaTlacitko h={hlas} disabled={A.loading} className="h-9 w-9 shrink-0 border border-input" />}
           <input
             ref={vstupListy}
             value={text}
@@ -414,9 +508,7 @@ export default function AsistentPanel({ lite = false }) {
             data-testid="chat-bar-input"
           />
           <Button type="button" size="icon" variant="outline" className="h-9 w-9" title={t('expand')} aria-label={t('expand')} onClick={() => { zListy.current = true; A.setOpen(true); }} data-testid="chat-bar-rozbalit"><ChevronUp className="w-4 h-4" /></Button>
-          {umiHlas && !text.trim()
-            ? <HlasovkaTlacitko h={hlas} disabled={A.loading} className="h-9 w-9" />
-            : <Button type="submit" size="icon" className="h-9 w-9" disabled={A.loading || !text.trim()} aria-label={t('send')} data-testid="chat-bar-send"><Send className="w-4 h-4" /></Button>}
+          <Button type="submit" size="icon" className="h-9 w-9" disabled={A.loading || !text.trim()} aria-label={t('send')} data-testid="chat-bar-send"><Send className="w-4 h-4" /></Button>
           </>)}
         </form>
       </div>
@@ -428,14 +520,15 @@ export default function AsistentPanel({ lite = false }) {
       <button
         type="button"
         onClick={() => A.setOpen(true)}
-        title={nabidnoutPoradu ? t('poradaOffer') : t('toggle')}
+        title={nabidnoutPoradu ? t('poradaOffer') : relaxNabidka ? t('relaxOffer') : t('toggle')}
         aria-label={t('toggle')}
         data-testid="chat-tab"
         className="fixed right-0 top-24 z-30 flex items-center gap-1.5 rounded-l-lg border border-r-0 bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all"
       >
         <Bot className="w-4 h-4 text-primary" />
-        <span className="hidden sm:inline text-xs font-medium">{nabidnoutPoradu ? t('poradaTab') : t('tab')}</span>
+        <span className="hidden sm:inline text-xs font-medium">{nabidnoutPoradu ? t('poradaTab') : relaxNabidka ? t('relaxTab') : t('tab')}</span>
         {nabidnoutPoradu && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" data-testid="chat-tab-porada" />}
+        {!nabidnoutPoradu && relaxNabidka && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" data-testid="chat-tab-relax" />}
       </button>
     );
   }
@@ -447,13 +540,20 @@ export default function AsistentPanel({ lite = false }) {
   while (posledniIdx > 0 && zpravy[posledniIdx].role === 'tool') posledniIdx--;
   const chyba = A.error ? (A.error === 'rate' ? t('errorRate') : A.error === 'timeout' ? t('errorTimeout') : A.error === 'lost' ? t('errorLost') : A.error === 'generic' ? t('errorGeneric') : A.error) : null;
   const chips = t('chips', { returnObjects: true });
+  // telefon na výšku + relax „vedle“ = scéna NAD chatem (RelaxVrstva), panel začíná pod ní
+  const relaxNad = mobil && !!panel.relax && panel.relax.rozlozeni === 'vedle' && !panel.relax.zamek; // i lite (panel přes celou šířku)
+  // čip „🐟 Relax 5 min“ navíc mezi „co dál“ po větší akci (průvodce, nebo tah s ≥ 3 nástroji), ne do hodiny po pauze
+  let relaxNavrh = '';
+  if (!A.loading && !panel.relax && zpravy.length && (zpravy.slice(posledniUzivatelIdx + 1).filter((z) => z.role === 'tool').length >= 3 || (A.chat && A.chat.mode))) {
+    if (Date.now() - (ctiAktivitu(klicRelax).posledniRelax || 0) >= HLIDAC_ZNOVU_MS) relaxNavrh = t('relaxChip');
+  }
 
   return (
     <>
     {panel.dokOpen && <DokumentyPanel mobil={mobil} />}
     <aside
       className={`fixed right-0 top-0 bottom-0 z-40 flex flex-col bg-card border-l shadow-xl w-full ${mobil ? '' : 'sm:w-auto'}`}
-      style={mobil ? undefined : { width: A.width, minWidth: MIN_W, maxWidth: MAX_W }}
+      style={mobil ? (relaxNad ? { top: NAD_PODIL } : undefined) : { width: A.width, minWidth: MIN_W, maxWidth: MAX_W }}
       data-testid="chat-panel"
       aria-label={t('title')}
     >
@@ -493,6 +593,8 @@ export default function AsistentPanel({ lite = false }) {
             </DropdownMenuContent>
           </DropdownMenu>
           {/* Dokumenty (30. 9. 2026): poznámky, e-maily a sumáře od asistenta — panel vlevo od chatu */}
+          {/* relax (Richard 15. 10. 2026): stálý přepínač mapa ⇄ rybičky v hlavičce — bez odpočtu, vedle chatu (na telefonu celá) */}
+          <Button variant={panel.relax ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('relaxToggle')} aria-label={t('relaxToggle')} aria-pressed={!!panel.relax} onClick={() => (panel.relax ? panel.ukonciRelax() : spustRelax({ minut: 0, rozlozeni: 'vedle' }))} data-testid="chat-relax-toggle"><Fish className="w-4 h-4" /></Button>
           <Button variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('dok.title')} aria-label={t('dok.title')} aria-pressed={panel.dokOpen} onClick={() => (panel.dokOpen ? panel.opatrne(() => panel.setDokOpen(false)) : panel.setDokOpen(true))} data-testid="chat-dokumenty-btn"><FolderOpen className="w-4 h-4" /></Button>
           {/* PDF mezi historií a pamětí (Richard 19. 9. 2026) */}
           <Button variant={pohled === 'pdf' ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('pdf.tab')} aria-label={t('pdf.tab')} onClick={() => setPohled((p) => (p === 'pdf' ? 'chat' : 'pdf'))} data-testid="chat-pdf-btn"><FileText className="w-4 h-4" /></Button>
@@ -505,6 +607,17 @@ export default function AsistentPanel({ lite = false }) {
       {pohled === 'pdf' ? <PdfPohled onZpet={() => setPohled('chat')} onOpravit={naOpravit} loading={A.loading} soubory={pdfSeznam} setSoubory={setPdfSeznam} /> : (
         <>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2" data-testid="chat-zpravy">
+            {relaxNabidka && !panel.relax && (
+              <div className="rounded-lg border border-primary/50 bg-background/70 p-3 text-sm" data-testid="chat-relax-nabidka">
+                <p className="inline-flex items-center gap-1.5 font-medium"><Fish className="w-4 h-4 text-primary" />{t('relaxOffer')}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('relaxOfferHint')}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => spustRelax({ minut: 5 })} data-testid="chat-relax-5">{t('relaxOffer5')}</Button>
+                  <Button size="sm" variant="outline" onClick={() => spustRelax({ minut: 15 })} data-testid="chat-relax-15">{t('relaxOffer15')}</Button>
+                  <Button size="sm" variant="ghost" onClick={odmitniRelax} data-testid="chat-relax-ne">{t('relaxOfferNe')}</Button>
+                </div>
+              </div>
+            )}
             {nabidnoutPoradu && !A.loading && (
               <div className="rounded-lg border border-primary/50 bg-background/70 p-3 text-sm" data-testid="chat-porada-nabidka">
                 <p className="inline-flex items-center gap-1.5 font-medium"><Sunrise className="w-4 h-4 text-primary" />{t('poradaOffer')}</p>
@@ -543,7 +656,7 @@ export default function AsistentPanel({ lite = false }) {
               // klíč nese i rozhovor: jinak stav karet (rozepsaná odpověď, otevřená úprava přepisu) přežil přepnutí
               // rozhovoru z historie a karta s jiným počtem otázek pak při odeslání spadla
               <div key={`${(A.chat && A.chat.id) || 'novy'}:${i}`} ref={i === prvniOdpovedIdx ? zacatekOdpovedi : undefined} className={i === prvniOdpovedIdx ? 'scroll-mt-2' : undefined}>
-                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onRevertNastaveni={vratNastaveni} onKlientSkin={potvrdKlientaSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} lzeOpravit={i === posledniUzivatelIdx && !!(A.chat && A.chat.lze_opravit)} onOprav={opravPrepis} />
+                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onRevertNastaveni={vratNastaveni} onKlientSkin={potvrdKlientaSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} lzeOpravit={i === posledniUzivatelIdx && !!(A.chat && A.chat.lze_opravit)} onOprav={opravPrepis} extraNavrh={i === posledniIdx ? relaxNavrh : ''} />
               </div>
             ))}
             {A.loading && (
@@ -558,11 +671,14 @@ export default function AsistentPanel({ lite = false }) {
             {chyba && <p className="text-xs text-destructive px-1" data-testid="chat-chyba">{chyba}</p>}
             <div ref={konec} />
           </div>
+          {panel.relax && <RelaxStav relax={panel.relax} t={t} onKonec={panel.ukonciRelax} onProdluz={(m) => panel.prodluzRelax(m || 5)} onDal={() => panel.upravRelax({ konecV: 0, hotovo: false })} />}
           {zpravy.length === 0 && Array.isArray(chips) && (
-            <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+            <div className={`px-3 pb-2 flex gap-1.5 ${mobil ? 'flex-nowrap overflow-x-auto whitespace-nowrap [scrollbar-width:none]' : 'flex-wrap'}`} data-testid="chat-chipy">
               {/* průvodci: ranní porada, rozbor projektu (na mapě: tenhle projekt), zaseknutí; noční plánování má vlastní rámeček výš */}
               <button type="button" onClick={() => A.zacniRezim('porada', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-porada">{t('chipPorada')}</button>
               <button type="button" onClick={() => A.zacniRezim('rozbor', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-rozbor">{kontext.map_id ? t('chipRozborMapa') : t('chipRozbor')}</button>
+              {/* relax (14. 10. 2026): pauza s akváriem / úlem — bez modelu */}
+              {!panel.relax && <button type="button" onClick={() => spustRelax({ minut: 0 })} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-relax">{t('relaxChipVolny')}</button>}
               {chips.map((c) => (
                 <button key={c} type="button" onClick={() => odesli(c)} disabled={A.loading} className="text-xs rounded-full border px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip">{c}</button>
               ))}
@@ -608,12 +724,15 @@ export default function AsistentPanel({ lite = false }) {
             data-testid="chat-form"
           >
             {hlas.aktivni ? <HlasovkaPruh h={hlas} /> : (<>
+            {/* mikrofon úplně vlevo a přes celou výšku políčka (Richard 15. 10. 2026, z telefonu) */}
+            {umiHlas && <HlasovkaTlacitko h={hlas} disabled={A.loading} className="self-stretch h-auto min-h-[44px] w-11 shrink-0 border border-input" />}
             <Textarea
               ref={vstup}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); odesli(); } }}
               onPaste={(e) => { const f = souborZPrenosu(e.clipboardData); if (f) { e.preventDefault(); prijmiSoubor(f); } }}
+              onBlur={() => { psalDo.current = Date.now(); }}
               placeholder={pretahuje ? t('imageDrop') : t('placeholder')}
               title={t(umiObrazek ? 'imageHint' : 'pdfHint')}
               rows={2}
@@ -631,7 +750,6 @@ export default function AsistentPanel({ lite = false }) {
             <Button type="button" size="icon" variant="ghost" title={umiObrazek ? `${t('imageAdd')} — ${t('imageHint')}` : `${t('pdfAdd')} — ${t('pdfHint')}`} aria-label={t(umiObrazek ? 'imageAdd' : 'pdfAdd')} disabled={A.loading} onClick={() => souborRef.current?.click()} data-testid="chat-obrazek">
               {umiObrazek ? <ImagePlus className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
             </Button>
-            {umiHlas && <HlasovkaTlacitko h={hlas} disabled={A.loading} />}
             {mobil && (
               <Button type="button" size="icon" variant="outline" title={t('shrink')} aria-label={t('shrink')} onClick={zmensit} data-testid="chat-zmensit"><ChevronDown className="w-4 h-4" /></Button>
             )}

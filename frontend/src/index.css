@@ -183,3 +183,8 @@
   background: transparent;
   color: hsl(var(--muted-foreground));
 }
+
+/* Tažení šířky panelu (asistent, Dokumenty): po dobu tahu iframe (scéna relaxu) nesmí sebrat ukazatel
+   a text se nesmí vybírat — lib/tahSirky.js nasazuje třídu na body (15. 10. 2026) */
+body.kb-tah { user-select: none; cursor: col-resize; }
+body.kb-tah iframe { pointer-events: none; }

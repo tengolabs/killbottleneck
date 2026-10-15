@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.82-beta": {
+    cs: [
+      "Relax v asistentovi: rybička v hlavičce panelu nebo slovo „relax“ pustí klidné akvárium, včelí úl nebo mraveniště — vedle chatu místo mapy, nebo přes celou obrazovku.",
+      "Odpočet je na vás: 5, 15 nebo 30 minut na klik, „+5“ prodlouží; po doběhnutí jemně cinkne a nabídne Zpět k práci, Ještě 5 min nebo Relaxovat dál.",
+      "Obrazovku jde zamknout čtyřmístným PINem a odejít od počítače; zámek vydrží i obnovení stránky.",
+      "Asistent pauzu sám nabídne, když píšete o únavě nebo pracujete 50 minut v kuse; ráno se při prvním otevření asistenta rybičky pustí samy.",
+      "Na telefonu je scéna nad chatem, na ležato vedle něj; scény jsou i anglicky.",
+    ],
+    en: [
+      "Relax in the assistant: the fish button in the panel header or the word \"relax\" starts a calm aquarium, beehive or ant colony — next to the chat instead of the map, or full screen.",
+      "The countdown is up to you: 5, 15 or 30 minutes with one click, \"+5\" extends it; when it ends a soft chime offers Back to work, 5 more min or Keep relaxing.",
+      "Lock the screen with a 4-digit PIN and step away; the lock survives a page reload.",
+      "The assistant offers a break itself when you write that you are tired or work 50 minutes straight; in the morning the fish start by themselves the first time you open the assistant.",
+      "On a phone the scene sits above the chat, in landscape next to it; the scenes are in English too.",
+    ],
+  },
   "v0.81-beta": {
     cs: [
       "Nová aplikace killBottleneck pro Windows: vlastní okno, upozornění Windows i se zavřeným oknem a počet nepřečtených u hodin. Ke stažení na github.com/tengolabs/killbottleneck-desktop.",

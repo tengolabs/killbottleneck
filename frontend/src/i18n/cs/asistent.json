@@ -115,6 +115,7 @@
   "toolsLooked": "Nahlédl do: {{names}}",
   "helpLinks": "Víc v návodu:",
   "toolNames": {
+    "start_relax": "Relax",
     "list_maps": "seznam projektů",
     "get_map": "mapa projektu",
     "get_my_day": "Můj den",
@@ -169,6 +170,26 @@
   "nocniOffer": "Noční plánování",
   "nocniOfferHint": "Vysypte hlavu: nápady a poznámky z dneška roztřídím a doporučím, co z nich udělat.",
   "nocniYes": "Jdeme na to",
+  "relaxChip": "🐟 Relax 5 min",
+  "relaxChipVolny": "🐟 Relax",
+  "relaxToggle": "Relax: rybičky místo mapy (přepínač)",
+  "relaxBeziVolne": "Relax běží",
+  "relaxSablona": "{{count}} min",
+  "relaxMin": "min",
+  "relaxPlus5": "+5 min",
+  "relaxOffer": "Pracuješ už 50 minut v kuse. Dát si pauzu u rybiček?",
+  "relaxOfferHint": "Akvárium nebo včelí úl s odpočtem; obrazovku jde zamknout a odejít od počítače. Stačí taky napsat „relax“ nebo „relax 15“.",
+  "relaxOffer5": "5 minut",
+  "relaxOffer15": "15 minut",
+  "relaxOfferNe": "Teď ne",
+  "relaxTab": "Pauza?",
+  "relaxBezi": "Relax běží · zbývá {{cas}}",
+  "relaxKonec": "Ukončit",
+  "relaxHotovo": "Pauza skončila. Jdeme na to?",
+  "relaxPokracuji": "Zpět k práci",
+  "relaxJeste": "Ještě 5 min",
+  "relaxKarta": "Relax na {{count}} min spuštěn.",
+  "relaxKartaVolny": "Relax spuštěn (bez odpočtu).",
   "aiBlok": {
     "title": "AI pomocníci",
     "trideni": "Roztřídit poznámky",
@@ -373,5 +394,6 @@
     "ceka": "{{n}} čeká na podkroky",
     "zvyraznit": "Zvýraznit v mapě",
     "zrusit": "Zrušit zvýraznění"
-  }
+  },
+  "relaxDal": "Relaxovat dál"
 }

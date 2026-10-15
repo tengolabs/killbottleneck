@@ -115,6 +115,7 @@
   "toolsLooked": "Looked at: {{names}}",
   "helpLinks": "More in the guide:",
   "toolNames": {
+    "start_relax": "Relax",
     "list_maps": "project list",
     "get_map": "project map",
     "get_my_day": "My day",
@@ -169,6 +170,26 @@
   "nocniOffer": "Evening planning",
   "nocniOfferHint": "Empty your head: I will sort today's ideas and notes and recommend what to make of them.",
   "nocniYes": "Let's go",
+  "relaxChip": "🐟 Relax 5 min",
+  "relaxChipVolny": "🐟 Relax",
+  "relaxToggle": "Relax: fish instead of the map (toggle)",
+  "relaxBeziVolne": "Relax running",
+  "relaxSablona": "{{count}} min",
+  "relaxMin": "min",
+  "relaxPlus5": "+5 min",
+  "relaxOffer": "You've been working for 50 minutes straight. Take a break with the fish?",
+  "relaxOfferHint": "An aquarium or a beehive with a countdown; you can lock the screen and step away. Typing \"relax\" or \"relax 15\" works too.",
+  "relaxOffer5": "5 minutes",
+  "relaxOffer15": "15 minutes",
+  "relaxOfferNe": "Not now",
+  "relaxTab": "Break?",
+  "relaxBezi": "Relax running · {{cas}} left",
+  "relaxKonec": "End",
+  "relaxHotovo": "The break is over. Back to it?",
+  "relaxPokracuji": "Back to work",
+  "relaxJeste": "5 more min",
+  "relaxKarta": "Relax started for {{count}} min.",
+  "relaxKartaVolny": "Relax started (no countdown).",
   "aiBlok": {
     "title": "AI helpers",
     "trideni": "Sort my notes",
@@ -373,5 +394,6 @@
     "ceka": "{{n}} waiting for sub-steps",
     "zvyraznit": "Highlight in the map",
     "zrusit": "Clear highlight"
-  }
+  },
+  "relaxDal": "Keep relaxing"
 }

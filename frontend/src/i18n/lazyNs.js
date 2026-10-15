@@ -92,6 +92,11 @@ const LOADERS = {
     cs: () => import('./cs/asistent.json'),
     en: () => import('./en/asistent.json'),
   },
+  // Relax (14. 10. 2026): vrstva s akváriem / úlem a odpočtem — líný chunk components/relax, texty s ním
+  relax: {
+    cs: () => import('./cs/relax.json'),
+    en: () => import('./en/relax.json'),
+  },
 };
 const nactene = new Set();
 

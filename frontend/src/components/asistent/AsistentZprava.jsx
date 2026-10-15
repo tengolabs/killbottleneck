@@ -403,7 +403,9 @@ function KartaRizika({ karta, onOdkaz }) {
   );
 }
 
-function KartaNavrhy({ karta, aktivni, onSend, loading }) {
+// extra = čip navíc od APLIKACE (ne od modelu): „🐟 Relax 5 min“ po větší akci (Richard 14. 10. 2026) — jen u poslední zprávy;
+// klik pošle text, který panel zachytí sám (odesli → spustRelax), model se nevolá
+function KartaNavrhy({ karta, aktivni, onSend, loading, extra }) {
   return (
     <div className="mt-2 flex flex-wrap gap-1.5" data-testid="chat-navrhy">
       {karta.items.map((n) => (
@@ -411,6 +413,7 @@ function KartaNavrhy({ karta, aktivni, onSend, loading }) {
           ? <button key={n} type="button" disabled={loading} onClick={() => onSend(n)} className="text-xs rounded-full border border-primary/50 bg-background/70 px-2.5 py-1 hover:bg-primary hover:text-primary-foreground transition-colors" data-testid="chat-navrh">{n}</button>
           : <span key={n} className="text-xs rounded-full border border-border px-2.5 py-1 text-muted-foreground">{n}</span>
       ))}
+      {aktivni && extra && <button type="button" disabled={loading} onClick={() => onSend(extra)} className="text-xs rounded-full border border-dashed border-primary/50 bg-background/70 px-2.5 py-1 hover:bg-primary hover:text-primary-foreground transition-colors" data-testid="chat-navrh-relax">{extra}</button>}
     </div>
   );
 }
@@ -556,7 +559,7 @@ function ZpravaUzivatele({ zprava, lzeOpravit, onOprav, loading }) {
   );
 }
 
-export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onRevertNastaveni, onKlientSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, lzeOpravit, onOprav }) {
+export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onRevertNastaveni, onKlientSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, lzeOpravit, onOprav, extraNavrh }) {
   const { t } = useTranslation('asistent');
   if (zprava.role === 'tool') return null;
   const jaUzivatel = zprava.role === 'user';
@@ -591,7 +594,8 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
               <KartaAkce karta={k} onPotvrd={onPotvrd} onKlientSkin={onKlientSkin} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={onOtevriDokument} onRevertNastaveni={onRevertNastaveni} />
             </Fragment>
           );
-          if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
+          if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} extra={extraNavrh} />;
+          if (k.type === 'relax') return <p key={i} className="mt-1.5 text-xs text-muted-foreground" data-testid="chat-relax-karta" data-minut={k.minutes}>{k.minutes ? t('relaxKarta', { count: k.minutes }) : t('relaxKartaVolny')}</p>;
           if (k.type === 'koncept') return <KartaKoncept key={i} karta={k} onOtevriDokument={onOtevriDokument} />;
           if (k.type === 'dokument') return (
             <button key={i} type="button" onClick={() => onOtevriDokument && onOtevriDokument(k.doc_id)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-secondary" data-testid="chat-dokument-karta">

@@ -26,7 +26,7 @@ H.beh(async () => {
   await inst.register('admin@example.com', { name: 'Petr' });
   const A = await inst.login('admin@example.com');
   const { page, chyby } = await H.browser();
-  await page.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); localStorage.setItem('kb-chat-porada-ne', new Date().toLocaleDateString('en-CA')); }, A);
+  await page.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); /* relax (15. 10. 2026): ranní akvárium by překrylo mapu → vypnout */ try { localStorage.setItem('kb-relax-rano:' + JSON.parse(atob(tk.split('.')[1])).id, new Date().toLocaleDateString('en-CA')); } catch {} localStorage.setItem('kb-chat-porada-ne', new Date().toLocaleDateString('en-CA')); }, A);
   const cekej = async (sel, ms = 10000) => page.waitForSelector(sel, { timeout: ms }).then(() => true).catch(() => false);
   const napis = async (sel, text) => { await page.click(sel, { clickCount: 3 }); await page.keyboard.press('Backspace'); await page.keyboard.type(text); };
   // tlačítko v KARTĚ AI (sourozenec „Otestovat připojení“), ne jiné Uložit na stránce

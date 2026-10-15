@@ -61,7 +61,7 @@ H.beh(async () => {
   await sleep(3000); // síť po startu kontejnerů ať se ustálí dřív, než Chrome začne sledovat změny sítě
   const args = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wavSoubor}`];
   const { page, chyby, novaStranka } = await H.browser({ args });
-  const priprav = async (p, tk) => p.evaluateOnNewDocument((t) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: {} })); localStorage.setItem('kb-chat-porada-ne', new Date().toLocaleDateString('en-CA')); localStorage.setItem('kb-mode', 'full'); }, tk);
+  const priprav = async (p, tk) => p.evaluateOnNewDocument((t) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: {} })); /* relax (15. 10. 2026): ranní akvárium by překrylo mapu → vypnout */ try { localStorage.setItem('kb-relax-rano:' + JSON.parse(atob(t.split('.')[1])).id, new Date().toLocaleDateString('en-CA')); } catch {} localStorage.setItem('kb-chat-porada-ne', new Date().toLocaleDateString('en-CA')); localStorage.setItem('kb-mode', 'full'); }, tk);
   await priprav(page, A);
   const cekej = async (sel, ms = 10000, p = page) => p.waitForSelector(sel, { timeout: ms }).then(() => true).catch(() => false);
   const otevriPanel = async (p = page) => { await p.goto(`${inst.base}/`, { waitUntil: 'networkidle2' }); if (!(await cekej('[data-testid="chat-input"]', 3000, p))) { await cekej('[data-testid="chat-tab"]', 10000, p); await p.click('[data-testid="chat-tab"]'); } await cekej('[data-testid="chat-input"]', 10000, p); };
@@ -233,16 +233,18 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-hlas-chyba"]', 5000, p2) && /nepovolil mikrofon/.test(await p2.$eval('[data-testid="chat-hlas-chyba"]', (el) => el.innerText)), 'zakázaný mikrofon → srozumitelná hláška');
   await p2.close();
 
-  console.log('== telefon: spodní lišta, mikrofon místo Odeslat při prázdném políčku ==');
+  console.log('== telefon: spodní lišta, mikrofon vlevo od políčka, Odeslat vpravo (Richard 15. 10. 2026) ==');
   const p3 = await novaStranka();
   await p3.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   await priprav(p3, A);
   await p3.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
   if (await cekej('[data-testid="chat-zavrit"]', 3000, p3)) await p3.click('[data-testid="chat-zavrit"]');
-  expect(await cekej('[data-testid="chat-bar"]', 10000, p3) && await cekej('[data-testid="chat-bar"] [data-testid="chat-hlas"]', 5000, p3) && !(await p3.$('[data-testid="chat-bar-send"]')), 'lišta: prázdné políčko → mikrofon místo Odeslat');
+  expect(await cekej('[data-testid="chat-bar"]', 10000, p3) && await cekej('[data-testid="chat-bar"] [data-testid="chat-hlas"]', 5000, p3) && !!(await p3.$('[data-testid="chat-bar-send"][disabled]')), 'lišta: prázdné políčko → mikrofon vlevo, Odeslat vpravo (zašedlé)');
+  const poradi = await p3.evaluate(() => { const m = document.querySelector('[data-testid="chat-bar"] [data-testid="chat-hlas"]').getBoundingClientRect(); const i = document.querySelector('[data-testid="chat-bar-input"]').getBoundingClientRect(); return m.x < i.x; });
+  expect(poradi, 'mikrofon je úplně vlevo od políčka');
   await p3.click('[data-testid="chat-bar-input"]');
   await p3.keyboard.type('Ahoj');
-  expect(await cekej('[data-testid="chat-bar-send"]', 3000, p3) && !(await p3.$('[data-testid="chat-bar"] [data-testid="chat-hlas"]')), 'po napsání textu je tam zase Odeslat');
+  expect(await cekej('[data-testid="chat-bar-send"]:not([disabled])', 3000, p3) && !!(await p3.$('[data-testid="chat-bar"] [data-testid="chat-hlas"]')), 'po napsání textu je Odeslat aktivní, mikrofon zůstává');
   await p3.close();
 
   console.log('== limit délky: nahrávka se zastaví a odejde sama ==');

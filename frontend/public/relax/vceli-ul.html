@@ -1,0 +1,1386 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#282d1d">
+  <meta name="description" content="Malý včelí svět pro chvíli klidu. Přilákej včelky nektarem, sázej květiny a pozoruj, jak plní plástve medem.">
+  <title>U včel · Malý svět, sladký klid</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23282d1d'/%3E%3Cpath d='m32 10 19 11v22L32 54 13 43V21z' fill='none' stroke='%23f1ce81' stroke-width='3'/%3E%3Cellipse cx='32' cy='32' rx='12' ry='8' fill='%23f1ce81'/%3E%3Cpath d='M29 24v16m7-15v14' stroke='%23282d1d' stroke-width='3'/%3E%3C/svg%3E">
+  <style>
+    :root{color-scheme:dark;font-family:"Avenir Next",Avenir,"Segoe UI",sans-serif;font-synthesis:none;color:#fff3d7;background:#25291b;--line:rgba(249,228,181,.22);--honey:#f1d08a;--glass:rgba(33,36,24,.88);--muted:#ded9bb}
+    *{box-sizing:border-box}body{margin:0}button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:2px solid #ffdda0;outline-offset:4px}button svg{width:20px;height:20px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}button span{pointer-events:none}[hidden]{display:none!important}
+    .hive{position:relative;isolation:isolate;width:100%;height:100svh;min-height:560px;overflow:hidden;background:#343b25}
+    #meadow{display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+    .shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(19,25,13,.55),transparent 24%,transparent 65%,rgba(14,24,14,.8));z-index:1}
+    .header{position:absolute;inset:0 0 auto;z-index:6;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:34px 40px;pointer-events:none}
+    .brand{display:flex;align-items:center;gap:14px}.brand-mark{width:38px;height:44px;fill:none;stroke:var(--honey);stroke-width:1.3;flex:none}
+    h1{font-family:Georgia,"Times New Roman",serif;font-size:30px;line-height:1.15;font-weight:400;letter-spacing:-.6px;margin:0 0 7px}.eyebrow{margin:0;font-size:10px;line-height:1.5;letter-spacing:2.2px;text-transform:uppercase;color:#e0dcc1}
+    .settings{display:flex;align-items:center;gap:8px;pointer-events:auto}.setting{display:flex;align-items:center;justify-content:center;gap:9px;background:rgba(29,36,21,.45);border:1px solid var(--line);border-radius:28px;padding:11px 15px;font-size:13px;line-height:20px;min-height:44px;transition:background .2s,border-color .2s}
+    .setting:hover,.icon-button:hover{background:rgba(117,117,67,.35);border-color:rgba(249,228,181,.45)}.setting[aria-pressed=true]{background:rgba(235,205,135,.16);border-color:rgba(249,228,181,.42)}.setting.square{padding:11px;width:44px}
+    .light-control{position:relative}.light-menu{position:absolute;right:0;top:calc(100% + 12px);width:230px;padding:17px 10px 10px;border:1px solid var(--line);border-radius:20px;background:#292f20;box-shadow:0 15px 45px #10180f55}
+    .menu-heading{margin:0 12px 10px;font-size:11px;line-height:1.5;letter-spacing:1.7px;color:#dbd5b5;text-transform:uppercase;font-weight:500}.light-option{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;border:0;border-radius:11px;padding:10px 12px;background:transparent;text-align:left;font-size:14px}.light-option:hover,.light-option[aria-pressed=true]{background:#f1d08a15}.light-option[aria-pressed=true]::after{content:'✓';margin-left:auto;color:var(--honey)}.light-dot{width:12px;height:12px;border-radius:50%;box-shadow:0 0 12px currentColor;background:currentColor}
+    .bottom{position:absolute;left:40px;right:40px;bottom:30px;z-index:5;display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:24px;pointer-events:none}
+    .population{padding-bottom:11px;display:flex;align-items:center;gap:18px;color:#e5e4cb;font-size:12px;line-height:1.5;white-space:nowrap}.stat{display:flex;align-items:center;gap:9px}.stat svg{width:23px;height:26px;fill:none;stroke:var(--honey);stroke-width:1.3;flex:none}.stat strong{font-size:18px;line-height:1.3;font-weight:500;font-variant-numeric:tabular-nums;display:block;color:#fff6df}.count-caption{font-size:11px;color:#d2d5b8}.stat-separator{height:26px;border-left:1px solid var(--line)}
+    .center-controls{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px}.hint{margin:0;font-size:13px;line-height:1.5;letter-spacing:.1px;color:#ecedd8;text-align:center;text-shadow:0 2px 12px #111a0c}
+    .dock{position:relative;display:flex;align-items:center;gap:5px;padding:8px;border:1px solid rgba(249,228,181,.27);border-radius:22px;background:var(--glass);backdrop-filter:blur(20px);box-shadow:0 10px 45px #10160e55;pointer-events:auto}
+    .action{display:flex;align-items:center;justify-content:center;gap:9px;min-height:49px;border:0;border-radius:15px;padding:12px 16px;font-size:14px;line-height:1.5;font-weight:500;white-space:nowrap;transition:background .2s,transform .2s;background:transparent;color:#f5f2d9}.action:hover{background:rgba(241,208,138,.12)}.action:active{transform:scale(.97)}.action.primary{background:var(--honey);color:#343722}.action.primary:hover{background:#fce0a4}
+    .divider{height:25px;width:1px;background:var(--line);margin:0 4px}.icon-button{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:10px;background:transparent;border:1px solid transparent;border-radius:14px;transition:background .2s;flex-shrink:0}
+    .capacity{font-size:11px;font-weight:400;color:#d2d5b8;letter-spacing:0}
+    #harvest[data-state=warning]{color:#ffdc8c;border-color:#f1d08a55}
+    #harvest[data-state=overflow]{color:#292d1d;background:#f1d08a;border-color:#ffe3a1}
+    .rescue{display:flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:9px 15px;max-width:100%;border:1px solid #f1d08a88;border-radius:26px;background:#333421ed;color:#ffe4ab;font-size:12px;line-height:1.5;pointer-events:auto;box-shadow:0 4px 24px #10160e33}
+    .rescue:hover{background:#4a4327}.rescue svg{width:17px;height:17px}.rescue strong{font-weight:500;font-variant-numeric:tabular-nums}
+    .atmosphere{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding-bottom:10px;pointer-events:auto}.atmosphere .setting{padding:11px;width:44px;background:rgba(29,36,21,.6)}
+    .toast{position:absolute;top:114px;left:50%;transform:translateX(-50%) translateY(-8px);padding:10px 18px;background:rgba(32,37,22,.94);border:1px solid var(--line);border-radius:24px;z-index:4;width:max-content;max-width:calc(100% - 32px);text-align:center;font-size:13px;line-height:1.5;color:#fff0ce;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+    .pause-tag{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);pointer-events:none;z-index:3;font-family:Georgia,serif;font-size:23px;color:#fff2d8;white-space:nowrap;background:rgba(31,38,23,.8);backdrop-filter:blur(12px);padding:18px 28px;border-radius:40px;border:1px solid var(--line)}
+    .error-panel{position:absolute;z-index:10;top:25%;left:10%;right:10%;padding:24px;background:#292f20;border:1px solid var(--line);border-radius:20px;color:#fff3d7;line-height:1.6}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(min-width:1600px){.header{padding:42px 50px}.bottom{left:50px;right:50px;bottom:38px}}
+    @media(max-width:1100px){.header{padding:28px}.bottom{left:28px;right:28px;gap:14px;grid-template-columns:1fr auto}.center-controls{grid-row:2;grid-column:1/-1;gap:14px}.population{padding:0 4px;gap:16px}.stat strong{display:inline;font-size:15px}.count-caption{display:inline;margin-left:5px;font-size:12px}.atmosphere{padding:0}.stat-separator{height:18px}.atmosphere .setting{min-height:44px}}
+    @media(max-width:600px){.hive{min-height:560px}.header{padding:22px 16px;gap:10px}.brand{gap:8px}.brand-mark{width:27px;height:35px}h1{font-size:26px;margin-bottom:5px}.eyebrow{font-size:9px;letter-spacing:1px}.settings{gap:5px}.settings>.setting,.settings>.light-control>.setting{padding:10px;width:44px}.settings>.setting>span,.settings>.light-control>.setting>span{display:none}.settings .square{display:none}.bottom{left:12px;right:12px;bottom:20px;gap:12px}.dock{width:100%;gap:3px;padding:7px;border-radius:20px}.action{padding:12px 11px;font-size:13px;gap:7px;flex:1}.action svg{width:18px}.action .long-label{display:none}#plant{flex:0 0 44px;padding:10px}.divider{margin:0 1px}.icon-button{width:44px}.hint{font-size:12px;max-width:100%;padding:0 4px}.stat{gap:6px}.stat svg{width:18px;height:23px}.stat strong{font-size:14px}.count-caption{font-size:11px;margin-left:3px}.population{gap:10px}.atmosphere{gap:6px}.toast{top:96px;font-size:12px}.light-menu{width:215px}.pause-tag{font-size:21px;padding:16px 23px}}
+    @media(max-width:360px){.header{padding-left:13px;padding-right:13px}.brand-mark{display:none}.action{padding:12px 7px;gap:5px}.dock{gap:1px;padding:6px}.stat svg{display:none}.population{gap:8px}.eyebrow{letter-spacing:.6px}.hint{font-size:11px}}
+    @media(max-height:650px) and (min-width:700px){.header{padding:16px 24px}.bottom{bottom:14px;gap:5px}.center-controls{gap:7px}.toast{top:85px}.hive{min-height:360px}.population,.atmosphere{padding:0}.settings .setting{min-height:44px}.atmosphere .setting{min-height:44px;height:44px}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+    @media(max-width:600px){.toast{left:auto;right:12px;max-width:calc(100% - 110px);padding:9px 12px;transform:translateY(-8px)}.toast.visible{transform:translateY(0)}}
+  </style>
+</head>
+<body>
+<main class="hive" id="hive" aria-label="Relaxační simulace včelího úlu">
+  <canvas id="meadow" aria-describedby="jar-status" aria-label="Včelky létají mezi květy a otevřeným úlem. Kliknutím nebo podržením přidáš nektar. Při přeplnění teče med po stromě a včelky se do něj přilepí. Kliknutím na přilepenou včelku ji uvolníš. Sklenice vlevo se naplní třemi odběry; pak ji vypije medvěd a můžeš sbírat znovu. Stejné akce lze provést tlačítky. Zjednodušená relaxační simulace.">Prohlížeč nepodporuje kreslení. Otevři tento soubor v aktuálním prohlížeči.</canvas>
+  <div class="shade" aria-hidden="true"></div>
+  <header class="header">
+    <div class="brand"><svg class="brand-mark" viewBox="0 0 40 44" aria-hidden="true"><path d="m20 2 17 10v20L20 42 3 32V12Z"/><ellipse cx="20" cy="23" rx="10" ry="6"/><path d="M17 17v12m6-12v12M17 17c-11-11 4-14 3 0m3 0c10-10-3-13-3 0M10 22l-3-2M30 22l3-2"/></svg><div><h1>U včel</h1><p class="eyebrow">Malý svět. Sladký klid.</p></div></div>
+    <div class="settings" aria-label="Atmosféra louky">
+      <button class="setting" id="sound" type="button" aria-pressed="false" aria-label="Zapnout zvuky louky" title="Zvuky louky (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5"/><path id="sound-waves" d="m16 9 6 6m0-6-6 6"/></svg><span id="sound-label">Zvuk vypnutý</span></button>
+      <div class="light-control"><button class="setting" id="lighting" type="button" aria-expanded="false" aria-controls="light-menu" aria-label="Světlo: Zlaté odpoledne" title="Vybrat světlo (N)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span id="light-label">Zlaté odpoledne</span></button>
+        <div class="light-menu" id="light-menu" role="group" aria-label="Vyber světlo" hidden><h2 class="menu-heading">Světlo mezi stromy</h2>
+          <button class="light-option" data-light="day" type="button" aria-pressed="true"><span class="light-dot" style="color:#efd590" aria-hidden="true"></span><span>Zlaté odpoledne</span></button>
+          <button class="light-option" data-light="sunset" type="button" aria-pressed="false"><span class="light-dot" style="color:#edab82" aria-hidden="true"></span><span>Západ slunce</span></button>
+          <button class="light-option" data-light="night" type="button" aria-pressed="false"><span class="light-dot" style="color:#b1cbdc" aria-hidden="true"></span><span>Měsíční noc</span></button>
+        </div>
+      </div>
+      <button class="setting square" id="fullscreen" type="button" aria-label="Celá obrazovka" title="Celá obrazovka"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="fullscreen-path" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button>
+    </div>
+  </header>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="pause-tag" id="pause-tag" hidden>Chvilka zastavení</div>
+  <div class="error-panel" id="error" role="alert" hidden></div>
+  <p class="sr-only" id="jar-status">Sklenice je prázdná. Naplní ji tři odběry medu.</p>
+  <footer class="bottom">
+    <div class="population" aria-label="Život v úlu">
+      <div class="stat"><svg viewBox="0 0 28 28" aria-hidden="true"><ellipse cx="14" cy="17" rx="10" ry="6"/><path d="M11 11v12m6-12v12M11 11c-12-10 4-14 3 0m3 0c11-10-4-14-3 0"/></svg><div><strong id="count">19</strong><span class="count-caption" id="count-caption">včelek</span></div></div>
+      <div class="stat-separator" aria-hidden="true"></div>
+      <div class="stat" id="honey-stat" title="Kapacita pláství: 60 kapek. Přebytečný med teče po stromě."><svg viewBox="0 0 24 28" aria-hidden="true"><path d="M12 3S4 13 4 18a8 8 0 0 0 16 0c0-5-8-15-8-15Z"/><path d="M8 18a4 4 0 0 0 4 4"/></svg><div><strong><span id="honey">0</span><span class="capacity" id="honey-capacity"> / 60</span></strong><span class="count-caption">kapek medu</span></div></div>
+    </div>
+    <div class="center-controls"><p class="hint" id="hint">Klikni do louky. Včelky přiletí pro nektar.</p>
+      <button class="rescue" id="rescue" type="button" aria-label="Uvolnit jednu přilepenou včelku" title="Uvolnit včelku (R). Můžeš také kliknout přímo na včelku v medu." hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 3 3 7-7M12 3a9 9 0 1 0 9 9"/></svg><span><strong id="stuck-count">0</strong> v medu · Uvolnit včelku</span></button>
+      <div class="dock" role="group" aria-label="Péče o včelí svět">
+        <button class="action primary" id="nectar" type="button" title="Přidat nektar (F)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3S4 10 4 14a6 6 0 0 0 12 0c0-4-6-11-6-11Z"/><path d="M8 15a2 2 0 0 0 2 2M20 5v6m-3-3h6"/></svg><span>Nektar</span></button>
+        <button class="action" id="add" type="button" aria-label="Přidat tři včelky" title="Přidat 3 včelky (B)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span><span class="long-label">Přidat </span>včelky</span></button>
+        <button class="action" id="plant" type="button" aria-label="Zasadit květinu" title="Zasadit květinu (K)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-8m0 5c-5 0-6-3-6-3 5-1 6 3 6 3Zm0-3c5 0 6-3 6-3-5-1-6 3-6 3Z"/><path d="M9 7c-6-5 1-9 3-3 2-6 9-2 3 3 7 0 4 8-1 4-2 6-7 2-4-2-6 3-8-4-1-2Z"/></svg><span class="long-label">Květina</span></button>
+        <button class="icon-button" id="harvest" type="button" aria-label="Sklidit med" title="Sklidit med (H)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4H7zM8 7c0 3-3 3-3 6v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6c0-3-3-3-3-6M5 13h14M5 17h14"/></svg></button>
+        <div class="divider" aria-hidden="true"></div>
+        <button class="icon-button" id="pause" type="button" aria-pressed="false" aria-label="Pozastavit simulaci" title="Pozastavit (P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="pause-path" d="M8 5v14M16 5v14" stroke-width="2.4"/></svg></button>
+      </div>
+    </div>
+    <div class="atmosphere" aria-label="Drobnosti pro klid">
+      <button class="setting" id="calm" type="button" aria-pressed="false" aria-label="Zapnout pomalé tempo" title="Pomalé tempo (S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4c0 11-4 15-10 14C1 16 6 3 20 4ZM6 21 16 10M8 17v-6m3 3h5"/></svg></button>
+      <button class="setting" id="fireflies" type="button" aria-pressed="true" aria-label="Skrýt světlušky a poletující pyl" title="Světlušky a poletující pyl (L)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/><path d="M20 3v3m-1.5-1.5h3M4 19v3m-1.5-1.5h3"/></svg></button>
+    </div>
+  </footer>
+  <p class="sr-only">Klávesové zkratky: F nektar, B přidat včelky, K zasadit květinu, H přidat odběr medu do sklenice, R uvolnit jednu přilepenou včelku, P pauza, M zvuk, N světlo, S pomalé tempo, L světlušky. Plástve pojmou 60 kapek, další med přetéká po kmeni a může uvěznit včelky. Sklizeň zastaví přetékání; přilepenou včelku uvolní kliknutí nebo tlačítko Uvolnit včelku. Sklenici vlevo naplní tři úspěšné odběry. Plnou sklenici vypije medvěd a po odchodu ji můžeš plnit znovu. Escape zavře nabídku světla. Jde o hravou simulaci, nikoli návod k chovu včel.</p>
+</main>
+<script>
+/* A small, self-contained, hand-painted world. No external assets. */
+(() => {
+  'use strict';
+  const TAU = Math.PI * 2;
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const mix = (a, b, t) => a + (b - a) * t;
+  const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const palette = {
+    day: { sky: ['#283e2d', '#526443', '#99a165'], light: '#fff4b0', bark: '#302b20', barkLight: '#514635', ground: '#172d22', haze: '#c6c88a', glow: .3 },
+    sunset: { sky: ['#353428', '#766448', '#c09765'], light: '#ffd693', bark: '#392c23', barkLight: '#5f4835', ground: '#273021', haze: '#e8b374', glow: .4 },
+    night: { sky: ['#102323', '#203d35', '#416051'], light: '#bedac4', bark: '#1d2620', barkLight: '#35443a', ground: '#101f1b', haze: '#739c85', glow: .14 }
+  };
+  class BeeHive {
+    constructor(canvas, options = {}) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d', { alpha: false });
+      this.options = options;
+      this.bees = [];
+      this.flowers = [];
+      this.nectarDrops = [];
+      this.ripples = [];
+      this.time = 0;
+      this.honey = 28;
+      this.honeyCapacity = 60;
+      this.spilledHoney = 0;
+      this.honeyStreams = [];
+      this._dryRate = 0;
+      this._trapAnnounced = false;
+      this.jar = { fills: 0, level: 0, phase: 'idle', phaseTime: 0, visits: 0, pour: 0 };
+      this.lighting = 'day';
+      this.calm = false;
+      this.fireflies = true;
+      this.paused = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      this.pointer = null;
+      this._lastTime = 0;
+      this._statsTime = 0;
+      this._dropTime = 0;
+      this._destroyed = false;
+      this._boundFrame = t => this._frame(t);
+      this._resize = () => this.resize();
+      this._visibility = () => { this._lastTime = 0; };
+      this._down = e => {
+        if (e.button !== undefined && e.button !== 0) return;
+        const r = canvas.getBoundingClientRect();
+        if (this.releaseBeeAt(e.clientX - r.left, e.clientY - r.top)) { this.pointer = null; return; }
+        if (this._jarHit(e.clientX - r.left, e.clientY - r.top)) { this.pointer = null; this.harvest(); return; }
+        this.pointer = { x: e.clientX - r.left, y: e.clientY - r.top, id: e.pointerId };
+        canvas.setPointerCapture?.(e.pointerId);
+        this.nectar(this.pointer.x, this.pointer.y);
+      };
+      this._move = e => {
+        const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+        if (this.pointer) { this.pointer.x = x; this.pointer.y = y; }
+        canvas.style.cursor = this._jarHit(x, y) || this.bees.some(b => b.stuck && Math.hypot(b.x - x, b.y - y) < Math.max(25, 22 * this.s * b.size)) ? 'pointer' : 'crosshair';
+      };
+      this._up = () => { this.pointer = null; };
+      canvas.style.touchAction = 'none';
+      canvas.addEventListener('pointerdown', this._down);
+      canvas.addEventListener('pointermove', this._move);
+      canvas.addEventListener('pointerup', this._up);
+      canvas.addEventListener('pointercancel', this._up);
+      document.addEventListener('visibilitychange', this._visibility);
+      window.addEventListener('resize', this._resize);
+      this._observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(this._resize) : null;
+      this._observer?.observe(canvas);
+      this.resize();
+      for (let i = 0; i < 16; i++) this._newFlower(i);
+      for (let i = 0; i < 18; i++) this._newBee(i);
+      this.bees.push({ queen: true, x: this.hive.x, y: this.hive.y, phase: 0, angle: -Math.PI / 2, size: 1.52 });
+      this._emitStats();
+      this._raf = requestAnimationFrame(this._boundFrame);
+    }
+    get overflowing() { return this.honey >= this.honeyCapacity && this.spilledHoney > 0; }
+    get stats() { return { bees: this.bees.length, honey: this.honey, flowers: this.flowers.length, capacity: this.honeyCapacity, overflowing: this.overflowing, spilledHoney: this.spilledHoney, stuck: this.bees.filter(b => b.stuck).length, jarFills: this.jar.fills, bearPhase: this.jar.phase, jarVisits: this.jar.visits }; }
+    _emitStats() { this.options.onStats?.(this.stats); }
+    resize() {
+      const rect = this.canvas.getBoundingClientRect();
+      const W = Math.max(1, rect.width || innerWidth), H = Math.max(1, rect.height || innerHeight);
+      if (W === this.W && H === this.H) return;
+      const oldW = this.W || W, oldH = this.H || H;
+      this.W = W; this.H = H;
+      this.dpr = Math.min(2, window.devicePixelRatio || 1);
+      this.canvas.width = Math.round(W * this.dpr); this.canvas.height = Math.round(H * this.dpr);
+      this.s = clamp(Math.min(W / 1150, H / 800), .60, 1.35);
+      this.hive = { x: W * (W < 600 ? .255 : .238), y: H * .415, rx: W < 600 ? W * .19 : Math.min(W * .121, H * .19), ry: W < 600 ? Math.min(H * .195, W * .31) : Math.min(H * .23, W * .163) };
+      const jarWidth = clamp(W * .072, 56, 84);
+      this.jarLayout = { x: Math.max(12, this.hive.x - this.hive.rx * 1.65 + 8), y: W < 600 ? Math.max(105, H * .16) : H < 550 ? 105 : H * .52, w: jarWidth, h: jarWidth * 1.15 };
+      for (const b of this.bees) { b.x *= W / oldW; b.y *= H / oldH; }
+      for (const f of this.flowers) this._placeFlower(f);
+      for (const n of this.nectarDrops) { n.x *= W / oldW; n.y *= H / oldH; }
+      this._refreshHoneyStreams();
+      for (const b of this.bees) if (b.stuck) this._anchorStuckBee(b);
+      this._makeBackground(); this._makeComb();
+      this.draw();
+    }
+    _placeFlower(f) {
+      f.x = f.nx * this.W;
+      f.baseY = this.H * f.ny;
+      f.height = this.H * f.nh * (this.W < 600 ? .73 : 1);
+      f.y = f.baseY - f.height;
+    }
+    _newFlower(i, x, y) {
+      const r = rng(181 + i * 97);
+      const given = Number.isFinite(x) && Number.isFinite(y);
+      const f = { nx: given ? clamp(x / this.W, .1, .97) : .44 + r() * .55, ny: .91 + r() * .055, nh: .15 + r() * .26, type: i % 4, phase: r() * TAU, size: .8 + r() * .5, lean: (r() - .5) * 40, nectar: 1, added: this.time };
+      if (given) { f.ny = clamp(y / this.H + .2, .8, .96); f.nh = clamp(f.ny - y / this.H, .13, .44); }
+      this._placeFlower(f); this.flowers.push(f);
+      return f;
+    }
+    _newBee(i = this.bees.length) {
+      const r = rng(95 + i * 387 + Math.round(this.time) * 29);
+      const x = this.W * (.30 + r() * .58), y = this.H * (.24 + r() * .43);
+      this.bees.push({ x, y, vx: (r() - .5) * 40, vy: (r() - .5) * 30, angle: r() * TAU, phase: r() * TAU, size: .72 + r() * .45, state: i % 5 === 0 ? 'return' : 'seek', timer: r() * 2, target: i % Math.max(1, this.flowers.length), payload: i % 5 === 0 ? .28 : 0, depth: .7 + r() * .3, speed: 30 + r() * 29, curious: i % 3 === 0, affinity: r(), stuck: false, immuneUntil: 0 });
+    }
+    addBees(n = 3) {
+      n = clamp(Math.floor(Number(n) || 3), 1, 80 - this.bees.length);
+      if (this.bees.length >= 80) { this.options.onEvent?.('Úl už je plný života.'); return 0; }
+      for (let i = 0; i < n; i++) { this._newBee(); const b = this.bees[this.bees.length - 1]; b.x = this.hive.x + this.hive.rx * .65; b.y = this.hive.y + this.hive.ry * .3 + i * 8; }
+      this._emitStats(); if (this.paused) this.draw(); return n;
+    }
+    plantFlower(x, y) {
+      if (this.flowers.length >= 36) { this.options.onEvent?.('Louka už krásně kvete.'); return false; }
+      this._newFlower(this.flowers.length, x, y);
+      this._emitStats(); if (this.paused) this.draw(); return true;
+    }
+    nectar(x = this.W * .61, y = this.H * .43) {
+      x = clamp(x, 12, this.W - 12); y = clamp(y, 90, this.H - 110);
+      const near = this.nectarDrops.find(n => Math.hypot(n.x - x, n.y - y) < 35);
+      if (near) { near.life = 16; near.amount = Math.min(5, near.amount + .5); }
+      else { if (this.nectarDrops.length >= 12) this.nectarDrops.shift(); this.nectarDrops.push({ x, y, life: 16, amount: 3, phase: Math.random() * TAU }); }
+      this.ripples.push({ x, y, age: 0 }); if (this.ripples.length > 9) this.ripples.shift();
+      if (this.paused) this.draw();
+    }
+    _jarHit(x, y) {
+      const j = this.jarLayout;
+      return j && x >= j.x - 4 && x <= j.x + j.w + 4 && y >= j.y - 5 && y <= j.y + j.h + 36;
+    }
+    harvest() {
+      if (this.jar.phase !== 'idle' || this.jar.fills >= 3) {
+        this.options.onEvent?.(this.paused ? 'Medvěd počká. Spusť simulaci a dokončí návštěvu.' : 'Medvěd si bere med. Za chvilku bude sklenice zase volná.');
+        return 0;
+      }
+      const amount = Math.max(0, this.honey - 8);
+      if (amount < 1) { this.options.onEvent?.('Necháme včelkám jejich zásobu. Počkej, až přinesou další med.'); return 0; }
+      this.honey -= amount;
+      this._dryRate = this.spilledHoney / 25;
+      this.jar.fills++;
+      this.jar.pour = 1;
+      if (this.paused) this.jar.level = this.jar.fills / 3;
+      if (this.jar.fills === 3) {
+        this.jar.phase = 'approach'; this.jar.phaseTime = 0;
+        this.options.onEvent?.(this.paused ? 'Třetí odběr! Spusť simulaci a medvěd si přijde pro plnou sklenici.' : 'Třetí odběr — sklenice je plná. Už vykukuje mlsný medvěd!');
+      } else {
+        this.options.onEvent?.(`Ve sklenici je ${this.jar.fills}/3. Přibylo ${Math.floor(amount)} kapek medu.`);
+      }
+      this._emitStats(); if (this.paused) this.draw(); return amount;
+    }
+    _updateJar(dt) {
+      const jar = this.jar;
+      jar.pour = Math.max(0, jar.pour - dt * 1.2);
+      if (jar.phase === 'idle') {
+        jar.level = mix(jar.level, jar.fills / 3, 1 - Math.exp(-dt * 7));
+        return;
+      }
+      jar.phaseTime += dt;
+      if (jar.phase === 'approach') {
+        jar.level = mix(jar.level, 1, 1 - Math.exp(-dt * 7));
+        if (jar.phaseTime >= 1.5) {
+          jar.phaseTime -= 1.5; jar.phase = 'drink'; jar.level = 1;
+          this._emitStats();
+        }
+      } else if (jar.phase === 'drink') {
+        jar.level = clamp(1 - jar.phaseTime / 2.5, 0, 1);
+        if (jar.phaseTime >= 2.5) {
+          jar.phaseTime -= 2.5; jar.phase = 'leave'; jar.level = 0;
+          this._emitStats();
+        }
+      } else if (jar.phase === 'leave' && jar.phaseTime >= 1.5) {
+        jar.phase = 'idle'; jar.phaseTime = 0; jar.fills = 0; jar.level = 0; jar.visits++;
+        this.options.onEvent?.('Medvěd dopil a nechal ti prázdnou sklenici. Můžeš zase sbírat med.');
+        this._emitStats();
+      }
+    }
+    _depositHoney(amount) {
+      const wasOverflowing = this.overflowing;
+      const total = this.honey + Math.max(0, amount || 0);
+      this.honey = Math.min(this.honeyCapacity, total);
+      const spill = Math.max(0, total - this.honeyCapacity);
+      if (spill > 0) {
+        this.spilledHoney = Math.min(45, this.spilledHoney + spill);
+        this._dryRate = 0;
+        if (!this.honeyStreams.length) this.honeyStreams = [
+          { id: 0, offset: -.40, start: .79, bend: .10, growth: 0, points: [] },
+          { id: 1, offset: .08, start: .89, bend: -.12, growth: 0, points: [] },
+          { id: 2, offset: .50, start: .73, bend: .08, growth: 0, points: [] }
+        ];
+        if (!wasOverflowing) this.options.onEvent?.('Úl je plný! Med stéká po stromě. Odeber ho do sklenice.');
+      }
+      this._emitStats();
+    }
+    _rescueCeiling() { return Math.max(140, Math.min(this.H * (this.W <= 1100 ? .64 : .78), this.H - (this.W <= 1100 ? 195 : 145))); }
+    _streamPoint(stream, progress) {
+      const h = this.hive;
+      const startY = Math.min(h.y + h.ry * stream.start, this._rescueCeiling() - 22 * this.s);
+      const endY = Math.max(startY + 30 * this.s, Math.min(this.H * .87, h.y + h.ry * 2.05));
+      return { x: h.x + h.rx * (stream.offset + stream.bend * progress + Math.sin(progress * 8 + stream.id) * .022), y: mix(startY, endY, progress) };
+    }
+    _streamAccessibleProgress(stream) {
+      const start = this._streamPoint(stream, 0), end = this._streamPoint(stream, 1);
+      return clamp((this._rescueCeiling() - start.y) / (end.y - start.y), .01, 1);
+    }
+    _refreshHoneyStreams() {
+      for (const stream of this.honeyStreams) {
+        stream.points = [];
+        stream.active = this.spilledHoney > .001 && stream.growth > .002;
+        stream.width = (14 - stream.id * 2) * this.s * clamp(this.spilledHoney * 1.4, .18, 1);
+        if (!stream.active) continue;
+        for (let j = 0; j <= 20; j++) stream.points.push({ ...this._streamPoint(stream, stream.growth * j / 20), progress: stream.growth * j / 20 });
+        const tip = stream.points[stream.points.length - 1]; stream.x = tip.x; stream.y = tip.y;
+      }
+    }
+    _updateHoney(dt) {
+      if (this.spilledHoney > 0 && this.honey < this.honeyCapacity && this._dryRate > 0) this.spilledHoney = Math.max(0, this.spilledHoney - this._dryRate * dt);
+      for (const stream of this.honeyStreams) {
+        if (this.spilledHoney <= .001) { stream.growth = 0; continue; }
+        const target = clamp(this.spilledHoney / (2.3 + stream.id * 1.3), .035, 1);
+        stream.growth = Math.max(stream.growth, Math.min(target, stream.growth + dt * (.105 - stream.id * .016)));
+      }
+      this._refreshHoneyStreams();
+    }
+    _honeyTarget(b) {
+      if (this.spilledHoney < .06 || !this.honeyStreams.length) return null;
+      const stream = this.honeyStreams[b.target % this.honeyStreams.length];
+      if (!stream.active || stream.growth < .025) return null;
+      return this._streamPoint(stream, Math.min(stream.growth * (.20 + b.affinity * .62), this._streamAccessibleProgress(stream) * .85));
+    }
+    _honeyCollision(b) {
+      if (b.queen || b.stuck || this.time < b.immuneUntil || b.y > this._rescueCeiling() || this.spilledHoney < .02) return null;
+      for (const stream of this.honeyStreams) {
+        const points = stream.points;
+        for (let i = 1; i < points.length; i++) {
+          const a = points[i - 1], z = points[i], dx = z.x - a.x, dy = z.y - a.y;
+          const t = clamp(((b.x - a.x) * dx + (b.y - a.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+          const x = a.x + dx * t, y = a.y + dy * t;
+          if (Math.hypot(b.x - x, b.y - y) <= stream.width * .5 + 4 * this.s * b.size) return { stream, progress: mix(a.progress, z.progress, t), x, y };
+        }
+      }
+      return null;
+    }
+    _trapBee(b, hit) {
+      b.stuck = true; b.state = 'stuck'; b.timer = 0; b.vx = 0; b.vy = 0; b.drop = null;
+      b.stuckStream = hit.stream; b.stuckProgress = hit.progress;
+      b.stuckOffsetX = clamp((b.x - hit.x) / this.s, -4, 4);
+      this._anchorStuckBee(b);
+      if (!this._trapAnnounced) { this._trapAnnounced = true; this.options.onEvent?.('Včelka uvízla v medu. Klikni na ni a pomoz jí ven.'); }
+      this._emitStats();
+    }
+    _anchorStuckBee(b) {
+      if (!b.stuckStream) return;
+      b.stuckProgress = Math.min(b.stuckProgress, this._streamAccessibleProgress(b.stuckStream));
+      const p = this._streamPoint(b.stuckStream, b.stuckProgress);
+      b.x = p.x + (b.stuckOffsetX || 0) * this.s; b.y = p.y;
+    }
+    _releaseBee(b) {
+      if (!b || !b.stuck) return false;
+      b.stuck = false; b.state = 'seek'; b.timer = 0; b.stuckStream = null;
+      b.immuneUntil = this.time + 8; b.escapeUntil = this.time + 1.8;
+      b.escapeX = Math.min(this.W - 30, this.hive.x + this.hive.rx * 1.4);
+      b.escapeY = Math.max(120, b.y - 55 * this.s); b.vx = 38 * this.s; b.vy = -22 * this.s;
+      b.target = Math.floor(Math.random() * this.flowers.length);
+      this.ripples.push({ x: b.x, y: b.y, age: 0 }); if (this.ripples.length > 9) this.ripples.shift();
+      this.canvas.style.cursor = 'crosshair';
+      this.options.onEvent?.('Včelka je volná a může zase létat.');
+      this._emitStats(); if (this.paused) this.draw(); return true;
+    }
+    releaseBeeAt(x, y) {
+      let found = null, distance = Infinity;
+      for (const b of this.bees) if (b.stuck) { const d = Math.hypot(b.x - x, b.y - y); if (d < Math.max(25, 22 * this.s * b.size) && d < distance) { found = b; distance = d; } }
+      return this._releaseBee(found);
+    }
+    releaseNextBee() { return this._releaseBee(this.bees.find(b => b.stuck)); }
+    setLighting(mode) { if (!palette[mode]) return; this.lighting = mode; this._makeBackground(); if (this.paused) this.draw(); }
+    setCalm(value) { this.calm = !!value; }
+    setPaused(value) { this.paused = !!value; this._lastTime = 0; this.draw(); }
+    setFireflies(value) { this.fireflies = !!value; if (this.paused) this.draw(); }
+    _frame(stamp) {
+      if (this._destroyed) return;
+      const dt = this._lastTime ? clamp((stamp - this._lastTime) / 1000, 0, .04) : 0;
+      this._lastTime = stamp;
+      if (!document.hidden) {
+        if (!this.paused) this._update(dt * (this.calm ? .42 : 1) * (this.lighting === 'night' ? .6 : 1));
+        if (!this.paused || !this._hasDrawn) this.draw();
+      }
+      this._raf = requestAnimationFrame(this._boundFrame);
+    }
+    _update(dt) {
+      this.time += dt;
+      this._updateJar(dt);
+      this._updateHoney(dt);
+      this._statsTime += dt;
+      if (this._statsTime > .5) { this._statsTime = 0; this._emitStats(); }
+      if (this.pointer) { this._dropTime += dt; if (this._dropTime > .65) { this._dropTime = 0; this.nectar(this.pointer.x, this.pointer.y); } }
+      for (let i = this.nectarDrops.length - 1; i >= 0; i--) { this.nectarDrops[i].life -= dt; if (this.nectarDrops[i].life < 0 || this.nectarDrops[i].amount <= 0) this.nectarDrops.splice(i, 1); }
+      for (let i = this.ripples.length - 1; i >= 0; i--) { this.ripples[i].age += dt; if (this.ripples[i].age > 1.8) this.ripples.splice(i, 1); }
+      for (const f of this.flowers) f.nectar = Math.min(1, f.nectar + dt * .1);
+      for (const b of this.bees) {
+        if (b.queen) { const t = this.time * .075; const x = this.hive.x + Math.sin(t) * this.hive.rx * .28, y = this.hive.y + Math.cos(t * 1.3) * this.hive.ry * .31; b.angle = Math.atan2(y - b.y, x - b.x); b.x = mix(b.x, x, dt * .7); b.y = mix(b.y, y, dt * .7); continue; }
+        if (b.stuck) { b.phase += dt * 4; b.timer += dt; this._anchorStuckBee(b); continue; }
+        b.phase += dt * (b.state === 'collect' || b.state === 'deposit' ? 10 : 47);
+        b.timer += dt;
+        let tx, ty;
+        const f = this.flowers[b.target % this.flowers.length];
+        let drop = null;
+        if (b.escapeUntil > this.time) { tx = b.escapeX; ty = b.escapeY; }
+        else if (b.state === 'seek') {
+          let nearest = Infinity;
+          for (const n of this.nectarDrops) { const d = Math.hypot(n.x - b.x, n.y - b.y); if (d < nearest && d < this.W * .7) { nearest = d; drop = n; } }
+          const sticky = !drop && b.curious && this.time >= b.immuneUntil ? this._honeyTarget(b) : null;
+          const pos = drop || sticky || this._flowerTop(f);
+          tx = pos.x; ty = pos.y - (sticky ? 0 : 7 * this.s);
+          if (!sticky && Math.hypot(tx - b.x, ty - b.y) < 16 * this.s) { b.state = 'collect'; b.timer = 0; b.drop = drop; }
+          if (b.timer > 35) { b.target = Math.floor(Math.random() * this.flowers.length); b.timer = 0; }
+        } else if (b.state === 'collect') {
+          const pos = b.drop && this.nectarDrops.includes(b.drop) ? b.drop : this._flowerTop(f);
+          tx = pos.x; ty = pos.y - 6 * this.s;
+          if (b.timer > 1.4 + b.size) { b.payload = b.drop ? .68 : .35 + f.nectar * .30; if (b.drop) b.drop.amount -= .5; else f.nectar = Math.max(.1, f.nectar - .25); b.drop = null; b.state = 'return'; b.timer = 0; }
+        } else {
+          tx = this.hive.x + Math.sin(b.target * 8.9) * this.hive.rx * .58;
+          ty = this.hive.y + Math.cos(b.target * 3.5) * this.hive.ry * .6;
+          if (b.state === 'return' && Math.hypot(tx - b.x, ty - b.y) < 17 * this.s) { b.state = 'deposit'; b.timer = 0; }
+          if (b.state === 'deposit' && b.timer > 1.5) { this._depositHoney(b.payload); b.payload = 0; b.state = 'seek'; b.target = Math.floor(Math.random() * this.flowers.length); b.timer = 0; }
+        }
+        const dx = tx - b.x, dy = ty - b.y, distance = Math.hypot(dx, dy) || 1;
+        const resting = b.state === 'collect' || b.state === 'deposit';
+        const speed = Math.min(b.speed * this.s, distance * (resting ? 1.9 : 1.4));
+        const wander = resting ? .35 : Math.min(12, distance * .12);
+        b.vx = mix(b.vx, dx / distance * speed + Math.sin(this.time * 1.9 + b.phase * .017) * wander, Math.min(1, dt * 2.1));
+        b.vy = mix(b.vy, dy / distance * speed + Math.cos(this.time * 2.5 + b.target) * wander * .7, Math.min(1, dt * 2.1));
+        b.x = clamp(b.x + b.vx * dt, 12, this.W - 12); b.y = clamp(b.y + b.vy * dt, 100, this.H * .91);
+        if (Math.hypot(b.vx, b.vy) > 2) { let da = Math.atan2(b.vy, b.vx) - b.angle; da = Math.atan2(Math.sin(da), Math.cos(da)); b.angle += da * Math.min(1, dt * 5); }
+        const hit = this._honeyCollision(b); if (hit) this._trapBee(b, hit);
+      }
+    }
+    _makeBackground() {
+      if (!this.W) return;
+      const c = document.createElement('canvas'); c.width = this.canvas.width; c.height = this.canvas.height;
+      const g = c.getContext('2d'); g.scale(this.dpr, this.dpr);
+      const W = this.W, H = this.H, p = palette[this.lighting], r = rng(4213), night = this.lighting === 'night';
+      let grad = g.createLinearGradient(0, 0, W * .7, H); p.sky.forEach((color, i) => grad.addColorStop(i / 2, color)); g.fillStyle = grad; g.fillRect(0, 0, W, H);
+      grad = g.createRadialGradient(W * .69, H * .31, 0, W * .69, H * .31, W * .63); grad.addColorStop(0, p.haze + (night ? '40' : '8a')); grad.addColorStop(1, p.haze + '00'); g.fillStyle = grad; g.fillRect(0, 0, W, H);
+      // Soft woodland depth: distant trunks disappear into the lit glade.
+      for (let layer = 0; layer < 3; layer++) {
+        g.fillStyle = [night ? '#203a3280' : '#40573b36', '#253c2b45', '#182d235c'][layer];
+        for (let i = 0; i < 12; i++) { const x = r() * W, w = (5 + r() * 25) * this.s, foot = H * (.57 + r() * .25); g.beginPath(); g.moveTo(x, -30); g.lineTo(x + w, -30); g.lineTo(x + w * .3 + (r() - .5) * 90, foot); g.lineTo(x - w * .2, foot); g.fill(); }
+      }
+      // Long translucent sunbeams, a little tilted by the canopy.
+      for (let i = 0; i < 6; i++) { const x = W * (.33 + i * .12), spread = W * (.035 + r() * .045); const beam = g.createLinearGradient(x, 0, x - W * .23, H); beam.addColorStop(0, p.light + (night ? '0a' : '14')); beam.addColorStop(.55, p.light + '0a'); beam.addColorStop(1, p.light + '00'); g.fillStyle = beam; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + spread, 0); g.lineTo(x - W * .2 + spread * 2, H); g.lineTo(x - W * .2, H); g.fill(); }
+      if (night) { for (let i = 0; i < 30; i++) { g.fillStyle = '#eef4ca' + (r() < .2 ? '70' : '22'); g.beginPath(); g.arc(W * (.3 + r() * .7), H * r() * .5, .6 + r() * .6, 0, TAU); g.fill(); } }
+      // Distant meadow mounds and flecks of flowers.
+      for (let j = 0; j < 3; j++) { g.fillStyle = ['#56734b40', '#3b573860', p.ground][j]; g.beginPath(); g.moveTo(0, H); g.lineTo(0, H * (.70 + j * .08)); g.bezierCurveTo(W * .3, H * (.60 + j * .1), W * .65, H * (.82 + j * .06), W, H * (.65 + j * .1)); g.lineTo(W, H); g.fill(); }
+      for (let i = 0; i < 180; i++) { const x = r() * W, y = H * (.63 + r() * .27); g.fillStyle = ['#c6c79228', '#e3d5a638', '#57744b60'][i % 3]; g.beginPath(); g.ellipse(x, y, 1 + r() * 2.8, .6 + r() * 1.2, 0, 0, TAU); g.fill(); }
+      this._drawTree(g, r, p);
+      // Grass in back of the flowering plants.
+      for (let i = 0; i < 155; i++) { const x = r() * W, y = H * (.94 + r() * .08), h = (15 + r() * 125) * this.s, lean = (r() - .5) * 60 * this.s; g.fillStyle = ['#234333', '#36523a', '#486242', '#1a382b'][i % 4]; g.globalAlpha = .40 + r() * .35; g.beginPath(); g.moveTo(x - 3 * this.s, y); g.quadraticCurveTo(x + lean * .2, y - h * .55, x + lean, y - h); g.quadraticCurveTo(x + lean * .35, y - h * .25, x + 3 * this.s, y); g.fill(); }
+      g.globalAlpha = 1;
+      // A hanging fringe of leaves frames the light.
+      for (let i = 0; i < 54; i++) { const side = i < 31 ? 0 : 1, x = side ? W * (.86 + r() * .18) : W * (r() * .53 - .1), y = -10 + r() * H * (side ? .22 : .15), a = r() * TAU; g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = ['#1b3023', '#233c29', '#30452b'][i % 3]; g.globalAlpha = .65 + r() * .3; g.beginPath(); g.ellipse(0, 0, (13 + r() * 32) * this.s, (7 + r() * 12) * this.s, 0, 0, TAU); g.fill(); g.restore(); }
+      // Foreground and corners recede so the controls remain easy to read.
+      grad = g.createLinearGradient(0, H * .67, 0, H); grad.addColorStop(0, '#10231b00'); grad.addColorStop(.8, '#10231b4d'); grad.addColorStop(1, '#081b16c9'); g.fillStyle = grad; g.fillRect(0, H * .67, W, H * .33);
+      grad = g.createLinearGradient(0, 0, 0, 130); grad.addColorStop(0, '#0c211ad6'); grad.addColorStop(1, '#0c211a00'); g.fillStyle = grad; g.fillRect(0, 0, W, 130);
+      this.background = c;
+    }
+    _drawTree(g, r, p) {
+      const { x, y, rx, ry } = this.hive, H = this.H, s = this.s;
+      const left = x - rx * 1.65, right = x + rx * 1.26;
+      const trunk = new Path2D(); trunk.moveTo(left - rx * .4, -50); trunk.bezierCurveTo(left + rx * .65, H * .2, left - rx * .1, H * .50, left + rx * .17, H * .75); trunk.bezierCurveTo(left + rx * .1, H * .85, left - rx * .8, H * .92, left - rx * 1.6, H); trunk.lineTo(right + rx * .8, H); trunk.bezierCurveTo(right - rx * .35, H * .88, right - rx * .08, H * .73, right, H * .57); trunk.bezierCurveTo(right + rx * .25, H * .35, right - rx * .3, H * .14, right + rx * .15, -50); trunk.closePath();
+      const wood = g.createLinearGradient(left, 0, right, 0); wood.addColorStop(0, '#1c281d'); wood.addColorStop(.28, p.bark); wood.addColorStop(.7, p.barkLight); wood.addColorStop(1, '#20281c'); g.fillStyle = wood; g.fill(trunk);
+      g.save(); g.clip(trunk);
+      for (let i = 0; i < 70; i++) { const xx = left + r() * (right - left), yy = r() * H; g.lineWidth = (1 + r() * 6) * s; g.strokeStyle = i % 3 ? '#111b1760' : '#d2b47512'; g.beginPath(); g.moveTo(xx, yy - 150 * s); g.bezierCurveTo(xx + (r() - .5) * 30, yy - 40, xx - 15 * s, yy + 40, xx + (r() - .5) * 30, yy + 200 * s); g.stroke(); }
+      for (let i = 0; i < 90; i++) { const xx = left + r() * (right - left), yy = H * (.68 + r() * .3); g.fillStyle = ['#67714030', '#7b824324', '#445b3830'][i % 3]; g.beginPath(); g.ellipse(xx, yy, 2 + r() * 10 * s, 3 + r() * 14 * s, r() * TAU, 0, TAU); g.fill(); }
+      g.restore();
+      // Deep organic cavity with a worn, lit wooden lip.
+      const hole = new Path2D(); hole.moveTo(x - rx * .32, y - ry * 1.19); hole.bezierCurveTo(x + rx * .75, y - ry * 1.3, x + rx * 1.08, y - ry * .72, x + rx * 1.08, y - ry * .1); hole.bezierCurveTo(x + rx * 1.15, y + ry * .58, x + rx * .60, y + ry * 1.23, x - rx * .10, y + ry * 1.19); hole.bezierCurveTo(x - rx * .89, y + ry * 1.2, x - rx * 1.16, y + ry * .43, x - rx * 1.11, y - ry * .1); hole.bezierCurveTo(x - rx * 1.09, y - ry * .70, x - rx * .90, y - ry * 1.10, x - rx * .32, y - ry * 1.19); hole.closePath();
+      g.lineWidth = 13 * s; g.strokeStyle = '#98724b3d'; g.stroke(hole); g.fillStyle = '#151a12'; g.fill(hole); g.lineWidth = 3 * s; g.strokeStyle = '#131b12'; g.stroke(hole);
+      const glow = g.createRadialGradient(x, y, rx * .18, x, y, ry * 1.15); glow.addColorStop(0, '#ce8c242c'); glow.addColorStop(1, '#ad741400'); g.fillStyle = glow; g.fill(hole);
+      // Tiny shelf mushrooms and ivy soften the old bark.
+      for (let i = 0; i < 4; i++) { const xx = left + rx * (.45 + (i % 2) * .38), yy = H * (.64 + i * .033); g.fillStyle = '#b5986b'; g.beginPath(); g.ellipse(xx, yy, (12 - i) * s, 4 * s, -.13, Math.PI, TAU); g.fill(); g.fillStyle = '#746747'; g.beginPath(); g.ellipse(xx, yy + 1, (11 - i) * s, 2 * s, -.13, 0, Math.PI); g.fill(); }
+      g.strokeStyle = '#6b754647'; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(left + rx * .32, H * .89); g.bezierCurveTo(left - 15, H * .68, left + rx * .43, H * .56, left + rx * .2, H * .4); g.stroke();
+      for (let i = 0; i < 11; i++) { const xx = left + rx * (.19 + Math.sin(i * .6) * .14), yy = H * (.83 - i * .032); this._leaf(g, xx, yy, (i % 2 ? -1 : 1) * 17 * s, -15 * s, '#48603a'); }
+    }
+    _makeComb() {
+      const { x, y, rx, ry } = this.hive, r = rng(8655);
+      this.cells = [];
+      const radius = this.W < 600 ? clamp(rx / 7.5, 6.5, 13) : clamp(rx / 9, 11, 20);
+      this.cellRadius = radius;
+      const dx = radius * 1.5, dy = radius * Math.sqrt(3);
+      for (let col = -12; col <= 12; col++) for (let row = -16; row <= 16; row++) {
+        const xx = col * dx, yy = (row + (col % 2 ? .5 : 0)) * dy;
+        const boundary = Math.pow(xx / (rx * .91), 2) + Math.pow((yy + ry * .02) / (ry * .95), 2);
+        if (boundary < .93 + .075 * Math.sin(col * 2.1 + row)) this.cells.push({ x: x + xx, y: y + yy, rank: r(), shade: r(), capped: row < -2 && r() > .55, edge: boundary > .77 });
+      }
+    }
+    _hex(g, x, y, r) { g.beginPath(); for (let i = 0; i < 6; i++) { const a = i * TAU / 6; const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); }
+    _drawComb(g) {
+      const r = this.cellRadius, night = this.lighting === 'night';
+      g.save();
+      const glow = g.createRadialGradient(this.hive.x, this.hive.y, 0, this.hive.x, this.hive.y, this.hive.ry); glow.addColorStop(0, '#e6aa3533'); glow.addColorStop(1, '#e6aa3500'); g.fillStyle = glow; g.fillRect(this.hive.x - this.hive.ry, this.hive.y - this.hive.ry, this.hive.ry * 2, this.hive.ry * 2);
+      for (const c of this.cells) {
+        const level = clamp(this.honey / this.honeyCapacity * 1.72 - c.rank * .72, 0, 1);
+        this._hex(g, c.x, c.y, r * .975);
+        g.fillStyle = c.capped ? (night ? '#93835c' : ['#c9b579', '#d9c58a', '#bda065'][Math.floor(c.shade * 3)]) : (level > .05 ? (night ? '#806022' : '#b27623') : (night ? '#3b351b' : '#513617'));
+        g.fill(); g.lineWidth = r * .14; g.strokeStyle = night ? '#967a3d' : '#d0a452'; g.stroke();
+        if (!c.capped && level > .025) {
+          g.save(); this._hex(g, c.x, c.y, r * .80); g.clip();
+          const h = r * 1.7 * level, yy = c.y + r * .82 - h;
+          const fill = g.createLinearGradient(c.x, yy, c.x, c.y + r); fill.addColorStop(0, night ? '#c69a39' : '#e2ab3c'); fill.addColorStop(1, night ? '#8a6322' : '#aa621a'); g.fillStyle = fill;
+          g.beginPath(); g.moveTo(c.x - r, c.y + r); g.lineTo(c.x - r, yy); g.quadraticCurveTo(c.x, yy + r * .12, c.x + r, yy); g.lineTo(c.x + r, c.y + r); g.fill();
+          g.strokeStyle = '#ffe39780'; g.lineWidth = 1; g.beginPath(); g.moveTo(c.x - r * .48, yy + 1); g.quadraticCurveTo(c.x, yy + r * .09, c.x + r * .5, yy + 1); g.stroke(); g.restore();
+        }
+        if (c.capped) { g.fillStyle = '#fff0b223'; for (let j = 0; j < 3; j++) { g.beginPath(); g.arc(c.x + Math.sin(c.shade * 50 + j * 3) * r * .55, c.y + Math.cos(c.shade * 24 + j) * r * .4, r * .07, 0, TAU); g.fill(); } }
+        // A fine bright upper rim gives every cell the depth of real wax.
+        g.strokeStyle = night ? '#d9b25a36' : '#ffe0a161'; g.lineWidth = .7; g.beginPath(); g.moveTo(c.x - r * .91, c.y); g.lineTo(c.x - r * .46, c.y - r * .79); g.lineTo(c.x + r * .46, c.y - r * .79); g.stroke();
+      }
+      g.restore();
+    }
+    _leaf(g, x, y, dx, dy, color) {
+      g.fillStyle = color; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + dx * .05 - dy * .25, y + dy * .05 + dx * .25, x + dx, y + dy); g.quadraticCurveTo(x + dx * .65 + dy * .23, y + dy * .65 - dx * .23, x, y); g.fill();
+      g.strokeStyle = '#a4ad6c18'; g.lineWidth = .65; g.beginPath(); g.moveTo(x, y); g.lineTo(x + dx * .85, y + dy * .85); g.stroke();
+    }
+    _flowerTop(f) { return { x: f.x + f.lean * this.s + Math.sin(this.time * .55 + f.phase) * 5 * this.s, y: f.y + Math.cos(this.time * .55 + f.phase) * 1.5 * this.s }; }
+    _drawFlower(g, f) {
+      const s = this.s * f.size, top = this._flowerTop(f), night = this.lighting === 'night', stem = night ? '#3a5b3c' : '#5c7544';
+      g.save();
+      const grow = clamp((this.time - f.added) * .8, 0, 1); // Initial meadow is fully grown.
+      const growth = f.added === 0 ? 1 : .25 + .75 * grow;
+      if (growth < 1) { g.translate(f.x, f.baseY); g.scale(growth, growth); g.translate(-f.x, -f.baseY); }
+      g.strokeStyle = stem; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(f.x, f.baseY); g.bezierCurveTo(f.x - f.lean * .3, f.baseY - f.height * .36, top.x + f.lean * .3, top.y + f.height * .28, top.x, top.y); g.stroke();
+      for (let j = 0; j < 3; j++) { const fraction = .22 + j * .19, yy = f.baseY - f.height * fraction, xx = mix(f.x, top.x, fraction), dir = j % 2 ? 1 : -1; this._leaf(g, xx, yy, dir * (21 + f.type * 3) * s, -15 * s, j % 2 ? '#46663d' : '#587648'); }
+      g.translate(top.x, top.y); g.rotate(Math.sin(this.time * .55 + f.phase) * .05);
+      if (f.type === 1) {
+        // Lavender spires, each small flower built from three separate petals.
+        for (let k = 0; k < 8; k++) { const yy = -k * 5.5 * s, ww = (7.5 - k * .48) * s; g.fillStyle = night ? '#78778c' : ['#a394b3', '#b4a0bb', '#897f9d'][k % 3]; g.beginPath(); g.ellipse(-ww * .4, yy, ww * .65, 3.7 * s, -.5, 0, TAU); g.ellipse(ww * .5, yy - 1.5 * s, ww * .65, 3.9 * s, .5, 0, TAU); g.fill(); g.fillStyle = '#d2bed330'; g.beginPath(); g.ellipse(ww * .25, yy - 2 * s, 2 * s, 1 * s, 0, 0, TAU); g.fill(); }
+      } else if (f.type === 2) {
+        // Wild pink cosmos.
+        for (let k = 0; k < 8; k++) { g.save(); g.rotate(k * TAU / 8); g.fillStyle = night ? '#947c70' : (k % 2 ? '#d3a68c' : '#e0b99b'); g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-9 * s, -7 * s, -10 * s, -19 * s, -3 * s, -20 * s); g.quadraticCurveTo(0, -17 * s, 3 * s, -20 * s); g.bezierCurveTo(10 * s, -19 * s, 9 * s, -7 * s, 0, 0); g.fill(); g.strokeStyle = '#f5e4c531'; g.lineWidth = .7; g.beginPath(); g.moveTo(0, -4 * s); g.lineTo(0, -16 * s); g.stroke(); g.restore(); }
+        this._flowerCenter(g, 5 * s, night);
+      } else if (f.type === 3) {
+        // Umbels of small pale buttercups.
+        for (let k = 0; k < 5; k++) { const a = k * TAU / 5, x = Math.cos(a) * 13 * s, y = Math.sin(a) * 9 * s; g.strokeStyle = stem; g.lineWidth = s; g.beginPath(); g.moveTo(0, 8 * s); g.lineTo(x, y); g.stroke(); g.save(); g.translate(x, y); for (let j = 0; j < 5; j++) { g.fillStyle = night ? '#979477' : '#e5d79b'; g.beginPath(); g.ellipse(Math.cos(j * TAU / 5) * 3.5 * s, Math.sin(j * TAU / 5) * 3.5 * s, 3.1 * s, 2.4 * s, j * TAU / 5, 0, TAU); g.fill(); } this._flowerCenter(g, 2 * s, night); g.restore(); }
+      } else {
+        for (let k = 0; k < 12; k++) { const a = k * TAU / 12; g.fillStyle = night ? (k % 2 ? '#a1ac99' : '#c0c8b0') : (k % 2 ? '#e8dfb7' : '#fff1ce'); g.beginPath(); g.ellipse(Math.cos(a) * 10 * s, Math.sin(a) * 10 * s, 9.5 * s, 3.1 * s, a, 0, TAU); g.fill(); }
+        this._flowerCenter(g, 5.7 * s, night);
+      }
+      g.restore();
+    }
+    _flowerCenter(g, r, night) { g.fillStyle = night ? '#a38a42' : '#ca9b35'; g.beginPath(); g.ellipse(0, 0, r, r * .75, 0, 0, TAU); g.fill(); g.fillStyle = '#ffe5a785'; for (let k = 0; k < 6; k++) { g.beginPath(); g.arc(Math.cos(k * 2.4) * r * .58, Math.sin(k * 2.4) * r * .4, Math.max(.5, r * .12), 0, TAU); g.fill(); } }
+    _drawHoney(g) {
+      const night = this.lighting === 'night';
+      g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+      for (const stream of this.honeyStreams) {
+        if (!stream.active || stream.points.length < 2) continue;
+        const points = stream.points, first = points[0], tip = points[points.length - 1];
+        const width = stream.width, wetness = clamp(this.spilledHoney / .8, 0, 1);
+        g.globalAlpha = .25 + wetness * .75;
+        const trace = (offset = 0) => {
+          g.beginPath(); g.moveTo(first.x + offset, first.y);
+          for (let i = 1; i < points.length; i++) g.lineTo(points[i].x + offset, points[i].y);
+        };
+        trace(2 * this.s); g.lineWidth = width + 4 * this.s; g.strokeStyle = '#19160b80'; g.stroke();
+        const syrup = g.createLinearGradient(first.x - width * .5, first.y, tip.x + width * .5, tip.y);
+        syrup.addColorStop(0, night ? '#b68831' : '#f2c65a');
+        syrup.addColorStop(.45, night ? '#a57020' : '#d99523');
+        syrup.addColorStop(1, night ? '#c39435' : '#e6ac34');
+        trace(); g.lineWidth = width; g.strokeStyle = syrup; g.stroke();
+        trace(-width * .22); g.lineWidth = Math.max(1, width * .18); g.strokeStyle = night ? '#efd17a65' : '#fff0aaaf'; g.stroke();
+        // The rounded, heavy leading drop stretches as the honey descends.
+        const swell = 1 + Math.sin(this.time * .85 + stream.id * 2.6) * .07;
+        const r = width * .70;
+        g.fillStyle = syrup; g.beginPath();
+        g.ellipse(tip.x, tip.y + r * .24, r * swell, r * 1.22, 0, 0, TAU); g.fill();
+        g.fillStyle = night ? '#ffe6a178' : '#fff2b2c4'; g.beginPath();
+        g.ellipse(tip.x - r * .34, tip.y - r * .07, Math.max(.8, r * .17), r * .52, -.2, 0, TAU); g.fill();
+        // Slow gleams follow the actual sticky trail; collision uses the same points.
+        for (let i = 0; i < 3; i++) {
+          const progress = ((this.time * .038 + stream.id * .21 + i / 3) % 1) * stream.growth;
+          const p = this._streamPoint(stream, progress);
+          g.fillStyle = '#fff0ba50'; g.beginPath(); g.ellipse(p.x + width * .13, p.y, width * .12, 2.8 * this.s, 0, 0, TAU); g.fill();
+        }
+        if (stream.growth > .96) {
+          g.fillStyle = syrup; g.beginPath(); g.ellipse(tip.x, tip.y + r, r * 1.7, r * .52, 0, 0, TAU); g.fill();
+        }
+      }
+      g.restore();
+    }
+    _drawStuckMark(g, b) {
+      const r = Math.max(17, 20 * this.s * b.size);
+      g.save(); g.translate(b.x, b.y);
+      // A little honey remains on a trapped bee even after the tree has dried.
+      g.fillStyle = '#e8a72d7a'; g.strokeStyle = '#f4c558b0'; g.lineWidth = 1;
+      g.beginPath(); g.ellipse(0, 2 * this.s, r * .82, r * .61, b.angle, 0, TAU); g.fill(); g.stroke();
+      g.strokeStyle = '#ffdf8cd9'; g.lineWidth = 1.5;
+      g.setLineDash([3, 4]); g.lineDashOffset = -this.time * 3;
+      g.beginPath(); g.arc(0, 0, r + 6, 0, TAU); g.stroke(); g.setLineDash([]);
+      g.fillStyle = '#ffdc82'; g.beginPath(); g.arc(0, -r - 5, 7, 0, TAU); g.fill();
+      g.fillStyle = '#4a3416'; g.font = 'bold 11px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', 0, -r - 4.5);
+      g.restore();
+    }
+    _drawBee(g, b) {
+      const scale = this.s * b.size, resting = b.queen || b.stuck || b.state === 'collect' || b.state === 'deposit', night = this.lighting === 'night';
+      if (b.stuck) this._drawStuckMark(g, b);
+      g.save(); g.translate(b.x, b.y); g.rotate(b.angle + (b.stuck ? Math.sin(b.phase * 2) * .09 : 0)); g.scale(scale, scale);
+      if (resting) { g.fillStyle = '#081c1640'; g.beginPath(); g.ellipse(-2, 6, b.queen ? 19 : 15, 6, 0, 0, TAU); g.fill(); }
+      // Six jointed legs, pollen baskets on the hind pair.
+      g.strokeStyle = '#2e2d1d'; g.lineWidth = 1.15; g.lineCap = 'round';
+      for (let side = -1; side <= 1; side += 2) for (let k = 0; k < 3; k++) { const xx = 3 - k * 5, swing = resting ? Math.sin(this.time * 4 + k * 2) * 1.3 : Math.sin(b.phase * .5 + k) * 1.5; g.beginPath(); g.moveTo(xx, side * 3); g.lineTo(xx - 1 + swing, side * (8 + k)); g.lineTo(xx - 5 + swing, side * (10 + k * 1.2)); g.stroke(); }
+      if (b.payload > .1) { g.fillStyle = night ? '#b78c33' : '#e9b541'; for (const side of [-1, 1]) { g.beginPath(); g.ellipse(-8, side * 10, 3.2, 3.5, side * .3, 0, TAU); g.fill(); g.fillStyle = '#fbd677'; g.beginPath(); g.arc(-8.8, side * 10 - 1, .9, 0, TAU); g.fill(); } }
+      const wingbeat = b.stuck ? .72 + Math.sin(b.phase * 2) * .11 : resting ? .75 : .56 + Math.abs(Math.sin(b.phase)) * .62;
+      // Veined, translucent wings, four per bee.
+      for (const side of [-1, 1]) {
+        g.save(); g.rotate(side * (resting ? .22 : .1 + Math.sin(b.phase) * .12));
+        g.fillStyle = night ? '#d7e5d18a' : '#eaf3d4a1'; g.strokeStyle = '#f5ffdb66'; g.lineWidth = .55;
+        g.beginPath(); g.ellipse(-4, side * 10 * wingbeat, 10.2, 5.6 * wingbeat, side * .6, 0, TAU); g.fill(); g.stroke();
+        g.fillStyle = '#dceacb70'; g.beginPath(); g.ellipse(-10, side * 8 * wingbeat, 7.2, 4.3 * wingbeat, side * .18, 0, TAU); g.fill();
+        g.strokeStyle = '#7c947e5c'; g.beginPath(); g.moveTo(1, side * 3); g.quadraticCurveTo(-6, side * 9 * wingbeat, -13, side * 15 * wingbeat); g.moveTo(-4, side * 8 * wingbeat); g.lineTo(-10, side * 8 * wingbeat); g.stroke(); g.restore();
+      }
+      // Segmented abdomen with clipped curved stripes.
+      const bodyLength = b.queen ? 14 : 10.5;
+      let grad = g.createLinearGradient(-10, -6, -10, 6); grad.addColorStop(0, night ? '#c4a349' : '#f3cc60'); grad.addColorStop(.5, night ? '#9c792c' : '#dfac39'); grad.addColorStop(1, night ? '#695323' : '#a16c26');
+      g.fillStyle = grad; g.beginPath(); g.ellipse(-7, 0, bodyLength, b.queen ? 6.4 : 6, 0, 0, TAU); g.fill();
+      g.save(); g.beginPath(); g.ellipse(-7, 0, bodyLength, b.queen ? 6.4 : 6, 0, 0, TAU); g.clip(); g.strokeStyle = '#393321'; g.lineWidth = b.queen ? 2.2 : 3.1; for (let j = 0; j < 3; j++) { const xx = -3 - j * 5; g.beginPath(); g.moveTo(xx, -8); g.quadraticCurveTo(xx + 4, 0, xx, 8); g.stroke(); } g.restore();
+      // A fuzzy ochre thorax, dark face and bright, tiny eye.
+      g.fillStyle = night ? '#a18b46' : '#c8aa54'; g.beginPath(); g.ellipse(3, 0, 5.6, 5.2, 0, 0, TAU); g.fill();
+      g.strokeStyle = '#e7cf7a70'; g.lineWidth = .6; for (let j = 0; j < 10; j++) { const a = j * TAU / 10; g.beginPath(); g.moveTo(3 + Math.cos(a) * 4.4, Math.sin(a) * 4); g.lineTo(3 + Math.cos(a) * 6.2, Math.sin(a) * 5.7); g.stroke(); }
+      g.fillStyle = '#332e21'; g.beginPath(); g.ellipse(9, 0, 4.3, 4.1, 0, 0, TAU); g.fill();
+      g.fillStyle = '#121b16'; g.beginPath(); g.ellipse(10, -1.9, 1.5, 1.9, -.4, 0, TAU); g.fill(); g.fillStyle = '#f0ebbe'; g.beginPath(); g.arc(10.6, -2.5, .58, 0, TAU); g.fill();
+      g.strokeStyle = '#393826'; g.lineWidth = .8; for (const side of [-1, 1]) { g.beginPath(); g.moveTo(11, side * 1.8); g.quadraticCurveTo(17, side * 7, 18, side * 4.5); g.stroke(); }
+      if (b.queen) { g.fillStyle = '#f6e8ba'; g.beginPath(); g.arc(3, 0, 1.4, 0, TAU); g.fill(); }
+      g.restore();
+    }
+    _drawAtmosphere(g) {
+      const W = this.W, H = this.H, t = this.time, night = this.lighting === 'night';
+      if (this.fireflies) for (let i = 0; i < 48; i++) { const x = ((i * 193.23 + Math.sin(t * .12 + i) * 28 + t * (2 + i % 4)) % (W + 30)) - 15, y = ((i * 79.17 - t * (1.6 + i % 3) + Math.sin(i + t * .3) * 13) % (H * .9) + H * .9) % (H * .9); const alpha = (.13 + (Math.sin(t + i) + 1) * .075) * (night ? .5 : 1); g.fillStyle = `rgba(243,225,163,${alpha})`; g.beginPath(); g.arc(x, y, (i % 7 === 0 ? 1.7 : .8) * this.s, 0, TAU); g.fill(); }
+      if (this.fireflies) for (let i = 0; i < 16; i++) { const x = W * (.35 + ((i * .157) % .65)) + Math.sin(t * .22 + i * 3) * 22 * this.s, y = H * (.44 + ((i * .113) % .40)) + Math.cos(t * .28 + i * 2) * 20 * this.s; const blink = Math.pow((Math.sin(t * .9 + i * 2.7) + 1) / 2, 4) * (night ? .85 : .26); if (blink < .025) continue; const glow = g.createRadialGradient(x, y, 0, x, y, 10 * this.s); glow.addColorStop(0, `rgba(234,247,154,${blink * .55})`); glow.addColorStop(1, '#eaf79a00'); g.fillStyle = glow; g.fillRect(x - 10 * this.s, y - 10 * this.s, 20 * this.s, 20 * this.s); g.fillStyle = `rgba(245,255,180,${blink})`; g.beginPath(); g.arc(x, y, 1.5 * this.s, 0, TAU); g.fill(); }
+      for (const n of this.nectarDrops) { const alpha = Math.min(1, n.life / 3); g.save(); g.globalAlpha = alpha; const glow = g.createRadialGradient(n.x, n.y, 0, n.x, n.y, 27); glow.addColorStop(0, '#fbd86b4d'); glow.addColorStop(1, '#fbd86b00'); g.fillStyle = glow; g.fillRect(n.x - 27, n.y - 27, 54, 54); for (let j = 0; j < 5; j++) { const a = j * TAU / 5 + t * .15, rr = 5 + Math.sin(t + j) * 2; g.fillStyle = j % 2 ? '#f5d47d' : '#fae7ad'; g.beginPath(); g.arc(n.x + Math.cos(a) * rr, n.y + Math.sin(a) * rr, 1.8 + (j % 2) * .4, 0, TAU); g.fill(); } g.restore(); }
+      for (const r of this.ripples) { g.strokeStyle = `rgba(246,227,159,${.38 * (1 - r.age / 1.8)})`; g.lineWidth = 1; g.beginPath(); g.arc(r.x, r.y, 9 + r.age * 23, 0, TAU); g.stroke(); }
+    }
+    draw() {
+      if (!this.background || this._destroyed) return;
+      const g = this.ctx; g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      g.drawImage(this.background, 0, 0, this.W, this.H);
+      this._drawComb(g);
+      this._drawHoney(g);
+      this._drawJarScene?.(g);
+      for (const f of [...this.flowers].sort((a, b) => a.baseY - b.baseY)) this._drawFlower(g, f);
+      this._drawAtmosphere(g);
+      for (const b of this.bees) this._drawBee(g, b);
+      this._hasDrawn = true;
+    }
+    destroy() {
+      this._destroyed = true; cancelAnimationFrame(this._raf); this._observer?.disconnect();
+      window.removeEventListener('resize', this._resize); document.removeEventListener('visibilitychange', this._visibility);
+      this.canvas.removeEventListener('pointerdown', this._down); this.canvas.removeEventListener('pointermove', this._move); this.canvas.removeEventListener('pointerup', this._up); this.canvas.removeEventListener('pointercancel', this._up);
+    }
+  }
+  window.BeeHive = BeeHive;
+})();
+
+</script>
+<script>
+/* Painted glass, a little hollow in the tree, and a honey-loving visitor. */
+(() => {
+  'use strict';
+  const TAU = Math.PI * 2;
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const ease = n => { n = clamp(n, 0, 1); return n * n * (3 - 2 * n); };
+
+  window.BeeHive.prototype._drawJarScene = function (g) {
+    if (!this.jar || !this.jarLayout) return;
+    const jar = this.jar, { x, y, w, h } = this.jarLayout;
+    const unit = w / 100, H = h / unit, night = this.lighting === 'night';
+    const level = clamp(jar.level || 0, 0, 1);
+    const progress = jar.phase === 'approach' ? ease(jar.phaseTime / 1.5)
+      : jar.phase === 'drink' ? 1
+      : jar.phase === 'leave' ? 1 - ease(jar.phaseTime / 1.5) : 0;
+    const bearShift = -(x / unit + 132) * (1 - progress);
+    const drinking = jar.phase === 'drink';
+    const nod = drinking ? Math.sin(jar.phaseTime * 8) * 1.6 : Math.sin(this.time * 1.8) * .65;
+    const ellipse = (cx, cy, rx, ry, color, rotation = 0) => {
+      g.fillStyle = color; g.beginPath(); g.ellipse(cx, cy, rx, ry, rotation, 0, TAU); g.fill();
+    };
+    const glassOutline = () => {
+      g.beginPath(); g.moveTo(17, 9); g.lineTo(83, 9); g.lineTo(83, 19);
+      g.bezierCurveTo(83, 26, 94, 28, 94, 39); g.lineTo(94, H - 15);
+      g.quadraticCurveTo(94, H - 2, 80, H - 2); g.lineTo(20, H - 2);
+      g.quadraticCurveTo(6, H - 2, 6, H - 15); g.lineTo(6, 39);
+      g.bezierCurveTo(6, 28, 17, 26, 17, 19); g.closePath();
+    };
+
+    g.save();
+    g.translate(x, y); g.scale(unit, unit);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+
+    // A shallow, irregular niche shares the old tree's subdued, warm bark.
+    g.beginPath(); g.moveTo(-8, H + 5); g.lineTo(-8, 22);
+    g.bezierCurveTo(-8, -12, 11, -22, 50, -20);
+    g.bezierCurveTo(92, -22, 108, -9, 108, 22); g.lineTo(108, H + 5); g.closePath();
+    g.fillStyle = night ? '#131e19' : '#201e14'; g.fill();
+    g.strokeStyle = night ? '#60705a70' : '#a2855869'; g.lineWidth = 3.6; g.stroke();
+    const nicheGlow = g.createRadialGradient(52, H * .72, 4, 50, H * .64, 79);
+    nicheGlow.addColorStop(0, night ? '#c7a44320' : '#d8a84c2d'); nicheGlow.addColorStop(1, '#b1873600');
+    g.fillStyle = nicheGlow; g.fillRect(-7, -16, 114, H + 21);
+    g.strokeStyle = night ? '#81907822' : '#d1b88a29'; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(-3, H - 5); g.bezierCurveTo(1, H * .55, -9, 2, 25, -13); g.stroke();
+    // A softly lit wooden ledge anchors the jar in the hollow.
+    ellipse(50, H + 3, 59, 7, '#0c140dad');
+    g.fillStyle = night ? '#3b4430' : '#6a5130';
+    g.beginPath(); g.moveTo(-9, H); g.lineTo(109, H); g.lineTo(105, H + 10);
+    g.quadraticCurveTo(50, H + 15, -5, H + 10); g.closePath(); g.fill();
+    g.strokeStyle = night ? '#a3a27b78' : '#c6aa7190'; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(-6, H + 1); g.quadraticCurveTo(48, H + 5, 105, H + 1); g.stroke();
+
+    // Only a head and a reaching foreleg emerge from the left edge.
+    if (progress > 0) {
+      g.save(); g.translate(bearShift, nod);
+      g.strokeStyle = night ? '#584634' : '#795536'; g.lineWidth = 25;
+      g.beginPath(); g.moveTo(-x / unit - 30, H * .90);
+      g.bezierCurveTo(-65, H * .85, -30, H * .59, 9, H * .59); g.stroke();
+      g.strokeStyle = night ? '#9d7a4b40' : '#d0a66a4d'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(-51, H * .75); g.quadraticCurveTo(-24, H * .60, 3, H * .55); g.stroke();
+      ellipse(-49, -44, 19, 21, night ? '#65513c' : '#88603e', -.25);
+      ellipse(11, -47, 18, 20, night ? '#756047' : '#a3774b', .16);
+      ellipse(-49, -44, 11.5, 13, night ? '#362d24' : '#553727', -.25);
+      ellipse(11, -47, 10.5, 12, night ? '#45372a' : '#6b4430', .16);
+      const fur = g.createRadialGradient(10, -22, 4, -18, 7, 70);
+      fur.addColorStop(0, night ? '#9b8056' : '#b88b52');
+      fur.addColorStop(.55, night ? '#746044' : '#916540'); fur.addColorStop(1, night ? '#42392b' : '#5c3d29');
+      ellipse(-18, -1, 54, 54, fur, -.12);
+      ellipse(-25, 27, 42, 25, night ? '#54463055' : '#67452a40', .07);
+      // Fine fur flicks blend the silhouette into the painted woodland.
+      g.strokeStyle = night ? '#a48c6155' : '#d1a56966'; g.lineWidth = .9;
+      for (let i = 0; i < 14; i++) {
+        const a = 2.5 + i * .22;
+        const fx = -18 + Math.cos(a) * 50, fy = -1 + Math.sin(a) * 50;
+        g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx + Math.cos(a) * 5, fy + Math.sin(a) * 4); g.stroke();
+      }
+      const muzzle = g.createLinearGradient(8, -1, 27, 42);
+      muzzle.addColorStop(0, night ? '#bbaa82' : '#dfc08b'); muzzle.addColorStop(1, night ? '#91825f' : '#b89360');
+      ellipse(22, 19, 34, 25, muzzle, -.12);
+      // The near eye softens into a contented crescent while drinking.
+      if (drinking || jar.phase === 'leave') {
+        g.strokeStyle = '#29261d'; g.lineWidth = 2.8;
+        g.beginPath(); g.moveTo(3, -9); g.quadraticCurveTo(10, -15, 17, -9); g.stroke();
+      } else {
+        ellipse(10, -11, 4.7, 5.8, '#27271d', -.15);
+        ellipse(11.3, -12.8, 1.6, 1.8, '#f6e9c4');
+      }
+      g.strokeStyle = night ? '#c4ab7890' : '#e2be8399'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(2, -22); g.quadraticCurveTo(9, -26, 17, -22); g.stroke();
+      ellipse(47, 8, 11.4, 8.6, '#292820', -.16);
+      ellipse(45, 5, 4.6, 2, '#9b967277', -.13);
+      g.strokeStyle = '#634a30'; g.lineWidth = 1.8;
+      g.beginPath(); g.moveTo(43, 15); g.lineTo(42, 24);
+      g.quadraticCurveTo(36, 31, 27, 27); g.stroke();
+      ellipse(15, 22, 3, 1.6, '#88674435');
+      g.restore();
+    }
+
+    // Pale transparent glass: a thick base, rounded shoulders and an open rim.
+    ellipse(50, H - 1, 47, 6, '#07130b66');
+    const glass = g.createLinearGradient(6, 0, 94, 0);
+    glass.addColorStop(0, '#d8eadf2f'); glass.addColorStop(.17, '#d6e1bd09');
+    glass.addColorStop(.78, '#a4cbb315'); glass.addColorStop(1, '#d6ece239');
+    glassOutline(); g.fillStyle = glass; g.fill();
+    if (level > .001) {
+      const bottom = H - 9, top = 28, surfaceY = bottom - (bottom - top) * level;
+      g.save(); glassOutline(); g.clip();
+      const honey = g.createLinearGradient(0, surfaceY, 0, H);
+      honey.addColorStop(0, night ? '#cfab49' : '#f3c85a');
+      honey.addColorStop(.32, night ? '#aa791e' : '#dea22f');
+      honey.addColorStop(1, night ? '#755018' : '#a5611d');
+      g.fillStyle = honey; g.beginPath(); g.moveTo(5, H); g.lineTo(5, surfaceY);
+      g.bezierCurveTo(29, surfaceY + 3.4, 70, surfaceY - 3.4, 95, surfaceY);
+      g.lineTo(95, H); g.closePath(); g.fill();
+      g.strokeStyle = night ? '#ffe1a5a0' : '#ffedb7db'; g.lineWidth = 1.7;
+      g.beginPath(); g.moveTo(10, surfaceY + .7);
+      g.bezierCurveTo(34, surfaceY + 3.2, 69, surfaceY - 2.2, 90, surfaceY + .5); g.stroke();
+      for (let i = 0; i < 8; i++) {
+        const bx = 20 + (i * 23.1) % 59, by = H - 14 - ((i * 19.3 + this.time * .6) % (H - 38));
+        if (by < surfaceY + 7) continue;
+        g.strokeStyle = '#fff0b653'; g.lineWidth = .75; g.beginPath();
+        g.ellipse(bx, by, 1.1 + i % 3 * .5, 1.5 + i % 2 * .7, -.2, 0, TAU); g.stroke();
+      }
+      g.restore();
+    }
+    glassOutline(); g.strokeStyle = night ? '#bad2c99c' : '#e0ece0ad'; g.lineWidth = 1.7; g.stroke();
+    // Three notches correspond exactly to the three harvests.
+    for (let i = 1; i <= 3; i++) {
+      const markY = H - 9 - (H - 37) * i / 3;
+      g.strokeStyle = i <= jar.fills ? '#fff0bbd9' : '#dce3d08a'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(78, markY); g.lineTo(88, markY); g.stroke();
+    }
+    g.strokeStyle = '#f0f7e795'; g.lineWidth = 3.1;
+    g.beginPath(); g.moveTo(16, 40); g.quadraticCurveTo(14, H * .51, 16, H * .75); g.stroke();
+    g.strokeStyle = '#f2f8e6bf'; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(25, 15); g.lineTo(25, 22); g.stroke();
+    g.strokeStyle = '#e6efe160'; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(84, 46); g.lineTo(84, H - 21); g.stroke();
+    g.strokeStyle = '#ecf1dba6'; g.lineWidth = 2.7;
+    g.beginPath(); g.moveTo(20, H - 7); g.quadraticCurveTo(49, H - 4, 79, H - 7); g.stroke();
+    ellipse(50, 9, 34, 6, night ? '#b7ccc226' : '#e4efdc22');
+    g.strokeStyle = night ? '#c4d9c8bc' : '#e8efdaeb'; g.lineWidth = 2.1;
+    g.beginPath(); g.ellipse(50, 9, 34, 6, 0, 0, TAU); g.stroke();
+    g.strokeStyle = '#e8efdb75'; g.lineWidth = 1.1;
+    g.beginPath(); g.moveTo(18, 15); g.quadraticCurveTo(50, 22, 82, 15); g.stroke();
+
+    if (jar.pour > 0) {
+      g.save(); g.globalAlpha = clamp(jar.pour * 2, 0, 1);
+      g.strokeStyle = night ? '#d7ae4b' : '#f4c556'; g.lineWidth = 5;
+      g.beginPath(); g.moveTo(66, -31); g.bezierCurveTo(63, -17, 51, -9, 51, 32); g.stroke();
+      g.strokeStyle = '#fff0b4b5'; g.lineWidth = 1.3;
+      g.beginPath(); g.moveTo(64, -27); g.quadraticCurveTo(51, -8, 50, 24); g.stroke();
+      ellipse(51, 32, 4, 5.5, night ? '#d5a844' : '#f3c053');
+      g.restore();
+    }
+
+    if (progress > 0) {
+      g.save(); g.translate(bearShift, nod);
+      // The paw cups the jar; rounded fingers, with no claws.
+      const paw = g.createLinearGradient(-8, H * .51, 13, H * .75);
+      paw.addColorStop(0, night ? '#9a7c50' : '#bb8c54'); paw.addColorStop(1, night ? '#5e4a35' : '#7a5032');
+      ellipse(7, H * .63, 18, 16, paw, -.24);
+      g.strokeStyle = night ? '#4e3e2c99' : '#704d3199'; g.lineWidth = 1.2;
+      for (let i = 0; i < 3; i++) {
+        g.beginPath(); g.moveTo(11 + i * 4, H * .54 + i * 3);
+        g.quadraticCurveTo(7 + i * 4, H * .60 + i * 3, 10 + i * 4, H * .64 + i * 3); g.stroke();
+      }
+      if (drinking) {
+        // A tiny amber sip joins the mouth to the open rim.
+        g.strokeStyle = night ? '#d8af54' : '#f4c45b'; g.lineWidth = 3.2;
+        g.beginPath(); g.moveTo(41, 24); g.quadraticCurveTo(51, 26, 53, 11); g.stroke();
+        ellipse(41, 26 + Math.max(0, Math.sin(jar.phaseTime * 9)) * 3, 2.2, 3.6, '#efb64d');
+      } else if (jar.phase === 'leave') {
+        ellipse(40, 26, 2.2, 3.4, night ? '#d6ab4b' : '#edb64b');
+      }
+      g.restore();
+    }
+
+    // The small plate remains readable on narrow screens as well.
+    const fontSize = clamp(w * .17, 11, 14) / unit;
+    const labelY = H + 24 / unit;
+    g.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#172017d9';
+    const plateW = 38 / unit, plateH = 20 / unit;
+    g.beginPath(); g.roundRect(50 - plateW / 2, labelY - plateH / 2, plateW, plateH, 7 / unit); g.fill();
+    g.strokeStyle = '#dac99538'; g.lineWidth = 1 / unit; g.stroke();
+    g.fillStyle = jar.fills === 3 ? '#ffe0a0' : '#e5d6af';
+    g.fillText(`${jar.fills}/3`, 50, labelY + .2 / unit);
+    g.restore();
+  };
+})();
+
+</script>
+<script>
+/* Offline meadow ambience. Nothing starts before setEnabled(true).
+ * API: await setEnabled(boolean) -> accepted on/off state; enabled (getter),
+ * setNight(boolean), setPaused(boolean), destroy(). Pausing / hiding the page
+ * temporarily silences sound while retaining the user's enabled preference.
+ */
+(() => {
+  'use strict';
+
+  class MeadowAudio {
+    constructor() {
+      this.context = null;
+      this._wanted = false;
+      this._night = false;
+      this._paused = false;
+      this._destroyed = false;
+      this._nodes = [];
+      this._continuous = [];
+      this._accents = new Set();
+      this._timer = null;
+      this._queue = Promise.resolve();
+      this._onVisibility = () => {
+        this._silence();
+        this._reconcile().catch(() => {});
+      };
+      document.addEventListener('visibilitychange', this._onVisibility);
+    }
+
+    get enabled() { return this._wanted && !this._destroyed; }
+
+    async setEnabled(value) {
+      if (this._destroyed) return false;
+      this._wanted = Boolean(value);
+      if (!this._wanted) this._silence();
+      if (this._wanted && !this.context) {
+        const Audio = window.AudioContext || window.webkitAudioContext;
+        if (!Audio) { this._wanted = false; return false; }
+        try {
+          this.context = new Audio();
+          this._buildGraph();
+        } catch (error) {
+          this._wanted = false;
+          this._disposeGraph();
+          if (this.context) this.context.close().catch(() => {});
+          this.context = null;
+          return false;
+        }
+      }
+      return this._reconcile();
+    }
+
+    setNight(value) {
+      this._night = Boolean(value);
+      if (!this.context) return;
+      const t = this.context.currentTime;
+      this._humVolume.gain.setTargetAtTime(this._night ? 0.23 : 1, t, 1.8);
+      this._breezeVolume.gain.setTargetAtTime(this._night ? 0.07 : 0.10, t, 1.8);
+      this._clearAccents();
+      if (this._canPlay() && this.context.state === 'running') this._scheduleAccent();
+    }
+
+    setPaused(value) {
+      this._paused = Boolean(value);
+      if (this._paused) this._silence();
+      this._reconcile().catch(() => {});
+    }
+
+    _canPlay() {
+      return this.enabled && !this._paused && !document.hidden;
+    }
+
+    _reconcile() {
+      // Serializing resume/suspend prevents a late resume from undoing a mute.
+      // Every queued operation reads the current desired state, not its caller's.
+      this._queue = this._queue.catch(() => {}).then(async () => {
+        const ctx = this.context;
+        if (!ctx || this._destroyed) return false;
+        if (!this._canPlay()) {
+          this._silence();
+          if (ctx.state === 'running') await ctx.suspend();
+          return this.enabled;
+        }
+        try {
+          if (ctx.state !== 'running') await ctx.resume();
+        } catch (error) {
+          this._wanted = false;
+          this._silence();
+          return false;
+        }
+        if (ctx !== this.context || this._destroyed) return false;
+        if (!this._canPlay()) {
+          this._silence();
+          if (ctx.state === 'running') await ctx.suspend();
+        } else if (ctx.state === 'running') {
+          const t = ctx.currentTime;
+          this._master.gain.cancelScheduledValues(t);
+          this._master.gain.setTargetAtTime(0.38, t, 0.65);
+          if (!this._timer) this._scheduleAccent();
+        } else {
+          this._wanted = false;
+        }
+        return this.enabled;
+      });
+      return this._queue;
+    }
+
+    _node(node) { this._nodes.push(node); return node; }
+
+    _buildGraph() {
+      const ctx = this.context;
+      const gain = amount => {
+        const node = this._node(ctx.createGain());
+        node.gain.value = amount;
+        return node;
+      };
+      this._master = gain(0);
+      this._master.connect(ctx.destination);
+      this._humVolume = gain(this._night ? 0.23 : 1);
+      this._humVolume.connect(this._master);
+      this._breezeVolume = gain(this._night ? 0.07 : 0.10);
+      this._breezeVolume.connect(this._master);
+
+      // Low, soft hum; detuning and slow modulation keep it from sounding static.
+      [112, 168.7, 225.5].forEach((frequency, index) => {
+        const oscillator = this._node(ctx.createOscillator());
+        oscillator.type = index === 0 ? 'triangle' : 'sine';
+        oscillator.frequency.value = frequency;
+        const voiceGain = gain([0.017, 0.010, 0.006][index]);
+        const lowpass = this._node(ctx.createBiquadFilter());
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = 420;
+        lowpass.Q.value = 0.35;
+        oscillator.connect(lowpass);
+        lowpass.connect(voiceGain);
+        if (ctx.createStereoPanner) {
+          const panner = this._node(ctx.createStereoPanner());
+          panner.pan.value = (index - 1) * 0.35;
+          voiceGain.connect(panner);
+          panner.connect(this._humVolume);
+        } else voiceGain.connect(this._humVolume);
+        const drift = this._node(ctx.createOscillator());
+        drift.frequency.value = 0.075 + index * 0.033;
+        const driftDepth = gain(1.5 + index * 0.7);
+        drift.connect(driftDepth);
+        driftDepth.connect(oscillator.frequency);
+        oscillator.start();
+        drift.start();
+        this._continuous.push(oscillator, drift);
+      });
+
+      // A softly filtered, seamless loop of locally generated brown noise.
+      const length = Math.ceil(ctx.sampleRate * 6);
+      const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      let brown = 0;
+      for (let i = 0; i < length; i++) {
+        brown = (brown + (Math.random() * 2 - 1) * 0.022) / 1.025;
+        data[i] = brown * 2.5;
+      }
+      // Remove the endpoint difference to avoid a periodic click at the loop seam.
+      const edge = data[length - 1] - data[0];
+      for (let i = 0; i < length; i++) data[i] -= edge * i / (length - 1);
+      const breeze = this._node(ctx.createBufferSource());
+      breeze.buffer = buffer;
+      breeze.loop = true;
+      const low = this._node(ctx.createBiquadFilter());
+      low.type = 'lowpass';
+      low.frequency.value = 720;
+      low.Q.value = 0.3;
+      const high = this._node(ctx.createBiquadFilter());
+      high.type = 'highpass';
+      high.frequency.value = 110;
+      const swell = gain(0.7);
+      breeze.connect(low);
+      low.connect(high);
+      high.connect(swell);
+      swell.connect(this._breezeVolume);
+      const windLFO = this._node(ctx.createOscillator());
+      windLFO.frequency.value = 0.082;
+      const windDepth = gain(0.22);
+      windLFO.connect(windDepth);
+      windDepth.connect(swell.gain);
+      breeze.start();
+      windLFO.start();
+      this._continuous.push(breeze, windLFO);
+    }
+
+    _scheduleAccent() {
+      clearTimeout(this._timer);
+      this._timer = null;
+      if (!this._canPlay() || !this.context || this.context.state !== 'running') return;
+      const delay = this._night ? 3400 + Math.random() * 5000 : 7500 + Math.random() * 10000;
+      this._timer = setTimeout(() => {
+        this._timer = null;
+        if (!this._canPlay() || this.context.state !== 'running') return;
+        this._accent();
+        this._scheduleAccent();
+      }, delay);
+    }
+
+    _accent() {
+      if (this._accents.size >= 2 || !this.context) return;
+      const ctx = this.context;
+      const start = ctx.currentTime + 0.02;
+      const oscillator = ctx.createOscillator();
+      const volume = ctx.createGain();
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      oscillator.type = 'sine';
+      volume.gain.value = 0;
+      oscillator.connect(volume);
+      if (panner) {
+        panner.pan.value = (Math.random() * 2 - 1) * 0.7;
+        volume.connect(panner);
+        panner.connect(this._master);
+      } else volume.connect(this._master);
+      const voice = { oscillator, volume, panner };
+      this._accents.add(voice);
+      const night = this._night;
+      const notes = night ? 4 : 2 + Math.floor(Math.random() * 2);
+      const spacing = night ? 0.105 : 0.22;
+      const duration = night ? 0.045 : 0.13;
+      const base = night ? 2200 : 1250 + Math.random() * 450;
+      for (let i = 0; i < notes; i++) {
+        const t = start + i * spacing;
+        oscillator.frequency.setValueAtTime(base * (night ? 1 : 0.82), t);
+        oscillator.frequency.exponentialRampToValueAtTime(base * (night ? 1.055 : 1.24), t + duration * 0.45);
+        oscillator.frequency.exponentialRampToValueAtTime(base, t + duration);
+        volume.gain.setValueAtTime(0, t);
+        volume.gain.linearRampToValueAtTime(night ? 0.008 : 0.018, t + 0.012);
+        volume.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+        volume.gain.setValueAtTime(0, t + duration + 0.01);
+      }
+      oscillator.onended = () => this._disconnectAccent(voice);
+      oscillator.start(start);
+      oscillator.stop(start + notes * spacing + 0.1);
+    }
+
+    _disconnectAccent(voice) {
+      voice.oscillator.onended = null;
+      for (const node of [voice.oscillator, voice.volume, voice.panner]) {
+        if (node) { try { node.disconnect(); } catch (error) {} }
+      }
+      this._accents.delete(voice);
+    }
+
+    _clearAccents() {
+      clearTimeout(this._timer);
+      this._timer = null;
+      for (const voice of this._accents) {
+        voice.oscillator.onended = null;
+        try { voice.oscillator.stop(); } catch (error) {}
+        this._disconnectAccent(voice);
+      }
+    }
+
+    _silence() {
+      this._clearAccents();
+      if (this._master && this.context && this.context.state !== 'closed') {
+        const t = this.context.currentTime;
+        this._master.gain.cancelScheduledValues(t);
+        this._master.gain.setValueAtTime(0, t);
+      }
+    }
+
+    _disposeGraph() {
+      this._clearAccents();
+      for (const source of this._continuous) {
+        try { source.stop(); } catch (error) {}
+      }
+      for (const node of this._nodes) {
+        try { node.disconnect(); } catch (error) {}
+      }
+      this._continuous = [];
+      this._nodes = [];
+    }
+
+    destroy() {
+      if (this._destroyed) return;
+      this._destroyed = true;
+      this._wanted = false;
+      document.removeEventListener('visibilitychange', this._onVisibility);
+      this._silence();
+      this._disposeGraph();
+      if (this.context) {
+        const ctx = this.context;
+        this.context = null;
+        ctx.close().catch(() => {});
+      }
+    }
+  }
+
+  window.MeadowAudio = MeadowAudio;
+})();
+
+</script>
+<script>
+(() => {
+  'use strict';
+  const root = document.getElementById('hive');
+  const $ = id => root.querySelector('#' + id);
+  const labels = { day: 'Zlaté odpoledne', sunset: 'Západ slunce', night: 'Měsíční noc' };
+  let toastTimer = 0, audioRequest = 0, soundWanted = false;
+  let simulation, audio, lastStats;
+  const toast = message => {
+    clearTimeout(toastTimer);
+    $('toast').textContent = message;
+    $('toast').classList.add('visible');
+    toastTimer = setTimeout(() => $('toast').classList.remove('visible'), 3400);
+  };
+  const number = n => Math.floor(n).toLocaleString('cs-CZ');
+  function updateHint() {
+    const stats = lastStats;
+    if (!stats) return;
+    const trapped = stats.stuck || 0;
+    $('stuck-count').textContent = number(trapped);
+    $('rescue').hidden = !trapped;
+    $('hint').hidden = Boolean(trapped);
+    $('rescue').setAttribute('aria-label', `Uvolnit jednu přilepenou včelku. V medu: ${trapped}.`);
+    $('hint').textContent = stats.bearPhase !== 'idle'
+      ? simulation?.paused ? 'Medvěd počká. Spusť simulaci a dokončí návštěvu.' : stats.bearPhase === 'leave' ? 'Medvěd odchází. Sklenice bude zase volná.' : 'Mlsný návštěvník si přišel pro plnou sklenici.'
+      : stats.overflowing
+      ? 'Med přetéká po stromě. Sklidíš ho skleničkou.'
+      : stats.spilledHoney > 0
+      ? 'Med na kmeni pomalu zasychá. Na přilepenou včelku klikni.'
+      : stats.honey >= (stats.capacity || 60) * .8
+      ? 'Plástve se plní. Je čas na skleničku medu.'
+      : stats.jarFills > 0
+      ? `Sklenice ${stats.jarFills}/3. Až bude plná, přijde medvěd.`
+      : !stats.jarVisits
+      ? 'Med sbírej do sklenice vlevo. Tři odběry ji naplní.'
+      : simulation?.lighting === 'night'
+      ? 'Pod měsícem zpomalí i ten nejpilnější svět.'
+      : 'Klikni do louky. Včelky přiletí pro nektar.';
+  }
+  function updateStats(stats) {
+    lastStats = stats;
+    $('count').textContent = number(stats.bees);
+    $('count-caption').textContent = stats.bees >= 5 ? 'včelek' : stats.bees === 1 ? 'včelka' : 'včelky';
+    $('honey').textContent = number(stats.honey);
+    $('honey-capacity').textContent = ' / ' + number(stats.capacity || 60);
+    const honeyState = stats.overflowing ? 'overflow' : stats.honey >= (stats.capacity || 60) * .8 ? 'warning' : 'normal';
+    $('harvest').dataset.state = honeyState;
+    const bearBusy = stats.bearPhase !== 'idle';
+    $('harvest').disabled = bearBusy;
+    $('harvest').setAttribute('aria-label', bearBusy ? 'Sklenici právě vyprazdňuje medvěd' : `Sklidit med do sklenice. Naplnění ${stats.jarFills} ze 3.${stats.overflowing ? ' Plástve přetékají.' : ''}`);
+    $('harvest').title = bearBusy ? 'Medvěd si bere med. Za chvilku můžeš znovu sbírat.' : `Sklidit med (H) · Sklenice ${stats.jarFills}/3`;
+    const jarDescription = bearBusy ? 'Plná sklenice přilákala medvěda. Po jeho odchodu bude opět prázdná.' : `Sklenice je naplněná ${stats.jarFills} ze 3 odběrů. Klikni na ni nebo použij tlačítko sklizně.`;
+    if ($('jar-status').textContent !== jarDescription) $('jar-status').textContent = jarDescription;
+    $('add').disabled = stats.bees >= 80;
+    $('plant').disabled = stats.flowers >= 36;
+    $('add').title = stats.bees >= 80 ? 'Úl je plný — 80 včelek' : 'Přidat 3 včelky (B)';
+    $('plant').title = stats.flowers >= 36 ? 'Louka je plná květin' : 'Zasadit květinu (K)';
+    updateHint();
+  }
+  function syncPause() {
+    const paused = simulation.paused;
+    $('pause').setAttribute('aria-pressed', String(paused));
+    $('pause').setAttribute('aria-label', paused ? 'Pokračovat v simulaci' : 'Pozastavit simulaci');
+    $('pause').title = paused ? 'Pokračovat (P)' : 'Pozastavit (P)';
+    $('pause-path').setAttribute('d', paused ? 'M8 5 19 12 8 19Z' : 'M8 5v14M16 5v14');
+    $('pause-tag').hidden = !paused;
+    audio.setPaused(paused);
+    updateHint();
+  }
+  try {
+    audio = new window.MeadowAudio();
+    simulation = new window.BeeHive($('meadow'), { onStats: updateStats, onEvent: toast });
+    window.hiveSimulation = simulation;
+    window.meadowAudio = audio;
+    updateStats(simulation.stats);
+    syncPause();
+  } catch (error) {
+    console.error(error);
+    $('error').textContent = 'Louku se nepodařilo vykreslit. Zkus tento soubor otevřít v aktuálním prohlížeči Chrome, Edge, Firefox nebo Safari.';
+    $('error').hidden = false;
+    root.querySelectorAll('button').forEach(button => button.disabled = true);
+    return;
+  }
+  $('nectar').addEventListener('click', () => {
+    const box = $('meadow').getBoundingClientRect();
+    simulation.nectar(box.width * (.53 + Math.random() * .3), box.height * (.35 + Math.random() * .24));
+    if (simulation.paused) toast('Nektar je připravený. Spusť včelky tlačítkem ▶.');
+  });
+  $('add').addEventListener('click', () => {
+    const previous = simulation.stats.bees;
+    simulation.addBees(3);
+    const added = simulation.stats.bees - previous;
+    updateStats(simulation.stats);
+    toast(added ? `Do úlu přiletěl${added === 1 ? 'a 1 včelka' : `y ${added} včelky`}.` : 'Úl je plný. Necháme včelkám dost místa.');
+  });
+  $('plant').addEventListener('click', () => {
+    const before = simulation.stats.flowers;
+    simulation.plantFlower();
+    updateStats(simulation.stats);
+    toast(simulation.stats.flowers > before ? 'Nový květ, další malá zastávka pro včelky.' : 'Louka už je plná květin.');
+  });
+  $('harvest').addEventListener('click', () => {
+    simulation.harvest();
+    updateStats(simulation.stats);
+  });
+  $('rescue').addEventListener('click', () => {
+    simulation.releaseNextBee();
+    updateStats(simulation.stats);
+  });
+  $('pause').addEventListener('click', () => {
+    simulation.setPaused(!simulation.paused);
+    syncPause();
+  });
+  $('calm').addEventListener('click', () => {
+    const value = $('calm').getAttribute('aria-pressed') !== 'true';
+    simulation.setCalm(value);
+    $('calm').setAttribute('aria-pressed', String(value));
+    $('calm').setAttribute('aria-label', value ? 'Vrátit běžné tempo' : 'Zapnout pomalé tempo');
+    toast(value ? 'Zpomalíme. Všechno má svůj čas.' : 'Včelky se vracejí ke svému tempu.');
+  });
+  $('fireflies').addEventListener('click', () => {
+    const value = $('fireflies').getAttribute('aria-pressed') !== 'true';
+    simulation.setFireflies(value);
+    $('fireflies').setAttribute('aria-pressed', String(value));
+    $('fireflies').setAttribute('aria-label', value ? 'Skrýt světlušky a poletující pyl' : 'Ukázat světlušky a poletující pyl');
+  });
+  function closeLight() {
+    $('light-menu').hidden = true;
+    $('lighting').setAttribute('aria-expanded', 'false');
+  }
+  $('lighting').addEventListener('click', () => {
+    const open = $('light-menu').hidden;
+    $('light-menu').hidden = !open;
+    $('lighting').setAttribute('aria-expanded', String(open));
+  });
+  root.querySelectorAll('[data-light]').forEach(button => button.addEventListener('click', () => {
+    const mode = button.dataset.light;
+    simulation.setLighting(mode);
+    audio.setNight(mode === 'night');
+    $('light-label').textContent = labels[mode];
+    $('lighting').setAttribute('aria-label', 'Světlo: ' + labels[mode]);
+    root.querySelectorAll('[data-light]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    closeLight();
+    $('lighting').focus({ preventScroll: true });
+    updateHint();
+  }));
+  document.addEventListener('pointerdown', event => {
+    if (!event.target.closest('.light-control')) closeLight();
+  });
+  $('sound').addEventListener('click', async () => {
+    const request = ++audioRequest;
+    soundWanted = !soundWanted;
+    const requestedEnabled = soundWanted;
+    $('sound-label').textContent = soundWanted ? 'Zapínám zvuk…' : 'Zvuk vypnutý';
+    try {
+      const enabled = await audio.setEnabled(soundWanted);
+      if (request !== audioRequest) return;
+      soundWanted = enabled;
+      $('sound').setAttribute('aria-pressed', String(enabled));
+      $('sound').setAttribute('aria-label', enabled ? 'Vypnout zvuky louky' : 'Zapnout zvuky louky');
+      $('sound-label').textContent = enabled ? 'Zvuky louky' : 'Zvuk vypnutý';
+      $('sound-waves').setAttribute('d', enabled ? 'M16 8a6 6 0 0 1 0 8M19 5a10 10 0 0 1 0 14' : 'm16 9 6 6m0-6-6 6');
+      if (requestedEnabled && !enabled) toast('Prohlížeč zvuk nespustil. Zkus jej zapnout ještě jednou.');
+    } catch (error) {
+      if (request !== audioRequest) return;
+      soundWanted = false;
+      $('sound').setAttribute('aria-pressed', 'false');
+      $('sound').setAttribute('aria-label', 'Zapnout zvuky louky');
+      $('sound-label').textContent = 'Zvuk vypnutý';
+      toast('Prohlížeč zvuk nespustil. Zkus jej zapnout ještě jednou.');
+    }
+  });
+  $('fullscreen').addEventListener('click', async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (root.requestFullscreen) await root.requestFullscreen();
+      else toast('Celou obrazovku můžeš zapnout v nabídce prohlížeče.');
+    } catch (error) { toast('Celou obrazovku můžeš zapnout v nabídce prohlížeče.'); }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    const full = Boolean(document.fullscreenElement);
+    $('fullscreen').setAttribute('aria-label', full ? 'Ukončit celou obrazovku' : 'Celá obrazovka');
+    $('fullscreen-path').setAttribute('d', full ? 'M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5' : 'M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5');
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !$('light-menu').hidden) {
+      closeLight(); $('lighting').focus(); return;
+    }
+    if (event.repeat || event.ctrlKey || event.altKey || event.metaKey || /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) || event.target.isContentEditable) return;
+    const shortcuts = { f: 'nectar', b: 'add', k: 'plant', h: 'harvest', r: 'rescue', p: 'pause', m: 'sound', n: 'lighting', s: 'calm', l: 'fireflies' };
+    const id = shortcuts[event.key.toLowerCase()];
+    if (id) { event.preventDefault(); $(id).click(); }
+  });
+  window.addEventListener('pagehide', event => {
+    if (event.persisted) return;
+    clearTimeout(toastTimer);
+    simulation.destroy(); audio.destroy();
+  });
+})();
+
+</script>
+<!-- killBottleneck embed (14. 10. 2026): jediný zásah do originálu. S ?embed=1 skryje vlastní tlačítko celé
+     obrazovky (celou obrazovku řídí vrstva aplikace) a poslouchá rodiče: {type:'kb-relax', akce:'pauza'|'pokracuj'|'ztlum'}.
+     Po načtení pošle rodiči {type:'kb-relax-ready', scena}. Bez embed=1 se chová jako původní soubor. -->
+<script>
+(function () {
+  var SCENA = 'ul';
+  var SIM = function () { return window.hiveSimulation; };
+  var AUDIO = function () { return window.meadowAudio; };
+  var embed = /(?:^|[?&])embed=1(?:&|$)/.test(location.search);
+  if (!embed) return;
+  try { var fs = document.getElementById('fullscreen'); if (fs) fs.hidden = true; } catch (e) {}
+  function ztlum() {
+    try {
+      var s = document.getElementById('sound');
+      if (s && s.getAttribute('aria-pressed') === 'true') s.click();
+    } catch (e) {}
+  }
+  window.addEventListener('message', function (ev) {
+    var d = ev && ev.data;
+    if (!d || d.type !== 'kb-relax') return;
+    try {
+      var sim = SIM();
+      if (d.akce === 'pauza' && sim && typeof sim.setPaused === 'function') sim.setPaused(true);
+      else if (d.akce === 'pokracuj' && sim && typeof sim.setPaused === 'function') sim.setPaused(false);
+      else if (d.akce === 'ztlum') ztlum();
+    } catch (e) {}
+  });
+  var ohlas = function () { try { if (window.parent !== window) window.parent.postMessage({ type: 'kb-relax-ready', scena: SCENA }, location.origin); } catch (e) {} };
+  if (document.readyState === 'complete') setTimeout(ohlas, 0); else window.addEventListener('load', function () { setTimeout(ohlas, 0); });
+})();
+</script>
+</body>
+</html>

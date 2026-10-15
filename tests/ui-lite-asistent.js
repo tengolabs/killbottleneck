@@ -45,7 +45,7 @@ H.beh(async () => {
   const { page, chyby } = await H.browser({ mobil: true });
   // lite zvolené výslovně + panel plné appky „otevřený" (kb-chat-open=1): lite ho NESMÍ zdědit
   await page.evaluateOnNewDocument((tk) => {
-    localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} }));
+    localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); /* relax (15. 10. 2026): ranní akvárium z plné appky by přežilo do lite a překrylo tlačítko → vypnout */ try { localStorage.setItem('kb-relax-rano:' + JSON.parse(atob(tk.split('.')[1])).id, new Date().toLocaleDateString('en-CA')); } catch {}
     localStorage.setItem('kb-mode', 'lite');
     localStorage.setItem('kb-chat-open', '1');
   }, A);

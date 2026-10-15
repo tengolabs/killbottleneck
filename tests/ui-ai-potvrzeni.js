@@ -38,7 +38,7 @@ H.beh(async () => {
   expect(!!map.id, 'mapa založena');
 
   const { page, chyby } = await H.browser();
-  await page.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); localStorage.setItem('kb-chat-porada-ne', new Date().toISOString().slice(0, 10)); }, A);
+  await page.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); /* relax (15. 10. 2026): ranní akvárium by překrylo mapu → vypnout */ try { localStorage.setItem('kb-relax-rano:' + JSON.parse(atob(tk.split('.')[1])).id, new Date().toLocaleDateString('en-CA')); } catch {} localStorage.setItem('kb-chat-porada-ne', new Date().toISOString().slice(0, 10)); }, A);
   const cekej = async (sel, ms = 10000) => page.waitForSelector(sel, { timeout: ms }).then(() => true).catch(() => false);
   const textPanelu = () => page.evaluate(() => document.querySelector('[data-testid="chat-panel"]')?.innerText || '');
   const cekejText = async (s, ms = 15000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if ((await textPanelu()).includes(s)) return true; await sleep(300); } return false; };

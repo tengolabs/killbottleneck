@@ -78,7 +78,7 @@ H.beh(async () => {
   const A = await inst.login('admin@example.com');
 
   const { page, chyby } = await H.browser();
-  await page.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); localStorage.setItem('kb-chat-porada-ne', new Date().toLocaleDateString('en-CA')); }, A);
+  await page.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); /* relax (15. 10. 2026): ranní akvárium by překrylo mapu → vypnout */ try { localStorage.setItem('kb-relax-rano:' + JSON.parse(atob(tk.split('.')[1])).id, new Date().toLocaleDateString('en-CA')); } catch {} localStorage.setItem('kb-chat-porada-ne', new Date().toLocaleDateString('en-CA')); }, A);
   const cdp = await page.createCDPSession();
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: stazene, eventsEnabled: true });
   const cekej = async (sel, ms = 10000) => page.waitForSelector(sel, { timeout: ms }).then(() => true).catch(() => false);

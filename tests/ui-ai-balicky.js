@@ -46,7 +46,7 @@ H.beh(async () => {
 
   const { browser, page, chyby, novaStranka } = await H.browser();
   const priprav = async (p, tk) => p.evaluateOnNewDocument((t) => {
-    localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: {} }));
+    localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: {} })); /* relax (15. 10. 2026): ranní akvárium by překrylo mapu → vypnout */ try { localStorage.setItem('kb-relax-rano:' + JSON.parse(atob(t.split('.')[1])).id, new Date().toLocaleDateString('en-CA')); } catch {}
     localStorage.setItem('kb-mode', 'full');
     // povzbuzení v Mém dni se negeneruje (brzda 1×/min na účet → každá další záložka by dostala 429);
     // karta s odkazem na poradu se ukáže i bez něj
