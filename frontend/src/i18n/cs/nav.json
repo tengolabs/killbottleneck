@@ -46,7 +46,8 @@
     "versionLine": "Verze {{version}}",
     "updateAvailable": "Je dostupná verze {{version}}",
     "updateCurrent": "Máte {{version}} — klikněte pro poznámky k vydání",
-    "supportHosted": "Líbí se vám killBottleneck? Podpořte vývoj tím, že o něm řeknete dál."
+    "supportHosted": "Líbí se vám killBottleneck? Podpořte vývoj tím, že o něm řeknete dál.",
+    "desktopVersion": "Aplikace pro Windows {{version}}"
   },
   "theme": {
     "toLight": "Přepnout na světlý režim",

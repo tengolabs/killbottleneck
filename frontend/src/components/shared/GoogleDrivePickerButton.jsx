@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { pickedDocToLink } from '@/lib/drivePicker';
+import { isDesktopShell } from '@/lib/shell';
 
 // „Vybrat z Google Disku" — otevře Google Picker a vybraný soubor předá jako
 // ODKAZ (url + název). Nic se nenahrává: hostovaná verze cizí soubory záměrně
@@ -45,6 +46,10 @@ export default function GoogleDrivePickerButton({ cfg, onPicked, disabled }) {
   const { t } = useTranslation('editor');
   const [busy, setBusy] = useState(false);
   if (!cfg || !cfg.client_id || !cfg.api_key) return null;
+  // Aplikace pro Windows: Google posílá token zpět do okna, které výběr otevřelo
+  // (window.opener). Odkazy ven ale aplikace otevírá ve výchozím prohlížeči a do okna
+  // aplikace Google přihlášení nepustí — tlačítko by nikdy nic nevybralo.
+  if (isDesktopShell()) return null;
 
   const openPicker = async () => {
     setBusy(true);

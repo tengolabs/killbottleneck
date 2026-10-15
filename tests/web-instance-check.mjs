@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const { overExistenci } = await import(join(ROOT, 'product/docs/.vitepress/theme/instanceCheck.mjs'))
+const web = await import(join(ROOT, 'product/docs/.vitepress/theme/instanceCheck.mjs'))
+// Aplikace pro Windows má kopii (vlastní veřejné repo) — tytéž případy musí projít oběma.
+const desktop = await import(join(ROOT, 'product/desktop/lib/existence.js'))
 
 const dohOdpoved = (telo) => ({ ok: true, json: async () => telo })
 const chyba = (name) => { const e = new TypeError('failed'); if (name) e.name = name; return e }
@@ -27,7 +29,8 @@ const expect = (ok, popis) => {
   if (!ok) selhani++
 }
 
-console.log('web-instance-check: DoH + záložní dotek')
+for (const [jmeno, { overExistenci }] of [['web', web], ['desktop', desktop]]) {
+console.log(`web-instance-check (${jmeno}): DoH + záložní dotek`)
 
 expect(await overExistenci('x.killbottleneck.com',
   fetchFake(dohOdpoved({ Status: 3 }))) === false,
@@ -56,6 +59,7 @@ expect(await overExistenci('x.killbottleneck.com',
 expect(await overExistenci('x.killbottleneck.com',
   fetchFake({ ok: false }, { ok: true })) === true,
   'DoH HTTP chyba (ok=false) → záložní dotek rozhodne')
+}
 
 if (selhani) {
   console.error(`SELHALO: ${selhani} případů`)

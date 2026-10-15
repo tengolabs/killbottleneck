@@ -9,6 +9,29 @@ below before you jump several versions.
 
 ---
 
+## v0.81-beta — 2026-10-15
+
+**killBottleneck for Windows, and a server outage no longer signs you out**
+
+- **New: killBottleneck for Windows** — a separate desktop app (own repository
+  [tengolabs/killbottleneck-desktop](https://github.com/tengolabs/killbottleneck-desktop), own version numbers) that opens
+  your organization's server in its own window: Windows notifications also with the window closed, unread count by the
+  clock, starts with Windows, updates itself. The window shows the server's own web, so new features arrive with the
+  server. This release adds the web side: on the sign-in page the app shows the organization's address with **Change
+  organization**, unsaved map changes are saved before the app quits or switches organizations, clicking a Windows
+  notification opens its target and marks it read, Google Drive picking is hidden in the app (it cannot work outside a
+  browser), and About shows the app version. Older servers work with the app too (notifications included), just without
+  these extras.
+- **A server outage no longer signs you out.** The client used to clear the stored sign-in on any error while refreshing
+  it (502 during a deploy, no network yet after waking up); now only when the server rejects it (401/403).
+- **After a deploy, an open page reloads itself** when a code chunk it needs is gone (`vite:preloadError`), instead of
+  failing to load a dialog or page.
+- The assistant's built-in help index was regenerated from the corrected documentation.
+
+Upgrade notes: no configuration changes.
+
+---
+
 ## v0.80-beta — 2026-10-14
 
 **Sharing with an address that has no account: invite to the organization right from the Share dialog, or a request to the administrators**

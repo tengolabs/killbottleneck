@@ -6,6 +6,7 @@
 // ⚠️ getUserMedia jde jen na https nebo localhost (secure context) — na self-hostu přes http:// v LAN
 // mikrofon není (stejně jako schránka), proto `duvodNejde()`.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isDesktopShell } from '@/lib/shell';
 
 const FORMATY = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg'];
 
@@ -20,7 +21,7 @@ export function duvodNejde() {
 export default function useNahravani({ maxS = 300, maxBajtu = Math.round(3 * 1024 * 1024 * 0.95), onNahrano } = {}) {
   const [stav, setStav] = useState('klid'); // klid | ceka (povolení) | nahrava | chyba
   const [sekundy, setSekundy] = useState(0);
-  const [chyba, setChyba] = useState('');   // povoleni | zadnyMikrofon | nezabezpeceno | nepodporovano
+  const [chyba, setChyba] = useState('');   // povoleni | povoleniWindows | zadnyMikrofon | nezabezpeceno | nepodporovano
   const rec = useRef(null);
   const proud = useRef(null);
   const kousky = useRef([]);
@@ -51,7 +52,10 @@ export default function useNahravani({ maxS = 300, maxBajtu = Math.round(3 * 102
     } catch (e) {
       if (muj !== pokus.current) return false; // mezitím zrušeno — chybu už nikdo nečeká
       const n = e && e.name;
-      setChyba(n === 'NotAllowedError' || n === 'SecurityError' ? 'povoleni' : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'zadnyMikrofon' : 'nepodporovano');
+      // Aplikace pro Windows: mikrofon jí blokuje jen Windows (stránce ho rám povoluje sám),
+      // a to se hlásí jako NotReadableError — rada „ikona zámku vedle adresy“ by tam lhala.
+      const windows = isDesktopShell() && (n === 'NotAllowedError' || n === 'SecurityError' || n === 'NotReadableError');
+      setChyba(windows ? 'povoleniWindows' : n === 'NotAllowedError' || n === 'SecurityError' ? 'povoleni' : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'zadnyMikrofon' : 'nepodporovano');
       setStav('chyba'); uvolni(); return false;
     }
     // zrušeno (nebo odmontováno) dřív, než prohlížeč mikrofon povolil → hned ho uvolnit a nenahrávat

@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { Target, Youtube, MessagesSquare, Heart, ArrowUpCircle, BookOpen } from 'lucide-react';
 import useVersionCheck from '@/hooks/useVersionCheck';
+import { isDesktopShell } from '@/lib/shell';
 
 // Decentní „O aplikaci" — jediné místo s podporou projektu a odkazy.
 // Odkazy drží konstanty níže, ať se dají měnit na jednom místě.
@@ -94,6 +95,10 @@ export default function AboutDialog({ open, onClose }) {
             ) : (
               <p className="text-xs text-muted-foreground">{t('about.versionLine', { version })}</p>
             )
+          )}
+          {/* Aplikace pro Windows má vlastní verzi (rám), obsah dodává server výš. */}
+          {isDesktopShell() && window.kbDesktop.version && (
+            <p className="text-xs text-muted-foreground">{t('about.desktopVersion', { version: window.kbDesktop.version })}</p>
           )}
           <p className="text-xs text-muted-foreground flex items-start gap-1.5 pt-1">
             <Heart className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />

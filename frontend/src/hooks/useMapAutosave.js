@@ -96,6 +96,28 @@ export function useMapAutosave({
   const inFlightPromise = useRef(null);
   const saveTimer = useRef(null);
 
+  // Aplikace pro Windows (lib/desktopApp.js): před zavřením okna, přepnutím organizace
+  // a obnovením stránky rám požádá o okamžité uložení — autosave jinak čeká 1,2 s a úprava
+  // těsně před zavřením by se ztratila. Stejný flush jako při odchodu z mapy (cleanup
+  // load-efektu v GoalMapEditor), jen se na něj počká. Nově zakládaná mapa (časovač
+  // založení, bez pendingSave) se tudy NEuspěchá — časovač zrušit nesmíme, mapa by nevznikla.
+  useEffect(() => {
+    const ulozHned = (e) => {
+      const fn = pendingSave.current;
+      let zapis = null;
+      if (fn) {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        pendingSave.current = null;
+        zapis = fn(true);
+      } else if (saveInFlight.current) {
+        zapis = inFlightPromise.current;
+      }
+      if (zapis && e.detail && typeof e.detail.wait === 'function') e.detail.wait(zapis);
+    };
+    window.addEventListener('kb-desktop-flush', ulozHned);
+    return () => window.removeEventListener('kb-desktop-flush', ulozHned);
+  }, []);
+
   // latest-ref vzor: přiřazení při KAŽDÉM renderu, ať refy nikdy nezaostávají
   nodesNow.current = nodes;
   edgesNow.current = edges;

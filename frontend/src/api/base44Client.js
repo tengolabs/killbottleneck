@@ -335,8 +335,14 @@ export const base44 = {
         const res = await pb.collection('users').authRefresh();
         return toDto('User', res.record);
       } catch (err) {
-        pb.authStore.clear();
-        clearOfflineData(); // vypršelá session je taky odhlášení
+        // Odhlásit JEN když server přihlášení odmítl (vypršelo, změněné heslo, smazaný
+        // účet). Výpadek sítě nebo 5xx při nasazování dřív přihlášení taky smazal — počítač
+        // spuštěný dřív než Wi-Fi (aplikace pro Windows po startu systému) tak odhlásil
+        // každého. Přihlášení zůstane a další pokus (obnovení stránky) ho ověří znovu.
+        if (err?.status === 401 || err?.status === 403) {
+          pb.authStore.clear();
+          clearOfflineData(); // vypršelá session je taky odhlášení
+        }
         throw authError(err, i18next.t('errors:auth.refreshFailed'));
       }
     },

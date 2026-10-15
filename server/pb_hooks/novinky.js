@@ -11,6 +11,20 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.81-beta": {
+    cs: [
+      "Nová aplikace killBottleneck pro Windows: vlastní okno, upozornění Windows i se zavřeným oknem a počet nepřečtených u hodin. Ke stažení na github.com/tengolabs/killbottleneck-desktop.",
+      "Krátký výpadek serveru vás už neodhlásí — přihlášení se smaže jen tehdy, když ho server opravdu odmítne.",
+      "Po nasazení nové verze se otevřená stránka sama obnoví, místo aby hlásila chybu při načítání.",
+      "Nápověda asistenta vychází z opravené dokumentace.",
+    ],
+    en: [
+      "New killBottleneck for Windows app: its own window, Windows notifications even with the window closed, and the unread count by the clock. Download it from github.com/tengolabs/killbottleneck-desktop.",
+      "A short server outage no longer signs you out — your sign-in is cleared only when the server actually rejects it.",
+      "After a new version is deployed, an open page reloads itself instead of failing to load.",
+      "The assistant's help is based on the corrected documentation.",
+    ],
+  },
   "v0.80-beta": {
     cs: [
       "Sdílíte projekt s někým, kdo tu ještě nemá účet a sám se zaregistrovat nemůže? Dialog Sdílet se zeptá: Pozvat do organizace a sdílet (účet vznikne hned, pozvánka odejde e-mailem), nebo jen zapnout veřejný odkaz k nahlédnutí.",

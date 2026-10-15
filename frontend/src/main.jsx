@@ -5,6 +5,7 @@ import '@/index.css'
 import { i18nReady } from '@/i18n'
 import { initTheme } from '@/lib/theme'
 import { isNativeShell } from '@/lib/nativeShell'
+import { isDesktopShell } from '@/lib/shell'
 
 initTheme()
 
@@ -22,9 +23,32 @@ if (isNativeShell()) {
     .catch(() => { /* bez nativních vychytávek appka funguje dál */ });
 }
 
+// Aplikace pro Windows (product/desktop): uložení rozdělané mapy před zavřením a klik
+// na upozornění Windows — lib/desktopApp.js, taky samostatný chunk.
+if (isDesktopShell()) {
+  import('@/lib/desktopApp')
+    .then((m) => m.initDesktopApp())
+    .catch(() => { /* okno funguje i bez napojení (jako se starším serverem) */ });
+}
+
+// Po nasazení nové verze serveru zmizí staré soubory stránky a líně načítaný kus
+// (dialog, editor mapy) skončí chybou. Obnovit stránku, ať se načte nová verze —
+// jednou za 30 s, aby skutečně rozbitý soubor nevyrobil smyčku obnovování.
+window.addEventListener('vite:preloadError', (e) => {
+  try {
+    const posledne = Number(sessionStorage.getItem('kb-preload-reload') || 0);
+    if (Date.now() - posledne < 30000) return;
+    sessionStorage.setItem('kb-preload-reload', String(Date.now()));
+  } catch { /* bez sessionStorage radši neobnovovat */ return; }
+  e.preventDefault();
+  window.location.reload();
+});
+
 // V nativním obalu (Capacitor) se SW neregistruje: assets jsou v APK a jeho
-// cache-first by po aktualizaci appky servírovala starý frontend.
-if (!isNativeShell() && 'serviceWorker' in navigator) {
+// cache-first by po aktualizaci appky servírovala starý frontend. V aplikaci pro
+// Windows taky ne: při výpadku serveru by servíroval starou stránku z mezipaměti
+// místo hlášky aplikace „server neodpovídá“ (rám ho navíc blokuje i u starších verzí).
+if (!isNativeShell() && !isDesktopShell() && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => { /* bez SW appka funguje dál */ });
   });

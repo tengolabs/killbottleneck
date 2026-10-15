@@ -1,7 +1,9 @@
 // Parita slugify: web (docs/.vitepress/theme/slug.mjs) ↔ frontend
-// (frontend/src/lib/signup.js) ↔ server (cloud/auto/signup.py).
-// Slugify existuje ve třech JS/py kopiích, protože se importovat navzájem
-// nemohou (build-cz kopíruje jen theme+data, orchestrátor tahá hcloud) —
+// (frontend/src/lib/signup.js) ↔ aplikace pro Windows (desktop/lib/adresa.js)
+// ↔ server (cloud/auto/signup.py).
+// Slugify existuje ve čtyřech JS/py kopiích, protože se importovat navzájem
+// nemohou (build-cz kopíruje jen theme+data, orchestrátor tahá hcloud, aplikace
+// pro Windows má vlastní veřejné repo) —
 // tenhle test je jediná pojistka, že se nerozjedou. Python se NEIMPORTUJE
 // jako modul (module-level load_env čte secrets), místo toho se funkce
 // slugify vytáhne ze zdrojáku doslovně a spustí — běží tedy skutečný
@@ -16,6 +18,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 const web = await import(join(ROOT, 'product/docs/.vitepress/theme/slug.mjs'))
 const frontend = await import(join(ROOT, 'product/frontend/src/lib/signup.js'))
+const desktop = await import(join(ROOT, 'product/desktop/lib/adresa.js'))
 
 // Fixtures z ui-mobile-signup.js (vygenerované pythonem) + případy kryjící
 // historické rozdíly webové kopie: o.p.s., dvojité pomlčky, pomlčka po
@@ -53,17 +56,18 @@ const expect = (ok, popis) => {
   if (!ok) selhani++
 }
 
-console.log('web-slugify-parita: web ↔ frontend ↔ signup.py')
+console.log('web-slugify-parita: web ↔ frontend ↔ desktop ↔ signup.py')
 CASES.forEach(([vstup, ocekavane], i) => {
   const w = web.slugifyCompany(vstup)
   const f = frontend.slugifyCompany(vstup)
+  const d = desktop.slugifyCompany(vstup)
   const p = pySlugs[i]
-  expect(w === ocekavane && f === ocekavane && p === ocekavane,
-    `„${vstup.slice(0, 40)}" → „${ocekavane}" (web: ${w} · frontend: ${f} · python: ${p})`)
+  expect(w === ocekavane && f === ocekavane && d === ocekavane && p === ocekavane,
+    `„${vstup.slice(0, 40)}" → „${ocekavane}" (web: ${w} · frontend: ${f} · desktop: ${d} · python: ${p})`)
 })
 
-expect(web.MIN_SLUG === frontend.MIN_SLUG, `MIN_SLUG shodné (${web.MIN_SLUG})`)
-expect(web.CLOUD_SUFFIX === frontend.CLOUD_SUFFIX, `CLOUD_SUFFIX shodné (${web.CLOUD_SUFFIX})`)
+expect(web.MIN_SLUG === frontend.MIN_SLUG && web.MIN_SLUG === desktop.MIN_SLUG, `MIN_SLUG shodné (${web.MIN_SLUG})`)
+expect(web.CLOUD_SUFFIX === frontend.CLOUD_SUFFIX && web.CLOUD_SUFFIX === desktop.CLOUD_SUFFIX, `CLOUD_SUFFIX shodné (${web.CLOUD_SUFFIX})`)
 
 if (selhani) {
   console.error(`SELHALO: ${selhani} případů — slugify se rozjelo, viz komentář v cloud/auto/signup.py`)

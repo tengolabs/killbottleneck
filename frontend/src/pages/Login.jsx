@@ -11,12 +11,15 @@ import { LogIn, Mail, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
 import { isNativeShell } from "@/lib/nativeShell";
+import { isDesktopShell } from "@/lib/shell";
 import { getServerUrl, clearServerUrl } from "@/lib/serverUrl";
 import { safeNext } from "@/lib/safeNext";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Login() {
   const { t } = useTranslation("auth");
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -46,6 +49,15 @@ export default function Login() {
       })
       .catch(() => setEmailEnabled(false));
   }, [navigate]);
+
+  // Aplikace pro Windows: kdo přihlášený JE, nemá na přihlášení co dělat — rovnou tam, kam
+  // mířil. Po výpadku serveru poslala chráněná stránka na /login, přihlášení ale zůstalo
+  // platné a po obnovení okna by člověk zbytečně viděl formulář s heslem (adresní řádek,
+  // kterým by odešel, aplikace nemá). V prohlížeči ne: tam /login slouží i k přihlášení
+  // za jiného člověka bez odhlášení (a tak to dělají i testy).
+  useEffect(() => {
+    if (isAuthenticated && isDesktopShell()) navigate(safeNext(new URLSearchParams(window.location.search).get("next")), { replace: true });
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,6 +99,20 @@ export default function Login() {
                 onClick={async () => { await clearServerUrl(); window.location.href = "/"; }}
               >
                 {t("serverPicker.changeServer")}
+              </button>
+            </span>
+          )}
+          {isDesktopShell() && (
+            // Aplikace pro Windows: kam se člověk přihlašuje (podobné jméno = cizí firma)
+            // a cesta zpět na výběr organizace, který drží rám (product/desktop).
+            <span className="block mt-2">
+              {t("serverPicker.desktopOrganization", { host: window.location.host })}{" "}
+              <button
+                type="button"
+                className="text-primary font-medium hover:underline"
+                onClick={() => window.kbDesktop.changeOrganization()}
+              >
+                {t("serverPicker.desktopChange")}
               </button>
             </span>
           )}

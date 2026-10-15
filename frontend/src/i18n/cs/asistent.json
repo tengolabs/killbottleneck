@@ -299,7 +299,8 @@
     "povoleni": "Prohlížeč nepovolil mikrofon — povolte ho v nastavení stránky (ikona zámku vedle adresy).",
     "zadnyMikrofon": "Nenašel jsem žádný mikrofon.",
     "nezabezpeceno": "Mikrofon jde jen přes zabezpečené spojení (https).",
-    "nepodporovano": "Tenhle prohlížeč nahrávat neumí."
+    "nepodporovano": "Tenhle prohlížeč nahrávat neumí.",
+    "povoleniWindows": "Windows aplikaci nepovolil mikrofon — zapněte ho v Nastavení → Ochrana osobních údajů → Mikrofon (přístup pro klasické aplikace)."
   },
   "treeAll": "Ukázat celý strom ({{count}})",
   "treeLess": "Méně",

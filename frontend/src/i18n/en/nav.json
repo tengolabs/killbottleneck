@@ -46,7 +46,8 @@
     "versionLine": "Version {{version}}",
     "updateAvailable": "Version {{version}} is available",
     "updateCurrent": "You have {{version}} — click for release notes",
-    "supportHosted": "Enjoying killBottleneck? Support the project by telling others about it."
+    "supportHosted": "Enjoying killBottleneck? Support the project by telling others about it.",
+    "desktopVersion": "Windows app {{version}}"
   },
   "theme": {
     "toLight": "Switch to light mode",

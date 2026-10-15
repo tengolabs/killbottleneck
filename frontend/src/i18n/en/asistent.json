@@ -299,7 +299,8 @@
     "povoleni": "The browser blocked the microphone — allow it in the site settings (the lock icon next to the address).",
     "zadnyMikrofon": "No microphone found.",
     "nezabezpeceno": "The microphone only works over a secure connection (https).",
-    "nepodporovano": "This browser cannot record."
+    "nepodporovano": "This browser cannot record.",
+    "povoleniWindows": "Windows blocked the microphone for the app — turn it on in Settings → Privacy → Microphone (let desktop apps access your microphone)."
   },
   "treeAll": "Show the whole tree ({{count}})",
   "treeLess": "Less",
