@@ -54,7 +54,8 @@
     "stuck": "Not moving",
     "open": "Open",
     "events": "Today in calendar",
-    "allDay": "all day"
+    "allDay": "all day",
+    "away": "Away today"
   },
   "export": {
     "buttonTitle": "Save this overview as an image (PNG for mobile)",

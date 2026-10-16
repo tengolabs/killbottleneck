@@ -54,7 +54,8 @@
     "stuck": "Tohle se nehýbe",
     "open": "Otevřené",
     "events": "Dnes v kalendáři",
-    "allDay": "celý den"
+    "allDay": "celý den",
+    "away": "Dnes chybí"
   },
   "export": {
     "buttonTitle": "Uložit přehled jako obrázek (PNG pro mobil)",

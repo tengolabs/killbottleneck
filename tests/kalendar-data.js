@@ -83,6 +83,16 @@ expect(V(plan(uz()), '2026-09-15', 'a@x').duvod === 'planMimoRozsah' && V(plan(u
 }
 expect(K.smiMenitTermin(uz(), { map: mapa, userEmail: '' }) === false, 'bez přihlášeného e-mailu nikdo termín nemění');
 
+console.log('== události ve sdílených kalendářích (14. 10. 2026): can_edit ze serveru, vícedenní se netáhne ==');
+{
+  const ev = (extra) => ({ klic: 'ev-1:termin', druh: 'termin', den: '2026-10-20', hotovo: false, item: Object.assign({ key: 'ev-1', kind: 'event', deadline: '2026-10-20', mine: false }, extra) });
+  const ctx = { dnes: '2026-10-14', userEmail: 'a@x.cz', map: null };
+  expect(K.vyhodnotPresun(ev({ can_edit: true }), '2026-10-21', ctx).akce === 'udalost', 'cizí sdílená událost s can_edit (správce) se přesouvá');
+  expect(K.vyhodnotPresun(ev({ can_edit: false }), '2026-10-21', ctx).duvod === 'udalostCizi', 'bez can_edit = odmítnuto udalostCizi');
+  expect(K.vyhodnotPresun(ev({ mine: true }), '2026-10-21', ctx).akce === 'udalost', 'starší položka bez can_edit: rozhoduje mine');
+  expect(K.vyhodnotPresun(ev({ can_edit: true, end_day: '2026-10-24' }), '2026-10-21', ctx).duvod === 'vicedenni', 'vícedenní (dovolená) se v mřížce netáhne — důvod vicedenni');
+}
+
 console.log(`\n${fail === 0 ? '🟢' : '🔴'} KALENDAR-DATA PASS ${ok} / FAIL ${fail}`);
 process.exit(fail === 0 ? 0 : 1);
 })().catch((e) => { console.error('❌ výjimka:', e); process.exit(2); });

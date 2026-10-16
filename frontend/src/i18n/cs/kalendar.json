@@ -26,7 +26,8 @@
     "hotovoNepresouvat": "Hotová položka se nepřesouvá.",
     "udalostPresunuta": "Událost přesunuta na {{to}}",
     "udalostVracena": "Událost vrácena na {{from}}",
-    "udalostSelhala": "Událost se nepodařilo uložit"
+    "udalostSelhala": "Událost se nepodařilo uložit",
+    "vicedenni": "Vícedenní událost se posouvá v detailu, ne tažením."
   },
   "v2": {
     "title": "Kalendář",
@@ -81,7 +82,20 @@
     "projectsNone": "Žádný",
     "projectsAll": "Vše",
     "personal": "Události",
-    "personalTitle": "Schůzky, zubař, telekonference… — mimo projekty. Odškrtnutím je v kalendáři schováte."
+    "personalTitle": "Schůzky, zubař, telekonference… — mimo projekty. Odškrtnutím je v kalendáři schováte.",
+    "kalendare": "Sdílené kalendáře",
+    "pryc": "Kdo je pryč",
+    "druh": {
+      "shared": "společné akce",
+      "resource": "místnost / zdroj",
+      "absence": "nepřítomnosti"
+    },
+    "novyKalendar": "Nový",
+    "novyKalendarTitle": "Založit sdílený kalendář (firemní akce, místnost, nepřítomnosti)",
+    "novyKalendarNazev": "Název, např. Zasedací místnost",
+    "novyKalendarPozn": "Později změníte tužkou u kalendáře v panelu nebo ve Správě organizace.",
+    "kalendareZadne": "Zatím žádný sdílený kalendář.",
+    "upravitKalendar": "Upravit kalendář: kdo ho vidí, kdo zapisuje, archivovat, smazat"
   },
   "nova": {
     "titulek": "Co přidat na {{date}}?",
@@ -89,7 +103,9 @@
     "ukol": "Úkol do projektu",
     "ukolPopis": "Nový cíl v mapě projektu s termínem na tento den.",
     "udalost": "Událost",
-    "udalostPopis": "S časem, kolegy a připomínkou. Nic v projektech nemění."
+    "udalostPopis": "S časem, kolegy a připomínkou. Nic v projektech nemění.",
+    "kalendar": "Sdílený kalendář",
+    "kalendarPopis": "Firemní akce, zasedačka nebo nepřítomnosti — pro celý tým, nebo jen pro vybrané."
   },
   "udalost": {
     "titulekNova": "Nová událost",
@@ -127,7 +143,35 @@
     "opustena": "Z události „{{title}}“ jste se odebrali",
     "ucastniciPocet_one": "{{count}} pozvaný",
     "ucastniciPocet_few": "{{count}} pozvaní",
-    "ucastniciPocet_other": "{{count}} pozvaných"
+    "ucastniciPocet_other": "{{count}} pozvaných",
+    "kalendar": "Kalendář",
+    "kalendarOsobni": "Osobní (jen já a pozvaní)",
+    "popisSdilena": "Sdílený kalendář „{{name}}“ — uvidí ji celý tým.",
+    "popisSdilenaCteni": "Založil(a) {{who}} v kalendáři „{{name}}“. Měnit ji může autor, správce nebo manažer.",
+    "nazevPhAbsence": "Např. Dovolená, Lékař, Home office",
+    "nazevPhZdroj": "Např. Schůzka s klientem",
+    "kdoJePryc": "Kdo je pryč",
+    "ja": "Já",
+    "denOd": "Od",
+    "denDo": "Do",
+    "konecCas": "Konec",
+    "casZdroj": "Čas je povinný; bez konce se rezervuje hodina.",
+    "viceDni": "Více dní",
+    "kolizeJinyDen": "Tento den už není volno — zkuste jiný den.",
+    "pouzitSlot": "Použít {{from}}–{{to}}",
+    "zapsat": "Zapsat nepřítomnost",
+    "rezervovat": "Rezervovat",
+    "stav": {
+      "requested": "Čeká na schválení správcem nebo manažerem.",
+      "approved": "Schváleno.",
+      "rejected": "Zamítnuto."
+    },
+    "schvalit": "Schválit",
+    "zamitnout": "Zamítnout",
+    "posoudit": "Posoudit s asistentem",
+    "rozhodnutiPozn": "Poznámka k rozhodnutí (uvidí žadatel)",
+    "schvaleno": "Nepřítomnost „{{title}}“ schválena",
+    "zamitnuto": "Nepřítomnost „{{title}}“ zamítnuta"
   },
   "pripominka": {
     "chipTitle": "Máte tu nastavenou připomínku",
@@ -148,5 +192,37 @@
       "7": "týden před termínem"
     },
     "offsetJine": "{{n}} dní před termínem"
+  },
+  "novyKal": {
+    "titulek": "Nový sdílený kalendář",
+    "popis": "Kalendář, který není osoba. Zapisovat do něj může každý, kdo ho vidí.",
+    "nazev": "Název",
+    "druh": "Druh",
+    "druhPopis": {
+      "shared": "večírek, školení, porada celé firmy",
+      "resource": "rezervace se nepřekrývají, bez konce hodina",
+      "absence": "dovolená, nemoc, home office; kdo je pryč"
+    },
+    "viditelnost": "Kdo ho vidí",
+    "vidVsichni": "Celý tým",
+    "vidVybrani": "Jen vybraní",
+    "vidPozn": "Jako sdílený projekt: uvidí ho jen vybraní a vy — ani správce, který tu není, ho neuvidí.",
+    "zalozen": "Sdílený kalendář „{{name}}“ založen",
+    "selhalo": "Kalendář se nepodařilo založit.",
+    "titulekUprava": "Sdílený kalendář",
+    "druhPevny": "po založení se nemění",
+    "zapis": "Kdo zapisuje",
+    "zapisVsichni": "každý, kdo ho vidí",
+    "zapisSpravci": "jen správce a manažer",
+    "schvalovani": "Nepřítomnosti schvaluje správce nebo manažer",
+    "ulozen": "Kalendář „{{name}}“ uložen",
+    "archivovat": "Archivovat",
+    "obnovit": "Obnovit",
+    "archivPozn": "Události zůstanou, kalendář zmizí z nabídky",
+    "archivovan": "Kalendář „{{name}}“ archivován",
+    "obnoven": "Kalendář „{{name}}“ obnoven",
+    "smazat": "Smazat",
+    "smazatPotvrdit": "Opravdu smazat i {{count}} událostí",
+    "smazan": "Kalendář „{{name}}“ smazán i s událostmi"
   }
 }

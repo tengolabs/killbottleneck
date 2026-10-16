@@ -26,7 +26,8 @@
     "hotovoNepresouvat": "A done item cannot be moved.",
     "udalostPresunuta": "Event moved to {{to}}",
     "udalostVracena": "Event moved back to {{from}}",
-    "udalostSelhala": "The event could not be saved"
+    "udalostSelhala": "The event could not be saved",
+    "vicedenni": "A multi-day event is moved in its detail, not by dragging."
   },
   "v2": {
     "title": "Calendar",
@@ -81,7 +82,20 @@
     "projectsNone": "None",
     "projectsAll": "All",
     "personal": "Events",
-    "personalTitle": "Meetings, dentist, video calls… — outside projects. Untick to hide them in the calendar."
+    "personalTitle": "Meetings, dentist, video calls… — outside projects. Untick to hide them in the calendar.",
+    "kalendare": "Shared calendars",
+    "pryc": "Who is away",
+    "druh": {
+      "shared": "company events",
+      "resource": "room / resource",
+      "absence": "time off"
+    },
+    "novyKalendar": "New",
+    "novyKalendarTitle": "Create a shared calendar (company events, a room, time off)",
+    "novyKalendarNazev": "Name, e.g. Meeting room",
+    "novyKalendarPozn": "Change it later with the pencil next to the calendar in the panel or in Organization settings.",
+    "kalendareZadne": "No shared calendars yet.",
+    "upravitKalendar": "Edit calendar: who sees it, who adds entries, archive, delete"
   },
   "nova": {
     "titulek": "What to add on {{date}}?",
@@ -89,7 +103,9 @@
     "ukol": "Task in a project",
     "ukolPopis": "A new goal in a project map, due on this day.",
     "udalost": "Event",
-    "udalostPopis": "With a time, colleagues and a reminder. Changes nothing in projects."
+    "udalostPopis": "With a time, colleagues and a reminder. Changes nothing in projects.",
+    "kalendar": "Shared calendar",
+    "kalendarPopis": "Company events, a meeting room or time off — for the whole team, or selected people only."
   },
   "udalost": {
     "titulekNova": "New event",
@@ -127,7 +143,35 @@
     "opustena": "You left the event \"{{title}}\"",
     "ucastniciPocet_one": "{{count}} invited",
     "ucastniciPocet_other": "{{count}} invited",
-    "ucastniciPocet_few": "{{count}} invited"
+    "ucastniciPocet_few": "{{count}} invited",
+    "kalendar": "Calendar",
+    "kalendarOsobni": "Personal (me and invitees only)",
+    "popisSdilena": "Shared calendar \"{{name}}\" — the whole team sees it.",
+    "popisSdilenaCteni": "Created by {{who}} in the calendar \"{{name}}\". The author, an admin or a manager can change it.",
+    "nazevPhAbsence": "E.g. Vacation, Doctor, Home office",
+    "nazevPhZdroj": "E.g. Client meeting",
+    "kdoJePryc": "Who is away",
+    "ja": "Me",
+    "denOd": "From",
+    "denDo": "To",
+    "konecCas": "End",
+    "casZdroj": "Time is required; without an end, one hour is booked.",
+    "viceDni": "Multiple days",
+    "kolizeJinyDen": "No free slot that day — try another day.",
+    "pouzitSlot": "Use {{from}}–{{to}}",
+    "zapsat": "Record time off",
+    "rezervovat": "Book",
+    "stav": {
+      "requested": "Waiting for an admin or manager to approve.",
+      "approved": "Approved.",
+      "rejected": "Declined."
+    },
+    "schvalit": "Approve",
+    "zamitnout": "Decline",
+    "posoudit": "Review with the assistant",
+    "rozhodnutiPozn": "Decision note (the requester sees it)",
+    "schvaleno": "Time off \"{{title}}\" approved",
+    "zamitnuto": "Time off \"{{title}}\" declined"
   },
   "pripominka": {
     "chipTitle": "You have a reminder set here",
@@ -148,5 +192,37 @@
       "7": "a week before the deadline"
     },
     "offsetJine": "{{n}} days before the deadline"
+  },
+  "novyKal": {
+    "titulek": "New shared calendar",
+    "popis": "A calendar that is not a person. Everyone who sees it can add entries.",
+    "nazev": "Name",
+    "druh": "Kind",
+    "druhPopis": {
+      "shared": "party, training, all-hands",
+      "resource": "bookings never overlap, one hour without an end",
+      "absence": "vacation, sick day, home office; who is away"
+    },
+    "viditelnost": "Who sees it",
+    "vidVsichni": "Whole team",
+    "vidVybrani": "Selected people only",
+    "vidPozn": "Like a shared project: only the selected people and you see it — an admin who is not listed does not either.",
+    "zalozen": "Shared calendar \"{{name}}\" created",
+    "selhalo": "The calendar could not be created.",
+    "titulekUprava": "Shared calendar",
+    "druhPevny": "fixed after creation",
+    "zapis": "Who adds entries",
+    "zapisVsichni": "everyone who sees it",
+    "zapisSpravci": "admins and managers only",
+    "schvalovani": "Time off needs an admin or manager",
+    "ulozen": "Calendar \"{{name}}\" saved",
+    "archivovat": "Archive",
+    "obnovit": "Restore",
+    "archivPozn": "Events stay, the calendar leaves the menus",
+    "archivovan": "Calendar \"{{name}}\" archived",
+    "obnoven": "Calendar \"{{name}}\" restored",
+    "smazat": "Delete",
+    "smazatPotvrdit": "Really delete with {{count}} event(s)",
+    "smazan": "Calendar \"{{name}}\" deleted with its events"
   }
 }

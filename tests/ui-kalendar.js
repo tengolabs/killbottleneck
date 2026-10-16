@@ -1,7 +1,8 @@
 // UI e2e: KALENDÁŘ v2 na stránce Úkoly (v0.60-beta) — dodávka z externího nástroje (Měsíc/Týden/
 // Den/Agenda, postranní panel) + přetažení termínu s potvrzením (z feat/kalendar).
 //
-// Hlídá: /tasks?view=calendar otevře kalendář; chipy uzlů; hotový chip se netáhne;
+// Hlídá: /kalendar (vlastní stránka + položka „Kalendář“ v nabídce, 14. 10. 2026; starý /tasks?view=calendar
+// přesměruje) otevře kalendář; chipy uzlů; hotový chip se netáhne;
 // přetažení vlastníkem → dialog „Změnit termín z X na Y?“ → Zrušit nic nezmění,
 // Potvrdit zapíše termín (API) a chip je v cílovém dni, Vrátit v hlášce vrátí zpět;
 // Týden: tažení karty do jiného sloupce otevře dialog; klávesa w při otevřeném
@@ -63,7 +64,7 @@ H.beh(async () => {
     await sleep(1000);
   };
   const otevriKalendar = async (pg) => {
-    await pg.goto(`${inst.base}/tasks?view=calendar`, { waitUntil: 'networkidle2' });
+    await pg.goto(`${inst.base}/kalendar`, { waitUntil: 'networkidle2' });
     await pg.waitForSelector('.gcal-wrapper', { timeout: 15000 });
     // fáze 2 načtení map (uzly) — teprve pak jsou chipy tažitelné
     await pg.waitForFunction(() => !!document.querySelector('[data-testid^="gcal-chip-"][data-tazitelny="true"]'), { timeout: 15000 }).catch(() => {});
@@ -104,10 +105,20 @@ H.beh(async () => {
   };
   const dialogJe = (pg, rezim) => pg.$(`[data-testid="kal-dialog-${rezim}"]`).then((h) => !!h);
 
-  console.log('== vlastník: /tasks?view=calendar otevře kalendář v2 ==');
+  console.log('== vlastník: /kalendar = vlastní stránka s položkou v nabídce; starý odkaz přesměruje ==');
   await prihlas(page, VLASTNIK);
   await otevriKalendar(page);
   expect(!!(await page.$('.gcal-wrapper')), 'kalendář v2 (.gcal-wrapper) je na stránce');
+  expect((await page.$eval('[data-nav="kalendar"]', (el) => el.textContent.trim()).catch(() => '')) === 'Kalendář', 'hlavní nabídka má položku „Kalendář“');
+  expect(await page.$eval('[data-nav="kalendar"]', (el) => el.className.includes('border-primary')).catch(() => false), 'položka je zvýrazněná jako aktivní');
+  expect(!(await page.$('[role="tablist"]')), 'na stránce kalendáře není lišta pohledů Úkolů');
+  await page.goto(`${inst.base}/tasks?view=calendar&udalost=neexistuje`, { waitUntil: 'networkidle2' });
+  await page.waitForFunction(() => location.pathname === '/kalendar', { timeout: 10000 }).catch(() => {});
+  expect(await page.evaluate(() => location.pathname === '/kalendar'), `starý /tasks?view=calendar přesměruje na /kalendar (${await page.evaluate(() => location.pathname + location.search)})`);
+  await page.goto(`${inst.base}/tasks`, { waitUntil: 'networkidle2' });
+  await sleep(800);
+  expect(await page.evaluate(() => location.pathname === '/tasks' && ![...document.querySelectorAll('[role="tab"]')].some((t) => /Kalendář/.test(t.textContent))), 'Úkoly už záložku Kalendář nemají (uložený pohled calendar nespadne do kalendáře)');
+  await otevriKalendar(page);
   expect((await page.$$('.gcal-month-cell')).length === 42, `mřížka měsíce má 42 buněk (${(await page.$$('.gcal-month-cell')).length})`);
   const telo = await page.evaluate(() => document.body.innerText);
   for (const cil of ['Ochutnávka pro sousedy', 'Hotové vybavení']) expect(telo.includes(cil), `cíl „${cil}“ je v kalendáři`);
@@ -389,7 +400,7 @@ H.beh(async () => {
   if (polozka) await polozka.click();
   const dialogZeZvonku = await page2.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 15000 }).catch(() => null);
   expect(!!dialogZeZvonku && (await page2.$eval('[data-testid="udalost-nazev"]', (el) => el.value).catch(() => '')) === 'Zubař', 'klik na pozvánku ve zvonečku přepnul na kalendář a otevřel detail události');
-  expect(!!(await page2.$('.gcal-wrapper')), 'pohled se přepnul z Tabulky na Kalendář');
+  expect(!!(await page2.$('.gcal-wrapper')) && (await page2.evaluate(() => location.pathname)) === '/kalendar', 'zvoneček vedl na stránku /kalendar');
   await page2.keyboard.press('Escape');
   await sleep(500);
   await otevriKalendar(page2);
@@ -404,5 +415,225 @@ H.beh(async () => {
   await H.waitFor(async () => !(await page2.$(chipSel('14:00 Zubař'))), { timeout: 8000, popis: 'chip zmizel' }).catch(() => {});
   expect(!(await page2.$(chipSel('14:00 Zubař'))), 'a chip mu z kalendáře zmizel (realtime)');
 
-  expect(chyby.length === 0, `konzole bez chyb (${chyby.length}${chyby.length ? ': ' + chyby[0].slice(0, 160) : ''})`);
+  console.log('== týmový kalendář (14. 10. 2026): sdílené kalendáře v panelu, vícedenní nepřítomnost, kdo je pryč, rezervace s kolizí ==');
+  await page.bringToFront();
+  await prihlas(page, VLASTNIK); // page2 (řešitel) přepsal sdílené localStorage → správce znovu
+  let rk = await inst.api('POST', '/api/kb/calendars/save', { token: V, body: { name: 'Firemní', kind: 'shared', color: '#6366f1' } });
+  expect(rk.status === 200, `vlastník (první = admin) založil Firemní (${rk.status})`);
+  const FIREMNI = rk.json.calendar.id;
+  const ZASEDACKA = (await inst.api('POST', '/api/kb/calendars/save', { token: V, body: { name: 'Zasedačka', kind: 'resource' } })).json.calendar.id;
+  const NEPR = (await inst.api('POST', '/api/kb/calendars/save', { token: V, body: { name: 'Nepřítomnosti', kind: 'absence' } })).json.calendar.id;
+  rk = await inst.api('POST', '/api/kb/events/save', { token: W, body: { title: 'Večírek', day: den(0), time: '18:00', calendar: FIREMNI } });
+  expect(rk.status === 200, 'řešitel zapsal firemní akci');
+  rk = await inst.api('POST', '/api/kb/events/save', { token: W, body: { title: 'Dovolená', day: den(0), end_day: den(2), calendar: NEPR } });
+  const DOVOLENA = rk.json.event.id;
+  await otevriKalendar(page);
+  expect(!!(await page.$('[data-testid="kal-sekce-kalendare"]')) && !!(await page.$(`[data-testid="kal-filtr-kalendar-${FIREMNI}"]`)), 'panel má sekci Sdílené kalendáře s řádkem Firemní');
+  expect(!!(await page.$(chipSel('18:00 Večírek'))), 'firemní akce kolegy je v mřížce (vlastník ji vidí, ač nepozván)');
+  expect(await page.evaluate((s) => document.querySelector(s)?.dataset.druh === 'shared', chipSel('18:00 Večírek')), 'chip nese data-druh=shared');
+  const segmenty = await page.$$(`[data-testid^="gcal-chip-ev-${DOVOLENA}:"]`);
+  expect(segmenty.length === 3, `vícedenní nepřítomnost = 3 chipy, jeden na den (${segmenty.length})`);
+  expect(await page.evaluate((id) => { const el = document.querySelector(`[data-testid="gcal-chip-ev-${id}:${new Date().toLocaleDateString('en-CA')}"]`); return !!el && /resitel-kal/.test(el.textContent) && el.dataset.prvni === 'true'; }, DOVOLENA), 'první chip nese jméno nepřítomného a data-prvni');
+  await page.click(`[data-testid="kal-filtr-kalendar-${FIREMNI}"] .gcal-custom-checkbox`);
+  await sleep(500);
+  expect(!(await page.$(chipSel('18:00 Večírek'))) && (await page.$$(`[data-testid^="gcal-chip-ev-${DOVOLENA}:"]`)).length === 3, 'odškrtnutí Firemní schová jen jeho události');
+  expect(await page.evaluate(() => (localStorage.getItem('kb-calendar-hidden-cals') || '').length > 2), 'skryté kalendáře se pamatují v prohlížeči');
+  await page.click(`[data-testid="kal-filtr-kalendar-${FIREMNI}"] .gcal-custom-checkbox`);
+  await sleep(500);
+  // Týden: pruh „Kdo je pryč“ nad dnešním sloupcem
+  await klikText(page, 'Týden', '.gcal-view-btn');
+  await sleep(700);
+  const pryc = await page.$eval(`[data-testid="kal-pryc-${den(0)}"]`, (el) => el.textContent).catch(() => '');
+  expect(/resitel/i.test(pryc), `Týden ukazuje „Kdo je pryč“ s řešitelem (${pryc})`);
+  await klikText(page, 'Měsíc', '.gcal-view-btn');
+  await sleep(500);
+  // detail nepřítomnosti: kalendář a osoba
+  await page.click(`[data-testid="gcal-chip-ev-${DOVOLENA}:${den(0)}"]`);
+  await page.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 8000 }).catch(() => {});
+  expect(/Nepřítomnosti/.test(await page.$eval('[data-testid="udalost-kalendar"]', (el) => el.textContent).catch(() => '')), 'detail nepřítomnosti ukazuje kalendář Nepřítomnosti');
+  const osobaText = await page.$eval('[data-testid="udalost-osoba"]', (el) => el.textContent).catch(() => '(chybí)');
+  expect(/resitel/i.test(osobaText), `a koho se týká — správce ji smí měnit (${osobaText})`);
+  await page.keyboard.press('Escape');
+  await sleep(400);
+  // rezervace zasedačky dialogem: kalendář → čas → uložit = konec +60 min
+  await page.click('.gcal-create-primary-btn');
+  await page.waitForSelector('[data-testid="kal-nova-udalost"]', { timeout: 8000 }).catch(() => {});
+  await page.click('[data-testid="kal-nova-udalost"]');
+  await page.waitForSelector('[data-testid="udalost-kalendar"]', { timeout: 8000 }).catch(() => {});
+  await page.click('[data-testid="udalost-kalendar"]');
+  await page.waitForSelector(`[data-testid="udalost-kalendar-${ZASEDACKA}"]`, { timeout: 5000 }).catch(() => {});
+  await page.click(`[data-testid="udalost-kalendar-${ZASEDACKA}"]`);
+  await sleep(300);
+  await page.type('[data-testid="udalost-nazev"]', 'Schůzka s klientem');
+  const nastavCas = (sel, v) => page.$eval(sel, (el, val) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, v);
+  expect(await page.$eval('[data-testid="udalost-ulozit"]', (el) => el.disabled), 'rezervace bez času nejde uložit');
+  await nastavCas('[data-testid="udalost-cas"]', '10:00');
+  await page.click('[data-testid="udalost-ulozit"]');
+  await H.waitFor(async () => (await udalosti()).some((e) => e.title === 'Schůzka s klientem'), { timeout: 8000, popis: 'rezervace v API' }).catch(() => {});
+  const rez = (await udalosti()).find((e) => e.title === 'Schůzka s klientem');
+  expect(!!rez && rez.kind === 'resource' && rez.end_time === '11:00' && rez.calendar === ZASEDACKA, `API: rezervace Zasedačky 10:00 s dopočteným koncem 11:00 (${JSON.stringify(rez)})`);
+  expect(!!(await page.waitForSelector(chipSel('10:00–11:00 Schůzka s klientem'), { timeout: 8000 }).catch(() => null)), 'chip rezervace nese rozsah 10:00–11:00');
+  // kolize: 10:30 → dialog nabídne 11:00–12:00 → Použít → uložit
+  await page.click('.gcal-create-primary-btn');
+  await page.waitForSelector('[data-testid="kal-nova-udalost"]', { timeout: 8000 }).catch(() => {});
+  await page.click('[data-testid="kal-nova-udalost"]');
+  await page.waitForSelector('[data-testid="udalost-kalendar"]', { timeout: 8000 }).catch(() => {});
+  await page.click('[data-testid="udalost-kalendar"]');
+  await page.waitForSelector(`[data-testid="udalost-kalendar-${ZASEDACKA}"]`, { timeout: 5000 }).catch(() => {});
+  await page.click(`[data-testid="udalost-kalendar-${ZASEDACKA}"]`);
+  await sleep(300);
+  await page.type('[data-testid="udalost-nazev"]', 'Pohovor');
+  await nastavCas('[data-testid="udalost-cas"]', '10:30');
+  await nastavCas('[data-testid="udalost-konec-cas"]', '11:30');
+  await page.click('[data-testid="udalost-ulozit"]');
+  const kolize = await page.waitForSelector('[data-testid="udalost-kolize"]', { timeout: 8000 }).catch(() => null);
+  expect(!!kolize && /obsazen/.test(await page.$eval('[data-testid="udalost-kolize"]', (el) => el.textContent)), 'překryv → dialog ukáže kolizi (ne holou chybu)');
+  expect(/11:00–12:00/.test(await page.$eval('[data-testid="udalost-kolize-pouzit"]', (el) => el.textContent).catch(() => '')), 'a nabídne nejbližší volný čas 11:00–12:00');
+  await page.click('[data-testid="udalost-kolize-pouzit"]');
+  await sleep(300);
+  expect((await page.$eval('[data-testid="udalost-cas"]', (el) => el.value)) === '11:00' && (await page.$eval('[data-testid="udalost-konec-cas"]', (el) => el.value)) === '12:00', 'Použít dosadí 11:00–12:00');
+  await page.click('[data-testid="udalost-ulozit"]');
+  await H.waitFor(async () => (await udalosti()).some((e) => e.title === 'Pohovor'), { timeout: 8000, popis: 'pohovor v API' }).catch(() => {});
+  const pohovor = (await udalosti()).find((e) => e.title === 'Pohovor');
+  expect(!!pohovor && pohovor.time === '11:00' && pohovor.end_time === '12:00', `API: Pohovor 11:00–12:00 bez kolize (${JSON.stringify(pohovor)})`);
+  // správce upraví cizí firemní akci v detailu (can_edit)
+  await page.click(chipSel('18:00 Večírek'));
+  await page.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 8000 }).catch(() => {});
+  expect(!(await page.$eval('[data-testid="udalost-nazev"]', (el) => el.readOnly).catch(() => true)), 'správce může cizí firemní akci upravit (pole nejsou jen ke čtení)');
+  await page.keyboard.press('Escape');
+  await sleep(400);
+
+  console.log('== správce založí sdílený kalendář rovnou z panelu kalendáře ==');
+  await otevriKalendar(page);
+  expect(!!(await page.$('[data-testid="kal-novy-sdileny"]')), 'panel má tlačítko + Nový u Sdílených kalendářů');
+  await page.click('[data-testid="kal-novy-sdileny"]');
+  await page.waitForSelector('[data-testid="kal-dialog-novy-kalendar"]', { timeout: 5000 }).catch(() => {});
+  expect(!!(await page.$('[data-testid="kal-dialog-novy-kalendar"]')), 'otevřel se dialog nového sdíleného kalendáře');
+  await page.type('[data-testid="kal-novy-sdileny-nazev"]', 'Dodávka');
+  await page.click('[data-testid="kal-novy-sdileny-druh-resource"]');
+  await page.click('[data-testid="kal-novy-sdileny-ulozit"]');
+  await H.waitFor(async () => ((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).some((c) => c.name === 'Dodávka' && c.kind === 'resource'), { timeout: 8000, popis: 'Dodávka v API' }).catch(() => {});
+  const dodavka = ((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).find((c) => c.name === 'Dodávka');
+  expect(!!dodavka && dodavka.kind === 'resource', 'kalendář založen z panelu (resource)');
+  if (dodavka) expect(!!(await page.waitForSelector(`[data-testid="kal-filtr-kalendar-${dodavka.id}"]`, { timeout: 8000 }).catch(() => null)), 'a hned má řádek v panelu (realtime)');
+  // „+ Vytvořit“ → třetí volba Sdílený kalendář → jen pro vybrané (řešitel)
+  await page.waitForSelector('[data-testid="kal-dialog-novy-kalendar"]', { hidden: true, timeout: 5000 }).catch(() => {});
+  await page.click('.gcal-create-primary-btn');
+  await page.waitForSelector('[data-testid="kal-novy-kalendar"]', { timeout: 8000 }).catch(() => {});
+  expect(!!(await page.$('[data-testid="kal-novy-kalendar"]')), 'volič „+“ nabízí správci Sdílený kalendář');
+  await page.click('[data-testid="kal-novy-kalendar"]');
+  await page.waitForSelector('[data-testid="kal-novy-sdileny-nazev"]', { timeout: 5000 }).catch(() => {});
+  await page.type('[data-testid="kal-novy-sdileny-nazev"]', 'Vedení');
+  await page.click('[data-testid="kal-novy-vid-members"]');
+  expect(await page.$eval('[data-testid="kal-novy-sdileny-ulozit"]', (el) => el.disabled), 'jen vybraní bez výběru = nejde uložit');
+  await page.click(`[data-testid="kal-novy-clen-${RESITEL}"]`);
+  await page.click('[data-testid="kal-novy-sdileny-ulozit"]');
+  await H.waitFor(async () => ((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).some((c) => c.name === 'Vedení'), { timeout: 8000, popis: 'Vedení v API' }).catch(() => {});
+  const vedeni = ((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).find((c) => c.name === 'Vedení');
+  expect(!!vedeni && vedeni.visibility === 'members' && JSON.stringify(vedeni.members) === JSON.stringify([RESITEL]), `kalendář jen pro vybrané s řešitelem (${JSON.stringify(vedeni && vedeni.members)})`);
+  // tužka u kalendáře → úprava: přepnout na celý tým, pak smazat i s událostmi
+  await otevriKalendar(page);
+  if (vedeni) {
+    await page.click(`[data-testid="kal-upravit-${vedeni.id}"]`);
+    await page.waitForSelector('[data-testid="kal-dialog-novy-kalendar"]', { timeout: 5000 }).catch(() => {});
+    expect((await page.$eval('[data-testid="kal-novy-sdileny-nazev"]', (el) => el.value).catch(() => '')) === 'Vedení', 'tužka otevře úpravu s názvem kalendáře');
+    expect(await page.$eval('[data-testid="kal-novy-sdileny-druh-shared"]', (el) => el.disabled).catch(() => false), 'druh se při úpravě nemění');
+    await page.click('[data-testid="kal-novy-vid-all"]');
+    await page.click('[data-testid="kal-novy-sdileny-ulozit"]');
+    await H.waitFor(async () => ((((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).find((c) => c.id === vedeni.id) || {}).visibility === 'all'), { timeout: 8000, popis: 'viditelnost' }).catch(() => {});
+    expect(((((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).find((c) => c.id === vedeni.id) || {}).visibility === 'all'), 'z dialogu jde přepnout na celý tým');
+    await inst.api('POST', '/api/kb/events/save', { token: V, body: { title: 'Porada vedení', day: den(5), time: '08:00', calendar: vedeni.id } });
+    await page.waitForSelector('[data-testid="kal-dialog-novy-kalendar"]', { hidden: true, timeout: 5000 }).catch(() => {});
+    await page.click(`[data-testid="kal-upravit-${vedeni.id}"]`);
+    await page.waitForSelector('[data-testid="kal-novy-smazat"]', { timeout: 5000 }).catch(() => {});
+    await page.click('[data-testid="kal-novy-smazat"]');
+    await sleep(200);
+    expect(/1/.test(await page.$eval('[data-testid="kal-novy-smazat"]', (el) => el.textContent).catch(() => '')), 'první klik = potvrzení s počtem událostí (1)');
+    await page.click('[data-testid="kal-novy-smazat"]');
+    await H.waitFor(async () => !((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).some((c) => c.id === vedeni.id), { timeout: 8000, popis: 'smazání' }).catch(() => {});
+    expect(!((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).some((c) => c.id === vedeni.id), 'kalendář smazán z dialogu');
+    expect(!((await inst.api('GET', `/api/kb/events?from=${den(5)}&to=${den(5)}`, { token: V })).json.events || []).some((e) => e.title === 'Porada vedení'), 'i s jeho událostí');
+  }
+  await page.bringToFront();
+  await prihlas(page, RESITEL);
+  await otevriKalendar(page);
+  expect(!(await page.$('[data-testid="kal-novy-sdileny"]')), 'člen tlačítko + Nový nemá');
+  await page.click('.gcal-create-primary-btn');
+  await page.waitForSelector('[data-testid="kal-nova-udalost"]', { timeout: 8000 }).catch(() => {});
+  expect(!(await page.$('[data-testid="kal-novy-kalendar"]')), 'členovi volič „+“ sdílený kalendář nenabízí');
+  await page.keyboard.press('Escape');
+  await sleep(300);
+  await prihlas(page, VLASTNIK);
+
+  console.log('== Správa organizace: sekce Sdílené kalendáře; Můj den: „Dnes chybí“ ==');
+  await page.goto(`${inst.base}/admin/users`, { waitUntil: 'networkidle2' });
+  const sprava = await page.waitForSelector('[data-testid="kal-sprava"]', { timeout: 15000 }).catch(() => null);
+  expect(!!sprava, 'Správa organizace má sekci Sdílené kalendáře');
+  expect(!!(await page.$(`[data-testid="kal-radek-${FIREMNI}"]`)) && !!(await page.$(`[data-testid="kal-radek-${NEPR}"]`)), 'tabulka ukazuje založené kalendáře');
+  expect(!(await page.$('[data-testid="kal-predvolby"]')), 'všechny tři předvolby už existují → nabídka předvoleb zmizela');
+  expect(!!(await page.$(`[data-testid="kal-schvalovani-${NEPR}"]`)) && !(await page.$(`[data-testid="kal-schvalovani-${FIREMNI}"]`)), 'přepínač schvalování jen u nepřítomností');
+  await page.click('[data-testid="kal-novy-btn"]');
+  await page.waitForSelector('[data-testid="kal-novy-nazev"]', { timeout: 5000 }).catch(() => {});
+  await page.type('[data-testid="kal-novy-nazev"]', 'Auto');
+  await page.click('[data-testid="kal-novy-druh"]');
+  await page.waitForSelector('[data-testid="kal-novy-druh-resource"]', { timeout: 5000 }).catch(() => {});
+  await page.click('[data-testid="kal-novy-druh-resource"]');
+  await sleep(200);
+  await page.click('[data-testid="kal-novy-ulozit"]');
+  await H.waitFor(async () => ((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).some((c) => c.name === 'Auto'), { timeout: 8000, popis: 'Auto v API' }).catch(() => {});
+  const auto = ((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).find((c) => c.name === 'Auto');
+  expect(!!auto && auto.kind === 'resource', `formulář založil kalendář Auto (resource) (${JSON.stringify(auto)})`);
+  if (auto) {
+    await page.waitForSelector(`[data-testid="kal-archivovat-${auto.id}"]`, { timeout: 8000 }).catch(() => {});
+    await page.click(`[data-testid="kal-archivovat-${auto.id}"]`);
+    await H.waitFor(async () => (((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).find((c) => c.id === auto.id) || {}).archived === true, { timeout: 8000, popis: 'archivace' }).catch(() => {});
+    expect((((await inst.api('GET', '/api/kb/calendars', { token: V })).json.calendars || []).find((c) => c.id === auto.id) || {}).archived === true, 'archivace z tabulky');
+    expect(!!(await page.waitForSelector('[data-testid="kal-archiv-toggle"]', { timeout: 5000 }).catch(() => null)), 'archivované jdou rozbalit');
+  }
+  await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  const prycDoma = await page.waitForSelector('[data-testid="myday-pryc"]', { timeout: 15000 }).catch(() => null);
+  const prycDomaText = prycDoma ? await page.evaluate((el) => el.textContent, prycDoma) : '';
+  expect(/resitel/i.test(prycDomaText), `Můj den na titulce říká „Dnes chybí: řešitel“ (${prycDomaText})`);
+
+  console.log('== schvalování nepřítomnosti v dialogu (správce) ==');
+  await inst.api('POST', '/api/kb/calendars/save', { token: V, body: { id: NEPR, needs_approval: true } });
+  const zad = await inst.api('POST', '/api/kb/events/save', { token: W, body: { title: 'Hory', day: den(1), end_day: den(2), calendar: NEPR } });
+  expect(zad.status === 200 && zad.json.event.status === 'requested', 'řešitel požádal o nepřítomnost');
+  await otevriKalendar(page);
+  const chipZad = await page.waitForSelector(`[data-testid="gcal-chip-ev-${zad.json.event.id}:${den(1)}"]`, { timeout: 8000 }).catch(() => null);
+  expect(!!chipZad, 'žádost je v kalendáři správce');
+  if (chipZad) await chipZad.click();
+  await page.waitForSelector('[data-testid="udalost-stav"]', { timeout: 8000 }).catch(() => {});
+  expect((await page.$eval('[data-testid="udalost-stav"]', (el) => el.dataset.stav).catch(() => '')) === 'requested', 'detail ukazuje stav „čeká na schválení“');
+  expect(!!(await page.$('[data-testid="udalost-schvalit"]')) && !!(await page.$('[data-testid="udalost-zamitnout"]')), 'správce má Schválit / Zamítnout');
+  expect(!(await page.$('[data-testid="udalost-posoudit"]')), '„Posoudit s asistentem“ se bez AI na instanci nenabízí (tlačítko vede do panelu asistenta)');
+  await page.type('[data-testid="udalost-rozhodnuti-pozn"]', 'Dobře, užij si to');
+  await page.click('[data-testid="udalost-schvalit"]');
+  await H.waitFor(async () => ((await udalosti()).find((e) => e.id === zad.json.event.id) || {}).status === 'approved', { timeout: 8000, popis: 'schválení' }).catch(() => {});
+  const zadPo = (await udalosti()).find((e) => e.id === zad.json.event.id);
+  expect(!!zadPo && zadPo.status === 'approved' && zadPo.decision_note === 'Dobře, užij si to', `API: schváleno s poznámkou (${JSON.stringify(zadPo && zadPo.status)})`);
+
+  console.log('== lite: kalendář na týden (jen čtení) — firemní akce, rezervace, kdo je pryč ==');
+  {
+    const { page: mob, novaStranka: _ns } = await H.browser({ mobil: true });
+    void _ns;
+    await prihlas(mob, VLASTNIK);
+    await mob.goto(`${inst.base}/lite/kalendar`, { waitUntil: 'networkidle2' });
+    const liteKal = await mob.waitForSelector('[data-testid="lite-kalendar"]', { timeout: 15000 }).catch(() => null);
+    expect(!!liteKal, 'lite má stránku /lite/kalendar');
+    expect(!!(await mob.$('a[href="/lite/kalendar"]')), 'spodní navigace lite má položku Kalendář');
+    await mob.waitForSelector(`[data-testid="lite-kal-den-${den(0)}"]`, { timeout: 10000 }).catch(() => {});
+    const dnesText = await mob.$eval(`[data-testid="lite-kal-den-${den(0)}"]`, (el) => el.textContent).catch(() => '');
+    expect(/Večírek/.test(dnesText) && /Firemní/.test(dnesText), `dnešek v lite ukazuje firemní akci se jménem kalendáře (${dnesText.slice(0, 80)})`);
+    expect(/resitel/i.test(await mob.$eval(`[data-testid="lite-kal-pryc-${den(0)}"]`, (el) => el.textContent).catch(() => '')), 'a kdo dnes chybí');
+    expect(!/Dovolená/.test(dnesText) && !/Hory/.test(dnesText), 'nepřítomnosti nejsou mezi událostmi (jen v řádku „Dnes chybí“)');
+    await mob.close().catch(() => {});
+  }
+
+  // 409 u rezervace zasedačky je ZÁMĚR (kolize → dialog nabídne volný čas); prohlížeč ho přesto loguje jako chybu zdroje
+  const chybyMimoKolizi = chyby.filter((c) => !/status of 409/.test(c));
+  expect(chybyMimoKolizi.length === 0, `konzole bez chyb (${chybyMimoKolizi.length}${chybyMimoKolizi.length ? ': ' + chybyMimoKolizi[0].slice(0, 160) : ''})`);
 }, { nazev: 'UI-KALENDAR' });

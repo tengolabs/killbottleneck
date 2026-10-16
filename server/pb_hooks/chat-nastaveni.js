@@ -46,6 +46,7 @@ const NOTIFY_NASTAVITELNE = [
   "node_unassigned", "node_comment", "map_shared", "ai_request", "automation_ready", "deadline",
   "agent_done", "agent_failed", "user_joined", "deadline_request", "deadline_request_resolved",
   "rule_notice", "rule_broken", "org_notice", "reminder", "event_invited",
+  "absence_requested", "absence_decided",
 ];
 const SKINY = ["indigo", "contrast", "terminal", "sepia", "ocean", "les", "pulnoc", "svestka", "broskev", "grafit", "rubin", "ruze"];
 const ROLE = ["admin", "manager", "user"];

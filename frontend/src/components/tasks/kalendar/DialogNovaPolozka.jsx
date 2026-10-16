@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { Diamond, CalendarClock } from 'lucide-react';
+import { Diamond, CalendarClock, CalendarDays } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { fmtDen } from '@/hooks/useKalendarZapis';
 
 // „+" v kalendáři (19. 9. 2026): od teď dvě věci — úkol do projektu (uzel mapy,
 // jako dosud) nebo událost (zubař, telko; mimo projekty). Jeden volič místo
 // dvou tlačítek na devíti místech kalendáře; TaskCalendar zůstává beze změny.
-export default function DialogNovaPolozka({ open, den, onClose, onUkol, onUdalost }) {
+// + nový sdílený kalendář (správce/manažer; Richard 15. 10. 2026: „dal bych ho ještě pod + vytvořit“)
+export default function DialogNovaPolozka({ open, den, onClose, onUkol, onUdalost, onKalendar }) {
   const { t } = useTranslation('kalendar');
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -30,6 +31,15 @@ export default function DialogNovaPolozka({ open, den, onClose, onUkol, onUdalos
               <span className="block text-xs text-muted-foreground">{t('nova.udalostPopis')}</span>
             </span>
           </button>
+          {onKalendar && (
+            <button type="button" className="flex items-start gap-3 rounded-lg border p-3 text-left hover:bg-secondary" onClick={onKalendar} data-testid="kal-novy-kalendar">
+              <CalendarDays className="w-5 h-5 mt-0.5 text-indigo-600 shrink-0" />
+              <span>
+                <span className="block font-medium">{t('nova.kalendar')}</span>
+                <span className="block text-xs text-muted-foreground">{t('nova.kalendarPopis')}</span>
+              </span>
+            </button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

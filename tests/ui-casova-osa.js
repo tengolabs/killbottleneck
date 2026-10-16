@@ -69,14 +69,15 @@ H.beh(async () => {
   await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}), page.click('button[type="submit"]')]);
   await sleep(1200);
 
-  console.log('== /tasks: pořadí záložek Tabulka | Kalendář | Časová osa | Kanban (Richard 17. 9.) ==');
+  // od 14. 10. 2026 má Kalendář vlastní stránku /kalendar (Richard) — na /tasks zůstávají 3 pohledy
+  console.log('== /tasks: pořadí záložek Tabulka | Časová osa | Kanban (Richard 17. 9.; Kalendář od 14. 10. na /kalendar) ==');
   await page.goto(`${inst.base}/tasks`, { waitUntil: 'networkidle2' });
   await sleep(1200);
   const zalozky = await page.evaluate(() =>
     [...document.querySelectorAll('[role="tab"]')].map((el) => (el.textContent || '').trim()));
-  expect(zalozky.length >= 4, `lišta pohledů má ${zalozky.length} záložky`);
-  expect(zalozky.slice(0, 4).join(' | ') === 'Tabulka | Kalendář | Časová osa | Kanban',
-    `pořadí pohledů: ${zalozky.slice(0, 4).join(' | ')} (čeká se Tabulka | Kalendář | Časová osa | Kanban)`);
+  expect(zalozky.length >= 3, `lišta pohledů má ${zalozky.length} záložky`);
+  expect(zalozky.slice(0, 3).join(' | ') === 'Tabulka | Časová osa | Kanban',
+    `pořadí pohledů: ${zalozky.slice(0, 3).join(' | ')} (čeká se Tabulka | Časová osa | Kanban)`);
 
   console.log('== přepnutí na Časovou osu: projekt, cíle, týdenní hlavička, Dnes ==');
   // skutečný klik myší (syntetické el.click() radixový TabsTrigger nepřepne)

@@ -9,6 +9,58 @@ below before you jump several versions.
 
 ---
 
+## v0.83-beta — 2026-10-16
+
+**Team calendar: shared calendars (company events, meeting room, time off), the calendar as its own page, the assistant handles it all — never per user**
+
+- **Calendar is its own page** (`/kalendar`) with a **Calendar** item in the main navigation for every role; the old
+  `/tasks?view=calendar` link redirects there with its parameters. The Tasks page no longer has the Calendar tab.
+- **Security (panel 15 Oct)**: the read rules of `calendars` and `events` now require a signed-in user (migration
+  `1792080000`; the previous rules let an anonymous request read calendars and events, the personal-event part of that
+  predates this release), and they match the routes: a rejected request is visible only to the requester, the person
+  concerned and admins/managers, events of archived calendars are not returned. Approval cannot be bypassed by editing:
+  moving an event into an absence calendar with approval, or changing the dates/person of a decided request, creates a
+  new request (the decision is cleared, admins and managers who see the calendar are notified again). Only an admin or
+  manager can enter time off **for a colleague** (`err.absenceForOtherAdminOnly`); `decision_note` is returned only to the
+  requester, the person concerned and admins/managers (also in the export); leaving an event you were not invited to is
+  refused (`err.eventNotParticipant`); the event list cap is 3000 with a `truncated` flag; import matches calendar names
+  exactly.
+- **Default calendars**: a new instance starts with *Company* (`shared`) and *Time off* (`absence`) in the first
+  administrator's language (`KB_UVODNI_MAPA=0` switches this off, as with the starter projects).
+- **Shared calendars** — calendars that are not a person: *company events* (`shared`), *room / resource*
+  (`resource`) and *time off* (`absence`). An administrator creates them in Organization settings → Shared
+  calendars (one-click presets: Company, Time off, Meeting room), an admin or manager also through the assistant
+  or the API, also right from the calendar (**+ New** in the panel, **+** → *Shared calendar*). **Visibility like a
+  project**: the whole team, or selected members only (plus the creator — an admin who is not listed does not see it, like a private project; `visibility`, `members`).
+  Every member adds entries unless `write_access` is `admins`. A pencil next to the calendar in the side panel edits it
+  (name, who sees it, who adds entries, approval), archives it or **deletes it with all its events** (confirmation
+  shows the count). Side panel: a row per calendar with its colour; hidden ones are remembered.
+- **Events have an end** (`end_time`, `end_day`): a multi-day event is a bar across the days (moved in the detail,
+  not by dragging; moving the start keeps the length). **Room bookings never overlap**: the server refuses a taken
+  slot with **409** `{ collision, next_free }`, the dialog and the assistant offer the next free slot that day;
+  a booking without an end takes one hour.
+- **Time off**: all-day with a From–To range, an admin or manager can enter it for a colleague; the **Who is away**
+  band in Week/Day, the **Away today** line in My day and lite, `GET /api/kb/away`. **Approval is optional and off
+  by default**: when switched on for the calendar, a new entry waits (`requested`), admins and managers get a
+  *Time-off request* notification, decide in the detail (Approve / Decline + note) or with the assistant — the
+  **time-off approval mode** gathers who else is away, colliding company events and the requester's due work and
+  gives a recommendation; the requester gets a *Time-off decision* notification.
+- **Assistant**: `create_event` / `update_event` take `calendar`, `end_day`, `end_time`, `person`; new
+  `list_calendars`, `who_is_away`, `create_calendar` (admin/manager), `decide_absence`; the events tool group
+  also opens on vacation / room / time-off wording. Cards: "Book "Meeting room" 15 Oct 10:00–11:00", "Record time
+  off: jana@… 20–24 Oct".
+- **Lite**: read-only **Calendar** page for the next 7 days (own events, company events, bookings, who is away) in
+  the bottom navigation.
+- **API / MCP**: `GET/POST /api/kb/v1/calendars`, `POST /api/kb/v1/calendars/{id}`, `GET /api/kb/v1/away`,
+  `POST /api/kb/v1/events/{id}/decide`; `/v1/events` takes `calendar`, `end_day`, `end_time` and `?calendar=`;
+  foreign fields `room`, `location`, `vacation`, `end`… get a hint. MCP has 26 tools (was 20): `update_event`,
+  `delete_event`, `list_calendars`, `create_calendar`, `delete_calendar`, `who_is_away`. Export carries `calendars` and shared-calendar
+  events; `/import-all` imports calendars (admin/manager) and the importer's own events.
+- Permissions are enforced on the server (`can_edit` in the event DTO): the author; in a shared calendar also
+  an admin/manager; time off also the person it concerns. Personal events stay private even from administrators.
+- **Upgrade notes:** migration `1792001003` adds the `calendars` collection, new event fields and two notification
+  types; the down-migration **deletes** shared calendars and the new fields. Reminders on shared events go to the
+  author and invitees only (not the whole team).
 ## v0.82-beta — 2026-10-15
 
 **Relax: a guarded break with an aquarium, a beehive or an ant colony, right next to the assistant**

@@ -129,6 +129,8 @@
     "list_documents": "dokumenty",
     "get_document": "dokument",
     "list_events": "kalendář",
+    "list_calendars": "sdílené kalendáře",
+    "who_is_away": "kdo je pryč",
     "get_week_review": "přehled týdne",
     "get_project_changes": "změny v projektu",
     "get_person_work": "práce kolegy",

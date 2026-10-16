@@ -32,6 +32,9 @@ export const NOTIFY_TYPES = [
   // časová připomínka (událost i uzel) + pozvání na událost (19. 9. 2026)
   'reminder',
   'event_invited',
+  // nepřítomnost se schvalováním (týmový kalendář, 14. 10. 2026)
+  'absence_requested',
+  'absence_decided',
 ];
 
 // E-mail výchozí ZAPNUTÝ (zrcadlo helpers.js NOTIFY_EMAIL_DEFAULT_ON): připomínka
@@ -64,6 +67,8 @@ const META = {
   rule_broken: { icon: AlertTriangle, className: 'text-amber-600' },
   reminder: { icon: Bell, className: 'text-sky-600' },
   event_invited: { icon: CalendarPlus, className: 'text-sky-600' },
+  absence_requested: { icon: CalendarClock, className: 'text-teal-600' },
+  absence_decided: { icon: CheckCircle2, className: 'text-teal-600' },
   // bezpečnostní poplach „někdo jiný ti změnil heslo" — červená, ať nezapadne
   // mezi běžné zprávy; vypnout ho nejde (server: NOTIFY_ALWAYS)
   password_reset: { icon: KeyRound, className: 'text-red-600' },
@@ -94,10 +99,10 @@ export const notifyTarget = (n) => {
   if (n.type === 'org_notice' && n.extra && n.extra.pozvat) return `/admin/users?pozvat=${encodeURIComponent(n.extra.pozvat)}`;
   if (n.type === 'org_notice') return n.map_id ? `/map/${n.map_id}` : '/admin/users';
   // připomínka: událost → kalendář s otevřeným detailem; uzel → mapa s uzlem
-  if (n.type === 'reminder' || n.type === 'event_invited') {
-    if (n.event_id) return `/tasks?view=calendar&udalost=${encodeURIComponent(n.event_id)}`;
+  if (n.type === 'reminder' || n.type === 'event_invited' || n.type === 'absence_requested' || n.type === 'absence_decided') {
+    if (n.event_id) return `/kalendar?udalost=${encodeURIComponent(n.event_id)}`;
     if (n.map_id) return `/map/${n.map_id}${n.node_id ? `?node=${n.node_id}` : ''}`;
-    return '/tasks?view=calendar';
+    return '/kalendar';
   }
   if (n.type === 'deadline') {
     if (n.task_id) return `/tasks?task=${n.task_id}`;

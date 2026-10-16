@@ -122,14 +122,14 @@ const api = async (path, { token, bearer, body, method } = {}) => {
       'Úkoly předfiltrované na člena: jeho práce ano, adminova soukromá ne');
     await page.close();
 
-    console.log('== mobil 390 px: pátá položka lišty nesmí roztáhnout stránku ==');
+    console.log('== mobil 390 px: šestá položka lišty (Kalendář od 14. 10.) nesmí roztáhnout stránku ==');
     const pm = await browser.newPage();
     await pm.setViewport({ width: 390, height: 844 });
     await login(pm, admin.email);
     await pm.goto(`${BASE}/organizace`, { waitUntil: 'networkidle2' });
     await pm.waitForSelector('[data-testid="organizace-kpis"]', { timeout: 10000 });
     const sirky = await pm.evaluate(() => ({ body: document.body.scrollWidth, doc: document.documentElement.scrollWidth, win: window.innerWidth, nav: [...document.querySelectorAll('header nav button')].length }));
-    expect(sirky.nav === 5 && sirky.body <= sirky.win && sirky.doc <= sirky.win, `admin má 5 položek a stránka nemá vodorovný posun (${JSON.stringify(sirky)})`);
+    expect(sirky.nav === 6 && sirky.body <= sirky.win && sirky.doc <= sirky.win, `admin má 6 položek a stránka nemá vodorovný posun (${JSON.stringify(sirky)})`);
     await pm.close();
 
     console.log('== člen: bez položky, /organizace = bez oprávnění ==');

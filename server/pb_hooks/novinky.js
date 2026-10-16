@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.83-beta": {
+    cs: [
+      "Kalendář má vlastní stránku a položku Kalendář v hlavní nabídce — už není schovaný v Úkolech.",
+      "Sdílené kalendáře týmu: firemní akce, zasedací místnost (rezervace se nepřekrývají, nabídne se nejbližší volný čas) a nepřítomnosti s pruhem „Kdo je pryč“ — Firemní a Nepřítomnosti máte rovnou, zasedačku založí správce jedním kliknutím, za lidi se neplatí.",
+      "Dovolenou zapíšete na celé dny od–do (správce i za kolegu); schvalování je volitelné a výchozí vypnuté — kdo ho zapne, může si nechat žádost posoudit asistentem se sumářem a doporučením.",
+      "Asistentovi stačí věta: „zarezervuj zasedačku zítra v 10“, „Jana má příští týden dovolenou“, „kdo bude příští týden pryč?“.",
+      "Zjednodušené zobrazení na telefonu má kalendář na týden: události, rezervace a kdo chybí.",
+    ],
+    en: [
+      "The calendar has its own page and a Calendar item in the main navigation — no longer hidden inside Tasks.",
+      "Shared team calendars: company events, a meeting room (bookings never overlap, the next free slot is offered) and time off with a \"Who is away\" band — Company and Time off are there from the start, an administrator adds a meeting room with one click, never per user.",
+      "Time off is entered for whole days from–to (an admin also for a colleague); approval is optional and off by default — whoever switches it on can have the assistant review a request with a summary and a recommendation.",
+      "One sentence to the assistant is enough: \"book the meeting room tomorrow at 10\", \"Jane is off next week\", \"who is away next week?\".",
+      "The simplified phone view has a calendar for the week: events, bookings and who is away.",
+    ],
+  },
   "v0.82-beta": {
     cs: [
       "Relax v asistentovi: rybička v hlavičce panelu nebo slovo „relax“ pustí klidné akvárium, včelí úl nebo mraveniště — vedle chatu místo mapy, nebo přes celou obrazovku.",

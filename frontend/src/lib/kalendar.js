@@ -102,7 +102,10 @@ export function vyhodnotPresun(stitek, den, { dnes, userEmail, map } = {}) {
   // událost (19. 9. 2026) nemá projekt: přesouvá ji jen ten, kdo ji založil;
   // pozvaný účastník dostane vysvětlení místo tichého ne
   if (it.kind === 'event') {
-    if (!it.mine) return { akce: 'odmitnout', duvod: 'udalostCizi' };
+    // sdílený kalendář: přesouvá i správce/manažer, nepřítomnost i ten, koho se týká (can_edit ze serveru)
+    if (!(it.can_edit !== undefined ? it.can_edit : it.mine)) return { akce: 'odmitnout', duvod: 'udalostCizi' };
+    // vícedenní událost (dovolená) se v mřížce netáhne — posouvá se v detailu (konec by jinak zůstal viset)
+    if (it.end_day) return { akce: 'odmitnout', duvod: 'vicedenni' };
     return { akce: 'udalost', pole: 'day', puvodni: stitek.den, nova: den };
   }
   if (!map || (it.kind === 'node' && !Array.isArray(map.nodes))) return { akce: 'odmitnout', duvod: 'mapaChybi' };

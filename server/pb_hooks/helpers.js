@@ -316,6 +316,8 @@ const NOTIFY_TYPES = [
   "password_reset",
   // časová připomínka (událost i uzel) + pozvání na událost (migrace 1789820000)
   "reminder", "event_invited",
+  // nepřítomnost se schvalováním (týmový kalendář, 14. 10. 2026): žádost správcům/manažerům, rozhodnutí žadateli
+  "absence_requested", "absence_decided",
 ];
 
 // Typy, které uživatel NESMÍ vypnout — poplachy o vlastním účtu. Předvolby je
@@ -1324,8 +1326,11 @@ const V1_BODY_FIELDS = {
   rule: ["name", "node_id", "trigger", "conditions", "actions", "enabled"],
   ruleTemplate: ["id", "name", "trigger", "conditions", "actions"],
   // události a připomínky k uzlům (events-api.js: EVENT_FIELDS / NODE_REMINDER_FIELDS)
-  event: ["title", "day", "time", "note", "participants", "remind", "remind_before_min"],
+  event: ["title", "day", "time", "note", "participants", "remind", "remind_before_min", "calendar", "end_day", "end_time"],
   nodeReminder: ["offset_days", "time"],
+  // sdílené kalendáře (events-api.js: CALENDAR_FIELDS) — zakládá/mění jen admin/manager
+  calendar: ["name", "kind", "color", "description", "write_access", "needs_approval", "archived", "visibility", "members"],
+  absenceDecision: ["decision", "note"],
 };
 // tvar pravidla — zrcadlo RULE_TRIGGER / RULE_CONDITION / RULE_ACTION v mcp-tools.js
 const RULE_TRIGGER_FIELDS = ["type", "status", "when", "days", "freq", "weekday", "hour"];
@@ -1344,6 +1349,10 @@ const FOREIGN_FIELD_HINTS = {
   event: "hint.event", meeting: "hint.event", schuzka: "hint.event", udalost: "hint.event",
   due_date: "hint.deadline", due: "hint.deadline", due_on: "hint.deadline", due_at: "hint.deadline", termin: "hint.deadline", end_date: "hint.deadline",
   assignee: "hint.owner", assigned_to: "hint.owner", assignee_email: "hint.owner", resitel: "hint.owner", responsible: "hint.owner",
+  // místnost / dovolená = událost ve SDÍLENÉM kalendáři (pole calendar), konec = end_day / end_time
+  room: "hint.calendar", location: "hint.calendar", resource: "hint.calendar", place: "hint.calendar", mistnost: "hint.calendar", zasedacka: "hint.calendar",
+  vacation: "hint.calendar", absence: "hint.calendar", dovolena: "hint.calendar", out_of_office: "hint.calendar", time_off: "hint.calendar",
+  end: "hint.end", until: "hint.end", end_at: "hint.end", duration: "hint.end", length: "hint.end",
   estimate: "hint.estimate", estimated_hours: "hint.estimate", estimate_hours: "hint.estimate", effort: "hint.estimate", story_points: "hint.estimate", points: "hint.estimate", odhad: "hint.estimate",
 };
 const snakeOf = (k) => String(k).replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
@@ -6233,12 +6242,25 @@ function buildExport(app, userId, email, opts) {
     deadline: b.getString("deadline"), planned_on: b.getString("planned_on"), created: b.getString("created"),
   }));
   // události: vlastní i ty, kam mě pozvali (osobní kalendář = osobní data); připomínky k uzlům jen moje
+  // + sdílené kalendáře (14. 10. 2026): jejich události vidí každý → jsou v exportu; seznam kalendářů zvlášť
   let eventsOut = [];
+  let calendarsOut = [];
   try {
-    const rows = rowsOf("events", "owner = {:u} || participants.id ?= {:u}", { u: userId }, ROWS, "day,time");
-    if (rows.length >= ROWS) truncated.events = true;
     const E = require(`${__hooks}/events-api.js`);
-    eventsOut = rows.map((ev) => { const d = E.eventDto(app, ev, userId); delete d.mine; return d; });
+    let ja = null; try { ja = app.findRecordById("users", userId); } catch (err) { ja = null; }
+    const kal = E.kalendareMapa(app, ja); // jen kalendáře, které vidím (jen pro vybrané = jako soukromý projekt)
+    calendarsOut = Object.values(kal).filter((c) => !c.getBool("archived")).map((c) => {
+      const d = E.calendarDto(c, ja, app);
+      return { name: d.name, kind: d.kind, color: d.color, description: d.description, write_access: d.write_access, needs_approval: d.needs_approval, visibility: d.visibility, members: d.members };
+    });
+    const rows = rowsOf("events", 'owner = {:u} || participants.id ?= {:u} || calendar != ""', { u: userId }, ROWS, "day,time");
+    if (rows.length >= ROWS) truncated.events = true;
+    // stejná pravidla jako listEvents: skrytý/archivovaný kalendář pryč; zamítnutá nepřítomnost
+    // jen žadateli, dotyčnému a správci (poznámka k rozhodnutí je důvěrná — eventDto ji odstíní)
+    const spravce = ja ? jeAdminNeboManazer(ja) : false;
+    eventsOut = rows.filter((ev) => { const c = ev.getString("calendar"); return !c || (kal[c] && !kal[c].getBool("archived")); })
+      .filter((ev) => ev.getString("status") !== "rejected" || spravce || ev.getString("owner") === userId || (ev.get("participants") || []).indexOf(userId) >= 0)
+      .map((ev) => { const d = E.eventDto(app, ev, ja || userId, null, kal); delete d.mine; delete d.can_edit; delete d.calendar; return d; });
   } catch (err) { /* kolekce chybí u starší instance */ }
   const nodeReminders = own("node_reminders", "day,time", (rm) => ({
     map: rm.getString("map"), node_id: rm.getString("node_id"), offset_days: Number(rm.get("offset_days")) || 0,
@@ -6288,13 +6310,14 @@ function buildExport(app, userId, email, opts) {
     maps: mapsOut,
     buffer_nodes: buffer,
     events: eventsOut,
+    calendars: calendarsOut,
     node_reminders: nodeReminders,
     documents: documents,
     time_entries: timeEntries,
     external_contacts: contacts,
     notifications: notifications,
     rule_templates: ruleTemplates,
-    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, node_reminders: nodeReminders.length, documents: documents.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
+    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, calendars: calendarsOut.length, node_reminders: nodeReminders.length, documents: documents.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
     truncated: Object.keys(truncated).length ? truncated : null,
     errors: errors.length ? errors : null,
   };
@@ -6902,18 +6925,37 @@ function buildMyDay(app, userId, email, opts) {
   // Nejsou práce (nezapočítávají se do counts), jen řádky s časem nad seznamem;
   // celodenní první, pak podle času. `today` je den uživatele (klient), události
   // nesou den v čase instance — shodné, dokud se člověk nepřihlásí z jiné zóny.
+  // + sdílené kalendáře (14. 10. 2026): firemní akce a rezervace vidí každý; nepřítomnosti
+  // se tu NEvypisují (šly by za každého kolegu), ty shrnuje řádek „Dnes chybí“ (away)
   let events = [];
+  let away = [];
   try {
-    events = app.findRecordsByFilter("events", "(owner = {:u} || participants.id ?= {:u}) && day = {:d}",
-      "time,created", 50, 0, { u: userId, d: today })
+    const E = require(`${__hooks}/events-api.js`);
+    let ja = null; try { ja = app.findRecordById("users", userId); } catch (err) { ja = null; }
+    const kal = E.kalendareMapa(app, ja); // skryté kalendáře (jen pro vybrané) do Můj den nepatří
+    const jmena = {};
+    events = app.findRecordsByFilter("events", '(owner = {:u} || participants.id ?= {:u} || calendar != "") && day <= {:d} && (end_day >= {:d} || day >= {:d})',
+      "time,created", 80, 0, { u: userId, d: today })
+      .filter((ev) => { const c = ev.getString("calendar"); return !c || (kal[c] && !kal[c].getBool("archived") && kal[c].getString("kind") !== "absence"); })
+      .slice(0, 50)
       .map((ev) => ({
         id: ev.id,
         title: ev.getString("title") || untitled,
-        time: ev.getString("time"),
+        time: ev.getString("day") === today ? ev.getString("time") : "",
+        end_time: ev.getString("end_time"),
+        calendar: ev.getString("calendar") ? kal[ev.getString("calendar")].getString("name") : "",
         mine: ev.getString("owner") === userId,
         participants: (ev.get("participants") || []).length,
       }));
-  } catch (err) { events = []; }
+    for (const a of E.whoIsAway(app, today, today, ja)) {
+      if (!jmena[a.email]) {
+        let n = "";
+        try { n = app.findFirstRecordByFilter("users", "email = {:e}", { e: a.email }).getString("full_name"); } catch (err) { n = ""; }
+        jmena[a.email] = { email: a.email, name: n || a.email, until: a.to, title: a.title };
+      }
+    }
+    away = Object.values(jmena);
+  } catch (err) { events = []; away = []; }
 
   return {
     today: today,
@@ -6956,6 +6998,7 @@ function buildMyDay(app, userId, email, opts) {
       later: laterOut,
       noDate: noDateOut,
       events: events,
+      away: away,
     },
     // `rest` panel nezobrazuje (práce bez blízkého termínu) — používá ho AI sumář
     rest: [].concat(buckets.later, buckets.noDate),

@@ -34,6 +34,10 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
   const NAV = [
     { key: 'projects', label: t('nav.projects'), to: '/' },
     { key: 'tasks', label: t('nav.tasks'), to: '/tasks' },
+    // „Kalendář" — týmový kalendář (sdílené kalendáře, zasedačky, nepřítomnosti) jako vlastní
+    // stránka pro všechny role. Druhá vědomá výjimka z anti-bloat pravidla „žádná nová trvalá
+    // položka v navigaci" rozhodnutím majitele produktu (Richard 14. 10. 2026).
+    { key: 'kalendar', label: t('nav.kalendar'), to: '/kalendar' },
     { key: 'mymap', label: t('nav.myMap'), to: '/my-map' },
     // „Organizace" — pohled shora, jen admin a manažer. Vědomé prolomení
     // anti-bloat pravidla „žádná nová trvalá položka v navigaci" rozhodnutím

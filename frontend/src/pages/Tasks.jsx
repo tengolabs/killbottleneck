@@ -13,6 +13,7 @@ import { useUdalosti } from '@/hooks/useUdalosti';
 // události v kalendáři (19. 9. 2026) — líné chunky, otevírají se jen z kalendáře
 const DialogUdalost = lazy(() => import('@/components/tasks/kalendar/DialogUdalost'));
 const DialogNovaPolozka = lazy(() => import('@/components/tasks/kalendar/DialogNovaPolozka'));
+const DialogNovyKalendar = lazy(() => import('@/components/tasks/kalendar/DialogNovyKalendar'));
 import TaskTimeline from '@/components/tasks/TaskTimeline';
 import TaskDialog from '@/components/tasks/TaskDialog';
 import NewNodeDialog from '@/components/tasks/NewNodeDialog';
@@ -45,7 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Loader2, CheckSquare, Search, X, LayoutList, Columns3, CalendarDays, CalendarRange, Download, CircleUser, Send, ArrowLeft, Map as MapIcon } from 'lucide-react';
+import { Plus, Loader2, CheckSquare, Search, X, LayoutList, Columns3, CalendarRange, Download, CircleUser, Send, ArrowLeft, Map as MapIcon } from 'lucide-react';
 import { exportTasksCsv, exportMarkdownReport } from '@/lib/taskExport';
 import { useToast } from '@/components/ui/use-toast';
 import { STATUSES } from '@/lib/statusMeta';
@@ -57,7 +58,11 @@ import { useTaskTrees } from '@/hooks/useTaskTrees';
 import { useMapNodeActions } from '@/hooks/useMapNodeActions';
 import { PAGE_CONTAINER } from '@/lib/layout';
 
-export default function Tasks() {
+// kalendar = stránka /kalendar (Richard 14. 10. 2026): stejné jádro (data, dialogy, filtry), jen zamčený pohled
+// kalendáře bez lišty pohledů a bez panelu Můj den; staré /tasks?view=calendar sem přesměruje
+const POHLEDY_UKOLU = ['table', 'timeline', 'board'];
+
+export default function Tasks({ kalendar = false }) {
   const navigate = useNavigate();
   const { user, isLoadingAuth } = useAuth();
   const { toast } = useToast();
@@ -67,8 +72,11 @@ export default function Tasks() {
   const { items, loading, byParent } = tasksApi;
 
   const [view, setView] = useState(() => {
+    if (kalendar) return 'calendar';
     const requested = searchParams.get('view');
-    return ['table', 'timeline', 'board', 'calendar'].includes(requested) ? requested : nactiKlic('kb-tasks-view') || 'table';
+    if (POHLEDY_UKOLU.includes(requested)) return requested;
+    const ulozeny = nactiKlic('kb-tasks-view');
+    return POHLEDY_UKOLU.includes(ulozeny) ? ulozeny : 'table'; // uložené 'calendar' z dob záložky → tabulka
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newNodeOpen, setNewNodeOpen] = useState(false);
@@ -76,6 +84,7 @@ export default function Tasks() {
   // kalendář: volič „úkol / událost“ pro den + dialog události (nová / detail)
   const [novaPolozkaDen, setNovaPolozkaDen] = useState(null);
   const [udalostDialog, setUdalostDialog] = useState(null); // { udalost: DTO|null, den }
+  const [novyKalendarOpen, setNovyKalendarOpen] = useState(false); // „+“ → Sdílený kalendář (správce/manažer)
   const [editTask, setEditTask] = useState(null);
   const buffer = useBufferNodes(user);
   const [editBufferItem, setEditBufferItem] = useState(null);
@@ -96,6 +105,9 @@ export default function Tasks() {
   // e-maily pro našeptávače — viz useTasksPageData (F3-10)
   const { maps, setMaps, loadMaps, org, members, reloadMembers, commentCounts, emailOptions } =
     useTasksPageData({ user, items, dialogOpen });
+
+  // pojistka: stránka kalendáře má pohled vždy zamčený (kdyby komponent přežil přechod z /tasks)
+  useEffect(() => { if (kalendar && view !== 'calendar') setView('calendar'); }, [kalendar, view]);
 
   const changeView = (v) => {
     setView(v);
@@ -123,10 +135,18 @@ export default function Tasks() {
   useEffect(() => {
     const requested = searchParams.get('view');
     if (!requested) return;
-    const cil = ['table', 'timeline', 'board', 'calendar'].includes(requested) ? requested : view;
+    searchParams.delete('view');
+    // kalendář má od 14. 10. 2026 vlastní stránku — starý deep-link (zvoneček, Můj den, karta
+    // asistenta, uložené odkazy) vede tam i s ostatními parametry (&udalost=…)
+    if (requested === 'calendar' && !kalendar) {
+      const q = searchParams.toString();
+      navigate(`/kalendar${q ? '?' + q : ''}`, { replace: true });
+      return;
+    }
+    if (kalendar) { setSearchParams(searchParams, { replace: true }); return; }
+    const cil = POHLEDY_UKOLU.includes(requested) ? requested : view;
     if (cil !== view) setView(cil);
     ulozKlic('kb-tasks-view', cil);
-    searchParams.delete('view');
     setSearchParams(searchParams, { replace: true });
   }, [searchParams]);
 
@@ -177,7 +197,7 @@ export default function Tasks() {
   const zpetDoMapy = () => navigate(`/map/${projektFiltru.id}`);
 
   // události + připomínky k uzlům — jen když je kalendář otevřený
-  const { items: udalostiItems, udalosti, pripominkyPodleUzlu, nacteno: udalostiNacteny } = useUdalosti({ aktivni: view === 'calendar', userEmail: user?.email });
+  const { items: udalostiItems, udalosti, pripominkyPodleUzlu, kalendare, nacteno: udalostiNacteny } = useUdalosti({ aktivni: view === 'calendar', userEmail: user?.email });
   // deep-link ze zvonečku: /tasks?view=calendar&udalost=<id> otevře detail události
   useEffect(() => {
     const uid = searchParams.get('udalost');
@@ -390,7 +410,7 @@ export default function Tasks() {
     <div className={`min-h-screen bg-background relative transition-[padding] ${bufferOpen ? 'sm:pl-72' : timeLogOpen ? 'sm:pl-80' : ''}`}>
       <SkinPattern />
       <AppHeader
-        active="tasks"
+        active={kalendar ? 'kalendar' : 'tasks'}
         backTo={projektFiltru ? `/map/${projektFiltru.id}` : undefined}
         org={org}
         onInvited={reloadMembers}
@@ -404,6 +424,7 @@ export default function Tasks() {
       <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />
 
       <div className={`${PAGE_CONTAINER} py-6`}>
+        {!kalendar && (
         <MyDaySection
           user={user}
           ideas={buffer.items}
@@ -438,6 +459,7 @@ export default function Tasks() {
             setStatusFilter(kind === 'done' ? 'done' : ALL);
           }}
         />
+        )}
 
         {/* Pruh „Úkoly projektu": sem vede ikona Úkoly z levé lišty mapy
             (/tasks?map=<id>). Na telefonu se člověk ze seznamu neuměl vrátit do
@@ -469,6 +491,7 @@ export default function Tasks() {
         )}
 
         <div className="flex flex-wrap items-center gap-2 mb-5">
+          {!kalendar && (
           <Tabs value={view} onValueChange={changeView} className="max-w-full">
             {/* na telefonu se čtyři pohledy zalomí — jinak lišta (441 px) roztáhne
                 stránku a vše „fixed“ (dialogy, detail dne v kalendáři) se centruje mimo displej */}
@@ -476,10 +499,7 @@ export default function Tasks() {
               <TabsTrigger value="table" className="gap-1.5">
                 <LayoutList className="w-3.5 h-3.5" /> {t('tasksPage.viewTable')}
               </TabsTrigger>
-              {/* pořadí Richard 17. 9. 2026: Tabulka, Kalendář, Časová osa, Kanban */}
-              <TabsTrigger value="calendar" className="gap-1.5">
-                <CalendarDays className="w-3.5 h-3.5" /> {t('tasksPage.viewCalendar')}
-              </TabsTrigger>
+              {/* Kalendář má od 14. 10. 2026 vlastní stránku /kalendar (položka v hlavní nabídce) */}
               <TabsTrigger value="timeline" className="gap-1.5">
                 <CalendarRange className="w-3.5 h-3.5" /> {t('tasksPage.viewTimeline')}
               </TabsTrigger>
@@ -488,6 +508,7 @@ export default function Tasks() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          )}
 
           <Button
             variant={assigneeFilter === user?.email ? 'default' : 'outline'}
@@ -674,6 +695,7 @@ export default function Tasks() {
             loadMaps={loadMaps}
             setMaps={setMaps}
             pripominky={pripominkyPodleUzlu}
+            kalendare={kalendare}
             onCreate={openCalendarCreate}
             onOpen={(it) => (it.kind === 'event' ? setUdalostDialog({ udalost: it.raw, den: it.raw.day })
               : it.kind === 'node' ? setEditNodeItem(it.raw) : openEdit(it.raw))}
@@ -730,6 +752,11 @@ export default function Tasks() {
         )}
       </div>
 
+      {novyKalendarOpen && (
+        <Suspense fallback={null}>
+          <DialogNovyKalendar open members={members} userEmail={user?.email} toast={toast} onClose={() => setNovyKalendarOpen(false)} />
+        </Suspense>
+      )}
       {(novaPolozkaDen !== null || udalostDialog) && (
         <Suspense fallback={null}>
           {novaPolozkaDen !== null && (
@@ -739,6 +766,7 @@ export default function Tasks() {
               onClose={() => setNovaPolozkaDen(null)}
               onUkol={() => openCalendarNode(novaPolozkaDen)}
               onUdalost={() => openCalendarEvent(novaPolozkaDen)}
+              onKalendar={user?.role === 'admin' || user?.role === 'manager' ? () => { setNovaPolozkaDen(null); setNovyKalendarOpen(true); } : undefined}
             />
           )}
           {udalostDialog && (
@@ -747,7 +775,9 @@ export default function Tasks() {
               udalost={udalostDialog.udalost}
               defaultDay={udalostDialog.den}
               members={members}
+              kalendare={kalendare}
               userEmail={user?.email}
+              userRole={user?.role}
               toast={toast}
               onClose={() => setUdalostDialog(null)}
             />

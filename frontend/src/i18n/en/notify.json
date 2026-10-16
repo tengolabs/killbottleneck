@@ -44,7 +44,9 @@
     "event_invited": "Event invitation",
     "org_notice": "Organization",
     "password_reset": "Password reset",
-    "overflow": "Notification digest"
+    "overflow": "Notification digest",
+    "absence_requested": "Time-off request",
+    "absence_decided": "Time-off decision"
   },
   "prefs": {
     "title": "Notification settings",

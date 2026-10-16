@@ -787,7 +787,8 @@
 
 /* řádek „Události“ ve filtru projektů — oddělený od map tenkou linkou */
 .gcal-filter-row-udalosti { border-bottom: 1px solid hsl(var(--border)); margin-bottom: 4px; padding-bottom: 6px; }
-.gcal-filter-row-udalosti .gcal-filter-label { display: inline-flex; align-items: center; gap: 4px; }
+.gcal-filter-row-udalosti .gcal-filter-label,
+.gcal-filter-row-kalendar .gcal-filter-label { display: inline-flex; align-items: center; gap: 4px; }
 
 .gcal-chip-overdue-dot {
   width: 6px;
@@ -1554,3 +1555,32 @@
   background: hsl(var(--card));
   box-shadow: 0 6px 20px hsl(var(--foreground) / 0.18);
 }
+
+/* Kdo je pryč (nepřítomnosti) — pruh nad sloupcem dne v Týdnu a odznak v Dni (týmový kalendář, 14. 10. 2026) */
+.gcal-away-band {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 6px 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f766e;
+  background: rgba(20, 184, 166, 0.14);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.gcal-away-band > span { overflow: hidden; text-overflow: ellipsis; }
+.dark .gcal-away-band { color: #5eead4; }
+/* vícedenní událost: pruh přes dny — zaoblení jen na krajích */
+.gcal-event-chip[data-prvni="false"] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.gcal-event-chip[data-posledni="false"] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+/* tužka u sdíleného kalendáře (správce/manažer): úprava, viditelnost, smazání */
+.gcal-filter-edit { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-left: 2px; border: 0; border-radius: 4px; background: transparent; color: inherit; opacity: .45; cursor: pointer; }
+.gcal-filter-row:hover .gcal-filter-edit, .gcal-filter-edit:focus-visible { opacity: 1; }
+.gcal-filter-edit:hover { background: var(--gcal-hover-bg); }

@@ -28,6 +28,7 @@ import { ArrowLeft, Shield, UserPlus, Trash2, KeyRound, Loader2, ChevronDown, Ma
 import AiSettingsSection from '@/components/shared/AiSettingsSection';
 import OrgStructureSection from '@/components/shared/OrgStructureSection';
 import InstanceSkinSection from '@/components/shared/InstanceSkinSection';
+import KalendareSection from '@/components/shared/KalendareSection';
 import AiKredityKarta from '@/components/shared/AiKredityKarta';
 import BillingSection from '@/components/shared/BillingSection';
 import MembershipSection from '@/components/shared/MembershipSection';
@@ -593,6 +594,9 @@ export default function UserAdmin() {
 
         {/* organizační struktura a zastupování — tabulkový pohled nad org mapou */}
         <OrgStructureSection />
+
+        {/* sdílené kalendáře týmu (firemní / zasedačka / nepřítomnosti) — 14. 10. 2026 */}
+        {!jenStruktura && <KalendareSection />}
 
         {/* fakturační údaje hned pod uživateli (Richard 8. 8. 2026); košík
             členství jen na hostované instanci — self-host nic nekupuje tady */}

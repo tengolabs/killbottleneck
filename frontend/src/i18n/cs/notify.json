@@ -44,7 +44,9 @@
     "event_invited": "Pozvání na událost",
     "org_notice": "Organizace",
     "password_reset": "Reset hesla",
-    "overflow": "Souhrn upozornění"
+    "overflow": "Souhrn upozornění",
+    "absence_requested": "Žádost o nepřítomnost",
+    "absence_decided": "Rozhodnutí o nepřítomnosti"
   },
   "prefs": {
     "title": "Nastavení notifikací",

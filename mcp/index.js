@@ -67,6 +67,7 @@ async function call(method, path, body) {
   if (!res.ok) {
     const err = new Error((json && json.error) || `HTTP ${res.status}`);
     err.status = res.status;
+    err.json = json;
     throw err;
   }
   return json;
@@ -496,33 +497,156 @@ server.registerTool('get_portfolio', {
 // (server/pb_hooks/mcp-tools.js). Událost NENÍ úkol (nic v mapě), připomínka
 // k uzlu je relativní k termínu a termín nemění.
 function renderEvent(e) {
-  const kdy = e.time ? `${e.day} ${e.time}` : `${e.day} (all day)`;
-  const parts = (e.participants || []).length ? `, participants: ${e.participants.join(', ')}` : '';
+  const konec = e.end_day ? ` → ${e.end_day}${e.end_time ? ' ' + e.end_time : ''}` : (e.end_time ? `–${e.end_time}` : '');
+  const kdy = e.time ? `${e.day} ${e.time}${konec}` : `${e.day}${konec} (all day)`;
+  const kdo = e.mine ? 'mine' : (e.calendar_name ? 'by ' + e.owner_email : 'invited by ' + e.owner_email);
+  const away = e.kind === 'absence' && (e.away || []).length ? `, away: ${e.away.join(', ')}` : '';
+  const kal = e.calendar_name ? `, calendar: ${e.calendar_name}${away}${e.status ? ', ' + e.status : ''}` : '';
+  const parts = (e.participants || []).length && e.kind !== 'absence' ? `, participants: ${e.participants.join(', ')}` : '';
   const rem = e.remind ? `, reminder ${e.remind_before_min} min before` : '';
-  return `${kdy} — ${e.title} (id: ${e.id}, ${e.mine ? 'mine' : 'invited by ' + e.owner_email}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ''}`;
+  return `${kdy} — ${e.title} (id: ${e.id}, ${kdo}${kal}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ''}`;
+}
+// argumenty události, které jdou do těla 1:1 (title/day jsou u create povinné zvlášť)
+const EVENT_ARGS = ['time', 'end_day', 'end_time', 'note', 'participants', 'remind_before_min', 'calendar'];
+// 409 u zdroje nese kolidující rezervaci a první volný čas téhož dne — řekneme ho rovnou
+function kolizeText(e) {
+  const nf = e.json && e.json.next_free;
+  return nf ? `${e.message} Next free slot that day: ${nf.time}–${nf.end_time}.` : e.message;
+}
+function renderCalendar(c) {
+  const kdo = c.visibility === 'members' ? `, visible to: ${(c.members || []).join(', ') || 'creator only'}` : '';
+  return `${c.name} [${c.kind}] (id: ${c.id}${c.color ? ', ' + c.color : ''}, write: ${c.write_access}${kdo}${c.needs_approval ? ', time off needs approval' : ''}${c.archived ? ', archived' : ''})${c.description ? ` ↳ ${String(c.description).slice(0, 120)}` : ''}`;
+}
+function renderAway(x) {
+  return `${x.from}${x.to !== x.from ? ' → ' + x.to : ''} — ${x.email}: ${x.title} (${x.calendar}, event id: ${x.event_id})`;
 }
 
 server.registerTool('create_event', {
-  description: 'Create a personal calendar EVENT with a time (meeting, call, dentist…) — NOT a task and not part of any map. Optional participants (e-mails of instance members from list_people; each sees the event in their calendar) and a reminder N minutes before (in-app + e-mail). Times are the instance\'s local time.',
+  description: 'Create a calendar EVENT with a time (meeting, call, dentist…) — NOT a task and not part of any map. Personal by default; `calendar` (a name from list_calendars) puts it into a SHARED calendar: company events (kind shared), a room/car booking (kind resource — needs time; end_time defaults to +60 min; an overlapping booking is refused and the error names the next free slot) or time off (kind absence — all-day, end_day for a range, participants = who is away, default the key owner). Optional participants (e-mails of instance members from list_people; each sees the event in their calendar) and a reminder N minutes before (in-app + e-mail). Times are the instance\'s local time.',
   inputSchema: strict({
     title: z.string(),
     day: z.string().describe('YYYY-MM-DD'),
     time: z.string().optional().describe('HH:MM (24h); omit for an all-day event'),
+    end_day: z.string().optional().describe('YYYY-MM-DD; last day of a multi-day event (vacation)'),
+    end_time: z.string().optional().describe('HH:MM (24h); end of a timed event (room booking)'),
     note: z.string().optional(),
     participants: z.array(z.string()).optional().describe('e-mails of instance members'),
     remind_before_min: z.number().int().min(0).max(10080).optional().describe('reminder N minutes before start (0 = at start); omit for no reminder'),
+    calendar: z.string().optional().describe('name or id of a shared calendar (list_calendars); omit for a personal event'),
   }),
 }, async (a) => {
   try {
     const body = { title: a.title, day: a.day };
-    for (const k of ['time', 'note', 'participants', 'remind_before_min']) if (a[k] !== undefined) body[k] = a[k];
+    for (const k of EVENT_ARGS) if (a[k] !== undefined) body[k] = a[k];
     const r = await call('POST', '/api/kb/v1/events', body);
     return text(`Event created: ${renderEvent(r.event)}`);
-  } catch (e) { return errText(e.message); }
+  } catch (e) { return errText(kolizeText(e)); }
+});
+
+server.registerTool('update_event', {
+  description: 'Change an existing event by id: your own, one in a shared calendar as admin/manager, or your own time off. Only the given fields change; an empty string clears time, end_day, end_time or calendar (calendar "" = make it personal). Moving `day` of a multi-day event keeps its length. participants replaces the whole list; remind false cancels the reminder.',
+  inputSchema: strict({
+    event_id: z.string(),
+    title: z.string().optional(),
+    day: z.string().optional().describe('YYYY-MM-DD'),
+    time: z.string().optional().describe('HH:MM (24h); "" = all day'),
+    end_day: z.string().optional().describe('YYYY-MM-DD; "" = single day'),
+    end_time: z.string().optional().describe('HH:MM (24h); "" = no end time'),
+    note: z.string().optional(),
+    participants: z.array(z.string()).optional().describe('the complete new list of member e-mails'),
+    remind: z.boolean().optional().describe('false cancels the reminder'),
+    remind_before_min: z.number().int().min(0).max(10080).optional(),
+    calendar: z.string().optional().describe('name or id of a shared calendar; "" = personal'),
+  }),
+}, async (a) => {
+  try {
+    const body = {};
+    for (const k of EVENT_ARGS.concat(['title', 'day', 'remind'])) if (a[k] !== undefined) body[k] = a[k];
+    const r = await call('POST', `/api/kb/v1/events/${enc(a.event_id)}`, body);
+    return text(`Event updated: ${renderEvent(r.event)}`);
+  } catch (e) { return errText(kolizeText(e)); }
+});
+
+server.registerTool('delete_event', {
+  description: 'Delete an event by id (your own, or one in a shared calendar as admin/manager). If you were only invited, you leave the event instead and it stays for the others.',
+  inputSchema: strict({ event_id: z.string() }),
+}, async ({ event_id }) => {
+  try {
+    await call('POST', `/api/kb/v1/events/${enc(event_id)}/delete`, {});
+    return text('Event deleted.');
+  } catch (e) {
+    if (e.status !== 403) return errText(e.message);
+    try {
+      await call('POST', `/api/kb/v1/events/${enc(event_id)}/leave`, {});
+      return text('You left the event (it stays for the others).');
+    } catch (e2) { return errText(e2.message); }
+  }
 });
 
 server.registerTool('list_events', {
-  description: 'List the key owner\'s calendar events (own and invited) in a day range; default today−365 … +730. Read-only.',
+  description: 'List the calendar events the key owner sees — own, invited, and every event of the shared calendars — in a day range; default today−365 … +730. A multi-day event counts when it overlaps the range. Optional calendar = only that shared calendar. Read-only.',
+  inputSchema: strict({
+    from: z.string().optional().describe('YYYY-MM-DD'),
+    to: z.string().optional().describe('YYYY-MM-DD'),
+    calendar: z.string().optional().describe('name or id of a shared calendar'),
+  }),
+}, async ({ from, to, calendar }) => {
+  try {
+    const q = [from ? `from=${enc(from)}` : '', to ? `to=${enc(to)}` : '', calendar ? `calendar=${enc(calendar)}` : ''].filter(Boolean).join('&');
+    const r = await call('GET', `/api/kb/v1/events${q ? '?' + q : ''}`);
+    if (!r.events.length) return text(`No events between ${r.from} and ${r.to}.`);
+    return text(DATA_FENCE + '\n\n' + r.events.map((x) => `• ${renderEvent(x)}`).join('\n'));
+  } catch (e) { return errText(e.message); }
+});
+
+server.registerTool('list_calendars', {
+  description: 'List the shared calendars of the instance — company events (shared), rooms and other bookable things (resource), vacations and time off (absence) — with kind, color, who may add entries (write_access) and whether time off needs approval. Read-only.',
+  inputSchema: strict({}),
+}, async () => {
+  try {
+    const r = await call('GET', '/api/kb/v1/calendars');
+    if (!r.calendars.length) return text('No shared calendars yet — an admin or manager creates them (create_calendar).');
+    return text(DATA_FENCE + '\n\n' + r.calendars.map((c) => `• ${renderCalendar(c)}`).join('\n'));
+  } catch (e) { return errText(e.message); }
+});
+
+server.registerTool('create_calendar', {
+  description: 'Create a shared calendar (admin or manager only): kind shared = company events, resource = a room, car or other bookable thing (overlapping bookings are refused), absence = vacations and time off (needs_approval makes new entries wait for an admin/manager decision). visibility all = the whole team sees it (default); members = only the listed members (e-mails from list_people), and the creator — like a project shared with chosen people (an admin who is not listed does not see it either). write_access admins limits new entries to admins and managers. Archive a calendar to keep its history; delete_calendar removes it with all its events.',
+  inputSchema: strict({
+    name: z.string(),
+    kind: z.enum(['shared', 'resource', 'absence']),
+    color: z.string().optional().describe('#RRGGBB'),
+    description: z.string().optional(),
+    write_access: z.enum(['all', 'admins']).optional().describe('default all'),
+    needs_approval: z.boolean().optional().describe('absence only; default false'),
+    visibility: z.enum(['all', 'members']).optional().describe('default all'),
+    members: z.array(z.string()).optional().describe('member e-mails who see the calendar (visibility members)'),
+  }),
+}, async (a) => {
+  try {
+    const body = { name: a.name, kind: a.kind };
+    for (const k of ['color', 'description', 'write_access', 'needs_approval', 'visibility', 'members']) if (a[k] !== undefined) body[k] = a[k];
+    const r = await call('POST', '/api/kb/v1/calendars', body);
+    return text(`Calendar created: ${renderCalendar(r.calendar)}`);
+  } catch (e) { return errText(e.message); }
+});
+
+server.registerTool('delete_calendar', {
+  description: 'Delete a shared calendar by id or name together with ALL its events (admin or manager only). Cannot be undone — prefer archiving (not offered here) when the history should stay.',
+  inputSchema: strict({ calendar: z.string().describe('id or name') }),
+}, async ({ calendar }) => {
+  try {
+    const r = await call('GET', '/api/kb/v1/calendars');
+    const n = String(calendar || '').trim().toLowerCase();
+    const c = (r.calendars || []).find((x) => x.id === calendar) || (r.calendars || []).find((x) => String(x.name).toLowerCase() === n);
+    if (!c) return errText(`Calendar "${calendar}" not found (list_calendars).`);
+    const d = await call('POST', `/api/kb/v1/calendars/${enc(c.id)}/delete`, {});
+    return text(`Calendar "${c.name}" deleted together with ${d.events_deleted} event(s).`);
+  } catch (e) { return errText(e.message); }
+});
+
+server.registerTool('who_is_away', {
+  description: 'Who is away — time off from absence calendars that is approved or not subject to approval (pending and rejected requests are excluded) — in a day range; default today … +14. One line per person and absence. Read-only.',
   inputSchema: strict({
     from: z.string().optional().describe('YYYY-MM-DD'),
     to: z.string().optional().describe('YYYY-MM-DD'),
@@ -530,9 +654,9 @@ server.registerTool('list_events', {
 }, async ({ from, to }) => {
   try {
     const q = [from ? `from=${enc(from)}` : '', to ? `to=${enc(to)}` : ''].filter(Boolean).join('&');
-    const r = await call('GET', `/api/kb/v1/events${q ? '?' + q : ''}`);
-    if (!r.events.length) return text(`No events between ${r.from} and ${r.to}.`);
-    return text(DATA_FENCE + '\n\n' + r.events.map((x) => `• ${renderEvent(x)}`).join('\n'));
+    const r = await call('GET', `/api/kb/v1/away${q ? '?' + q : ''}`);
+    if (!r.away.length) return text(`Nobody is away between ${r.from} and ${r.to}.`);
+    return text(DATA_FENCE + '\n\n' + r.away.map((x) => `• ${renderAway(x)}`).join('\n'));
   } catch (e) { return errText(e.message); }
 });
 

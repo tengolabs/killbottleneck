@@ -2,7 +2,8 @@
   "nav": {
     "today": "Today",
     "delegated": "Assigned",
-    "notifications": "Inbox"
+    "notifications": "Inbox",
+    "calendar": "Calendar"
   },
   "today": {
     "title": "What I need to do today",
@@ -20,7 +21,8 @@
     "idea": "idea",
     "doneList": "Done today",
     "events": "Today in calendar",
-    "allDay": "all day"
+    "allDay": "all day",
+    "away": "Away today"
   },
   "delegated": {
     "title": "What I assigned",
@@ -70,5 +72,12 @@
     "today": "most important today",
     "tomorrow": "most important tomorrow"
   },
-  "homeLink": "Back to today's list"
+  "homeLink": "Back to today's list",
+  "calendar": {
+    "title": "Calendar for the week",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "empty": "Nothing in the calendar for the next 7 days and nobody is away.",
+    "hint": "Tap to open the detail in the full app; the assistant can add entries too."
+  }
 }

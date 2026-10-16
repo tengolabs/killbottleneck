@@ -47,5 +47,47 @@
     "ok": "Verified — the assistant reads images.",
     "notTested": "Not verified yet — save the settings or click Test an image.",
     "env": "Image reading is set by the operator (KB_VISION_* environment variables) — it cannot be changed here."
+  },
+  "kalendare": {
+    "title": "Shared calendars",
+    "desc": "Calendars that are not a person: company events, a meeting room or a car (bookings never overlap), vacations and time off. The whole team sees them; every member can add entries unless you limit it to admins. The assistant handles them (\"book the meeting room tomorrow at 10\", \"who is away next week\"). Never per user.",
+    "empty": "No shared calendars yet. Start with the presets.",
+    "presetFiremni": "Company",
+    "presetNepritomnosti": "Time off",
+    "presetZasedacka": "Meeting room",
+    "presetAdd": "Add \"{{name}}\"",
+    "colName": "Name",
+    "colKind": "Kind",
+    "colColor": "Color",
+    "colWrite": "Who adds entries",
+    "colApproval": "Approval",
+    "kind": {
+      "shared": "Company events",
+      "resource": "Room / resource",
+      "absence": "Time off"
+    },
+    "kindHint": {
+      "shared": "party, training, all-hands",
+      "resource": "bookings never overlap",
+      "absence": "vacation, sick day, home office"
+    },
+    "writeAll": "every member",
+    "writeAdmins": "admins and managers only",
+    "approvalOn": "time off needs an admin or manager",
+    "approvalOff": "no approval",
+    "archive": "Archive (events stay, the calendar leaves the menus)",
+    "restore": "Restore",
+    "showArchived": "Archived ({{count}})",
+    "hideArchived": "Hide archived",
+    "rename": "Rename",
+    "newBtn": "New calendar",
+    "create": "Create",
+    "saveFailed": "The calendar could not be saved.",
+    "colVisibility": "Who sees it",
+    "visAll": "whole team",
+    "visMembers": "selected only",
+    "membersCount": "selected members: {{count}} (edit)",
+    "delete": "Delete with its events (cannot be undone)",
+    "deleteConfirm": "really delete ({{count}} events)"
   }
 }

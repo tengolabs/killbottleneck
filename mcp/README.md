@@ -75,7 +75,7 @@ docker run -i --rm -e KB_URL=https://firma.killbottleneck.com -e KB_API_KEY=kb_u
 ## Vzdálené připojení (bez lokálního serveru)
 
 Každá instance vystavuje MCP i přímo na **`/mcp`** (Streamable HTTP, stateless,
-stejných 20 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
+stejných 26 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
 doméně — asistent se připojí odkudkoli, bez instalace čehokoli lokálně.
 
 **Claude Code:**
@@ -125,8 +125,14 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `delete_rule_template` | smazání šablony (autor nebo admin) |
 | `get_org_structure` | organizační struktura: pozice a funkce s držiteli a zástupci (jen čtení) |
 | `list_people` | lidé instance (členové + viditelné externí kontakty) — platné hodnoty `owner`; neznámý e-mail server odmítne |
-| `create_event` | událost v kalendáři (schůzka, zubař) s časem, pozvanými členy a připomínkou — NENÍ úkol, do mapy nepatří |
-| `list_events` | události vlastníka klíče (vlastní i pozvané) v rozsahu dní |
+| `create_event` | událost v kalendáři (schůzka, zubař) s časem, pozvanými členy a připomínkou — NENÍ úkol, do mapy nepatří; `calendar` ji dá do sdíleného kalendáře (firemní akce, rezervace místnosti s `end_time`, dovolená s `end_day`) |
+| `update_event` | úprava události (vlastní, ve sdíleném kalendáři jako správce/manažer, vlastní nepřítomnost) |
+| `delete_event` | smazání události; pozvaný se jí místo toho jen odhlásí |
+| `list_events` | události, které vlastník klíče vidí (vlastní, pozvané i všechny ze sdílených kalendářů) v rozsahu dní; `calendar` = jen jeden kalendář |
+| `list_calendars` | sdílené kalendáře instance: firemní (shared), místnosti a zdroje (resource), nepřítomnosti (absence) |
+| `create_calendar` | nový sdílený kalendář — jen správce/manažer; `visibility`/`members` = jen pro vybrané |
+| `delete_calendar` | smazání sdíleného kalendáře i s událostmi — jen správce/manažer, nejde vrátit |
+| `who_is_away` | kdo je kdy pryč (nepřítomnosti) v rozsahu dní, výchozí dnes…+14 |
 | `create_reminder` | časová připomínka k uzlu relativně k termínu (den před v HH:MM); termín nemění, jedna na uzel |
 | `get_portfolio` | pohled shora jako stránka Organizace: projekty s % hotovo, po termínu, nehýbe se, lidé, změny za 7 dní — nad týmovými a sdílenými mapami, které vlastník klíče vidí |
 

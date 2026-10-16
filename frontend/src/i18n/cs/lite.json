@@ -2,7 +2,8 @@
   "nav": {
     "today": "Dnes",
     "delegated": "Zadal jsem",
-    "notifications": "Zprávy"
+    "notifications": "Zprávy",
+    "calendar": "Kalendář"
   },
   "today": {
     "title": "Co mám dnes dělat",
@@ -20,7 +21,8 @@
     "idea": "nápad",
     "doneList": "Hotovo dnes",
     "events": "Dnes v kalendáři",
-    "allDay": "celý den"
+    "allDay": "celý den",
+    "away": "Dnes chybí"
   },
   "delegated": {
     "title": "Co jsem zadal",
@@ -70,5 +72,12 @@
     "today": "nejdůležitější dnes",
     "tomorrow": "nejdůležitější zítra"
   },
-  "homeLink": "Zpět na dnešní seznam"
+  "homeLink": "Zpět na dnešní seznam",
+  "calendar": {
+    "title": "Kalendář na týden",
+    "today": "Dnes",
+    "tomorrow": "Zítra",
+    "empty": "Příštích 7 dní nic v kalendáři a nikdo nechybí.",
+    "hint": "Klepnutím otevřete detail v celé aplikaci; zapisovat umí i asistent."
+  }
 }

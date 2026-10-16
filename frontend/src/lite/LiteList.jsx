@@ -202,10 +202,17 @@ export default function LiteList({ kind, day, failed, onReload, onChanged, onFai
               <div key={ev.id} className="flex items-center gap-3 px-4 py-2 text-sm border-b last:border-b-0">
                 <span className="w-12 shrink-0 tabular-nums text-xs font-semibold text-sky-700 dark:text-sky-300">{ev.time || t('today.allDay')}</span>
                 <span className="truncate">{ev.title}</span>
+                {ev.calendar && <span className="ml-auto text-[10px] rounded px-1 bg-secondary text-muted-foreground truncate max-w-[7rem]">{ev.calendar}</span>}
               </div>
             ))}
           </div>
         </section>
+      )}
+
+      {kind === 'today' && (day?.sections?.away || []).length > 0 && (
+        <p className="px-4 mb-4 text-xs text-muted-foreground" data-testid="lite-pryc">
+          <span className="font-semibold">{t('today.away')}:</span> {day.sections.away.map((a) => a.name || a.email).join(', ')}
+        </p>
       )}
 
       {groups.map((g) => (

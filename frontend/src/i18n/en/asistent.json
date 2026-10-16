@@ -129,6 +129,8 @@
     "list_documents": "documents",
     "get_document": "document",
     "list_events": "calendar",
+    "list_calendars": "shared calendars",
+    "who_is_away": "who is away",
     "get_week_review": "week review",
     "get_project_changes": "project changes",
     "get_person_work": "a colleague's work",

@@ -15,6 +15,21 @@ export const listUdalosti = (from, to) => {
   return kbSend(`/api/kb/events${s ? `?${s}` : ''}`, { method: 'GET' });
 };
 export const ulozUdalost = (body) => kbSend('/api/kb/events/save', { body });
+// sdílené kalendáře (týmový kalendář, 14. 10. 2026): firemní / zasedačka / nepřítomnosti;
+// zakládá a mění jen správce/manažer (routa to hlídá), seznam vidí každý člen
+export const listKalendare = () => kbSend('/api/kb/calendars', { method: 'GET' });
+export const ulozKalendar = (body) => kbSend('/api/kb/calendars/save', { body });
+// smazání i s událostmi (správce/manažer); archivace = ulozKalendar({ id, archived: true })
+export const smazKalendar = (id) => kbSend('/api/kb/calendars/delete', { body: { id } });
+// rozhodnutí o nepřítomnosti (schvalování zapnuté na kalendáři) — správce/manažer
+export const rozhodniNepritomnost = (id, decision, note) => kbSend('/api/kb/events/decide', { body: { id, decision, note: note || '' } });
+export const listKdoJePryc = (from, to) => {
+  const q = new URLSearchParams();
+  if (from) q.set('from', from);
+  if (to) q.set('to', to);
+  const s = q.toString();
+  return kbSend(`/api/kb/away${s ? `?${s}` : ''}`, { method: 'GET' });
+};
 export const smazUdalost = (id) => kbSend('/api/kb/events/delete', { body: { id } });
 // pozvaný se odebere sám (vlastník maže)
 export const opustUdalost = (id) => kbSend('/api/kb/events/leave', { body: { id } });

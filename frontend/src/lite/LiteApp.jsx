@@ -15,7 +15,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Send, Bell, Plus, ExternalLink, Palette, ArrowDown, X, Bot } from 'lucide-react';
+import { Sun, Moon, Send, Bell, Plus, ExternalLink, Palette, ArrowDown, X, Bot, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { fetchMyDay } from '@/api/myDay';
@@ -30,10 +30,13 @@ import LiteList from './LiteList';
 import SkinPattern from '@/components/shared/SkinPattern';
 import LiteNotifications from './LiteNotifications';
 import LiteQuickAdd from './LiteQuickAdd';
+import LiteKalendar from './LiteKalendar';
 
 const NAV = [
   { to: '/lite', end: true, key: 'today', icon: Sun },
   { to: '/lite/delegated', key: 'delegated', icon: Send },
+  // týmový kalendář (14. 10. 2026): agenda 7 dní jen ke čtení — firemní akce, rezervace, kdo je pryč
+  { to: '/lite/kalendar', key: 'calendar', icon: CalendarDays },
   { to: '/lite/inbox', key: 'notifications', icon: Bell },
 ];
 
@@ -189,6 +192,7 @@ export default function LiteApp() {
         <Route path="delegated" element={
           <LiteList kind="delegated" day={day} failed={failed} onReload={reload} onChanged={changed} onFailed={failedAction} />
         } />
+        <Route path="kalendar" element={<LiteKalendar />} />
         <Route path="inbox" element={<LiteNotifications />} />
         <Route path="*" element={<Navigate to="/lite" replace />} />
       </Routes>
@@ -269,7 +273,7 @@ export default function LiteApp() {
       {adding && <LiteQuickAdd onClose={() => setAdding(false)} onAdded={() => { setAdding(false); reload(); }} />}
 
       <nav className="fixed bottom-0 inset-x-0 z-20 border-t bg-card">
-        <div className="max-w-xl mx-auto grid grid-cols-3">
+        <div className="max-w-xl mx-auto grid grid-cols-4">
           {NAV.map((n) => (
             <NavLink
               key={n.key}

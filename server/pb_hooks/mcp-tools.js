@@ -244,19 +244,77 @@ const TOOLS = [
   },
   {
     name: "create_event",
-    description: "Create a personal calendar EVENT with a time (meeting, call, dentist…) — NOT a task and not part of any map. Optional participants (e-mails of instance members from list_people; each sees the event in their calendar) and a reminder N minutes before (in-app + e-mail). Times are the instance's local time.",
+    description: "Create a calendar EVENT with a time (meeting, call, dentist…) — NOT a task and not part of any map. Personal by default; `calendar` (a name from list_calendars) puts it into a SHARED calendar: company events (kind shared), a room/car booking (kind resource — needs time; end_time defaults to +60 min; an overlapping booking is refused and the error names the next free slot) or time off (kind absence — all-day, end_day for a range, participants = who is away, default the key owner). Optional participants (e-mails of instance members from list_people; each sees the event in their calendar) and a reminder N minutes before (in-app + e-mail). Times are the instance's local time.",
     inputSchema: { type: "object", properties: {
       title: { type: "string" },
       day: { type: "string", description: "YYYY-MM-DD" },
       time: { type: "string", description: "HH:MM (24h); omit for an all-day event" },
+      end_day: { type: "string", description: "YYYY-MM-DD; last day of a multi-day event (vacation)" },
+      end_time: { type: "string", description: "HH:MM (24h); end of a timed event (room booking)" },
       note: { type: "string" },
       participants: { type: "array", items: { type: "string" }, description: "e-mails of instance members" },
       remind_before_min: { type: "integer", minimum: 0, maximum: 10080, description: "reminder N minutes before start (0 = at start); omit for no reminder" },
+      calendar: { type: "string", description: "name or id of a shared calendar (list_calendars); omit for a personal event" },
     }, required: ["title", "day"], additionalProperties: false },
   },
   {
+    name: "update_event",
+    description: "Change an existing event by id: your own, one in a shared calendar as admin/manager, or your own time off. Only the given fields change; an empty string clears time, end_day, end_time or calendar (calendar \"\" = make it personal). Moving `day` of a multi-day event keeps its length. participants replaces the whole list; remind false cancels the reminder.",
+    inputSchema: { type: "object", properties: {
+      event_id: { type: "string" },
+      title: { type: "string" },
+      day: { type: "string", description: "YYYY-MM-DD" },
+      time: { type: "string", description: "HH:MM (24h); \"\" = all day" },
+      end_day: { type: "string", description: "YYYY-MM-DD; \"\" = single day" },
+      end_time: { type: "string", description: "HH:MM (24h); \"\" = no end time" },
+      note: { type: "string" },
+      participants: { type: "array", items: { type: "string" }, description: "the complete new list of member e-mails" },
+      remind: { type: "boolean", description: "false cancels the reminder" },
+      remind_before_min: { type: "integer", minimum: 0, maximum: 10080 },
+      calendar: { type: "string", description: "name or id of a shared calendar; \"\" = personal" },
+    }, required: ["event_id"], additionalProperties: false },
+  },
+  {
+    name: "delete_event",
+    description: "Delete an event by id (your own, or one in a shared calendar as admin/manager). If you were only invited, you leave the event instead and it stays for the others.",
+    inputSchema: { type: "object", properties: { event_id: { type: "string" } }, required: ["event_id"], additionalProperties: false },
+  },
+  {
     name: "list_events",
-    description: "List the key owner's calendar events (own and invited) in a day range; default today−365 … +730. Read-only.",
+    description: "List the calendar events the key owner sees — own, invited, and every event of the shared calendars — in a day range; default today−365 … +730. A multi-day event counts when it overlaps the range. Optional calendar = only that shared calendar. Read-only.",
+    inputSchema: { type: "object", properties: {
+      from: { type: "string", description: "YYYY-MM-DD" },
+      to: { type: "string", description: "YYYY-MM-DD" },
+      calendar: { type: "string", description: "name or id of a shared calendar" },
+    }, required: [], additionalProperties: false },
+  },
+  {
+    name: "list_calendars",
+    description: "List the shared calendars of the instance — company events (shared), rooms and other bookable things (resource), vacations and time off (absence) — with kind, color, who may add entries (write_access) and whether time off needs approval. Read-only.",
+    inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
+  },
+  {
+    name: "create_calendar",
+    description: "Create a shared calendar (admin or manager only): kind shared = company events, resource = a room, car or other bookable thing (overlapping bookings are refused), absence = vacations and time off (needs_approval makes new entries wait for an admin/manager decision). visibility all = the whole team sees it (default); members = only the listed members (e-mails from list_people), and the creator — like a project shared with chosen people (an admin who is not listed does not see it either). write_access admins limits new entries to admins and managers. Archive a calendar to keep its history; delete_calendar removes it with all its events.",
+    inputSchema: { type: "object", properties: {
+      name: { type: "string" },
+      kind: { type: "string", enum: ["shared", "resource", "absence"] },
+      color: { type: "string", description: "#RRGGBB" },
+      description: { type: "string" },
+      write_access: { type: "string", enum: ["all", "admins"], description: "default all" },
+      needs_approval: { type: "boolean", description: "absence only; default false" },
+      visibility: { type: "string", enum: ["all", "members"], description: "default all" },
+      members: { type: "array", items: { type: "string" }, description: "member e-mails who see the calendar (visibility members)" },
+    }, required: ["name", "kind"], additionalProperties: false },
+  },
+  {
+    name: "delete_calendar",
+    description: "Delete a shared calendar by id or name together with ALL its events (admin or manager only). Cannot be undone — prefer archiving (not offered here) when the history should stay.",
+    inputSchema: { type: "object", properties: { calendar: { type: "string", description: "id or name" } }, required: ["calendar"], additionalProperties: false },
+  },
+  {
+    name: "who_is_away",
+    description: "Who is away — time off from absence calendars that is approved or not subject to approval (pending and rejected requests are excluded) — in a day range; default today … +14. One line per person and absence. Read-only.",
     inputSchema: { type: "object", properties: {
       from: { type: "string", description: "YYYY-MM-DD" },
       to: { type: "string", description: "YYYY-MM-DD" },
@@ -328,10 +386,28 @@ function renderMap(m) {
 }
 // kompaktní řádek události (create/list_events)
 function renderEvent(e) {
-  const kdy = e.time ? `${e.day} ${e.time}` : `${e.day} (all day)`;
-  const parts = (e.participants || []).length ? `, participants: ${e.participants.join(", ")}` : "";
+  const konec = e.end_day ? ` → ${e.end_day}${e.end_time ? " " + e.end_time : ""}` : (e.end_time ? `–${e.end_time}` : "");
+  const kdy = e.time ? `${e.day} ${e.time}${konec}` : `${e.day}${konec} (all day)`;
+  const kdo = e.mine ? "mine" : (e.calendar_name ? "by " + e.owner_email : "invited by " + e.owner_email);
+  const away = e.kind === "absence" && (e.away || []).length ? `, away: ${e.away.join(", ")}` : "";
+  const kal = e.calendar_name ? `, calendar: ${e.calendar_name}${away}${e.status ? ", " + e.status : ""}` : "";
+  const parts = (e.participants || []).length && e.kind !== "absence" ? `, participants: ${e.participants.join(", ")}` : "";
   const rem = e.remind ? `, reminder ${e.remind_before_min} min before` : "";
-  return `${kdy} — ${e.title} (id: ${e.id}, ${e.mine ? "mine" : "invited by " + e.owner_email}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ""}`;
+  return `${kdy} — ${e.title} (id: ${e.id}, ${kdo}${kal}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ""}`;
+}
+// argumenty události, které jdou do těla 1:1 (title/day jsou u create povinné zvlášť)
+const EVENT_ARGS = ["time", "end_day", "end_time", "note", "participants", "remind_before_min", "calendar"];
+// 409 u zdroje nese kolidující rezervaci a první volný čas téhož dne — řekneme ho rovnou
+function kolizeText(e) {
+  const nf = e.json && e.json.next_free;
+  return nf ? `${e.message} Next free slot that day: ${nf.time}–${nf.end_time}.` : e.message;
+}
+function renderCalendar(c) {
+  const kdo = c.visibility === "members" ? `, visible to: ${(c.members || []).join(", ") || "creator only"}` : "";
+  return `${c.name} [${c.kind}] (id: ${c.id}${c.color ? ", " + c.color : ""}, write: ${c.write_access}${kdo}${c.needs_approval ? ", time off needs approval" : ""}${c.archived ? ", archived" : ""})${c.description ? ` ↳ ${String(c.description).slice(0, 120)}` : ""}`;
+}
+function renderAway(x) {
+  return `${x.from}${x.to !== x.from ? " → " + x.to : ""} — ${x.email}: ${x.title} (${x.calendar}, event id: ${x.event_id})`;
 }
 // kompaktní řádek pravidla pro LLM výstupy (create/list/update_rule)
 function renderRule(r) {
@@ -401,6 +477,7 @@ function vcall(auth, method, path, body) {
   if (res.statusCode < 200 || res.statusCode >= 300) {
     const err = new Error((res.json && res.json.error) || ("HTTP " + res.statusCode));
     err.status = res.statusCode;
+    err.json = res.json || null;
     throw err;
   }
   return res.json;
@@ -506,15 +583,60 @@ const EXEC = {
   },
   create_event: (auth, a) => {
     const body = { title: a.title, day: a.day };
-    for (const k of ["time", "note", "participants", "remind_before_min"]) if (a[k] !== undefined) body[k] = a[k];
-    const r = vcall(auth, "POST", "/api/kb/v1/events", body);
-    return text(`Event created: ${renderEvent(r.event)}`);
+    for (const k of EVENT_ARGS) if (a[k] !== undefined) body[k] = a[k];
+    try {
+      const r = vcall(auth, "POST", "/api/kb/v1/events", body);
+      return text(`Event created: ${renderEvent(r.event)}`);
+    } catch (e) { return errText(kolizeText(e)); }
+  },
+  update_event: (auth, a) => {
+    const body = {};
+    for (const k of EVENT_ARGS.concat(["title", "day", "remind"])) if (a[k] !== undefined) body[k] = a[k];
+    try {
+      const r = vcall(auth, "POST", `/api/kb/v1/events/${enc(a.event_id)}`, body);
+      return text(`Event updated: ${renderEvent(r.event)}`);
+    } catch (e) { return errText(kolizeText(e)); }
+  },
+  delete_event: (auth, a) => {
+    try {
+      vcall(auth, "POST", `/api/kb/v1/events/${enc(a.event_id)}/delete`, {});
+      return text("Event deleted.");
+    } catch (e) {
+      if (e.status !== 403) throw e;
+      vcall(auth, "POST", `/api/kb/v1/events/${enc(a.event_id)}/leave`, {});
+      return text("You left the event (it stays for the others).");
+    }
   },
   list_events: (auth, a) => {
-    const q = [a.from ? `from=${enc(a.from)}` : "", a.to ? `to=${enc(a.to)}` : ""].filter(Boolean).join("&");
+    const q = [a.from ? `from=${enc(a.from)}` : "", a.to ? `to=${enc(a.to)}` : "", a.calendar ? `calendar=${enc(a.calendar)}` : ""].filter(Boolean).join("&");
     const r = vcall(auth, "GET", `/api/kb/v1/events${q ? "?" + q : ""}`);
     if (!r.events.length) return text(`No events between ${r.from} and ${r.to}.`);
     return text(DATA_FENCE + "\n\n" + r.events.map((x) => `• ${renderEvent(x)}`).join("\n"));
+  },
+  list_calendars: (auth) => {
+    const r = vcall(auth, "GET", "/api/kb/v1/calendars");
+    if (!r.calendars.length) return text("No shared calendars yet — an admin or manager creates them (create_calendar).");
+    return text(DATA_FENCE + "\n\n" + r.calendars.map((c) => `• ${renderCalendar(c)}`).join("\n"));
+  },
+  create_calendar: (auth, a) => {
+    const body = { name: a.name, kind: a.kind };
+    for (const k of ["color", "description", "write_access", "needs_approval", "visibility", "members"]) if (a[k] !== undefined) body[k] = a[k];
+    const r = vcall(auth, "POST", "/api/kb/v1/calendars", body);
+    return text(`Calendar created: ${renderCalendar(r.calendar)}`);
+  },
+  delete_calendar: (auth, a) => {
+    const r = vcall(auth, "GET", "/api/kb/v1/calendars");
+    const n = String(a.calendar || "").trim().toLowerCase();
+    const c = (r.calendars || []).find((x) => x.id === a.calendar) || (r.calendars || []).find((x) => String(x.name).toLowerCase() === n);
+    if (!c) return errText(`Calendar "${a.calendar}" not found (list_calendars).`);
+    const d = vcall(auth, "POST", `/api/kb/v1/calendars/${enc(c.id)}/delete`, {});
+    return text(`Calendar "${c.name}" deleted together with ${d.events_deleted} event(s).`);
+  },
+  who_is_away: (auth, a) => {
+    const q = [a.from ? `from=${enc(a.from)}` : "", a.to ? `to=${enc(a.to)}` : ""].filter(Boolean).join("&");
+    const r = vcall(auth, "GET", `/api/kb/v1/away${q ? "?" + q : ""}`);
+    if (!r.away.length) return text(`Nobody is away between ${r.from} and ${r.to}.`);
+    return text(DATA_FENCE + "\n\n" + r.away.map((x) => `• ${renderAway(x)}`).join("\n"));
   },
   create_reminder: (auth, a) => {
     const r = vcall(auth, "POST", `/api/kb/v1/maps/${enc(a.map_id)}/nodes/${enc(a.node_id)}/reminders`,
@@ -703,4 +825,4 @@ function validujArgumenty(schema, args, toolName) {
 }
 
 // renderery a validátor sdílí i chat na boku (chat.js) — jedna podoba mapy pro LLM
-module.exports = { TOOLS, zpracujMcpPost, renderMap, renderRule, renderEvent, renderPortfolio, validujArgumenty, DATA_FENCE };
+module.exports = { TOOLS, zpracujMcpPost, renderMap, renderRule, renderEvent, renderCalendar, renderAway, renderPortfolio, validujArgumenty, DATA_FENCE };

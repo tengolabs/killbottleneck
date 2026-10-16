@@ -449,6 +449,19 @@ const STRINGS = {
     cs: "{by} vás pozval(a) na „{title}“ {day}{time}",
     en: "{by} invited you to \"{title}\" on {day}{time}",
   },
+  // ── nepřítomnost se schvalováním (týmový kalendář) ──
+  "notify.absenceRequested": {
+    cs: "{by} žádá o nepřítomnost: {who} {from}–{to} („{title}“) — posuďte v kalendáři",
+    en: "{by} requests time off: {who} {from}–{to} (\"{title}\") — review it in the calendar",
+  },
+  "notify.absenceApproved": {
+    cs: "{by} schválil(a) nepřítomnost {from}–{to} („{title}“){note}",
+    en: "{by} approved the time off {from}–{to} (\"{title}\"){note}",
+  },
+  "notify.absenceRejected": {
+    cs: "{by} zamítl(a) nepřítomnost {from}–{to} („{title}“){note}",
+    en: "{by} declined the time off {from}–{to} (\"{title}\"){note}",
+  },
 
   // ── agentní běhy (webhook → callback) ──
   "notify.agentDone": {
@@ -1007,6 +1020,58 @@ const STRINGS = {
     cs: "Událost smí měnit jen ten, kdo ji založil.",
     en: "Only the person who created the event can change it.",
   },
+  // ── týmový kalendář (sdílené kalendáře, konec události, nepřítomnosti) ──
+  "err.eventNotEditable": {
+    cs: "Tuhle událost nesmíte měnit — jen ten, kdo ji založil, nebo správce či manažer u sdíleného kalendáře.",
+    en: "You cannot change this event — only its creator, or an admin or manager for a shared calendar.",
+  },
+  "err.calendarNotFound": { cs: "Kalendář „{name}“ neexistuje. Seznam dá list_calendars.", en: "Calendar \"{name}\" does not exist. list_calendars gives the list." },
+  "err.calendarArchived": { cs: "Kalendář „{name}“ je archivovaný — nejde do něj zapisovat.", en: "Calendar \"{name}\" is archived — nothing can be added to it." },
+  "err.calendarWriteDenied": {
+    cs: "Do kalendáře „{name}“ zapisuje jen správce nebo manažer.",
+    en: "Only an admin or manager can add to the calendar \"{name}\".",
+  },
+  "err.calendarAdminOnly": {
+    cs: "Sdílené kalendáře zakládá a mění jen správce nebo manažer.",
+    en: "Only an admin or manager can create or change shared calendars.",
+  },
+  "err.calendarNameRequired": { cs: "Kalendář potřebuje název.", en: "The calendar needs a name." },
+  "err.calendarNameLong": { cs: "Název kalendáře je příliš dlouhý (max 80 znaků).", en: "Calendar name is too long (max 80 characters)." },
+  "err.calendarNameTaken": { cs: "Kalendář „{name}“ už existuje.", en: "A calendar named \"{name}\" already exists." },
+  "err.calendarKind": {
+    cs: "Druh kalendáře musí být shared (společné akce), resource (místnost, auto) nebo absence (dovolené, nepřítomnosti).",
+    en: "Calendar kind must be shared (common events), resource (room, car) or absence (vacations, time off).",
+  },
+  "err.calendarKindFixed": { cs: "Druh kalendáře se po založení nemění.", en: "Calendar kind cannot be changed after creation." },
+  "err.calendarColor": { cs: "Barva musí být #RRGGBB.", en: "Color must be #RRGGBB." },
+  "err.calendarDescriptionLong": { cs: "Popis kalendáře je příliš dlouhý (max 500 znaků).", en: "Calendar description is too long (max 500 characters)." },
+  "err.calendarWriteAccess": { cs: "write_access musí být all nebo admins.", en: "write_access must be all or admins." },
+  "err.calendarVisibility": { cs: "visibility musí být all (celý tým) nebo members (jen vybraní členové).", en: "visibility must be all (whole team) or members (selected members only)." },
+  "err.badEndDay": {
+    cs: "Konec „{value}“ není platné datum (RRRR-MM-DD).",
+    en: "End day \"{value}\" is not a valid date (YYYY-MM-DD).",
+  },
+  "err.endBeforeStart": {
+    cs: "Konec události ({end}) je před jejím začátkem ({start}).",
+    en: "The event ends ({end}) before it starts ({start}).",
+  },
+  "err.endTimeNeedsTime": {
+    cs: "Konec s časem (end_time) jde jen u události, která má čas začátku (time).",
+    en: "An end time (end_time) requires a start time (time).",
+  },
+  "err.resourceNeedsTime": {
+    cs: "Rezervace v kalendáři „{name}“ potřebuje čas začátku (time) — místnost se rezervuje na hodiny, ne na celý den.",
+    en: "A booking in \"{name}\" needs a start time (time) — resources are booked by the hour, not for a whole day.",
+  },
+  "err.absenceNotAbsence": { cs: "Tohle není nepřítomnost — schvalují se jen záznamy v kalendáři nepřítomností.", en: "This is not time off — only entries in an absence calendar are approved." },
+  "err.absenceNotPending": { cs: "Tahle nepřítomnost schválení nepotřebuje (kalendář má schvalování vypnuté).", en: "This time off needs no approval (the calendar has approval switched off)." },
+  "err.absenceDecision": { cs: "Rozhodnutí musí být approved (schválit) nebo rejected (zamítnout).", en: "The decision must be approved or rejected." },
+  "err.absenceDecideAdminOnly": { cs: "Nepřítomnost schvaluje jen správce nebo manažer.", en: "Only an admin or manager can approve time off." },
+  "err.absenceNoteLong": { cs: "Poznámka k rozhodnutí je příliš dlouhá (max 500 znaků).", en: "The decision note is too long (max 500 characters)." },
+  "err.eventCollision": {
+    cs: "„{name}“ je v tu dobu obsazená: „{title}“ {from}–{to}.",
+    en: "\"{name}\" is already booked then: \"{title}\" {from}–{to}.",
+  },
   "err.eventTitleRequired": { cs: "Událost potřebuje název.", en: "The event needs a title." },
   "err.eventTitleLong": { cs: "Název události je příliš dlouhý (max 200 znaků).", en: "Event title is too long (max 200 characters)." },
   "err.eventNoteLong": { cs: "Poznámka je příliš dlouhá (max 2000 znaků).", en: "Note is too long (max 2000 characters)." },
@@ -1049,6 +1114,9 @@ const STRINGS = {
     cs: "Uzel je hotový nebo je projekt archivovaný — připomínka by už nepřišla.",
     en: "The node is done or the project is archived — the reminder would never arrive.",
   },
+  "err.calendarLimit": { cs: "Příliš mnoho sdílených kalendářů (strop {max}). Archivujte nebo smažte staré.", en: "Too many shared calendars (limit {max}). Archive or delete old ones." },
+  "err.eventNotParticipant": { cs: "Na tuto událost nejste pozváni, není co opustit.", en: "You are not invited to this event, nothing to leave." },
+  "err.absenceForOtherAdminOnly": { cs: "Nepřítomnost za kolegu zapisuje jen správce nebo manažer.", en: "Only an admin or manager can enter time off for a colleague." },
   "err.eventLimit": { cs: "Příliš mnoho událostí (strop {max}). Smažte staré.", en: "Too many events (limit {max}). Delete old ones." },
   "err.noWriteAccess": {
     cs: "K téhle mapě nemáte právo zápisu.",
@@ -1141,8 +1209,16 @@ const STRINGS = {
     en: "A reminder (\"{key}\") is not a node field and does not change the deadline. Create a timed reminder via POST /v1/maps/{id}/nodes/{nodeId}/reminders (offset_days, time HH:MM) or MCP create_reminder; an untimed alert for a whole map is a create_rule with trigger deadline_approaching.",
   },
   "hint.event": {
-    cs: "Schůzka/událost („{key}“) není uzel mapy — založte ji přes POST /v1/events (title, day, time, participants, remind_before_min) nebo MCP create_event.",
-    en: "A meeting/event (\"{key}\") is not a map node — create it via POST /v1/events (title, day, time, participants, remind_before_min) or MCP create_event.",
+    cs: "Schůzka/událost („{key}“) není uzel mapy — založte ji přes POST /v1/events (title, day, time, end_time, participants, remind_before_min, calendar) nebo MCP create_event.",
+    en: "A meeting/event (\"{key}\") is not a map node — create it via POST /v1/events (title, day, time, end_time, participants, remind_before_min, calendar) or MCP create_event.",
+  },
+  "hint.calendar": {
+    cs: "Místnost, zdroj nebo dovolená („{key}“) = událost ve SDÍLENÉM kalendáři: pole calendar (název nebo id z GET /v1/calendars / MCP list_calendars); místnost potřebuje time (+ end_time), dovolená end_day pro rozsah dní a participants = kdo je pryč.",
+    en: "A room, resource or vacation (\"{key}\") is an event in a SHARED calendar: field calendar (name or id from GET /v1/calendars / MCP list_calendars); a room needs time (+ end_time), time off takes end_day for a range and participants = who is away.",
+  },
+  "hint.end": {
+    cs: "Konec události („{key}“) se zapisuje jako end_time (HH:MM, týž den) a end_day (RRRR-MM-DD, poslední den vícedenní události).",
+    en: "The end of an event (\"{key}\") is end_time (HH:MM, same day) and end_day (YYYY-MM-DD, last day of a multi-day event).",
   },
   "hint.deadline": {
     cs: "Termín se jmenuje deadline (RRRR-MM-DD), ne „{key}“.",

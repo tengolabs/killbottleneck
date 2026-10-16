@@ -223,6 +223,16 @@ onRecordCreateRequest((e) => {
   } catch (err) {
     try { e.app.logger().warn("uvodni_mapa: hook selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
+  // První správce instance dostane výchozí sdílené kalendáře (Firemní, Nepřítomnosti),
+  // aby tým i asistent („zapiš mi dovolenou“) měli kam psát hned; detail events-api.js.
+  if (isFirst) {
+    try {
+      const E = require(`${__hooks}/events-api.js`);
+      E.zalozVychoziKalendare(e.app, e.record);
+    } catch (err) {
+      try { e.app.logger().warn("vychozi_kalendare: hook selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
 }, "users");
 
 // E-mail malými písmeny i při KAŽDÉ ZMĚNĚ účtu (kontrolní panel 31. 8. 2026):
@@ -4214,6 +4224,36 @@ kbRoute("POST", "/import-all", (e) => {
       out.ideas_imported++;
     } catch (err) { /* nápad, který neprojde, se přeskočí */ }
   }
+  // sdílené kalendáře (14. 10. 2026): podle názvu, jen správce/manažer; existující se nepřepisují
+  const E = require(`${__hooks}/events-api.js`);
+  const { jeAdminNeboManazer } = require(`${__hooks}/helpers.js`);
+  out.calendars_imported = 0; out.calendars_skipped = 0;
+  const kalendare = (Array.isArray(info.calendars) ? info.calendars : []).slice(0, 100);
+  for (const c of kalendare) {
+    const name = String((c && c.name) || "").trim().slice(0, 80);
+    if (!name) { out.calendars_skipped++; continue; }
+    if (!jeAdminNeboManazer(e.auth) || E.kalendarZaznam($app, name, { presne: true })) { out.calendars_skipped++; continue; }
+    const r = E.saveCalendar($app, e.auth, null, { name: name, kind: c.kind, color: c.color || "", description: c.description || "", write_access: c.write_access || "all", needs_approval: !!c.needs_approval, visibility: c.visibility || "all", members: Array.isArray(c.members) ? c.members.filter((p) => { try { return !!$app.findFirstRecordByFilter("users", "email = {:e}", { e: String(p) }); } catch (err) { return false; } }) : [] }, { lang: L });
+    if (r.status === 200) out.calendars_imported++; else out.calendars_skipped++;
+  }
+  // události: jen VLASTNÍ (cizí, kam mě pozvali nebo firemní od kolegů, by se zdvojily, až je naimportuje autor);
+  // kalendář podle názvu (neznámý = osobní), neznámí účastníci se vynechají, bez notifikací
+  out.events_imported = 0; out.events_skipped = 0;
+  const udalosti = (Array.isArray(info.events) ? info.events : []).slice(0, 2000);
+  const jaEmail = e.auth.email();
+  for (const ev of udalosti) {
+    if (!ev || !ev.title || !ev.day || (ev.owner_email && ev.owner_email !== jaEmail)) { out.events_skipped++; continue; }
+    const body = { title: ev.title, day: ev.day, time: ev.time || "", end_day: ev.end_day || "", end_time: ev.end_time || "", note: ev.note || "",
+      remind: !!ev.remind, remind_before_min: Number(ev.remind_before_min) || 0 };
+    const cal = ev.calendar_name ? E.kalendarZaznam($app, ev.calendar_name, { user: e.auth, presne: true }) : null;
+    if (cal) body.calendar = cal.id;
+    const lide = Array.isArray(ev.participants) ? ev.participants : (Array.isArray(ev.away) ? ev.away : []);
+    body.participants = lide.filter((p) => { try { return !!$app.findFirstRecordByFilter("users", "email = {:e}", { e: String(p) }); } catch (err) { return false; } });
+    try {
+      const r = E.saveEvent($app, e.auth, null, body, { lang: L, tise: true });
+      if (r.status === 200) out.events_imported++; else out.events_skipped++;
+    } catch (err) { out.events_skipped++; }
+  }
   return e.json(200, out);
 }, $apis.requireAuth());
 
@@ -4434,6 +4474,20 @@ kbRoute("POST", "/events/delete", (e) => {
   return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
+// rozhodnutí o nepřítomnosti (schvalování zapnuté na kalendáři) — správce/manažer
+kbRoute("POST", "/events/decide", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang, t } = require(`${__hooks}/i18n.js`);
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const L = userLang(e.auth);
+  if (minuteLimitHit($app.store(), "evsave:" + e.auth.id, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const info = e.requestInfo().body || {};
+  const f = E.findEvent($app, info.id, e.auth, L);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = E.decideAbsence($app, e.auth, f.rec, info, { lang: L });
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
 // pozvaný se z události odebere sám (vlastník ji maže, ne opouští)
 kbRoute("POST", "/events/leave", (e) => {
   const E = require(`${__hooks}/events-api.js`);
@@ -4442,6 +4496,54 @@ kbRoute("POST", "/events/leave", (e) => {
   const f = E.findEvent($app, (e.requestInfo().body || {}).id, e.auth, L);
   if (f.error) return e.json(f.error.status, f.error.body);
   const r = E.leaveEvent($app, e.auth, f.rec, L);
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+// ---------- SDÍLENÉ KALENDÁŘE (týmový kalendář, 14. 10. 2026) ----------
+// Seznam vidí každý člen (vč. archivovaných — UI je schová, filtr si je pamatuje);
+// zakládá a mění jen admin/manager (jádro saveCalendar). Archivace = /calendars/save {archived:true}; smazání i s událostmi = /calendars/delete.
+kbRoute("GET", "/calendars", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const r = E.listCalendars($app, e.auth);
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+kbRoute("POST", "/calendars/save", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang, t } = require(`${__hooks}/i18n.js`);
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const L = userLang(e.auth);
+  if (minuteLimitHit($app.store(), "calsave:" + e.auth.id, 30)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const info = e.requestInfo().body || {};
+  let rec = null;
+  if (info.id) {
+    rec = E.kalendarZaznam($app, info.id, { jenId: true });
+    if (!rec) return e.json(404, { error: t(L, "err.calendarNotFound", { name: String(info.id).slice(0, 80) }) });
+  }
+  const r = E.saveCalendar($app, e.auth, rec, info, { lang: L });
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+// smazání kalendáře i s jeho událostmi — správce/manažer (archivace = /calendars/save {archived:true})
+kbRoute("POST", "/calendars/delete", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang, t } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const info = e.requestInfo().body || {};
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  if (minuteLimitHit($app.store(), "calsave:" + e.auth.id, 30)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const rec = E.kalendarZaznam($app, info.id, { jenId: true });
+  if (!rec) return e.json(404, { error: t(L, "err.calendarNotFound", { name: String(info.id || "").slice(0, 80) }) });
+  const r = E.deleteCalendar($app, e.auth, rec, L);
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+// kdo je pryč (nepřítomnosti v okně dní; výchozí dnes…+14) — vidí každý člen,
+// stejně jako sdílený kalendář sám
+kbRoute("GET", "/away", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const q = e.requestInfo().query || {};
+  const r = E.listAway($app, q, e.auth);
   return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
@@ -5430,7 +5532,7 @@ kbRoute("GET", "/v1/events", (e) => {
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
   const q = e.requestInfo().query || {};
-  const r = E.listEvents($app, a.user, { from: q.from, to: q.to });
+  const r = E.listEvents($app, a.user, { from: q.from, to: q.to, calendar: q.calendar });
   return e.json(r.status, r.body);
 });
 
@@ -5472,6 +5574,21 @@ kbRoute("POST", "/v1/events/{id}/delete", (e) => {
   return e.json(r.status, r.body);
 });
 
+// rozhodnutí o nepřítomnosti: {decision: approved|rejected, note?} — správce/manažer (asistent tudy dočasným klíčem)
+kbRoute("POST", "/v1/events/{id}/decide", (e) => {
+  const { apiKeyAuth, unknownFieldsError, V1_BODY_FIELDS } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  const badBody = unknownFieldsError(info, V1_BODY_FIELDS.absenceDecision, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const f = E.findEvent($app, e.request.pathValue("id"), a.user, a.lang);
+  if (f.error) return e.json(f.error.status, f.error.body);
+  const r = E.decideAbsence($app, a.user, f.rec, info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
 kbRoute("POST", "/v1/events/{id}/leave", (e) => {
   const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
   const E = require(`${__hooks}/events-api.js`);
@@ -5480,6 +5597,66 @@ kbRoute("POST", "/v1/events/{id}/leave", (e) => {
   const f = E.findEvent($app, e.request.pathValue("id"), a.user, a.lang);
   if (f.error) return e.json(f.error.status, f.error.body);
   const r = E.leaveEvent($app, a.user, f.rec, a.lang);
+  return e.json(r.status, r.body);
+});
+
+// ---------- v1: SDÍLENÉ KALENDÁŘE + kdo je pryč (týmový kalendář, 14. 10. 2026) ----------
+kbRoute("GET", "/v1/calendars", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const r = E.listCalendars($app, a.user);
+  return e.json(r.status, r.body);
+});
+
+// založení: {name, kind: shared|resource|absence, color?, description?, write_access?, needs_approval?} — jen admin/manager
+kbRoute("POST", "/v1/calendars", (e) => {
+  const { apiKeyAuth, unknownFieldsError, V1_BODY_FIELDS } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  const badBody = unknownFieldsError(info, V1_BODY_FIELDS.calendar, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const r = E.saveCalendar($app, a.user, null, info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
+kbRoute("POST", "/v1/calendars/{id}", (e) => {
+  const { apiKeyAuth, unknownFieldsError, V1_BODY_FIELDS } = require(`${__hooks}/helpers.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  const badBody = unknownFieldsError(info, V1_BODY_FIELDS.calendar, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const rec = E.kalendarZaznam($app, e.request.pathValue("id"), { jenId: true });
+  if (!rec) return e.json(404, { error: t(a.lang, "err.calendarNotFound", { name: String(e.request.pathValue("id")).slice(0, 80) }) });
+  const r = E.saveCalendar($app, a.user, rec, info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
+kbRoute("POST", "/v1/calendars/{id}/delete", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const rec = E.kalendarZaznam($app, e.request.pathValue("id"), { jenId: true });
+  if (!rec) return e.json(404, { error: t(a.lang, "err.calendarNotFound", { name: String(e.request.pathValue("id")).slice(0, 80) }) });
+  const r = E.deleteCalendar($app, a.user, rec, a.lang);
+  return e.json(r.status, r.body);
+});
+
+kbRoute("GET", "/v1/away", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const q = e.requestInfo().query || {};
+  const r = E.listAway($app, { from: q.from, to: q.to }, a.user);
   return e.json(r.status, r.body);
 });
 

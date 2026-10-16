@@ -47,5 +47,47 @@
     "ok": "Ověřeno — asistent čte obrázky.",
     "notTested": "Zatím neověřeno — uložte nastavení nebo klikněte na Otestovat obrázek.",
     "env": "Čtení obrázků nastavil provozovatel (proměnné prostředí KB_VISION_*) — tady se nemění."
+  },
+  "kalendare": {
+    "title": "Sdílené kalendáře",
+    "desc": "Kalendáře, které nejsou osoba: společné akce firmy, zasedací místnost nebo auto (rezervace se nepřekrývají), dovolené a nepřítomnosti. Vidí je celý tým; zapisovat může každý člen, pokud to nezúžíte na správce. Asistent je umí obsluhovat („zarezervuj zasedačku zítra v 10“, „kdo je příští týden pryč“). Za lidi se neplatí.",
+    "empty": "Zatím žádný sdílený kalendář. Začněte předvolbami.",
+    "presetFiremni": "Firemní",
+    "presetNepritomnosti": "Nepřítomnosti",
+    "presetZasedacka": "Zasedací místnost",
+    "presetAdd": "Přidat „{{name}}“",
+    "colName": "Název",
+    "colKind": "Druh",
+    "colColor": "Barva",
+    "colWrite": "Kdo zapisuje",
+    "colApproval": "Schvalování",
+    "kind": {
+      "shared": "Společné akce",
+      "resource": "Místnost / zdroj",
+      "absence": "Nepřítomnosti"
+    },
+    "kindHint": {
+      "shared": "večírek, školení, porada celé firmy",
+      "resource": "rezervace se nepřekrývají",
+      "absence": "dovolená, nemoc, home office"
+    },
+    "writeAll": "každý člen",
+    "writeAdmins": "jen správce a manažer",
+    "approvalOn": "nepřítomnosti schvaluje správce nebo manažer",
+    "approvalOff": "bez schvalování",
+    "archive": "Archivovat (události zůstanou, kalendář zmizí z nabídky)",
+    "restore": "Obnovit",
+    "showArchived": "Archivované ({{count}})",
+    "hideArchived": "Skrýt archivované",
+    "rename": "Přejmenovat",
+    "newBtn": "Nový kalendář",
+    "create": "Založit",
+    "saveFailed": "Kalendář se nepodařilo uložit.",
+    "colVisibility": "Kdo vidí",
+    "visAll": "celý tým",
+    "visMembers": "jen vybraní",
+    "membersCount": "vybraní členové: {{count}} (upravit)",
+    "delete": "Smazat i s událostmi (nejde vrátit)",
+    "deleteConfirm": "opravdu smazat ({{count}} událostí)"
   }
 }

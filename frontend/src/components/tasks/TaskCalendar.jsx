@@ -2,27 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
 import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Diamond,
-  CheckSquare,
-  ArrowUpRight,
-  CalendarCheck2,
-  Check,
-  ListFilter,
-  Search,
-  X,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  FolderKanban,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Sparkles,
-  CalendarClock,
-  Bell,
+  CalendarDays, ChevronLeft, ChevronRight, Plus, Diamond, CheckSquare, ArrowUpRight, CalendarCheck2, Check, ListFilter, Search, X, Clock, AlertTriangle, CheckCircle2, FolderKanban, PanelLeftClose, PanelLeftOpen, Sparkles, CalendarClock, Bell, Plane, DoorOpen, Building2, Users, Pencil,
 } from 'lucide-react';
 import { STATUSES, statusConfig } from '@/lib/statusMeta';
 import { intlLocale } from '@/lib/locale';
@@ -33,6 +13,9 @@ import { dateKey, parseDateKey, monthDays, weekDays, movePeriod, addDays } from 
 import { useKalendarDnd } from './kalendar/useKalendarDnd';
 import { DenCil, Tazitelny } from './kalendar/dnd';
 import { useMedia } from '@/lib/useMedia';
+import { labelForEmail } from '@/lib/memberLabel';
+import { lazy, Suspense } from 'react';
+const DialogNovyKalendar = lazy(() => import('./kalendar/DialogNovyKalendar'));
 import './TaskCalendar.css';
 
 // Mobil (< 640 px): Měsíc = tečky + klepnutí na den otevře detail dne, Týden =
@@ -62,8 +45,12 @@ const PROJECT_PALETTE = [
 // pseudo-projekt „Osobní“ (jeden řádek, vlastní barva), aby šly schovat jako mapy.
 export const OSOBNI = '__osobni';
 const OSOBNI_BARVA = '#0ea5e9';
+// Sdílené kalendáře (týmový kalendář, 14. 10. 2026): firemní akce / zasedačka / nepřítomnosti —
+// barva kalendáře, nebo výchozí podle druhu. Skryté kalendáře si prohlížeč pamatuje (kb-calendar-hidden-cals).
+const DRUH_BARVA = { shared: '#6366f1', resource: '#f97316', absence: '#14b8a6' };
+const nactiSkryteKalendare = () => { try { return new Set(JSON.parse(nactiKlic('kb-calendar-hidden-cals') || '[]')); } catch { return new Set(); } };
 
-export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, onPresun, kontextPresunu, pripominky }) {
+export default function TaskCalendar({ items = [], maps = [], kalendare = [], members = [], userRole = '', userEmail = '', onOpen, onCreate, onPresun, kontextPresunu, pripominky }) {
   // texty kalendáře v2 = líný ns `kalendar` (tasks.json se veze do lite — strop 510 kB);
   // z `tasks` zůstává jen společné calendar.more/dow/todayButton (sdílí TaskTimeline) a tasksPage.*
   const { t } = useTranslation('kalendar');
@@ -88,6 +75,24 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   const [visibleStatuses, setVisibleStatuses] = useState(() => new Set(STATUSES.map((s) => s.value)));
   // Skryté projekty (prázdná množina = vše vidět) — nová mapa je tak viditelná bez synchronizace.
   const [hiddenProjects, setHiddenProjects] = useState(() => new Set());
+  const [hiddenCals, setHiddenCals] = useState(nactiSkryteKalendare);
+  const toggleCal = (id) => setHiddenCals((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    ulozKlic('kb-calendar-hidden-cals', JSON.stringify(Array.from(next)));
+    return next;
+  });
+  const kalendareAktivni = useMemo(() => kalendare.filter((c) => !c.archived), [kalendare]);
+  // nový sdílený kalendář rovnou z panelu (Richard 15. 10. 2026: „sám si nemůžu založit sdílený kalendář?“) —
+  // správce i manažer; server práva hlídá (403), zápis realtime obnoví seznam
+  const smiZakladat = userRole === 'admin' || userRole === 'manager';
+  const [novyKalOpen, setNovyKalOpen] = useState(false);
+  const [upravaKal, setUpravaKal] = useState(null); // kalendář v editaci (tužka u řádku)
+  const kalendarMeta = useMemo(() => {
+    const meta = {};
+    for (const c of kalendare) meta[c.id] = { title: c.name, color: c.color || DRUH_BARVA[c.kind] || OSOBNI_BARVA, kind: c.kind };
+    return meta;
+  }, [kalendare]);
 
   // Day popover / modal state
   const [activeDayModalKey, setActiveDayModalKey] = useState(null);
@@ -111,16 +116,16 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
   }, [maps, t]);
 
   const getProjectName = useCallback((item) => {
-    if (item.kind === 'event') return t('v2.personal');
+    if (item.kind === 'event') return item.calendar ? (kalendarMeta[item.calendar]?.title || item.calendar_name || t('v2.kalendare')) : t('v2.personal');
     const mapId = item.raw?.map_id;
     return projectMeta[mapId]?.title || t('v2.noProject');
-  }, [projectMeta, t]);
+  }, [projectMeta, kalendarMeta, t]);
 
   const getProjectColor = useCallback((item) => {
-    if (item.kind === 'event') return OSOBNI_BARVA;
+    if (item.kind === 'event') return item.calendar ? (kalendarMeta[item.calendar]?.color || DRUH_BARVA[item.druh] || OSOBNI_BARVA) : OSOBNI_BARVA;
     const mapId = item.raw?.map_id;
     return projectMeta[mapId]?.color || '#64748b';
-  }, [projectMeta]);
+  }, [projectMeta, kalendarMeta]);
   const jeUdalost = (item) => item.kind === 'event';
   // uzel s mou připomínkou → zvoneček na chipu (pripominky = Map "<mapId>:<nodeId>")
   const maPripominku = useCallback((item) => item.kind === 'node' && !!pripominky?.get?.(`${item.map_id}:${item.node_id}`), [pripominky]);
@@ -158,7 +163,8 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
     return validItems.filter((item) => {
       // událost nemá stav — řídí ji jen filtr „Osobní“ a hledání
       if (jeUdalost(item)) {
-        if (!jeVidetUdalosti) return false;
+        // událost ve sdíleném kalendáři řídí řádek toho kalendáře; osobní řádek „Události“
+        if (item.calendar ? hiddenCals.has(item.calendar) : !jeVidetUdalosti) return false;
       } else {
         // Status filter
         const st = item.status in STATUS_COLORS ? item.status : 'todo';
@@ -178,7 +184,7 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
 
       return true;
     });
-  }, [validItems, visibleStatuses, hiddenProjects, jeVidetUdalosti, searchQuery, getProjectName]);
+  }, [validItems, visibleStatuses, hiddenProjects, hiddenCals, jeVidetUdalosti, searchQuery, getProjectName]);
 
   // Group items by deadline day
   const byDay = useMemo(() => {
@@ -231,9 +237,22 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
     maps.forEach((m) => {
       counts[m.id] = validItems.filter((item) => periodKeys.has(item.deadline) && item.raw?.map_id === m.id).length;
     });
-    counts[OSOBNI] = validItems.filter((item) => periodKeys.has(item.deadline) && jeUdalost(item)).length;
+    counts[OSOBNI] = validItems.filter((item) => periodKeys.has(item.deadline) && jeUdalost(item) && !item.calendar).length;
+    for (const c of kalendare) counts[c.id] = validItems.filter((item) => periodKeys.has(item.deadline) && item.calendar === c.id).length;
     return counts;
-  }, [maps, validItems, periodKeys]);
+  }, [maps, kalendare, validItems, periodKeys]);
+
+  // Kdo je pryč (nepřítomnosti) podle dne — pruh v Týdnu a Dni; respektuje filtr kalendářů
+  const prycPodleDne = useMemo(() => {
+    const m = {};
+    for (const item of filteredItems) {
+      if (!jeUdalost(item) || item.druh !== 'absence' || item.stav === 'rejected' || item.stav === 'requested') continue;
+      const lide = item.away && item.away.length ? item.away : (item.created_by ? [item.created_by] : []);
+      for (const e of lide) { (m[item.deadline] ||= new Set()).add(e); }
+    }
+    return m;
+  }, [filteredItems]);
+  const prycText = useCallback((den) => Array.from(prycPodleDne[den] || []).map((e) => labelForEmail(members, e) || e), [prycPodleDne, members]);
 
   // Overdue count
   const overdueCount = useMemo(() => {
@@ -374,12 +393,15 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
         data-tazitelny={h ? !h.disabled : undefined}
         data-testid={`gcal-chip-${item.key}`}
         data-kind={item.kind}
+        data-druh={item.druh || undefined}
+        data-prvni={item.end_day ? item.prvni : undefined}
+        data-posledni={item.end_day ? item.posledni : undefined}
         onClick={(e) => {
           e.stopPropagation();
           onOpen?.(item);
         }}
         title={jeUdalost(item)
-          ? `${item.time ? item.time + ' ' : ''}${item.title} · ${getProjectName(item)}`
+          ? `${item.time ? item.time + (item.end_time ? '–' + item.end_time : '') + ' ' : ''}${item.title} · ${getProjectName(item)}${item.druh === 'absence' && item.away?.length ? ' · ' + item.away.map((e) => labelForEmail(members, e) || e).join(', ') : ''}`
           : `${item.title} · ${getProjectName(item)} · ${(statusConfig[item.status] || statusConfig.todo).label}${isOverdue ? ` (${t('v2.overdue')})` : ''}`}
         {...(h?.props || {})}
       >
@@ -387,7 +409,7 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
           {isDone ? (
             <Check size={11} strokeWidth={2.8} />
           ) : jeUdalost(item) ? (
-            <CalendarClock size={10} strokeWidth={2.4} />
+            item.druh === 'absence' ? <Plane size={10} strokeWidth={2.4} /> : item.druh === 'resource' ? <DoorOpen size={10} strokeWidth={2.4} /> : item.druh === 'shared' ? <Building2 size={10} strokeWidth={2.4} /> : <CalendarClock size={10} strokeWidth={2.4} />
           ) : item.kind === 'node' ? (
             <Diamond size={10} strokeWidth={2.4} />
           ) : (
@@ -395,8 +417,8 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
           )}
         </span>
 
-        {item.time && <span className="gcal-chip-time">{item.time}</span>}
-        <span className="gcal-chip-title">{item.title}</span>
+        {item.time && <span className="gcal-chip-time">{item.time}{item.end_time && !item.end_day ? `–${item.end_time}` : ''}</span>}
+        <span className="gcal-chip-title">{item.druh === 'absence' && item.away?.length ? `${item.away.map((e) => labelForEmail(members, e) || e).join(', ')}: ` : ''}{item.title}</span>
         {maPripominku(item) && (
           <span className="gcal-chip-bell" title={t('pripominka.chipTitle')} data-testid="gcal-chip-zvonek"><Bell size={9} strokeWidth={2.6} /></span>
         )}
@@ -747,6 +769,46 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
               </div>
             </div>
 
+            {/* Sdílené kalendáře (týmový kalendář): firemní / zasedačka / nepřítomnosti */}
+            {(kalendareAktivni.length > 0 || smiZakladat) && (
+              <div className="gcal-sidebar-section" data-testid="kal-sekce-kalendare">
+                <div className="gcal-section-header">
+                  <span className="gcal-section-title">
+                    <Users size={14} /> {t('v2.kalendare')}
+                  </span>
+                  {smiZakladat && (
+                    <button type="button" className="gcal-filter-toggle-all" onClick={() => setNovyKalOpen(true)} data-testid="kal-novy-sdileny" title={t('v2.novyKalendarTitle')}>
+                      + {t('v2.novyKalendar')}
+                    </button>
+                  )}
+                </div>
+                {kalendareAktivni.length === 0 && <p className="gcal-empty-hint">{t('v2.kalendareZadne')}</p>}
+                <div className="gcal-project-list">
+                  {kalendareAktivni.map((c) => {
+                    const meta = kalendarMeta[c.id] || {};
+                    const isChecked = !hiddenCals.has(c.id);
+                    return (
+                      <label key={c.id} className="gcal-filter-row gcal-filter-row-kalendar" style={{ '--gcal-accent': meta.color }} data-testid={`kal-filtr-kalendar-${c.id}`} title={t(`v2.druh.${c.kind}`)}>
+                        <input type="checkbox" checked={isChecked} onChange={() => toggleCal(c.id)} className="gcal-checkbox" />
+                        <span className="gcal-custom-checkbox" style={{ borderColor: meta.color, backgroundColor: isChecked ? meta.color : 'transparent' }}>
+                          {isChecked && <Check size={10} color="#fff" strokeWidth={3} />}
+                        </span>
+                        <span className="gcal-filter-label">
+                          {c.kind === 'absence' ? <Plane size={12} /> : c.kind === 'resource' ? <DoorOpen size={12} /> : <Building2 size={12} />} {c.name}
+                        </span>
+                        <span className="gcal-filter-count">{projectCounts[c.id] || 0}</span>
+                        {smiZakladat && c.can_manage && (
+                          <button type="button" className="gcal-filter-edit" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUpravaKal(c); }} title={t('v2.upravitKalendar')} data-testid={`kal-upravit-${c.id}`}>
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Statuses Filter */}
             <div className="gcal-sidebar-section">
               <div className="gcal-section-header">
@@ -948,6 +1010,11 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
                         <span className="gcal-week-num-badge" data-today={isToday}>{date.getDate()}</span>
                         <span className="gcal-week-col-day-name">{date.toLocaleDateString(locale, { weekday: 'long' })}</span>
                       </div>
+                      {prycPodleDne[key] && (
+                        <div className="gcal-away-band" data-testid={`kal-pryc-${key}`} title={t('v2.pryc')}>
+                          <Plane size={11} /> <span>{prycText(key).join(', ')}</span>
+                        </div>
+                      )}
                       <div className="gcal-week-column-content">
                         {dayItems.map((item) => (
                           <Tazitelny key={item.key} stitek={stitky.get(item.key)} disabled={!smiTahnout(item)}>
@@ -985,7 +1052,7 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
                             <h4 className="gcal-week-event-title">{item.time ? `${item.time} · ` : ''}{item.title}</h4>
                             <div className="gcal-week-card-foot">
                               <span className="gcal-week-status-pill">
-                                {jeUdalost(item) ? t('v2.personal') : (statusConfig[item.status] || statusConfig.todo).label}
+                                {jeUdalost(item) ? getProjectName(item) : (statusConfig[item.status] || statusConfig.todo).label}
                               </span>
                             </div>
                           </div>
@@ -1036,6 +1103,11 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
                     <span className="gcal-badge-count">
                       {t('v2.itemCount', { total: (byDay[selectedKey] || []).length })}
                     </span>
+                    {prycPodleDne[selectedKey] && (
+                      <span className="gcal-away-band" data-testid={`kal-pryc-${selectedKey}`}>
+                        <Plane size={11} /> {t('v2.pryc')}: {prycText(selectedKey).join(', ')}
+                      </span>
+                    )}
                   </div>
                   <h3 className="gcal-day-hero-date">
                     {cursor.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -1197,6 +1269,11 @@ export default function TaskCalendar({ items = [], maps = [], onOpen, onCreate, 
     <DragOverlay dropAnimation={null}>
       {dnd.aktivni ? <div className="gcal-drag-overlay">{renderEventChip(dnd.aktivni.item, { overlay: true })}</div> : null}
     </DragOverlay>
-    </DndContext>
+    {smiZakladat && (novyKalOpen || upravaKal) && (
+        <Suspense fallback={null}>
+          <DialogNovyKalendar open kalendar={upravaKal} members={members} userEmail={userEmail} onClose={() => { setNovyKalOpen(false); setUpravaKal(null); }} />
+        </Suspense>
+      )}
+      </DndContext>
   );
 }

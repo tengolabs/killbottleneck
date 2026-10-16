@@ -151,7 +151,7 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
         <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>{popisek}{stav === 'chyba' && karta.vysledek ? ` — ${karta.vysledek}` : ''}</span>
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.udalost_id && (
-            <Link to={`/tasks?view=calendar&udalost=${encodeURIComponent(karta.odkaz.udalost_id)}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
+            <Link to={`/kalendar?udalost=${encodeURIComponent(karta.odkaz.udalost_id)}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
               {t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
             </Link>
           )}
@@ -162,7 +162,7 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
           )}
           {/* připomínka ke kroku žije v kalendáři (klik-test 5. 10. 2026: „Ukázat v mapě“ u připomínky mátlo) */}
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.pripominka && (
-            <Link to="/tasks?view=calendar" onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
+            <Link to="/kalendar" onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
               {t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
             </Link>
           )}

@@ -128,7 +128,12 @@ const AuthenticatedApp = () => {
               znamená světlý motiv, a ten killBottleneck má taky). Stará adresa musí dál
               fungovat — lidé si ji mohli uložit na plochu telefonu jako appku. */}
           <Route path="/light/*" element={<Navigate to="/lite" replace />} />
-          <Route path="/tasks" element={<Tasks />} />
+          {/* key: /tasks a /kalendar jsou TÝŽ komponent v téže pozici — bez klíče by React při přechodu
+              ze zvonečku na Úkolech jen změnil props a stav pohledu (tabulka) by zůstal */}
+          <Route path="/tasks" element={<Tasks key="tasks" />} />
+          {/* Kalendář jako vlastní stránka (Richard 14. 10. 2026) — stejné jádro jako Úkoly, jen zamčený pohled;
+              staré /tasks?view=calendar sem přesměrovává Tasks sám */}
+          <Route path="/kalendar" element={<Tasks key="kalendar" kalendar />} />
           <Route path="/my-map" element={<GoalMapEditor personalMap />} />
           <Route path="/archive" element={<Archive />} />
           <Route path="/notifications" element={<Notifications />} />

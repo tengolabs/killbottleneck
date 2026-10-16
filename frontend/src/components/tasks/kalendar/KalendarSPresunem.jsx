@@ -19,7 +19,7 @@ import DialogTermin from './DialogTermin';
 // nedojede (pár kB, jednou), je tu jen krátký spinner. Když chunk nedojede
 // vůbec (starý tab po nasazení), useLazyNs přesto uvolní → kalendář se ukáže
 // s klíči místo textů, nikdy nezůstane u spinneru.
-export default function KalendarSPresunem({ items = [], maps = [], members = [], user, tasksApi, loadMaps, setMaps, onOpen, onCreate, pripominky }) {
+export default function KalendarSPresunem({ items = [], maps = [], members = [], kalendare = [], user, tasksApi, loadMaps, setMaps, onOpen, onCreate, pripominky }) {
   const nsReady = useLazyNs('kalendar');
   const { t } = useTranslation('kalendar');
   const { t: tCommon } = useTranslation('common');
@@ -45,6 +45,7 @@ export default function KalendarSPresunem({ items = [], maps = [], members = [],
     if (r.akce === 'odmitnout') {
       if (r.duvod === 'hotovo') toast({ title: t('toast.hotovoNepresouvat') });
       else if (r.duvod === 'mapaChybi') toast({ title: t('chip.nacita') });
+      else if (r.duvod === 'vicedenni') toast({ title: t('toast.vicedenni') });
       else {
         setDialog({
           rezim: 'odmitnuto', stitek, nova: den, duvod: r.duvod,
@@ -98,6 +99,10 @@ export default function KalendarSPresunem({ items = [], maps = [], members = [],
         onPresun={onAkce}
         kontextPresunu={kontextPro}
         pripominky={pripominky}
+        kalendare={kalendare}
+        members={members}
+        userRole={user?.role}
+        userEmail={user?.email}
       />
       <DialogTermin
           stav={dialog}
