@@ -219,6 +219,13 @@ function instanceInfo(app, zalozniOdkaz) {
     const slovo = host.split(".")[0].toLowerCase();
     if (slovo !== "www") org = slovo;
   }
+  // Hostovaná instance na VLASTNÍ doméně zákazníka (ukoly.firma.cz): adresa je jeho,
+  // ale slovo do rozcestníku je pořád slug u provozovatele — nese ho provisioning
+  // (KB_ORG_SLUG). Self-host ho nemá, takže tam se nic nemění.
+  if (!org) {
+    const slug = String($os.getenv("KB_ORG_SLUG") || "").trim().toLowerCase();
+    if (/^[a-z0-9][a-z0-9-]{2,29}$/.test(slug)) org = slug;
+  }
   return { base: base, org: org, host: host };
 }
 

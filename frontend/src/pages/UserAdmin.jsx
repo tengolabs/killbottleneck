@@ -32,6 +32,7 @@ import KalendareSection from '@/components/shared/KalendareSection';
 import AiKredityKarta from '@/components/shared/AiKredityKarta';
 import BillingSection from '@/components/shared/BillingSection';
 import MembershipSection from '@/components/shared/MembershipSection';
+import CustomDomainSection from '@/components/shared/CustomDomainSection';
 import { fmtDateShort, fmtDateTimeShort } from '@/lib/locale';
 import { serverOrigin } from '@/lib/serverUrl';
 import { PURPOSES } from '@/lib/purpose';
@@ -602,6 +603,8 @@ export default function UserAdmin() {
             členství jen na hostované instanci — self-host nic nekupuje tady */}
         {!jenStruktura && <BillingSection onChange={setBillingComplete} />}
         {!jenStruktura && <MembershipSection billingComplete={billingComplete} />}
+        {/* vlastní doména — jen vlastní server Pro / AI Agent (komponenta se sama skryje jinde) */}
+        {!jenStruktura && <CustomDomainSection />}
 
         {!jenStruktura && hosted === false && <AiSettingsSection />}
 

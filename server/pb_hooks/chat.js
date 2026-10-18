@@ -21,7 +21,8 @@
 // HOOKS: v PocketBase `__hooks`; mimo PocketBase (testy čtou NASTROJE v node) složka souboru — jako v napoveda.js
 const HOOKS = typeof __hooks !== "undefined" ? __hooks : __dirname;
 const SPOL = require(`${HOOKS}/chat-spolecne.js`);
-const { TREE_ITEM, bezDiakritiky, bezId, chybaPrav, chybaV1, datumKratce, dnes, dosad, mapaId, mapyUzivatele, napadNaPolozku, napadPodleId, napadZaznam, napadyProSmazani, napadyUzivatele, norm, ocisti, pravaMapy, sDocasnymKlicem, titulUzlu, uvoz, uzelId , kontrolyZapisu, pojmenovani } = SPOL;
+const { TREE_ITEM, bezDiakritiky, bezId, chybaPrav, chybaV1, datumKratce, dnes, dosad, mapaId, mapyUzivatele, napadNaPolozku, napadPodleId, napadZaznam, napadyProSmazani, napadyUzivatele, norm, ocisti, pravaMapy, sDocasnymKlicem, titulUzlu, uvoz, uzelId , kontrolyZapisu, pojmenovani, doplnIkony, ikonaPodleNazvu, uzelVSeznamu } = SPOL;
+const ikonaUzlu = (v) => require(`${__hooks}/helpers.js`).ikonaUzlu(v); // jediný ořez ikony (16 kódových bodů, ne UTF-16 jednotek)
 const { tydenData } = require(`${HOOKS}/chat-tym.js`);
 const MODULY = ["chat-pravidla.js", "chat-udalosti.js", "chat-prace.js", "chat-terminy.js", "chat-hledani.js", "chat-tym.js", "chat-rizika.js"];
 
@@ -1066,14 +1067,17 @@ const NASTROJE_ZAKLAD = [
     parameters: { type: "object", properties: { idea_id: { type: "string", description: "the exact idea title as listed by list_ideas" }, map_id: { type: "string", description: "the exact map title as listed by list_maps" }, parent_id: { type: "string", description: "REQUIRED when the map has nodes: the exact title of the most fitting existing node (from get_map); \"apex\" only if nothing fits" } }, required: ["idea_id", "map_id"], additionalProperties: false } },
   { name: "delete_ideas", kind: "write", description: "Delete ideas from the user's idea buffer for good — old, duplicate or nonsense entries, or the whole buffer when the user asks to clear it. Pass the exact titles from list_ideas, or all: true for every idea. Only when the user asked for it or chose it — never on your own. The user confirms on a card listing every deleted idea; it cannot be undone.",
     parameters: { type: "object", properties: { idea_ids: { type: "array", items: { type: "string" }, description: "exact idea titles as listed by list_ideas" }, all: { type: "boolean", description: "true = every idea in the buffer" } }, required: [], additionalProperties: false } },
-  { name: "create_project", skupina: "projekt", kind: "write", description: "Create a NEW project (map) from scratch for the user — the user is always its owner (never ask who the owner is or for an e-mail). Give it a title, the goal (apex text) and 5–8 first steps you propose yourself from what the user said (outline; nested children allowed). Also use this for a list of items from an image transcript or from the conversation: put those items straight into outline (never save them to the idea buffer first). The user confirms first.",
-    parameters: { type: "object", properties: { title: { type: "string", description: "short project title" }, goal: { type: "string", description: "what success looks like — one sentence, becomes the apex of the map" }, description: { type: "string" }, outline: { type: "array", items: { $ref: "#/$defs/treeItem" }, description: "first steps (5–8; when the user chose a level of detail, follow it instead), nested children allowed" } }, required: ["title"], additionalProperties: false, $defs: { treeItem: TREE_ITEM } } },
+  { name: "create_project", skupina: "projekt", kind: "write", description: "Create a NEW project (map) from scratch for the user — the user is always its owner (never ask who the owner is or for an e-mail). Give it a title, ONE emoji as its icon, the goal (apex text) and 5–8 first steps you propose yourself from what the user said (outline; nested children allowed; every step gets an icon). Also use this for a list of items from an image transcript or from the conversation: put those items straight into outline (never save them to the idea buffer first). The user confirms first.",
+    parameters: { type: "object", properties: { title: { type: "string", description: "short project title" }, icon: { type: "string", description: "ONE emoji for the whole project (🌭 hot-dog stand, 🏠 house, 🚀 launch…) — always set it" }, goal: { type: "string", description: "what success looks like — one sentence, becomes the apex of the map" }, description: { type: "string" }, outline: { type: "array", items: { $ref: "#/$defs/treeItem" }, description: "first steps (5–8; when the user chose a level of detail, follow it instead), nested children allowed" } }, required: ["title"], additionalProperties: false, $defs: { treeItem: TREE_ITEM } } },
   { name: "create_project_from_ideas", skupina: "projekt", kind: "write", description: "Create a new project (map) from ideas that are ALREADY in the idea buffer (as listed by list_ideas); they become its first nodes and are removed from the buffer. NOT for items from an image transcript or from the conversation — those are not in the buffer; use create_project with an outline instead. Optional extra outline nodes. The user confirms first.",
     parameters: { type: "object", properties: { title: { type: "string" }, idea_ids: { type: "array", items: { type: "string" }, description: "exact idea titles as listed by list_ideas" }, outline: { type: "array", items: { $ref: "#/$defs/treeItem" } } }, required: ["title", "idea_ids"], additionalProperties: false, $defs: { treeItem: TREE_ITEM } } },
-  { name: "add_nodes", kind: "write", description: "Add nodes (a subtree) to a map, under parent_id or under the apex. The user confirms first.",
+  { name: "add_nodes", kind: "write", description: "Add nodes (a subtree) to a map, under parent_id or under the apex; give every node an icon. The user confirms first.",
     parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, parent_id: { type: "string", description: "the exact node title to attach under; \"apex\" = top of the map (required when the map has nodes)" }, items: { type: "array", items: { $ref: "#/$defs/treeItem" } } }, required: ["map_id", "items"], additionalProperties: false, $defs: { treeItem: TREE_ITEM } } },
-  { name: "update_node", kind: "write", description: "Change a node: title, status, description, owner, planned_on or deadline. USE THIS whenever the user says WHEN they will work on a task (\"today\", \"tomorrow\", \"Monday\") — set planned_on to that date (YYYY-MM-DD). Set, change or remove (empty string) the deadline when a date agreed with someone follows from the conversation. The user confirms first.",
-    parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, node_id: { type: "string", description: "the exact node title (from get_map)" }, note: { type: "string", description: "one short sentence for the user shown on the confirmation card, REQUIRED when the conversation called the task differently than its node title (e.g. \"= the phone call with Mrs. Krausová you just prepared\")" }, title: { type: "string" }, status: { type: "string", enum: ["todo", "in_progress", "done"] }, description: { type: "string" }, owner: { type: "string" }, planned_on: { type: "string", description: "YYYY-MM-DD within 7 days, empty string clears" }, deadline: { type: "string", description: "YYYY-MM-DD agreed date, empty string removes the deadline" } }, required: ["map_id", "node_id"], additionalProperties: false } },
+  { name: "update_node", kind: "write", description: "Change a node: title, status, description, owner, planned_on, deadline or icon (one emoji; for icons on MANY steps use set_node_icons). USE THIS whenever the user says WHEN they will work on a task (\"today\", \"tomorrow\", \"Monday\") — set planned_on to that date (YYYY-MM-DD). Set, change or remove (empty string) the deadline when a date agreed with someone follows from the conversation. The user confirms first.",
+    parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, node_id: { type: "string", description: "the exact node title (from get_map)" }, note: { type: "string", description: "one short sentence for the user shown on the confirmation card, REQUIRED when the conversation called the task differently than its node title (e.g. \"= the phone call with Mrs. Krausová you just prepared\")" }, title: { type: "string" }, status: { type: "string", enum: ["todo", "in_progress", "done"] }, description: { type: "string" }, owner: { type: "string" }, icon: { type: "string", description: "one emoji shown in front of the step; empty string clears" }, planned_on: { type: "string", description: "YYYY-MM-DD within 7 days, empty string clears" }, deadline: { type: "string", description: "YYYY-MM-DD agreed date, empty string removes the deadline" } }, required: ["map_id", "node_id"], additionalProperties: false } },
+  // ikonky hromadně (Richard 15. 10. 2026 „doplň ikonky všude“: model to zkoušel přes update_node bez pole icon → 10 prázdných karet)
+  { name: "set_node_icons", kind: "write", description: "Give icons (one emoji each) to several steps of a map at once — when the user asks for icons everywhere / for the whole project / for a list of steps. Read the map with get_map first (it shows which steps already have an icon); items = exact node titles with the emoji; the project goal (apex) counts as a step too. Steps not listed keep their icon. The user confirms once for the whole list.",
+    parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, items: { type: "array", items: { type: "object", properties: { node_id: { type: "string", description: "the exact node title (from get_map)" }, icon: { type: "string", description: "ONE emoji that fits the step" } }, required: ["node_id", "icon"], additionalProperties: false } } }, required: ["map_id", "items"], additionalProperties: false } },
   { name: "delete_node", kind: "write", description: "Delete a node (step) of a map together with its subtree — cannot be undone. When the user merely finished a step, use update_node status=done instead. Editors of the map only. The user confirms first.",
     parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, node_id: { type: "string", description: "the exact node title (from get_map)" } }, required: ["map_id", "node_id"], additionalProperties: false } },
   { name: "archive_project", skupina: "projekt", kind: "write", description: "Archive a finished or paused project (map): it leaves the home page and goes to the Archive (archived=false restores it). Project owner only. The user confirms first.",
@@ -1185,7 +1189,7 @@ const NASTROJE_ZAKLAD = [
     parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"], additionalProperties: false } },
 ];
 // Nástroje skupin žijí ve svých modulech; seznam pro model se skládá v PŮVODNÍM pořadí (schémata = prefix promptu → cache).
-const PORADI_NASTROJU = ["list_maps", "get_map", "get_my_day", "get_week_review", "get_project_changes", "get_person_work", "get_team_work", "get_portfolio", "list_people", "list_ideas", "search_projects", "list_rules", "list_rule_templates", "get_memory", "ask_user", "add_idea_to_map", "delete_ideas", "create_project", "create_project_from_ideas", "add_nodes", "update_node", "delete_node", "archive_project", "rename_project", "delete_project", "request_deadline_change", "decline_deadline_request", "list_reminders", "delete_reminder", "update_rule", "delete_rule", "save_rule_template", "delete_rule_template", "move_node", "update_idea", "add_comment", "get_timer", "start_timer", "stop_timer", "delete_document", "revert_document", "create_rule", "set_rule_enabled", "draft_text", "list_documents", "get_document", "update_document", "open_tools", "suggest_next", "set_skin", "set_theme", "add_ideas", "pdf_replace_text", "add_idea", "remember", "create_event", "list_events", "update_event", "delete_event", "create_reminder", "get_settings", "set_preference", "set_notification", "invite_member", "update_member", "update_organization", "set_ai_settings", "set_ai_credits", "set_instance_skin", "set_billing", "save_ai_agent", "delete_ai_agent", "get_org_structure", "add_org_position", "update_org_position", "remove_org_position", "order_membership", "get_map_sharing", "share_map", "unshare_map", "set_team_access", "set_map_public", "mark_notifications_read", "report_problem", "help", "map_risks", "start_relax", "list_calendars", "who_is_away", "create_calendar", "decide_absence", "delete_calendar"];
+const PORADI_NASTROJU = ["list_maps", "get_map", "get_my_day", "get_week_review", "get_project_changes", "get_person_work", "get_team_work", "get_portfolio", "list_people", "list_ideas", "search_projects", "list_rules", "list_rule_templates", "get_memory", "ask_user", "add_idea_to_map", "delete_ideas", "create_project", "create_project_from_ideas", "add_nodes", "update_node", "delete_node", "archive_project", "rename_project", "delete_project", "request_deadline_change", "decline_deadline_request", "list_reminders", "delete_reminder", "update_rule", "delete_rule", "save_rule_template", "delete_rule_template", "move_node", "update_idea", "add_comment", "get_timer", "start_timer", "stop_timer", "delete_document", "revert_document", "create_rule", "set_rule_enabled", "draft_text", "list_documents", "get_document", "update_document", "open_tools", "suggest_next", "set_skin", "set_theme", "add_ideas", "pdf_replace_text", "add_idea", "remember", "create_event", "list_events", "update_event", "delete_event", "create_reminder", "get_settings", "set_preference", "set_notification", "invite_member", "update_member", "update_organization", "set_ai_settings", "set_ai_credits", "set_instance_skin", "set_billing", "save_ai_agent", "delete_ai_agent", "get_org_structure", "add_org_position", "update_org_position", "remove_org_position", "order_membership", "get_map_sharing", "share_map", "unshare_map", "set_team_access", "set_map_public", "mark_notifications_read", "report_problem", "help", "map_risks", "start_relax", "list_calendars", "who_is_away", "create_calendar", "decide_absence", "delete_calendar", "set_node_icons"];
 const NASTROJE_VSECH = [].concat(NASTROJE_ZAKLAD, ...MODULY.map((f) => require(`${HOOKS}/${f}`).NASTROJE.map((n) => Object.assign({ modul: f }, n))));
 const NASTROJE = PORADI_NASTROJU.map((jm) => { const n = NASTROJE_VSECH.find((x) => x.name === jm); if (!n) throw new Error("chat: nástroj " + jm + " chybí v modulech"); return n; });
 if (NASTROJE_VSECH.length !== NASTROJE.length) throw new Error("chat: nástroj mimo PORADI_NASTROJU");
@@ -1756,20 +1760,23 @@ function vykonej(app, auth, L, name, args, ktx) {
         const r = v1("POST", "/v1/maps", body);
         if (r.status !== 200) return { text: chybaV1(r) };
         // emoji / barva / klient z dialogu Nový projekt (doplnil server, ne model) — jen u mapy, kterou uživatel
-        // právě založil; veřejné v1 API se kvůli tomu nerozšiřuje
-        if (a.__meta && typeof a.__meta === "object") {
+        // právě založil; veřejné v1 API se kvůli tomu nerozšiřuje. Emoji projektu od 15. 10. 2026 dává i model (icon),
+        // dialog má přednost.
+        const metaP = Object.assign({}, a.__meta && typeof a.__meta === "object" ? a.__meta : {});
+        if (!metaP.emoji && typeof a.icon === "string" && a.icon.trim()) metaP.emoji = ikonaUzlu(a.icon);
+        if (metaP.emoji || metaP.color || metaP.client) {
           try {
             const H2 = require(`${__hooks}/helpers.js`);
             const mapa = app.findRecordById("goalmaps", r.json.id);
             if (mapa.getString("owner") === auth.id) {
               // emoji = ikona vrcholového uzlu (jako applyEmojiToApex při ručním založení), název zůstává čistý
-              if (a.__meta.emoji) {
+              if (metaP.emoji) {
                 const uzly = H2.jsonVal(mapa, "nodes", []);
                 const apex = uzly.find((n) => n && (n.type === "apexNode" || (n.data || {}).nodeType === "apex"));
-                if (apex) { apex.data = Object.assign({}, apex.data, { icon: String(a.__meta.emoji).slice(0, 16) }); mapa.set("nodes", uzly); }
+                if (apex) { apex.data = Object.assign({}, apex.data, { icon: ikonaUzlu(metaP.emoji) }); mapa.set("nodes", uzly); }
               }
-              if (a.__meta.color) mapa.set("color", String(a.__meta.color).slice(0, 16));
-              if (a.__meta.client) { try { app.findRecordById("clients", String(a.__meta.client)); mapa.set("client", String(a.__meta.client)); } catch (e2) { /* klient neexistuje — bez něj */ } }
+              if (metaP.color) mapa.set("color", String(metaP.color).slice(0, 16));
+              if (metaP.client) { try { app.findRecordById("clients", String(metaP.client)); mapa.set("client", String(metaP.client)); } catch (e2) { /* klient neexistuje — bez něj */ } }
               app.save(mapa);
             }
           } catch (err) { /* doplněk; mapa je založená i bez něj */ }
@@ -1820,11 +1827,32 @@ function vykonej(app, auth, L, name, args, ktx) {
         const m = v1("GET", `/v1/maps/${encodeURIComponent(mid)}`);
         if (m.status !== 200) return { text: chybaV1(m) };
         const body = { base_updated: m.json.updated };
-        for (const k of ["title", "status", "description", "owner", "planned_on", "deadline"]) if (a[k] !== undefined) body[k] = a[k];
+        for (const k of ["title", "status", "description", "owner", "planned_on", "deadline", "icon"]) if (a[k] !== undefined) body[k] = a[k];
         const r = v1("POST", `/v1/maps/${encodeURIComponent(mid)}/nodes/${encodeURIComponent(nid)}`, body);
         if (r.status !== 200) return { text: chybaV1(r) };
         return { text: `Node updated in "${m.json.title}".`, karta: { type: "vysledek", map_id: mid, map_title: m.json.title, node_id: nid } };
       });
+    }
+    case "set_node_icons": {
+      const p = pravaMapy(app, auth, a.map_id);
+      if (!p) return { text: "Error: map not found." };
+      const N2 = require(`${__hooks}/chat-nastaveni.js`);
+      const http = N2.sVlastnimTokenem(ktx);
+      if (!http) return N2.BEZ_TOKENU;
+      const H3 = require(`${__hooks}/helpers.js`);
+      const nodes = H3.jsonVal(p.map, "nodes", []);
+      let n = 0;
+      for (const it of (Array.isArray(a.items) ? a.items : [])) {
+        const uz = it ? uzelVSeznamu(nodes, it.node_id) : null;
+        if (!uz) continue;
+        uz.data = Object.assign({}, uz.data, { icon: H3.ikonaUzlu(it.icon) }); n += 1;
+      }
+      if (!n) return { text: "Error: none of the steps was found (use get_map; pass exact titles)." };
+      // base_updated = ochrana 409 proti souběžné úpravě v otevřeném editoru (jako move_node)
+      const r = http("PATCH", `/api/collections/goalmaps/records/${encodeURIComponent(p.map.id)}`, { nodes: nodes, base_updated: p.map.getString("updated") });
+      if (r.status === 409) return { text: "Error: the map was changed by someone else meanwhile — nothing was changed; ask the user to try again." };
+      if (r.status !== 200) return { text: `Error ${r.status}: ${((r.json || {}).message) || "update failed"}` };
+      return { text: `Icons set on ${n} step(s) in "${p.map.getString("title")}".`, karta: { type: "vysledek", map_id: p.map.id, map_title: p.map.getString("title") } };
     }
     case "delete_node": {
       const mid = mapaId(app, auth, a.map_id);
@@ -1970,11 +1998,35 @@ function chybaDuplicityNapadu(app, auth, ideaRef, mapRef, parentRef) {
 // od 1. 10. 2026 (klik-test: AI dala měřitelné cíle do popisu kroků a před potvrzením nebyly vidět).
 function stromKarty(items, napadyNazvy) {
   const out = [];
-  for (const t of (napadyNazvy || [])) if (out.length < 200) out.push({ u: 0, t: ocisti(t, 120), z: 1 });
-  const projdi = (arr, u) => { for (const it of (Array.isArray(arr) ? arr : [])) { if (!it || !it.title || out.length >= 200) continue; const r = { u: u, t: ocisti(it.title, 120) }; if (it.deadline) r.d = String(it.deadline).slice(0, 10); if (it.owner) r.o = ocisti(it.owner, 80); if (it.planned_on) r.p = String(it.planned_on).slice(0, 10); if (it.description) r.k = ocisti(it.description, 240); out.push(r); projdi(it.children, u + 1); } };
+  for (const t of (napadyNazvy || [])) if (out.length < 200) { const r = { u: 0, t: ocisti(t, 120), z: 1 }; const ik = ikonaPodleNazvu(t); if (ik) r.i = ik; out.push(r); }
+  const projdi = (arr, u) => { for (const it of (Array.isArray(arr) ? arr : [])) { if (!it || !it.title || out.length >= 200) continue; const r = { u: u, t: ocisti(it.title, 120) }; if (it.icon) r.i = ikonaUzlu(it.icon); if (it.deadline) r.d = String(it.deadline).slice(0, 10); if (it.owner) r.o = ocisti(it.owner, 80); if (it.planned_on) r.p = String(it.planned_on).slice(0, 10); if (it.description) r.k = ocisti(it.description, 240); out.push(r); projdi(it.children, u + 1); } };
   projdi(items, 0);
   return out;
 }
+// Cesta „odkud → kam → pod co“ na kartu (15. 10. 2026, Richard: „aby uživatel viděl, že něco jde někam a pod něco“):
+// u vložení nápadu, přesunu kroku a přidání kroků pod uzel karta kreslí projekt → nadřazené kroky → nový/přesunutý řádek,
+// místo jedné dlouhé věty. {mapa:{t,c}, rodice:[názvy od vrcholu dolů bez vrcholu], odkud:{druh:'zasobnik'|'uzel',t,rodice,pocet}, novy:{t,druh:'novy'|'presun',pocet}}
+function cestaKarty(app, auth, mapRef, parentRef) {
+  try {
+    const H = require(`${__hooks}/helpers.js`);
+    const mid = mapaId(app, auth, mapRef);
+    const r = mid ? H.v1ReadableMap(app, mid, auth) : null;
+    if (!r) return null;
+    const nodes = H.jsonVal(r.map, "nodes", []); const edges = H.jsonVal(r.map, "edges", []);
+    const rodicOd = {}; for (const e of edges) if (e && e.target && !rodicOd[e.target]) rodicOd[e.target] = e.source;
+    const titul = (id) => { const n = nodes.find((x) => x.id === id); return n ? ocisti((n.data || {}).title || (n.data || {}).apexText || "", 120) : ""; };
+    // nadřazené kroky od vrcholu dolů (vrchol = projekt sám, ten se nevypisuje); strop a seen = ochrana proti cyklu
+    const rodice = (id) => { const out = []; const seen = {}; let cur = id; while (cur && !seen[cur] && out.length < 12) { seen[cur] = 1; const n = nodes.find((x) => x.id === cur); if (!n || n.type === "apexNode") break; out.unshift(titul(cur)); cur = rodicOd[cur]; } return out; };
+    const pocetPod = (id) => { let n = 0; const seen = {}; const go = (x) => { for (const e of edges) if (e.source === x && !seen[e.target]) { seen[e.target] = 1; const t = nodes.find((y) => y.id === e.target); if (t && t.type !== "note") { n += 1; go(e.target); } } }; go(id); return n; };
+    const pref = String(parentRef || "").trim();
+    const pid = !pref || pref.toLowerCase() === "apex" ? "" : uzelId(app, auth, mid, pref);
+    if (pref && pref.toLowerCase() !== "apex" && !pid) return null;
+    return { mapa: { t: ocisti(r.map.getString("title"), 120), c: H.formatProjectNumber(r.map.get("project_number")) }, rodice: pid ? rodice(pid) : [], _mid: mid, _rodice: rodice, _pocet: pocetPod, _uzel: (ref) => uzelId(app, auth, mid, ref), _titul: titul };
+  } catch (err) { console.log("chat: cesta na kartu selhala:", err && err.message ? err.message : String(err)); return null; }
+}
+// jen serializovatelná část (pomocné funkce pryč)
+function cestaCista(c) { if (!c) return null; const out = {}; for (const k of Object.keys(c)) if (k[0] !== "_") out[k] = c[k]; return out; }
+
 // Nový projekt s AI: odpovídá strom zvolené podrobnosti? (pravidla schváleného generátoru Poradce, 7. 8. 2026)
 // Hláška jmenuje KONKRÉTNÍ uzly, které pravidlo porušují — bez toho slabší model (ostrý běh 1. 10. 2026) poslal
 // dvakrát tentýž strom, protože z „2/2/2 steps, 22 nodes“ nepoznal, že jeden krok má 3 podkroky.
@@ -2280,7 +2332,10 @@ function overZapis(app, auth, name, a) {
 function overZapisZaklad(app, auth, name, a) {
   if (jeNastrojNastaveni(name)) return require(`${__hooks}/chat-nastaveni.js`).overNastaveni(app, auth, name, a);
   const { chybaMapy, chybaUzlu, chybaNapadu } = kontrolyZapisu(app, auth);
-  const prava = ["add_idea_to_map", "add_nodes", "update_node", "delete_node", "move_node", "create_rule", "set_rule_enabled", "update_rule", "delete_rule"].includes(name) ? (chybaMapy(a.map_id) || chybaPrav(app, auth, name, a)) : null;
+  // bez jediného pole ke změně karta „Upravit „X“ ()“ nic neudělá (Richard 15. 10. 2026: ikonky přes update_node bez pole icon);
+  // dřív než práva, aby řešitel nedostal větu „…not .“
+  if (name === "update_node" && a.node_id && !Object.keys(a).some((k) => !["map_id", "node_id", "note"].includes(k) && a[k] !== undefined)) return "Error: nothing to change — pass at least one of title, status, description, owner, planned_on, deadline, icon. For icons on many steps use set_node_icons.";
+  const prava = ["add_idea_to_map", "add_nodes", "update_node", "delete_node", "move_node", "set_node_icons", "create_rule", "set_rule_enabled", "update_rule", "delete_rule"].includes(name) ? (chybaMapy(a.map_id) || chybaPrav(app, auth, name, a)) : null;
   if (prava) return prava;
   const modul = NASTROJ[name] && NASTROJ[name].modul;
   if (modul) return require(`${__hooks}/${modul}`).overZapis(app, auth, name, a);
@@ -2306,6 +2361,15 @@ function overZapisZaklad(app, auth, name, a) {
     case "create_project_from_ideas": { for (const id of (Array.isArray(a.idea_ids) ? a.idea_ids : [])) { const e = chybaNapadu(id); if (e) return e + " If these items come from an image transcript or from the conversation, call create_project with them as outline instead — do NOT save them to the buffer first."; } return null; }
     case "add_nodes": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.parent_id) || chybaBezRodice(app, auth, a.map_id, a.parent_id) || chybaDuplicity(app, auth, a.map_id, a.parent_id, a.items);
     case "update_node": return chybaMapy(a.map_id) || chybaUzlu(a.map_id, a.node_id) || (a.node_id ? null : "Error: node_id is required.");
+    case "set_node_icons": {
+      const e0 = chybaMapy(a.map_id); if (e0) return e0;
+      const items = Array.isArray(a.items) ? a.items : [];
+      if (!items.length) return "Error: items is required (node_id + icon for each step).";
+      const pS = pravaMapy(app, auth, a.map_id);
+      const uzlyS = pS ? require(`${__hooks}/helpers.js`).jsonVal(pS.map, "nodes", []) : [];
+      for (const it of items) { if (!it || !it.node_id) return "Error: each item needs node_id (the exact node title)."; if (!uzelVSeznamu(uzlyS, it.node_id)) return `Error: node "${String(it.node_id)}" not found in the map (use get_map; pass the node id or its exact title).`; }
+      return null;
+    }
     case "delete_node": {
       if (String(a.node_id || "").trim().toLowerCase() === "apex") return "Error: the apex (goal) of a map cannot be deleted — delete the whole project with delete_project if that is what the user wants.";
       const nid = uzelId(app, auth, mapaId(app, auth, a.map_id), a.node_id);
@@ -2474,10 +2538,10 @@ function popisAkce(app, auth, L, name, a) {
   if (modul) return require(`${__hooks}/${modul}`).popisAkce(app, auth, L, name, a);
   switch (name) {
     case "add_idea_to_map": {
-      const kam = a.parent_id && String(a.parent_id).toLowerCase() !== "apex" ? (cs ? ` pod „${nazevUzlu(a.map_id, a.parent_id)}“` : ` under "${nazevUzlu(a.map_id, a.parent_id)}"`) : "";
+      // odkud/kam/pod co kreslí karta (cesta) — věta je jen nadpis (15. 10. 2026, schválený náhled A)
       return cs
-        ? `Vložit nápad „${nazevNapadu(a.idea_id)}“ do projektu „${nazevMapy(a.map_id)}“${kam}`
-        : `Put the idea "${nazevNapadu(a.idea_id)}" into the project "${nazevMapy(a.map_id)}"${kam}`;
+        ? `Vložit nápad ze zásobníku do projektu „${nazevMapy(a.map_id)}“`
+        : `Put an idea from the buffer into the project "${nazevMapy(a.map_id)}"`;
     }
     case "create_project": {
       const n = pocetUzlu(a.outline);
@@ -2485,7 +2549,9 @@ function popisAkce(app, auth, L, name, a) {
       // řešitelé v osnově musí být na kartě vidět — nová mapa se jim tím nasdílí (checkup 15. 9.)
       const lide = vlastniciStromu(a.outline);
       const kdo = lide.length ? (cs ? ` · přiřazeno: ${lide.join(", ")}` : ` · assigned: ${lide.join(", ")}`) + vetaNasdileni(cs, komuSeNasdili(app, auth, "", lide)) : "";
-      return cs ? `Založit nový projekt „${a.title}“${cil}${n ? ` s ${n} prvními kroky` : ""}${kdo}` : `Create the new project "${a.title}"${cil}${n ? ` with ${n} first steps` : ""}${kdo}`;
+      const em = (a.__meta && a.__meta.emoji) || (typeof a.icon === "string" && a.icon.trim() ? ikonaUzlu(a.icon) : "");
+      const emS = em ? em + " " : "";
+      return cs ? `Založit nový projekt ${emS}„${a.title}“${cil}${n ? ` s ${n} prvními kroky` : ""}${kdo}` : `Create the new project ${emS}"${a.title}"${cil}${n ? ` with ${n} first steps` : ""}${kdo}`;
     }
     case "pdf_replace_text": { const n = Array.isArray(a.replacements) ? a.replacements.length : 0; const f = ocisti(a.file, 80); return cs ? `Opravit ${n} ${n === 1 ? "místo" : n < 5 ? "místa" : "míst"} v PDF${f ? ` „${f}“` : ""}` : `Correct ${n} ${n === 1 ? "place" : "places"} in the PDF${f ? ` "${f}"` : ""}`; }
     case "remember": return cs ? `Uložit do paměti asistenta${a.map ? ` (projekt „${nazevMapy(mapaId(app, auth, a.map))}“)` : ""}` : `Save to the assistant's memory${a.map ? ` (project "${nazevMapy(mapaId(app, auth, a.map))}")` : ""}`;
@@ -2541,6 +2607,7 @@ function popisAkce(app, auth, L, name, a) {
           ? (cs ? `Změnit termín „${uzel}“ z ${datumCz(puvodni)} na ${datumCz(a.deadline)}` : `Change the deadline of "${uzel}" from ${datumKratce(puvodni, "en")} to ${datumKratce(a.deadline, "en")}`)
           : (cs ? `Nastavit termín „${uzel}“ na ${datumCz(a.deadline)}` : `Set the deadline of "${uzel}" to ${datumKratce(a.deadline, "en")}`);
       }
+      if (kl.length === 1 && kl[0] === "icon") return a.icon ? (cs ? `Dát „${uzel}“ ikonku ${ikonaUzlu(a.icon)}` : `Give "${uzel}" the icon ${ikonaUzlu(a.icon)}`) : (cs ? `Odebrat ikonku u „${uzel}“` : `Remove the icon of "${uzel}"`);
       if (kl.length === 1 && kl[0] === "status") return cs ? `Označit „${uzel}“ jako ${stavy[a.status] || a.status}` : `Mark "${uzel}" as ${stavy[a.status] || a.status}`;
       if (kl.length === 1 && kl[0] === "title") return cs ? `Přejmenovat „${uzel}“ na „${ocisti(a.title, 120)}“ (projekt „${nazevMapy(a.map_id)}“)` : `Rename "${uzel}" to "${ocisti(a.title, 120)}" (project "${nazevMapy(a.map_id)}")`;
       // předání práce (týmová porada, po schůzce): kdo → komu, bez technického „owner:“
@@ -2554,10 +2621,13 @@ function popisAkce(app, auth, L, name, a) {
       const nasd = a.owner ? vetaNasdileni(cs, komuSeNasdili(app, auth, a.map_id, [a.owner])) : "";
       return cs ? `Upravit „${uzel}“ v projektu „${nazevMapy(a.map_id)}“ (${zm})${nasd}` : `Update "${uzel}" in "${nazevMapy(a.map_id)}" (${zm})${nasd}`;
     }
+    case "set_node_icons": {
+      const n = (Array.isArray(a.items) ? a.items : []).length;
+      return cs ? `Doplnit ikonky ${n} ${n === 1 ? "kroku" : "krokům"} v projektu „${nazevMapy(a.map_id)}“` : `Set icons for ${n} ${n === 1 ? "step" : "steps"} in the project "${nazevMapy(a.map_id)}"`;
+    }
     case "move_node": {
-      const pref = String(a.parent_id || "").trim();
-      const rodic = !pref || pref.toLowerCase() === "apex" ? (cs ? "vrchol projektu" : "the apex") : `„${nazevUzlu(a.map_id, pref)}“`;
-      return cs ? `Přesunout krok „${nazevUzlu(a.map_id, a.node_id)}“ i s podkroky pod ${rodic} (projekt „${nazevMapy(a.map_id)}“)` : `Move the step "${nazevUzlu(a.map_id, a.node_id)}" with its sub-steps under ${rodic.replace(/[„“]/g, '"')} (project "${nazevMapy(a.map_id)}")`;
+      // odkud/kam kreslí karta (cesta) — věta je jen nadpis (15. 10. 2026, schválený náhled A)
+      return cs ? `Přesunout krok i s podkroky v projektu „${nazevMapy(a.map_id)}“` : `Move a step with its sub-steps in the project "${nazevMapy(a.map_id)}"`;
     }
     case "update_idea": {
       const z = [];
@@ -2939,6 +3009,8 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
             continue;
           }
           ownerJa(c.args.outline || c.args.items, auth.email());
+          // ikonky automaticky (Richard 15. 10. 2026): model je dává sám, chybějící doplní server podle názvu — PŘED kartou, ať je karta ukáže
+          doplnIkony(c.args.outline || c.args.items);
         }
         if (cfg.tier === "light" && cfg.predani) { msgs.length = start; stats.predano = (stats.predano || 0) + 1; return "predat"; }
         const chybaOdkazu = overZapis(app, auth, c.name, c.name === "pdf_replace_text" ? Object.assign({ __msgs: msgs }, c.args || {}) : (c.args || {}));
@@ -2969,6 +3041,30 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
           const napady = c.name === "create_project_from_ideas" ? (Array.isArray(c.args.idea_ids) ? c.args.idea_ids : []).map((i) => { const r = napadZaznam(app, auth, i); return r ? r.getString("title") : String(i); }) : null;
           const strom = stromKarty(c.args.outline || c.args.items, napady);
           if (strom.length) karta.strom = strom;
+        }
+        // cesta odkud → kam → pod co (15. 10. 2026): nápad ze zásobníku, přesun kroku, kroky pod uzel
+        if (c.name === "add_idea_to_map") {
+          const ces = cestaKarty(app, auth, c.args.map_id, c.args.parent_id);
+          const napad = napadZaznam(app, auth, c.args.idea_id);
+          if (ces && napad) { ces.odkud = { druh: "zasobnik", t: ocisti(napad.getString("title"), 120) }; ces.novy = { t: ces.odkud.t, druh: "novy" }; karta.cesta = cestaCista(ces); }
+        }
+        if (c.name === "move_node") {
+          const ces = cestaKarty(app, auth, c.args.map_id, c.args.parent_id);
+          const nid = ces ? ces._uzel(c.args.node_id) : "";
+          if (ces && nid) {
+            const vsechny = ces._rodice(nid); // včetně uzlu samého (poslední)
+            ces.odkud = { druh: "uzel", t: ces._titul(nid), rodice: vsechny.slice(0, -1), pocet: ces._pocet(nid) };
+            ces.novy = { t: ces.odkud.t, druh: "presun", pocet: ces.odkud.pocet };
+            karta.cesta = cestaCista(ces);
+          }
+        }
+        if (c.name === "add_nodes") { const ces = cestaKarty(app, auth, c.args.map_id, c.args.parent_id); if (ces) karta.cesta = cestaCista(ces); }
+        if (c.name === "set_node_icons") {
+          const pI = pravaMapy(app, auth, c.args.map_id);
+          const uzlyI = pI ? require(`${__hooks}/helpers.js`).jsonVal(pI.map, "nodes", []) : [];
+          const apexN = uzelVSeznamu(uzlyI, "apex") || {};
+          const apexT = (apexN.data || {}).apexText || (apexN.data || {}).title || (pI ? pI.map.getString("title") : "");
+          karta.strom = (c.args.items || []).slice(0, 200).map((it) => { const uz = uzelVSeznamu(uzlyI, it.node_id); const t = uz && uz.type === "apexNode" ? apexT : (uz ? ((uz.data || {}).title || (uz.data || {}).apexText || "") : String(it.node_id)); return { u: 0, t: ocisti(t, 120), i: ikonaUzlu(it.icon) }; });
         }
         // mazání: na kartě musí být vidět KAŽDÝ nápad, který zmizí (prvních 12 + „Ukázat celý strom“)
         if (c.name === "delete_ideas") karta.strom = c.args.idea_ids.map((id) => { const r = napadZaznam(app, auth, id); return { u: 0, t: ocisti(r ? r.getString("title") : String(id), 120) }; }).slice(0, 200);
@@ -3248,7 +3344,7 @@ function chatRun(app, auth, body, cfg, L, oprava) {
       if (cilProjektu) target.cil = cilProjektu;
       const m = tg.meta && typeof tg.meta === "object" ? tg.meta : {};
       const meta = {};
-      if (m.emoji) meta.emoji = ocisti(m.emoji, 16);
+      if (m.emoji) meta.emoji = ikonaUzlu(m.emoji);
       if (m.color && /^#[0-9a-f]{3,8}$/i.test(String(m.color))) meta.color = String(m.color); // hex z ProjectColorPicker
       if (m.client && /^[a-z0-9]{15}$/.test(String(m.client))) meta.client = String(m.client);
       if (Object.keys(meta).length) target.meta = meta;

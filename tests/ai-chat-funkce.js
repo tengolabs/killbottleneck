@@ -296,7 +296,10 @@ H.beh(async () => {
   fronta.push(nastroj('move_node', { map_id: 'Přesuny', node_id: 'Gama', parent_id: 'Beta' }));
   r = await chatuj(A, { message: 'Přesuň Gamu pod Betu', context: { route: '/' } });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
-  expect(!!k && k.popis === 'Přesunout krok „Gama“ i s podkroky pod „Beta“ (projekt „Přesuny“)', `karta přesunu (${k && k.popis})`);
+  expect(!!k && k.popis === 'Přesunout krok i s podkroky v projektu „Přesuny“', `karta přesunu (${k && k.popis})`);
+  // cesta odkud → kam (15. 10. 2026): Gama je dnes pod vrcholem, půjde pod Betu (pod Alfou)
+  expect(!!k && k.cesta && k.cesta.odkud && k.cesta.odkud.druh === 'uzel' && k.cesta.odkud.t === 'Gama' && (k.cesta.odkud.rodice || []).length === 0 && k.cesta.odkud.pocet === 0, `cesta: odkud = Gama pod vrcholem (${JSON.stringify(k && k.cesta)})`);
+  expect(!!k && k.cesta && k.cesta.mapa.t === 'Přesuny' && JSON.stringify(k.cesta.rodice) === '["Alfa","Beta"]' && k.cesta.novy.t === 'Gama' && k.cesta.novy.druh === 'presun', `cesta: kam = Přesuny → Alfa → Beta → Gama (${JSON.stringify(k && k.cesta)})`);
   fronta.push(text('x'));
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   expect(kartaPodleId(chat, k.id).stav === 'hotovo' && (await rodic('c')) === 'b' && ((await mapaZ(mapaP.id)).edges || []).length === 3, `Gama je pod Betou, hran stále 3 (${await rodic('c')})`);
@@ -305,13 +308,65 @@ H.beh(async () => {
   fronta.push(nastroj('move_node', { map_id: 'Přesuny', node_id: 'Gama', parent_id: 'apex' }));
   r = await chatuj(A, { chat_id: chat.id, message: 'Dej Gamu zpět nahoru' });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
-  expect(!!k && k.popis === 'Přesunout krok „Gama“ i s podkroky pod vrchol projektu (projekt „Přesuny“)', `karta přesunu pod vrchol (${k && k.popis})`);
+  expect(!!k && k.popis === 'Přesunout krok i s podkroky v projektu „Přesuny“', `karta přesunu pod vrchol (${k && k.popis})`);
+  expect(!!k && k.cesta && JSON.stringify(k.cesta.odkud.rodice) === '["Alfa","Beta"]' && (k.cesta.rodice || []).length === 0, `cesta pod vrchol: odkud Alfa → Beta, kam bez rodičů (${JSON.stringify(k && k.cesta)})`);
   fronta.push(text('x'));
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   expect(kartaPodleId(chat, k.id).stav === 'hotovo' && (await rodic('c')) === 'root', 'Gama zpět pod vrcholem');
   fronta.push(nastroj('move_node', { map_id: 'Přesuny', node_id: 'Gama', parent_id: 'Beta' }), text('x'));
   r = await chatuj(B, { message: 'Přesuň Gamu pod Betu', context: { route: '/' } });
   expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => /not found or not accessible|only "work" access/.test(m.content)), 'cizí (nenasdílená) mapa → chyba, bez karty');
+  console.log('== ikonky hromadně (set_node_icons), update_node jen icon, update_node bez změny ==');
+  // Richard 15. 10. 2026 „doplň ikonky všude“: dřív model volal update_node bez pole icon → 10 karet „()“ a nic se nestalo
+  fronta.push(nastroj('set_node_icons', { map_id: 'Přesuny', items: [{ node_id: 'Alfa', icon: '🅰️' }, { node_id: 'apex', icon: '🎯' }, { node_id: 'Gama', icon: '🌀' }] }));
+  r = await chatuj(A, { message: 'Doplň ikonky všude', context: { route: '/' } });
+  chat = r.json.chat; k = posledniKarta(chat, 'akce');
+  expect(!!k && k.popis === 'Doplnit ikonky 3 krokům v projektu „Přesuny“' && (k.strom || []).length === 3 && k.strom[0].t === 'Alfa' && k.strom[0].i === '🅰️' && k.strom[1].t === 'Cíl' && k.strom[1].i === '🎯', `jedna karta se seznamem kroků a ikon, vrchol jménem cíle (${k && k.popis} ${JSON.stringify(k && k.strom)})`);
+  fronta.push(text('x'));
+  r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
+  let mpI = await mapaZ(mapaP.id); const ikonaZ = (id) => (((mpI.nodes || []).find((n) => n.id === id) || {}).data || {}).icon || '';
+  expect(kartaPodleId(chat, k.id).stav === 'hotovo' && ikonaZ('a') === '🅰️' && ikonaZ('root') === '🎯' && ikonaZ('c') === '🌀' && ikonaZ('b') === '', `ikony zapsány do uzlů vč. vrcholu, nevyjmenovaná Beta beze změny (${ikonaZ('a')}${ikonaZ('root')}${ikonaZ('c')}|${ikonaZ('b')})`);
+  expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'set_node_icons' && /Icons set on 3 step/.test(m.content)), 'model dostal výsledek');
+  fronta.push(nastroj('get_map', { map_id: 'Přesuny' }), text('x'));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Ukaž mapu' });
+  expect(toolZ(posledniVolani()).some((m) => m.tool_name === 'get_map' && /🅰️ Alfa/.test(m.content) && /🎯 Cíl/.test(m.content)), 'get_map ukazuje modelu ikony před názvy');
+  fronta.push(nastroj('update_node', { map_id: 'Přesuny', node_id: 'Beta', icon: '🅱️' }));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Betě dej ikonku' });
+  chat = r.json.chat; k = posledniKarta(chat, 'akce');
+  expect(!!k && k.popis === 'Dát „Beta“ ikonku 🅱️', `karta ikonky jednoho kroku (${k && k.popis})`);
+  fronta.push(text('x'));
+  r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
+  mpI = await mapaZ(mapaP.id);
+  expect(kartaPodleId(chat, k.id).stav === 'hotovo' && ikonaZ('b') === '🅱️', 'update_node zapsal icon přes v1');
+  fronta.push(nastroj('update_node', { map_id: 'Přesuny', node_id: 'Beta' }), text('x'));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Uprav Betu' });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => m.tool_name === 'update_node' && /nothing to change/.test(m.content)), 'update_node bez jediného pole → chyba modelu, žádná karta „()“');
+  // panel 18. 10. 2026: práva PŘED kartou i u set_node_icons (řešitel „work“ dřív dostal kartu a 403 až po potvrzení)
+  fronta.push(nastroj('set_node_icons', { map_id: 'Truhlářství', items: [{ node_id: 'Vybrat dodavatele', icon: '🔧' }] }), text('x'));
+  r = await chatuj(B, { message: 'Doplň ikonky všude', context: { route: '/' } });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => m.tool_name === 'set_node_icons' && /only "work" access/.test(m.content)), 'řešitel (work) → set_node_icons odmítnut před kartou, bez karty');
+  expect((((await mapaZ(map.id)).nodes || []).find((n) => n.id === 'n2') || { data: {} }).data.icon === undefined, 'ikona řešitelem nezapsána');
+  fronta.push(nastroj('set_node_icons', { map_id: 'Přesuny', items: [] }), text('x'));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Doplň ikonky' });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => m.tool_name === 'set_node_icons' && /items is required/.test(m.content)), 'set_node_icons bez položek → chyba, bez karty');
+  fronta.push(nastroj('set_node_icons', { map_id: 'Přesuny', items: [{ node_id: 'Neexistuje', icon: '🔧' }] }), text('x'));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Doplň ikonky' });
+  expect(r.json.chat.pending.length === 0 && toolZ(posledniVolani()).some((m) => m.tool_name === 'set_node_icons' && /node "Neexistuje" not found/.test(m.content)), 'set_node_icons s neznámým krokem → chyba, bez karty');
+  // odebrání ikonky: icon "" = karta „Odebrat ikonku“, uzel pak bez ikony; dlouhý řetězec se ořízne na 16 kódových bodů (ne půl emoji)
+  fronta.push(nastroj('update_node', { map_id: 'Přesuny', node_id: 'Beta', icon: '' }));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Betě ikonku odeber' });
+  chat = r.json.chat; k = posledniKarta(chat, 'akce');
+  expect(!!k && k.popis === 'Odebrat ikonku u „Beta“', `karta odebrání ikonky (${k && k.popis})`);
+  fronta.push(text('x'));
+  r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat; mpI = await mapaZ(mapaP.id);
+  expect(kartaPodleId(chat, k.id).stav === 'hotovo' && ikonaZ('b') === '', 'ikona odebrána');
+  fronta.push(nastroj('set_node_icons', { map_id: 'Přesuny', items: [{ node_id: 'Beta', icon: 'a🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥' }] }));
+  r = await chatuj(A, { chat_id: chat.id, message: 'Betě dej plameny' });
+  chat = r.json.chat; k = posledniKarta(chat, 'akce');
+  expect(!!k && k.strom && k.strom[0].i === 'a🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥' && Array.from(k.strom[0].i).length === 16 && !/\uFFFD/.test(k.strom[0].i), `ikona na kartě oříznutá po celých emoji (${k && k.strom && k.strom[0].i})`);
+  fronta.push(text('x'));
+  r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat; mpI = await mapaZ(mapaP.id);
+  expect(ikonaZ('b') === 'a🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥', `uložená ikona = 16 kódových bodů (${ikonaZ('b')})`);
   // nápad: založit, upravit podle názvu
   fronta.push(nastroj('add_idea', { title: 'Koupit lepidlo' }), text('x'));
   r = await chatuj(A, { message: 'Nápad: koupit lepidlo', context: { route: '/' } });

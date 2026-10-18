@@ -2546,6 +2546,17 @@ kbRoute("GET", "/config", (e) => {
     // zákazník — frontend podle toho schová sekci AI ve správě organizace
     // (Richard 6. 8. 2026: „v cloud verzi je AI nadefinované, nezobrazovat").
     hosted: env("HOSTED") === "1",
+    // KB Cloud Pro / AI Agent: adresa portálu serveru (agent Hermes, stav služeb) —
+    // plní provisioning (KB_PORTAL_URL, relativně „/portal", ať platí na slug doméně
+    // i na vlastní doméně zákazníka). Bez ní se položka v menu neukáže.
+    portal_url: (env("PORTAL_URL") || "").trim() || null,
+    // tarif vlastního serveru (kb | pro | agent) — jen hostované instance
+    plan: (env("PLAN") || "").trim() || null,
+    // identifikátor instance u provozovatele (Stripe client_reference_id). Dřív se
+    // odvozoval z hostname, což na vlastní doméně zákazníka nevyjde.
+    slug: (env("ORG_SLUG") || "").trim() || null,
+    // samoobslužná vlastní doména: jen tam, kde ji provisioning připravil (cíl CNAME)
+    custom_domain_enabled: (env("CUSTOM_DOMAIN_TARGET") || "").trim() !== "",
     // Stripe payment linky pro košík členství ({plan_id: url}, plní provozovatel
     // přes KB_PAYMENT_LINKS). Nejsou tajemství — jsou i na veřejném ceníku.
     // Bez nich košík kartu nenabízí (jen převod u ročního).
@@ -3542,6 +3553,56 @@ kbRoute("POST", "/order-transfer", (e) => {
   }
 }, $apis.requireAuth());
 
+// Vlastní doména hostované instance (KB Cloud Pro / AI Agent) — jen správce. Instance
+// sama nic nepřepíná: ukáže záznamy, předkontroluje DNS a žádost pošle na bránu
+// provozovatele (stejný kanál jako objednávky převodem). Logika ve vlastniDomena.js.
+kbRoute("GET", "/custom-domain", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error_code: "admin_only" });
+  const V = require(`${__hooks}/vlastniDomena.js`);
+  if (!V.dostupna()) return e.json(200, { available: false });
+  return e.json(200, V.stav());
+}, $apis.requireAuth());
+
+kbRoute("POST", "/custom-domain/records", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error_code: "admin_only" });
+  const V = require(`${__hooks}/vlastniDomena.js`);
+  if (!V.dostupna()) return e.json(404, { error_code: "unavailable" });
+  const d = V.normalizuj((e.requestInfo().body || {}).domain);
+  if (!d) return e.json(400, { error_code: "bad_domain" });
+  return e.json(200, { domain: d, apex: V.jeApex(d), records: V.zaznamy(d) });
+}, $apis.requireAuth());
+
+kbRoute("POST", "/custom-domain/check", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error_code: "admin_only" });
+  const V = require(`${__hooks}/vlastniDomena.js`);
+  if (!V.dostupna()) return e.json(404, { error_code: "unavailable" });
+  const d = V.normalizuj((e.requestInfo().body || {}).domain);
+  if (!d) return e.json(400, { error_code: "bad_domain" });
+  if (!V.brzda()) return e.json(429, { error_code: "too_often" });
+  const checks = V.kontrola(d);
+  if (!checks.every((c) => c.ok)) return e.json(200, { domain: d, checks: checks, requested: false });
+  // DNS sedí → žádost na bránu; přepnutí udělá centrála (ověří DNS znovu, sama)
+  const r = V.brana("POST", { action: "set", domain: d });
+  if (r.status === 409) return e.json(409, { error_code: "busy", request: (r.json.detail || {}).request || null });
+  if (r.status < 200 || r.status >= 300) return e.json(502, { error_code: "gateway_error", checks: checks });
+  return e.json(200, { domain: d, checks: checks, requested: true, request: r.json.request || null });
+}, $apis.requireAuth());
+
+kbRoute("POST", "/custom-domain/remove", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error_code: "admin_only" });
+  const V = require(`${__hooks}/vlastniDomena.js`);
+  if (!V.dostupna()) return e.json(404, { error_code: "unavailable" });
+  if (!V.brzda()) return e.json(429, { error_code: "too_often" });
+  const r = V.brana("POST", { action: "remove", domain: String($os.getenv("KB_CUSTOM_DOMAIN") || "") });
+  if (r.status === 409) return e.json(409, { error_code: "busy", request: (r.json.detail || {}).request || null });
+  if (r.status < 200 || r.status >= 300) return e.json(502, { error_code: "gateway_error" });
+  return e.json(200, { requested: true, request: r.json.request || null });
+}, $apis.requireAuth());
+
 // test připojení — bere hodnoty z formuláře (neuložené), prázdný token = uložený
 kbRoute("POST", "/ai-test", (e) => {
   const { jeAdmin } = require(`${__hooks}/helpers.js`);
@@ -4328,7 +4389,9 @@ kbRoute("POST", "/ai-agents/save", (e) => {
   const url = String(info.webhook_url || "").trim();
   if (!/^https?:\/\/.+/i.test(url)) return e.json(400, { error: t(L, "err.agentUrlRequired") });
   // hostovaná instance: webhook agenta nesmí mířit na privátní/lokální adresu (server na ni POSTuje běhy) — stejně jako AI nastavení
-  if (require(`${__hooks}/helpers.js`).aiHostBlocked(url)) return e.json(400, { error: t(L, "err.aiHostPrivate") });
+  // (výjimka: adaptér Hermese na vlastním serveru, KB_PRIVATE_WEBHOOK_HOSTS — viz webhookVyjimka)
+  const H = require(`${__hooks}/helpers.js`);
+  if (!H.webhookVyjimka(url) && H.aiHostBlocked(url)) return e.json(400, { error: t(L, "err.aiHostPrivate") });
 
   let rec;
   if (info.id) {
@@ -5276,6 +5339,7 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
     d.owner = ro.owner;
   }
   if (info.color !== undefined) d.color = String(info.color || "");
+  if (info.icon !== undefined) d.icon = H.ikonaUzlu(info.icon);
   if (info.wait_for_children !== undefined) d.waitForChildren = !!info.wait_for_children;
   // vykonavatel kroku; neplatná hodnota je CHYBA, ne tichý fallback na "human" —
   // jinak by si LLM myslelo, že krok předalo automatizaci, a čekalo by na běh.

@@ -242,6 +242,18 @@ H.beh(async () => {
   await page.keyboard.press('Enter');
   expect(await cekejText('PO-DVOU') && volani[volani.length - 1].messages.some((m) => m.role === 'tool' && /1\) v pátek\n2\) Jana/.test(m.content)), 'Enter v poslední otázce odešle obě odpovědi');
 
+  console.log('== sekce v textu asistenta: „Název: text“ → blok s ikonou (15. 10. 2026) ==');
+  fronta.push(text('Stav mapy „Truhlářství“:\nHotové: zatím nic — všechny kroky jsou otevřené.\nStojí: nic neblokuje, jen se nezačalo.\nHoří: dnes je naplánovaný jediný krok.\nZavolat Novákovi: hotovo\n\nAno, udělám to: zítra.\nZapíšu „Poslat poptávku“ na dnešek: stačí říct.'));
+  await page.click('[data-testid="chat-input"]');
+  await page.keyboard.type('Jak na tom je mapa?');
+  await page.keyboard.press('Enter');
+  expect(await cekejText('Hoří'), 'odpověď se stavem mapy dorazila');
+  // jen POSLEDNÍ odpověď (starší podvržené texty „PO-ENTERU: …“ jsou taky sekce — to je správně)
+  const sekce = await page.evaluate(() => { const b = [...document.querySelectorAll('[data-testid="chat-text-sekce"]')].pop(); return b ? [...b.querySelectorAll('[data-testid="chat-sekce"]')].map((e) => e.getAttribute('data-nazev')) : null; });
+  expect(JSON.stringify(sekce) === JSON.stringify(['Hotové', 'Stojí', 'Hoří']), `Hotové/Stojí/Hoří jsou bloky; řádek s uvozovkami (Stav mapy „…“:), položka „krok: stav“, věta s čárkou ani věta s dvojtečkou uprostřed NEJSOU (${JSON.stringify(sekce)})`);
+  expect(await page.evaluate(() => { const b = [...document.querySelectorAll('[data-testid="chat-text-sekce"]')].pop(); const h = b && [...b.querySelectorAll('[data-testid="chat-sekce"]')].find((e) => e.getAttribute('data-nazev') === 'Hoří'); return !!h && /Zavolat Novákovi: hotovo/.test(h.innerText); }), 'řádek „Zavolat Novákovi: hotovo“ zůstal uvnitř bloku Hoří');
+  expect(/✅/.test(await textPanelu()) && /🔥/.test(await textPanelu()) && /stačí říct/.test(await textPanelu()), 'ikony známých sekcí + zbytek textu zůstal');
+
   console.log('== akce → karta → Ano → uzel v mapě ==');
   fronta.push(nastroj('add_idea_to_map', { idea_id: napad.id, map_id: map.id, parent_id: 'apex' }));
   await page.click('[data-testid="chat-input"]');
@@ -249,10 +261,15 @@ H.beh(async () => {
   await page.keyboard.press('Enter');
   expect(await cekej('[data-testid="chat-akce"][data-stav="ceka"]'), 'karta akce čeká na potvrzení');
   expect((await textPanelu()).includes('Koupit novou pilu') && (await textPanelu()).includes('Truhlářství'), 'karta popisuje akci lidsky');
+  // cesta odkud → kam (15. 10. 2026): zásobník s nápadem nahoře, projekt a zvýrazněný nový řádek dole
+  const cesta = await page.evaluate(() => { const c = document.querySelector('[data-testid="chat-akce-cesta"]'); return c ? { odkud: c.querySelector('[data-testid="chat-akce-cesta-odkud"]')?.innerText || '', mapa: c.querySelector('[data-testid="chat-akce-cesta-mapa"]')?.innerText || '', novy: c.querySelector('[data-testid="chat-akce-cesta-novy"]')?.innerText || '', rodicu: c.querySelectorAll('[data-testid="chat-akce-cesta-rodic"]').length } : null; });
+  expect(!!cesta && /Zásobník/.test(cesta.odkud) && /Truhlářství/.test(cesta.mapa) && /Koupit novou pilu/.test(cesta.novy) && /nový podkrok/.test(cesta.novy) && cesta.rodicu === 0, `karta kreslí cestu zásobník → projekt → nový řádek (${JSON.stringify(cesta)})`);
   fronta.push(text('VLOZENO.'));
   await page.click('[data-testid="chat-akce-ano"]');
   expect(await cekej('[data-testid="chat-akce"][data-stav="hotovo"]', 15000), 'po Ano je karta hotovo');
   expect(await cekej('[data-testid="chat-akce-odkaz"]'), 'karta nabízí odkaz do projektu');
+  // odkaz i úplně dole jako poslední věc tahu (Richard 15. 10. 2026) — pod dopovědí „VLOZENO.“, ne jen v kartě
+  expect(await cekej('[data-testid="chat-odkaz-dole"]') && await page.evaluate(() => { const m = [...document.querySelectorAll('[data-testid="chat-msg"][data-role="assistant"]')].pop(); return !!(m && m.querySelector('[data-testid="chat-odkaz-dole"]') && /VLOZENO/.test(m.innerText)); }), 'poslední zpráva tahu končí odkazem „Ukázat v mapě“');
   const mapPo = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
   expect(mapPo.nodes.length === 3 && mapPo.nodes.some((n) => n.data.title === 'Koupit novou pilu'), 'uzel je v mapě');
 

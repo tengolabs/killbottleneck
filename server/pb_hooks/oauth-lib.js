@@ -21,6 +21,16 @@ function zaklad(e) {
   // funkce pro metadata, WWW-Authenticate i /agent-setup.md — všechno musí říkat
   // TUTÉŽ adresu, jinak MCP SDK odmítne „resource" jako cizí.
   const { publicBaseUrlFromRequest } = require(`${__hooks}/helpers.js`);
+  // Vlastní doména hostované instance: instance odpovídá na DVOU adresách (slug
+  // u provozovatele i doména zákazníka). Discovery musí vrátit adresu, na kterou se
+  // klient ptá — jinak konektor připojený před přepnutím domény přestane sedět
+  // (issuer ≠ resource). Bere se JEN host ze známého seznamu, ne cokoli z hlavičky.
+  // ⚠️ Host je v PB hoocích JEN v e.request.host — Go ho z hlaviček vyjímá, takže
+  // header.get("Host") je vždy prázdné (stejná past jako u /agent-setup.md).
+  const dotaz = String(e.request.host || "").toLowerCase().replace(/:443$/, "");
+  const zname = [$os.getenv("KB_SLUG_DOMAIN"), $os.getenv("KB_CUSTOM_DOMAIN")]
+    .map((d) => String(d || "").trim().toLowerCase()).filter(Boolean);
+  if (dotaz && zname.indexOf(dotaz) >= 0) return `https://${dotaz}`;
   return publicBaseUrlFromRequest($app, e);
 }
 

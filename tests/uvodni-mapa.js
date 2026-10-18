@@ -62,8 +62,9 @@ async function prihlas(email, heslo = HESLO) {
   const r = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: heslo } });
   return r.json?.token;
 }
+// kalendářně (setDate), ne +n·86400000: v týdnu před změnou času (25. 10. 2026) dávalo po půlnoci 25. 10. čtyřikrát (regrese 19. 10.)
 const den = (posun) => {
-  const d = new Date(Date.now() + posun * 86400000);
+  const d = new Date(); d.setDate(d.getDate() + posun);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 

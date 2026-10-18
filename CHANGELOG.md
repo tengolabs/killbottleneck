@@ -9,6 +9,29 @@ below before you jump several versions.
 
 ---
 
+## v0.84-beta — 2026-10-18
+
+**The assistant shows where things go, gives steps icons automatically and structures its answers; Tasks mark sub-steps with `└`**
+
+- **The assistant's confirmation card shows where things go.** Putting an idea into a project, moving a step or adding
+  steps under a step no longer reads as one long sentence: the card draws the path — the idea buffer (or the step's
+  current place) on top, an arrow, then the project, the parent steps and the new or moved row highlighted. The sentence
+  above it only names the action and the project.
+- **The assistant's answers are easier to scan.** A part of the answer that starts with a label ("Done:", "Blocked:",
+  "On fire:", "Recommendation:" …) is shown as its own block with an icon and a coloured edge instead of one long
+  paragraph.
+- **Tasks: sub-steps carry a `└` mark** in front of the name, so a row visibly belongs under the one above it (rows with
+  their own sub-steps keep the expand arrow). The target circle in front of every step name is gone; only the step's own
+  icon shows when you set one.
+- **The assistant gives steps and projects icons automatically.** When it creates a project, adds steps or moves an idea
+  from the buffer, every step gets a fitting emoji (and the project its own); the confirmation card shows them. Ask for
+  icons on an existing project ("add icons everywhere") and the assistant proposes them for all steps in one card. REST
+  API v1 and MCP: nodes accept and return `icon`; the map text the agents read shows icons in front of step names.
+
+Upgrade notes: no configuration changes. REST API v1 and MCP nodes carry an optional `icon` field (up to 16 characters).
+
+---
+
 ## v0.83-beta — 2026-10-16
 
 **Team calendar: shared calendars (company events, meeting room, time off), the calendar as its own page, the assistant handles it all — never per user**

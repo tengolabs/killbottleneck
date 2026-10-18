@@ -18,7 +18,8 @@
     "appearance": "Vzhled",
     "docs": "Dokumentace",
     "myAccount": "Můj účet",
-    "orgStructure": "Organizační struktura"
+    "orgStructure": "Organizační struktura",
+    "portal": "Portál serveru (agent)"
   },
   "nav": {
     "projects": "Projekty",

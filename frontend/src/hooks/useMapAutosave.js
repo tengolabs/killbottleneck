@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useUpdateNodeInternals } from '@xyflow/react';
 import { base44 } from '@/api/base44Client';
 import { rulesApi } from '@/components/rules/rulesApi';
 import { isApexNode as isApexNodeShared } from '@/lib/mapNodes';
@@ -347,7 +348,16 @@ export function useMapAutosave({
   // „zmizely všechny čáry", data v DB přitom zdravá; vzácný souběh — chycen
   // 1× ze ~40 kol). Nezměněný uzel/hrana si proto drží PŮVODNÍ objekt (identita
   // = žádné překreslení), změněné přebírají measured ze starého.
+  // Uzly převzaté slitím (kroky od asistenta) nemají změřené rozměry/úchyty — xyflow k nim hranu nenakreslí, dokud je
+  // nepřeměří. Po nasazení se nové uzly výslovně přeměří (Richard 15. 10. 2026: „po vytvoření nejsou čáry u nodů, až když
+  // aktualizuji stránku“). Hook žije uvnitř ReactFlowProvider (GoalMapEditor).
+  const updateNodeInternals = useUpdateNodeInternals();
+  const premereniRaf = useRef(0); // naplánované přeměření — po odchodu z editoru se zruší
+  useEffect(() => () => { if (premereniRaf.current) cancelAnimationFrame(premereniRaf.current); }, []);
   const nasadNaPlatno = useCallback((noveNodes, noveEdges) => {
+    // nové = co ještě není na plátně podle posledního stavu ze serveru (serverNodes = uzly, které editor převzal naposled)
+    const znameIds = new Set((serverNodes.current || []).map((n) => n.id));
+    const noveIds = (noveNodes || []).map((n) => n.id).filter((id) => !znameIds.has(id));
     setNodes((prev) => {
       const stare = new Map(prev.map((n) => [n.id, n]));
       return (noveNodes || []).map((n) => {
@@ -369,7 +379,12 @@ export function useMapAutosave({
         return { ...ed, type: 'deletable' };
       });
     });
-  }, [setNodes, setEdges]);
+    // dva snímky: první po vykreslení uzlů, druhý pro jistotu po jejich změření
+    if (noveIds.length) {
+      if (premereniRaf.current) cancelAnimationFrame(premereniRaf.current);
+      premereniRaf.current = requestAnimationFrame(() => { updateNodeInternals(noveIds); premereniRaf.current = requestAnimationFrame(() => { updateNodeInternals(noveIds); premereniRaf.current = 0; }); });
+    }
+  }, [setNodes, setEdges, updateNodeInternals]);
 
   // Doklad, že za cizí změnou stojí AUTOMATIZACE — a to zrovna u TĚCH uzlů,
   // které se chystáme převzít. Nestačí „nějaké pravidlo mezitím běželo": na

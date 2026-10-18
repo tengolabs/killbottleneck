@@ -59,7 +59,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
       title: 'Vydání aplikace', apex_text: 'Vydat aplikaci v1.0',
       tree: [
         { title: 'Příprava', deadline: '2026-09-01', children: [
-          { title: 'Napsat changelog' },
+          { title: 'Napsat changelog', icon: '📝' },
           { title: 'Otestovat build', status: 'done' },
         ] },
         { title: 'Nasazení', owner: 'b@x.cz', wait_for_children: true, children: [{ title: 'Deploy skript' }] },
@@ -91,6 +91,8 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     r = await api('GET', `/api/flowmap/v1/maps/${mapId}`, { bearer: aRW });
     expect(r.status === 200 && r.json.tree[0].children.length === 2, `get_map vrací strom (${r.status})`);
     const child1 = r.json.tree[0].children[0].children[0]; // Napsat changelog
+    // icon (15. 10. 2026): v1 ho bere při založení i vrací ve stromu
+    expect(child1.icon === '📝' && r.json.tree[0].children[0].icon === '', `icon uzlu projde create_map a vrátí se v get_map (${child1.icon})`);
     const waitNode = r.json.tree[0].children[1]; // Nasazení (wait_for_children, owner b)
     const waitChild = waitNode.children[0]; // Deploy skript
     r = await api('GET', `/api/flowmap/v1/maps/${mapId}`, { bearer: cRW });

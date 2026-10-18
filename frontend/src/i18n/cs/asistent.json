@@ -329,6 +329,13 @@
   "treeLess": "Méně",
   "treePlan": "plán",
   "treeFromBuffer": "ze zásobníku",
+  "pathBuffer": "Zásobník nápadů",
+  "pathFromHere": "odtud",
+  "pathHere": "sem",
+  "pathNewStep": "nový podkrok",
+  "pathSubsteps_one": "podkrok",
+  "pathSubsteps_few": "podkroky",
+  "pathSubsteps_other": "podkroků",
   "dok": {
     "title": "Dokumenty",
     "close": "Zavřít dokumenty",

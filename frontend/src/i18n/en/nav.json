@@ -18,7 +18,8 @@
     "appearance": "Appearance",
     "docs": "Documentation",
     "myAccount": "My account",
-    "orgStructure": "Org structure"
+    "orgStructure": "Org structure",
+    "portal": "Server portal (agent)"
   },
   "nav": {
     "projects": "Projects",

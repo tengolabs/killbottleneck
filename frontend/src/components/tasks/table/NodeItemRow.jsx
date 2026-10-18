@@ -1,6 +1,6 @@
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Pencil, Plus, Calendar, Target, ExternalLink, Inbox, CalendarCheck } from 'lucide-react';
+import { ChevronRight, Pencil, Plus, Calendar, ExternalLink, Inbox, CalendarCheck } from 'lucide-react';
 import TaskRowActions from '@/components/shared/TaskRowActions';
 import { planState } from '@/lib/taskActions';
 import { formatDeadline } from '@/lib/nodeMeta';
@@ -35,12 +35,15 @@ export default function NodeItemRow({ item, depth = 0, hasChildren, collapsed, o
             >
               <ChevronRight className={`w-4 h-4 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
             </button>
+          ) : depth > 0 ? (
+            // podkrok bez vlastních podkroků: odrážka „└“ jako na kartě asistenta — bez ní pod šipkou větve
+            // „nebylo nic“ a nebylo vidět, že řádek patří pod ten nad ním (Richard 15. 10. 2026)
+            <span className="w-4 shrink-0 text-center text-xs leading-none text-muted-foreground" aria-hidden="true" data-testid="task-node-odrazka">└</span>
           ) : (
             <span className="w-4 shrink-0" />
           )}
-          {item.icon
-            ? <span className="text-sm leading-none shrink-0 w-3.5 text-center">{item.icon}</span>
-            : <Target className={`w-3.5 h-3.5 shrink-0 ${item.isApex ? 'text-amber-500' : 'text-primary'}`} />}
+          {/* kolečko (Target) před názvem pryč — Richard 15. 10. 2026: jen odrážka „└“, nebo ikonka, když si ji uživatel nastaví */}
+          {item.icon && <span className="text-sm leading-none shrink-0 w-3.5 text-center">{item.icon}</span>}
           <span className={`text-sm ${item.isApex ? 'font-semibold' : ''} ${isDone ? 'line-through opacity-50' : ''}`}>{item.title}</span>
           {planned && (
             <span

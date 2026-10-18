@@ -48,6 +48,47 @@
     "notTested": "Not verified yet — save the settings or click Test an image.",
     "env": "Image reading is set by the operator (KB_VISION_* environment variables) — it cannot be changed here."
   },
+  "customDomain": {
+    "heading": "Custom domain",
+    "hint": "killBottleneck and the agent chat can run on your own domain (e.g. tasks.company.com). The address {{slug}} keeps working.",
+    "active": "Active: {{domain}}",
+    "remove": "Disconnect domain",
+    "change": "Change domain",
+    "prepare": "Continue",
+    "switching": "Switching to {{domain}} — issuing a certificate and changing the instance address. This takes a few minutes; the app will be briefly unavailable.",
+    "removing": "Disconnecting the custom domain…",
+    "failed": "Switching to {{domain}} failed: {{reason}}. Check the DNS records and try again.",
+    "recordsIntro": "At your domain provider (where {{domain}} is registered), add these DNS records:",
+    "col": {
+      "name": "Name",
+      "type": "Type",
+      "value": "Value",
+      "state": "Check"
+    },
+    "copy": "Copy",
+    "ok": "✔ OK",
+    "check": {
+      "button": "Check and switch",
+      "missing": "record not visible yet",
+      "wrong_target": "points elsewhere ({{found}})",
+      "dns_unavailable": "DNS can't be checked right now, try again shortly"
+    },
+    "tipCloudflare": "If your DNS is at Cloudflare, set both records to “DNS only” (grey cloud) — we can't issue a certificate through the proxy.",
+    "tipApex": "A root domain (no www/subdomain) only allows an A record to the server IP. If we ever move the server we'll let you know and the record will need updating — a subdomain (e.g. tasks.company.com) is more reliable.",
+    "tipWait": "New records usually propagate within minutes, sometimes hours. You can repeat the check.",
+    "tipLogin": "After the switch you'll sign in once more on the new address. E-mails from the app will link to the new address.",
+    "gatewayDown": "The connection to the operator can't be verified right now — the status may be incomplete.",
+    "err": {
+      "generic": "Something went wrong. Please try again.",
+      "bad_domain": "That doesn't look like a domain (e.g. tasks.company.com). killbottleneck.* addresses can't be used.",
+      "too_often": "You can check once every 10 seconds (at most 30 times an hour). Try again shortly.",
+      "busy": "The previous domain change is still in progress.",
+      "gateway_error": "The request couldn't be passed to the operator. Try again shortly, or write to support@killbottleneck.com.",
+      "gateway_unavailable": "This instance has no connection to the operator — we'll set the custom domain on request (support@killbottleneck.com).",
+      "unavailable": "A custom domain isn't available on this plan.",
+      "admin_only": "Only the organisation admin can set a custom domain."
+    }
+  },
   "kalendare": {
     "title": "Shared calendars",
     "desc": "Calendars that are not a person: company events, a meeting room or a car (bookings never overlap), vacations and time off. The whole team sees them; every member can add entries unless you limit it to admins. The assistant handles them (\"book the meeting room tomorrow at 10\", \"who is away next week\"). Never per user.",

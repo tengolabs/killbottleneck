@@ -46,6 +46,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await sleep(1500);
     let txt = await page.evaluate(() => document.body.innerText);
     expect(txt.includes('Zásobník nápadů') && txt.includes('NAPAD-XYZ'), 'zásobník viditelný BEZ filtrů');
+    // odrážka „└“ u podkroku bez vlastních podkroků (Richard 15. 10. 2026: pod šipkou větve nebylo nic)
+    const odrazky = await page.$$eval('[data-testid="task-node-odrazka"]', (els) => els.map((e) => e.closest('tr')?.innerText || ''));
+    expect(odrazky.length >= 1 && odrazky.some((t) => /Zázemí úkolů/.test(t)), `podkrok „Zázemí úkolů“ má před názvem odrážku └ (${odrazky.length})`);
 
     // zapnout filtr „Moje úkoly" (tlačítko v liště filtrů) — zásobník musí zůstat
     for (const h of await page.$$('button')) {

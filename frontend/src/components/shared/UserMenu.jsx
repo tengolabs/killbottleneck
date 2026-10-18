@@ -22,8 +22,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User as UserIcon, LogOut, Shield, UserPlus, Info, BookOpen, KeyRound, Clock, Languages, Bot, Cable, Smartphone, Palette, UserCog, Network, Bug } from 'lucide-react';
+import { User as UserIcon, LogOut, Shield, UserPlus, Info, BookOpen, KeyRound, Clock, Languages, Bot, Cable, Smartphone, Palette, UserCog, Network, Bug, LayoutDashboard } from 'lucide-react';
 import { useLanguageSwitch } from '@/components/LanguageToggle';
+import { useKbConfig } from '@/hooks/useKbConfig';
 // líně — dialog i jeho texty jsou mimo hlavní balík (viz AgentSetupGate)
 const AgentSetupDialog = lazy(() => import('@/components/shared/AgentSetupDialog'));
 
@@ -60,6 +61,10 @@ export default function UserMenu({ onInvited }) {
   // V cizím self-hostu se položka vůbec neukáže — nic nemá odcházet ven
   // bez vědomí toho, kdo instanci provozuje.
   const reportCfg = useReportConfig(!!user);
+  // KB Cloud Pro / AI Agent: portál serveru (agent Hermes, stav služeb). Jen správci
+  // a jen tam, kde ho provisioning nastavil (KB_PORTAL_URL) — self-host ani Lite ho nemají.
+  const { config: kbCfg } = useKbConfig(!!user);
+  const portalUrl = kbCfg?.portal_url || '';
 
   // Organizační struktura pod panáčkem — vidí ji KAŽDÝ člen (Richard 15. 8.);
   // kdo ji nesmí měnit, dostane mapu jen pro čtení.
@@ -133,6 +138,13 @@ export default function UserMenu({ onInvited }) {
           {(user?.role === 'admin' || smiSpravovatStrukturu) && (
             <DropdownMenuItem onClick={() => navigate('/admin/users')}>
               <Shield className="w-4 h-4 mr-2" /> {t('menu.orgAdmin')}
+            </DropdownMenuItem>
+          )}
+          {user?.role === 'admin' && portalUrl && (
+            <DropdownMenuItem asChild data-testid="menu-portal">
+              <a href={portalUrl} target="_blank" rel="noopener noreferrer">
+                <LayoutDashboard className="w-4 h-4 mr-2" /> {t('menu.portal')}
+              </a>
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />

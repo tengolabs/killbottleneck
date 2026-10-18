@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { BookOpen, Check, CheckCheck, ClipboardList, Copy, Download, ExternalLink, FileText, Loader2, Mail, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { ArrowDown, BookOpen, Check, CheckCheck, ClipboardList, Copy, CornerDownRight, Download, ExternalLink, FileText, Folder, Inbox, Lightbulb, Loader2, Mail, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, Plus, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
@@ -98,16 +98,20 @@ const STAV_STYL = {
 // vlastním v1 API; Ne → model dostane „zamítnuto" a hledá jinou cestu.
 // Celý strom nových uzlů na kartě (fáze C, 1. 10. 2026): prvních 12 řádků, zbytek po rozbalení — náhled
 // před založením, jaký měl starý Poradce. Řádek = odsazení podle úrovně, řešitel, termín, plán.
-function KartaStrom({ strom }) {
+// zaklad = o kolik úrovní je strom zavěšený pod cestou (KartaCesta u add_nodes) — odsazuje řádky, ne celý rámeček
+function KartaStrom({ strom, zaklad = 0 }) {
   const { t } = useTranslation('asistent');
   const [vse, setVse] = useState(false);
   const radky = vse ? strom : strom.slice(0, 12);
   return (
-    <div className="mt-1.5 rounded-md border bg-background/60 px-2 py-1.5 text-xs" data-testid="chat-akce-strom">
+    <div className={zaklad > 0 ? 'mt-0.5 text-xs' : 'mt-1.5 rounded-md border bg-background/60 px-2 py-1.5 text-xs'} data-testid="chat-akce-strom">
+      {/* flex-wrap + min-w názvu: v úzkém panelu řešitel a datum zalomí POD název — bez toho se název (flex-1 min-w-0)
+          smrskl na sloupec písmen vedle pevně širokých štítků (Richard 15. 10. 2026, snímek) */}
       {radky.map((r, i) => (
-        <div key={i} className="flex items-baseline gap-1.5 py-0.5" style={{ paddingLeft: `${Math.min(r.u, 6) * 14}px` }} data-testid="chat-akce-strom-uzel" data-uroven={r.u}>
-          <span className="text-muted-foreground">{r.u === 0 ? '•' : '–'}</span>
-          <span className="flex-1 min-w-0 break-words">{r.t}{r.z ? <span className="text-muted-foreground"> · {t('treeFromBuffer')}</span> : null}
+        <div key={i} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 py-0.5" style={{ paddingLeft: `${Math.min(zaklad + r.u, 6) * 14}px` }} data-testid="chat-akce-strom-uzel" data-uroven={r.u}>
+          {/* ikona kroku od asistenta (15. 10. 2026) místo obecné odrážky */}
+          <span className={r.i ? 'shrink-0' : 'text-muted-foreground'} data-testid={r.i ? 'chat-akce-strom-ikona' : undefined}>{r.i ? r.i : (r.u === 0 ? '•' : '–')}</span>
+          <span className="flex-1 min-w-[9rem] break-words">{r.t}{r.z ? <span className="text-muted-foreground"> · {t('treeFromBuffer')}</span> : null}
             {/* popis kroku (třeba měřitelný cíl od AI) musí být vidět PŘED potvrzením — klik-test 1. 10. 2026 */}
             {r.k ? <span className="block text-muted-foreground" data-testid="chat-akce-strom-popis">{r.k}</span> : null}
           </span>
@@ -125,6 +129,55 @@ function KartaStrom({ strom }) {
   );
 }
 
+// Cesta „odkud → kam → pod co“ (15. 10. 2026, schválený náhled A): nápad ze zásobníku / přesouvaný krok nahoře,
+// šipka, pak projekt → nadřazené kroky → nový řádek zvýrazněný čárkovaně. U add_nodes se pod rodiče zavěsí celý strom
+// nových uzlů (KartaStrom) odsazený o hloubku rodičů.
+function Radek({ u, ik, children, testid }) {
+  return (
+    <div className="flex items-baseline gap-1.5 py-0.5" style={{ paddingLeft: `${Math.min(u, 6) * 14}px` }} data-testid={testid}>
+      <span className="shrink-0 text-muted-foreground w-[1.1em] text-center">{ik}</span>
+      <span className="flex-1 min-w-0 break-words">{children}</span>
+    </div>
+  );
+}
+function KartaCesta({ cesta, strom }) {
+  const { t } = useTranslation('asistent');
+  const rodice = Array.isArray(cesta.rodice) ? cesta.rodice : [];
+  const hl = rodice.length + 1;
+  const podkroky = (n) => (n > 0 ? <span className="text-muted-foreground"> (+{n} {t('pathSubsteps', { count: n })})</span> : null);
+  const odkud = cesta.odkud;
+  return (
+    <div className="mt-1.5 rounded-md border bg-background/60 px-2 py-1.5 text-xs" data-testid="chat-akce-cesta">
+      {odkud && odkud.druh === 'zasobnik' && (
+        <>
+          <Radek u={0} ik={<Inbox className="w-3.5 h-3.5 inline" />} testid="chat-akce-cesta-odkud"><span className="text-muted-foreground">{t('pathBuffer')}</span></Radek>
+          <Radek u={1} ik={<Lightbulb className="w-3.5 h-3.5 inline" />}>{odkud.t}</Radek>
+        </>
+      )}
+      {odkud && odkud.druh === 'uzel' && (
+        <>
+          <Radek u={0} ik={<Folder className="w-3.5 h-3.5 inline" />} testid="chat-akce-cesta-odkud"><b>{cesta.mapa.t}</b>{cesta.mapa.c ? <span className="text-muted-foreground"> {cesta.mapa.c}</span> : null}</Radek>
+          {(odkud.rodice || []).map((r, i) => <Radek key={i} u={i + 1} ik="└">{r}</Radek>)}
+          <Radek u={(odkud.rodice || []).length + 1} ik="└"><span className="line-through text-muted-foreground">{odkud.t}</span>{podkroky(odkud.pocet)}<span className="text-muted-foreground"> → {t('pathFromHere')}</span></Radek>
+        </>
+      )}
+      {odkud && <div className="text-center text-amber-600 dark:text-amber-400 py-0.5" aria-hidden="true"><ArrowDown className="w-4 h-4 inline" /></div>}
+      <Radek u={0} ik={<Folder className="w-3.5 h-3.5 inline" />} testid="chat-akce-cesta-mapa"><b>{cesta.mapa.t}</b>{cesta.mapa.c ? <span className="text-muted-foreground"> {cesta.mapa.c}</span> : null}</Radek>
+      {rodice.map((r, i) => <Radek key={i} u={i + 1} ik="└" testid="chat-akce-cesta-rodic">{r}</Radek>)}
+      {cesta.novy && (
+        <Radek u={hl} ik="└" testid="chat-akce-cesta-novy">
+          <span className="inline-block rounded-md border border-dashed border-emerald-500 bg-emerald-500/10 px-1.5 py-0.5">
+            {cesta.novy.druh === 'presun' ? <CornerDownRight className="w-3 h-3 inline mr-1" /> : <Plus className="w-3 h-3 inline mr-1" />}{cesta.novy.t}
+          </span>
+          {podkroky(cesta.novy.pocet)}
+          <span className="text-muted-foreground"> {cesta.novy.druh === 'presun' ? t('pathHere') : t('pathNewStep')}</span>
+        </Radek>
+      )}
+      {Array.isArray(strom) && strom.length > 0 && <KartaStrom strom={strom} zaklad={hl} />}
+    </div>
+  );
+}
+
 function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, onRevertNastaveni }) {
   const { t } = useTranslation('asistent');
   const stav = karta.stav || 'ceka';
@@ -136,7 +189,7 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
     <div className={`mt-2 rounded-lg border p-2.5 text-sm ${STAV_STYL[stav] || STAV_STYL.ceka}`} data-testid="chat-akce" data-stav={stav}>
       <p className="font-medium leading-snug">{karta.popis}</p>
       {karta.detail && <p className="text-xs text-muted-foreground mt-0.5" data-testid="chat-akce-detail">{karta.detail}</p>}
-      {Array.isArray(karta.strom) && karta.strom.length > 0 && <KartaStrom strom={karta.strom} />}
+      {karta.cesta && karta.cesta.mapa ? <KartaCesta cesta={karta.cesta} strom={karta.strom} /> : (Array.isArray(karta.strom) && karta.strom.length > 0 && <KartaStrom strom={karta.strom} />)}
       {karta.jednorazove && karta.jednorazove.temp_password && <DocasneHeslo udaj={karta.jednorazove} />}
       {stav === 'ceka' ? (
         <div className="mt-2 flex gap-2">
@@ -456,17 +509,68 @@ function KartaKoncept({ karta, onOtevriDokument }) {
   );
 }
 
-// Prostý text s lehkým členěním: řádek zakončený dvojtečkou (do 60 znaků) je
-// název sekce → polotučně. Žádný markdown, model ho nemá psát.
-function Text({ text }) {
-  const radky = String(text).split('\n');
+// Prostý text s členěním do sekcí (Richard 15. 10. 2026, schválený náhled A): „Název: text“ nebo řádek „Název:“ = sekce
+// s ikonou, tučným názvem a barevným proužkem; tělo = zbytek řádku + další řádky až po prázdný řádek / další sekci.
+// Známé názvy (cs/en) mají ikonu a barvu, ostatní obecnou odrážku. Žádný markdown, model ho nemá psát.
+const SEKCE_ZNAME = [
+  [/^(hotov[éoe]|done|completed|finished)$/i, '✅', 'border-emerald-500 bg-emerald-500/10'],
+  [/^(stoj[íi]|blocked|stuck|waiting|čeká)$/i, '⏸️', 'border-muted-foreground/60 bg-muted/40'],
+  [/^(ho[řr][íi]|co ho[řr][íi]|urgent|burning|on fire)$/i, '🔥', 'border-orange-500 bg-orange-500/10'],
+  [/^(dnes|today)$/i, '📅', 'border-sky-500 bg-sky-500/10'],
+  [/^(bl[íi][žz][íi] se|na p[řr][íi][šs]t[íi] t[ýy]den|upcoming|next week|coming up)$/i, '⏳', 'border-amber-500 bg-amber-500/10'],
+  [/^(doporu[čc]en[íi]|recommendation|doporu[čc]uji|i recommend)$/i, '💡', 'border-primary bg-primary/10'],
+  [/^(dal[šs][íi] krok|nejmen[šs][íi] krok|next step|smallest step|co d[áa]l|what next)$/i, '➡️', 'border-primary bg-primary/10'],
+  [/^(shrnut[íi]|summary|n[áa]zev|title)$/i, '📝', 'border-primary bg-primary/10'],
+  [/^(rizik[ao]|risks?|pozor|warning)$/i, '⚠️', 'border-destructive bg-destructive/10'],
+];
+const sekceInfo = (nazev) => { const n = nazev.trim(); for (const [re, ik, b] of SEKCE_ZNAME) if (re.test(n)) return { ik, b }; return { ik: '•', b: 'border-border bg-muted/30' }; };
+// „Název: text“ — název do 4 slov / 40 znaků, bez uvozovek, čísel a interpunkce (ať „Zapíšu „X“ na dnešek: …“, čas „10:30“
+// ani „Ano, udělám to: zítra.“ nejsou sekce). Neznámý název je sekce jen s delším textem — řádek „Zavolat Novákovi: hotovo“
+// je položka seznamu, ne blok (panel 18. 10. 2026).
+const RE_SEKCE = /^([^-•\s"„“(][^:"„“(),.!?\d]{0,38}?)\s*:(?:\s+(.*))?$/;
+const jeZnamaSekce = (n) => SEKCE_ZNAME.some(([re]) => re.test(n.trim()));
+function rozdelSekce(text) {
+  const out = []; let akt = null;
+  for (const r of String(text).split('\n')) {
+    const m = RE_SEKCE.exec(r.trim());
+    let nazev = m && m[1].trim().split(/\s+/).length <= 4 ? m[1].trim() : null;
+    if (nazev && !jeZnamaSekce(nazev) && m[2] && m[2].trim().length < 25) nazev = null;
+    if (nazev) { akt = { nazev, radky: m[2] ? [m[2]] : [] }; out.push(akt); continue; }
+    if (akt && r.trim() === '') { akt = null; out.push({ radky: [''] }); continue; }
+    if (akt) akt.radky.push(r); else if (out.length && !out[out.length - 1].nazev) out[out.length - 1].radky.push(r); else out.push({ radky: [r] });
+  }
+  return out;
+}
+// Odrážky („- “, „• “, „1) “) odskočené od textu s předsazením — zalomený řádek se zarovná za značku (Richard 15. 10. 2026)
+const RE_ODRAZKA = /^(\s*)([-•–]|\d{1,2}[.)](?!\s+\d))\s+/; // „15. 10. 2026 — schůzka“ není odrážka
+function Odstavec({ text, className }) {
+  const radky = String(text).replace(/^\n+|\n+$/g, '').split('\n');
+  if (!radky.some((r) => RE_ODRAZKA.test(r))) return <p className={`whitespace-pre-wrap break-words ${className || ''}`}>{radky.join('\n')}</p>;
   return (
-    <p className="whitespace-pre-wrap break-words">
-      {radky.map((r, i) => {
-        const sekce = /^[^-•\s].{0,58}:$/.test(r.trim());
-        return <span key={i}>{sekce ? <span className="font-semibold">{r}</span> : r}{i < radky.length - 1 ? '\n' : ''}</span>;
+    <div className={`break-words ${className || ''}`}>
+      {radky.map((r, i) => (RE_ODRAZKA.test(r)
+        ? <div key={i} className="whitespace-pre-wrap" style={{ paddingLeft: '1.75rem', textIndent: '-1rem' }} data-testid="chat-odrazka">{r.replace(/^\s+/, '')}</div>
+        : <div key={i} className="whitespace-pre-wrap min-h-[0.5em]">{r}</div>))}
+    </div>
+  );
+}
+function Text({ text }) {
+  const casti = rozdelSekce(text);
+  if (!casti.some((c) => c.nazev)) return <Odstavec text={text} />;
+  return (
+    <div className="space-y-1.5" data-testid="chat-text-sekce">
+      {casti.map((c, i) => {
+        if (!c.nazev) { const t = c.radky.join('\n').replace(/^\n+|\n+$/g, ''); return t ? <Odstavec key={i} text={t} /> : null; }
+        const { ik, b } = sekceInfo(c.nazev);
+        const telo = c.radky.join('\n').replace(/\n+$/g, '');
+        return (
+          <div key={i} className={`border-l-4 rounded-r-md pl-2.5 pr-2 py-1 ${b}`} data-testid="chat-sekce" data-nazev={c.nazev}>
+            <div className="font-semibold leading-snug"><span className="mr-1.5" aria-hidden="true">{ik}</span>{c.nazev}</div>
+            {telo && <Odstavec text={telo} className="mt-0.5" />}
+          </div>
+        );
       })}
-    </p>
+    </div>
   );
 }
 
@@ -559,7 +663,7 @@ function ZpravaUzivatele({ zprava, lzeOpravit, onOprav, loading }) {
   );
 }
 
-export default function AsistentZprava({ zprava, posledni, loading, onSend, onPotvrd, onRevertSkin, onRevertNastaveni, onKlientSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, lzeOpravit, onOprav, extraNavrh }) {
+export default function AsistentZprava({ zprava, posledni, odkazDole, loading, onSend, onPotvrd, onRevertSkin, onRevertNastaveni, onKlientSkin, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, lzeOpravit, onOprav, extraNavrh }) {
   const { t } = useTranslation('asistent');
   if (zprava.role === 'tool') return null;
   const jaUzivatel = zprava.role === 'user';
@@ -637,6 +741,13 @@ export default function AsistentZprava({ zprava, posledni, loading, onSend, onPo
           if (k.type === 'napad') return <p key={i} className="mt-1.5 text-xs text-muted-foreground" data-testid="chat-napad-karta">{t('ideaSaved', { title: k.title })}</p>;
           return null;
         })}
+        {odkazDole && (
+          <div className="mt-2 pt-1.5 border-t border-border/50 flex justify-end text-xs" data-testid="chat-odkaz-dole">
+            <Link to={`/map/${odkazDole.map_id}${odkazDole.node_id ? `?node=${encodeURIComponent(odkazDole.node_id)}` : ''}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline">
+              {odkazDole.node_id ? t('actionOpenNode') : t('actionOpen')} <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

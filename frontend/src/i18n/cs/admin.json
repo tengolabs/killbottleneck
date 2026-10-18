@@ -48,6 +48,47 @@
     "notTested": "Zatím neověřeno — uložte nastavení nebo klikněte na Otestovat obrázek.",
     "env": "Čtení obrázků nastavil provozovatel (proměnné prostředí KB_VISION_*) — tady se nemění."
   },
+  "customDomain": {
+    "heading": "Vlastní doména",
+    "hint": "killBottleneck i chat s agentem můžou běžet na vaší doméně (např. ukoly.firma.cz). Adresa {{slug}} bude fungovat dál.",
+    "active": "Aktivní: {{domain}}",
+    "remove": "Odpojit doménu",
+    "change": "Změnit doménu",
+    "prepare": "Pokračovat",
+    "switching": "Přepínáme na {{domain}} — vydáváme certifikát a měníme adresu instance. Trvá to pár minut, aplikace bude chvíli nedostupná.",
+    "removing": "Odpojujeme vlastní doménu…",
+    "failed": "Přepnutí na {{domain}} se nepovedlo: {{reason}}. Zkontrolujte DNS záznamy a zkuste to znovu.",
+    "recordsIntro": "U správce domény (kde máte {{domain}} registrovanou) přidejte tyto DNS záznamy:",
+    "col": {
+      "name": "Název",
+      "type": "Typ",
+      "value": "Hodnota",
+      "state": "Kontrola"
+    },
+    "copy": "Zkopírovat",
+    "ok": "✔ sedí",
+    "check": {
+      "button": "Zkontrolovat a přepnout",
+      "missing": "záznam zatím není vidět",
+      "wrong_target": "míří jinam ({{found}})",
+      "dns_unavailable": "DNS teď nejde ověřit, zkuste za chvíli"
+    },
+    "tipCloudflare": "Máte-li DNS u Cloudflare, nastavte u obou záznamů „DNS only“ (šedý mráček) — přes proxy certifikát nevydáme.",
+    "tipApex": "U hlavní domény (bez www/subdomény) jde jen záznam A na IP serveru. Kdybychom server stěhovali, dáme vám vědět a záznam bude potřeba upravit — spolehlivější je subdoména (např. ukoly.firma.cz).",
+    "tipWait": "Nové záznamy se šíří obvykle pár minut, někdy až hodiny. Kontrolu můžete opakovat.",
+    "tipLogin": "Po přepnutí se na nové adrese jednou znovu přihlásíte. E-maily z aplikace budou odkazovat na novou adresu.",
+    "gatewayDown": "Spojení s provozovatelem teď nejde ověřit — stav se může zobrazovat neúplně.",
+    "err": {
+      "generic": "Něco se nepovedlo. Zkuste to prosím znovu.",
+      "bad_domain": "Tohle nevypadá jako doména (např. ukoly.firma.cz). Adresy killbottleneck.* použít nejdou.",
+      "too_often": "Kontrolovat jde jednou za 10 vteřin (nejvýš 30× za hodinu). Zkuste to za chvíli.",
+      "busy": "Předchozí změna domény ještě probíhá.",
+      "gateway_error": "Žádost se nepodařilo předat provozovateli. Zkuste to za chvíli, případně napište na support@killbottleneck.com.",
+      "gateway_unavailable": "Tahle instance nemá spojení s provozovatelem — vlastní doménu nastavíme na požádání (support@killbottleneck.com).",
+      "unavailable": "Vlastní doména není v tomto tarifu k dispozici.",
+      "admin_only": "Vlastní doménu nastavuje jen správce organizace."
+    }
+  },
   "kalendare": {
     "title": "Sdílené kalendáře",
     "desc": "Kalendáře, které nejsou osoba: společné akce firmy, zasedací místnost nebo auto (rezervace se nepřekrývají), dovolené a nepřítomnosti. Vidí je celý tým; zapisovat může každý člen, pokud to nezúžíte na správce. Asistent je umí obsluhovat („zarezervuj zasedačku zítra v 10“, „kdo je příští týden pryč“). Za lidi se neplatí.",

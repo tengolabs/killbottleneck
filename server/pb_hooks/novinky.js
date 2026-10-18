@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.84-beta": {
+    cs: [
+      "Karta asistenta před potvrzením kreslí cestu: odkud nápad nebo krok bere, do kterého projektu a pod který krok ho dává — nový řádek je zvýrazněný.",
+      "Asistent dává krokům a projektům ikonky sám; řekněte „doplň ikonky všude“ a navrhne je pro celý projekt v jedné kartě.",
+      "Odpověď asistenta je členěná: část začínající návěštím (Hotové, Hoří, Doporučení…) je blok s ikonou a barevným proužkem, odrážky jsou odsazené.",
+      "V Úkolech mají podkroky před názvem značku └ a terčík před každým krokem zmizel — zůstává jen vlastní ikonka kroku.",
+      "Odkaz „Ukázat v mapě“ je i na konci odpovědi, když za hotovou kartou následuje další text.",
+    ],
+    en: [
+      "Before you confirm, the assistant's card draws the path: where the idea or step comes from, which project it goes to and under which step — the new row is highlighted.",
+      "The assistant gives steps and projects icons by itself; say \"add icons everywhere\" and it proposes them for the whole project in one card.",
+      "The assistant's answers are structured: a part starting with a label (Done, On fire, Recommendation…) becomes a block with an icon and a coloured edge, bullets are indented.",
+      "In Tasks, sub-steps carry a └ mark in front of the name and the target circle before every step is gone — only the step's own icon remains.",
+      "The \"Show in map\" link also appears at the end of the answer when more text follows the completed card.",
+    ],
+  },
   "v0.83-beta": {
     cs: [
       "Kalendář má vlastní stránku a položku Kalendář v hlavní nabídce — už není schovaný v Úkolech.",

@@ -536,8 +536,29 @@ export default function AsistentPanel({ lite = false }) {
   // poslední VIDITELNÁ zpráva (zprávy nástrojů se nekreslí): když model skončí textem
   // a zároveň suggest_next, leží za odpovědí ještě výsledek nástroje a čipy by byly zašedlé
   const posledniUzivatelIdx = zpravy.map((z) => z.role).lastIndexOf('user');
+  // „Ukázat v mapě“ i úplně dole jako poslední věc tahu (Richard 15. 10. 2026): odkaz hotové karty z kteréhokoli
+  // bloku tahu se zopakuje pod poslední zprávou asistenta v tahu — jen když za kartou ještě něco je (text, čipy),
+  // jinak by byl dvakrát pod sebou
   let posledniIdx = zpravy.length - 1;
   while (posledniIdx > 0 && zpravy[posledniIdx].role === 'tool') posledniIdx--;
+  const odkazDole = (i) => {
+    const z = zpravy[i];
+    if (i !== posledniIdx || !z || z.role !== 'assistant') return null; // jen poslední zpráva tahu
+    let zac = i; while (zac > 0 && zpravy[zac - 1].role !== 'user') zac -= 1;
+    const blok = zpravy.slice(zac, i + 1);
+    // po založení projektu už server přidává kartu „Otevřít projekt“ — druhý odkaz by byl navíc
+    if (blok.some((m) => (m.karty || []).some((k) => k.type === 'otevrit'))) return null;
+    let odkaz = null; let zaKartou = false;
+    blok.forEach((m, mi) => {
+      (m.karty || []).forEach((k) => {
+        if (k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.map_id && !k.odkaz.pripominka) { odkaz = k.odkaz; zaKartou = false; return; }
+        if (odkaz && (k.type === 'navrhy' || k.type === 'otazky')) zaKartou = true;
+      });
+      // text zprávy se kreslí NAD jejími kartami — „za kartou“ je tedy jen text pozdější zprávy
+      if (odkaz && mi > 0 && m.content && String(m.content).trim() && !(m.karty || []).some((k) => k.odkaz === odkaz)) zaKartou = true;
+    });
+    return odkaz && zaKartou ? odkaz : null;
+  };
   const chyba = A.error ? (A.error === 'rate' ? t('errorRate') : A.error === 'timeout' ? t('errorTimeout') : A.error === 'lost' ? t('errorLost') : A.error === 'generic' ? t('errorGeneric') : A.error) : null;
   const chips = t('chips', { returnObjects: true });
   // telefon na výšku + relax „vedle“ = scéna NAD chatem (RelaxVrstva), panel začíná pod ní
@@ -656,7 +677,7 @@ export default function AsistentPanel({ lite = false }) {
               // klíč nese i rozhovor: jinak stav karet (rozepsaná odpověď, otevřená úprava přepisu) přežil přepnutí
               // rozhovoru z historie a karta s jiným počtem otázek pak při odeslání spadla
               <div key={`${(A.chat && A.chat.id) || 'novy'}:${i}`} ref={i === prvniOdpovedIdx ? zacatekOdpovedi : undefined} className={i === prvniOdpovedIdx ? 'scroll-mt-2' : undefined}>
-                <AsistentZprava zprava={z} posledni={i === posledniIdx} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onRevertNastaveni={vratNastaveni} onKlientSkin={potvrdKlientaSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} lzeOpravit={i === posledniUzivatelIdx && !!(A.chat && A.chat.lze_opravit)} onOprav={opravPrepis} extraNavrh={i === posledniIdx ? relaxNavrh : ''} />
+                <AsistentZprava zprava={z} posledni={i === posledniIdx} odkazDole={odkazDole(i)} loading={A.loading} onSend={odesli} onPotvrd={potvrd} onRevertSkin={vratSkin} onRevertNastaveni={vratNastaveni} onKlientSkin={potvrdKlientaSkin} onOdkaz={poOdkazu} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={otevriDokument} lzeOpravit={i === posledniUzivatelIdx && !!(A.chat && A.chat.lze_opravit)} onOprav={opravPrepis} extraNavrh={i === posledniIdx ? relaxNavrh : ''} />
               </div>
             ))}
             {A.loading && (

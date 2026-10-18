@@ -1235,6 +1235,9 @@ function normalizeMapData(nodes, edges, lang) {
 // apex/parent sama. Pozice = jen pořadí sourozenců (x = index), finální rozložení
 // dělá layoutTreeServer na celé mapě. Id: node-<ts>-<n> (vzor templateToMapServer).
 // Vrací { nodes, edges, rootIds, count } nebo { error } (i18n hláška).
+// ikona uzlu z API: řetězec, nejvýš 16 kódových bodů (stejný strop jako normalizeNodeShapes v hooku goalmaps — bez něj šlo uložit megabajty;
+// canonicalNodeData neořezává). Jediné místo ořezu — chat i MCP volají tuhle funkci.
+function ikonaUzlu(v) { return typeof v === "string" ? Array.from(v.trim()).slice(0, 16).join("") : ""; }
 function treeItemsToNodes(items, idPrefix, lang) {
   const { t } = require(`${__hooks}/i18n.js`);
   const NODE_STATUSES = { todo: true, in_progress: true, done: true }; // lib/statusMeta.js
@@ -1279,7 +1282,7 @@ function treeItemsToNodes(items, idPrefix, lang) {
           description: String(item.description || ""),
           collapsed: false,
           color: color,
-          icon: "",
+          icon: ikonaUzlu(item.icon), // emoji před názvem (v1 od 15. 10. 2026: asistent dává ikonky automaticky)
           nodeType: "normal",
           goalType: "",
           apexText: "",
@@ -1315,7 +1318,7 @@ function treeItemsToNodes(items, idPrefix, lang) {
 // klíč = CHYBA s výčtem povolených polí, ne tiché ignorování: 28. 8. 2026 agent
 // (Hermes) poslal `priority`, server vrátil 200 a klíč zahodil → agent ohlásil
 // „hotovo" nad nezměněnou mapou. Stejná přísnost jako u `scope` klíčů (P6-05).
-const V1_NODE_FIELDS = ["title", "status", "description", "deadline", "planned_on", "owner", "color",
+const V1_NODE_FIELDS = ["title", "status", "description", "deadline", "planned_on", "owner", "color", "icon",
   "wait_for_children", "executor_kind", "executor_name", "automation_wanted", "automation_note"];
 const V1_TREE_ITEM_FIELDS = V1_NODE_FIELDS.concat(["children"]);
 const V1_BODY_FIELDS = {
@@ -1490,6 +1493,7 @@ function mapToTree(nodes, edges) {
       automation_wanted: !!d.automationWanted,
       automation_note: d.automationNote || "",
       color: d.color || "",
+      icon: d.icon || "",
       children: [],
     };
   };
@@ -3809,8 +3813,25 @@ function isPrivateHost(url, prisne) {
   return false; // veřejné jméno; přesměrování dovírá až síťová vrstva
 }
 
+// Úzká výjimka pro vlastní server (KB Cloud Pro / AI Agent): adaptér agenta Hermes
+// běží ve stejné compose síti (kb-portal:8100) — privátní adresa, kterou by guard jinak
+// odmítl. KB_PRIVATE_WEBHOOK_HOSTS = čárkami oddělené `host:port`; povoluje JEN přesnou
+// shodu hostu i portu, ne celou síť (plošné KB_ALLOW_PRIVATE_WEBHOOKS=1 by otevřelo
+// i metadata poskytovatele a cokoli dalšího v síti serveru).
+function webhookVyjimka(url) {
+  const povolene = String(env("PRIVATE_WEBHOOK_HOSTS") || "").split(",")
+    .map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (!povolene.length) return false;
+  const m = String(url || "").match(/^https?:\/\/([^/?#@]+)(?:[/?#]|$)/i);
+  if (!m) return false;
+  const hp = m[1].toLowerCase();
+  // bez portu se nepouští: výjimka je pro jednu službu, ne pro jméno na libovolném portu
+  return hp.indexOf(":") > 0 && povolene.indexOf(hp) >= 0;
+}
+
 function webhookHostBlocked(url) {
   if (env("ALLOW_PRIVATE_WEBHOOKS") === "1") return false;
+  if (webhookVyjimka(url)) return false;
   // na hostovaném boxu i jména (soused, metadata poskytovatele), doma jen adresy
   return isPrivateHost(url, env("HOSTED") === "1");
 }
@@ -7605,8 +7626,8 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

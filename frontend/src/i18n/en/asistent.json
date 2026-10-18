@@ -329,6 +329,13 @@
   "treeLess": "Less",
   "treePlan": "plan",
   "treeFromBuffer": "from the buffer",
+  "pathBuffer": "Idea buffer",
+  "pathFromHere": "from here",
+  "pathHere": "here",
+  "pathNewStep": "new sub-step",
+  "pathSubsteps_one": "sub-step",
+  "pathSubsteps_few": "sub-steps",
+  "pathSubsteps_other": "sub-steps",
   "dok": {
     "title": "Documents",
     "close": "Close documents",

@@ -162,7 +162,9 @@ H.beh(async () => {
   expect(chat.pending.length === 1 && chat.pending[0].name === 'add_idea_to_map', 'akce čeká v pending');
   am = chat.messages[chat.messages.length - 1];
   const karta = (am.karty || []).find((k) => k.type === 'akce');
-  expect(!!karta && karta.stav === 'ceka' && /Koupit novou pilu/.test(karta.popis) && /Truhlářství/.test(karta.popis), `karta akce s lidským popisem (${karta && karta.popis})`);
+  expect(!!karta && karta.stav === 'ceka' && /^Vložit nápad ze zásobníku do projektu „Truhlářství/.test(karta.popis), `karta akce s lidským popisem (${karta && karta.popis})`);
+  // cesta odkud → kam (15. 10. 2026): nápad ze zásobníku, na vrchol = bez rodičů; název nápadu je v cestě, ne ve větě
+  expect(!!karta && karta.cesta && karta.cesta.odkud.druh === 'zasobnik' && karta.cesta.odkud.t === 'Koupit novou pilu' && /^Truhlářství/.test(karta.cesta.mapa.t) && (karta.cesta.rodice || []).length === 0 && karta.cesta.novy.t === 'Koupit novou pilu' && karta.cesta.novy.druh === 'novy', `karta nese cestu zásobník → projekt (${JSON.stringify(karta && karta.cesta)})`);
   let mapPo = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
   expect(mapPo.nodes.length === 2, 'mapa se BEZ potvrzení nezměnila');
   fronta.push(text('Rozumím, nechám to být.'));
@@ -232,7 +234,7 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Dej brusný papír k pile' } });
   chat = r.json.chat;
   const kN = chat.messages[chat.messages.length - 1].karty.find((k) => k.type === 'akce');
-  expect(!!kN && /Objednat brusný papír/.test(kN.popis) && /pod „Koupit novou pilu“/.test(kN.popis), `karta nese název nápadu i rodiče (${kN && kN.popis})`);
+  expect(!!kN && kN.cesta && kN.cesta.odkud.t === 'Objednat brusný papír' && JSON.stringify(kN.cesta.rodice) === '["Koupit novou pilu"]' && kN.cesta.novy.t === 'Objednat brusný papír', `karta nese název nápadu i rodiče v cestě (${JSON.stringify(kN && kN.cesta)})`);
   fronta.push(text('Přidáno k pile.'));
   r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: kN.id, ok: true } });
   mapPo = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
@@ -465,20 +467,25 @@ H.beh(async () => {
   console.log('== nový projekt od nuly: vlastník = uživatel, návrh kroků, karta, založení ==');
   // Richard 14. 9. 2026: asistent neuměl založit projekt, ptal se na e-mail vlastníka; chyběl nástroj.
   // Až ZA blokem „z nápadů“: „vytvořit“ zapne skupinu projekt pro zbytek okna, a pojistka výše testuje stav bez ní.
-  fronta.push(nastroj('create_project', { title: 'Hotdog stánek', goal: 'Prodávat párky v rohlíku a rozjet to jako nový byznys', outline: [
-    { title: 'Povolení a živnost' }, { title: 'Stánek a vybavení', children: [{ title: 'Gril a chladnička' }] }, { title: 'Dodavatelé surovin' }, { title: 'První prodejní den' } ] }));
+  // icon: model dá ikonu projektu + jednomu kroku; ostatní doplní server podle názvu (15. 10. 2026)
+  fronta.push(nastroj('create_project', { title: 'Hotdog stánek', icon: '🌭', goal: 'Prodávat párky v rohlíku a rozjet to jako nový byznys', outline: [
+    { title: 'Povolení a živnost' }, { title: 'Stánek a vybavení', children: [{ title: 'Gril a chladnička', icon: '🔥' }] }, { title: 'Dodavatelé surovin' }, { title: 'První prodejní den' } ] }));
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Chtěl bych vytvořit novou mapu: hotdog stánek, prodávat párky v rohlíku.' } });
   expect((posledniVolani().tools || []).some((t) => t.function.name === 'create_project'), 'věta „vytvořit novou mapu“ nabídne modelu create_project (skupina projekt)');
   expect(/vlastníkem je VŽDY uživatel/.test(systemZ(posledniVolani())) && /ROVNOU zavolej create_project/.test(systemZ(posledniVolani())), 'pravidlo: vlastník = uživatel, návrh kroků a rovnou nástroj');
   chat = r.json.chat;
   const kP = (chat.messages[chat.messages.length - 1].karty || []).find((k) => k.type === 'akce');
-  expect(!!kP && /Založit nový projekt „Hotdog stánek“ — cíl: Prodávat párky/.test(kP.popis) && /5 prvními kroky/.test(kP.popis), `karta: název, cíl, počet kroků vč. vnořených (${kP && kP.popis})`);
+  expect(!!kP && /Založit nový projekt 🌭 „Hotdog stánek“ — cíl: Prodávat párky/.test(kP.popis) && /5 prvními kroky/.test(kP.popis), `karta: emoji projektu, název, cíl, počet kroků vč. vnořených (${kP && kP.popis})`);
+  const ikony = Object.fromEntries((kP.strom || []).map((r) => [r.t, r.i || '']));
+  expect(ikony['Gril a chladnička'] === '🔥' && ikony['Povolení a živnost'] === '📄' && ikony['Dodavatelé surovin'] === '🚚' && ikony['Stánek a vybavení'] === '🛠️', `strom karty nese ikony: od modelu i doplněné podle názvu (${JSON.stringify(ikony)})`);
   fronta.push(nastroj('suggest_next', { suggestions: ['Připravit finanční rozvahu', 'Sepsat dodavatele surovin'] }), text('Projekt založen.'));
   r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chat.id, action_id: chat.pending[0].id, ok: true } });
   const novaMapa = (await inst.api('GET', '/api/collections/goalmaps/records?filter=' + encodeURIComponent('title="Hotdog stánek"'), { token: A })).json.items[0];
   expect(!!novaMapa && novaMapa.owner === meA.id, 'mapa založena a vlastníkem je uživatel (bez ptaní)');
   expect(novaMapa.nodes.length === 6 && novaMapa.nodes.some((n) => n.type === 'apexNode' && /Prodávat párky/.test(n.data.apexText || n.data.title)) && novaMapa.nodes.some((n) => n.data.title === 'Gril a chladnička'), `vrchol = cíl, 5 kroků vč. vnořeného (${novaMapa && novaMapa.nodes.length} uzlů)`);
   expect(toolZ(posledniVolani()).some((m) => /created .* with 5 steps; the user is its owner/.test(m.content)), 'model dostal výsledek + pokyn nabídnout podklady');
+  const ikonaUzlu = (t) => ((novaMapa.nodes.find((n) => n.data.title === t) || {}).data || {}).icon || '';
+  expect(ikonaUzlu('Gril a chladnička') === '🔥' && ikonaUzlu('Povolení a živnost') === '📄' && ikonaUzlu('Dodavatelé surovin') === '🚚' && (novaMapa.nodes.find((n) => n.type === 'apexNode') || {}).data.icon === '🌭', `uzly mají ikony a vrchol emoji projektu (${ikonaUzlu('Gril a chladnička')} ${ikonaUzlu('Povolení a živnost')})`);
   expect(r.json.chat.messages.some((m) => (m.karty || []).some((k) => k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.map_id === novaMapa.id)), 'hotová karta nese odkaz na nový projekt');
 
   console.log('== pravidlo ==');

@@ -27,12 +27,48 @@ const TREE_ITEM = {
     deadline: { type: "string", description: "YYYY-MM-DD — a date agreed with someone (meeting, delivery). Set it when the material or the user states such a date." },
     owner: { type: "string", description: "E-mail of an instance member (see list_people), \"me\" for the user themself, or \"none\" when the user said nobody. A step with a deadline must have one." },
     status: { type: "string", enum: ["todo", "in_progress", "done"] },
+    icon: { type: "string", description: "ONE emoji that fits the step (📞 call, ✉️ e-mail, 🧾 invoice, 🛒 purchase, 🤝 meeting, 📏 measuring, ✍️ writing, 🚚 delivery, 🔧 repair, 📣 marketing, 📄 permit/contract…). ALWAYS set it — the app shows it in front of the step." },
     children: { type: "array", items: { $ref: "#/$defs/treeItem" } },
   },
   required: ["title"],
   additionalProperties: false,
 };
 const bezDiakritiky = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// Záložní ikona kroku podle názvu (Richard 15. 10. 2026: „asistent bude dávat ikonky automaticky“): model má icon
+// v každé položce dát sám; když ji vynechá (slabší model, nápad ze zásobníku), vybere ji server podle klíčových slov
+// (cs bez diakritiky i en, kmeny). Když nic nesedí, ikona zůstane prázdná — obecný terčík na všem by byl jen šum.
+const IKONY_PODLE_SLOV = [
+  [/telefon|zavol|hovor|\bcall|phone/, "📞"], [/e-?mail|\bmail|dopis|napsat|napis|\bwrite|\bletter/, "✉️"],
+  [/faktur|invoice|platb|zaplat|payment|\bpay\b/, "🧾"], [/rozpoc|budget|cenik|cenov|\bcena|\bprice|pricing|nakladov/, "💰"],
+  [/schuz|porad|meeting|jednani|sejit|setkani/, "🤝"], [/koup|nakup|objedn|\bbuy|order|purchase/, "🛒"],
+  [/zmer|\bmer(it|eni)|measure/, "📏"], [/\btest|zkous|vyzkous|overit|verify|validat/, "🧪"], [/kontrol|\bcheck|audit|revize|review/, "✅"],
+  [/navrh|design|grafik|\blogo|vizual|brand/, "🎨"], [/dodav|doruc|deliver|shipping|doprav|transport|zasil/, "🚚"],
+  [/oprav|repair|\bfix|servis|montaz|instal|setup|nastav/, "🔧"], [/smlouv|contract|podpis|\bsign|povolen|zivnost|\burad|permit|legal|pravn|licenc/, "📄"],
+  [/marketing|reklam|kampan|socia|instagram|facebook|linkedin|inzer/, "📣"], [/\bweb|stranky|website|domen|hosting/, "🌐"],
+  [/dokument|docs|manual|navod|prirucka|wiki/, "📚"], [/\bplan|harmonogram|termin|schedule|kalendar|rozvrh/, "📅"],
+  [/skolen|training|\bkurz|\blearn|nauc|workshop/, "🎓"], [/zakazn|klient|customer|client|poptav/, "👤"], [/\btym|\bteam|najmout|\bhire|nabor|recruit|brigad/, "👥"],
+  [/prezent|presentation|\bpitch|slide/, "📊"], [/sklad|stock|inventory|zasob/, "📦"], [/stavb|\bbuild|rekonstruk|stavebn/, "🏗️"], [/vyrob|vyroba|produce|manufact|produkc/, "🏭"],
+  [/uklid|\bclean|uklizet/, "🧹"], [/jidl|varit|\bcook|\bfood|kuchy|recept|menu|obcerstv/, "🍳"], [/vybav|equipment|\bstroj|nastroj|\btool|pomuck/, "🛠️"],
+  [/\bfoto|video|natoc|photo|kamer/, "📷"], [/vyzkum|research|analyz|pruzkum|zjist|prozkoum|\bhled/, "🔍"], [/spust|launch|\bstart|zahaj|rozjet|\bopen|otevr/, "🚀"],
+  [/pojist|insurance/, "🛡️"], [/\bbank|\bucet\b|account/, "🏦"], [/\bdan[eiy]?\b|\btax|ucetn|accounting|ucetni/, "📒"], [/\bauto\b|\bcar\b|\bvuz|vozidl|dodavk/, "🚗"],
+  [/prodej|\bsell|\bsale|obchod|eshop|e-shop/, "🏷️"], [/\bprvni|\bfirst|oslav|celebrat|party/, "🎉"], [/\bdata|databaz|database|export|import|tabulk|excel/, "🗂️"],
+  [/\bkod|\bcode|program|software|\bapp|aplikac|vyvoj|develop/, "💻"], [/bezpec|secur|zaloh|backup|heslo|password/, "🔒"], [/\bpeniz|\bmoney|financ|\buver|\bloan|investi|dotac|grant/, "💰"],
+];
+function ikonaPodleNazvu(title) {
+  const t = " " + bezDiakritiky(title).toLowerCase() + " ";
+  for (const [re, ik] of IKONY_PODLE_SLOV) if (re.test(t)) return ik;
+  return "";
+}
+// doplní icon do položek stromu (rekurzivně), kde chybí — upravuje položky na místě a vrací je
+function doplnIkony(items) {
+  for (const it of (Array.isArray(items) ? items : [])) {
+    if (!it || typeof it !== "object") continue;
+    if (typeof it.icon !== "string" || !it.icon.trim()) { const ik = ikonaPodleNazvu(it.title); if (ik) it.icon = ik; else delete it.icon; }
+    else it.icon = require(`${__hooks}/helpers.js`).ikonaUzlu(it.icon);
+    doplnIkony(it.children);
+  }
+  return items;
+}
 // záznamy map, které uživatel vidí (vlastní, týmové, sdílené mu; ne veřejné cizí, ne org), aktivní NEBO archivované
 // — práva ověřuje mapAccessLevel; vrací [{rec, access}] pro hledání i souhrny
 function zaznamyMap(app, auth, archived) {
@@ -202,6 +238,14 @@ function pripominkyUzlu(app, auth, mapId, nodeId) {
   return ((E.listNodeReminders(app, auth, mapId, nodeId) || {}).body || {}).reminders || [];
 }
 // uzel mapy podle id nebo názvu → id uzlu nebo ""
+// uzel v už načteném seznamu uzlů mapy: id, přesný/částečný název, nebo „apex“ = vrchol (set_node_icons čte mapu jednou)
+function uzelVSeznamu(nodes, ref) {
+  const id = String(ref || "").trim();
+  if (!id) return null;
+  const rows = (Array.isArray(nodes) ? nodes : []).filter((n) => n && n.type !== "note");
+  if (id.toLowerCase() === "apex") return rows.find((n) => n.type === "apexNode" || (n.data || {}).nodeType === "apex") || null;
+  return rows.find((n) => n.id === id) || podleNazvu(rows, id, (x) => (x.data || {}).title || (x.data || {}).apexText || "");
+}
 function uzelId(app, auth, mapId, ref) {
   const id = String(ref || "");
   if (!id || id.toLowerCase() === "apex") return "";
@@ -215,6 +259,7 @@ function uzelId(app, auth, mapId, ref) {
 }
 function napadNaPolozku(rec) {
   const it = { title: ocisti(rec.getString("title"), 200) };
+  const ik = ikonaPodleNazvu(it.title); if (ik) it.icon = ik; // nápad ze zásobníku ikonu nemá → podle názvu
   const d = ocisti(rec.getString("description"), 2000);
   if (d) it.description = d;
   return it;
@@ -316,4 +361,4 @@ function pojmenovani(app, auth) {
   return { nazevMapy, nazevNapadu, uzelData, nazevUzlu };
 }
 
-module.exports = { MAX_ZN, RE_CISLO_PROJEKTU, MAX_MAP_ZAZNAMU, V1_BASE, ocisti, dnes, dosad, TREE_ITEM, bezDiakritiky, zaznamyMap, mapyUzivatele, napadyUzivatele, sDocasnymKlicem, chybaV1, norm, podleNazvu, napadPodleId, napadyProSmazani, napadZaznam, mapaId, titulMapy, titulUzlu, pravidloId, sablonaDto, pripominkyUzlu, uzelId, napadNaPolozku, bezId, pravaMapy, chybaPrav, MESICE_EN, uvoz, datumKratce, ymdLocal, posunDatum, kontrolyZapisu, pojmenovani };
+module.exports = { MAX_ZN, RE_CISLO_PROJEKTU, MAX_MAP_ZAZNAMU, V1_BASE, ocisti, dnes, dosad, TREE_ITEM, bezDiakritiky, zaznamyMap, mapyUzivatele, napadyUzivatele, sDocasnymKlicem, chybaV1, norm, podleNazvu, napadPodleId, napadyProSmazani, napadZaznam, mapaId, titulMapy, titulUzlu, pravidloId, sablonaDto, pripominkyUzlu, uzelId, uzelVSeznamu, napadNaPolozku, bezId, pravaMapy, chybaPrav, MESICE_EN, uvoz, datumKratce, ymdLocal, posunDatum, kontrolyZapisu, pojmenovani, ikonaPodleNazvu, doplnIkony };

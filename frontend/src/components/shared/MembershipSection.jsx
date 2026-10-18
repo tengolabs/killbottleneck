@@ -49,11 +49,10 @@ export default function MembershipSection({ billingComplete }) {
   const prevodem = samoobsluha && vybrany.transferYear && period === 'year';
   const links = config.payment_links || {};
   const cardLink = links[`${tier}-${period}`];
-  // client_reference_id = slug instance (subdoména) — Stripe webhook podle něj
-  // povýší TUHLE instanci místo zakládání nové. Platí pro hostované adresy
-  // <slug>.killbottleneck.com; na vlastní doméně by slug nevyšel, ale košík
-  // se ukazuje jen na hostovaných instancích (config.hosted), takže to sedí.
-  const slug = window.location.hostname.split('.')[0];
+  // client_reference_id = slug instance — Stripe webhook podle něj povýší TUHLE
+  // instanci místo zakládání nové. Slug nese provisioning (config.slug); z hostname
+  // jen záložně: na vlastní doméně zákazníka (ukoly.firma.cz) by vyšlo „ukoly".
+  const slug = config.slug || window.location.hostname.split('.')[0];
   // prefilled_email: webhook povýší instanci jen při shodě e-mailu plátce s e-mailem,
   // kterým byla založená — jinak by platba založila NOVOU instanci. Správce zkušebky
   // je skoro vždy ten, kdo ji zakládal, tak mu ho rovnou předvyplníme.

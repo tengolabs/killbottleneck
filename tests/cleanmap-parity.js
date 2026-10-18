@@ -63,6 +63,9 @@ const EDITOR_EDGES = [
   const canonicalNodeData = eval('(' + extractFn(helpersSrc, 'canonicalNodeData') + ')');
   // eslint-disable-next-line no-eval
   const normalizeMapData = eval('(' + extractFn(helpersSrc, 'normalizeMapData') + ')');
+  // ikona uzlu (v1 od 15. 10. 2026) — treeItemsToNodes ji volá, musí být ve stejném scope
+  // eslint-disable-next-line no-eval, no-unused-vars
+  const ikonaUzlu = eval('(' + extractFn(helpersSrc, 'ikonaUzlu') + ')');
   // eslint-disable-next-line no-eval
   const treeItemsToNodes = eval('(' + extractFn(helpersSrc, 'treeItemsToNodes') + ')');
   // eslint-disable-next-line no-eval
