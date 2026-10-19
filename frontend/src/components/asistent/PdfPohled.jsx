@@ -150,12 +150,13 @@ export default function PdfPohled({ onZpet, onOpravit, loading, soubory, setSoub
               <Button size="sm" variant="outline" className="h-8 text-xs" disabled={bezi || !rozsah.trim()} onClick={odebrat} data-testid="chat-pdf-odebrat-strany">{akce === 'odebrat' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t('pdf.removePages')}</Button>
             </div>
           </div>
-          <div className="pt-1 border-t border-border">
+          {/* bez fungující AI (onOpravit chybí) jen nástroje v prohlížeči — oprava by šla přes model */}
+          {onOpravit && <div className="pt-1 border-t border-border">
             <Button size="sm" variant="secondary" className="w-full h-8 text-xs" disabled={bezi || loading} onClick={opravit} data-testid="chat-pdf-opravit">
               {akce === 'opravit' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Bot className="w-3.5 h-3.5 mr-1 text-primary" />}{t('pdf.fixWithAssistant')}
             </Button>
             <p className="text-[11px] text-muted-foreground mt-1">{t('pdf.fixHint')}</p>
-          </div>
+          </div>}
         </div>
       )}
       {chyba && <p className="text-xs text-destructive" data-testid="chat-pdf-chyba">{t(`pdf.chyba.${chyba}`, { defaultValue: t('pdf.chyba.poskozeno') })}</p>}

@@ -155,7 +155,9 @@ export default function SkinDialog({ open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      {/* závoj jen naznačený (Richard 19. 10. 2026: „kolem tak hodně tmavo, chci vidět změnu skinu“) — aplikace za oknem
+          zůstane vidět a skin se na ní projeví hned po kliknutí */}
+      <DialogContent className="sm:max-w-md" overlayClassName="bg-black/10">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Palette className="w-5 h-5" /> {t('skins.title')}

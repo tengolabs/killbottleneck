@@ -404,5 +404,20 @@
     "zvyraznit": "Zvýraznit v mapě",
     "zrusit": "Zrušit zvýraznění"
   },
-  "relaxDal": "Relaxovat dál"
+  "relaxDal": "Relaxovat dál",
+  "stav": {
+    "vypadekTitle": "Asistent má teď výpadek",
+    "vypadekText": "AI na naší straně dočasně neodpovídá, takže asistent teď nemůže psát ani přepisovat hlasovky. Historie rozhovorů, Dokumenty a relax fungují dál. Jakmile se AI vrátí, asistent naskočí sám, nic nemusíte obnovovat.",
+    "vlastniVypadekTitle": "Vaše AI teď neodpovídá",
+    "vlastniVypadekText": "Asistent se nedostane k AI nastavené na této instanci. Historie, Dokumenty a relax fungují dál.",
+    "nepripojenoTitle": "AI ještě není připojená",
+    "nepripojenoText": "Asistent zatím umí jen relax a Dokumenty. Po připojení AI za vás bude zakládat projekty, třídit nápady ze zásobníku, plánovat den na ranní poradě, psát koncepty e-mailů a rozumět hlasovkám.",
+    "nepripojenoClen": "Připojit ji může správce vaší organizace.",
+    "zkusit": "Zkusit znovu",
+    "relax": "Relax",
+    "pripojit": "Připojit AI",
+    "nastaveni": "Zkontrolovat nastavení AI",
+    "placeholderVypadek": "Asistent teď neodpovídá · „relax“ funguje",
+    "placeholderNepripojeno": "Bez AI asistent neodpoví · „relax“ funguje"
+  }
 }

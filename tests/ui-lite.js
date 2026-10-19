@@ -415,8 +415,9 @@ const clickText = async (page, text, sel = 'button, a') => {
     await sleep(1500);
     expect(!!(await page.$('header [data-testid="lite-to-full-top"]')), 'tlačítko „Celá aplikace" je i na obrazovce Zprávy');
     expect(!!(await page.$('header button[aria-label="Zpět na dnešní seznam"]')), 'logo (zkratka domů) je i na obrazovce Zprávy');
-    // bez AI (kontejner nemá chat providera) tlačítko Asistent NENÍ — ověřuje se v ui-lite-asistent.js
-    expect(!(await page.$('[data-testid="lite-asistent"]')), 'bez chat providera není v lite tlačítko Asistent');
+    // bez AI (vlastní instalace, kontejner nemá chat providera) je tlačítko Asistent ve stavu „AI ještě není připojená“
+    // (19. 10. 2026: asistent bez AI ukazuje historii, Dokumenty a relax — ui-ai-chat-bez-ai.js); s AI ui-lite-asistent.js
+    expect(!!(await page.$('[data-testid="lite-asistent"][data-stav="nepripojeno"]')), 'bez chat providera je v lite tlačítko Asistent ve stavu nepřipojeno');
     await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
     await sleep(1500);
 

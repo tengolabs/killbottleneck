@@ -28,9 +28,10 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 // size="full" = skoro celoobrazovkové okno (editor uzlu s levým menu kategorií,
 // n8n styl — Richard 14. 8. 2026). Default beze změny: max-w-lg, přebíjí se
 // className (žádný stávající dialog se nemění).
-const DialogContent = React.forwardRef(({ className, children, size, ...props }, ref) => (
+// overlayClassName = jiný závoj kolem okna (výběr vzhledu: skoro průhledný, ať je změna skinu vidět — Richard 19. 10. 2026)
+const DialogContent = React.forwardRef(({ className, children, size, overlayClassName, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(

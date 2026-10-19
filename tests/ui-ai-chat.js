@@ -686,8 +686,12 @@ H.beh(async () => {
   const rozplanuj = (await page.$$('[data-testid="chat-navrh"]')).pop();
   if (rozplanuj) await rozplanuj.click();
   expect(await cekejText('CIP-KLIK-MOCK') && volani.length > predCip, 'klik na čip pošle zprávu');
+  // relax „vedle“ by cílovou mapu zakryl (klik-test 19. 10.) → odkaz z karty ho ukončí
+  await page.click('[data-testid="chat-relax-toggle"]');
+  expect(await cekej('[data-testid="relax-vrstva"]'), 'relax vedle chatu běží');
   await page.click('[data-testid="chat-otevrit-projekt"]');
   await sleep(1500);
+  expect((await page.$('[data-testid="relax-vrstva"]')) === null, 'odkaz z karty relax ukončil (mapa není zakrytá)');
   expect(/\/map\/[a-z0-9]+/.test(page.url()), `tlačítko otevře mapu projektu (${page.url().slice(-30)})`);
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
   // další sekce hledá první odkaz v rozhovoru → začít čistý rozhovor

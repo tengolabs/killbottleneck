@@ -404,5 +404,20 @@
     "zvyraznit": "Highlight in the map",
     "zrusit": "Clear highlight"
   },
-  "relaxDal": "Keep relaxing"
+  "relaxDal": "Keep relaxing",
+  "stav": {
+    "vypadekTitle": "The assistant is down right now",
+    "vypadekText": "The AI on our side isn't responding at the moment, so the assistant can't reply or transcribe voice notes. Your conversation history, Documents and Relax still work. As soon as the AI is back, the assistant comes back on its own, no need to reload.",
+    "vlastniVypadekTitle": "Your AI isn't responding",
+    "vlastniVypadekText": "The assistant can't reach the AI configured on this instance. History, Documents and Relax still work.",
+    "nepripojenoTitle": "No AI connected yet",
+    "nepripojenoText": "For now the assistant only offers Relax and Documents. Once you connect an AI, it will create projects for you, sort ideas from the inbox, plan your day in a morning briefing, draft e-mails and understand voice notes.",
+    "nepripojenoClen": "Your organization's administrator can connect it.",
+    "zkusit": "Try again",
+    "relax": "Relax",
+    "pripojit": "Connect AI",
+    "nastaveni": "Check AI settings",
+    "placeholderVypadek": "The assistant isn't responding · “relax” works",
+    "placeholderNepripojeno": "Without AI the assistant can't reply · “relax” works"
+  }
 }

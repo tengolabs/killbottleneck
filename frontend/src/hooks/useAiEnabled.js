@@ -13,7 +13,11 @@ import { loadKbConfig } from '@/hooks/useKbConfig';
 // vyprázdníme `modes`, takže se všechna AI tlačítka schovají sama (těží z toho
 // všech 7 míst, co hook používají), a `healthy:false` dovolí jednomu místu
 // slušně vysvětlit proč.
-const EMPTY = { enabled: false, configured: false, provider: 'none', modes: [], healthy: true };
+// Asistent (19. 10. 2026, Richard: „když nefunguje AI, není vidět celý asistent“) se ale schovávat
+// nesmí — historie, Dokumenty a relax AI nepotřebují. Proto vedle `modes` ještě `nastaveneModes`
+// (co server nabízí bez ohledu na zdraví) a `hosted` (cloud hlásí výpadek, vlastní instalace „AI
+// ještě není připojená“).
+const EMPTY = { enabled: false, configured: false, provider: 'none', modes: [], nastaveneModes: [], healthy: true }; // bez `hosted` = config nedorazil, asistent zůstane schovaný
 let cached = null;
 const listeners = new Set();
 let recheckTimer = null;
@@ -39,10 +43,16 @@ function load(fresh = false) {
         configured,
         provider: cfg.ai_provider || 'none',
         modes: healthy ? modes : [],
+        nastaveneModes: modes,
+        hosted: !!cfg.hosted,
         healthy,
       });
     })
-    .catch(() => publish({ ...EMPTY }));
+    // Nedorazil ani config (síť / server dole): když už jednou dorazil, je to výpadek — asistent
+    // zůstane vidět s pruhem a doptávání běží dál; jinak (první načtení) zůstává schovaný.
+    .catch(() => publish(cached && cached.hosted !== undefined
+      ? { ...cached, enabled: false, modes: [], healthy: false }
+      : { ...EMPTY }));
 }
 
 // ruční obnova (po uložení nastavení AI v administraci) — překreslí všechna
@@ -52,12 +62,12 @@ export function refreshAiModes() {
 }
 
 export function useAiModes() {
-  const [state, setState] = useState(cached ?? { enabled: false, provider: 'none', modes: [] });
+  const [state, setState] = useState(cached ?? { ...EMPTY });
 
   useEffect(() => {
     listeners.add(setState);
     if (cached === null) {
-      cached = { enabled: false, provider: 'none', modes: [] };
+      cached = { ...EMPTY };
       load();
     } else {
       setState(cached);
@@ -65,7 +75,19 @@ export function useAiModes() {
     return () => listeners.delete(setState);
   }, []);
 
-  return { ...state, has: (mode) => state.modes.includes(mode) };
+  // `nacteno` = config už dorazil (dřív by asistent na vlastní instalaci na okamžik hlásil „nepřipojeno“)
+  return { ...state, nacteno: state.hosted !== undefined, has: (mode) => state.modes.includes(mode), nastaveno: (mode) => (state.nastaveneModes || []).includes(mode) };
+}
+
+// Stav asistenta pro tlačítko v hlavičce, lite i panel — jedno místo pravdy:
+//   funkcni     AI odpovídá
+//   vypadek     asistent nastavený, AI teď neodpovídá (cloud: výpadek u nás, vlastní instalace: jejich AI)
+//   nepripojeno vlastní instalace bez AI pro asistenta → pozvánka „připojte AI“
+//   skryto      config ještě nedorazil, nebo cloud bez asistenta (výpadek by lhal)
+export function stavAsistenta(ai) {
+  if (!ai || !ai.nacteno) return 'skryto';
+  if (ai.nastaveno('chat_panel')) return ai.has('chat_panel') ? 'funkcni' : 'vypadek';
+  return ai.hosted ? 'skryto' : 'nepripojeno';
 }
 
 export function useAiEnabled() {

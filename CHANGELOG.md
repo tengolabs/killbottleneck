@@ -9,6 +9,29 @@ below before you jump several versions.
 
 ---
 
+## v0.85-beta — 2026-10-19
+
+**The assistant stays visible when the AI is down or not connected: history, Documents and relax keep working**
+
+- **The assistant no longer disappears when the AI does not respond.** The header button (and the one in the map
+  toolbar) and the side panel stay; a bar at the top of the panel says the AI is temporarily unavailable, offers **Try
+  again** and lists recent conversations so you can open them. Documents and relax (the word "relax" or the 🐟 chip) keep
+  working. Typing, voice messages and photos are paused — a message you type stays in the field. As soon as the AI
+  answers again the bar disappears by itself; a failed message also re-checks the AI right away instead of waiting.
+- **Installations without AI now show the assistant too.** The bar explains what the assistant will do once AI is
+  connected; admins get **Connect AI**, which opens *Organization admin → AI*, members see who can connect it. There is
+  no edge tab or phone bar until the AI is connected, only the button in the header or the map toolbar. If the AI is
+  configured but does not respond, the bar says so and admins get a link to check the AI settings.
+- Buttons elsewhere that need the AI (sorting the idea buffer, the morning and night planning offers, the event dialog)
+  hide while the AI is down, as before.
+- **Picking a look:** the area around the dialog is only slightly dimmed, so you see the new look right behind it.
+- **Relax next to the chat** no longer covers Documents, and links from the assistant's cards ("Show in map", "Open
+  project"…) end a relax that is not locked, so the page they open is not hidden under the aquarium.
+
+Upgrade notes: no configuration changes.
+
+---
+
 ## v0.84-beta — 2026-10-18
 
 **The assistant shows where things go, gives steps icons automatically and structures its answers; Tasks mark sub-steps with `└`**

@@ -28,7 +28,9 @@
     "templates": "Šablony",
     "myMap": "Moje mapa",
     "organizace": "Organizace",
-    "aiChat": "Asistent"
+    "aiChat": "Asistent",
+    "aiChatVypadek": "Asistent – dočasný výpadek AI",
+    "aiChatVlastniVypadek": "Asistent – AI neodpovídá"
   },
   "notFound": {
     "title": "Stránka nenalezena",

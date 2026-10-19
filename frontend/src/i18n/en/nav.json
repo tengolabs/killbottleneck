@@ -28,7 +28,9 @@
     "templates": "Templates",
     "myMap": "My map",
     "organizace": "Organization",
-    "aiChat": "Assistant"
+    "aiChat": "Assistant",
+    "aiChatVypadek": "Assistant – temporary AI outage",
+    "aiChatVlastniVypadek": "Assistant – AI isn't responding"
   },
   "notFound": {
     "title": "Page Not Found",

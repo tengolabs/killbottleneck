@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.85-beta": {
+    cs: [
+      "Asistent zůstane vidět, i když AI zrovna neběží: historie rozhovorů, Dokumenty a relax fungují dál a pruh nahoře řekne, co se děje.",
+      "Když AI neodpovídá, pruh nabídne Zkusit znovu — asistent naskočí sám, jakmile se AI vrátí, nic nemusíte obnovovat.",
+      "Na instalaci bez připojené AI je asistent vidět taky; správce má v pruhu tlačítko Připojit AI, které vede rovnou do nastavení AI.",
+      "Při výběru vzhledu je okolí okna ztmavené jen lehce, takže změnu vzhledu vidíte hned za oknem.",
+      "Dokumenty se otevřou nad relaxem a odkazy z karet asistenta relax ukončí, takže nic nezůstane schované pod akváriem.",
+    ],
+    en: [
+      "The assistant stays visible even when the AI is not running: chat history, Documents and relax keep working and a bar at the top says what is going on.",
+      "When the AI does not respond, the bar offers Try again — the assistant comes back by itself as soon as the AI does, no reload needed.",
+      "On an installation without connected AI the assistant is visible too; admins get a Connect AI button in the bar that leads straight to the AI settings.",
+      "While picking a look, the area around the window is only slightly dimmed, so you see the new look right behind it.",
+      "Documents open above relax and links from the assistant's cards end relax, so nothing stays hidden under the aquarium.",
+    ],
+  },
   "v0.84-beta": {
     cs: [
       "Karta asistenta před potvrzením kreslí cestu: odkud nápad nebo krok bere, do kterého projektu a pod který krok ho dává — nový řádek je zvýrazněný.",

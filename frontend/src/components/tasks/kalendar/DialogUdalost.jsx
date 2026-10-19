@@ -233,7 +233,7 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
                     {stav !== 'rejected' && (
                       <Button type="button" size="sm" variant="outline" className="h-7" disabled={rozhoduji} onClick={() => rozhodni('rejected')} data-testid="udalost-zamitnout"><X className="w-3.5 h-3.5" /> {t('udalost.zamitnout')}</Button>
                     )}
-                    {stav === 'requested' && asistent?.dostupny && (
+                    {stav === 'requested' && asistent?.funkcni && (
                       <Button type="button" size="sm" variant="secondary" className="h-7" onClick={posoudit} data-testid="udalost-posoudit"><Sparkles className="w-3.5 h-3.5" /> {t('udalost.posoudit')}</Button>
                     )}
                   </div>

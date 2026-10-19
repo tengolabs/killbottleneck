@@ -312,7 +312,7 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
             <div className="flex items-start gap-2 text-sm rounded-lg bg-secondary/40 px-3 py-2">
               <span className="leading-relaxed flex-1 min-w-0 whitespace-pre-wrap">
                 {refreshing ? t('panel.thinking') : (summary?.text || t('panel.noSummaryYet'))}
-                {asistent.dostupny && (
+                {asistent.funkcni && (
                   <button type="button" onClick={() => asistent.spust('porada', {})} className="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:underline" data-testid="myday-porada">
                     <Sunrise className="w-3.5 h-3.5" />{t('panel.porada')}
                   </button>
@@ -444,7 +444,7 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
                     </span>
                   </button>
                   {/* po termínu → rozbor toho uzlu s asistentem (fáze D); na telefonu jen ikona */}
-                  {s.key === 'overdue' && item.kind === 'node' && asistent.dostupny && (
+                  {s.key === 'overdue' && item.kind === 'node' && asistent.funkcni && (
                     <button type="button" onClick={() => asistent.spust('rozbor', { map: item.mapId, node: item.title })} title={t('panel.zaseklTitle')} aria-label={t('panel.zaseklTitle')}
                       className="shrink-0 mr-1 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-primary hover:bg-secondary" data-testid="myday-zasekl">
                       <LifeBuoy className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t('panel.zasekl')}</span>

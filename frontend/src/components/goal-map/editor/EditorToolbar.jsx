@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Loader2, Check, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
+import { stavAsistenta } from '@/hooks/useAiEnabled';
 import { useMedia } from '@/lib/useMedia';
 import {
   DropdownMenu,
@@ -91,6 +92,9 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
     setPersonalView, handleExport, handleExportJson,
     setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
   } = actions;
+  // Asistent i bez fungující AI (19. 10. 2026) — mapa nemá AppHeader, tlačítko je jen tady
+  const stavAs = stavAsistenta(ai);
+  const popisAs = stavAs === 'vypadek' ? t(ai.hosted ? 'nav:nav.aiChatVypadek' : 'nav:nav.aiChatVlastniVypadek') : t('toolbar.asistent');
 
   // „Uspořádat podle…" (Richard 5. 9. 2026): rozbalovací nabídka VEDLE Zarovnat
   // — termín / plán / řešitel / stav; klik na položku mapu rovnou přerovná
@@ -272,10 +276,10 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
       // mapou i „Poznámka“ — lišta byla tak plná, že vytlačila logo vlevo.
       klic: 'asistent',
       sekceListy: 'akce2',
-      viditelna: ai.has('chat_panel') && user,
+      viditelna: stavAs !== 'skryto' && user,
       Ikona: Bot,
       popisek: t('toolbar.asistent'),
-      titulekListy: t('toolbar.asistent'),
+      titulekListy: popisAs,
       testIdListy: 'toolbar-asistent',
       varianta: asistent.open ? 'default' : 'outline',
       onClick: () => asistent.setOpen((v) => !v),
@@ -602,9 +606,10 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
           {/* Telefon: Asistent i v horní řadě (Richard 29. 9. 2026: „proč na mobilu není nahoře
               taky tlačítko AI asistent?") — jako na titulce; do 1850 px je jinak jen v ⋮ menu
               a na počítači ho zastupuje ouško na pravém okraji, na telefonu lišta dole. */}
-          {user && ai.has('chat_panel') && (
-            <Button variant="default" size="icon" className="sm:hidden h-9 w-9 shrink-0" onClick={() => asistent.setOpen((v) => !v)} title={t('toolbar.asistent')} aria-label={t('toolbar.asistent')} data-testid="toolbar-asistent-mobil">
+          {user && stavAs !== 'skryto' && (
+            <Button variant="default" size="icon" className="sm:hidden relative h-9 w-9 shrink-0" onClick={() => asistent.setOpen((v) => !v)} title={popisAs} aria-label={popisAs} data-testid="toolbar-asistent-mobil" data-stav={stavAs}>
               <Bot className="w-4 h-4" />
+              {stavAs === 'vypadek' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-background" aria-hidden="true" />}
             </Button>
           )}
           <NotificationBell />

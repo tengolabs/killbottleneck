@@ -342,7 +342,9 @@ export default function DokumentyPanel({ mobil }) {
 
   return (
     <aside
-      className={mobil ? 'fixed inset-0 z-50 flex flex-col bg-card' : 'fixed bottom-0 z-40 flex flex-col bg-card border-l border-t shadow-2xl'}
+      // z-[45]: NAD relaxem „vedle“ (z-40, kreslí se později a Dokumenty dřív zakryl — klik-test 19. 10.), pod relaxem přes celou
+      // obrazovku (z-[60]) a pod dialogy (z-50)
+      className={mobil ? 'fixed inset-0 z-50 flex flex-col bg-card' : 'fixed bottom-0 z-[45] flex flex-col bg-card border-l border-t shadow-2xl'}
       style={mobil ? undefined : { top: spodek, right: A.width, width: sirka, maxWidth: DOK_MAX_W }}
       data-testid="chat-dokumenty"
       aria-label={t('dok.title')}

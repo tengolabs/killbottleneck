@@ -243,7 +243,7 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
             {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           </Button>
         </div>
-        {asistent.dostupny && items.length >= 2 && (
+        {asistent.funkcni && items.length >= 2 && (
           <Button variant="outline" size="sm" className="mt-2 w-full h-8 text-xs" title={t('buffer.sortAiHint')} onClick={() => asistent.spust('trideni', { zdroj: 'zasobnik' })} data-testid="buffer-roztridit">
             <Sparkles className="w-3.5 h-3.5 mr-1.5 text-primary" />{t('buffer.sortAi')}
           </Button>

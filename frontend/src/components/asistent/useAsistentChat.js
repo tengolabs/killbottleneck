@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { chat as chatApi, chatPotvrdit, chatPredehrat, chatOprav, chatDetail, chatSeznam, chatSmazat, chatVratit } from '@/api/asistentApi';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
+import { refreshAiModes } from '@/hooks/useAiEnabled';
 import { nahradPrepis } from '@/lib/prepisZpravy';
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
 import { setSkin, setTheme } from '@/lib/theme';
@@ -116,6 +117,9 @@ function ohlasZmenuMapy(dto) {
   try { window.dispatchEvent(new CustomEvent('kb-map-changed', { detail: { mapIds: zmenene.map((k) => (k.odkaz && k.odkaz.map_id) || k.map_id).filter(Boolean) } })); } catch { /* SSR/test */ }
 }
 const prevedChybu = (e) => {
+  // výpadek (síť, 5xx, vypršení) → hned se zeptat serveru na zdraví AI: když je dole, panel ukáže pruh výpadku
+  // teď, ne až po pravidelném doptání (19. 10. 2026). Zdravá AI = nic se nezmění, jen jeden levný dotaz.
+  if (e && (e.isTimeout || !e.status || e.status >= 500)) refreshAiModes();
   if (e && e.isTimeout) return 'timeout';
   // vyčerpaná týdenní kvóta kreditů organizace: server říká komu a kolik → ukázat jeho text
   if (e && e.status === 429 && e.response && e.response.code === 'ai_kvota' && e.response.error) return e.response.error;

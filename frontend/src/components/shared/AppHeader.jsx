@@ -13,7 +13,7 @@ import TimerWidget from '@/components/shared/TimerWidget';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Smartphone, Bot } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
-import { useAiModes } from '@/hooks/useAiEnabled';
+import { useAiModes, stavAsistenta } from '@/hooks/useAiEnabled';
 import { PAGE_CONTAINER } from '@/lib/layout';
 
 // Jednotná hlavička přihlášené aplikace (Home i Úkoly) — stejné logo, navigace
@@ -31,6 +31,9 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
   const { user, logout } = useAuth();
   const asistent = useAsistent();
   const ai = useAiModes();
+  // asistent je vidět i bez fungující AI (historie, Dokumenty, relax) — 19. 10. 2026; ve výpadku tečka + jiný popisek
+  const stavAs = stavAsistenta(ai);
+  const popisAs = stavAs === 'vypadek' ? t(ai.hosted ? 'nav.aiChatVypadek' : 'nav.aiChatVlastniVypadek') : t('nav.aiChat');
   const NAV = [
     { key: 'projects', label: t('nav.projects'), to: '/' },
     { key: 'tasks', label: t('nav.tasks'), to: '/tasks' },
@@ -108,17 +111,19 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
           {actions}
           <TimerWidget />
           {/* AI chat na boku — přepínač; panel sám žije v App.jsx přes všechny stránky */}
-          {user && ai.has('chat_panel') && (
+          {user && stavAs !== 'skryto' && (
             <Button
               variant={asistent.open ? 'default' : 'outline'}
               // telefon: zvýrazněné jako „+ Nový" (Richard 29. 9. 2026: „nechal bych i toho agenta");
               // stav „otevřeno" tam barva hlásit nemusí, panel překryje celou obrazovku
-              className="max-sm:bg-primary max-sm:text-primary-foreground max-sm:border-primary max-sm:hover:bg-primary/90 max-sm:hover:text-primary-foreground"
+              className="relative max-sm:bg-primary max-sm:text-primary-foreground max-sm:border-primary max-sm:hover:bg-primary/90 max-sm:hover:text-primary-foreground"
               onClick={() => asistent.setOpen((v) => !v)}
-              title={t('nav.aiChat')}
-              aria-label={t('nav.aiChat')}
+              title={popisAs}
+              aria-label={popisAs}
               data-testid="chat-toggle"
+              data-stav={stavAs}
             >
+              {stavAs === 'vypadek' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-background" data-testid="chat-toggle-vypadek" aria-hidden="true" />}
               {/* Stejné tlačítko jako v liště editoru (ikona + „Asistent“) — Richard 28. 9. 2026:
                   „v mapě je tlačítko větší a lepší než na home“; na úzkém displeji jen ikona. */}
               <Bot className="w-4 h-4" />

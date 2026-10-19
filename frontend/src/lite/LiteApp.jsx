@@ -25,7 +25,7 @@ import { BUILTIN_SKINS, DEFAULT_SKIN_ID, getBuiltinSkin } from '@/lib/skins';
 import { validateSkin } from '@/lib/skinValidator';
 import { setSkin, setTheme, effectiveTheme } from '@/lib/theme';
 import { useAsistent } from '@/lib/AsistentContext';
-import { useAiModes } from '@/hooks/useAiEnabled';
+import { useAiModes, stavAsistenta } from '@/hooks/useAiEnabled';
 import LiteList from './LiteList';
 import SkinPattern from '@/components/shared/SkinPattern';
 import LiteNotifications from './LiteNotifications';
@@ -48,11 +48,13 @@ export default function LiteApp() {
   const { t: tCommon } = useTranslation('common');
   const { t: tNav } = useTranslation('nav'); // „Asistent" = tentýž nápis jako v hlavičce plné appky (nav je v hlavním balíku)
   const { user, isLoadingAuth, patchUser } = useAuth();
-  // Asistent i v lite (Richard 4. 10. 2026). Tlačítko jen když server chat nabízí (chat_panel);
+  // Asistent i v lite (Richard 4. 10. 2026). Tlačítko podle stavAsistenta — i při výpadku AI / bez AI (19. 10. 2026);
   // /api/kb/config se na /lite volá už kvůli skinu, takže žádný požadavek navíc. Panel sám je
   // líný chunk a stáhne se až po klepnutí — proto se tu nic z components/asistent NEimportuje.
   const asistent = useAsistent();
   const ai = useAiModes();
+  const stavAs = stavAsistenta(ai);
+  const popisAs = stavAs === 'vypadek' ? tNav(ai.hosted ? 'nav.aiChatVypadek' : 'nav.aiChatVlastniVypadek') : tNav('nav.aiChat');
   const { toast } = useToast();
   const navigate = useNavigate();
   const [day, setDay] = useState(null);
@@ -163,15 +165,17 @@ export default function LiteApp() {
                  className="dark:hidden h-6 w-auto" />
           </span>
         </button>
-        {ai.has('chat_panel') && (
+        {stavAs !== 'skryto' && (
           <button
             type="button"
             onClick={() => asistent.setLiteOpen(true)}
-            title={tNav('nav.aiChat')}
-            aria-label={tNav('nav.aiChat')}
+            title={popisAs}
+            aria-label={popisAs}
             data-testid="lite-asistent"
-            className="inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+            data-stav={stavAs}
+            className="relative inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
           >
+            {stavAs === 'vypadek' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-background" data-testid="lite-asistent-vypadek" aria-hidden="true" />}
             <Bot className="w-4 h-4" /> {tNav('nav.aiChat')}
           </button>
         )}
