@@ -9,6 +9,20 @@ below before you jump several versions.
 
 ---
 
+## v0.87-beta — 2026-10-24
+
+**Come-back e-mails: whoever has not signed in for 3, 7, 14 or 30 days gets an overview of their open work and the smallest steps back**
+
+- **Come-back e-mail ladder** — after 3, 7, 14 and 30 days without opening the app an e-mail arrives with what is waiting, what is overdue, what is holding up others, and three smallest steps for today. The text is written by the AI assistant from the same data as the morning summary; without AI the e-mail still goes out with a plain list of the most important items. One e-mail per step, only the highest reached step, silence after the last one until the next sign-in; signing in resets the ladder.
+- **Unsubscribe in one click** — every such e-mail carries an unsubscribe link (also `List-Unsubscribe` for mail clients) and the same switch sits in Notification settings. Not sent in the "Nothing" e-mail mode, after an expired trial or without SMTP.
+- New environment variables `KB_NAVRAT_MAILY`, `KB_NAVRAT_DNY`, `KB_NAVRAT_HODINA`, `KB_NAVRAT_MAX_DENNE` (see [Environment](https://killbottleneck.com/reference/environment)); a new `navrat` field on `users` (migration, no action needed).
+
+**Every e-mail subject starts with the organization name**
+
+- **Subjects like `Tengo: Welcome to killBottleneck`** — invitations, welcome mail, password reset, verification, one-time code, notifications, the daily digest, project-share invitations and bug reports all start with the organization name (the word from the instance address; a self-hosted instance on its own domain uses the name from Organization settings, without one the subject is unchanged). The former "— organization tengo" suffix on invitations and the welcome mail is gone, the name now leads.
+- **The organization name also heads the body** — right under the logo of every e-mail, large, with killBottleneck underneath, so a recipient who does not remember the app still recognizes their own organization. Without a known organization the header is unchanged.
+- **"Login from a new location" in the recipient's language** — the alert about a sign-in from a new device was the only system e-mail still sent in English and without the organization name. It now uses the same look, shows when, from which address and browser, and its button leads to a password change (a new password signs out every other device).
+
 ## v0.86-beta — 2026-10-24
 
 **Invoices to clients from the assistant — PDF with a QR payment code; client address book with billing details; supplier profile**

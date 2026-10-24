@@ -219,7 +219,8 @@ const predmetZ = (raw) => {
     const hosRaw = maily.join('\n---\n');
     const hos = dekoduj(hosRaw);
     const predmet2 = predmetZ(hosRaw);
-    expect(/^cesky@example\.com vás zve do killBottlenecku — organizace tengo$/.test(predmet2),
+    // organizace je na ZAČÁTKU předmětu (Richard 24. 10. 2026: všechny maily začínají názvem organizace)
+    expect(/^Tengo: cesky@example\.com vás zve do killBottlenecku$/.test(predmet2),
       `předmět = zvoucí + organizace (${predmet2})`);
     expect(/organizace tengo/.test(hos), 'předmět i nadpis jmenují organizaci');
     expect(/Organizace:[\s\S]{0,200}tengo/.test(hos), 'kartička pojmenuje slovo, které se zadává při přihlášení');
@@ -250,7 +251,7 @@ const predmetZ = (raw) => {
     const uvit = dekoduj(uvitRaw);
     expect(maily.length === 1, `první vstup vyrobil právě 1 zprávu (${maily.length})`);
     expect(/Vítejte v killBottlenecku/.test(uvit), 'uvítací mail vítá, nezve podruhé');
-    expect(predmetZ(uvitRaw) === 'Vítejte v killBottlenecku — organizace tengo',
+    expect(predmetZ(uvitRaw) === 'Tengo: Vítejte v killBottlenecku',
       `předmět jmenuje organizaci (${predmetZ(uvitRaw)})`);
     expect(/Uložte si to do oblíbených/.test(uvit), 'má kartičku s radou uložit stránku');
     expect(/Ctrl\+D/.test(uvit) && /⌘\+D/.test(uvit), '…a říká, ČÍM se to udělá (hvězdička v prohlížeči)');
@@ -266,6 +267,38 @@ const predmetZ = (raw) => {
     expect(vstup2.status === 200, `druhý vstup zaznamenán (${vstup2.status})`);
     await sleep(2500);
     expect(maily.length === 0, `druhý vstup už NEposlal nic (${maily.length})`);
+
+    console.log('== přihlášení z nového místa chodí v jazyce příjemce ==');
+    // Richardův nález 24. 10. 2026: „Login from a new location" chodilo anglicky
+    // i Čechům a bez organizace — PocketBase authAlert neměl náš mailer hook.
+    // Alert odejde, když se účet přihlásí z jiného prohlížeče než dosud (otisk =
+    // IP + User-Agent); český účet už přihlášený byl, anglický se přihlásí 2×.
+    const prihlasJako = (identity, ua) => fetch(BASE + '/api/collections/users/auth-with-password', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(ua ? { 'User-Agent': ua } : {}) },
+      body: JSON.stringify({ identity, password: PW }) });
+    maily.length = 0;
+    const prihl2 = await prihlasJako('cesky@example.com', 'Mozilla/5.0 (Windows NT 10.0) Chrome/130 jiny-prohlizec');
+    expect(prihl2.status === 200, `druhé přihlášení z jiného prohlížeče (${prihl2.status})`);
+    await sleep(2500);
+    const alertRaw = maily.join('\n---\n');
+    const alert = dekoduj(alertRaw);
+    expect(maily.length === 1, `nové místo vyrobilo 1 zprávu (${maily.length})`);
+    expect(predmetZ(alertRaw) === 'Tengo: Přihlášení z nového místa', `předmět česky s organizací (${predmetZ(alertRaw)})`);
+    expect(/Nové přihlášení k vašemu účtu/.test(alert), 'nadpis česky');
+    expect(!/Login from a new location|If this wasn't you|Hello,/.test(alert), 'nezůstala původní angličtina PocketBase');
+    expect(/Prohlížeč:[\s\S]{0,200}jiny-prohlizec/.test(alert), 'kartička říká, Z JAKÉHO prohlížeče');
+    expect(/Adresa \(IP\):/.test(alert) && /Kdy:[\s\S]{0,120}\d{1,2}\. \d{1,2}\. \d{4} \d{2}:\d{2}/.test(alert), '…odkud a kdy (čitelné datum, ne razítko)');
+    expect(/https:\/\/tengo\.killbottleneck\.com\/forgot-password/.test(alert), 'tlačítko „Změnit heslo" vede na vlastní stránku instance');
+    expect(/Změnit heslo/.test(alert), '…a jmenuje se tak');
+    maily.length = 0;
+    await prihlasJako('english@example.com');
+    await prihlasJako('english@example.com', 'Mozilla/5.0 (Macintosh) Safari/18');
+    await sleep(2500);
+    const alertEnRaw = maily.join('\n---\n');
+    const alertEn = dekoduj(alertEnRaw);
+    expect(maily.length === 1, `anglický účet: první přihlášení ticho, druhé z jiného prohlížeče 1 zpráva (${maily.length})`);
+    expect(predmetZ(alertEnRaw) === 'Tengo: Sign-in from a new location', `předmět anglicky (${predmetZ(alertEnRaw)})`);
+    expect(/New sign-in to your account/.test(alertEn) && !/Přihlášení|Prohlížeč/.test(alertEn), 'tělo anglicky bez češtiny');
 
     console.log('== jednotný vzhled a použitelnost ==');
     expect(/killbottleneck\.com/.test(cz), 'patička odkazuje na web');
@@ -288,6 +321,12 @@ const predmetZ = (raw) => {
     // Richard 6. 8. 2026: pod logem má být nápis jako v registračním mailu —
     // při blokovaných obrázcích jinak hlavička neříká, od koho zpráva je.
     expect(/<div[^>]*>killBottleneck<\/div>/.test(cz), 'pod logem je nápis killBottleneck');
+    // Richard 24. 10. 2026 večer: organizaci chce vidět i v těle HNED NAHOŘE — lidé
+    // program neznají nebo si ho nepamatují, svoji organizaci poznají.
+    expect(/<div[^>]*>Tengo<\/div>\s*<div[^>]*>killBottleneck<\/div>/.test(hos), 'hostovaná: název organizace v hlavičce NAD značkou');
+    expect(hos.indexOf('>Tengo</div>') >= 0 && hos.indexOf('>Tengo</div>') < hos.indexOf('<h1'), '…a před nadpisem zprávy');
+    expect(/Tengo · killBottleneck/.test(hos), '…i v textové verzi (první řádek)');
+    expect(!/<div[^>]*>[^<]+<\/div>\s*<div[^>]*>killBottleneck<\/div>/.test(cz), 'self-host bez názvu: hlavička jen se značkou jako dřív');
     // Nález 8. 8. 2026: uživatelka na logo klikala a „nikam ji to nevedlo".
     expect(/<a href="[^"]+"[^>]*>\s*<img[^>]+mail-znak\.jpg/.test(hos), 'logo v hlavičce je klikací');
     expect(/<a href="https:\/\/tengo\.killbottleneck\.com"/.test(hos), '…a vede do vlastní instance');

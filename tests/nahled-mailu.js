@@ -98,7 +98,12 @@ const predmetZ = (raw) => {
   try {
     await new Promise((r) => server.listen(SMTP_PORT, '0.0.0.0', r));
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} --add-host=host.docker.internal:host-gateway -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    // AI pro návratové maily: bez env jde deterministický výpis; se skutečným modelem
+    // (KB_AI_PROVIDER/URL/MODEL/TOKEN z prostředí) ukáže náhled i text modelu
+    const aiEnv = ['KB_AI_PROVIDER', 'KB_AI_URL', 'KB_AI_MODEL', 'KB_AI_TOKEN', 'KB_AI_OPENAI_EXTRA']
+      .filter((k) => process.env[k]).map((k) => `-e ${k}='${String(process.env[k]).replace(/'/g, "'\\''")}'`).join(' ');
+    // KB_NOTIFY_EMAIL_DEFAULT=1: notifikace jdou hned mailem (náhled notifikačního mailu)
+    execSync(`docker run -d --name ${NAME} --add-host=host.docker.internal:host-gateway -e TZ=Europe/Prague -e KB_UVODNI_MAPA=0 -e KB_NOTIFY_EMAIL_DEFAULT=1 ${aiEnv} -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert ${SU.email} ${SU.pw}`, { stdio: 'ignore' });
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: SU.email, password: SU.pw } })).json.token;
@@ -120,10 +125,74 @@ const predmetZ = (raw) => {
     const tok = (qp(maily.join('')).match(/\/reset-password\?token=([A-Za-z0-9._-]+)/) || [])[1];
     await api('POST', '/api/collections/users/confirm-password-reset', { body: { token: tok, password: PW, passwordConfirm: PW } });
     const pozv = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'kolega@firma.cz', password: PW } });
+    // mail podle PŘÍJEMCE: s KB_NOTIFY_EMAIL_DEFAULT=1 dostane zvoucí zároveň oznámení o vstupu
+    const mailPro = async (komu) => { const re = new RegExp('^To:.*' + komu.replace(/\./g, '\\.'), 'mi'); for (let i = 0; i < 24; i++) { const m = maily.find((x) => re.test(x)); if (m) return m; await sleep(500); } return ''; };
     maily.length = 0;
     await api('POST', '/api/collections/loginlogs/records', { token: pozv.json.token, body: {} });
-    await sleep(2500);
-    zachyceno.push({ soubor: 'uvitaci.html', popis: 'Uvítací mail po prvním vstupu', raw: maily[0] || '' });
+    zachyceno.push({ soubor: 'uvitaci.html', popis: 'Uvítací mail po prvním vstupu', raw: await mailPro('kolega@firma.cz') });
+    zachyceno.push({ soubor: 'vstup-pozvaneho.html', popis: 'Oznámení zvoucímu: pozvaný poprvé vstoupil', raw: await mailPro('sefka@firma.cz') });
+
+    // Ostatní odchozí maily — všechny s názvem organizace na začátku předmětu (24. 10. 2026)
+    const KT = pozv.json.token, kolegaId = pozv.json.record.id;
+    maily.length = 0;
+    await api('POST', '/api/collections/users/request-password-reset', { body: { email: 'kolega@firma.cz' } });
+    zachyceno.push({ soubor: 'obnova-hesla.html', popis: 'Obnovení hesla', raw: await mailPro('kolega@firma.cz') });
+    // ověření adresy jde jen NEověřenému účtu → čerstvá samoregistrace
+    await api('POST', '/api/collections/users/records', { body: { email: 'novacek@firma.cz', password: PW, passwordConfirm: PW } });
+    maily.length = 0;
+    await api('POST', '/api/collections/users/request-verification', { body: { email: 'novacek@firma.cz' } });
+    zachyceno.push({ soubor: 'overeni-adresy.html', popis: 'Ověření e-mailové adresy', raw: await mailPro('novacek@firma.cz') });
+    // přihlášení z nového místa (PocketBase authAlert): do 24. 10. 2026 chodilo anglicky
+    // („Login from a new location"). Kolega už přihlášený byl → druhé přihlášení z jiného prohlížeče.
+    maily.length = 0;
+    await fetch(BASE + '/api/collections/users/auth-with-password', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36' },
+      body: JSON.stringify({ identity: 'kolega@firma.cz', password: PW }) });
+    zachyceno.push({ soubor: 'nove-misto.html', popis: 'Přihlášení z nového místa (do 24. 10. anglicky „Login from a new location")', raw: await mailPro('kolega@firma.cz') });
+    const mapaN = (await api('POST', '/api/collections/goalmaps/records', { token: UT, body: {
+      title: 'Web pro Dvořáka',
+      nodes: [
+        { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Web spuštěný', title: 'Web spuštěný', status: 'todo' } },
+        { id: 'n1', type: 'goalNode', position: { x: 0, y: 1 }, data: { title: 'Návrh úvodní stránky', status: 'todo', owner: 'kolega@firma.cz' } },
+      ],
+      edges: [{ id: 'e1', source: 'root', target: 'n1' }],
+    } })).json;
+    maily.length = 0;
+    await api('POST', '/api/collections/comments/records', { token: UT, body: { goalmap: mapaN.id, node_id: 'n1', text: 'Stihneš návrh do pátku?' } });
+    zachyceno.push({ soubor: 'notifikace.html', popis: 'Notifikace e-mailem (komentář k cíli)', raw: await mailPro('kolega@firma.cz') });
+    await api('PATCH', `/api/collections/users/records/${kolegaId}`, { token: KT, body: { notify_email_mode: 'digest' } });
+    await api('POST', '/api/collections/comments/records', { token: UT, body: { goalmap: mapaN.id, node_id: 'n1', text: 'A přidej i patičku.' } });
+    maily.length = 0;
+    await api('POST', '/api/kb/run-email-digests', { token: ST });
+    zachyceno.push({ soubor: 'denni-souhrn.html', popis: 'Denní souhrn notifikací', raw: await mailPro('kolega@firma.cz') });
+    maily.length = 0;
+    await api('POST', '/api/kb/share', { token: UT, body: { action: 'share', mapId: mapaN.id, email: 'grafik@externi.cz', permission: 'read' } });
+    zachyceno.push({ soubor: 'sdileni-bez-uctu.html', popis: 'Pozvánka ke sdílení pro adresu bez účtu', raw: await mailPro('grafik@externi.cz') });
+
+    // Návratové maily (navratMaily.js): kolega má rozdělanou práci (po termínu, dnes,
+    // blokuje šéfku) a „nepřihlásí se" 3 / 7 / 14 / 30 dní — každé zpětné datování
+    // je nový cyklus, takže odejde vždy jen ten nejvyšší stupeň.
+    const dnes = (o) => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Prague' })); d.setDate(d.getDate() + o); return d.toISOString().slice(0, 10); };
+    await api('POST', '/api/collections/goalmaps/records', { token: KT, body: {
+      title: 'Zakázka Dvořák — kuchyň',
+      nodes: [
+        { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Kuchyň hotová do konce měsíce', title: 'Kuchyň hotová do konce měsíce', status: 'todo' } },
+        { id: 'n1', type: 'goalNode', position: { x: 0, y: 1 }, data: { title: 'Poslat cenovou nabídku Dvořákovi', status: 'todo', owner: 'kolega@firma.cz', deadline: dnes(-4) } },
+        { id: 'n2', type: 'goalNode', position: { x: 0, y: 2 }, data: { title: 'Objednat dvířka u dodavatele', status: 'in_progress', owner: 'kolega@firma.cz', deadline: dnes(0) } },
+        { id: 'n3', type: 'goalNode', position: { x: 0, y: 3 }, data: { title: 'Změřit stěnu u zákazníka', status: 'todo', owner: 'kolega@firma.cz', deadline: dnes(5) } },
+        { id: 'n4', type: 'goalNode', position: { x: 0, y: 4 }, data: { title: 'Vyfakturovat zálohu', status: 'todo', owner: 'kolega@firma.cz' } },
+        { id: 'n5', type: 'goalNode', position: { x: 0, y: 5 }, data: { title: 'Montáž u zákazníka', status: 'todo', owner: 'sefka@firma.cz', deadline: dnes(12), waitForChildren: true } },
+        { id: 'n6', type: 'goalNode', position: { x: 1, y: 6 }, data: { title: 'Vyzvednout kování', status: 'todo', owner: 'kolega@firma.cz', deadline: dnes(-1) } },
+      ],
+      edges: [1, 2, 3, 4, 5].map((i) => ({ id: `e${i}`, source: 'root', target: `n${i}` })).concat([{ id: 'e6', source: 'n5', target: 'n6' }]),
+    } });
+    for (const dnu of [3, 7, 14, 30]) {
+      maily.length = 0;
+      await api('PATCH', `/api/collections/users/records/${kolegaId}`, { token: ST, body: { last_login: new Date(Date.now() - (dnu * 24 + 2) * 3600000).toISOString() } });
+      const r = await api('POST', '/api/kb/run-navrat-maily', { token: ST });
+      for (let i = 0; i < 20 && !maily.length; i++) await sleep(500);
+      zachyceno.push({ soubor: `navrat-${dnu}.html`, popis: `Návratový mail — ${dnu} dní bez přihlášení (odesláno ${r.json && r.json.sent})`, raw: maily[0] || '' });
+    }
 
     fs.mkdirSync(VEN, { recursive: true });
     const karty = [];
@@ -140,7 +209,7 @@ const predmetZ = (raw) => {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     fs.writeFileSync(path.join(VEN, 'index.html'), `<!doctype html>
 <html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>killBottleneck — pozvánkové maily</title>
+<title>killBottleneck — odchozí maily</title>
 <style>
  body{margin:0;background:#eef1f5;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#1f2937}
  header{padding:28px 20px;background:#fff;border-bottom:1px solid #e5e7eb}
@@ -154,7 +223,7 @@ const predmetZ = (raw) => {
  iframe{width:100%;height:820px;border:0;display:block;background:#f3f4f6}
 </style></head><body>
 <header>
- <h1>killBottleneck — pozvánkové maily</h1>
+ <h1>killBottleneck — odchozí maily: název organizace v předmětu i v hlavičce každé zprávy</h1>
  <p>Zachyceno z opravdu odeslané pošty (SMTP jímka), ne přeskládáno. Obrázek loga se tahá z killbottleneck.com — když se nenačte, uvidíte, jak zpráva vypadá s blokovanými obrázky.</p>
 </header>
 <div class="mriz">

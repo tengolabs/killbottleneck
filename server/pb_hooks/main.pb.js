@@ -63,9 +63,8 @@ onMailerRecordPasswordResetSend((e) => {
     // Předmět začíná ADRESOU ZVOUCÍHO (Richard 17. 8. 2026) — lidé pozvánku od
     // neznámého odesílatele hlásili jako spam. Bez značky invited_by (nemělo by
     // u pozvánky nastat) spadneme na starý neosobní předmět, ať mail odejde vždy.
-    const zPredmet = zvouciEmail
-      ? (info.org ? "sysmail.inviteSubjectFromOrg" : "sysmail.inviteSubjectFrom")
-      : (info.org ? "sysmail.inviteSubjectOrg" : "sysmail.inviteSubject");
+    // organizaci předřadí prepisSystemovyMail (predmetOrg) — „Tengo: … vás zve do killBottlenecku"
+    const zPredmet = zvouciEmail ? "sysmail.inviteSubjectFrom" : "sysmail.inviteSubject";
     klicePozvanky = {
       subject: { key: zPredmet, params: p },
       heading: info.org ? { key: "sysmail.inviteHeadingOrg", params: p } : "sysmail.inviteHeading",
@@ -109,6 +108,23 @@ onMailerRecordOTPSend((e) => {
   prepisSystemovyMail(e, {
     subject: "sysmail.otpSubject", heading: "sysmail.otpHeading",
     body: "sysmail.otpBody", kod: true,
+  });
+  e.next();
+}, "users");
+
+// Přihlášení z nového zařízení/místa (PocketBase authAlert). Richardův nález
+// 24. 10. 2026: jako JEDINÝ systémový mail chodil anglicky („Login from a new
+// location") a bez názvu organizace, protože tenhle hook chyběl. Původní zpráva
+// nemá odkaz ani kód — jen čas/IP/prohlížeč v <em>, z nich prepisSystemovyMail
+// složí kartičku; tlačítko vede na /forgot-password (nové heslo = odhlášení všude).
+onMailerRecordAuthAlertSend((e) => {
+  const { prepisSystemovyMail } = require(`${__hooks}/mailTemplate.js`);
+  prepisSystemovyMail(e, {
+    subject: "sysmail.alertSubject", heading: "sysmail.alertHeading",
+    body: "sysmail.alertBody", ignore: "sysmail.alertIgnore",
+    button: "sysmail.alertButton", tlacitkoCesta: "/forgot-password",
+    bezOdkazu: true,
+    udalost: { nadpis: "sysmail.alertBoxTitle", kdy: "sysmail.alertBoxWhen", odkud: "sysmail.alertBoxFrom", cim: "sysmail.alertBoxAgent" },
   });
   e.next();
 }, "users");
@@ -193,6 +209,8 @@ onRecordCreateRequest((e) => {
     e.record.set("is_org_manager", false);
     // zástupce také nastavuje jen admin (vzor is_ai_manager)
     e.record.set("deputy", "");
+    // stav návratových e-mailů píše jen server (navratMaily.js)
+    e.record.set("navrat", null);
   } else if (e.record.getString("deputy")) {
     // i adminem zakládaný účet: zástupce jen platný člen a ne-sebe — překlep
     // při pozvání by se jinak tiše uložil a nikdy nerozřešil (nález panelu 15. 8.)
@@ -294,6 +312,20 @@ onRecordUpdateRequest((e) => {
     } catch (err) {
       e.record.set("last_login", e.record.original().getString("last_login"));
     }
+  }
+  // `navrat` (stav návratových e-mailů, navratMaily.js) píše JEN server — stejná
+  // past jako u last_login: PATCH z prohlížeče by cronem zapsaný stupeň přepsal
+  // hodnotou načtenou při startu requestu. Z klienta se přebírá JEDINĚ volba
+  // `odhlaseno` (přepínač v Nastavení notifikací), zbytek vždy čerstvý z DB.
+  if (!e.hasSuperuserAuth()) {
+    const { jsonVal } = require(`${__hooks}/helpers.js`);
+    let cerstve = null;
+    try { cerstve = jsonVal(e.app.findRecordById("users", e.record.id), "navrat", null); } catch (err) { cerstve = jsonVal(e.record.original(), "navrat", null); }
+    const poslane = jsonVal(e.record, "navrat", null);
+    if (poslane && typeof poslane === "object" && !Array.isArray(poslane) && typeof poslane.odhlaseno === "boolean") {
+      cerstve = Object.assign({}, (cerstve && typeof cerstve === "object" && !Array.isArray(cerstve)) ? cerstve : {}, { odhlaseno: poslane.odhlaseno });
+    }
+    e.record.set("navrat", cerstve);
   }
   // notify_prefs si uživatel mění sám, ale jen ve tvaru { "<známý typ>": {in_app, email} }
   // — pole je jinak volný 4kB JSON v users a nesmí posloužit jako úložiště čehokoli.
@@ -1381,6 +1413,19 @@ cronAdd("email_digests", "35 * * * *", () => {
   }
 });
 
+// Návratové e-maily (kdo se 3/7/14/30 dní nepřihlásil): cron HODINOVĚ (offset 40 min),
+// navratMaily.runNavratMaily pošle od cílové hodiny (KB_NAVRAT_HODINA, default 9)
+// nejvýš jeden mail na osobu a stupeň žebříku; strop KB_NAVRAT_MAX_DENNE na instanci a den.
+cronAdd("navrat_maily", "40 * * * *", () => {
+  try {
+    const { runNavratMaily } = require(`${__hooks}/navratMaily.js`);
+    const n = runNavratMaily($app);
+    if (n > 0) $app.logger().info("navrat_maily: odesláno návratových e-mailů", "count", n);
+  } catch (err) {
+    try { $app.logger().warn("navrat_maily: běh selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+});
+
 // Retence notifikací: přečtené starší 30 dní a cokoli staršího 180 dní. Bez tohohle
 // tabulka roste donekonečna (vzor prune_loginlogs). Denně ve 3:40.
 cronAdd("prune_notifications", "40 3 * * *", () => {
@@ -1613,6 +1658,30 @@ kbRoute("POST", "/run-email-digests", (e) => {
   const { runEmailDigests } = require(`${__hooks}/helpers.js`);
   return e.json(200, { sent: runEmailDigests($app, { force: true }) });
 });
+
+// ruční spuštění návratových e-mailů (testy + ladění na instanci) — force obchází
+// hodinovou bránu a denní zámek v paměti, NE stav na uživateli (žádné dvojité maily)
+kbRoute("POST", "/run-navrat-maily", (e) => {
+  if (!e.hasSuperuserAuth()) {
+    return e.json(404, { error: "Not found." }); // neprozrazovat existenci routy
+  }
+  const { runNavratMaily } = require(`${__hooks}/navratMaily.js`);
+  return e.json(200, { sent: runNavratMaily($app, { force: true }) });
+});
+
+// Odhlášení návratových e-mailů odkazem z mailu — bez přihlášení (klik ze schránky,
+// často z telefonu bez session). GET = klik člověka, POST = One-Click poštovního
+// klienta (RFC 8058). Token je v DB jen jako otisk; nesoulad vrací stejnou stránku
+// s jiným textem, existenci účtu neprozrazuje.
+const odhlasitNavratHandler = (e) => {
+  const { odhlasitNavrat, odhlaseniHtml } = require(`${__hooks}/navratMaily.js`);
+  const { instanceInfo } = require(`${__hooks}/mailTemplate.js`);
+  const q = e.requestInfo().query || {};
+  const v = odhlasitNavrat($app, q["u"], q["t"]);
+  return e.html(200, odhlaseniHtml(v.ok, v.lang, instanceInfo($app, "").base));
+};
+kbRoute("GET", "/navrat/odhlasit", odhlasitNavratHandler);
+kbRoute("POST", "/navrat/odhlasit", odhlasitNavratHandler);
 
 // ruční refresh vlastního sumáře („Aktualizovat" na dashboardu /tasks) —
 // přegeneruje a přepíše dnešní záznam přihlášeného uživatele
@@ -3815,7 +3884,7 @@ kbRoute("POST", "/invite", (e) => {
 kbRoute("POST", "/report", (e) => {
   const { env } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const { mailHtml, mailText, patickaRadky, instanceInfo, WEB } = require(`${__hooks}/mailTemplate.js`);
+  const { mailHtml, mailText, patickaRadky, instanceInfo, WEB, predmetOrg, nazevOrganizace } = require(`${__hooks}/mailTemplate.js`);
   const L = userLang(e.auth);
 
   const komu = String(env("REPORT_TO") || "").trim();
@@ -3895,6 +3964,7 @@ kbRoute("POST", "/report", (e) => {
     },
     paticka: patickaRadky(t, L, inst.base),
     domov: inst.base || WEB,
+    org: nazevOrganizace($app, inst), // v hlavičce jako v předmětu (operátor vidí, odkud hlášení je)
   };
 
   // Snímek: base64 → binárka přes dočasný soubor (vzor llm.js — čistě JS dekód
@@ -3965,7 +4035,7 @@ kbRoute("POST", "/report", (e) => {
     const zprava = new MailerMessage({
       from: { address: $app.settings().meta.senderAddress, name: $app.settings().meta.senderName },
       to: [{ address: komu }],
-      subject: t(L, druh === "napad" ? "report.subjectIdea" : "report.subjectBug", { verze: env("VERSION") || "?" }),
+      subject: predmetOrg($app, t(L, druh === "napad" ? "report.subjectIdea" : "report.subjectBug", { verze: env("VERSION") || "?" })),
       html: mailHtml(podklad),
       text: mailText(podklad),
     });

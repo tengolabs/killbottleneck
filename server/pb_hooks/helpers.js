@@ -749,18 +749,20 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, 
     try {
       // jednotný vzhled se systémovými maily (mailTemplate.js) — jinak by
       // uživatel dostával dvě různě vypadající pošty z jedné aplikace
-      const { mailHtml, mailText, patickaRadky } = require(`${__hooks}/mailTemplate.js`);
+      const { mailHtml, mailText, patickaRadky, predmetOrg, nazevOrganizace } = require(`${__hooks}/mailTemplate.js`);
       const podklad = {
         nadpis: i18n.t(lang, "mail.subjectPrefix").replace(/:\s*$/, ""),
         odstavce: [text],
         tlacitko: { text: i18n.t(lang, "mail.openButton"), url: app.settings().meta.appURL || "" },
         tlacitkoNahrada: i18n.t(lang, "mail.linkFallback"),
         paticka: patickaRadky(i18n.t, lang),
+        org: nazevOrganizace(app), // organizace v hlavičce (Richard 24. 10. 2026)
       };
       const message = new MailerMessage({
         from: { address: app.settings().meta.senderAddress, name: app.settings().meta.senderName },
         to: [{ address: email }],
-        subject: i18n.t(lang, "mail.subjectPrefix") + text,
+        // předmět začíná názvem organizace; bez ní zůstává „killBottleneck: " jako dřív
+        subject: predmetOrg(app, text, { bezOrg: i18n.t(lang, "mail.subjectPrefix") }),
         html: mailHtml(podklad),
         text: mailText(podklad),
       });
@@ -5792,7 +5794,7 @@ function runEmailDigests(app, opts) {
       });
       const L = userLang(u);
       // stejná šablona jako u ostatních mailů (mailTemplate.js)
-      const { mailHtml, mailText, patickaRadky } = require(`${__hooks}/mailTemplate.js`);
+      const { mailHtml, mailText, patickaRadky, predmetOrg, nazevOrganizace } = require(`${__hooks}/mailTemplate.js`);
       const odstavce = [t(L, "digest.emailIntro", { n: rowsAktualni.length, itemWord: plural(L, rowsAktualni.length, "notification") })];
       for (const r of rowsAktualni.slice(0, MAX_LINES)) odstavce.push("• " + r.getString("text"));
       if (rowsAktualni.length > MAX_LINES) odstavce.push(t(L, "digest.emailMore", { n: rowsAktualni.length - MAX_LINES, itemWord: plural(L, rowsAktualni.length - MAX_LINES, "notification") }));
@@ -5802,12 +5804,13 @@ function runEmailDigests(app, opts) {
         tlacitko: { text: t(L, "mail.openButton"), url: app.settings().meta.appURL || "" },
         tlacitkoNahrada: t(L, "mail.linkFallback"),
         paticka: patickaRadky(t, L),
+        org: nazevOrganizace(app), // organizace v hlavičce (Richard 24. 10. 2026)
       };
       const html = mailHtml(podklad);
       const message = new MailerMessage({
         from: { address: app.settings().meta.senderAddress, name: app.settings().meta.senderName },
         to: [{ address: u.email() }],
-        subject: t(L, "digest.emailSubject"),
+        subject: predmetOrg(app, t(L, "digest.emailSubject")),
         html: html,
         text: mailText(podklad),
       });
@@ -7436,25 +7439,16 @@ function upsertDailySummary(app, userId, date, text, provider) {
   return rec;
 }
 
-// Vygeneruje a uloží sumář jednoho uživatele. Vrací record, nebo null když není
-// co shrnovat (žádná otevřená práce). Cron NEmá auth kontext → model se volá
-// přímo (advisor.js / gateway), nikdy přes /api/flowmap/advisor.
-function generateDailySummary(app, userId, email, cfg, lang) {
-  // Stejná pojistka jako v /advisor: adresa z DB prošla kontrolou při uložení,
-  // ale cron ji čte až po čase — kdyby se mezitím změnila jinudy, hostovaná
-  // instance nesmí na privátní cíl sáhnout. Hodnoty z prostředí jsou provozovatele.
+// Jedno volání modelu s prostým textem na výstupu — společné pro denní sumář
+// i návratové e-maily (navratMaily.js). Dispatch providerů: ollama/openai jdou
+// přes advisor.js, api/custom na bránu stejným kontraktem jako routa /advisor.
+// Pojistka proti privátnímu cíli: adresa z DB prošla kontrolou při uložení,
+// ale cron ji čte až po čase — kdyby se mezitím změnila jinudy, hostovaná
+// instance nesmí na privátní cíl sáhnout. Hodnoty z prostředí jsou provozovatele.
+function summaryModelText(cfg, system, userMsg, lang) {
   if (cfg.source === "db" && aiHostBlocked(cfg.url)) {
     throw new Error("adresa AI služby míří na privátní cíl (viz nastavení AI)");
   }
-  const L = dgOf(lang);
-  const digest = collectUserTaskDigest(app, userId, email, lang);
-  if (digest.total === 0) return null;
-  const today = fmtDateLocal(new Date());
-  // Seznamy úkolů AI NEVYJMENOVÁVÁ — klikací přehled skládá frontend z dat
-  // (panel „Můj den"). AI dodává jen krátké denní povzbuzení; system prompt je
-  // jediné místo pro budoucí persony (kouč apod.).
-  const system = L.sysSummary;
-  const userMsg = L.userSummary(today, digest.promptText);
   let text;
   if (cfg.provider === "ollama" || cfg.provider === "openai") {
     const { advisorText } = require(`${__hooks}/advisor.js`);
@@ -7489,6 +7483,21 @@ function generateDailySummary(app, userId, email, cfg, lang) {
   }
   // pojistka: markdown zvýraznění frontend nerenderuje — svléknout na prostý text
   text = text.replace(/\*\*/g, "").replace(/^#+\s*/gm, "");
+  return text;
+}
+
+// Vygeneruje a uloží sumář jednoho uživatele. Vrací record, nebo null když není
+// co shrnovat (žádná otevřená práce). Cron NEmá auth kontext → model se volá
+// přímo (advisor.js / gateway), nikdy přes /api/flowmap/advisor.
+function generateDailySummary(app, userId, email, cfg, lang) {
+  const L = dgOf(lang);
+  const digest = collectUserTaskDigest(app, userId, email, lang);
+  if (digest.total === 0) return null;
+  const today = fmtDateLocal(new Date());
+  // Seznamy úkolů AI NEVYJMENOVÁVÁ — klikací přehled skládá frontend z dat
+  // (panel „Můj den"). AI dodává jen krátké denní povzbuzení; system prompt je
+  // jediné místo pro budoucí persony (kouč apod.).
+  const text = summaryModelText(cfg, L.sysSummary, L.userSummary(today, digest.promptText), lang);
   return upsertDailySummary(app, userId, today, text.slice(0, 10000), cfg.provider);
 }
 
@@ -7627,7 +7636,7 @@ module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, runDailySummaries, summaryAiConfig, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

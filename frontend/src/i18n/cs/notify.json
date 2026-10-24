@@ -65,6 +65,8 @@
     "emailModeDigestDesc": "Jednotlivé e-maily nechodí; jednou denně přijde jeden souhrn.",
     "emailModeNone": "Nic",
     "emailModeNoneDesc": "E-mailem nechodí nic. Notifikace zůstávají v aplikaci.",
+    "navratTitle": "Návratové e-maily, když se dlouho nepřihlásím",
+    "navratDesc": "Po 3, 7, 14 a 30 dnech bez přihlášení přijde přehled rozdělané práce a nejmenší kroky, jak zase naskočit. Přihlášením se počítání vrací na začátek.",
     "emailModeOverridden": "Řídí se režimem e-mailů výše"
   },
   "native": {

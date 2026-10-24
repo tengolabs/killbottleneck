@@ -102,6 +102,15 @@ function karticka(k) {
  */
 function mailHtml(o) {
   const znacka = o.znacka || "killBottleneck";
+  // Název organizace HNED NAHOŘE (Richard 24. 10. 2026): „mnoho lidí nezná náš
+  // program nebo si ho nepamatuje, ale když uvidí svoji organizaci, zpozorní."
+  // Proto je organizace v hlavičce velká a značka pod ní menší; bez známé
+  // organizace (self-host bez názvu) zůstává hlavička jako dřív.
+  const org = String(o.org || "").trim();
+  const hlavicka = org
+    ? `<div style="margin:6px 0 0;font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BARVA_TEXT};">${esc(org)}</div>
+          <div style="margin:2px 0 0;font-size:13px;font-weight:600;color:${BARVA_SEDA};">${esc(znacka)}</div>`
+    : `<div style="margin:6px 0 0;font-size:17px;font-weight:700;letter-spacing:-0.01em;color:${BARVA_TEXT};">${esc(znacka)}</div>`;
   const odstavec = (t) =>
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BARVA_TEXT};">${odkazuj(esc(t))}</p>`;
   const odstavce = (o.odstavce || []).map(odstavec).join("");
@@ -133,8 +142,8 @@ function mailHtml(o) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
       <tr><td style="padding:18px 28px;border-bottom:1px solid #e5e7eb;">
         <a href="${esc(o.domov || WEB)}" style="text-decoration:none;color:${BARVA_TEXT};">
-          <img src="${WEB}/znacka/mail-znak.jpg" width="120" height="78" alt="${esc(znacka)}" style="display:block;border:0;font-size:17px;font-weight:700;color:${BARVA_HLAVNI};">
-          <div style="margin:6px 0 0;font-size:17px;font-weight:700;letter-spacing:-0.01em;color:${BARVA_TEXT};">${esc(znacka)}</div>
+          <img src="${WEB}/znacka/mail-znak.jpg" width="120" height="78" alt="${esc(org || znacka)}" style="display:block;border:0;font-size:17px;font-weight:700;color:${BARVA_HLAVNI};">
+          ${hlavicka}
         </a>
       </td></tr>
       <tr><td style="padding:28px;">
@@ -155,7 +164,10 @@ function mailHtml(o) {
 
 /** Textová verze téhož — poštovní filtry ji čekají a starší klienti ji čtou. */
 function mailText(o) {
-  const casti = [o.nadpis || "", ""];
+  const org = String(o.org || "").trim();
+  const casti = [];
+  if (org) casti.push(org + " · " + (o.znacka || "killBottleneck"), ""); // organizace nahoře jako v HTML
+  casti.push(o.nadpis || "", "");
   for (const t of (o.odstavce || [])) casti.push(t, "");
   if (o.tlacitko && o.tlacitko.url) casti.push(o.tlacitko.text + ": " + o.tlacitko.url, "");
   if (o.karta) {
@@ -230,6 +242,57 @@ function instanceInfo(app, zalozniOdkaz) {
 }
 
 /**
+ * Název organizace pro PŘEDMĚT e-mailu (Richard 24. 10. 2026: „všechny e-maily
+ * musí začít v předmětu názvem organizace"). Pořadí: slovo ze subdomény
+ * (`tengo` — stejné rozhodnutí jako u pozvánky, 8. 8. 2026), jinak název ze
+ * Správy organizace (self-host na vlastní doméně), jinak nic.
+ */
+function orgProPredmet(app, info) {
+  const i = info || instanceInfo(app, "");
+  if (i.org) return i.org;
+  try {
+    const { orgSettingsName } = require(`${__hooks}/helpers.js`);
+    return String(orgSettingsName(app) || "").replace(/[\r\n\t]+/g, " ").trim().slice(0, 60);
+  } catch (err) { return ""; }
+}
+
+/**
+ * Předmět s názvem organizace na ZAČÁTKU: „Tengo: Vítejte v killBottlenecku".
+ * První písmeno názvu velké (Richard 24. 10. 2026: „ať to začíná velkým písmenem,
+ * příklad: Tengo") — slug ze subdomény je malými písmeny.
+ * Jediné místo, kde se tvar skládá — každý odesílatel (systémové maily, notify,
+ * digest, uvítací, pozvánka ke sdílení, hlášení chyb, návratové) jde tudy.
+ * `bezOrg` = co předřadit, když organizace není známá (notify má „killBottleneck: ").
+ */
+function velkePrvni(s) {
+  s = String(s || "");
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+/**
+ * Název organizace pro HLAVIČKU mailu — tentýž zdroj a tvar jako v předmětu
+ * (Richard 24. 10. 2026: organizaci chce vidět i v těle „hned nahoře").
+ * Předává se do mailHtml/mailText jako `org`; bez známé organizace prázdné.
+ */
+function nazevOrganizace(app, info) {
+  return velkePrvni(orgProPredmet(app, info));
+}
+function predmetOrg(app, predmet, o) {
+  const org = nazevOrganizace(app, o && o.info);
+  if (org) return org + ": " + predmet;
+  return ((o && o.bezOrg) || "") + predmet;
+}
+
+/** „24. 10. 2026 18:42 (UTC+2)" z razítka PocketBase; neznámý tvar vrací beze změny. */
+function formatujCas(s) {
+  const d = new Date(String(s).trim().replace(" ", "T"));
+  if (isNaN(d.getTime())) return String(s);
+  const p = (n) => (n < 10 ? "0" : "") + n;
+  const posun = -d.getTimezoneOffset();
+  const zona = posun === 0 ? "UTC" : "UTC" + (posun > 0 ? "+" : "-") + (Math.abs(posun) % 60 === 0 ? Math.abs(posun) / 60 : (Math.abs(posun) / 60).toFixed(1));
+  return d.getDate() + ". " + (d.getMonth() + 1) + ". " + d.getFullYear() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + " (" + zona + ")";
+}
+
+/**
  * Přepíše systémový mail PocketBase do jazyka příjemce a jednotného vzhledu.
  *
  * ⚠️ MUSÍ bydlet v modulu, ne v main.pb.js: handlery hooků běží v PocketBase
@@ -253,7 +316,8 @@ function prepisSystemovyMail(e, klice) {
     // aby se v původní zprávě našel jakýkoli odkaz, a mail odešel s textem
     // „Zadejte tento kód" — ale bez kódu, zato s tlačítkem bez popisku.
     if (klice.kod && !kod) return;
-    if (!odkaz && !kod) return;
+    // `bezOdkazu`: zpráva bez odkazu i kódu je v pořádku (upozornění na přihlášení)
+    if (!odkaz && !kod && !klice.bezOdkazu) return;
 
     // Odkaz z PocketBase míří do jeho ADMIN konzole (/_/#/auth/…), která je jen
     // anglicky — český příjemce tak dostal český mail a přistál na anglické
@@ -274,6 +338,24 @@ function prepisSystemovyMail(e, klice) {
 
     const info = instanceInfo(e.app, odkaz);
 
+    // Upozornění na přihlášení z nového místa: PocketBase dává čas, IP a prohlížeč
+    // do <em>…</em> („2026-10-24 16:42:43.373Z - 172.17.0.1 Mozilla/5.0 …").
+    // Rozložíme do kartičky; když tvar nepoznáme, jde celý řádek jako poznámka —
+    // raději syrový údaj než žádný.
+    let kartaUdalosti = null;
+    if (klice.udalost) {
+      const em = (puvodni.match(/<em>\s*([\s\S]*?)\s*<\/em>/) || [])[1] || "";
+      const cisty = em.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
+      const m = cisty.match(/^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+-\s+(\S+)\s*(.*)$/);
+      const radky = [];
+      if (m) {
+        radky.push({ label: text(klice.udalost.kdy), hodnota: formatujCas(m[1]) });
+        radky.push({ label: text(klice.udalost.odkud), hodnota: m[2] });
+        if (m[3]) radky.push({ label: text(klice.udalost.cim), hodnota: m[3].slice(0, 200) });
+      }
+      if (radky.length || cisty) kartaUdalosti = { ikona: "🔐", nadpis: text(klice.udalost.nadpis), radky: radky, poznamka: m ? "" : cisty };
+    }
+
     const odstavce = [];
     // volitelný úvodní odstavec s parametry (např. KDO posílá pozvánku)
     if (klice.uvod) odstavce.push(text(klice.uvod));
@@ -286,7 +368,9 @@ function prepisSystemovyMail(e, klice) {
       odstavce: odstavce,
       paticka: patickaRadky(t, lang, info.base, klice.replyTo),
       domov: info.base || WEB,
+      org: nazevOrganizace(e.app, info),
     };
+    if (kartaUdalosti) podklad.karta = kartaUdalosti;
     // „kam se vrátit" jde do šedé kartičky POD tlačítko (Richard 17. 8. 2026):
     // nad tlačítkem to odvádělo od jediné akce, kterou má příjemce udělat hned.
     if (klice.karta) {
@@ -302,10 +386,14 @@ function prepisSystemovyMail(e, klice) {
     if (cilovyOdkaz) {
       podklad.tlacitko = { text: text(klice.button), url: cilovyOdkaz };
       podklad.tlacitkoNahrada = t(lang, "mail.linkFallback");
+    } else if (klice.tlacitkoCesta && info.base) {
+      // zpráva bez tokenu (přihlášení z nového místa): tlačítko na vlastní stránku instance
+      podklad.tlacitko = { text: text(klice.button), url: info.base + klice.tlacitkoCesta };
+      podklad.tlacitkoNahrada = t(lang, "mail.linkFallback");
     }
     // návrat POD tlačítko: platí i tehdy, když jednorázový odkaz nad ním vyprší
     if (klice.navrat) podklad.odstavcePo = [text(klice.navrat)];
-    e.message.subject = text(klice.subject);
+    e.message.subject = predmetOrg(e.app, text(klice.subject), { info: info });
     e.message.html = mailHtml(podklad);
     e.message.text = mailText(podklad);
     // Odpověď na pozvánku má dorazit ZVOUCÍMU, ne do prázdna (Richard 17. 8. 2026):
@@ -318,4 +406,4 @@ function prepisSystemovyMail(e, klice) {
   }
 }
 
-module.exports = { mailHtml, mailText, patickaRadky, prepisSystemovyMail, instanceInfo, WEB, esc };
+module.exports = { mailHtml, mailText, patickaRadky, prepisSystemovyMail, instanceInfo, predmetOrg, orgProPredmet, nazevOrganizace, WEB, esc };

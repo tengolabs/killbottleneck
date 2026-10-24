@@ -130,17 +130,9 @@ const STRINGS = {
   // „killBottleneck <noreply@…>" vypadá ve schránce jako reklama a lidé ji
   // hlásili jako spam. Jméno zvoucího se do předmětu NEDÁVÁ — je dlouhé a
   // v mobilním Gmailu by uřízlo zbytek; zůstává v prvním odstavci těla.
-  "sysmail.inviteSubjectFromOrg": {
-    cs: "{inviter} vás zve do killBottlenecku — organizace {org}",
-    en: "{inviter} invites you to killBottleneck — organization {org}",
-  },
   "sysmail.inviteSubjectFrom": {
     cs: "{inviter} vás zve do killBottlenecku",
     en: "{inviter} invites you to killBottleneck",
-  },
-  "sysmail.inviteSubjectOrg": {
-    cs: "Pozvánka do killBottlenecku — organizace {org}",
-    en: "Invitation to killBottleneck — organization {org}",
   },
   "sysmail.inviteHeadingOrg": {
     cs: "Byli jste pozváni do killBottlenecku organizace {org}",
@@ -203,15 +195,83 @@ const STRINGS = {
   "sharemail.boxTitle": { cs: "Sdílený projekt", en: "Shared project" },
   "sharemail.boxProject": { cs: "Projekt:", en: "Project:" },
   "sharemail.boxEmail": { cs: "Registrujte se e-mailem:", en: "Sign up with:" },
+  // ── návratové e-maily (navratMaily.js) — žebřík 3/7/14/30 dní bez přihlášení ──
+  // Předmět i úvod per stupeň: „poslední připomenutí" smí stát jen u POSLEDNÍHO
+  // stupně žebříku (klíč *Last); stupeň mimo 3/7/14 dostane *Default s {days}.
+  "navrat.subject3": {
+    cs: "Tři dny bez vás — tohle na vás čeká",
+    en: "Three days without you — here is what is waiting",
+  },
+  "navrat.subject7": {
+    cs: "Týden bez vás: co se nahromadilo a kde začít",
+    en: "A week without you: what piled up and where to start",
+  },
+  "navrat.subject14": {
+    cs: "Dva týdny — nic se neztratilo, tady je nejkratší cesta zpátky",
+    en: "Two weeks — nothing was lost, here is the shortest way back",
+  },
+  "navrat.subjectLast": {
+    cs: "Poslední připomenutí — vaše projekty na vás čekají",
+    en: "Last reminder — your projects are waiting for you",
+  },
+  "navrat.subjectDefault": {
+    cs: "{days} dní bez vás — tohle na vás čeká",
+    en: "{days} days without you — here is what is waiting",
+  },
+  "navrat.heading": { cs: "Co na vás čeká po {days} dnech", en: "What is waiting after {days} days" },
+  "navrat.intro3": {
+    cs: "Už tři dny jste se v killBottlenecku neukázali. Nic hrozného — ale ať nic nepropadne, tady je rychlý přehled a pár malých kroků, jak zase naskočit.",
+    en: "It has been three days since you last opened killBottleneck. No big deal — but so nothing slips, here is a quick overview and a few small steps to get going again.",
+  },
+  "navrat.intro7": {
+    cs: "Týden bez přehledu stačí, aby se věci nahromadily. Tady je, co na vás čeká, a tři nejmenší kroky, kterými se dá dnes začít.",
+    en: "A week without an overview is enough for things to pile up. Here is what is waiting for you and the three smallest steps to start with today.",
+  },
+  "navrat.intro14": {
+    cs: "Dva týdny jsou dlouhá doba — a je úplně v pořádku, že jste měli jiné starosti. Vaše projekty jsou přesně tam, kde jste je nechali. Tady je nejkratší cesta zpátky.",
+    en: "Two weeks is a long time — and it is perfectly fine that other things needed your attention. Your projects are exactly where you left them. Here is the shortest way back.",
+  },
+  "navrat.introLast": {
+    cs: "Už {days} dní jste se nepřihlásili, tak vás dál obtěžovat nebudeme — tohle je poslední připomenutí. Projekty na vás počkají; až budete chtít, jedna minuta stačí k rozkoukání.",
+    en: "You have not signed in for {days} days, so we will not keep bothering you — this is the last reminder. Your projects will wait; whenever you are ready, a minute is enough to get your bearings.",
+  },
+  "navrat.introDefault": {
+    cs: "Už {days} dní jste se v killBottlenecku neukázali. Tady je přehled, co na vás čeká, a pár malých kroků, jak zase naskočit.",
+    en: "It has been {days} days since you last opened killBottleneck. Here is what is waiting for you and a few small steps to get going again.",
+  },
+  "navrat.bodyEmpty": {
+    cs: "Momentálně na vás nečeká žádná otevřená práce — čistý stůl. Až budete chtít něco rozjet, stačí si zapsat první nápad.",
+    en: "There is no open work waiting for you right now — a clean desk. Whenever you want to start something, just jot down the first idea.",
+  },
+  "navrat.fallbackIntro": { cs: "Nejdůležitější položky teď:", en: "The most important items right now:" },
+  "navrat.fallbackBlocking": { cs: "blokuje ostatní", en: "blocks others" },
+  "navrat.fallbackOverdue": { cs: "po termínu", en: "overdue" },
+  "navrat.fallbackToday": { cs: "dnes", en: "due today" },
+  "navrat.fallbackOpen": { cs: "otevřené", en: "open" },
+  "navrat.boxTitle": { cs: "Váš stav v číslech", en: "Your status in numbers" },
+  "navrat.boxBlocking": { cs: "Blokuje ostatní:", en: "Blocking others:" },
+  "navrat.boxOverdue": { cs: "Po termínu:", en: "Overdue:" },
+  "navrat.boxToday": { cs: "Dnes:", en: "Due today:" },
+  "navrat.boxOpen": { cs: "Otevřené položky:", en: "Open items:" },
+  "navrat.unsubscribeText": {
+    cs: "Nechcete tyhle připomínky? Odhlásíte je jedním kliknutím:",
+    en: "Do not want these reminders? Unsubscribe with one click:",
+  },
+  "navrat.unsubDoneTitle": { cs: "Hotovo — připomínky jsou vypnuté", en: "Done — reminders are off" },
+  "navrat.unsubDoneBody": {
+    cs: "Návratové e-maily vám už chodit nebudou. Zapnout je můžete kdykoli v aplikaci v Nastavení notifikací.",
+    en: "You will no longer receive come-back e-mails. You can turn them back on any time in the app under Notification settings.",
+  },
+  "navrat.unsubInvalidTitle": { cs: "Odkaz už neplatí", en: "This link is no longer valid" },
+  "navrat.unsubInvalidBody": {
+    cs: "Tento odhlašovací odkaz už neplatí. Připomínky si můžete vypnout přímo v aplikaci v Nastavení notifikací.",
+    en: "This unsubscribe link is no longer valid. You can turn the reminders off directly in the app under Notification settings.",
+  },
   // ── uvítací mail po PRVNÍM VSTUPU pozvaného ──────────────────────
   // Nález z ostrého provozu: pozvaný si nastavil heslo, prošel aplikací, zavřel
   // prohlížeč — a druhý den nevěděl ani jméno organizace, ani adresu. Pozvánkový
   // mail už mezitím vypadal jako „něco s heslem" a nikdo ho nehledal. Tohle je
   // zpráva, kterou si má nechat: přijde ve chvíli, kdy už účet FUNGUJE.
-  "sysmail.welcomeSubjectOrg": {
-    cs: "Vítejte v killBottlenecku — organizace {org}",
-    en: "Welcome to killBottleneck — organization {org}",
-  },
   "sysmail.welcomeSubject": { cs: "Vítejte v killBottlenecku", en: "Welcome to killBottleneck" },
   "sysmail.welcomeHeading": { cs: "Vítejte v killBottlenecku", en: "Welcome to killBottleneck" },
   "sysmail.welcomeBody": {
@@ -259,6 +319,25 @@ const STRINGS = {
     cs: "Zadejte tento kód v aplikaci. Platí jen několik minut a nikomu ho nesdělujte.",
     en: "Enter this code in the app. It is valid for a few minutes only — never share it with anyone.",
   },
+  // Přihlášení z nového místa (PocketBase authAlert). Do 24. 10. 2026 jediný
+  // systémový mail, který chodil anglicky a bez názvu organizace (Richardův nález
+  // „Login from a new location"). Tlačítko vede na /forgot-password: nové heslo
+  // odhlásí všechna ostatní zařízení, a jde to i bez přihlášení.
+  "sysmail.alertSubject": { cs: "Přihlášení z nového místa", en: "Sign-in from a new location" },
+  "sysmail.alertHeading": { cs: "Nové přihlášení k vašemu účtu", en: "New sign-in to your account" },
+  "sysmail.alertBody": {
+    cs: "K vašemu účtu killBottleneck se právě někdo přihlásil z nového zařízení nebo místa.",
+    en: "Someone just signed in to your killBottleneck account from a new device or location.",
+  },
+  "sysmail.alertIgnore": {
+    cs: "Pokud jste to byli vy, nemusíte nic dělat. Pokud ne, změňte si hned heslo — tím se odhlásí všechna ostatní zařízení.",
+    en: "If this was you, there is nothing to do. If not, change your password right away — that signs out every other device.",
+  },
+  "sysmail.alertButton": { cs: "Změnit heslo", en: "Change password" },
+  "sysmail.alertBoxTitle": { cs: "Podrobnosti přihlášení", en: "Sign-in details" },
+  "sysmail.alertBoxWhen": { cs: "Kdy:", en: "When:" },
+  "sysmail.alertBoxFrom": { cs: "Adresa (IP):", en: "Address (IP):" },
+  "sysmail.alertBoxAgent": { cs: "Prohlížeč:", en: "Browser:" },
 
   // ── notifikace (skládá server dle jazyka příjemce) ───────────────
   "notify.nodeUnblocked": {

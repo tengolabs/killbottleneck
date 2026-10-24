@@ -59,7 +59,7 @@ function registraceOtevrena(app) {
 function posliPozvankuKeSdileni(app, o) {
   const { env } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
-  const { mailHtml, mailText, patickaRadky, instanceInfo, WEB } = require(`${__hooks}/mailTemplate.js`);
+  const { mailHtml, mailText, patickaRadky, instanceInfo, predmetOrg, nazevOrganizace, WEB } = require(`${__hooks}/mailTemplate.js`);
   const komu = String(o.komu || "").trim().toLowerCase();
   const odesilatel = o.odesilatel;
   const mapa = o.mapa;
@@ -115,6 +115,7 @@ function posliPozvankuKeSdileni(app, o) {
     ],
     paticka: patickaRadky(t, lang, info.base, adresaOdesilatele),
     domov: info.base || WEB,
+    org: nazevOrganizace(app, info), // organizace v hlavičce (Richard 24. 10. 2026)
   };
   if (otevrena && info.base) {
     podklad.tlacitko = { text: t(lang, "sharemail.button"), url: info.base + "/register?email=" + encodeURIComponent(komu) };
@@ -134,7 +135,7 @@ function posliPozvankuKeSdileni(app, o) {
     const zprava = new MailerMessage({
       from: { address: app.settings().meta.senderAddress, name: app.settings().meta.senderName },
       to: [{ address: komu }],
-      subject: t(lang, "sharemail.subject", { actor: adresaOdesilatele, project: projekt }),
+      subject: predmetOrg(app, t(lang, "sharemail.subject", { actor: adresaOdesilatele, project: projekt }), { info: info }),
       html: mailHtml(podklad),
       text: mailText(podklad),
       // odpověď patří tomu, kdo sdílí — From zůstává noreply@ kvůli SPF/DKIM

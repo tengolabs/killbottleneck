@@ -180,6 +180,31 @@ const api = async (method, p, { token, body } = {}) => {
     });
     expect(digestChecked, 'volba „Denní souhrn" přežila reload (uložena na účtu)');
 
+    console.log('== návratové e-maily: přepínač čte a zapisuje users.navrat ==');
+    // Klik-test 24. 10. 2026: DTO uživatele pole `navrat` nepřenášelo → přepínač
+    // ukazoval VŽDY „zapnuto" a po vypnutí se vracel; sada navrat-maily.js (jen API)
+    // to nechytila. Tady se měří skutečný stav v prohlížeči proti DB.
+    const navratStav = () => page.evaluate(() => { const s = document.querySelector('[data-testid="navrat-maily-switch"]'); return s ? s.getAttribute('data-state') : null; });
+    const navratDb = async () => ((await api('GET', `/api/collections/users/records/${prijemceId}`, { token: ST })).json || {}).navrat || null;
+    expect((await navratStav()) === 'checked', `přepínač návratových e-mailů je zapnutý (${await navratStav()})`);
+    await page.evaluate(() => document.querySelector('[data-testid="navrat-maily-switch"]').click());
+    await sleep(1200);
+    expect(/Nastavení uloženo\.|Settings saved\./.test(await page.evaluate(() => document.body.innerText)), 'vypnutí návratových e-mailů dá potvrzení');
+    expect((await navratStav()) === 'unchecked', `po kliknutí zůstal vypnutý, nevrátil se (${await navratStav()})`);
+    expect(((await navratDb()) || {}).odhlaseno === true, 'DB: navrat.odhlaseno = true');
+    await page.reload({ waitUntil: 'networkidle2' });
+    await sleep(1200);
+    expect((await navratStav()) === 'unchecked', `vypnutí přežilo reload (${await navratStav()})`);
+    // zpět zapnout
+    await page.evaluate(() => document.querySelector('[data-testid="navrat-maily-switch"]').click());
+    await sleep(1200);
+    expect(((await navratDb()) || {}).odhlaseno === false, 'DB: po zapnutí navrat.odhlaseno = false');
+    // odhlášení MIMO aplikaci (odkaz v mailu) se musí po načtení stránky projevit
+    await api('PATCH', `/api/collections/users/records/${prijemceId}`, { token: ST, body: { navrat: { odhlaseno: true } } });
+    await page.reload({ waitUntil: 'networkidle2' });
+    await sleep(1200);
+    expect((await navratStav()) === 'unchecked', `odhlášení z odkazu v mailu je po načtení vidět jako vypnuté (${await navratStav()})`);
+
     console.log('== označit vše přečtené ==');
     await page.evaluate(() => {
       const b = [...document.querySelectorAll('button')].find((x) => /Označit vše|Mark all/.test(x.innerText || ''));

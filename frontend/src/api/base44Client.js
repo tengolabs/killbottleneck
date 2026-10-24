@@ -94,6 +94,9 @@ const toDto = (name, r) => {
         skin_custom: r.skin_custom || null,
         focus: r.focus || null,
         agent_setup_seen: !!r.agent_setup_seen,
+        // návratové e-maily: bez tohoto řádku by přepínač v Nastavení notifikací
+        // četl undefined → vždy „zapnuto“ a po vypnutí by se vracel (klik-test 24. 10. 2026)
+        navrat: r.navrat || null,
       };
     case 'LoginLog':
       return { ...base, user_id: r.user, email: r.email };

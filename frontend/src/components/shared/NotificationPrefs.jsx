@@ -17,12 +17,34 @@ export default function NotificationPrefs({ emailEnabled = false }) {
   const { toast } = useToast();
   const [prefs, setPrefs] = useState({});
   const [emailMode, setEmailMode] = useState('');
+  // návratové e-maily (žebřík 3/7/14/30 dní bez přihlášení) — stav drží server
+  // v users.navrat, klient smí měnit JEN `odhlaseno` (users update hook)
+  const [navratOn, setNavratOn] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setPrefs(user?.notify_prefs || {});
     setEmailMode(user?.notify_email_mode || '');
+    setNavratOn(!(user?.navrat && user.navrat.odhlaseno === true));
   }, [user]);
+
+  const changeNavrat = async (on) => {
+    const prev = navratOn;
+    setNavratOn(on); // optimisticky, stejný vzor jako changeMode
+    setSaving(true);
+    try {
+      const saved = await base44.entities.User.update(user.id, { navrat: { odhlaseno: !on } });
+      setNavratOn(!(saved.navrat && saved.navrat.odhlaseno === true));
+      patchUser?.({ navrat: saved.navrat || null });
+      toast({ title: t('prefs.saved') });
+    } catch (err) {
+      console.error(err);
+      setNavratOn(prev);
+      toast({ title: t('prefs.saveFailed'), variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // '' (starý účet bez volby) se chová jako 'instant' — dnešní stav beze změny
   const modeInstant = emailMode === '' || emailMode === 'instant';
@@ -125,6 +147,22 @@ export default function NotificationPrefs({ emailEnabled = false }) {
             ))}
           </div>
         </fieldset>
+      )}
+
+      {emailEnabled && emailMode !== 'none' && (
+        <div className="flex items-start justify-between gap-4 px-4 py-3 border-b" data-navrat-maily>
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">{t('prefs.navratTitle')}</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">{t('prefs.navratDesc')}</span>
+          </span>
+          <Switch
+            checked={navratOn}
+            disabled={saving}
+            onCheckedChange={changeNavrat}
+            aria-label={t('prefs.navratTitle')}
+            data-testid="navrat-maily-switch"
+          />
+        </div>
       )}
 
       <div className="hidden sm:grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-2 border-b text-[11px] uppercase tracking-wide text-muted-foreground font-medium">

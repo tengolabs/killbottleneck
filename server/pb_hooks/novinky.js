@@ -11,6 +11,20 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.87-beta": {
+    cs: [
+      "Kdo se 3, 7, 14 nebo 30 dní nepřihlásí, dostane e-mail: co na něj čeká, co je po termínu, co brzdí ostatní a tři nejmenší kroky na dnešek. Přihlášením počítadlo začíná znovu.",
+      "V Nastavení notifikací je přepínač „Návratové e-maily“; odhlásit se jde i odkazem v každém takovém e-mailu.",
+      "Předmět každého e-mailu začíná názvem vaší organizace a stejný název je v hlavičce zprávy pod logem, ať zprávu poznáte na první pohled.",
+      "Upozornění na přihlášení k účtu z nového zařízení chodí ve vašem jazyce, říká kdy a odkud, a tlačítko vede na změnu hesla.",
+    ],
+    en: [
+      "Whoever has not signed in for 3, 7, 14 or 30 days gets an e-mail: what is waiting, what is overdue, what is holding up others, and three smallest steps for today. Signing in resets the count.",
+      "Notification settings have a \"Come-back e-mails\" switch; you can also unsubscribe with the link in every such e-mail.",
+      "Every e-mail subject starts with your organization's name and the same name heads the message under the logo, so you recognize it at a glance.",
+      "The alert about a sign-in to your account from a new device arrives in your language, says when and from where, and its button leads to a password change.",
+    ],
+  },
   "v0.86-beta": {
     cs: [
       "Asistent vystaví fakturu klientovi: „vystav fakturu na Karla za konzultaci 2 h po 800“ — karta ukáže položky a součet, po potvrzení máte PDF s QR platbou na kartě i v Dokumentech → Faktury.",

@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.86-beta}
+        KB_VERSION: ${KB_VERSION:-v0.87-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -74,6 +74,14 @@ services:
       KB_REMINDER_CATCHUP_H: ${KB_REMINDER_CATCHUP_H:-48}
       # Hour of the daily e-mail digest (0–23, local TZ), default 8.
       KB_NOTIFY_DIGEST_HOUR: ${KB_NOTIFY_DIGEST_HOUR:-${FLOWMAP_NOTIFY_DIGEST_HOUR:-8}}
+      # Come-back e-mails for users who have not signed in: 0 = off (default on
+      # when SMTP is set), hour of sending (0–23, local TZ, default 9), ladder of
+      # days without sign-in (default 3,7,14,30 — one e-mail per step, silence after
+      # the last one until the next sign-in), daily cap per instance (default 10).
+      KB_NAVRAT_MAILY: ${KB_NAVRAT_MAILY:-}
+      KB_NAVRAT_HODINA: ${KB_NAVRAT_HODINA:-}
+      KB_NAVRAT_DNY: ${KB_NAVRAT_DNY:-}
+      KB_NAVRAT_MAX_DENNE: ${KB_NAVRAT_MAX_DENNE:-}
       # Notification budget per recipient per day — a runaway automation must not
       # bury someone. Above the in-app cap the rows collapse into one growing
       # summary; above the e-mail cap the e-mails are dropped. No "unlimited".

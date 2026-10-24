@@ -65,6 +65,8 @@
     "emailModeDigestDesc": "No individual e-mails; one digest arrives once a day.",
     "emailModeNone": "Nothing",
     "emailModeNoneDesc": "Nothing is e-mailed. Notifications stay in the app.",
+    "navratTitle": "Come-back e-mails when I have not signed in for a while",
+    "navratDesc": "After 3, 7, 14 and 30 days without signing in you get an overview of your open work and the smallest steps to get going again. Signing in resets the count.",
     "emailModeOverridden": "Controlled by the e-mail mode above"
   },
   "native": {

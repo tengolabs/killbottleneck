@@ -20,7 +20,7 @@
  */
 function posliUvitaciMail(app, user) {
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const { mailHtml, mailText, patickaRadky, instanceInfo, WEB } = require(`${__hooks}/mailTemplate.js`);
+  const { mailHtml, mailText, patickaRadky, instanceInfo, predmetOrg, nazevOrganizace, WEB } = require(`${__hooks}/mailTemplate.js`);
 
   const lang = userLang(user);
   const info = instanceInfo(app, "");
@@ -33,6 +33,7 @@ function posliUvitaciMail(app, user) {
     odstavce: [t(lang, "sysmail.welcomeBody")],
     paticka: patickaRadky(t, lang, info.base),
     domov: info.base || WEB,
+    org: nazevOrganizace(app, info), // organizace v hlavičce (Richard 24. 10. 2026)
   };
   if (info.base) {
     podklad.tlacitko = { text: t(lang, "sysmail.welcomeButton"), url: info.base };
@@ -52,9 +53,8 @@ function posliUvitaciMail(app, user) {
   const message = new MailerMessage({
     from: { address: app.settings().meta.senderAddress, name: app.settings().meta.senderName },
     to: [{ address: komu }],
-    subject: info.org
-      ? t(lang, "sysmail.welcomeSubjectOrg", p)
-      : t(lang, "sysmail.welcomeSubject"),
+    // organizace je na ZAČÁTKU předmětu (predmetOrg), ne za pomlčkou jako do 24. 10. 2026
+    subject: predmetOrg(app, t(lang, "sysmail.welcomeSubject"), { info: info }),
     html: mailHtml(podklad),
     text: mailText(podklad),
   });
