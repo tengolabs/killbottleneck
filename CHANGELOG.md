@@ -9,6 +9,47 @@ below before you jump several versions.
 
 ---
 
+## v0.86-beta — 2026-10-24
+
+**Invoices to clients from the assistant — PDF with a QR payment code; client address book with billing details; supplier profile**
+
+- **"Issue an invoice to Karel for 2 hours of consulting at 800."** New assistant tool group `faktury`: `list_clients`,
+  `save_client` (also from a business-card photo transcript — the card shows exactly what will be saved, nothing is
+  invented), `set_invoicing_profile` (scope `org` = shared, administrator; `me` = own), `create_invoice`, `list_invoices`. The invoice card lists every
+  item and the totals **computed by the server** (the model never computes amounts); after confirmation the app assigns
+  the number (one series per year — shared by the organization or the user's own, `20260001`, no gaps — unique index + transaction, two parallel
+  confirmations get two different numbers) and the card offers **Download PDF** and **Open in Documents**.
+- **PDF is created in the browser** (pdf-lib + Liberation fonts, lazily loaded): header with the organization logo,
+  supplier and customer, dates (plus date of taxable supply for VAT payers), items table over several pages, totals,
+  note, payment block with account, IBAN, variable symbol and a **QR payment code (SPAYD)** — the IBAN is derived by
+  the server from a Czech account number (check digits verified, mod 11 and mod 97). The PDF is never stored; the
+  invoice keeps snapshots of the supplier and customer, so it can be regenerated identically.
+- **Supplier details, shared or your own.** The organization's shared details are in Organization settings →
+  *Issuing invoices* (administrator). **Every user can also set their own details** under *My account → My invoice
+  details*: they take precedence over the shared ones for that user's invoices and give them **their own number
+  series** (a team of freelancers in one instance, each invoicing for themselves). When the applicable details are
+  missing and someone asks for the first invoice, **the app shows a form** (no model call; an administrator first
+  chooses "whole organization" or "only me") and the assistant saves the answers. VAT: non-payer, or payer with one
+  rate per invoice; CZK only.
+- **Clients** (the existing address book from time tracking) gained optional billing fields: address, company ID,
+  VAT ID, e-mail — editable in the clients dialog (*Billing details*) or by the assistant. Ambiguous first names
+  ("Karel" = two clients) make the assistant ask which one.
+- **Documents → Invoices** has a **filter by month issued** and **Download all (ZIP)** — the PDFs of the listed invoices in
+  one file for the accountant (fflate, MIT; lazily loaded). *My account → My invoice details* links there; the "Download all
+  my data" export says it does not contain invoices. Cards "Create the client" / "Save the supplier details" link to the
+  clients dialog / Organization settings / My account.
+- **Documents → Invoices**: list of issued invoices (own; administrators see all), detail with items and payment
+  details, *Download PDF*, *Paid* toggle. Invoices are immutable — a correction is a new invoice. The app says plainly
+  that it is not the legal archive of tax documents: keep the PDF.
+- Routes `GET/POST /api/kb/invoicing-profile` (admin), `GET/POST /api/kb/invoicing-profile/me` (own details; `{smazat: true}` removes them), `GET /api/kb/chat/faktury`, `GET /api/kb/chat/faktura/{id}`,
+  `POST /api/kb/chat/faktura/zaplaceno`; collection `invoices` (read: owner or admin; writes only by the server),
+  migrations for `clients` fields and `instance_settings.invoicing`.
+- **Assistant help answers "how do I…" without doing it.** The help tool's result now opens with a reminder that the user
+  asks HOW something is done, so the model explains the steps and only offers to do it (a `suggest_next` chip) instead of
+  changing the setting itself — DeepSeek used to switch the theme right after "How do I switch to the dark theme?".
+- Legal texts (DPA 2.2, 6.1, 7.1; privacy policy 3.3, 4.1; terms 2.2): data categories extended by client billing
+  data and issued invoices; AKI.IO GmbH listed as the AI sub-processor (EU, zero retention) instead of the outdated
+  "AI on the operator's hardware in the Czech Republic" wording.
 ## v0.85-beta — 2026-10-19
 
 **The assistant stays visible when the AI is down or not connected: history, Documents and relax keep working**

@@ -154,7 +154,7 @@ const toDto = (name, r) => {
     case 'DailySummary':
       return { ...base, date: r.date, text: r.text, provider: r.provider || '' };
     case 'Client':
-      return { ...base, name: r.name, color: r.color || '', note: r.note || '', created_by_id: r.owner, created_by: r.owner_email };
+      return { ...base, name: r.name, color: r.color || '', note: r.note || '', address: r.address || '', ico: r.ico || '', dic: r.dic || '', email: r.email || '', created_by_id: r.owner, created_by: r.owner_email };
     case 'ExternalContact':
       return { ...base, name: r.name, note: r.note || '', email: r.email || '', private: !!r.private, created_by_id: r.owner, created_by: r.owner_email };
     case 'TimeEntry':

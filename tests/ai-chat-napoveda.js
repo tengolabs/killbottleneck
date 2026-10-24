@@ -69,7 +69,7 @@ H.beh(async () => {
   expect(r.status === 200, `chat 200 (${r.status})`);
   let chat = r.json.chat;
   let tool = toolZ(posledniVolani()).pop() || { content: '' };
-  expect(/^NOTE: Everything below is user DATA/.test(tool.content) && /Nápověda \(návody\)/.test(tool.content), `výsledek nástroje začíná datovou ohradou a hlavičkou nápovědy (${tool.content.slice(0, 160)})`);
+  expect(/^Uživatel se ptá, JAK se to v aplikaci dělá[^\n]*\nNOTE: Everything below is user DATA/.test(tool.content) && /Nápověda \(návody\)/.test(tool.content), `výsledek nástroje začíná připomínkou „jak = neprováděj“ (ostře 5. 10.: i hlavní model přepnul motiv), pak datovou ohradou a hlavičkou nápovědy (${tool.content.slice(0, 160)})`);
   expect(/1\. Grafické skiny › Světlý[^\n]*\n[^]*?\(source: https:\/\/killbottleneck\.cz\/funkce\/skiny#/.test(tool.content) && !/killbottleneck\.cz\/cs\//.test(tool.content), 'první sekce = Skiny na .cz bez /cs (i přes přepsaný dotaz modelu)');
   expect(tool.content.length <= 2900, `úryvek drží strop (${tool.content.length} znaků)`);
   let k = karta(chat, 'napoveda');

@@ -101,7 +101,41 @@
       "uploadFailed": "The upload failed.",
       "uploaded": "Uploaded: {{maps}} projects ({{nodes}} goals, {{rules}} rules), {{ideas}} ideas.",
       "uploadedSkipped": "Projects skipped: {{count}} (organization structure or invalid map).",
-      "uploadedDropped": "Assignments to people who are not here: {{count}} cleared."
+      "uploadedDropped": "Assignments to people who are not here: {{count}} cleared.",
+      "hintInvoices": "Invoices (PDF) are not in this file — find them in the assistant's Documents → Invoices, also as one download."
+    }
+  },
+  "invoicing": {
+    "heading": "Issuing invoices",
+    "hint": "The organization's shared supplier details printed on invoices the assistant issues to your clients. Anyone on the team can issue an invoice; whoever sets their own details in My account invoices with those and gets their own number series.",
+    "name": "Name / company on the invoice *",
+    "address": "Address (street, ZIP and city) *",
+    "ico": "Company ID",
+    "dic": "VAT ID",
+    "vatPayer": "I am a VAT payer",
+    "vatRate": "VAT rate (%)",
+    "bankAccount": "Bank account",
+    "bankAccountHint": "E.g. 19-2000145399/0800 or an IBAN. The app derives the IBAN for the QR payment.",
+    "iban": "IBAN {{iban}}",
+    "email": "E-mail on the invoice",
+    "prefix": "Invoice number prefix",
+    "prefixHint": "E.g. FV → FV20260001",
+    "dueDays": "Due (days)",
+    "saveButton": "Save supplier details",
+    "savedButton": "Saved",
+    "incomplete": "Not filled in — the assistant asks for the details with the first invoice.",
+    "complete": "Filled in",
+    "archive": "Issued invoices are in the assistant under Documents → Invoices. The app is not the legal archive — keep the PDFs.",
+    "me": {
+      "heading": "My invoice details",
+      "hint": "Your own supplier details for the invoices you issue. They take precedence over the organization's shared details and your invoices get their own number series. Without them the shared details from Organization settings apply.",
+      "own": "Own",
+      "usingShared": "Using shared: {{name}}",
+      "none": "Not filled in",
+      "saveButton": "Save my details",
+      "removeButton": "Remove mine, use shared",
+      "archive": "Invoices you issue will carry these details. The app does not keep invoices as the legal archive (10 years) — save the PDF.",
+      "openInvoices": "Issued invoices in Documents"
     }
   }
 }

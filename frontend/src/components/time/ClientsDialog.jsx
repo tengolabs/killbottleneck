@@ -10,13 +10,15 @@ import { Label } from '@/components/ui/label';
 import ProjectColorPicker from '@/components/shared/ProjectColorPicker';
 import { useToast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
-import { Briefcase, Trash2, Pencil, Loader2, Plus, Check, X as XIcon } from 'lucide-react';
+import { Briefcase, Trash2, Pencil, Loader2, Plus, Check, X as XIcon, ChevronDown, ChevronRight, Receipt } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import BusyIcon from '@/components/shared/BusyIcon';
 import { useDialogForm } from '@/hooks/useDialogForm';
 
 // Číselník klientů (měření času, přiřazení projektů). Vidí ho každý přihlášený,
 // upravovat/mazat smí autor záznamu nebo admin — stejná pravidla vynucuje server (RLS).
-export default function ClientsDialog({ open, onClose, onChanged }) {
+// `vybranyId`: klient, který se po otevření rovnou rozbalí k úpravě (odkaz z karty asistenta „Otevřít klienta“, 24. 10. 2026)
+export default function ClientsDialog({ open, onClose, onChanged, vybranyId }) {
   const { t } = useTranslation('tasks');
   const { toast } = useToast();
   const { user } = useAuth();
@@ -27,15 +29,25 @@ export default function ClientsDialog({ open, onClose, onChanged }) {
   const [editId, setEditId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
+  // fakturační údaje klienta (9. 10. 2026): nepovinná pole pro faktury vystavené asistentem — rozbalovací
+  // blok v úpravě řádku, aby zakládání zůstalo jen jméno + barva (anti-bloat: žádné povinné pole navíc)
+  const PRAZDNE_FAKT = { address: '', ico: '', dic: '', email: '' };
+  const [editFakt, setEditFakt] = useState(PRAZDNE_FAKT);
+  const [faktOpen, setFaktOpen] = useState(false);
+  const FAKT_POLE = ['address', 'ico', 'dic', 'email'];
   // jen zakládání nového klienta; `loading` (načtení seznamu) a úpravy/mazání
   // řádků mají vlastní mechaniku
   const f = useDialogForm({ open, onClose, submit: () => create(), onError: (e) => toast({ title: t('clients.createFailed'), description: e?.message, variant: 'destructive' }) });
 
+  const zacniUpravu = (c) => { setEditId(c.id); setEditName(c.name); setEditColor(c.color || ''); const fk = {}; for (const k of FAKT_POLE) fk[k] = c[k] || ''; setEditFakt(fk); setFaktOpen(FAKT_POLE.some((k) => c[k]));  };
   const load = () => {
     setLoading(true);
-    base44.entities.Client.list('name').then(setClients).catch(() => {}).finally(() => setLoading(false));
+    base44.entities.Client.list('name').then((list) => {
+      setClients(list);
+      if (vybranyId) { const c = list.find((x) => x.id === vybranyId); if (c) { zacniUpravu(c); setFaktOpen(true); } }
+    }).catch(() => {}).finally(() => setLoading(false));
   };
-  useEffect(() => { if (open) { setName(''); setColor(''); setEditId(null); load(); } }, [open]);
+  useEffect(() => { if (open) { setName(''); setColor(''); setEditId(null); load(); } }, [open, vybranyId]);
 
   const canEdit = (c) => user?.role === 'admin' || c.created_by_id === user?.id;
 
@@ -53,12 +65,12 @@ export default function ClientsDialog({ open, onClose, onChanged }) {
   const saveEdit = async () => {
     if (!editName.trim()) return;
     try {
-      await base44.entities.Client.update(editId, { name: editName.trim(), color: editColor });
+      await base44.entities.Client.update(editId, { name: editName.trim(), color: editColor, address: editFakt.address.trim(), ico: editFakt.ico.trim(), dic: editFakt.dic.trim(), email: editFakt.email.trim() });
       setEditId(null);
       load();
       onChanged?.();
     } catch (e) {
-      toast({ title: t('common:misc.saveFailed'), description: e?.message, variant: 'destructive' });
+      toast({ title: t('clients.billingSaveFailed'), description: e?.message, variant: 'destructive' });
     }
   };
 
@@ -119,15 +131,33 @@ export default function ClientsDialog({ open, onClose, onChanged }) {
                       </Button>
                     </div>
                     <ProjectColorPicker value={editColor} onChange={setEditColor} />
+                    <button type="button" className="inline-flex items-center gap-1 text-xs text-primary hover:underline" onClick={() => setFaktOpen((v) => !v)} data-testid="client-billing-toggle">
+                      {faktOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}<Receipt className="w-3.5 h-3.5" />{t('clients.billingToggle')}
+                    </button>
+                    {faktOpen && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="client-billing">
+                        <p className="sm:col-span-2 text-[11px] text-muted-foreground">{t('clients.billingHint')}</p>
+                        <div className="sm:col-span-2">
+                          <Label htmlFor="client-address" className="text-xs">{t('clients.address')}</Label>
+                          <Textarea id="client-address" rows={2} value={editFakt.address} onChange={(e) => setEditFakt((fk) => ({ ...fk, address: e.target.value }))} maxLength={300} className="mt-1 text-sm" data-testid="client-address" />
+                        </div>
+                        {['ico', 'dic', 'email'].map((k) => (
+                          <div key={k}>
+                            <Label htmlFor={`client-${k}`} className="text-xs">{t(`clients.${k}`)}</Label>
+                            <Input id={`client-${k}`} value={editFakt[k]} onChange={(e) => setEditFakt((fk) => ({ ...fk, [k]: e.target.value }))} maxLength={k === 'email' ? 120 : 20} className="mt-1 h-8 text-sm" data-testid={`client-${k}`} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2.5">
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.color || '#94a3b8' }} />
-                    <span className="text-sm font-medium truncate flex-1 min-w-0">{c.name}</span>
+                    <span className="text-sm font-medium truncate flex-1 min-w-0">{c.name}{c.ico ? <span className="ml-1.5 text-[11px] text-muted-foreground font-normal" data-testid="client-ico">IČO {c.ico}</span> : null}</span>
                     {canEdit(c) && (
                       <>
                         <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0"
-                          onClick={() => { setEditId(c.id); setEditName(c.name); setEditColor(c.color || ''); }} title={t('common:actions.edit')}>
+                          onClick={() => zacniUpravu(c)} title={t('common:actions.edit')}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 hover:text-destructive"

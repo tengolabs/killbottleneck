@@ -279,7 +279,14 @@
     "namePlaceholder": "Client name…",
     "empty": "No clients yet.",
     "createFailed": "Couldn't create the client",
-    "confirmDelete": "Really delete the client \"{{name}}\"? Tracked time will remain, it just loses the client label."
+    "confirmDelete": "Really delete the client \"{{name}}\"? Tracked time will remain, it just loses the client label.",
+    "billingToggle": "Billing details",
+    "billingHint": "Optional — for invoices the assistant issues.",
+    "address": "Address (street, ZIP city)",
+    "ico": "Company ID",
+    "dic": "VAT ID",
+    "email": "E-mail",
+    "billingSaveFailed": "The billing details could not be saved"
   },
   "timeOverview": {
     "recentHeading": "Recent entries — a project/client can be assigned retroactively",

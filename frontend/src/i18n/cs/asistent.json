@@ -141,7 +141,9 @@
     "get_org_structure": "organizační struktura",
     "get_map_sharing": "sdílení projektu",
     "list_reminders": "připomínky ke krokům",
-    "get_timer": "běží stopky?"
+    "get_timer": "běží stopky?",
+    "list_clients": "adresář klientů",
+    "list_invoices": "vystavené faktury"
   },
   "errorGeneric": "Asistent neodpověděl. Zkuste to prosím znovu.",
   "errorRate": "Vyčerpali jste hodinový strop AI. Zkuste to za chvíli.",
@@ -349,7 +351,8 @@
       "vse": "Vše",
       "poznamky": "Poznámky",
       "emaily": "E-maily",
-      "sumare": "Sumáře"
+      "sumare": "Sumáře",
+      "faktury": "Faktury"
     },
     "kind": {
       "note": "Poznámka",
@@ -404,6 +407,45 @@
     "zvyraznit": "Zvýraznit v mapě",
     "zrusit": "Zrušit zvýraznění"
   },
+  "faktura": {
+    "card": "Faktura {{cislo}}",
+    "cardFor": "pro {{name}}",
+    "total": "Celkem k úhradě",
+    "due": "Splatnost {{date}}",
+    "issued": "Vystaveno {{date}}",
+    "download": "Stáhnout PDF",
+    "downloading": "Připravuji PDF…",
+    "open": "Otevřít v Dokumentech",
+    "error": "PDF se nepodařilo vytvořit ({{detail}}).",
+    "paid": "Zaplaceno {{date}}",
+    "unpaid": "Nezaplaceno",
+    "markPaid": "Označit jako zaplacenou",
+    "markUnpaid": "Vrátit na nezaplacenou",
+    "customer": "Odběratel",
+    "supplier": "Dodavatel",
+    "items": "Položky",
+    "net": "Základ",
+    "vat": "DPH {{rate}} %",
+    "nonVat": "Neplátce DPH",
+    "note": "Poznámka",
+    "qr": "QR platba",
+    "qrHint": "Naskenujte bankovní aplikací.",
+    "vs": "VS",
+    "account": "Účet",
+    "noAccount": "Bez bankovního účtu v profilu — bez platebního bloku a QR.",
+    "archiveHint": "Aplikace faktury neuchovává jako zákonný archiv dokladů (10 let) — PDF si uložte.",
+    "empty": "Zatím žádné faktury. Řekněte asistentovi: „Vystav fakturu na Karla za konzultaci 2 h po 800 Kč.“",
+    "notFound": "Faktura nenalezena.",
+    "errorLoad": "Faktury se nepodařilo načíst.",
+    "errorSave": "Změnu se nepodařilo uložit.",
+    "listTotal": "{{count}} faktur · nezaplaceno {{unpaid}}",
+    "filterUnpaid": "Jen nezaplacené",
+    "filterAll": "Všechny",
+    "downloadAll": "Stáhnout vše (ZIP)",
+    "zipping": "Připravuji {{done}}/{{total}}…",
+    "month": "Měsíc vystavení",
+    "monthAll": "Všechny měsíce"
+  },
   "relaxDal": "Relaxovat dál",
   "stav": {
     "vypadekTitle": "Asistent má teď výpadek",
@@ -419,5 +461,12 @@
     "nastaveni": "Zkontrolovat nastavení AI",
     "placeholderVypadek": "Asistent teď neodpovídá · „relax“ funguje",
     "placeholderNepripojeno": "Bez AI asistent neodpoví · „relax“ funguje"
+  },
+  "klient": {
+    "open": "Otevřít klienta"
+  },
+  "dodavatel": {
+    "openOrg": "Otevřít ve Správě organizace",
+    "openMe": "Otevřít v Můj účet"
   }
 }

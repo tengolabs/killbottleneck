@@ -2158,6 +2158,83 @@ kbRoute("POST", "/chat/dokument/smazat", (e) => {
   try { D.smazat($app, e.auth.id, String(b.id || "")); return e.json(200, { ok: true }); } catch (err) { return D.odpovedChyby(e, err); }
 }, $apis.requireAuth());
 
+// ---------- Faktury a klienti (9. 10. 2026, faktury.js) ----------
+// Profil DODAVATELE na faktury: společný na instanci (jen správce) + vlastní na uživatele (/me) — NEPLÉST s /billing (odběratel KB, jen hosting).
+// Tytéž funkce (profilOcisti/profilUloz) používá nástroj set_invoicing_profile → jedna validace pro UI i asistenta.
+kbRoute("GET", "/invoicing-profile", (e) => {
+  const F = require(`${__hooks}/faktury.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(userLang(e.auth), "err.invoicingAdminOnly") });
+  return e.json(200, F.profilDto(F.profilNacti($app)));
+}, $apis.requireAuth());
+
+kbRoute("POST", "/invoicing-profile", (e) => {
+  const F = require(`${__hooks}/faktury.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const L = userLang(e.auth);
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.invoicingAdminOnly") });
+  const body = e.requestInfo().body || {};
+  // whitelist + validace v modulu; částečná změna se slévá s aktuálním stavem (celé body se NIKDY neukládá)
+  const r = F.profilOcisti(body, F.profilNacti($app));
+  if (r.chyba) return e.json(400, { error: t(L, r.chyba), field: r.pole });
+  F.profilUloz($app, r.profil);
+  return e.json(200, Object.assign({ success: true }, F.profilDto(r.profil)));
+}, $apis.requireAuth());
+
+// VLASTNÍ údaje dodavatele uživatele (24. 10. 2026): mají přednost před společnými a dávají vlastní číselnou řadu.
+// GET → { own: dto|null, shared: {complete, name}, active: "vlastni"|"spolecny" }; POST tělo = změny (sléváno),
+// { smazat: true } vlastní profil odstraní → zase platí společné údaje.
+kbRoute("GET", "/invoicing-profile/me", (e) => {
+  const F = require(`${__hooks}/faktury.js`);
+  const own = F.profilVlastniNacti($app, e.auth.id);
+  const sp = F.profilNacti($app);
+  return e.json(200, { own: own ? F.profilDto(own) : null, shared: { complete: F.profilKompletni(sp), name: sp.name || "" }, active: own ? "vlastni" : "spolecny" });
+}, $apis.requireAuth());
+
+kbRoute("POST", "/invoicing-profile/me", (e) => {
+  const F = require(`${__hooks}/faktury.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const body = e.requestInfo().body || {};
+  if (body.smazat === true) {
+    F.profilVlastniUloz($app, e.auth.id, null);
+    const sp = F.profilNacti($app);
+    return e.json(200, { success: true, own: null, shared: { complete: F.profilKompletni(sp), name: sp.name || "" }, active: "spolecny" });
+  }
+  const r = F.profilOcisti(body, F.profilVlastniNacti($app, e.auth.id) || {});
+  if (r.chyba) return e.json(400, { error: t(L, r.chyba), field: r.pole });
+  F.profilVlastniUloz($app, e.auth.id, r.profil);
+  const sp = F.profilNacti($app);
+  return e.json(200, { success: true, own: F.profilDto(r.profil), shared: { complete: F.profilKompletni(sp), name: sp.name || "" }, active: "vlastni" });
+}, $apis.requireAuth());
+
+// vystavené faktury: vlastní (správce všechny); ?year=2026&unpaid=1
+kbRoute("GET", "/chat/faktury", (e) => {
+  const F = require(`${__hooks}/faktury.js`);
+  const q = e.requestInfo().query || {};
+  const rows = F.seznam($app, e.auth, { year: q.year ? Number(q.year) : 0, unpaid: q.unpaid === "1" || q.unpaid === "true" });
+  return e.json(200, { faktury: rows.map((r) => F.dto(r, false)), max: F.MAX_FAKTUR });
+}, $apis.requireAuth());
+
+// detail = DTO, ze kterého prohlížeč vyrobí PDF (snímky dodavatele/odběratele, položky, součty, SPAYD); cizí = 404
+kbRoute("GET", "/chat/faktura/{id}", (e) => {
+  const F = require(`${__hooks}/faktury.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const rec = F.najdi($app, e.auth, e.request.pathValue("id"));
+  if (!rec) return e.json(404, { error: t(userLang(e.auth), "err.invNotFound") });
+  return e.json(200, { faktura: F.dto(rec, true) });
+}, $apis.requireAuth());
+
+// {id, paid: true | false | "YYYY-MM-DD"} — jediná změna, kterou faktura připouští (zbytek je neměnný)
+kbRoute("POST", "/chat/faktura/zaplaceno", (e) => {
+  const F = require(`${__hooks}/faktury.js`);
+  const b = e.requestInfo().body || {};
+  try { return e.json(200, { faktura: F.dto(F.zaplaceno($app, e.auth, String(b.id || ""), b.paid === undefined ? true : b.paid), true) }); }
+  catch (err) { return F.odpovedChyby(e, err); }
+}, $apis.requireAuth());
+
 // modely k vyzkoušení (jen správce; u ollamy seznam z /api/tags)
 kbRoute("GET", "/chat/modely", (e) => {
   const { jeAdmin } = require(`${__hooks}/helpers.js`);

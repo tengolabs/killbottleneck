@@ -10,15 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { UserCog, Loader2, Download, Upload } from 'lucide-react';
+import { UserCog, Loader2, Download, Upload, ChevronDown, ChevronRight, KeyRound } from 'lucide-react';
 import { useLazyNs } from '@/i18n/lazyNs';
+import InvoicingSection from '@/components/shared/InvoicingSection';
+import { useAsistent } from '@/lib/AsistentContext';
 
 // Můj účet (Richard 8. 8. 2026): jméno + ZOBRAZOVANÉ jméno (přezdívka, pod
 // kterou člověka zná tým — ukazuje se v uzlech a seznamech místo e-mailu)
 // + změna hesla. Users kolekce dovoluje self-update (updateRule id = auth.id);
 // role a cizí pole hlídá server, tady se posílají jen tahle tři.
-export default function AccountDialog({ open, onClose }) {
+export default function AccountDialog({ open, onClose, sekce }) {
   const nsReady = useLazyNs('billing');
+  const asistent = useAsistent();
+  // proklik na vystavené faktury: zavřít dialog, otevřít asistenta a jeho Dokumenty s filtrem Faktury (dokId 'faktura:' = seznam)
+  const otevriFaktury = () => { onClose(); asistent.setOpen(true); asistent.otevriDokument('faktura:'); };
   const { t } = useTranslation('billing');
   const { user, patchUser, logout } = useAuth();
   const { toast } = useToast();
@@ -28,6 +33,7 @@ export default function AccountDialog({ open, onClose }) {
   const [newPassword, setNewPassword] = useState('');
   const [newPassword2, setNewPassword2] = useState('');
   const [saving, setSaving] = useState(false);
+  const [hesloOpen, setHesloOpen] = useState(false);
   const fileRef = useRef(null);
 
   // nahrání souboru z exportu: ověřit formát v prohlížeči, poslat celý na /import-all
@@ -99,7 +105,7 @@ export default function AccountDialog({ open, onClose }) {
   if (!nsReady) return null;
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCog className="w-5 h-5" /> {t('account.heading')}
@@ -124,8 +130,14 @@ export default function AccountDialog({ open, onClose }) {
             {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{t('account.saveNames')}
           </Button>
 
+          {/* Změna hesla sbalená (Richard 24. 10. 2026: „začíná změnou hesla, to bych dal až na klik“) */}
           <div className="border-t pt-3 space-y-3">
-            <p className="text-sm font-medium">{t('account.passwordHeading')}</p>
+            <button type="button" className="w-full flex items-center gap-2 text-left" onClick={() => setHesloOpen((v) => !v)} data-testid="account-password-toggle" aria-expanded={hesloOpen}>
+              {hesloOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              <KeyRound className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">{t('account.passwordHeading')}</span>
+            </button>
+            {hesloOpen && (<>
             <div>
               <Label htmlFor="acc-oldpass">{t('account.oldPassword')}</Label>
               <Input id="acc-oldpass" type="password" value={oldPassword}
@@ -149,13 +161,18 @@ export default function AccountDialog({ open, onClose }) {
               {t('account.changePassword')}
             </Button>
             <p className="text-xs text-muted-foreground">{t('account.passwordRelogin')}</p>
+            </>)}
           </div>
+
+          {/* Vlastní údaje dodavatele na faktury (24. 10. 2026): mají přednost před společnými
+              ze Správy organizace a dávají uživateli vlastní číselnou řadu. */}
+          <InvoicingSection rezim="me" vychoziOtevreno={open && sekce === 'faktury'} onOtevritFaktury={otevriFaktury} />
 
           {/* Moje data (P2-03): stažení všeho, co vidím, a nahrání zpět. Patří sem,
               ne do menu pod panáčkem — dělá se jednou nebo nikdy (Richard 26. 8. 2026). */}
           <div className="border-t pt-3 space-y-2">
             <p className="text-sm font-medium">{t('account.data.heading')}</p>
-            <p className="text-xs text-muted-foreground">{t('account.data.hint')}</p>
+            <p className="text-xs text-muted-foreground">{t('account.data.hint')} {t('account.data.hintInvoices')}</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" disabled={saving} data-testid="account-export-all"
                 onClick={() => downloadAllMyData().catch(() => toast({ title: t('account.data.downloadFailed'), variant: 'destructive' }))}>

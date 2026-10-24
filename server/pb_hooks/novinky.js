@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.86-beta": {
+    cs: [
+      "Asistent vystaví fakturu klientovi: „vystav fakturu na Karla za konzultaci 2 h po 800“ — karta ukáže položky a součet, po potvrzení máte PDF s QR platbou na kartě i v Dokumentech → Faktury.",
+      "Klienti z adresáře mají fakturační údaje (adresa, IČO, DIČ, e-mail); asistent je založí i z fotky vizitky a na kartě ukáže přesně to, co uloží.",
+      "Údaje dodavatele jsou společné pro organizaci (Správa organizace) a každý si může v Můj účet nastavit vlastní — pak fakturuje na ně a má vlastní číselnou řadu.",
+      "V Dokumentech → Faktury filtrujete po měsících vystavení a stáhnete všechny faktury měsíce jedním ZIPem pro účetní.",
+      "Asistent na otázku, jak se něco v aplikaci dělá, už to neprovede sám, jen vysvětlí a nabídne.",
+    ],
+    en: [
+      "The assistant issues invoices to clients: \"issue an invoice to Karel for 2 hours of consulting at 800\" — the card shows the items and total, and after confirming you get a PDF with a QR payment code on the card and in Documents → Invoices.",
+      "Clients in the address book have billing details (address, company ID, VAT ID, e-mail); the assistant creates them even from a business-card photo and the card shows exactly what will be saved.",
+      "Supplier details are shared by the organization (Organization settings) and everyone can set their own under My account — their invoices then carry those and get their own number series.",
+      "In Documents → Invoices you filter by month issued and download all invoices of a month as one ZIP for your accountant.",
+      "When you ask how something is done in the app, the assistant no longer does it by itself — it explains and offers.",
+    ],
+  },
   "v0.85-beta": {
     cs: [
       "Asistent zůstane vidět, i když AI zrovna neběží: historie rozhovorů, Dokumenty a relax fungují dál a pruh nahoře řekne, co se děje.",

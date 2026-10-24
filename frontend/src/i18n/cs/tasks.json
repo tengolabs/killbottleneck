@@ -279,7 +279,14 @@
     "namePlaceholder": "Název klienta…",
     "empty": "Zatím žádní klienti.",
     "createFailed": "Klienta se nepodařilo založit",
-    "confirmDelete": "Opravdu smazat klienta „{{name}}\"? Zaznamenaný čas zůstane, jen přijde o štítek klienta."
+    "confirmDelete": "Opravdu smazat klienta „{{name}}\"? Zaznamenaný čas zůstane, jen přijde o štítek klienta.",
+    "billingToggle": "Fakturační údaje",
+    "billingHint": "Nepovinné — na faktury, které vystaví asistent.",
+    "address": "Adresa (ulice, PSČ město)",
+    "ico": "IČO",
+    "dic": "DIČ",
+    "email": "E-mail",
+    "billingSaveFailed": "Fakturační údaje se nepodařilo uložit"
   },
   "timeOverview": {
     "recentHeading": "Poslední záznamy — projekt/klienta jde přiřadit i zpětně",

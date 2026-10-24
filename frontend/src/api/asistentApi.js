@@ -37,3 +37,19 @@ export const dokument = (id) => kbSend(`/api/kb/chat/dokument/${encodeURICompone
 export const dokumentUloz = (payload) => kbSend('/api/kb/chat/dokument', { body: payload });
 export const dokumentVratit = (id) => kbSend('/api/kb/chat/dokument/vratit', { body: { id } });
 export const dokumentSmazat = (id) => kbSend('/api/kb/chat/dokument/smazat', { body: { id } });
+// Faktury a profil dodavatele (9. 10. 2026): vystavuje je asistent (create_invoice), panel je čte a označuje
+// zaplacené; PDF vyrábí prohlížeč z DTO (lib/faktura). Profil dodavatele: společný (správce, Správa organizace) + vlastní (/me, Můj účet).
+export const faktury = ({ year, unpaid } = {}) => {
+  const p = new URLSearchParams();
+  if (year) p.set('year', String(year));
+  if (unpaid) p.set('unpaid', '1');
+  const qs = p.toString();
+  return kbSend(`/api/kb/chat/faktury${qs ? `?${qs}` : ''}`, { method: 'GET' });
+};
+export const faktura = (id) => kbSend(`/api/kb/chat/faktura/${encodeURIComponent(id)}`, { method: 'GET' });
+export const fakturaZaplaceno = (id, paid) => kbSend('/api/kb/chat/faktura/zaplaceno', { body: { id, paid } });
+export const invoicingProfile = () => kbSend('/api/kb/invoicing-profile', { method: 'GET' });
+export const invoicingProfileUloz = (payload) => kbSend('/api/kb/invoicing-profile', { body: payload });
+// vlastní údaje dodavatele uživatele (přednost před společnými, vlastní číselná řada); { smazat: true } = zpět na společné
+export const invoicingProfileMe = () => kbSend('/api/kb/invoicing-profile/me', { method: 'GET' });
+export const invoicingProfileMeUloz = (payload) => kbSend('/api/kb/invoicing-profile/me', { body: payload });

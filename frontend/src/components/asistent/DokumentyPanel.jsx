@@ -10,6 +10,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { dokumenty as apiSeznam, dokument as apiDokument, dokumentUloz, dokumentVratit, dokumentSmazat } from '@/api/asistentApi';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
 import PametPohled from './PametPohled';
+import { FakturySeznam, FakturaDetail, FAKTURA_PREFIX } from './FakturaPohled';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { zacniTah } from '@/lib/tahSirky';
 
@@ -26,7 +27,8 @@ import { zacniTah } from '@/lib/tahSirky';
 // by se tloukla se zásobníkem nápadů — úkoly v poznámce by z porad a plánování vypadly.
 
 const IKONA = { note: NotebookPen, email: Mail, summary: ClipboardList, meeting: Users, call: Phone, other: ScrollText };
-const SKUPINY = ['', 'poznamky', 'emaily', 'sumare'];
+// faktury (9. 10. 2026): vystavené faktury vedle dokumentů — jiný zdroj (/chat/faktury), stejné místo pro uživatele
+const SKUPINY = ['', 'poznamky', 'emaily', 'sumare', 'faktury'];
 // mailto: s dlouhým tělem prohlížeče / poštovní programy uříznou (limit URL ~2000 znaků) — měří se
 // ZAKÓDOVANÁ délka (č = %C4%8D, 6 znaků; checkup 1. 10.)
 const MAILTO_MAX = 1800;
@@ -64,6 +66,7 @@ function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
   useEffect(() => { const h = setTimeout(() => setHledat(q.trim()), 250); return () => clearTimeout(h); }, [q]);
   useEffect(() => {
     let zivy = true;
+    if (skupina === 'faktury') { setRows([]); return () => { zivy = false; }; }
     apiSeznam({ skupina, q: hledat })
       .then((r) => { if (zivy) { setRows(r.dokumenty || []); setChyba(''); } })
       .catch((e) => { if (zivy) { setRows((p) => p || []); setChyba(e.message || t('dok.errorLoad')); } });
@@ -88,11 +91,12 @@ function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
             </button>
           ))}
         </div>
-        <div className="relative">
+        {skupina !== 'faktury' && <div className="relative">
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('dok.search')} className="h-8 pl-8 text-sm" data-testid="chat-dok-hledat" />
-        </div>
+        </div>}
       </div>
+      {skupina === 'faktury' ? <FakturySeznam verze={verze} onOtevri={onOtevri} /> : (
       <div className="flex-1 overflow-y-auto p-2 space-y-1" data-testid="chat-dok-seznam">
         {rows === null && <Loader2 className="w-4 h-4 animate-spin m-3" />}
         {chyba && <p className="text-xs text-destructive px-2">{chyba}</p>}
@@ -135,6 +139,7 @@ function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
@@ -314,6 +319,9 @@ export default function DokumentyPanel({ mobil }) {
     window.addEventListener('resize', f);
     return () => window.removeEventListener('resize', f);
   }, []);
+  // otevřená faktura (z karty v chatu / po potvrzení) → filtr seznamu na Faktury, ať Zpět vede mezi faktury
+  // dokId 'faktura:' bez id (proklik z Můj účet) = jen přepnout filtr na Faktury a ukázat seznam
+  useEffect(() => { if (A.dokId && A.dokId.startsWith(FAKTURA_PREFIX)) { setSkupina('faktury'); if (A.dokId === FAKTURA_PREFIX) A.setDokId(''); } }, [A, A.dokId]);
   const zavri = useCallback(() => opatrne(() => A.setDokOpen(false)), [A, opatrne]);
   const zpet = useCallback(() => opatrne(() => A.setDokId('')), [A, opatrne]);
   // Esc zavře panel — ne při psaní (tam Esc patří políčku) a ne, když je otevřený jiný
@@ -377,6 +385,8 @@ export default function DokumentyPanel({ mobil }) {
       )}
       {A.dokId === PAMET
         ? <PametPohled />
+        : A.dokId && A.dokId.startsWith(FAKTURA_PREFIX)
+        ? <FakturaDetail key={A.dokId} id={A.dokId.slice(FAKTURA_PREFIX.length)} onZpet={() => { setSkupina('faktury'); A.setDokId(''); }} />
         : A.dokId
         ? <Detail key={A.dokId} id={A.dokId} verze={A.dokVerze} zmenene={A.dokZmenene} hlidac={hlidac} onProjekt={naProjekt} onZpet={() => A.setDokId('')} onSmazano={() => { A.setDokId(''); A.obnovDokumenty(); }} />
         : <Seznam verze={A.dokVerze} onOtevri={(id) => A.setDokId(id)} skupina={skupina} setSkupina={setSkupina} q={q} setQ={setQ} />}

@@ -24,11 +24,12 @@ async function getPdfjs() {
   return pdfjsP;
 }
 let libP = null;
-const getLib = () => (libP ||= Promise.all([import('pdf-lib'), import('@pdf-lib/fontkit')]).then(([PDFLib, fk]) => ({ PDFLib, fontkit: fk.default })));
+// sdílí i lib/faktura (PDF faktury): tytéž líně načtené knihovny a fonty — druhý import pdf-lib by bundle zdvojil
+export const getLib = () => (libP ||= Promise.all([import('pdf-lib'), import('@pdf-lib/fontkit')]).then(([PDFLib, fk]) => ({ PDFLib, fontkit: fk.default })));
 
 const fontCache = new Map();
 // řezy náhradního písma leží v public/fonts/pdf/ (Liberation, OFL, osekané na latinku)
-async function nactiFont(rez) {
+export async function nactiFont(rez) {
   if (!fontCache.has(rez)) {
     fontCache.set(rez, fetch(`${import.meta.env.BASE_URL || '/'}fonts/pdf/${rez}.ttf`).then(async (r) => {
       if (!r.ok) throw new Error(`font ${rez}: ${r.status}`);

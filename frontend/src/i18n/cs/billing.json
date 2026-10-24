@@ -101,7 +101,41 @@
       "uploadFailed": "Nahrání se nepodařilo.",
       "uploaded": "Nahráno: {{maps}} projektů ({{nodes}} cílů, {{rules}} pravidel), {{ideas}} nápadů.",
       "uploadedSkipped": "Přeskočeno projektů: {{count}} (organizační struktura nebo neplatná mapa).",
-      "uploadedDropped": "Přiřazení lidem, kteří tu nejsou: {{count}} vyprázdněno."
+      "uploadedDropped": "Přiřazení lidem, kteří tu nejsou: {{count}} vyprázdněno.",
+      "hintInvoices": "Faktury (PDF) v tomto souboru nejsou — najdete je v Dokumentech asistenta → Faktury, i ke stažení všech najednou."
+    }
+  },
+  "invoicing": {
+    "heading": "Vystavování faktur",
+    "hint": "Společné údaje dodavatele organizace, které se tisknou na faktury vystavené asistentem vašim klientům. Fakturu vystaví kdokoli z týmu; kdo si v Můj účet nastaví vlastní údaje, fakturuje na ně a má vlastní číselnou řadu.",
+    "name": "Jméno / firma na faktuře *",
+    "address": "Adresa (ulice, PSČ a město) *",
+    "ico": "IČO",
+    "dic": "DIČ",
+    "vatPayer": "Jsem plátce DPH",
+    "vatRate": "Sazba DPH (%)",
+    "bankAccount": "Bankovní účet",
+    "bankAccountHint": "Např. 19-2000145399/0800 nebo IBAN. IBAN pro QR platbu dopočítá aplikace.",
+    "iban": "IBAN {{iban}}",
+    "email": "E-mail na faktuře",
+    "prefix": "Předpona čísel faktur",
+    "prefixHint": "Např. FV → FV20260001",
+    "dueDays": "Splatnost (dní)",
+    "saveButton": "Uložit údaje dodavatele",
+    "savedButton": "Uloženo",
+    "incomplete": "Nevyplněno — asistent se na údaje zeptá při první faktuře.",
+    "complete": "Vyplněno",
+    "archive": "Vystavené faktury najdete v asistentovi v Dokumentech → Faktury. Aplikace není zákonný archiv dokladů — PDF si ukládejte.",
+    "me": {
+      "heading": "Moje údaje na faktury",
+      "hint": "Vlastní údaje dodavatele pro faktury, které vystavíte vy. Mají přednost před společnými údaji organizace a vaše faktury dostanou vlastní číselnou řadu. Bez nich platí společné údaje ze Správy organizace.",
+      "own": "Vlastní",
+      "usingShared": "Používám společné: {{name}}",
+      "none": "Nevyplněno",
+      "saveButton": "Uložit moje údaje",
+      "removeButton": "Smazat vlastní, používat společné",
+      "archive": "Faktury vystavené vámi ponesou tyto údaje. Aplikace faktury neuchovává jako zákonný archiv dokladů (10 let) — PDF si uložte.",
+      "openInvoices": "Vystavené faktury v Dokumentech"
     }
   }
 }

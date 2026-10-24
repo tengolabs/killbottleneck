@@ -505,7 +505,7 @@ export default function AsistentPanel({ lite = false }) {
   const predTahem = useRef(null); // podpisy karet dokumentů před tahem (id + stav)
   // podpis = id dokumentu + místo karty v rozhovoru (týž dokument přepsaný v dalším tahu je nová karta);
   // akce se počítá až provedená (potvrzení karty s přepisem dokumentu = nový podpis)
-  const podpisy = (msgs) => msgs.flatMap((m, i) => (m.karty || []).map((k, j) => (k.type === 'koncept' || k.type === 'dokument' ? `${k.doc_id}:${i}.${j}` : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'dokument' ? `${k.odkaz.doc_id}:${i}.${j}:hotovo` : ''))).filter(Boolean);
+  const podpisy = (msgs) => msgs.flatMap((m, i) => (m.karty || []).map((k, j) => (k.type === 'koncept' || k.type === 'dokument' ? `${k.doc_id}:${i}.${j}` : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'dokument' ? `${k.odkaz.doc_id}:${i}.${j}:hotovo` : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'faktura' ? `faktura:${k.odkaz.id}:${i}.${j}:hotovo` : ''))).filter(Boolean);
   useEffect(() => {
     if (A.loading) { if (!predTahem.current) predTahem.current = new Set(podpisy(zpravy)); return; }
     if (!predTahem.current) return;
@@ -513,7 +513,7 @@ export default function AsistentPanel({ lite = false }) {
     predTahem.current = null;
     const nove = podpisy(zpravy).filter((p) => !pred.has(p));
     if (!nove.length) return;
-    const ids = nove.map((p) => p.split(':')[0]);
+    const ids = nove.map((p) => (p.startsWith('faktura:') ? p.split(':').slice(0, 2).join(':') : p.split(':')[0])); // faktura:<id> = vystavená faktura (panel Dokumenty → Faktury)
     obnovDokumenty(ids);
     if (!mobil && !(hlidac && hlidac.current)) otevriDokument(ids[ids.length - 1]);
   }, [A.loading, zpravy, mobil, otevriDokument, obnovDokumenty, hlidac]);

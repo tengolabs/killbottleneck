@@ -10,6 +10,7 @@ import ApiKeysDialog from '@/components/shared/ApiKeysDialog';
 import AiAgentsDialog from '@/components/shared/AiAgentsDialog';
 import TimeOverviewDialog from '@/components/time/TimeOverviewDialog';
 import AccountDialog from '@/components/shared/AccountDialog';
+import ClientsDialog from '@/components/time/ClientsDialog';
 import ReportDialog from '@/components/shared/ReportDialog';
 import { useReportConfig } from '@/hooks/useReportConfig';
 import { saveMode, MODE_LITE } from '@/lib/liteMode';
@@ -55,6 +56,17 @@ export default function UserMenu({ onInvited }) {
   const [agentSetupOpen, setAgentSetupOpen] = useState(false);
   const [aiAgentsOpen, setAiAgentsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountSekce, setAccountSekce] = useState('');
+  // Odkazy z karet asistenta (24. 10. 2026): „Otevřít klienta“ → dialog Klienti s tím klientem; „Otevřít v Můj účet“ → sekce faktur
+  const [klientiOpen, setKlientiOpen] = useState(false);
+  const [klientId, setKlientId] = useState('');
+  useEffect(() => {
+    const naKlienty = (e) => { setKlientId((e.detail && e.detail.id) || ''); setKlientiOpen(true); };
+    const naUcet = (e) => { setAccountSekce((e.detail && e.detail.sekce) || ''); setAccountOpen(true); };
+    window.addEventListener('kb-otevri-klienty', naKlienty);
+    window.addEventListener('kb-otevri-ucet', naUcet);
+    return () => { window.removeEventListener('kb-otevri-klienty', naKlienty); window.removeEventListener('kb-otevri-ucet', naUcet); };
+  }, []);
   const [timeOpen, setTimeOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   // Hlásit chyby jde jen tam, kam je komu poslat (KB_REPORT_TO + SMTP).
@@ -218,7 +230,8 @@ export default function UserMenu({ onInvited }) {
           <AgentSetupDialog fromMenu onClose={() => setAgentSetupOpen(false)} />
         </Suspense>
       )}
-      <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AccountDialog open={accountOpen} sekce={accountSekce} onClose={() => { setAccountOpen(false); setAccountSekce(''); }} />
+      <ClientsDialog open={klientiOpen} vybranyId={klientId} onClose={() => { setKlientiOpen(false); setKlientId(''); }} />
       <TimeOverviewDialog open={timeOpen} onClose={() => setTimeOpen(false)} />
       <ReportDialog
         open={reportOpen}

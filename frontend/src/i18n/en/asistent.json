@@ -141,7 +141,9 @@
     "get_org_structure": "org structure",
     "get_map_sharing": "project sharing",
     "list_reminders": "step reminders",
-    "get_timer": "timer status"
+    "get_timer": "timer status",
+    "list_clients": "client address book",
+    "list_invoices": "issued invoices"
   },
   "errorGeneric": "The assistant did not respond. Please try again.",
   "errorRate": "You have used up the hourly AI cap. Try again in a while.",
@@ -349,7 +351,8 @@
       "vse": "All",
       "poznamky": "Notes",
       "emaily": "E-mails",
-      "sumare": "Summaries"
+      "sumare": "Summaries",
+      "faktury": "Invoices"
     },
     "kind": {
       "note": "Note",
@@ -404,6 +407,45 @@
     "zvyraznit": "Highlight in the map",
     "zrusit": "Clear highlight"
   },
+  "faktura": {
+    "card": "Invoice {{cislo}}",
+    "cardFor": "for {{name}}",
+    "total": "Total due",
+    "due": "Due {{date}}",
+    "issued": "Issued {{date}}",
+    "download": "Download PDF",
+    "downloading": "Preparing the PDF…",
+    "open": "Open in Documents",
+    "error": "The PDF could not be created ({{detail}}).",
+    "paid": "Paid {{date}}",
+    "unpaid": "Unpaid",
+    "markPaid": "Mark as paid",
+    "markUnpaid": "Mark as unpaid",
+    "customer": "Customer",
+    "supplier": "Supplier",
+    "items": "Items",
+    "net": "Net",
+    "vat": "VAT {{rate}} %",
+    "nonVat": "Not a VAT payer",
+    "note": "Note",
+    "qr": "QR payment",
+    "qrHint": "Scan with your banking app.",
+    "vs": "VS",
+    "account": "Account",
+    "noAccount": "No bank account in the profile — no payment block or QR.",
+    "archiveHint": "The app does not keep invoices as the legal archive (10 years) — save the PDF.",
+    "empty": "No invoices yet. Tell the assistant: \"Issue an invoice to Karel for 2 hours of consulting at 800 CZK.\"",
+    "notFound": "Invoice not found.",
+    "errorLoad": "The invoices could not be loaded.",
+    "errorSave": "The change could not be saved.",
+    "listTotal": "{{count}} invoices · unpaid {{unpaid}}",
+    "filterUnpaid": "Unpaid only",
+    "filterAll": "All",
+    "downloadAll": "Download all (ZIP)",
+    "zipping": "Preparing {{done}}/{{total}}…",
+    "month": "Month issued",
+    "monthAll": "All months"
+  },
   "relaxDal": "Keep relaxing",
   "stav": {
     "vypadekTitle": "The assistant is down right now",
@@ -419,5 +461,12 @@
     "nastaveni": "Check AI settings",
     "placeholderVypadek": "The assistant isn't responding · “relax” works",
     "placeholderNepripojeno": "Without AI the assistant can't reply · “relax” works"
+  },
+  "klient": {
+    "open": "Open the client"
+  },
+  "dodavatel": {
+    "openOrg": "Open in Organization settings",
+    "openMe": "Open in My account"
   }
 }

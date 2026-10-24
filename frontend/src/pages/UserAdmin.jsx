@@ -31,6 +31,8 @@ import InstanceSkinSection from '@/components/shared/InstanceSkinSection';
 import KalendareSection from '@/components/shared/KalendareSection';
 import AiKredityKarta from '@/components/shared/AiKredityKarta';
 import BillingSection from '@/components/shared/BillingSection';
+import InvoicingSection from '@/components/shared/InvoicingSection';
+import { useAsistent } from '@/lib/AsistentContext';
 import MembershipSection from '@/components/shared/MembershipSection';
 import CustomDomainSection from '@/components/shared/CustomDomainSection';
 import { fmtDateShort, fmtDateTimeShort } from '@/lib/locale';
@@ -82,13 +84,18 @@ export default function UserAdmin() {
   // účtu) vede sem s ?pozvat=adresa → rovnou otevřený pozvánkový dialog
   // s předvyplněnou adresou; parametr hned sundat, ať reload dialog neotvírá znovu.
   const [searchParams, setSearchParams] = useSearchParams();
+  // ?fakturace=1 (odkaz z karty asistenta „Otevřít údaje dodavatele“) → sekce Vystavování faktur rozbalená
+  const [fakturaceOtevrit, setFakturaceOtevrit] = useState(false);
+  const asistent = useAsistent();
+  const otevriFaktury = () => { asistent.setOpen(true); asistent.otevriDokument('faktura:'); }; // Dokumenty → Faktury (seznam)
   useEffect(() => {
     const pozvat = searchParams.get('pozvat');
-    if (!pozvat) return;
-    setInviteEmail(pozvat);
-    setInviteOpen(true);
+    const fakturace = searchParams.get('fakturace');
+    if (!pozvat && !fakturace) return;
+    if (pozvat) { setInviteEmail(pozvat); setInviteOpen(true); }
+    if (fakturace) setFakturaceOtevrit(true);
     const next = new URLSearchParams(searchParams);
-    next.delete('pozvat');
+    next.delete('pozvat'); next.delete('fakturace');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
   const [org, setOrg] = useState(null);
@@ -602,6 +609,8 @@ export default function UserAdmin() {
         {/* fakturační údaje hned pod uživateli (Richard 8. 8. 2026); košík
             členství jen na hostované instanci — self-host nic nekupuje tady */}
         {!jenStruktura && <BillingSection onChange={setBillingComplete} />}
+        {/* údaje dodavatele na faktury vystavované asistentem (9. 10. 2026) — i na self-hostu, jen správce */}
+        {!jenStruktura && <InvoicingSection vychoziOtevreno={fakturaceOtevrit} onOtevritFaktury={otevriFaktury} />}
         {!jenStruktura && <MembershipSection billingComplete={billingComplete} />}
         {/* vlastní doména — jen vlastní server Pro / AI Agent (komponenta se sama skryje jinde) */}
         {!jenStruktura && <CustomDomainSection />}

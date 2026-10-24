@@ -219,6 +219,25 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
               {t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
             </Link>
           )}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'faktura' && (
+            <KartaFaktura odkaz={karta.odkaz} onOtevriDokument={onOtevriDokument} />
+          )}
+          {/* založený/upravený klient → dialog Klienti s ním rozbaleným; uložené údaje dodavatele → Správa organizace / Můj účet (Richard 24. 10. 2026) */}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'klient' && (
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('kb-otevri-klienty', { detail: { id: karta.odkaz.id } }))} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-klient" data-id={karta.odkaz.id}>
+              {t('klient.open')} <Users className="w-3 h-3" />
+            </button>
+          )}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'dodavatel' && karta.odkaz.scope === 'org' && (
+            <Link to="/admin/users?fakturace=1" onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-dodavatel" data-scope="org">
+              {t('dodavatel.openOrg')} <ExternalLink className="w-3 h-3" />
+            </Link>
+          )}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'dodavatel' && karta.odkaz.scope === 'me' && (
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('kb-otevri-ucet', { detail: { sekce: 'faktury' } }))} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-dodavatel" data-scope="me">
+              {t('dodavatel.openMe')} <ExternalLink className="w-3 h-3" />
+            </button>
+          )}
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.map_id && !karta.odkaz.pripominka && (
             <Link to={`/map/${karta.odkaz.map_id}${karta.odkaz.node_id ? `?node=${encodeURIComponent(karta.odkaz.node_id)}` : ''}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
               {karta.odkaz.node_id ? t('actionOpenNode') : t('actionOpen')} <ExternalLink className="w-3 h-3" />
@@ -231,6 +250,33 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
         <KartaNastaveni karta={karta.odkaz} onRevert={onRevertNastaveni} />
       )}
     </div>
+  );
+}
+
+// Vystavená faktura (create_invoice po potvrzení): číslo, částka, Stáhnout PDF (vyrobí prohlížeč z DTO — lib/faktura,
+// líně) a Otevřít v Dokumentech → Faktury (dokId „faktura:<id>“). Server PDF nikdy nedrží.
+function KartaFaktura({ odkaz, onOtevriDokument }) {
+  const { t, i18n } = useTranslation('asistent');
+  const [bezi, setBezi] = useState(false);
+  const [chyba, setChyba] = useState('');
+  const stahni = async () => {
+    setBezi(true); setChyba('');
+    try { const { stahniFakturu } = await import('@/lib/faktura/stahni'); await stahniFakturu(odkaz.id, { lang: i18n.language === 'en' ? 'en' : 'cs' }); }
+    catch (e) { setChyba(t('faktura.error', { detail: (e && (e.message || e.status)) || '?' })); }
+    finally { setBezi(false); }
+  };
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2" data-testid="chat-faktura" data-id={odkaz.id} data-cislo={odkaz.cislo}>
+      <button type="button" onClick={stahni} disabled={bezi} className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60" data-testid="chat-faktura-pdf">
+        {bezi ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}{bezi ? t('faktura.downloading') : t('faktura.download')}
+      </button>
+      {onOtevriDokument && (
+        <button type="button" onClick={() => onOtevriDokument(`faktura:${odkaz.id}`)} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-faktura-otevrit">
+          {t('faktura.open')} <PanelLeftOpen className="w-3 h-3" />
+        </button>
+      )}
+      {chyba && <span className="text-destructive" data-testid="chat-faktura-chyba">{chyba}</span>}
+    </span>
   );
 }
 
