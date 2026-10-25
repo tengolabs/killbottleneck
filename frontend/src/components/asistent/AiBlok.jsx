@@ -5,7 +5,7 @@
 // Fáze D (1. 10. 2026): + Po schůzce, Týdenní revize. Fáze E: + Příprava na schůzku, Týmová porada (vedoucí).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CalendarCheck, ChevronDown, ChevronUp, ClipboardList, ListTree, NotebookPen, Sparkles, Users } from 'lucide-react';
+import { CalendarCheck, ChevronDown, ChevronUp, ClipboardList, LayoutTemplate, ListTree, NotebookPen, Sparkles, Users } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_AI_BLOK } from '@/lib/storageKeys';
 
 const POMOCNICI = [
@@ -16,15 +16,17 @@ const POMOCNICI = [
   { id: 'priprava', mode: 'priprava', Ikona: ClipboardList, testid: 'chat-blok-priprava' },
   // jen správce a vedoucí (server roli hlídá sám — tlačítko je jen nabídka)
   { id: 'tym', mode: 'tymova_porada', Ikona: Users, testid: 'chat-blok-tym', vedouci: true },
+  // stránka ze šablony (15. 10. 2026) — otevře formulář v panelu Stránek, ne režim chatu; jen s config.pages
+  { id: 'stranka', mode: 'stranka', Ikona: LayoutTemplate, testid: 'chat-blok-stranka', stranky: true },
 ];
 
-export default function AiBlok({ mobil, userId, vedouci, disabled, onSpust }) {
+export default function AiBlok({ mobil, userId, vedouci, stranky, disabled, onSpust }) {
   const { t } = useTranslation('asistent');
   const klic = `${KEY_AI_BLOK}:${userId || ''}`;
   const [rozbaleno, setRozbaleno] = useState(() => nactiKlic(klic) === '1');
   const prepni = () => setRozbaleno((r) => { ulozKlic(klic, r ? '0' : '1'); return !r; });
   const ukazat = !mobil || rozbaleno;
-  const polozky = POMOCNICI.filter((p) => !p.vedouci || vedouci);
+  const polozky = POMOCNICI.filter((p) => (!p.vedouci || vedouci) && (!p.stranky || stranky));
   return (
     <div className="rounded-lg border bg-background/70 p-3 text-sm" data-testid="chat-ai-blok">
       {mobil ? (

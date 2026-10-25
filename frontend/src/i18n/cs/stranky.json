@@ -1,0 +1,135 @@
+{
+  "title": "Stránky",
+  "skupina": {
+    "moje": "Moje",
+    "tym": "Sdílené se mnou"
+  },
+  "search": "Hledat ve stránkách…",
+  "empty": "Zatím žádné stránky. Vyberte šablonu, nebo asistentovi napište třeba „udělej mi prezentaci výsledků pro vedení“ — stránku napíše, tady ji uvidíte a nasdílíte odkazem nebo lidem z týmu.",
+  "emptyTeam": "Nikdo z týmu vám zatím žádnou stránku nenasdílel.",
+  "emptyFiltered": "Nic tu není.",
+  "by": "od {{name}}",
+  "state": {
+    "ceka": "čeká na napsání",
+    "pise": "píše se",
+    "hotovo": "hotovo",
+    "chyba": "nepovedlo se"
+  },
+  "writing": "Asistent píše stránku… bývá to minutu i déle. Můžete mezitím pokračovat v chatu, hotová se tu objeví sama.",
+  "writingSteps": "Asistent píše stránku po částech — náhled roste s každým krokem.",
+  "krok": {
+    "osnova_one": "Osnova stránky (1 část)",
+    "osnova_few": "Osnova stránky ({{count}} části)",
+    "osnova_other": "Osnova stránky ({{count}} částí)",
+    "kostra": "Vzhled a kostra stránky",
+    "cela": "Celá stránka najednou",
+    "osnovaBezi": "Osnova stránky…"
+  },
+  "code": "Kód",
+  "codeHint": "Ukázat vznikající HTML místo náhledu",
+  "queued": "Stránka čeká na napsání.",
+  "failed": "Stránku se nepovedlo napsat.",
+  "retry": "Zkusit znovu",
+  "retrying": "Spouštím psaní…",
+  "open": "Otevřít",
+  "openHint": "Otevřít stránku v nové kartě",
+  "share": "Sdílet odkazem",
+  "shareOn": "Odkaz je zapnutý — kdokoli s odkazem stránku uvidí, i bez účtu.",
+  "shareOff": "Zrušit odkaz",
+  "shareNew": "Nový odkaz",
+  "shareNewHint": "Vymění odkaz za nový, starý přestane fungovat.",
+  "copy": "Kopírovat odkaz",
+  "copied": "Zkopírováno",
+  "copyFailed": "Kopírování se nepovedlo — zkopírujte odkaz ručně.",
+  "team": "Celý tým (všichni členové organizace)",
+  "teamHint": "Zapnuto: stránku najdou všichni členové organizace v záložce Sdílené se mnou.",
+  "lide": {
+    "button": "Lidé",
+    "team": "Celý tým",
+    "count_one": "1 člověk",
+    "count_few": "{{count}} lidé",
+    "hint": "Komu stránku zpřístupnit — jako u sdílení projektu: vyberte členy organizace, nebo rovnou celý tým.",
+    "pick": "Vybrat člena…",
+    "nobody": "Nikdo další k výběru",
+    "add": "Přidat",
+    "remove": "Odebrat přístup",
+    "count_other": "{{count}} lidí"
+  },
+  "download": "Stáhnout jako HTML",
+  "restore": "Vrátit předchozí verzi",
+  "restored": "Vrácena předchozí verze (dalším kliknutím zpět).",
+  "delete": "Smazat stránku",
+  "deleteConfirm": "Opravdu smazat?",
+  "deleteYes": "Smazat",
+  "cancel": "Zrušit",
+  "back": "Všechny stránky",
+  "notFound": "Stránka nenalezena (možná ji někdo smazal).",
+  "errorLoad": "Stránku se nepovedlo načíst.",
+  "errorSave": "Změna se nepovedla.",
+  "size": "{{kb}} kB",
+  "sandboxNote": "Stránka běží v odděleném sandboxu — nemá přístup k vaší aplikaci ani přihlášení.",
+  "page": "Stránka",
+  "nova": {
+    "button": "Nová stránka",
+    "intro": "Vyberte, co má stránka být. Aplikace z toho složí zadání pro asistenta — ten si načte projekt, stránku napíše a vy ji nasdílíte.",
+    "sablona": "Šablona",
+    "projekt": "Projekt",
+    "bezProjektuVolba": "— bez projektu —",
+    "projektVeta": "Vycházej z projektu „{{projekt}}“ — načti si ho a použij jen fakta z něj.",
+    "bezProjektu": "Bez projektu — vycházej jen z toho, co ti napíšu, a na chybějící věci se zeptej.",
+    "styl": "Vzhled",
+    "styly": {
+      "svetly": "Světlý",
+      "tmavy": "Tmavý",
+      "firemni": "Střízlivý firemní"
+    },
+    "stylVeta": {
+      "svetly": "Vzhled: světlý, moderní, čitelný i na telefonu.",
+      "tmavy": "Vzhled: tmavý, moderní, výrazné nadpisy.",
+      "firemni": "Vzhled: střízlivý firemní, bílé pozadí, tabulky a jasná struktura."
+    },
+    "doplneni": "Doplnění (nepovinné)",
+    "doplneniPlaceholder": "Např. zdůrazni zpoždění dodávky, přidej kontakt na vedoucího…",
+    "doplneniVeta": "Doplnění: ",
+    "zadani": "Co má stránka obsahovat",
+    "zadaniPlaceholder": "Např. interaktivní kalkulačka ceny zakázky podle počtu hodin a sazby…",
+    "submit": "Nechat napsat"
+  },
+  "sablony": {
+    "vedeni": {
+      "nazev": "Prezentace pro vedení",
+      "popis": "Stav projektu, termíny, kdo co má na starosti, rizika a další kroky",
+      "zprava": "Udělej mi stránku: prezentace projektu pro vedení — stav, klíčové termíny, kdo co má na starosti, rizika a další kroky. Nahoře karty s hlavními čísly, graf stavu kroků a časová osa termínů; u každé části ikonka."
+    },
+    "tym": {
+      "nazev": "Přehled pro tým",
+      "popis": "Co kdo dělá, co hoří, termíny tohoto týdne",
+      "zprava": "Udělej mi stránku: přehled projektu pro tým — kdo co má na starosti, co právě hoří, termíny tohoto týdne a co je hotové. Semafor u každé části, pruhy postupu a ikonky; co hoří zvýrazni."
+    },
+    "zakaznik": {
+      "nazev": "Shrnutí pro zákazníka",
+      "popis": "Milníky, co je hotové, co od něj potřebujeme — bez interních detailů",
+      "zprava": "Udělej mi stránku: shrnutí projektu pro zákazníka — milníky, co je hotové, co následuje a co od zákazníka potřebujeme; bez interních poznámek, rozpočtů a jmen řešitelů. Časová osa milníků a pruh celkového postupu; přehledné, s ikonkami."
+    },
+    "osa": {
+      "nazev": "Časová osa",
+      "popis": "Milníky a kroky na ose s termíny",
+      "zprava": "Udělej mi stránku: časová osa projektu — milníky a kroky seřazené podle termínů, co je hotové, co běží a co teprve přijde. Jako Ganttův graf podle termínů se značkou dneška, pod ním přehled stavů; ikonky u částí."
+    },
+    "report": {
+      "nazev": "Report stavu",
+      "popis": "Jedna stránka se semaforem: zelená / žlutá / červená",
+      "zprava": "Udělej mi stránku: jednostránkový report stavu projektu se semaforem (zelená / žlutá / červená) u každé části, hlavní čísla, co se povedlo a co stojí. Semafor jako barevné kontrolky, karty s čísly a graf podílu hotovo / běží / čeká."
+    },
+    "checklist": {
+      "nazev": "Kontrolní seznam",
+      "popis": "Interaktivní seznam s odškrtáváním z kroků projektu",
+      "zprava": "Udělej mi stránku: interaktivní kontrolní seznam z kroků projektu — každý krok jako položka s políčkem k odškrtnutí, termín a kdo ho má na starosti, počítadlo hotových nahoře. Nahoře pruh postupu, u položek ikonky stavu."
+    },
+    "volne": {
+      "nazev": "Vlastní zadání",
+      "popis": "Napište, co má stránka být — třeba kalkulačka, formulář nebo mini-aplikace",
+      "zprava": "Udělej mi stránku podle tohoto zadání:"
+    }
+  }
+}

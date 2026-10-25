@@ -9,6 +9,64 @@ below before you jump several versions.
 
 ---
 
+## v0.88-beta — 2026-10-25
+
+**Pages: the assistant (or a connected agent) writes a single-file HTML page — presentation, overview, small app — and you share it by a secret link or with the team**
+
+- **New tab Pages** in the panel next to the chat (beside Documents). Tell the assistant *"make me a presentation of
+  the Q4 results for management"*: the assistant reads the project with its tools and hands over a brief; **the app
+  then writes the whole HTML in a separate model call after the turn** (`create_page` only queues it — large HTML never
+  travels through tool arguments or the chat history; the page writer runs with `KB_PAGE_NUM_PREDICT` output tokens and
+  the result arrives through realtime, so a Cloudflare-cut response does not lose it). Rewrites via `update_page` keep the
+  previous version (**Restore**); a failed write offers **Try again**. Rename by hand only; download as `.html`.
+- **Templates, so the feature is not hidden behind the right wording:** **New page** in the Pages tab (and *Page from a
+  template* among the AI helpers and the chips under the chat) opens a form — template (presentation for management, team
+  overview, customer summary, timeline, status report, checklist, custom brief), project, look, notes — and the app composes
+  the message to the assistant.
+- **Visuals by default:** the outline assigns every section a visual (stat cards, progress bars, Gantt, timeline,
+  donut, traffic light, table, checklist) and an icon, the skeleton ships a small CSS toolkit for them and each
+  section draws its chart as inline SVG / CSS from the given facts — no external images; the templates ask for
+  them explicitly (timeline = Gantt with a today marker, status report = traffic-light dots + cards).
+- **You can watch the page being written:** the writer builds it **section by section** (outline → look and skeleton →
+  each section) and after every step stores the partial HTML; the panel shows the list of steps with the running one,
+  the preview grows, and a **Code** toggle shows the HTML as it comes in. (PocketBase calls the model synchronously, so
+  token streaming is not possible — this is the honest substitute; smaller calls also suit local models better.) A
+  rewrite of a page built this way touches only the changed sections (keep / rewrite / new / delete), a page without
+  section markers (uploaded by an agent) is rewritten as a whole.
+- **Sharing like a project:** **Share by link** turns on a secret `/p/<32-char token>` link that anyone opens without an
+  account (**New link** invalidates the old one, **Turn the link off** stops it at once, 60 opens/min/IP); **People** lets
+  you pick **named members of the organization** (as in the map's share dialog; `shared_with`), or the **whole team**
+  — the other person finds the page in the **Shared with me** tab (never the token). The assistant does the same with
+  `share_page user_on / user_off` + `email`, MCP and `/v1/pages/{id}/share` too. The link carries the address the
+  request came in on (like a project link: LAN → LAN address, cloud → the instance domain); `KB_PUBLIC_URL` is used only
+  when the request has no usable host (MCP over 127.0.0.1, cron). Pages are in
+  **Download all my data** (without the token). Public pages keep working after a trial expires (like public maps);
+  writes are 402.
+- **Sandbox, not sanitizing:** `/p/…` is served with `Content-Security-Policy: sandbox …` (no `allow-same-origin`),
+  `nosniff`, `noindex`, `no-referrer`, `no-store`; the in-app preview and the `/stranka/:id` window use an `<iframe sandbox>`
+  without `allow-same-origin` — the page runs as an opaque origin and cannot read the app's sign-in (localStorage),
+  cookies or API. Opening in a new tab goes through `/stranka/:id`, never a `blob:` URL (which would inherit the app origin).
+- **MCP:** six new tools for connected agents (`list_pages`, `get_page`, `create_page`, `update_page`, `share_page`,
+  `delete_page`; HTTP and stdio, 32 tools in total) backed by `GET/POST/DELETE /api/kb/v1/pages…`; there the agent writes the
+  whole HTML itself. `/agent-setup.md` mentions pages.
+- **Limits and switches:** `KB_PAGES=0` turns the feature off (tools, tab, `/p/` links), `KB_PAGES_MAX` (100; Cloud Lite 20),
+  `KB_PAGE_KB` (300), `KB_PAGE_NUM_PREDICT` (12000; Lite 8000), `KB_PAGE_TIMEOUT` (280 s), `KB_AI_PAGE_VAHA` (3 in the hourly
+  AI limit). A page is text, not an upload — it works with `KB_FILES_MB=0`; V1 has no attachments.
+- **App start with the aquarium and the assistant open:** on a wide screen the app opens the assistant panel and starts
+  the aquarium beside it (relax without a countdown), once per browser tab; closing it and reloading does not bring it
+  back. `KB_START_RELAX=0` turns it off. Every relax scene has its own **Close** button next to the light setting.
+- **"My map" is gone from the top bar** (still reachable from My day and `/my-map`).
+- **After review (security, quality, architecture):** a shared page keeps serving its **last finished version while it is
+  being rewritten** (as a project does); pages left in "being written" by a restart turn into a retryable error; the
+  rewrite sends the model the **skeleton and text excerpts** of the sections, never the whole HTML (a page without section
+  markers over 100 kB is refused with advice to edit it by hand); one write is capped at **15 minutes** and the size limit
+  is checked after every section; at most **2 pages per user** are written at once; the public page adds
+  `form-action 'none'; connect-src 'none'; frame-ancestors 'none'` to its CSP and the in-app preview carries the same
+  `form-action`/`connect-src` rule, so a page uploaded by an agent cannot submit forms or send data anywhere; **Restore** is
+  unavailable while a page is being written.
+- **Fixed:** the service worker cached **every** navigation response as the offline shell (`/`), so visiting
+  `/p/<token>` or `/agent-setup.md` could replace the app shell with foreign HTML — those paths are no longer intercepted.
+
 ## v0.87-beta — 2026-10-24
 
 **Come-back e-mails: whoever has not signed in for 3, 7, 14 or 30 days gets an overview of their open work and the smallest steps back**

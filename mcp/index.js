@@ -678,6 +678,49 @@ server.registerTool('create_reminder', {
   } catch (e) { return errText(e.message); }
 });
 
+// ---------- stránky (14. 10. 2026): HTML artefakty — agent píše celý dokument sám; parita s HTTP katalogem (mcp-tools.js) ----------
+const popisStranky = (p) => `${p.title} (id: ${p.id}, status: ${p.status}, ${p.size_kb} kB, ${p.share_url ? 'public link: ' + p.share_url : 'no public link'}${p.team_visible ? ', visible to team' : ''}${p.shared_with && p.shared_with.length ? ', shared with: ' + p.shared_with.join(', ') : ''})`;
+server.registerTool('list_pages', {
+  description: 'List the key owner\'s pages — single-file HTML artifacts (presentations, overviews, small apps) created by the assistant or an agent: id, title, status (ceka = queued, pise = being written, hotovo = ready, chyba = failed), size, public link, team visibility.',
+  inputSchema: strict({}),
+}, async () => {
+  try {
+    const r = await call('GET', '/api/kb/v1/pages');
+    if (!r.pages.length) return text('No pages.');
+    return text(DATA_FENCE + '\n\n' + r.pages.map((p) => `• ${p.title} (id: ${p.id}, status: ${p.status}, ${p.size_kb} kB, ${p.share_url ? 'public link: ' + p.share_url : 'no public link'}${p.team_visible ? ', visible to team' : ''}, updated: ${p.updated})`).join('\n'));
+  } catch (e) { return errText(e.message); }
+});
+server.registerTool('get_page', {
+  description: 'Read one page (page_id from list_pages): its metadata and the full HTML. Read it before changing a page with update_page.',
+  inputSchema: strict({ page_id: z.string() }),
+}, async ({ page_id }) => {
+  try { const p = (await call('GET', `/api/kb/v1/pages/${enc(page_id)}`)).page; return text(popisStranky(p) + '\n\n```html\n' + p.html + '\n```'); } catch (e) { return errText(e.message); }
+});
+server.registerTool('create_page', {
+  description: 'Create a page from a COMPLETE single-file HTML document you wrote yourself (inline CSS/JS; external libraries only from https CDNs; no fetch to other servers; size limit per instance, typically 300 kB). The page appears in the user\'s Pages panel in the app and runs sandboxed (no access to the app\'s session). team_visible=true shows it to all members of the organization. Returns the id and the public link if one is on.',
+  inputSchema: strict({ title: z.string(), html: z.string().describe('the whole HTML document'), team_visible: z.boolean().optional() }),
+}, async ({ title, html, team_visible }) => {
+  try { const r = await call('POST', '/api/kb/v1/pages', { title, html, team_visible: !!team_visible }); return text('Page created. ' + popisStranky(r.page)); } catch (e) { return errText(e.message); }
+});
+server.registerTool('update_page', {
+  description: 'Replace the HTML and/or the title of an existing page (page_id from list_pages). Send the WHOLE new document, not a diff; the previous version is kept and the user can restore it.',
+  inputSchema: strict({ page_id: z.string(), html: z.string().describe('the whole new HTML document').optional(), title: z.string().optional() }),
+}, async ({ page_id, html, title }) => {
+  try { const r = await call('POST', `/api/kb/v1/pages/${enc(page_id)}`, { html, title }); return text('Page updated (previous version kept). ' + popisStranky(r.page)); } catch (e) { return errText(e.message); }
+});
+server.registerTool('share_page', {
+  description: "Change sharing of a page: link_on = public link for anyone with the link (no account needed), link_off = turn it off, link_new = replace the link (the old one stops working), team_on / team_off = show or hide the page for all members of the organization, user_on / user_off = share with / unshare from one named member (pass `email`; members come from list_people). Returns the current public link and the people it is shared with.",
+  inputSchema: strict({ page_id: z.string(), action: z.enum(['link_on', 'link_off', 'link_new', 'team_on', 'team_off', 'user_on', 'user_off']), email: z.string().describe("member's e-mail (only for user_on / user_off)").optional() }),
+}, async ({ page_id, action, email }) => {
+  try { const r = await call('POST', `/api/kb/v1/pages/${enc(page_id)}/share`, { action, email }); return text('Sharing updated. ' + popisStranky(r.page)); } catch (e) { return errText(e.message); }
+});
+server.registerTool('delete_page', {
+  description: 'Delete a page for good (page_id from list_pages). Cannot be undone.',
+  inputSchema: strict({ page_id: z.string() }),
+}, async ({ page_id }) => {
+  try { await call('DELETE', `/api/kb/v1/pages/${enc(page_id)}`); return text('Page deleted.'); } catch (e) { return errText(e.message); }
+});
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 // startup ping (nefatální): překlep v adrese ať je vidět hned, ne až u prvního nástroje.

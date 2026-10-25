@@ -80,6 +80,7 @@ function jenKdyz(jenKdy, app) {
   const hosted = env("HOSTED") === "1";
   if (jenKdy === "hosted") return hosted;
   if (jenKdy === "selfhost") return !hosted;
+  if (jenKdy === "pages") return require(`${__hooks}/stranky.js`).limity().zapnuto; // KB_PAGES=0 → nástroje stránek se nenabízejí
   return true;
 }
 

@@ -48,8 +48,8 @@ const expect = (c, m) => { console.log(`  ${c ? '✅' : '❌'} ${m}`); c ? ok++ 
 
   console.log('== 4) hledání ==');
   const PRIPADY = [
-    ['cs', 'jak přepnu tmavý motiv', 'funkce/skiny', 'svetly-tmavy'],
-    ['cs', 'kde nastavím připomínku k úkolu', 'funkce/ukoly-a-muj-den', 'pripominka-k-terminu'],
+    ['cs', 'jak přepnu tmavý motiv', 'funkce/ucet-a-nastaveni', 'svetly-a-tmavy-rezim'],
+    ['cs', 'kde nastavím připomínku k úkolu', 'funkce/kalendar', 'pripominka-k-terminu'],
     ['cs', 'jak sdílím mapu kolegovi', 'funkce/tym-a-role', 'sdileni-map'],
     ['cs', 'jak pozvu nového člena do týmu', 'jak-na-to/sprava-tymu', '_2-pozvete-lidi'],
     ['cs', 'kde zapnu zjednodušené zobrazení na telefonu', 'funkce/', 'zjednodusene'],

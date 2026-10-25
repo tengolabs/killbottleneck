@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Bot, ChevronDown, ChevronUp, FileText, Fish, FolderOpen, History, ImagePlus, Loader2, PanelRightClose, Plus, RefreshCw, Send, Sparkles, Sunrise, Moon, Trash2, X } from 'lucide-react';
-import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA, KEY_RELAX_AKTIVITA, KEY_RELAX_RANO } from '@/lib/storageKeys';
+import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA, KEY_RELAX_AKTIVITA, KEY_START_RELAX } from '@/lib/storageKeys';
 import { useRelaxOdpocet, formatOdpocet } from '@/components/relax/useRelaxOdpocet';
 import { NAD_PODIL } from '@/components/relax/RelaxVrstva';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,14 @@ import { setSkin, effectiveTheme } from '@/lib/theme';
 import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
 import { base44 } from '@/api/base44Client';
 import { pripravObrazek, obrazekZeSchranky } from '@/lib/obrazek';
-import { loadKbConfig } from '@/hooks/useKbConfig';
+import { loadKbConfig, useKbConfig } from '@/hooks/useKbConfig';
 import { useHlasovka, HlasovkaTlacitko, HlasovkaPruh } from './Hlasovka';
 import AsistentZprava from './AsistentZprava';
 import AiBlok from './AiBlok';
 import PdfPohled from './PdfPohled';
 import DokumentyPanel from './DokumentyPanel';
+import { STRANKA } from '@/lib/AsistentContext';
+import { strankaNapsat } from '@/api/asistentApi';
 import { useAsistentChat } from './useAsistentChat';
 import { useToast } from '@/components/ui/use-toast';
 import { savedMode } from '@/lib/liteMode';
@@ -342,18 +344,23 @@ export default function AsistentPanel({ lite = false }) {
   // čas pauzy pro hlídač zapisuje AsistentContext.spustRelax (i pro relax od modelu); obal jen schová nabídku
   const spustRelax = useCallback((o) => { setRelaxNabidka(false); panel.spustRelax(o || {}); }, [setRelaxNabidka, panel]);
   const odmitniRelax = () => setRelaxNabidka(false); // `nabidnuto` už je zapsané → příště nejdřív za hodinu
-  // Ráno (Richard 15. 10. 2026: „když ráno poprvé otevřu asistenta, otevři relax akvárium“): první otevření v daném dni
-  // (= stejná podmínka jako nabídka porady: nový den / víc než 8 h od poslední aktivity) spustí akvárium vedle chatu bez
-  // odpočtu, jednou za den (kb-relax-rano:<uid>); jen v plné aplikaci s otevřeným panelem, ne když už relax běží
-  const ranoRef = useRef(false);
+  // Start aplikace (Richard 25. 10. 2026: „po spuštění aplikace jako default akvárko a asistent otevřený“; nahrazuje ranní
+  // akvárium z 15. 10.): jednou za kartu prohlížeče (sessionStorage — po zavření akvárka ho F5 nevrátí, nová karta ano)
+  // otevře panel a spustí akvárium vedle chatu bez odpočtu. Jen plná aplikace na širokém okně, ne když relax běží;
+  // config.start_relax (KB_START_RELAX=0) to vypne.
+  const { config: kbConfig } = useKbConfig();
+  const startRef = useRef(false);
   useEffect(() => {
-    if (ranoRef.current || lite || !ready || !dostupny || !A.open || !poradaNabidka || panel.relax) return;
-    if (nactiKlic(klicUctu(KEY_RELAX_RANO)) === dnes) return;
-    ranoRef.current = true;
-    ulozKlic(klicUctu(KEY_RELAX_RANO), dnes);
+    if (startRef.current || lite || !ready || !dostupny || mobil || !kbConfig || kbConfig.start_relax === false) return;
+    startRef.current = true;
+    // relax už běží (stav v localStorage je společný pro karty) = start je vyřízený; jinak by se po zavření hned znovu otevřel (/checkup 25. 10.)
+    let uz = false; try { uz = sessionStorage.getItem(KEY_START_RELAX) === '1'; } catch { uz = false; }
+    if (uz || panel.relax) { try { sessionStorage.setItem(KEY_START_RELAX, '1'); } catch { /* nic */ } return; }
+    try { sessionStorage.setItem(KEY_START_RELAX, '1'); } catch { /* bez úložiště jen tentokrát */ }
+    if (!A.open) A.setOpen(true);
     spustRelax({ scena: 'akvarium', minut: 0, rozlozeni: 'vedle' });
-    // závislosti záměrně jen stráže: běží nejvýš jednou (ranoRef), spustRelax/mobil/klicUctu/dnes se čtou až v tom běhu
-  }, [lite, ready, dostupny, A.open, poradaNabidka, panel.relax]);
+    // závislosti záměrně jen stráže: běží nejvýš jednou (startRef)
+  }, [lite, ready, dostupny, mobil, panel.relax, kbConfig]);
 
   // kontext pro server: cesta + otevřená mapa (/map/:id) — „kde uživatel je"
   // + vybraný uzel z editoru (panel.uzel), jen když patří k otevřené mapě; server z toho
@@ -505,7 +512,14 @@ export default function AsistentPanel({ lite = false }) {
   const predTahem = useRef(null); // podpisy karet dokumentů před tahem (id + stav)
   // podpis = id dokumentu + místo karty v rozhovoru (týž dokument přepsaný v dalším tahu je nová karta);
   // akce se počítá až provedená (potvrzení karty s přepisem dokumentu = nový podpis)
-  const podpisy = (msgs) => msgs.flatMap((m, i) => (m.karty || []).map((k, j) => (k.type === 'koncept' || k.type === 'dokument' ? `${k.doc_id}:${i}.${j}` : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'dokument' ? `${k.odkaz.doc_id}:${i}.${j}:hotovo` : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'faktura' ? `faktura:${k.odkaz.id}:${i}.${j}:hotovo` : ''))).filter(Boolean);
+  // Stránky (14. 10. 2026): karta `stranka` (create_page / update_page) = záznam „ceka“ — writer spouští PROHLÍŽEČ až po tahu
+  // (POST /chat/stranka/napsat, minuty; odpověď se nečeká, panel čeká realtime). Karta akce se stránkou (share_page) jen otevře panel.
+  const podpisy = (msgs) => msgs.flatMap((m, i) => (m.karty || []).map((k, j) => (k.type === 'koncept' || k.type === 'dokument' ? `${k.doc_id}:${i}.${j}`
+    : k.type === 'stranka' ? `${STRANKA}${k.page_id}:${i}.${j}:ceka`
+    : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'dokument' ? `${k.odkaz.doc_id}:${i}.${j}:hotovo`
+    : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.odkaz && k.odkaz.odkaz.type === 'stranka' ? `${STRANKA}${k.odkaz.odkaz.page_id}:${i}.${j}:hotovo`
+    : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'faktura' ? `faktura:${k.odkaz.id}:${i}.${j}:hotovo` : ''))).filter(Boolean);
+  const spustenyWriter = useRef(new Set()); // podpis karty → napsat se volá jednou (reload rozhovoru ho nespustí znovu)
   useEffect(() => {
     if (A.loading) { if (!predTahem.current) predTahem.current = new Set(podpisy(zpravy)); return; }
     if (!predTahem.current) return;
@@ -513,7 +527,12 @@ export default function AsistentPanel({ lite = false }) {
     predTahem.current = null;
     const nove = podpisy(zpravy).filter((p) => !pred.has(p));
     if (!nove.length) return;
-    const ids = nove.map((p) => (p.startsWith('faktura:') ? p.split(':').slice(0, 2).join(':') : p.split(':')[0])); // faktura:<id> = vystavená faktura (panel Dokumenty → Faktury)
+    const ids = nove.map((p) => p.replace(/:\d+\.\d+(:ceka|:hotovo)?$/, '')); // doc_id | stranka:<id> | faktura:<id> (panel Dokumenty → Faktury)
+    for (const p of nove) {
+      if (!p.startsWith(STRANKA) || !p.endsWith(':ceka') || spustenyWriter.current.has(p)) continue;
+      spustenyWriter.current.add(p);
+      strankaNapsat(p.replace(/:\d+\.\d+:ceka$/, '').slice(STRANKA.length)).catch(() => {}); // stav přijde realtime; chybu ukáže detail
+    }
     obnovDokumenty(ids);
     if (!mobil && !(hlidac && hlidac.current)) otevriDokument(ids[ids.length - 1]);
   }, [A.loading, zpravy, mobil, otevriDokument, obnovDokumenty, hlidac]);
@@ -530,12 +549,18 @@ export default function AsistentPanel({ lite = false }) {
   // balíček spuštěný odjinud (Nový projekt → „Navrhnout s AI“, zásobník → „Roztřídit s AI“): vyřídit, až je
   // panel volný — během odpovědi by zacniRezim žádost tiše zahodil
   const { zadost, vyridZadost } = panel;
+  // Stránky ze šablony: panel Dokumentů → záložka Stránky → formulář (jen když instance stránky nabízí)
+  const strankyOn = !!(kbConfig && kbConfig.pages);
+  const otevriNovouStranku = useCallback(() => { panel.setDokId(STRANKA + 'nova'); panel.setDokOpen(true); }, [panel]);
   useEffect(() => {
     if (!zadost || !ready || !funkcni || A.loading) return;
     vyridZadost();
     setPohled('chat');
+    // 'zprava' = hotová zpráva složená formulářem (Stránky → šablona, 15. 10. 2026): do běžícího rozhovoru;
+    // na telefonu by panel Dokumentů chat zakryl → zavřít
+    if (zadost.mode === 'zprava') { if (mobil) panel.setDokOpen(false); A.send(String((zadost.target || {}).text || ''), sKlientem(kontext), patchUser); return; }
     A.zacniRezim(zadost.mode, zadost.target, sKlientem(kontext), patchUser);
-  }, [zadost, ready, funkcni, A, kontext, patchUser, vyridZadost]);
+  }, [zadost, ready, funkcni, A, kontext, patchUser, vyridZadost, mobil, panel]);
 
   if (!ready || !dostupny) return null;
   // lite: zavřený panel nekreslí nic (host ho stejně odmontuje) — žádná lišta dole ani ouško
@@ -745,7 +770,7 @@ export default function AsistentPanel({ lite = false }) {
             {/* AI blok (fáze C, 1. 10. 2026): balíčky, které si uživatel spustí sám — pod Nočním plánováním,
                 jen v prázdném rozhovoru */}
             {zpravy.length === 0 && funkcni && !A.loading && (
-              <AiBlok mobil={mobil} userId={user?.id} vedouci={user?.role === 'admin' || user?.role === 'manager'} disabled={A.loading} onSpust={(mode) => { setPohled('chat'); A.zacniRezim(mode, {}, kontext, patchUser); }} />
+              <AiBlok mobil={mobil} userId={user?.id} vedouci={user?.role === 'admin' || user?.role === 'manager'} stranky={strankyOn} disabled={A.loading} onSpust={(mode) => { if (mode === 'stranka') { otevriNovouStranku(); return; } setPohled('chat'); A.zacniRezim(mode, {}, kontext, patchUser); }} />
             )}
             {zpravy.length === 0 && funkcni && (
               <div className="pt-6 text-center space-y-3">
@@ -780,6 +805,7 @@ export default function AsistentPanel({ lite = false }) {
               {/* průvodci: ranní porada, rozbor projektu (na mapě: tenhle projekt), zaseknutí; noční plánování má vlastní rámeček výš */}
               <button type="button" onClick={() => A.zacniRezim('porada', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-porada">{t('chipPorada')}</button>
               <button type="button" onClick={() => A.zacniRezim('rozbor', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-rozbor">{kontext.map_id ? t('chipRozborMapa') : t('chipRozbor')}</button>
+              {strankyOn && <button type="button" onClick={otevriNovouStranku} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-stranka">{kontext.map_id ? t('chipStrankaMapa') : t('chipStranka')}</button>}
               {/* relax (14. 10. 2026): pauza s akváriem / úlem — bez modelu */}
               {!panel.relax && <button type="button" onClick={() => spustRelax({ minut: 0 })} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-relax">{t('relaxChipVolny')}</button>}
               {chips.map((c) => (

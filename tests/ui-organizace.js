@@ -58,7 +58,7 @@ const api = async (path, { token, bearer, body, method } = {}) => {
     await login(page, admin.email);
     let nav = await page.$$eval('nav button', (els) => els.map((e) => e.dataset.nav));
     expect(nav.includes('organizace'), `admin má v liště „Organizace" (${nav.join(',')})`);
-    expect(nav.indexOf('organizace') === nav.indexOf('mymap') + 1, 'položka stojí hned za „Moje mapa"');
+    expect(!nav.includes('mymap') && nav.indexOf('organizace') === nav.indexOf('kalendar') + 1, `„Moje mapa" v liště není (25. 10. 2026), Organizace stojí hned za Kalendářem (${nav.join(',')})`);
     await page.click('nav button[data-nav="organizace"]');
     await page.waitForSelector('[data-testid="organizace-kpis"]', { timeout: 10000 });
     expect(page.url().endsWith('/organizace'), `klik vede na /organizace (${page.url()})`);
@@ -129,7 +129,7 @@ const api = async (path, { token, bearer, body, method } = {}) => {
     await pm.goto(`${BASE}/organizace`, { waitUntil: 'networkidle2' });
     await pm.waitForSelector('[data-testid="organizace-kpis"]', { timeout: 10000 });
     const sirky = await pm.evaluate(() => ({ body: document.body.scrollWidth, doc: document.documentElement.scrollWidth, win: window.innerWidth, nav: [...document.querySelectorAll('header nav button')].length }));
-    expect(sirky.nav === 6 && sirky.body <= sirky.win && sirky.doc <= sirky.win, `admin má 6 položek a stránka nemá vodorovný posun (${JSON.stringify(sirky)})`);
+    expect(sirky.nav === 5 && sirky.body <= sirky.win && sirky.doc <= sirky.win, `admin má 5 položek (bez „Moje mapa“, 25. 10. 2026) a stránka nemá vodorovný posun (${JSON.stringify(sirky)})`);
     await pm.close();
 
     console.log('== člen: bez položky, /organizace = bez oprávnění ==');

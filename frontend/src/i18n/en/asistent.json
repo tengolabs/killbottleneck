@@ -128,6 +128,13 @@
     "pdf_replace_text": "PDF text correction",
     "list_documents": "documents",
     "get_document": "document",
+    "create_page": "new page",
+    "update_page": "page rewrite",
+    "list_pages": "pages",
+    "get_page": "page",
+    "share_page": "page sharing",
+    "delete_page": "page deletion",
+    "revert_page": "previous page version",
     "list_events": "calendar",
     "list_calendars": "shared calendars",
     "who_is_away": "who is away",
@@ -163,6 +170,8 @@
   "chipPorada": "Morning briefing",
   "chipRozbor": "Break down a project",
   "chipRozborMapa": "Break down this project",
+  "chipStranka": "Page from a template",
+  "chipStrankaMapa": "Page from this project",
   "chipZasekl": "I am stuck, let us do it together",
   "poradaOffer": "Shall we do the morning briefing?",
   "poradaOfferHint": "I will go through what is where, suggest where to start, and ask a few click questions.",
@@ -207,7 +216,9 @@
     "priprava": "Meeting prep",
     "pripravaHint": "Agenda, open points and what moved",
     "tym": "Team meeting",
-    "tymHint": "Who is overloaded, what is on fire, handovers"
+    "tymHint": "Who is overloaded, what is on fire, handovers",
+    "stranka": "Page from a template",
+    "strankaHint": "A presentation, overview or report of a project to share"
   },
   "modeRozbor": "Breakdown",
   "actionOpenNode": "Show in map",
@@ -406,6 +417,15 @@
     "ceka": "{{n}} waiting for sub-steps",
     "zvyraznit": "Highlight in the map",
     "zrusit": "Clear highlight"
+  },
+  "str": {
+    "open": "Open page",
+    "card": "Page “{{title}}” — being written, open",
+    "cardRewrite": "Rewriting the page “{{title}}” — open",
+    "tabDocs": "Documents",
+    "tabPages": "Pages",
+    "back": "All pages",
+    "nova": "New page"
   },
   "faktura": {
     "card": "Invoice {{cislo}}",

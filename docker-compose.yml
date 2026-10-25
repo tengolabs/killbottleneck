@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.87-beta}
+        KB_VERSION: ${KB_VERSION:-v0.88-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -61,6 +61,13 @@ services:
       # Cap on uploaded attachments across the whole instance, in MB. Empty = no
       # limit, 0 = uploading disabled (attachments as links only).
       KB_FILES_MB: ${KB_FILES_MB:-${FLOWMAP_FILES_MB:-}}
+      # stránky asistenta (HTML artefakty): vypínač, počet na uživatele, velikost v kB, strop tokenů a čas page writeru
+      KB_PAGES: ${KB_PAGES:-}
+      KB_PAGES_MAX: ${KB_PAGES_MAX:-}
+      KB_PAGE_KB: ${KB_PAGE_KB:-}
+      KB_PAGE_NUM_PREDICT: ${KB_PAGE_NUM_PREDICT:-}
+      KB_PAGE_TIMEOUT: ${KB_PAGE_TIMEOUT:-}
+      KB_AI_PAGE_VAHA: ${KB_AI_PAGE_VAHA:-}
       # Backwards compatibility: an instance where e-mails already arrive keeps
       # them by setting this to 1, even after per-user notification preferences.
       KB_NOTIFY_EMAIL_DEFAULT: ${KB_NOTIFY_EMAIL_DEFAULT:-${FLOWMAP_NOTIFY_EMAIL_DEFAULT:-}}
@@ -94,6 +101,7 @@ services:
       # Ask the first admin what the instance is for (company / family / solo)?
       # 0 = never ask (company). Off automatically when KB_UVODNI_MAPA=0.
       KB_PURPOSE_ASK: ${KB_PURPOSE_ASK:-}
+      KB_START_RELAX: ${KB_START_RELAX:-}
       # AI switch: none = no AI | openai = any OpenAI-compatible API (OpenAI,
       # OpenRouter, Groq, vLLM, LM Studio...) | ollama = your own local model
       # | api = remote AI service (URL + token) | custom = your own endpoint

@@ -40,6 +40,8 @@ const Organizace = lazy(() => import('./pages/Organizace'));
 const LiteApp = lazy(() => import('./lite/LiteApp'));
 // AI chat na boku — líně: do hlavního balíku nepatří; v lite se stáhne až po klepnutí
 const AsistentPanel = lazy(() => import('./components/asistent/AsistentPanel'));
+// stránka asistenta přes celé okno (sandbox iframe) — líně, patří k asistentovi
+const Stranka = lazy(() => import('./pages/Stranka'));
 // Relax (14. 10. 2026): vrstva s akváriem / úlem — montuje se JEN když pauza běží (AsistentContext.relax),
 // jinak nulová zátěž; líný chunk, do lite rozpočtu nejde
 const RelaxVrstva = lazy(() => import('./components/relax/RelaxVrstva'));
@@ -74,7 +76,10 @@ const AsistentHost = ({ children }) => {
   const A = useAsistent();
   const location = useLocation();
   const lite = location.pathname.startsWith('/lite') || location.pathname.startsWith('/light');
-  const zobrazit = !!user && !lite;
+  // okno stránky /stranka/:id („Otevřít“ z panelu Stránek v nové kartě) je jen ke čtení a sdílení: bez asistenta,
+  // bez panelu Dokumentů (nová karta nezná otevřenou stránku → ukazoval prázdné Dokumenty) a bez relaxu (klik-test 25. 10. 2026)
+  const strankaOkno = location.pathname.startsWith('/stranka/');
+  const zobrazit = !!user && !lite && !strankaOkno;
   const liteOtevren = lite && !!user && A.liteOpen;
   const odsun = zobrazit && A.dostupny && A.open && typeof window !== 'undefined' && window.innerWidth >= 640 ? A.width : 0;
   // odchod z lite (odkaz z karty do mapy, karta „celá aplikace") → příště v lite nenaskočí panel sám
@@ -86,7 +91,9 @@ const AsistentHost = ({ children }) => {
       {zobrazit && <Suspense fallback={null}><AsistentPanel /></Suspense>}
       {liteOtevren && <Suspense fallback={null}><AsistentPanel lite /></Suspense>}
       {/* zamčený relax po F5: tmavý závoj z hlavního balíku zakryje mapu, než dojede chunk vrstvy */}
-      {!!user && !!A.relax && (
+      {/* okno stránky /stranka/:id (Otevřít z panelu Stránek v nové kartě) relax nekreslí — stav pauzy je
+          v localStorage, takže by akvárium zakrylo i novou kartu (klik-test 25. 10. 2026); zámek s PINem platí dál */}
+      {!!user && !!A.relax && (!strankaOkno || A.relax.zamek) && (
         <Suspense fallback={A.relax.zamek ? <div className="fixed inset-0 z-[60] bg-[#06151a]" data-testid="relax-zavoj" /> : null}>
           <RelaxVrstva lite={lite} />
         </Suspense>
@@ -140,6 +147,8 @@ const AuthenticatedApp = () => {
           <Route path="/admin/users" element={<UserAdmin />} />
           {/* pohled shora pro admina a manažera (rozhodnutí 25. 8. 2026); role hlídá stránka i server */}
           <Route path="/organizace" element={<Organizace />} />
+          {/* HTML stránka asistenta v sandboxu (14. 10. 2026); veřejná podoba bez účtu je /p/<token> na serveru */}
+          <Route path="/stranka/:id" element={<Stranka />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

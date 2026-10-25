@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Brain, Check, ChevronLeft, Copy, Download, ExternalLink, FileText, FolderKanban, Loader2, Mail, Pencil, Phone, ScrollText, Search, Trash2, Undo2, Users, X, NotebookPen, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useAsistent, DOK_MAX_W, PAMET, sirkaDokumentu } from '@/lib/AsistentContext';
+import { useAsistent, DOK_MAX_W, PAMET, STRANKA, sirkaDokumentu } from '@/lib/AsistentContext';
+import { useKbConfig } from '@/hooks/useKbConfig';
+import { SeznamStranek, DetailStranky, NovaStranka, NOVA } from './StrankyPohled';
+import { LayoutTemplate } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { dokumenty as apiSeznam, dokument as apiDokument, dokumentUloz, dokumentVratit, dokumentSmazat } from '@/api/asistentApi';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
@@ -309,6 +312,21 @@ export default function DokumentyPanel({ mobil }) {
   const A = useAsistent();
   const [skupina, setSkupina] = useState('');
   const [q, setQ] = useState('');
+  // Stránky asistenta (14. 10. 2026): druhá záložka panelu (Moje | Tým); jen když instance stránky nabízí (config.pages, KB_PAGES=0 → nic)
+  const { config } = useKbConfig();
+  const strankyOn = !!(config && config.pages);
+  const [zalozka, setZalozka] = useState('dokumenty');
+  const [skupinaStr, setSkupinaStr] = useState('moje');
+  const [qStr, setQStr] = useState('');
+  const jeStranka = !!A.dokId && A.dokId.startsWith(STRANKA);
+  // 'stranka:nova' / 'stranka:nova:<šablona>' = formulář nové stránky ze šablony (15. 10. 2026)
+  const novaStranka = jeStranka && A.dokId.slice(STRANKA.length).split(':')[0] === NOVA;
+  const novaSablona = novaStranka ? (A.dokId.split(':')[2] || '') : '';
+  useEffect(() => { if (jeStranka) setZalozka('stranky'); }, [jeStranka]);
+  const location = useLocation();
+  const mapaZAdresy = (location.pathname.match(/^\/map\/([^/]+)/) || [])[1] || '';
+  // zpráva složená formulářem jde do chatu přes žádost kontextu (panel chatu je líný, vyřídí ji, až je volný)
+  const posliZpravu = useCallback((text) => { A.setDokId(''); A.spust('zprava', { text }); }, [A]);
   const [okno, setOkno] = useState(() => window.innerWidth);
   const spodek = useSpodekHlavicky(!mobil);
   // neuložené změny hlídá kontext (A.hlidac / A.opatrne / A.odchod) — jde přes něj i samootevření,
@@ -364,10 +382,20 @@ export default function DokumentyPanel({ mobil }) {
         <div className="flex items-center gap-1.5 min-w-0">
           {mobil ? (
             <Button variant="ghost" size="sm" className="h-8 px-2 -ml-1" onClick={A.dokId ? zpet : zavri} data-testid="chat-dok-zpet-chat">
-              <ChevronLeft className="w-4 h-4 mr-0.5" />{A.dokId ? t('dok.back') : t('dok.backToChat')}
+              <ChevronLeft className="w-4 h-4 mr-0.5" />{A.dokId ? (novaStranka ? t('str.nova') : jeStranka ? t('str.back') : t('dok.back')) : t('dok.backToChat')}
             </Button>
           ) : A.dokId ? (
-            <Button variant="ghost" size="sm" className="h-8 px-2 -ml-1" onClick={zpet} data-testid="chat-dok-zpet"><ChevronLeft className="w-4 h-4 mr-0.5" />{t('dok.back')}</Button>
+            <Button variant="ghost" size="sm" className="h-8 px-2 -ml-1" onClick={zpet} data-testid="chat-dok-zpet"><ChevronLeft className="w-4 h-4 mr-0.5" />{novaStranka ? t('str.nova') : jeStranka ? t('str.back') : t('dok.back')}</Button>
+          ) : strankyOn ? (
+            <div className="flex items-center gap-1" role="tablist" data-testid="chat-dok-zalozky">
+              {[['dokumenty', FileText, 'str.tabDocs'], ['stranky', LayoutTemplate, 'str.tabPages']].map(([z, Ik, klic]) => (
+                <button key={z} type="button" role="tab" aria-selected={zalozka === z} onClick={() => setZalozka(z)}
+                  className={`text-sm font-semibold inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${zalozka === z ? 'bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
+                  data-testid="chat-dok-zalozka" data-zalozka={z}>
+                  <Ik className={`w-4 h-4 ${zalozka === z ? 'text-primary' : ''}`} />{t(klic)}
+                </button>
+              ))}
+            </div>
           ) : (
             <span className="text-sm font-semibold inline-flex items-center gap-1.5"><FileText className="w-4 h-4 text-primary" />{t('dok.title')}</span>
           )}
@@ -385,6 +413,12 @@ export default function DokumentyPanel({ mobil }) {
       )}
       {A.dokId === PAMET
         ? <PametPohled />
+        : novaStranka
+        ? <NovaStranka key={A.dokId} sablona={novaSablona} mapId={mapaZAdresy} onOdeslat={posliZpravu} onZpet={() => A.setDokId('')} />
+        : jeStranka
+        ? <DetailStranky key={A.dokId} id={A.dokId.slice(STRANKA.length)} verze={A.dokVerze} zmenene={A.dokZmenene} onZpet={() => A.setDokId('')} onSmazano={() => { A.setDokId(''); A.obnovDokumenty(); }} />
+        : !A.dokId && strankyOn && zalozka === 'stranky'
+        ? <SeznamStranek verze={A.dokVerze} onOtevri={(id) => A.setDokId(STRANKA + id)} onNova={(s) => A.setDokId(STRANKA + NOVA + (s ? ':' + s : ''))} skupina={skupinaStr} setSkupina={setSkupinaStr} q={qStr} setQ={setQStr} />
         : A.dokId && A.dokId.startsWith(FAKTURA_PREFIX)
         ? <FakturaDetail key={A.dokId} id={A.dokId.slice(FAKTURA_PREFIX.length)} onZpet={() => { setSkupina('faktury'); A.setDokId(''); }} />
         : A.dokId

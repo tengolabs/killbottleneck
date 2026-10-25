@@ -128,6 +128,13 @@
     "pdf_replace_text": "oprava textu v PDF",
     "list_documents": "dokumenty",
     "get_document": "dokument",
+    "create_page": "nová stránka",
+    "update_page": "přepis stránky",
+    "list_pages": "stránky",
+    "get_page": "stránka",
+    "share_page": "sdílení stránky",
+    "delete_page": "smazání stránky",
+    "revert_page": "předchozí verze stránky",
     "list_events": "kalendář",
     "list_calendars": "sdílené kalendáře",
     "who_is_away": "kdo je pryč",
@@ -163,6 +170,8 @@
   "chipPorada": "Ranní porada",
   "chipRozbor": "Rozebrat projekt",
   "chipRozborMapa": "Rozebrat tento projekt",
+  "chipStranka": "Stránka ze šablony",
+  "chipStrankaMapa": "Stránka z tohoto projektu",
   "chipZasekl": "Zasekl jsem se, uděláme to spolu",
   "poradaOffer": "Uděláme ranní poradu?",
   "poradaOfferHint": "Projdu, co kde je, doporučím, čím začít, a pár klikacích otázek.",
@@ -207,7 +216,9 @@
     "priprava": "Příprava na schůzku",
     "pripravaHint": "Program, otevřené body a co se pohnulo",
     "tym": "Týmová porada",
-    "tymHint": "Kdo je přetížený, co hoří a předání práce"
+    "tymHint": "Kdo je přetížený, co hoří a předání práce",
+    "stranka": "Stránka ze šablony",
+    "strankaHint": "Prezentace, přehled nebo report z projektu k nasdílení"
   },
   "modeRozbor": "Rozbor",
   "actionOpenNode": "Ukázat v mapě",
@@ -406,6 +417,15 @@
     "ceka": "{{n}} čeká na podkroky",
     "zvyraznit": "Zvýraznit v mapě",
     "zrusit": "Zrušit zvýraznění"
+  },
+  "str": {
+    "open": "Otevřít stránku",
+    "card": "Stránka „{{title}}“ — píše se, otevřít",
+    "cardRewrite": "Přepisuji stránku „{{title}}“ — otevřít",
+    "tabDocs": "Dokumenty",
+    "tabPages": "Stránky",
+    "back": "Všechny stránky",
+    "nova": "Nová stránka"
   },
   "faktura": {
     "card": "Faktura {{cislo}}",

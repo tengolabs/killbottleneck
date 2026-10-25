@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.88-beta": {
+    cs: [
+      "Asistent vám napíše stránku: prezentaci pro vedení, přehled pro tým, shrnutí pro zákazníka, časovou osu nebo report — tlačítko Nová stránka nabídne šablony, vyberete projekt a vzhled; zadání složí aplikace.",
+      "Stránka má rovnou grafiku (karty s čísly, pruhy postupu, Ganttův graf, semafor, ikonky) nakreslenou z faktů projektu a vzniká před očima po částech: osnova, vzhled, jednotlivé části.",
+      "Nasdílíte ji tajným odkazem komukoli i bez účtu, vybraným lidem z organizace jako u projektu, nebo celému týmu; změny říkáte asistentovi („přidej slajd s riziky“), předchozí verze zůstává k vrácení, stránku jde stáhnout jako jeden soubor.",
+      "Stránku umí nahrát i připojený AI agent přes MCP; každá stránka běží v odděleném sandboxu, k vašim datům ani přihlášení se nedostane.",
+      "Aplikace se otevře s asistentem a akváriem vedle něj (jednou za kartu prohlížeče), křížek na zavření je i přímo ve scéně; „Moje mapa“ zmizela z horní lišty, najdete ji v Mém dni.",
+    ],
+    en: [
+      "The assistant writes you a page: a presentation for management, a team overview, a customer summary, a timeline or a status report — the New page button offers templates, you pick the project and the look; the app composes the brief.",
+      "The page comes with visuals (stat cards, progress bars, a Gantt chart, a traffic light, icons) drawn from the project facts and grows in front of you section by section: outline, look, each section.",
+      "Share it by a secret link with anyone, no account needed, with chosen people from your organization as with a project, or with the whole team; changes go through the assistant (\"add a slide with the risks\"), the previous version stays restorable, the page downloads as a single file.",
+      "A connected AI agent can upload a page through MCP too; every page runs in an isolated sandbox and cannot reach your data or sign-in.",
+      "The app opens with the assistant and the aquarium beside it (once per browser tab) and every scene has its own Close button; \"My map\" left the top bar, find it in My day.",
+    ],
+  },
   "v0.87-beta": {
     cs: [
       "Kdo se 3, 7, 14 nebo 30 dní nepřihlásí, dostane e-mail: co na něj čeká, co je po termínu, co brzdí ostatní a tři nejmenší kroky na dnešek. Přihlášením počítadlo začíná znovu.",

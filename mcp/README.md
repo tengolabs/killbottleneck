@@ -75,7 +75,7 @@ docker run -i --rm -e KB_URL=https://firma.killbottleneck.com -e KB_API_KEY=kb_u
 ## Vzdálené připojení (bez lokálního serveru)
 
 Každá instance vystavuje MCP i přímo na **`/mcp`** (Streamable HTTP, stateless,
-stejných 26 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
+stejných 32 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
 doméně — asistent se připojí odkudkoli, bez instalace čehokoli lokálně.
 
 **Claude Code:**

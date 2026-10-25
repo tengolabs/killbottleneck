@@ -41,7 +41,7 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
     // stránka pro všechny role. Druhá vědomá výjimka z anti-bloat pravidla „žádná nová trvalá
     // položka v navigaci" rozhodnutím majitele produktu (Richard 14. 10. 2026).
     { key: 'kalendar', label: t('nav.kalendar'), to: '/kalendar' },
-    { key: 'mymap', label: t('nav.myMap'), to: '/my-map' },
+    // „Moje mapa“ z lišty pryč (Richard 25. 10. 2026) — stránka /my-map zůstává, vede na ni odkaz z Mého dne
     // „Organizace" — pohled shora, jen admin a manažer. Vědomé prolomení
     // anti-bloat pravidla „žádná nová trvalá položka v navigaci" rozhodnutím
     // majitele produktu (Richard 25. 8. 2026). Člen položku nevidí; v lite není.

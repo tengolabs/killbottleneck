@@ -24,7 +24,7 @@ const jmenaNastroju = (v) => ((v && v.tools) || []).map((t) => t.function && t.f
 
 H.beh(async () => {
   const mock = await H.httpMock(mockHandler);
-  const inst = await H.startInstance({ slug: 'ui-relax', addHostGateway: true, env: { KB_CHAT_PROVIDER: 'ollama', KB_CHAT_URL: mock.base, KB_CHAT_MODEL: 'm-a', KB_UVODNI_MAPA: 0 } });
+  const inst = await H.startInstance({ slug: 'ui-relax', addHostGateway: true, env: { KB_CHAT_PROVIDER: 'ollama', KB_CHAT_URL: mock.base, KB_CHAT_MODEL: 'm-a', KB_UVODNI_MAPA: 0, KB_START_RELAX: 1 } }); // start s akváriem zapnutý i přes KB_PURPOSE_ASK=0 harnessu
   await inst.register('admin@example.com', { name: 'Petr Novák' });
   const A = await inst.login('admin@example.com');
   const me = (await inst.api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'admin@example.com', password: H.PW } })).json.record;
@@ -48,16 +48,23 @@ H.beh(async () => {
   const klicAktivita = `kb-relax-aktivita:${me.id}`;
   const napis = async (s) => { await page.click('[data-testid="chat-input"]'); await page.keyboard.type(s); await page.keyboard.press('Enter'); };
 
-  console.log('== otevřít panel, čip Relax v prázdném stavu ==');
+  console.log('== start aplikace: asistent otevřený + akvárium vedle (Richard 25. 10. 2026), křížek ve scéně, F5 ho nevrátí ==');
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
-  expect(await cekej('[data-testid="chat-tab"]'), 'ouško asistenta');
-  await page.click('[data-testid="chat-tab"]');
-  expect(await cekej('[data-testid="chat-panel"]'), 'panel otevřen');
-  // první otevření asistenta v daném dni = ráno → akvárium vedle chatu samo (Richard 15. 10.); ukončit a pokračovat „bez relaxu“
-  expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="vedle"][data-scena="akvarium"]', 15000), 'první otevření dne: akvárium se vedle chatu spustilo samo');
+  expect(await cekej('[data-testid="chat-panel"]', 15000), 'po spuštění je panel asistenta otevřený sám (bez kliku na ouško)');
+  expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="vedle"][data-scena="akvarium"]', 15000), 'po spuštění běží akvárium vedle chatu (bez odpočtu)');
+  expect(await cekej('[data-testid="relax-vrstva"][data-nacteno="1"]', 20000), 'scéna se načetla');
+  expect((await odpocet()) === '', `bez odpočtu (${await odpocet()})`);
   if (await page.$('[data-testid="chat-porada-ne"]')) await page.click('[data-testid="chat-porada-ne"]');
-  await page.click('[data-testid="relax-konec"]');
-  await sleep(300);
+  // křížek přímo ve scéně (vedle „Denní světlo“): scéna pošle rodiči kb-relax-zavrit
+  const scenaFr = page.frames().find((f) => /\/relax\/akvarium\.html/.test(f.url()));
+  expect(!!scenaFr && (await scenaFr.$eval('#close-embed', (b) => !b.hidden)), 've scéně je tlačítko Zavřít (v embedu odkryté)');
+  await scenaFr.click('#close-embed');
+  await sleep(500);
+  expect((await vrstva()) === null, 'křížek ve scéně relax ukončil');
+  await page.reload({ waitUntil: 'networkidle2' });
+  expect(await cekej('[data-testid="chat-panel"]'), 'po F5 panel');
+  await sleep(1500);
+  expect((await vrstva()) === null, 'po F5 se akvárium nevrátilo (jednou za kartu prohlížeče)');
   expect(await cekej('[data-testid="chat-chip-relax"]'), 'čip „🐟 Relax“ mezi čipy prázdného chatu');
   expect((await vrstva()) === null, 'bez relaxu žádná vrstva (nulová zátěž)');
 
@@ -336,18 +343,34 @@ H.beh(async () => {
   await sleep(300);
   expect((await page.$('[data-testid="chat-navrh-relax"]')) === null, 'hned po pauze se čip znovu nenabízí');
 
-  console.log('== ráno: první otevření asistenta v daném dni spustí akvárium vedle chatu, jednou za den ==');
-  const vcera = Date.now() - 20 * 3600000;
-  await page.evaluate((a, d, r, n, t) => { localStorage.setItem(a, String(t)); localStorage.removeItem(d); localStorage.removeItem(r); localStorage.removeItem(n); localStorage.setItem('kb-chat-open', '1'); }, `kb-chat-aktivita:${me.id}`, `kb-chat-porada-den:${me.id}`, `kb-relax-rano:${me.id}`, `kb-chat-porada-ne:${me.id}`, vcera);
-  await page.reload({ waitUntil: 'networkidle2' });
-  expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="vedle"][data-scena="akvarium"]', 15000) && !!(await page.$('[data-testid="relax-bez-odpoctu"]')), 'první otevření dne: akvárium vedle chatu bez odpočtu');
-  expect(!!(await page.$('[data-testid="chat-porada-nabidka"]')), 'nabídka ranní porady je zároveň v panelu');
-  await page.click('[data-testid="relax-konec"]');
+  console.log('== nová karta, když relax UŽ běží (stav sdílený v localStorage): start je vyřízený, po zavření se akvárium nevrací (/checkup 25. 10.) ==');
+  await page.evaluate((k) => localStorage.setItem(k, JSON.stringify({ scena: 'akvarium', minut: 0, start: Date.now(), konecV: 0, rozlozeni: 'vedle', zamek: '', hotovo: false, pokusy: 0, blokDo: 0 })), klicRelax);
+  const pageR = await page.browser().newPage();
+  await pageR.setViewport({ width: 1280, height: 900 });
+  await pageR.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); }, A);
+  await pageR.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  expect(await pageR.waitForSelector('[data-testid="relax-vrstva"]', { timeout: 15000 }).then(() => true).catch(() => false), 'nová karta vidí běžící relax');
+  await pageR.click('[data-testid="relax-konec"]');
+  await sleep(1500);
+  expect((await pageR.$('[data-testid="relax-vrstva"]')) === null, 'po zavření se akvárium v téže kartě hned znovu neotevřelo');
+  await pageR.close();
+
+  console.log('== nová karta prohlížeče = start aplikace znovu: akvárium vedle chatu bez odpočtu (sessionStorage je na kartu) ==');
+  const page2 = await page.browser().newPage();
+  await page2.setViewport({ width: 1280, height: 900 });
+  await page2.evaluateOnNewDocument((tk) => { localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} })); }, A);
+  await page2.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  expect(await page2.waitForSelector('[data-testid="relax-vrstva"][data-rozlozeni="vedle"][data-scena="akvarium"]', { timeout: 15000 }).then(() => true).catch(() => false) && !!(await page2.$('[data-testid="relax-bez-odpoctu"]')), 'nová karta: akvárium vedle chatu bez odpočtu');
+  expect(!!(await page2.$('[data-testid="chat-panel"]')), 'nová karta: panel asistenta otevřený');
+  // stav relaxu je v localStorage společný pro karty → v nové kartě ho ukončit, jinak by ho původní karta po reloadu právem ukázala
+  await page2.click('[data-testid="relax-konec"]');
   await sleep(300);
+  await page2.close();
+  // v původní kartě (start už proběhl) akvárium po reloadu nenaskočí
   await page.reload({ waitUntil: 'networkidle2' });
   await cekej('[data-testid="chat-panel"]');
   await sleep(1500);
-  expect((await vrstva()) === null, 'druhé otevření téhož dne akvárium nespustí');
+  expect((await vrstva()) === null, 'původní karta: po reloadu se akvárium nevrací');
   await page.click('[data-testid="chat-porada-ne"]').catch(() => {});
 
   console.log('== mikrofon úplně vlevo (když je přepis k dispozici) ==');

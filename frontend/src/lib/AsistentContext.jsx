@@ -21,6 +21,8 @@ export const DOK_MAX_W = 720;
 export const sirkaDokumentu = (okno, sirkaChatu, dokWidth) => Math.max(Math.min(DOK_MIN_W, okno - sirkaChatu), Math.min(dokWidth, okno - sirkaChatu - 48));
 // připnutá paměť asistenta v panelu Dokumenty (dokId) — PB id mají 15 znaků, se slovem se nepletou
 export const PAMET = 'pamet';
+// stránka asistenta otevřená v panelu Dokumentů (dokId = 'stranka:<id>', 14. 10. 2026)
+export const STRANKA = 'stranka:';
 
 // Relax (Richard 14. 10. 2026): hlídaná pauza s akváriem / úlem a odpočtem — přes celou obrazovku (jde zamknout
 // PINem a odejít od PC) nebo „vedle“ (vlevo místo mapy, vpravo chat). Scény jsou statické soubory v iframe

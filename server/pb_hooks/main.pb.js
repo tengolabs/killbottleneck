@@ -1262,6 +1262,8 @@ onRecordUpdateRequest((e) => {
 // Credentials si dodá každá instance vlastní (Google Cloud OAuth client) — nic natvrdo.
 onBootstrap((e) => {
   e.next();
+  // stránky asistenta rozepsané při pádu/restartu → chyba s vysvětlením (zámky ve store nepřežily)
+  try { const n = require(`${__hooks}/stranky.js`).poRestartu(e.app); if (n) console.log(`[stranky] po restartu: ${n} rozepsaných stránek → chyba`); } catch (err) { /* bez kolekce (první start) */ }
   try {
     const { env } = require(`${__hooks}/helpers.js`);
     const cid = env("GOOGLE_CLIENT_ID");
@@ -2227,6 +2229,91 @@ kbRoute("POST", "/chat/dokument/smazat", (e) => {
   try { D.smazat($app, e.auth.id, String(b.id || "")); return e.json(200, { ok: true }); } catch (err) { return D.odpovedChyby(e, err); }
 }, $apis.requireAuth());
 
+// ---------- Stránky asistenta (14. 10. 2026) ----------
+// HTML stránky, které napsal asistent (page writer) nebo připojený agent (MCP/v1); stranky.js.
+// Vlastník se hlídá v modulu (cizí id = 404). Týmové stránky (team_visible) čte člen přes
+// tyhle routy, nikdy přes record API (DTO bez tokenu). KB_PAGES=0 → vše 404.
+// ⚠️ pomocné funkce v modulu — handler v PB JSVM nevidí funkce deklarované v tomhle souboru.
+// ?skupina=moje|tym &q=hledání → bez HTML
+kbRoute("GET", "/chat/stranky", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const l = S.limity();
+  if (!l.zapnuto) return e.json(404, { error: t(userLang(e.auth), "err.pagesOff") });
+  const q = e.requestInfo().query || {};
+  const tym = String(q.skupina || "") === "tym";
+  const rows = tym ? S.seznamTymu($app, e.auth.id, { q: String(q.q || "") }) : S.seznam($app, e.auth.id, { q: String(q.q || "") });
+  // share_url rovnou v seznamu i detailu: panel po znovunačtení nesmí odkaz skládat z adresy okna (127.0.0.1 × KB_PUBLIC_URL)
+  const dtos = rows.map((r) => { const d = S.dtoSeznamu(r, e.auth.id); if (d.mine && d.shared) d.share_url = S.verejnaAdresa($app, e, r); return d; });
+  return e.json(200, { stranky: S.sAutory($app, dtos), max: l.max, kb: l.kb });
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+kbRoute("GET", "/chat/stranka/{id}", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  if (!S.limity().zapnuto) return e.json(404, { error: t(userLang(e.auth), "err.pagesOff") });
+  const rec = S.najdiCitelnou($app, e.auth.id, e.request.pathValue("id"));
+  if (!rec) return e.json(404, { error: t(userLang(e.auth), "err.pageNotFound") });
+  const d = S.dto(rec, true, { vlastnik: rec.getString("user") === e.auth.id }); d.owner = rec.getString("user");
+  if (d.mine && d.shared) d.share_url = S.verejnaAdresa($app, e, rec);
+  if (d.mine) d.shared_with = S.lideDto($app, rec); // jmenovitě nasdílení lidé (jen vlastníkovi)
+  return e.json(200, { stranka: S.sAutory($app, [d])[0] });
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+// {id, title}: jediná ruční úprava = přejmenování (obsah přepisuje asistent — update_page)
+kbRoute("POST", "/chat/stranka", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const b = e.requestInfo().body || {};
+  try { return e.json(200, { stranka: S.dto(S.prejmenuj($app, e.auth.id, String(b.id || ""), String(b.title || "")), false) }); } catch (err) { return S.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+// {id, model?}: page writer — model bez nástrojů napíše celý dokument (minuty); výsledek přijde
+// panelu přes realtime (ai_pages), odpověď tu klient čekat nemusí (Cloudflare ji po ~100 s utne)
+kbRoute("POST", "/chat/stranka/napsat", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const r = S.napsat($app, e, e.requestInfo().body || {});
+  return e.json(r.status, r.body);
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+kbRoute("POST", "/chat/stranka/vratit", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const b = e.requestInfo().body || {};
+  try { return e.json(200, { stranka: S.dto(S.vratit($app, e.auth.id, String(b.id || "")), true) }); } catch (err) { return S.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+kbRoute("POST", "/chat/stranka/smazat", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const b = e.requestInfo().body || {};
+  try { S.smazat($app, e.auth.id, String(b.id || "")); return e.json(200, { ok: true }); } catch (err) { return S.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+// {id, akce: zapnout|vypnout|obnovit} → stránka s share_token + hotová adresa
+kbRoute("POST", "/chat/stranka/sdilet", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const b = e.requestInfo().body || {};
+  try {
+    const rec = S.sdileni($app, e.auth.id, String(b.id || ""), String(b.akce || ""));
+    const d = S.dto(rec, false); d.share_url = S.verejnaAdresa($app, e, rec);
+    return e.json(200, { stranka: d });
+  } catch (err) { return S.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+kbRoute("POST", "/chat/stranka/tym", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const b = e.requestInfo().body || {};
+  try { return e.json(200, { stranka: S.dto(S.nastavTym($app, e.auth.id, String(b.id || ""), !!b.team_visible), false) }); } catch (err) { return S.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+// {id, akce: pridat|odebrat, user: id nebo e-mail člena} — jmenovité sdílení „jako u mapy“ (15. 10. 2026)
+kbRoute("POST", "/chat/stranka/lide", (e) => {
+  const S = require(`${__hooks}/stranky.js`);
+  const b = e.requestInfo().body || {};
+  try {
+    const rec = S.sdilejS($app, e.auth.id, String(b.id || ""), String(b.akce || ""), String(b.user || ""));
+    const d = S.dto(rec, false); d.shared_with = S.lideDto($app, rec);
+    return e.json(200, { stranka: d });
+  } catch (err) { return S.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
 // ---------- Faktury a klienti (9. 10. 2026, faktury.js) ----------
 // Profil DODAVATELE na faktury: společný na instanci (jen správce) + vlastní na uživatele (/me) — NEPLÉST s /billing (odběratel KB, jen hosting).
 // Tytéž funkce (profilOcisti/profilUloz) používá nástroj set_invoicing_profile → jedna validace pro UI i asistenta.
@@ -2407,7 +2494,7 @@ routerUse((e) => {
       if (cesta !== "/mcp") return b.action === "list";
       const metodaRpc = String(b.method || "");
       const cteciMetody = ["initialize", "notifications/initialized", "ping", "tools/list"];
-      const cteciNastroje = ["list_maps", "get_map", "list_rules", "list_rule_runs", "list_rule_templates", "get_org_structure", "list_people", "get_portfolio"];
+      const cteciNastroje = ["list_maps", "get_map", "list_rules", "list_rule_runs", "list_rule_templates", "get_org_structure", "list_people", "get_portfolio", "list_pages", "get_page"];
       if (cteciMetody.includes(metodaRpc)) return true;
       return metodaRpc === "tools/call" && cteciNastroje.includes(String(((b.params || {}).name) || ""));
     } catch (err) { return false; }
@@ -2649,6 +2736,9 @@ kbRoute("GET", "/config", (e) => {
     // testovací sady ho posílají všechny (harness i staré docker run), takže nový dialog
     // žádné kliky neblokuje bez úprav sad.
     agent_setup_ask: (env("AGENT_SETUP_ASK") || "").trim() !== "0" && (env("PURPOSE_ASK") || "").trim() !== "0",
+    // start aplikace s akváriem a otevřeným asistentem (Richard 25. 10. 2026). KB_START_RELAX=0 vypne; KB_PURPOSE_ASK=0
+    // (testovací sady) vypíná taky, ať vrstva neblokuje kliky — sada, která to testuje, dá KB_START_RELAX=1 (přednost).
+    start_relax: (() => { const sr = (env("START_RELAX") || "").trim(); return sr === "1" || (sr !== "0" && (env("PURPOSE_ASK") || "").trim() !== "0"); })(),
     over_user_limit: (() => { const { userLimitExceeded } = require(`${__hooks}/helpers.js`);
       return userLimitExceeded($app); })(),
     // strop tarifu, na který zkušebka překlápí — ať jde varovat před nákupem
@@ -2661,6 +2751,8 @@ kbRoute("GET", "/config", (e) => {
     // nahrávání souborů: v hostované verzi vypnuté (FLOWMAP_FILES_MB=0), přílohy
     // se tam přidávají jako odkazy → frontend podle toho schová tlačítko
     uploads_enabled: String(env("FILES_MB") || "").trim() !== "0",
+    // stránky asistenta (14. 10. 2026): KB_PAGES=0 vypne tvorbu stránek (nástroje, routy, záložka v panelu)
+    pages: (() => { const S = require(`${__hooks}/stranky.js`); const l = S.limity(); return l.zapnuto ? { max: l.max, kb: l.kb, timeout: l.timeout } : null; })(),
     // Google Drive picker („Vybrat z Disku" → příloha ODKAZEM, žádný upload):
     // ukáže se jen s nakonfigurovaným OAuth clientem + Picker API klíčem.
     // client_id i api_key jsou z podstaty veřejné hodnoty (jdou do prohlížeče).
@@ -5153,6 +5245,80 @@ kbRoute("GET", "/v1/maps", (e) => {
     });
   }
   return e.json(200, { maps: maps });
+});
+
+// ---------- v1: stránky (14. 10. 2026) — externí agent (MCP) píše HTML sám ----------
+// Stejné stropy a vlastnictví jako panel (stranky.js). `share_url` jen když je odkaz zapnutý.
+kbRoute("GET", "/v1/pages", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const S = require(`${__hooks}/stranky.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  if (!S.limity().zapnuto) return e.json(404, { error: "pages disabled" });
+  const pages = S.seznam($app, a.user.id, {}).map((r) => S.v1Dto($app, e, r, false));
+  return e.json(200, { pages: pages });
+});
+kbRoute("GET", "/v1/pages/{id}", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const S = require(`${__hooks}/stranky.js`);
+  const a = apiKeyAuth($app, e, "read");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const rec = S.limity().zapnuto ? S.najdi($app, a.user.id, e.request.pathValue("id")) : null;
+  if (!rec) return e.json(404, { error: "page not found" });
+  return e.json(200, { page: S.v1Dto($app, e, rec, true) });
+});
+// {title, html, team_visible?} → hotová stránka
+kbRoute("POST", "/v1/pages", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const S = require(`${__hooks}/stranky.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const b = e.requestInfo().body || {};
+  try {
+    const rec = S.zaloz($app, a.user.id, { title: String(b.title || ""), html: String(b.html || ""), team_visible: !!b.team_visible, zadani: "" });
+    return e.json(200, { page: S.v1Dto($app, e, rec, false) });
+  } catch (err) { return S.v1Chyba(e, a.user, err); }
+});
+// {html?, title?} → nová verze (předchozí se schová)
+kbRoute("POST", "/v1/pages/{id}", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const S = require(`${__hooks}/stranky.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const b = e.requestInfo().body || {};
+  const id = e.request.pathValue("id");
+  try {
+    let rec;
+    if (b.html != null && String(b.html).trim()) rec = S.ulozHtml($app, a.user.id, id, { html: String(b.html), title: b.title != null ? String(b.title) : null });
+    else if (b.title != null) rec = S.prejmenuj($app, a.user.id, id, String(b.title));
+    else throw Object.assign(new Error("err.pageNoHtml"), { status: 400, klic: "err.pageNoHtml" });
+    return e.json(200, { page: S.v1Dto($app, e, rec, false) });
+  } catch (err) { return S.v1Chyba(e, a.user, err); }
+});
+// {action: link_on|link_off|link_new|team_on|team_off}
+kbRoute("POST", "/v1/pages/{id}/share", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const S = require(`${__hooks}/stranky.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const b = e.requestInfo().body || {};
+  const id = e.request.pathValue("id");
+  const akce = { link_on: "zapnout", link_off: "vypnout", link_new: "obnovit" }[String(b.action || "")];
+  try {
+    let rec;
+    if (akce) rec = S.sdileni($app, a.user.id, id, akce);
+    else if (b.action === "team_on" || b.action === "team_off") rec = S.nastavTym($app, a.user.id, id, b.action === "team_on");
+    else if (b.action === "user_on" || b.action === "user_off") rec = S.sdilejS($app, a.user.id, id, b.action === "user_on" ? "pridat" : "odebrat", String(b.email || ""));
+    else throw Object.assign(new Error("err.pageBadAction"), { status: 400, klic: "err.pageBadAction" });
+    return e.json(200, { page: S.v1Dto($app, e, rec, false) });
+  } catch (err) { return S.v1Chyba(e, a.user, err); }
+});
+kbRoute("DELETE", "/v1/pages/{id}", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const S = require(`${__hooks}/stranky.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  try { S.smazat($app, a.user.id, e.request.pathValue("id")); return e.json(200, { ok: true }); } catch (err) { return S.v1Chyba(e, a.user, err); }
 });
 
 // Organizační struktura pro integrace/MCP — JEN ČTENÍ. Jmenování držitelů

@@ -207,7 +207,9 @@ Typical failures:
 ```
 
 Then suggest the first thing to try, for example: *"Make a map from these meeting notes"*
-or *"Show me what is overdue in my projects"* (`get_portfolio`).
+or *"Show me what is overdue in my projects"* (`get_portfolio`), or *"Build a one-page
+presentation of project #12 and share it with the team"* (`create_page` — you write the whole
+single-file HTML yourself; it runs sandboxed in the app and can be shared by link).
 
 ## Do not
 

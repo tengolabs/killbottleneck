@@ -39,7 +39,7 @@
 <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
 </defs></svg>
 <main class="app">
-<header class="topbar"><div class="brand"><span class="brand-mark"><svg aria-hidden="true"><use href="#i-ant"/></svg></span><div class="brand-name">mraveniště<span style="color:#7a896c">.</span><small>ASTRA · PŘÍRODA V POHYBU</small></div></div><div class="header-actions"><span class="header-note">Na chvíli jen pozoruj.</span><button class="quiet-button" id="sound" aria-pressed="false" title="Zapnout zvuky lesa"><svg aria-hidden="true"><use href="#i-sound"/></svg><span class="btn-text">Zvuky lesa</span></button><button class="quiet-button" id="zen" aria-pressed="false" title="Režim Nerušit"><svg aria-hidden="true"><use href="#i-expand"/></svg><span class="btn-text">Nerušit</span></button></div></header>
+<header class="topbar"><div class="brand"><span class="brand-mark"><svg aria-hidden="true"><use href="#i-ant"/></svg></span><div class="brand-name">mraveniště<span style="color:#7a896c">.</span><small>ASTRA · PŘÍRODA V POHYBU</small></div></div><div class="header-actions"><span class="header-note">Na chvíli jen pozoruj.</span><button class="quiet-button" id="sound" aria-pressed="false" title="Zapnout zvuky lesa"><svg aria-hidden="true"><use href="#i-sound"/></svg><span class="btn-text">Zvuky lesa</span></button><button class="quiet-button" id="close-embed" type="button" hidden aria-label="Zavřít relax" title="Zavřít"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Zavřít</span></button><button class="quiet-button" id="zen" aria-pressed="false" title="Režim Nerušit"><svg aria-hidden="true"><use href="#i-expand"/></svg><span class="btn-text">Nerušit</span></button></div></header>
 <div class="workspace">
 <aside class="controls" aria-label="Ovládání simulace">
 <div class="intro-block"><p class="eyebrow">TVŮJ KOUSEK LESA</p><h1>Malý svět.<br> Vlastním tempem.</h1><p class="intro">Polož něco dobrého a sleduj, jak si k tomu mravenci najdou cestu.</p></div>
@@ -180,6 +180,7 @@ let last=performance.now(),accumulator=0;function frame(now){let elapsed=Math.mi
       else if (d.akce === 'ztlum') { var s = document.getElementById('sound'); if (s && s.getAttribute('aria-pressed') === 'true') s.click(); }
     } catch (e) {}
   });
+  try { var z = document.getElementById('close-embed'); if (z) { z.hidden = false; z.addEventListener('click', function () { try { if (window.parent !== window) window.parent.postMessage({ type: 'kb-relax-zavrit' }, location.origin); } catch (e) {} }); } } catch (e) {}
   var ohlas = function () { try { if (window.parent !== window) window.parent.postMessage({ type: 'kb-relax-ready', scena: 'mraveniste' }, location.origin); } catch (e) {} };
   if (document.readyState === 'complete') setTimeout(ohlas, 0); else window.addEventListener('load', function () { setTimeout(ohlas, 0); });
 })();

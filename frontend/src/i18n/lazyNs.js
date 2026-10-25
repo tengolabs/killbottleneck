@@ -20,6 +20,11 @@ const LOADERS = {
     cs: () => import('./cs/agent.json'),
     en: () => import('./en/agent.json'),
   },
+  // Stránky asistenta (14. 10. 2026) — texty panelu Stránek a okna /stranka/:id; líně, aby asistent.json (jede i do lite) nerostl
+  stranky: {
+    cs: () => import('./cs/stranky.json'),
+    en: () => import('./en/stranky.json'),
+  },
   billing: {
     cs: () => import('./cs/billing.json'),
     en: () => import('./en/billing.json'),

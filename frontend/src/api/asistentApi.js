@@ -37,6 +37,23 @@ export const dokument = (id) => kbSend(`/api/kb/chat/dokument/${encodeURICompone
 export const dokumentUloz = (payload) => kbSend('/api/kb/chat/dokument', { body: payload });
 export const dokumentVratit = (id) => kbSend('/api/kb/chat/dokument/vratit', { body: { id } });
 export const dokumentSmazat = (id) => kbSend('/api/kb/chat/dokument/smazat', { body: { id } });
+// Stránky asistenta (14. 10. 2026): HTML artefakty — seznam (moje|tym), detail s HTML, page writer, sdílení
+export const stranky = ({ skupina, q } = {}) => {
+  const p = new URLSearchParams();
+  if (skupina) p.set('skupina', skupina);
+  if (q) p.set('q', q);
+  const qs = p.toString();
+  return kbSend(`/api/kb/chat/stranky${qs ? `?${qs}` : ''}`, { method: 'GET' });
+};
+export const stranka = (id) => kbSend(`/api/kb/chat/stranka/${encodeURIComponent(id)}`, { method: 'GET' });
+// writer píše minuty; odpověď klient nečeká (stav přijde realtime), strop jen ať požadavek nevisí navěky
+export const strankaNapsat = (id) => kbSend('/api/kb/chat/stranka/napsat', { body: { id }, timeoutMs: 300_000 });
+export const strankaVratit = (id) => kbSend('/api/kb/chat/stranka/vratit', { body: { id } });
+export const strankaSmazat = (id) => kbSend('/api/kb/chat/stranka/smazat', { body: { id } });
+export const strankaSdilet = (payload) => kbSend('/api/kb/chat/stranka/sdilet', { body: payload });
+export const strankaTym = (payload) => kbSend('/api/kb/chat/stranka/tym', { body: payload });
+// {id, akce: 'pridat'|'odebrat', user: id člena} — jmenovité sdílení (15. 10. 2026)
+export const strankaLide = (payload) => kbSend('/api/kb/chat/stranka/lide', { body: payload });
 // Faktury a profil dodavatele (9. 10. 2026): vystavuje je asistent (create_invoice), panel je čte a označuje
 // zaplacené; PDF vyrábí prohlížeč z DTO (lib/faktura). Profil dodavatele: společný (správce, Správa organizace) + vlastní (/me, Můj účet).
 export const faktury = ({ year, unpaid } = {}) => {

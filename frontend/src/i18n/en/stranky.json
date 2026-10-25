@@ -1,0 +1,135 @@
+{
+  "title": "Pages",
+  "skupina": {
+    "moje": "Mine",
+    "tym": "Shared with me"
+  },
+  "search": "Search pages…",
+  "empty": "No pages yet. Pick a template, or ask the assistant e.g. “make me a presentation of the results for management” — it writes the page, you see it here and share it by link or with people from your team.",
+  "emptyTeam": "Nobody from the team has shared a page with you yet.",
+  "emptyFiltered": "Nothing here.",
+  "by": "by {{name}}",
+  "state": {
+    "ceka": "waiting to be written",
+    "pise": "being written",
+    "hotovo": "ready",
+    "chyba": "failed"
+  },
+  "writing": "The assistant is writing the page… it usually takes a minute or more. You can keep chatting; the finished page shows up here by itself.",
+  "writingSteps": "The assistant writes the page section by section — the preview grows with every step.",
+  "krok": {
+    "osnova_one": "Page outline (1 section)",
+    "osnova_few": "Page outline ({{count}} sections)",
+    "osnova_other": "Page outline ({{count}} sections)",
+    "kostra": "Look and skeleton of the page",
+    "cela": "Whole page at once",
+    "osnovaBezi": "Page outline…"
+  },
+  "code": "Code",
+  "codeHint": "Show the HTML as it is written instead of the preview",
+  "queued": "The page is waiting to be written.",
+  "failed": "The page could not be written.",
+  "retry": "Try again",
+  "retrying": "Starting the writer…",
+  "open": "Open",
+  "openHint": "Open the page in a new tab",
+  "share": "Share by link",
+  "shareOn": "The link is on — anyone with the link can open the page, no account needed.",
+  "shareOff": "Turn the link off",
+  "shareNew": "New link",
+  "shareNewHint": "Replaces the link with a new one; the old one stops working.",
+  "copy": "Copy link",
+  "copied": "Copied",
+  "copyFailed": "Copying failed — copy the link by hand.",
+  "team": "Whole team (every member of the organization)",
+  "teamHint": "On: every member of the organization finds the page in the Shared with me tab.",
+  "lide": {
+    "button": "People",
+    "team": "Whole team",
+    "count_one": "1 person",
+    "hint": "Who can open the page — like sharing a project: pick members of the organization, or the whole team at once.",
+    "pick": "Pick a member…",
+    "nobody": "Nobody else to pick",
+    "add": "Add",
+    "remove": "Remove access",
+    "count_other": "{{count}} people",
+    "count_few": "{{count}} people"
+  },
+  "download": "Download as HTML",
+  "restore": "Restore previous version",
+  "restored": "Previous version restored (click again to redo).",
+  "delete": "Delete page",
+  "deleteConfirm": "Really delete?",
+  "deleteYes": "Delete",
+  "cancel": "Cancel",
+  "back": "All pages",
+  "notFound": "Page not found (maybe it was deleted).",
+  "errorLoad": "The page could not be loaded.",
+  "errorSave": "The change failed.",
+  "size": "{{kb}} kB",
+  "sandboxNote": "The page runs in an isolated sandbox — it has no access to your app or your sign-in.",
+  "page": "Page",
+  "nova": {
+    "button": "New page",
+    "intro": "Choose what the page should be. The app turns it into a brief for the assistant — it loads the project, writes the page and you share it.",
+    "sablona": "Template",
+    "projekt": "Project",
+    "bezProjektuVolba": "— no project —",
+    "projektVeta": "Base it on the project “{{projekt}}” — load it and use only facts from it.",
+    "bezProjektu": "No project — use only what I write here and ask about anything missing.",
+    "styl": "Look",
+    "styly": {
+      "svetly": "Light",
+      "tmavy": "Dark",
+      "firemni": "Plain corporate"
+    },
+    "stylVeta": {
+      "svetly": "Look: light, modern, readable on a phone.",
+      "tmavy": "Look: dark, modern, bold headings.",
+      "firemni": "Look: plain corporate, white background, tables and a clear structure."
+    },
+    "doplneni": "Anything to add (optional)",
+    "doplneniPlaceholder": "E.g. stress the delivery delay, add the manager's contact…",
+    "doplneniVeta": "Additional notes: ",
+    "zadani": "What the page should contain",
+    "zadaniPlaceholder": "E.g. an interactive price calculator by hours and rate…",
+    "submit": "Write it"
+  },
+  "sablony": {
+    "vedeni": {
+      "nazev": "Presentation for management",
+      "popis": "Project status, deadlines, who owns what, risks and next steps",
+      "zprava": "Make me a page: a presentation of the project for management — status, key deadlines, who owns what, risks and next steps. Stat cards with the key numbers at the top, a chart of step statuses and a timeline of deadlines; an icon for every part."
+    },
+    "tym": {
+      "nazev": "Team overview",
+      "popis": "Who does what, what is on fire, this week's deadlines",
+      "zprava": "Make me a page: a project overview for the team — who owns what, what is on fire right now, this week's deadlines and what is done. A traffic light for each part, progress bars and icons; highlight what is on fire."
+    },
+    "zakaznik": {
+      "nazev": "Summary for the customer",
+      "popis": "Milestones, what is done, what we need from them — no internal details",
+      "zprava": "Make me a page: a project summary for the customer — milestones, what is done, what comes next and what we need from the customer; no internal notes, budgets or assignee names. A milestone timeline and an overall progress bar; clear, with icons."
+    },
+    "osa": {
+      "nazev": "Timeline",
+      "popis": "Milestones and steps on a timeline with dates",
+      "zprava": "Make me a page: a project timeline — milestones and steps ordered by deadline, what is done, what is in progress and what is still ahead. As a Gantt chart by deadlines with a today marker, a status overview below it; icons for the parts."
+    },
+    "report": {
+      "nazev": "Status report",
+      "popis": "One page with a traffic light: green / amber / red",
+      "zprava": "Make me a page: a one-page project status report with a traffic light (green / amber / red) for each part, the key numbers, what went well and what is stuck. The traffic light as coloured dots, stat cards and a chart of done / running / waiting shares."
+    },
+    "checklist": {
+      "nazev": "Checklist",
+      "popis": "Interactive tick-off list built from the project steps",
+      "zprava": "Make me a page: an interactive checklist built from the project steps — each step as an item with a checkbox, its deadline and owner, and a counter of done items at the top. A progress bar at the top and status icons on the items."
+    },
+    "volne": {
+      "nazev": "Custom brief",
+      "popis": "Describe what the page should be — a calculator, a form or a small app",
+      "zprava": "Make me a page according to this brief:"
+    }
+  }
+}

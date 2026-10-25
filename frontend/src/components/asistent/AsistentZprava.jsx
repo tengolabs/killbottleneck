@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
 import { copyToClipboard } from '@/lib/clipboard';
-import { PAMET } from '@/lib/AsistentContext';
+import { PAMET, STRANKA } from '@/lib/AsistentContext';
 import { ZNACKA_PREPISU, ZNACKA_PDF, ZNACKA_HLASU } from '@/lib/prepisZpravy';
 import { ulozRizika, zrusRizika, nactiRizika, BARVY, PORADI_DRUHU } from '@/lib/rizika';
 
@@ -211,6 +211,12 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'dokument' && karta.odkaz.doc_id && onOtevriDokument && (
             <button type="button" onClick={() => onOtevriDokument(karta.odkaz.doc_id)} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-dokument">
               {t('dok.open')} <PanelLeftOpen className="w-3 h-3" />
+            </button>
+          )}
+          {/* sdílení / návrat verze stránky přes kartu (share_page, revert_page): otevřít ji v panelu Stránek */}
+          {stav === 'hotovo' && karta.odkaz && karta.odkaz.odkaz && karta.odkaz.odkaz.type === 'stranka' && karta.odkaz.odkaz.page_id && onOtevriDokument && (
+            <button type="button" onClick={() => onOtevriDokument(STRANKA + karta.odkaz.odkaz.page_id)} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-stranka">
+              {t('str.open')} <PanelLeftOpen className="w-3 h-3" />
             </button>
           )}
           {/* připomínka ke kroku žije v kalendáři (klik-test 5. 10. 2026: „Ukázat v mapě“ u připomínky mátlo) */}
@@ -747,6 +753,12 @@ export default function AsistentZprava({ zprava, posledni, odkazDole, loading, o
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} extra={extraNavrh} />;
           if (k.type === 'relax') return <p key={i} className="mt-1.5 text-xs text-muted-foreground" data-testid="chat-relax-karta" data-minut={k.minutes}>{k.minutes ? t('relaxKarta', { count: k.minutes }) : t('relaxKartaVolny')}</p>;
           if (k.type === 'koncept') return <KartaKoncept key={i} karta={k} onOtevriDokument={onOtevriDokument} />;
+          {/* stránka asistenta (create_page / update_page): karta nese jen id — HTML píše server po tahu, panel ji ukáže (14. 10. 2026) */}
+          if (k.type === 'stranka') return (
+            <button key={i} type="button" onClick={() => onOtevriDokument && onOtevriDokument(STRANKA + k.page_id)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-secondary" data-testid="chat-stranka-karta" data-id={k.page_id} data-akce={k.akce}>
+              <PanelLeftOpen className="w-3.5 h-3.5" />{t(k.akce === 'prepis' ? 'str.cardRewrite' : 'str.card', { title: k.title })}
+            </button>
+          );
           if (k.type === 'dokument') return (
             <button key={i} type="button" onClick={() => onOtevriDokument && onOtevriDokument(k.doc_id)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-secondary" data-testid="chat-dokument-karta">
               <PanelLeftOpen className="w-3.5 h-3.5" />{t('dok.updatedCard', { title: k.title })}

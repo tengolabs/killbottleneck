@@ -164,7 +164,7 @@ H.beh(async () => {
   console.log('== MCP /mcp (HTTP) — katalog a neznámé argumenty ==');
   r = await inst.api('POST', '/mcp', { bearer: A.key, body: { jsonrpc: '2.0', id: rpcId++, method: 'tools/list', params: {} } });
   const tools = ((r.json || {}).result || {}).tools || [];
-  expect(tools.length === 26 && tools.every((t) => t.inputSchema.additionalProperties === false), `tools/list: 26 nástrojů, každý additionalProperties:false (${tools.filter((t) => t.inputSchema.additionalProperties === false).length})`);
+  expect(tools.length === 32 && tools.every((t) => t.inputSchema.additionalProperties === false), `tools/list: 32 nástrojů, každý additionalProperties:false (${tools.filter((t) => t.inputSchema.additionalProperties === false).length})`);
   const un = tools.find((t) => t.name === 'update_node') || { inputSchema: { properties: {} } };
   expect(!!un.inputSchema.properties.planned_on, 'update_node má planned_on');
   const an = tools.find((t) => t.name === 'add_nodes') || { inputSchema: {} };
@@ -215,7 +215,7 @@ H.beh(async () => {
     await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '0' } });
     proc.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const st = (await rpc('tools/list', {})).result.tools;
-    expect(st.length === 26 && st.every((t) => t.inputSchema.additionalProperties === false), 'stdio tools/list: 26× additionalProperties:false (schéma říká pravdu)');
+    expect(st.length === 32 && st.every((t) => t.inputSchema.additionalProperties === false), 'stdio tools/list: 32× additionalProperties:false (schéma říká pravdu)');
     let s = await rpc('tools/call', { name: 'update_node', arguments: { map_id: mapId, node_id: k2.id, priority: 'high' } });
     const stext = JSON.stringify(s);
     expect(/-32602/.test(stext) && /priority/.test(stext), `stdio update_node priority → -32602 (ne tiché zahození) (${stext.slice(0, 120)})`);

@@ -3652,22 +3652,32 @@ function publicBaseUrl(app) {
 // na adrese, která na jeho stroji neexistuje (nález 10. 10. 2026). Localhost se proto
 // bere jako „nenastaveno" a padá se na Host + X-Forwarded-Proto požadavku — tedy na
 // adresu, kterou klient opravdu použil (self-host na LAN bez KB_PUBLIC_URL).
-function publicBaseUrlFromRequest(app, e) {
+// opts.prednostPozadavku (odkaz na stránku asistenta, 25. 10. 2026): adresa z požadavku má
+// PŘEDNOST před KB_PUBLIC_URL — stejně jako odkaz na mapu (ShareDialog skládá z adresy okna):
+// kdo aplikaci používá přes LAN, dostane LAN odkaz, přes Tailscale tailscale, v cloudu doménu.
+// KB_PUBLIC_URL zůstává jen pro požadavky bez použitelného hostu (localhost, MCP přes 127.0.0.1, cron).
+const HOST_RE = /^([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/i; // hostname[:port] / [ipv6][:port]
+function publicBaseUrlFromRequest(app, e, opts) {
   const zCfg = publicBaseUrl(app);
-  if (zCfg && !/^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:|\/|$)/i.test(zCfg)) return zCfg;
+  const cfgOk = !!zCfg && !/^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:|\/|$)/i.test(zCfg);
+  const prednostPozadavku = !!(opts && opts.prednostPozadavku);
+  if (cfgOk && !prednostPozadavku) return zCfg;
   let host = "", proto = "";
   try {
     // ⚠️ Go přesouvá hlavičku Host z mapy hlaviček do request.host — header.get("Host")
     // je VŽDY prázdné (přesně proto starý zaklad() v oauth-lib padal na „localhost")
-    host = e.request.header.get("X-Forwarded-Host") || e.request.host || "";
+    // neplatný X-Forwarded-Host (cizí vstup) se zahodí a platí skutečný Host požadavku, ne localhost
+    const fwd = String(e.request.header.get("X-Forwarded-Host") || "").split(",")[0].trim();
+    host = HOST_RE.test(fwd) ? fwd : (e.request.host || "");
     proto = e.request.header.get("X-Forwarded-Proto") || "";
   } catch (err) { /* bez požadavku (cron) */ }
   // Hlavičky jsou vstup od klienta: jen hostname[:port] / [ipv6][:port] a http(s) —
   // cokoli jiného (mezery, uvozovky, cizí schéma) se do metadat/návodu nedostane.
   host = String(host).split(",")[0].trim();
   proto = String(proto).split(",")[0].trim().toLowerCase();
-  if (!/^([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/i.test(host)) host = "";
+  if (!HOST_RE.test(host)) host = "";
   if (proto !== "http" && proto !== "https") proto = "";
+  if (prednostPozadavku && /^(localhost|127\.0\.0\.1|\[?::1\]?)(:|$)/i.test(host) && cfgOk) host = "";
   if (!host) return zCfg || "http://localhost:8090";
   if (!proto) { try { proto = e.request.tls ? "https" : "http"; } catch (err) { proto = "http"; } }
   return `${proto}://${host}`;
@@ -6296,6 +6306,12 @@ function buildExport(app, userId, email, opts) {
     email_subject: d.getString("email_subject"), map: d.getString("map"), created: d.getString("created"), updated: d.getString("updated"),
   }));
   if (documents.length >= ROWS) truncated.ai_documents = true;
+  // stránky asistenta (14. 10. 2026) — HTML, které si uživatel nechal napsat; sdílecí token NE (tajemství, jde obnovit)
+  const pages = rowsOf("ai_pages", "user = {:u}", { u: userId }, ROWS, "created").map((p) => ({
+    title: p.getString("title"), html: p.getString("html"), brief: p.getString("zadani"), status: p.getString("stav"),
+    team_visible: !!p.get("team_visible"), shared: !!p.getString("share_token"), map: p.getString("map"), created: p.getString("created"), updated: p.getString("updated"),
+  }));
+  if (pages.length >= ROWS) truncated.ai_pages = true;
   const timeEntries = own("time_entries", "started", (t) => ({
     id: t.id, label: t.getString("label"), note: t.getString("note"), started: t.getString("started"), ended: t.getString("ended"),
     duration_min: t.get("duration_min"), map: t.getString("map"), node_id: t.getString("node_id"), task: t.getString("task"), client: t.getString("client"),
@@ -6337,11 +6353,12 @@ function buildExport(app, userId, email, opts) {
     calendars: calendarsOut,
     node_reminders: nodeReminders,
     documents: documents,
+    pages: pages,
     time_entries: timeEntries,
     external_contacts: contacts,
     notifications: notifications,
     rule_templates: ruleTemplates,
-    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, calendars: calendarsOut.length, node_reminders: nodeReminders.length, documents: documents.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
+    counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, calendars: calendarsOut.length, node_reminders: nodeReminders.length, documents: documents.length, pages: pages.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
     truncated: Object.keys(truncated).length ? truncated : null,
     errors: errors.length ? errors : null,
   };

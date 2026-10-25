@@ -54,7 +54,7 @@ export const KEY_RELAX = 'kb-relax';
 export const KEY_RELAX_SCENA = 'kb-relax-scena';          // 'akvarium' | 'ul' | 'mraveniste'
 export const KEY_RELAX_ROZLOZENI = 'kb-relax-rozlozeni';  // 'cela' | 'vedle'
 export const KEY_RELAX_AKTIVITA = 'kb-relax-aktivita';    // + ':uid' {start, posledni, nabidnuto, posledniRelax} — hlídač 50 min práce
-export const KEY_RELAX_RANO = 'kb-relax-rano';            // + ':uid' den, kdy se ráno samo spustilo akvárium (Richard 15. 10. 2026)
+export const KEY_START_RELAX = 'kb-start-relax';         // sessionStorage: start aplikace s akváriem už v téhle kartě proběhl (25. 10. 2026)
 
 // Při odhlášení / vypršení session smazat všechny klíče asistenta (`kb-chat-*`):
 // rozhovor, model, porada, aktivita — patří k účtu, další člověk u téhož

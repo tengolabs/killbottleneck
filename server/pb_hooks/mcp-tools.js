@@ -332,6 +332,19 @@ const TOOLS = [
       time: { type: "string", description: "HH:MM (24h)" },
     }, required: ["map_id", "node_id", "time"], additionalProperties: false },
   },
+  // ---------- stránky (14. 10. 2026): externí agent HTML píše sám, stejné stropy a vlastnictví jako panel (stranky.js) ----------
+  { name: "list_pages", description: "List the key owner's pages \u2014 single-file HTML artifacts (presentations, overviews, small apps) created by the assistant or an agent: id, title, status (ceka = queued, pise = being written, hotovo = ready, chyba = failed), size, public link, team visibility.",
+    inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false } },
+  { name: "get_page", description: "Read one page (page_id from list_pages): its metadata and the full HTML. Read it before changing a page with update_page.",
+    inputSchema: { type: "object", properties: { page_id: { type: "string" } }, required: ["page_id"], additionalProperties: false } },
+  { name: "create_page", description: "Create a page from a COMPLETE single-file HTML document you wrote yourself (inline CSS/JS; external libraries only from https CDNs; no fetch to other servers; size limit per instance, typically 300 kB). The page appears in the user's Pages panel in the app and runs sandboxed (no access to the app's session). team_visible=true shows it to all members of the organization. Returns the id and the public link if one is on.",
+    inputSchema: { type: "object", properties: { title: { type: "string" }, html: { type: "string", description: "the whole HTML document" }, team_visible: { type: "boolean" } }, required: ["title", "html"], additionalProperties: false } },
+  { name: "update_page", description: "Replace the HTML and/or the title of an existing page (page_id from list_pages). Send the WHOLE new document, not a diff; the previous version is kept and the user can restore it.",
+    inputSchema: { type: "object", properties: { page_id: { type: "string" }, html: { type: "string", description: "the whole new HTML document" }, title: { type: "string" } }, required: ["page_id"], additionalProperties: false } },
+  { name: "share_page", description: "Change sharing of a page: link_on = public link for anyone with the link (no account needed), link_off = turn it off, link_new = replace the link (the old one stops working), team_on / team_off = show or hide the page for all members of the organization, user_on / user_off = share with / unshare from one named member (pass `email`; members come from list_people). Returns the current public link and the people it is shared with.",
+    inputSchema: { type: "object", properties: { page_id: { type: "string" }, action: { type: "string", enum: ["link_on", "link_off", "link_new", "team_on", "team_off", "user_on", "user_off"] }, email: { type: "string", description: "member's e-mail (only for user_on / user_off)" } }, required: ["page_id", "action"], additionalProperties: false } },
+  { name: "delete_page", description: "Delete a page for good (page_id from list_pages). Cannot be undone.",
+    inputSchema: { type: "object", properties: { page_id: { type: "string" } }, required: ["page_id"], additionalProperties: false } },
 ];
 
 // ---------- obsluha /mcp (Streamable HTTP, stateless) ----------
@@ -464,6 +477,7 @@ function renderPortfolio(p) {
 
 const text = (s) => ({ content: [{ type: "text", text: s }] });
 const errText = (s) => ({ content: [{ type: "text", text: s }], isError: true });
+const popisStranky = (p) => `${p.title} (id: ${p.id}, status: ${p.status}, ${p.size_kb} kB, ${p.share_url ? "public link: " + p.share_url : "no public link"}${p.team_visible ? ", visible to team" : ""}${p.shared_with && p.shared_with.length ? ", shared with: " + p.shared_with.join(", ") : ""})`;
 
 // interní volání vlastního v1 API — auth hlavička klienta se předává doslova:
 // autentizaci, scope, rate-limit i audit dělá apiKeyAuth ve v1 routách, tady
@@ -664,8 +678,30 @@ const EXEC = {
     const q = a && a.today ? `?today=${enc(String(a.today))}` : "";
     return text(renderPortfolio(vcall(auth, "GET", `/api/kb/v1/portfolio${q}`)));
   },
+  // stránky (14. 10. 2026) — chyby v1 (limit, 404, 402) jdou agentovi jako text, ne jako výjimka
+  list_pages: (auth) => {
+    try {
+      const r = vcall(auth, "GET", "/api/kb/v1/pages");
+      if (!r.pages.length) return text("No pages.");
+      return text(DATA_FENCE + "\n\n" + r.pages.map((p) => `• ${p.title} (id: ${p.id}, status: ${p.status}, ${p.size_kb} kB, ${p.share_url ? "public link: " + p.share_url : "no public link"}${p.team_visible ? ", visible to team" : ""}, updated: ${p.updated})`).join("\n"));
+    } catch (e) { return errText(e.message); }
+  },
+  get_page: (auth, a) => {
+    try { const p = vcall(auth, "GET", `/api/kb/v1/pages/${enc(a.page_id)}`).page; return text(popisStranky(p) + "\n\n```html\n" + p.html + "\n```"); } catch (e) { return errText(e.message); }
+  },
+  create_page: (auth, a) => {
+    try { const r = vcall(auth, "POST", "/api/kb/v1/pages", { title: a.title, html: a.html, team_visible: !!a.team_visible }); return text("Page created. " + popisStranky(r.page)); } catch (e) { return errText(e.message); }
+  },
+  update_page: (auth, a) => {
+    try { const r = vcall(auth, "POST", `/api/kb/v1/pages/${enc(a.page_id)}`, { html: a.html, title: a.title }); return text("Page updated (previous version kept). " + popisStranky(r.page)); } catch (e) { return errText(e.message); }
+  },
+  share_page: (auth, a) => {
+    try { const r = vcall(auth, "POST", `/api/kb/v1/pages/${enc(a.page_id)}/share`, { action: a.action, email: a.email || undefined }); return text("Sharing updated. " + popisStranky(r.page)); } catch (e) { return errText(e.message); }
+  },
+  delete_page: (auth, a) => {
+    try { vcall(auth, "DELETE", `/api/kb/v1/pages/${enc(a.page_id)}`); return text("Page deleted."); } catch (e) { return errText(e.message); }
+  },
 };
-
 const rpcOk = (id, result) => ({ jsonrpc: "2.0", id: id, result: result });
 const rpcErr = (id, code, message) => ({ jsonrpc: "2.0", id: id === undefined ? null : id, error: { code: code, message: message } });
 

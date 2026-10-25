@@ -152,6 +152,12 @@ export default function RelaxVrstva({ lite = false }) {
     try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch { /* nevadí */ }
     ukonciRelax();
   }, [ukonciRelax]);
+  // křížek přímo ve scéně (vedle „Denní světlo“, Richard 25. 10. 2026): scéna pošle kb-relax-zavrit; zamčený relax se tím neodemkne
+  useEffect(() => {
+    const f = (e) => { if (e.origin === window.location.origin && e.data && e.data.type === 'kb-relax-zavrit' && !zamceno) ukonci(); };
+    window.addEventListener('message', f);
+    return () => window.removeEventListener('message', f);
+  }, [ukonci, zamceno]);
 
   // zámek: 'nastavit' (dialog volby PINu) | 'odemknout' (pole PIN v zamčeném stavu) | ''
   const [pinRezim, setPinRezim] = useState('');
