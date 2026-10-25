@@ -19,7 +19,7 @@
 > tell us what happened: bugs → [Issues](../../issues), ideas → Discussions.
 > v1.0 ships when the beta goes quiet.
 
-A visual picture of your projects, your company and its processes — goal maps that people and AI agents work on together, **entirely on your own server: your data never leaves the company**. Open in the spirit of open source, just without the right to resell it as a hosted service — see [License](#license--fair-code).
+A visual picture of your projects, your company and its processes — goal maps that people and AI agents work on together, **entirely on your own server: your data never leaves the company**. **Free to self-host, with REST API and MCP server included.** Open in the spirit of open source, just without the right to resell it as a hosted service — see [License](#license--fair-code).
 
 ![The goal map editor](assets/mapa-en.jpg)
 

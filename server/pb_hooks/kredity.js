@@ -40,17 +40,20 @@ function jeLokalni(model, provider) { // eslint-disable-line no-unused-vars
 const sazba = (model, provider) => SAZBA_AKI; // eslint-disable-line no-unused-vars
 // kredity jednoho volání modelu
 function kredityVolani(v) {
-  if (!v || v.zahozeno) return 0;
+  if (!v || v.zahozeno || v.vlastni) return 0; // vlastní model zákazníka: výkon platí on
   const r = sazba(v.model, v.provider);
   const tin = Number(v.in) || 0, tc = Math.min(tin, Number(v.cached) || 0);
   return ((tin - tc) * r.in + tc * r.cache + (Number(v.out) || 0) * r.out) / KREDIT_KC;
 }
 // kredity tahu ze statistik smyčky: rozpad po voláních (stats.volani); bez něj součty za cenu AKI.
 // Chybový tah a potvrzení bez modelu = 0.
-function kredityTahu(stats, chyba) {
+function kredityTahu(stats, chyba, cfg) {
   if (chyba || !stats || stats.app || !(Number(stats.calls) > 0)) return 0;
   const prepis = stats.hlas ? kredityPrepisu(stats.hlas.s) : 0; // délka nahrávky v sekundách (chat.js: stats.hlas.s)
+  // vlastní model zákazníka (hostovaná, 14. 10. 2026): jeho volání (v.vlastni) = 0 kreditů, tokeny v logu zůstávají;
+  // přepis hlasovky a vize (naše AI) se v témže tahu účtují dál (audit 25. 10. 2026)
   if (Array.isArray(stats.volani) && stats.volani.length) return prepis + stats.volani.reduce((a, v) => a + kredityVolani(v), 0);
+  if (cfg && cfg.vlastni) return prepis;
   return prepis + kreditu(stats.in, stats.out, stats.cached);
 }
 // kredity ze součtů tokenů za cenu AKI (záloha, starší řádky bez rozpadu, testy)

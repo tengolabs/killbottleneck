@@ -178,7 +178,8 @@ function posliOpenAI(cfg, base, bohate, hole, limit, timeout) {
     body: JSON.stringify(payload),
     headers: {
       "Content-Type": "application/json",
-      "Authorization": "Bearer " + ((cfg && cfg.token) || ""),
+      // bez klíče hlavičku neposílat (prázdné „Bearer “ není klíč — vlastní llama-server zákazníka bez --api-key, 14. 10. 2026)
+      ...((cfg && cfg.token) ? { "Authorization": "Bearer " + cfg.token } : {}),
       // OpenRouter tímhle pozná, odkud volání je; ostatní brány to ignorují
       "HTTP-Referer": "https://killbottleneck.com",
       "X-Title": "killBottleneck",
@@ -420,7 +421,7 @@ function llmChatTools(cfg, zpravyIn, nastroje, opts) {
     const hole = { model: model, messages: messages, stream: false, max_completion_tokens: limit };
     // prázdný seznam nástrojů (poslední kolo smyčky, pokus „dopověz textem“) OpenAI odmítá 400 → vůbec neposílat
     if (tools.length) { bohate.tools = tools; hole.tools = tools; }
-    const res = posliOpenAI(cfg, base, bohate, hole, limit, 300);
+    const res = posliOpenAI(cfg, base, bohate, hole, limit, (cfg && Number(cfg.timeout)) || 300);
     if (res.statusCode < 200 || res.statusCode >= 300) throw chybaSluzby(res, lang, !!(cfg && cfg.podrobneChyby));
     const volba = (res.json && res.json.choices && res.json.choices[0]) || null;
     const m = (volba && volba.message) || {};

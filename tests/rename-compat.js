@@ -75,7 +75,10 @@ async function start(inst, env) {
     console.log('== ochrana hostované instance platí i po staru ==');
     const auth = await api(S, 'POST', '/api/collections/users/auth-with-password', { body: { identity: 'admin@example.com', password: PW } });
     const token = auth.json.token;
-    const ssrf = await api(S, 'POST', '/api/flowmap/ai-test', { token, body: { provider: 'custom', url: 'http://169.254.169.254/' } });
+    // od v0.89 je /ai-test na hostované instanci zamčený (403) — ochrana privátních cílů žije v testu vlastního modelu
+    const zamek = await api(S, 'POST', '/api/flowmap/ai-test', { token, body: { provider: 'custom', url: 'http://169.254.169.254/' } });
+    expect(zamek.status === 403, `FLOWMAP_HOSTED=1 zamyká AI nastavení provozovatele i po staru (${zamek.status})`);
+    const ssrf = await api(S, 'POST', '/api/flowmap/ai-vlastni/test', { token, body: { url: 'http://169.254.169.254/', model: 'm' } });
     expect(/privátní|private/i.test(ssrf.json?.message || ''), 'FLOWMAP_HOSTED=1 pořád blokuje privátní cíle');
 
     console.log('== vydávané tokeny mají nový tvar, staré ale platí ==');

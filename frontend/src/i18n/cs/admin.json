@@ -36,7 +36,8 @@
     "envNotice": "Provozovatel nastavil strop {{kvota}} kreditů na týden. Vlastní hodnota ho může jen snížit, ne zvednout.",
     "save": "Uložit",
     "saved": "Uloženo",
-    "loadError": "Spotřebu se nepodařilo načíst."
+    "loadError": "Spotřebu se nepodařilo načíst.",
+    "vlastniNote": "Asistent právě běží na vašem vlastním modelu — tahy chatu se do kvóty nepočítají (0 kreditů); fotky a hlasovky přes naši AI ano."
   },
   "aiVision": {
     "label": "Asistent čte obrázky (fotky poznámek, snímky obrazovky)",
@@ -130,5 +131,32 @@
     "membersCount": "vybraní členové: {{count}} (upravit)",
     "delete": "Smazat i s událostmi (nejde vrátit)",
     "deleteConfirm": "opravdu smazat ({{count}} událostí)"
+  },
+  "vlastniAi": {
+    "heading": "Vlastní model nebo API klíč",
+    "description": "Asistent může místo naší AI myslet na vašem vlastním modelu — na počítači s grafickou kartou u vás doma či ve firmě, nebo u poskytovatele, kterého si vyberete (OpenAI, OpenRouter a další). Stačí veřejná adresa OpenAI-kompatibilního API (obvykle končí /v1), název modelu a případně klíč. Tahy na vlastním modelu se do týdenní kvóty nepočítají.",
+    "switchOn": "Asistent používá váš vlastní model",
+    "switchOff": "Asistent používá naši AI (vlastní model vypnutý)",
+    "active": "běží",
+    "urlLabel": "Adresa API (veřejná, obvykle končí /v1)",
+    "modelLabel": "Model (přesný název u vaší služby)",
+    "tokenLabel": "API klíč (nepovinné — podle vaší služby)",
+    "tokenSetNote": "(uložen ✓ — vyplňte jen při změně)",
+    "plainHttp": "Adresa bez šifrování (http://) — klíč i obsah rozhovorů půjdou po internetu čitelně. Použijte https:// (tunel ho dává zdarma).",
+    "advancedShow": "Pokročilé: pole navíc pro model",
+    "advancedHide": "Skrýt pokročilé",
+    "extraLabel": "Pole navíc do každého volání (JSON) — např. vypnutí přemýšlení u llama-serveru",
+    "dataWhere": "<b>Kam data odcházejí:</b> text rozhovorů asistenta a výtahy z map jdou na adresu, kterou zadáte — mimo naše zpracování v EU, za službu ručíte vy. Fotky pro asistenta a přepis hlasu zůstávají na naší AI a čerpají kvótu.",
+    "tunnelHelp": "<b>Počítač doma:</b> nikdy neotvírejte port rovnou do internetu. Dejte před model tunel (Cloudflare Tunnel, Tailscale Funnel) a zapněte u modelu klíč (<c>llama-server --api-key</c>). Adresy v místní síti (192.168.…, 10.…) ani adresy Tailscale (100.x) odsud nejdou — box je vidět nesmí. Odpověď musí přijít do 100 s.",
+    "noKey": "Instance nemá šifrovací klíč, takže váš API klíč nejde bezpečně uložit. Napište podpoře — do té doby zůstává naše AI.",
+    "loadFailed": "Nastavení vlastního modelu se nepodařilo načíst. Obnovte stránku — Uložit je zamčené, aby se uložené údaje nepřepsaly prázdnými.",
+    "tokenUnreadable": "Uložený API klíč nejde přečíst (změnil se šifrovací klíč instance). Asistent vlastní model nepoužije, dokud klíč nezadáte znovu a neuložíte.",
+    "save": "Uložit",
+    "saved": "Uloženo",
+    "saveFailed": "Uložení se nepovedlo.",
+    "test": "Otestovat připojení",
+    "testFailed": "Test se nepodařilo spustit.",
+    "verified": "Ověřeno {{when}} — model odpověděl.",
+    "notTested": "Zatím neověřeno — klikněte na Otestovat připojení."
   }
 }

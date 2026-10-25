@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { ArrowLeft, Shield, UserPlus, Trash2, KeyRound, Loader2, ChevronDown, Mail, ShieldCheck, Clock, Map as MapIcon, Building2, Target, Check, Copy } from 'lucide-react';
 import AiSettingsSection from '@/components/shared/AiSettingsSection';
+import VlastniModelSekce from '@/components/shared/VlastniModelSekce';
 import OrgStructureSection from '@/components/shared/OrgStructureSection';
 import InstanceSkinSection from '@/components/shared/InstanceSkinSection';
 import KalendareSection from '@/components/shared/KalendareSection';
@@ -67,10 +68,11 @@ export default function UserAdmin() {
   // konfigurace, která zákazníkovi nepatří, je horší než chvilka bez ní.
   const [hosted, setHosted] = useState(null);
   const [chatPanel, setChatPanel] = useState(false);   // AI asistent nakonfigurovaný → sekce AI kredity dává smysl
+  const [chatVlastni, setChatVlastni] = useState(false); // asistent jede na vlastním modelu zákazníka (hostovaná) → kredity 0
   const [billingComplete, setBillingComplete] = useState(false);
   useEffect(() => {
     loadKbConfig()
-      .then((cfg) => { setHosted(!!(cfg && cfg.hosted)); setChatPanel(!!(cfg && Array.isArray(cfg.ai_modes) && cfg.ai_modes.includes('chat_panel'))); })
+      .then((cfg) => { setHosted(!!(cfg && cfg.hosted)); setChatPanel(!!(cfg && Array.isArray(cfg.ai_modes) && cfg.ai_modes.includes('chat_panel'))); setChatVlastni(!!(cfg && cfg.chat_vlastni)); })
       .catch(() => setHosted(false));
   }, []);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -616,9 +618,11 @@ export default function UserAdmin() {
         {!jenStruktura && <CustomDomainSection />}
 
         {!jenStruktura && hosted === false && <AiSettingsSection />}
+        {/* hostovaná instance: naši AI nastavuje provozovatel, zákazník si může připojit VLASTNÍ model (14. 10. 2026) */}
+        {!jenStruktura && hosted === true && <VlastniModelSekce onChange={setChatVlastni} />}
 
         {/* AI kredity: spotřeba i kvóta se týkají zákazníka i na hostingu (tarif); bez asistenta by ukázala jen nuly */}
-        {!jenStruktura && chatPanel && <AiKredityKarta />}
+        {!jenStruktura && chatPanel && <AiKredityKarta vlastniModel={chatVlastni} />}
 
         {!jenStruktura && <InstanceSkinSection />}
       </div>

@@ -36,7 +36,8 @@
     "envNotice": "The operator set a cap of {{kvota}} credits per week. Your own value can only lower it, not raise it.",
     "save": "Save",
     "saved": "Saved",
-    "loadError": "Could not load the usage."
+    "loadError": "Could not load the usage.",
+    "vlastniNote": "The assistant is currently running on your own model — chat turns do not count towards the quota (0 credits); photos and voice notes via our AI do."
   },
   "aiVision": {
     "label": "The assistant reads images (photos of notes, screenshots)",
@@ -130,5 +131,32 @@
     "membersCount": "selected members: {{count}} (edit)",
     "delete": "Delete with its events (cannot be undone)",
     "deleteConfirm": "really delete ({{count}} events)"
+  },
+  "vlastniAi": {
+    "heading": "Own model or API key",
+    "description": "Instead of our AI, the assistant can think on your own model — on a PC with a graphics card at home or at work, or at a provider of your choice (OpenAI, OpenRouter and others). All it needs is a public address of an OpenAI-compatible API (usually ending in /v1), the model name and, if required, a key. Turns on your own model do not count towards the weekly quota.",
+    "switchOn": "The assistant uses your own model",
+    "switchOff": "The assistant uses our AI (own model off)",
+    "active": "running",
+    "urlLabel": "API address (public, usually ends in /v1)",
+    "modelLabel": "Model (exact name at your service)",
+    "tokenLabel": "API key (optional — depends on your service)",
+    "tokenSetNote": "(saved ✓ — fill in only to change it)",
+    "plainHttp": "Unencrypted address (http://) — the key and your conversations will travel the internet in plain text. Use https:// (a tunnel gives it for free).",
+    "advancedShow": "Advanced: extra fields for the model",
+    "advancedHide": "Hide advanced",
+    "extraLabel": "Extra fields sent with every call (JSON) — e.g. turning thinking off in llama-server",
+    "dataWhere": "<b>Where the data goes:</b> the assistant's conversations and map extracts are sent to the address you enter — outside our EU processing, and you are responsible for that service. Photos for the assistant and voice transcription stay on our AI and use the quota.",
+    "tunnelHelp": "<b>A PC at home:</b> never open a port straight to the internet. Put a tunnel in front of the model (Cloudflare Tunnel, Tailscale Funnel) and enable a key on the model (<c>llama-server --api-key</c>). Local network addresses (192.168.…, 10.…) and Tailscale addresses (100.x) cannot be used from here — the server must not see them. The reply has to arrive within 100 s.",
+    "noKey": "This instance has no encryption key, so your API key cannot be stored safely. Contact support — until then our AI stays on.",
+    "loadFailed": "The own-model settings could not be loaded. Reload the page — Save is locked so the stored values are not overwritten with empty ones.",
+    "tokenUnreadable": "The stored API key cannot be read (the instance encryption key changed). The assistant will not use the own model until you enter the key again and save.",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Saving failed.",
+    "test": "Test connection",
+    "testFailed": "The test could not be started.",
+    "verified": "Verified {{when}} — the model replied.",
+    "notTested": "Not verified yet — click Test connection."
   }
 }

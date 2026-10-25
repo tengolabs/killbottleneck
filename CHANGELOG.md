@@ -9,6 +9,43 @@ below before you jump several versions.
 
 ---
 
+## v0.89-beta — 2026-10-25
+
+**Own model in the cloud: a hosted instance can run the assistant on the customer's own OpenAI-compatible service (home GPU behind a tunnel, own server or a provider of their choice); AI settings of the operator are now locked server-side**
+
+- **Organization settings → Own model (hosted instances only).** The administrator enters the address of an
+  OpenAI-compatible API (usually ending in `/v1`), the model name and, if needed, a key, tests the connection and switches
+  the assistant over. Turns on the own model **do not count towards the weekly quota** (logged with `zdroj=vlastni`,
+  0 credits); the hourly per-user brake stays. Photos for the assistant and voice transcription keep running on the
+  operator's AI and keep using the quota. When the own model is down the assistant says so (`502`, `code: ai_vlastni`)
+  and never silently falls back to the operator's AI. New routes `GET/POST /api/kb/ai-vlastni` and
+  `POST /api/kb/ai-vlastni/test` (administrator only, `404` on self-hosted instances); `/api/kb/config` carries
+  `chat_vlastni`. Guide: [Own model in the cloud](https://killbottleneck.com/tutorials/own-model-in-cloud).
+- **Private-address guard now judges IPv6 by value, not by spelling** (self-hosted AI settings too): `[::ffff:7f00:1]`,
+  `[0:0:0:0:0:0:0:1]`, `[::1%25lo]`, NAT64 `64:ff9b::/96`, 6to4 and link-local forms are rejected like `127.0.0.1`
+  (they used to pass). With an own model, turns carrying a photo or a voice note still use the weekly quota (vision and
+  transcription run on the operator's AI); only the text calls to the customer's model are free. Extra fields of the own
+  model cannot override `messages`, `tools`, `model` or `stream`. A stored key that can no longer be decrypted (changed
+  instance key) stops the assistant with a clear message instead of calling the model without a key.
+- **The key never leaves the server.** It is stored encrypted (AES, `KB_ENCRYPTION_KEY` of the instance), `GET` returns
+  only `token_set`, and it is sent only to the address it was saved for: a connection test against another origin goes
+  without it, and changing the address to another origin without a new key deletes the old one. Private, LAN and
+  Tailscale (`100.x`) addresses are refused on hosted instances — the model needs a public address (tunnel).
+- **Security (hosted instances):** `GET/POST /api/kb/ai-settings` and `POST /api/kb/ai-test` now return `403` on a hosted
+  instance — until now only the UI hid them, so a customer administrator could redirect the operator's AI through the
+  REST API. `POST /api/kb/ai-test` adds the stored token only when the tested address has the same origin as the saved
+  one (before, the stored token went to whatever address the request named), and the first save of AI settings copies
+  the token from `.env` only when the address stays at the same service. The chat re-checks a database-stored AI address
+  against the private-network guard right before every call, like `/advisor` already did.
+- `llm.js` sends `Authorization` only when a token is set (an own `llama-server` without `--api-key` got an empty
+  `Bearer ` header before).
+
+**Upgrade notes:** migrations add the `ai_vlastni` collection and `ai_chat_log.zdroj`. Hosted instances need
+`KB_ENCRYPTION_KEY` (exactly 32 characters; `tenant-add.sh` generates it once and keeps it) — without it the Own model
+section says so and stays off. Self-hosted instances are not affected: they keep the AI tile in Administration and the
+new section does not appear. Hosted instances that had saved `ai_settings` through the API lose that path (`403`); the
+assistant on hosted instances has always read `KB_CHAT_*` from the environment, so nothing changes for them.
+
 ## v0.88-beta — 2026-10-25
 
 **Pages: the assistant (or a connected agent) writes a single-file HTML page — presentation, overview, small app — and you share it by a secret link or with the team**

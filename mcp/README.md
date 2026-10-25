@@ -11,7 +11,7 @@ s instancí přes HTTP(S) s vaším API klíčem.
 
 *A thin stdio MCP server that connects AI assistants (Claude Desktop, Claude Code, …)
 to your killBottleneck instance via its authenticated `/api/kb/v1/*` REST API. Runs
-locally next to the assistant; works identically for self-hosted and hosted instances.*
+locally next to the assistant; works identically for free self-hosted and hosted instances.*
 
 ## Nejrychleji: jeden řádek do agenta
 

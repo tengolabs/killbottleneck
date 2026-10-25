@@ -836,6 +836,15 @@ function extraJson(v) {
   try { const o = JSON.parse(String(v)); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch (err) { return null; }
 }
 
+// Pole navíc zákazníka nesmí přepsat to, co tvoří samotné volání (zprávy, nástroje, model, stream — rozbilo by
+// parsování odpovědi) ani sahat na prototyp. Vrací název prvního zakázaného klíče, jinak "".
+const EXTRA_ZAKAZANE = ["model", "messages", "tools", "tool_choice", "stream", "n", "response_format", "__proto__", "constructor", "prototype"];
+function extraZakazane(o) {
+  if (!o || typeof o !== "object") return "";
+  for (const k of Object.keys(o)) if (EXTRA_ZAKAZANE.indexOf(k) >= 0) return k;
+  return "";
+}
+
 // AI konfigurace: záznam v ai_settings (administrace) má přednost, fallback .env.
 // Vrací i source ("db"/"env"), ať administrace umí říct, odkud config pochází.
 // `extra` (KB_AI_OPENAI_EXTRA) platí pro OBĚ větve: administrace pole navíc
@@ -869,6 +878,73 @@ function aiConfig(app) {
     transcribeUrl: env("AI_TRANSCRIBE_URL") || "",
     transcribeModel: env("AI_TRANSCRIBE_MODEL") || "",
     extra: extraJson(env("AI_OPENAI_EXTRA")),
+  };
+}
+
+// Původ adresy (schéma + host[:port]). Uložený klíč smí odejít JEN na adresu téhož původu, jaký má
+// uložená služba — jinak si správce (nebo XSS v administraci) vytáhne klíč testem připojení na cizí adresu.
+function puvodUrl(u) { const m = String(u || "").match(/^(https?:\/\/[^/?#]+)/i); return m ? m[1].toLowerCase() : ""; }
+
+// ---------- vlastní model zákazníka v cloudu (14. 10. 2026) ----------
+// Hostovaný zákazník smí asistenta přepnout na VLASTNÍ OpenAI-kompatibilní službu (domácí GPU za tunelem,
+// vlastní server, cizí poskytovatel — rozhodnutí Richarda 14. 10. 2026: jakékoli OpenAI-kompatibilní API,
+// tahy bez kvóty, všechny tarify, jen textový chat). Žije v kolekci ai_vlastni (jediný záznam), čte ji
+// JEN chatAiConfig a JEN na hostované instanci — obecná AI (rádce, objednávky, /v1/status přes bránu) se
+// nemění a self-host má svou plnou dlaždici AI (ai_settings).
+// Klíč zákazníka je v DB ŠIFROVANÝ (AES, $security.encrypt) klíčem instance KB_ENCRYPTION_KEY (32 znaků,
+// generuje tenant-add.sh): databáze tenanta jde do záloh mimo box. Bez klíče instance se vlastní model
+// nezapne (fail-closed) — admin to v administraci uvidí jako srozumitelnou chybu, ne jako tichý pád.
+const SIFRA_PREFIX = "enc:";
+function sifrovaciKlic() { const k = String(env("ENCRYPTION_KEY") || ""); return k.length === 32 ? k : ""; }
+function sifrujTajemstvi(plain) {
+  const k = sifrovaciKlic();
+  if (!k) throw new Error("KB_ENCRYPTION_KEY missing or not 32 chars");
+  return SIFRA_PREFIX + $security.encrypt(String(plain), k);
+}
+function odsifrujTajemstvi(cipher) {
+  const s = String(cipher || "");
+  if (!s || s.indexOf(SIFRA_PREFIX) !== 0) return "";
+  const k = sifrovaciKlic();
+  if (!k) return "";
+  try { return $security.decrypt(s.slice(SIFRA_PREFIX.length), k); } catch (err) { return ""; }
+}
+function vlastniAiZaznam(app) {
+  try { return app.findFirstRecordByFilter("ai_vlastni", "id != ''"); } catch (err) { return null; }
+}
+// Konfigurace chatu na vlastním modelu; null = vypnuto / není hostovaná / chybí klíč instance / neúplné.
+function vlastniAiConfig(app) {
+  if (env("HOSTED") !== "1") return null;
+  const rec = vlastniAiZaznam(app);
+  if (!rec || !rec.getBool("enabled") || !sifrovaciKlic()) return null;
+  const url = rec.getString("url"), model = rec.getString("model");
+  if (!url || !model) return null;
+  const sifra = rec.getString("token_enc");
+  const token = odsifrujTajemstvi(sifra);
+  // uložený klíč, který nejde přečíst (změněný KB_ENCRYPTION_KEY) — NEposílat tah bez klíče ani tiše nepřepnout
+  // na naši AI: chat vrátí 503 s hláškou „zadejte klíč znovu“ (audit 25. 10. 2026)
+  return { source: "vlastni", vlastni: true, provider: "openai", url: url, model: model,
+    token: token, tokenNecitelny: !!(sifra && !token), extra: extraJson(rec.getString("extra")) };
+}
+// otisk otestované dvojice adresa|model — „ověřeno“ platí, dokud se nezmění (klíč ani pole navíc test neruší)
+function vlastniOtisk(url, model) { return [String(url || ""), String(model || "")].join("|"); }
+
+// Podoba pro administraci — bez klíče (token_set), i stav: šifrovací klíč instance, http bez TLS (klíč by šel po síti čitelně)
+function vlastniAiDto(app) {
+  const rec = vlastniAiZaznam(app);
+  const url = rec ? rec.getString("url") : "";
+  return {
+    enabled: !!(rec && rec.getBool("enabled")),
+    url: url,
+    model: rec ? rec.getString("model") : "",
+    extra: rec ? rec.getString("extra") : "",
+    token_set: !!(rec && rec.getString("token_enc")),
+    token_unreadable: !!(rec && rec.getString("token_enc") && !odsifrujTajemstvi(rec.getString("token_enc"))),
+    ok: !!(rec && rec.getString("tested_otisk") && rec.getString("tested_otisk") === vlastniOtisk(url, rec.getString("model"))),
+    tested_at: rec ? String(rec.getString("tested_at") || "") : "",
+    key_ready: !!sifrovaciKlic(),
+    plain_http: /^http:\/\//i.test(url),
+    // běží z toho asistent právě teď? (enabled + klíč instance + úplné údaje + čitelný klíč)
+    active: (() => { const c = vlastniAiConfig(app); return !!c && !c.tokenNecitelny; })(),
   };
 }
 
@@ -3734,12 +3810,44 @@ function ipv4Privatni(host) {
 // IPv6 zápisy mířící do vlastní sítě: loopback, unique-local, link-local a IPv4
 // zabalená do IPv6. Vytaženo z isPrivateHost ven, ať se dá pustit i na adresy,
 // které teprve vypadly z resolveru.
+// IPv6 literál → 8 čísel (0–65535); null = není platný zápis. Zóna (`%eth0`, `%25lo`) se odřízne — adresa
+// s rozhraním je z principu místní. Vnořená tečkovaná IPv4 (`::ffff:127.0.0.1`) se převede na dvě skupiny.
+// Guard dřív porovnával jen ZÁPIS (`::1`, tečkovaná mapovaná) — `[::ffff:7f00:1]` (= 127.0.0.1),
+// `[0:0:0:0:0:0:0:1]`, `[::1%25lo]` nebo `[::ffff:ac11:1]` (= 172.17.0.1, hostitel) prošly a chat je pak volal
+// (nález auditu 25. 10. 2026, ověřeno dosažením ollamy hostitele z kontejneru). Rozhoduje se podle HODNOTY.
+function ipv6Skupiny(host) {
+  let h = String(host || "").toLowerCase().split("%")[0];
+  const m4 = h.match(/^(.*:)(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m4) {
+    const o = m4.slice(2).map(Number);
+    if (o.some((x) => x > 255)) return null;
+    h = m4[1] + ((o[0] << 8) | o[1]).toString(16) + ":" + ((o[2] << 8) | o[3]).toString(16);
+  }
+  if (!/^[0-9a-f:]+$/.test(h)) return null;
+  const casti = h.split("::");
+  if (casti.length > 2) return null;
+  const hlava = casti[0] ? casti[0].split(":") : [];
+  const ocas = casti.length === 2 && casti[1] ? casti[1].split(":") : [];
+  if (casti.length === 1 && hlava.length !== 8) return null;
+  if (hlava.length + ocas.length > (casti.length === 2 ? 7 : 8)) return null;
+  const vsechny = hlava.concat(new Array(8 - hlava.length - ocas.length).fill("0"), ocas);
+  const cisla = vsechny.map((x) => (/^[0-9a-f]{1,4}$/.test(x) ? parseInt(x, 16) : NaN));
+  return cisla.some((x) => isNaN(x)) ? null : cisla;
+}
 function ipv6Privatni(host) {
-  if (host === "::1" || host === "::") return true;
-  if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;   // fc00::/7
-  if (/^fe[89ab][0-9a-f]:/.test(host)) return true;   // fe80::/10
-  const mapped = host.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  if (mapped) return ipv4Privatni(mapped[1]);
+  const g = ipv6Skupiny(host);
+  if (!g) return true; // nerozpoznaný zápis neprojde (fail-closed) — veřejná služba má jméno
+  const v4 = (a, b) => [(a >> 8) & 255, a & 255, (b >> 8) & 255, b & 255].join(".");
+  const nuly = (n) => g.slice(0, n).every((x) => x === 0);
+  if (nuly(7) && g[7] <= 1) return true;                                           // :: a ::1
+  if (nuly(5) && g[5] === 0xffff) return ipv4Privatni(v4(g[6], g[7]));            // ::ffff:a.b.c.d (mapovaná)
+  if (nuly(4) && g[4] === 0xffff && g[5] === 0) return ipv4Privatni(v4(g[6], g[7])); // ::ffff:0:a.b.c.d (SIIT)
+  if (nuly(6)) return ipv4Privatni(v4(g[6], g[7]));                                // ::a.b.c.d (kompatibilní, zastaralé)
+  if (g[0] === 0x64 && g[1] === 0xff9b) return g[2] !== 0 || !nuly(6) ? true : ipv4Privatni(v4(g[6], g[7])); // NAT64 64:ff9b::/96 (+ místní 64:ff9b:1::/48)
+  if (g[0] === 0x2002) return ipv4Privatni(v4(g[1], g[2]));                        // 6to4 2002:a.b.c.d::
+  if ((g[0] & 0xfe00) === 0xfc00) return true;                                     // fc00::/7 (ULA)
+  if ((g[0] & 0xffc0) === 0xfe80) return true;                                     // fe80::/10 (link-local)
+  if ((g[0] & 0xff00) === 0xff00) return true;                                     // multicast
   return false;
 }
 
@@ -7653,7 +7761,7 @@ module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

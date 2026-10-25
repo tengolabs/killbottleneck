@@ -2060,13 +2060,13 @@ kbRoute("POST", "/chat", (e) => {
     const { zkontrolujHlas } = require(`${__hooks}/prepis.js`);
     try { zkontrolujHlas($app, body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
   }
-  const b = chatBrzda(e, L, body);
+  const b = chatBrzda(e, L, body, c.cfg);
   if (b) return e.json(b.status, b.body);
   let vysledek;
   try {
     vysledek = chatRun($app, e.auth, body, c.cfg, L);
   } catch (err) {
-    const ch = chatChyba(e, err, L);
+    const ch = chatChyba(e, err, L, c.cfg);
     return e.json(ch.status, ch.body);
   }
   return e.json(200, { chat: vysledek });
@@ -2080,13 +2080,13 @@ kbRoute("POST", "/chat/oprav", (e) => {
   const body = e.requestInfo().body || {};
   const c = chatCfg(e, body, L);
   if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
-  const b = chatBrzda(e, L);
+  const b = chatBrzda(e, L, null, c.cfg);
   if (b) return e.json(b.status, b.body);
   let vysledek;
   try {
     vysledek = chatOprav($app, e.auth, body, c.cfg, L);
   } catch (err) {
-    const ch = chatChyba(e, err, L);
+    const ch = chatChyba(e, err, L, c.cfg);
     return e.json(ch.status, ch.body);
   }
   return e.json(200, { chat: vysledek });
@@ -2099,13 +2099,13 @@ kbRoute("POST", "/chat/potvrdit", (e) => {
   const body = e.requestInfo().body || {};
   const c = chatCfg(e, body, L);
   if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
-  const b = chatBrzda(e, L);
+  const b = chatBrzda(e, L, null, c.cfg);
   if (b) return e.json(b.status, b.body);
   let vysledek;
   try {
     vysledek = chatPotvrdit($app, e.auth, body, c.cfg, L);
   } catch (err) {
-    const ch = chatChyba(e, err, L);
+    const ch = chatChyba(e, err, L, c.cfg);
     return e.json(ch.status, ch.body);
   }
   return e.json(200, { chat: vysledek });
@@ -2784,6 +2784,8 @@ kbRoute("GET", "/config", (e) => {
     // zákazník — frontend podle toho schová sekci AI ve správě organizace
     // (Richard 6. 8. 2026: „v cloud verzi je AI nadefinované, nezobrazovat").
     hosted: env("HOSTED") === "1",
+    // asistent jede na vlastním modelu zákazníka (hostovaná, 14. 10. 2026) — jen ano/ne, adresa ani model ven nejdou
+    chat_vlastni: (() => { try { const { vlastniAiConfig } = require(`${__hooks}/helpers.js`); return !!vlastniAiConfig($app); } catch (err) { return false; } })(),
     // KB Cloud Pro / AI Agent: adresa portálu serveru (agent Hermes, stav služeb) —
     // plní provisioning (KB_PORTAL_URL, relativně „/portal", ať platí na slug doméně
     // i na vlastní doméně zákazníka). Bez ní se položka v menu neukáže.
@@ -3561,6 +3563,9 @@ kbRoute("GET", "/ai-settings", (e) => {
     return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
   }
   const { aiConfig, env } = require(`${__hooks}/helpers.js`);
+  // hostovaná instance: AI nastavuje provozovatel (do 14. 10. 2026 to hlídal JEN frontend — admin zákazníka
+  // mohl přes REST přesměrovat rádce i souhrny a GET mu vracel adresu provozovatele); vlastní model má /ai-vlastni
+  if (env("HOSTED") === "1") return e.json(403, { error: t(L, "err.aiSettingsHosted") });
   const cfg = aiConfig($app);
   return e.json(200, {
     provider: cfg.provider,
@@ -3585,6 +3590,8 @@ kbRoute("POST", "/ai-settings", (e) => {
   if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
   }
+  const { aiHostBlocked, env, puvodUrl } = require(`${__hooks}/helpers.js`);
+  if (env("HOSTED") === "1") return e.json(403, { error: t(L, "err.aiSettingsHosted") });
   const info = e.requestInfo().body || {};
   const provider = String(info.provider || "none").toLowerCase();
   if (!["none", "ollama", "api", "custom", "openai"].includes(provider)) {
@@ -3592,7 +3599,6 @@ kbRoute("POST", "/ai-settings", (e) => {
   }
   // Uloženou adresu volá i cron sumářů a generování map — kdyby prošla privátní,
   // stačilo by ji uložit a číst návratové stavy jinudy než přes test připojení.
-  const { aiHostBlocked, env } = require(`${__hooks}/helpers.js`);
   const wantUrl = String(info.url || "").trim();
   const wantTranscribe = String(info.transcribe_url || "").trim();
   if (provider !== "none" && (aiHostBlocked(wantUrl) || (wantTranscribe && aiHostBlocked(wantTranscribe)))) {
@@ -3621,9 +3627,10 @@ kbRoute("POST", "/ai-settings", (e) => {
     rec.set("token", "");
   } else if (info.token) {
     rec.set("token", String(info.token).trim());
-  } else if (isNew) {
-    // první uložení: převzít token z .env — prohlížeč ho nikdy nedostane,
-    // takže by se jinak konfigurací z administrace ztratil
+  } else if (isNew && puvodUrl(rec.getString("url")) && puvodUrl(rec.getString("url")) === puvodUrl(env("AI_URL"))) {
+    // první uložení: převzít token z .env — prohlížeč ho nikdy nedostane, takže by se jinak konfigurací
+    // z administrace ztratil. JEN když adresa zůstává u téže služby: s cizí adresou by token z .env
+    // odešel na cizí server (nález 14. 10. 2026).
     rec.set("token", env("AI_TOKEN") || "");
   }
   const zmenaObrazku = otiskObrazku() !== predtim;
@@ -3644,6 +3651,108 @@ kbRoute("POST", "/ai-settings", (e) => {
       : t(L, "err.visionTestFail", { model: v.model, text: v.text || "—" });
   }
   return e.json(200, out);
+}, $apis.requireAuth());
+
+// ---------- vlastní model zákazníka (hostovaná instance, 14. 10. 2026) ----------
+// Zákazník cloudu si asistenta přepne na VLASTNÍ OpenAI-kompatibilní službu (domácí GPU za tunelem, vlastní
+// server, cizí poskytovatel). Jen hostovaná instance (self-host má plnou dlaždici AI) a jen správce.
+// Klíč: nikdy do prohlížeče (token_set), v DB šifrovaný klíčem instance, odchází JEN na uloženou adresu.
+// Privátní/LAN/Tailscale adresy odmítá aiHostBlocked (sdílený box = sousedé) — zákazník potřebuje veřejnou adresu.
+kbRoute("GET", "/ai-vlastni", (e) => {
+  const { jeAdmin, env, vlastniAiDto } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  if (env("HOSTED") !== "1") return e.json(404, { error: "Not found." });
+  if (!jeAdmin(e.auth)) return e.json(403, { error: t(userLang(e.auth), "err.aiSettingsAdminOnly") });
+  return e.json(200, vlastniAiDto($app));
+}, $apis.requireAuth());
+
+kbRoute("POST", "/ai-vlastni", (e) => {
+  const H = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (H.env("HOSTED") !== "1") return e.json(404, { error: "Not found." });
+  if (!H.jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
+  const info = e.requestInfo().body || {};
+  const enabled = !!info.enabled;
+  const url = String(info.url || "").trim().slice(0, 500);
+  const model = String(info.model || "").trim().slice(0, 120);
+  const extraRaw = info.extra === undefined ? undefined : String(info.extra || "").trim().slice(0, 2000);
+  if (extraRaw && !H.extraJson(extraRaw)) return e.json(400, { error: t(L, "err.aiVlastniExtra") });
+  if (extraRaw && H.extraZakazane(H.extraJson(extraRaw))) return e.json(400, { error: t(L, "err.aiVlastniExtraKeys") });
+  if (enabled || url) {
+    if (!/^https?:\/\/\S+$/i.test(url)) return e.json(400, { error: t(L, "err.aiVlastniUrl") });
+    // uloženou adresu volá každý tah chatu — privátní cíl nesmí ani do DB (jinak skener sítě boxu)
+    if (H.aiHostBlocked(url)) return e.json(400, { error: t(L, "err.aiHostPrivate") });
+  }
+  if (enabled && !model) return e.json(400, { error: t(L, "err.openaiModelMissing") });
+  if ((enabled || info.token) && !H.sifrovaciKlic()) return e.json(400, { error: t(L, "err.aiVlastniNoKey") });
+  let rec = H.vlastniAiZaznam($app);
+  if (!rec) rec = new Record($app.findCollectionByNameOrId("ai_vlastni"));
+  const stareUrl = rec.getString("url");
+  rec.set("url", url);
+  rec.set("model", model);
+  if (extraRaw !== undefined) rec.set("extra", extraRaw);
+  // klíč: prázdný v požadavku = ponechat (správce ho nemusí přepisovat); clear_token = smazat;
+  // adresa jinam (jiný původ) bez nového klíče = starý klíč SMAZAT — klíč patří k adrese, na cizí nesmí odejít
+  if (info.clear_token) rec.set("token_enc", "");
+  else if (info.token) rec.set("token_enc", H.sifrujTajemstvi(String(info.token).trim().slice(0, 500)));
+  else if (stareUrl && H.puvodUrl(stareUrl) !== H.puvodUrl(url)) rec.set("token_enc", "");
+  // „ověřeno“ se neruší ručně: DTO porovná tested_otisk s uloženou dvojicí adresa|model (test před uložením tak platí)
+  rec.set("enabled", enabled);
+  $app.save(rec);
+  $app.store().remove("aiModesCache");
+  return e.json(200, Object.assign({ success: true }, H.vlastniAiDto($app)));
+}, $apis.requireAuth());
+
+// test připojení k vlastnímu modelu — hodnoty z formuláře (neuložené); prázdný klíč = uložený, ale JEN pro
+// adresu téhož původu jako uložená (jinak by test vynášel klíč na cizí adresu)
+kbRoute("POST", "/ai-vlastni/test", (e) => {
+  const H = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (H.env("HOSTED") !== "1") return e.json(404, { error: "Not found." });
+  if (!H.jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
+  const info = e.requestInfo().body || {};
+  const rec = H.vlastniAiZaznam($app);
+  const url = String(info.url || "").trim() || (rec ? rec.getString("url") : "");
+  const model = String(info.model || "").trim() || (rec ? rec.getString("model") : "");
+  if (!url) return e.json(200, { ok: false, message: t(L, "err.missingUrl") });
+  if (!/^https?:\/\/\S+$/i.test(url)) return e.json(200, { ok: false, message: t(L, "err.aiVlastniUrl") });
+  if (H.aiHostBlocked(url)) return e.json(200, { ok: false, message: t(L, "err.aiHostPrivate") });
+  if (!model) return e.json(200, { ok: false, message: t(L, "err.openaiModelMissing") });
+  const ulozenyKlic = rec && H.puvodUrl(url) && H.puvodUrl(url) === H.puvodUrl(rec.getString("url")) ? H.odsifrujTajemstvi(rec.getString("token_enc")) : "";
+  const token = String(info.token || "").trim() || ulozenyKlic;
+  const extra = H.extraJson(info.extra !== undefined ? info.extra : (rec ? rec.getString("extra") : "")) || {};
+  if (H.extraZakazane(extra)) return e.json(200, { ok: false, message: t(L, "err.aiVlastniExtraKeys") });
+  const { openaiBase } = require(`${__hooks}/llm.js`);
+  const base = openaiBase(url);
+  const hlavicky = Object.assign({ "Content-Type": "application/json" }, token ? { "Authorization": "Bearer " + token } : {});
+  try {
+    const res = $http.send({ url: base + "/models", method: "GET", headers: hlavicky, timeout: 8 });
+    if (res.statusCode === 401 || res.statusCode === 403) return e.json(200, { ok: false, message: t(L, "err.serviceInvalidToken") });
+    const ids = res.statusCode === 200 && res.json && Array.isArray(res.json.data) ? res.json.data.map((m) => String(m.id || "")) : [];
+    if (ids.length && ids.indexOf(model) === -1) return e.json(200, { ok: false, message: t(L, "err.openaiModelNotFound", { model: model, count: ids.length }) });
+    // skutečný chat (to, co produkt používá); bohaté tělo s poli navíc, po HTTP 400 jednou holé (rodina „OpenAI-kompatibilní“)
+    const zpravy = [{ role: "user", content: "ping" }];
+    let zk = $http.send({ url: base + "/chat/completions", method: "POST", headers: hlavicky, timeout: 20,
+      body: JSON.stringify(Object.assign({ model: model, messages: zpravy, stream: false, max_tokens: 5 }, extra)) });
+    if (zk.statusCode === 400) {
+      zk = $http.send({ url: base + "/chat/completions", method: "POST", headers: hlavicky, timeout: 20,
+        body: JSON.stringify({ model: model, messages: zpravy, stream: false, max_completion_tokens: 5 }) });
+    }
+    if (zk.statusCode === 401 || zk.statusCode === 403) return e.json(200, { ok: false, message: t(L, "err.serviceInvalidToken") });
+    if (zk.statusCode < 200 || zk.statusCode >= 300) return e.json(200, { ok: false, message: t(L, "err.serviceHttp", { status: zk.statusCode }) });
+    // úspěch → zapsat otisk otestované dvojice adresa|model (i když se liší od uložené: správce obvykle testuje
+    // PŘED uložením — po Uložit se otisk shoduje a „ověřeno“ drží); bez záznamu založit VYPNUTÝ záznam (bez klíče)
+    const kdy = new Date().toISOString().replace("T", " ").slice(0, 19) + "Z";
+    const cil = rec || new Record($app.findCollectionByNameOrId("ai_vlastni"));
+    if (!rec) { cil.set("enabled", false); cil.set("url", url); cil.set("model", model); }
+    cil.set("tested_otisk", H.vlastniOtisk(url, model)); cil.set("tested_at", kdy);
+    $app.save(cil);
+    return e.json(200, { ok: true, tested_at: kdy, message: t(L, "err.openaiOkModel", { model: model }) });
+  } catch (err) {
+    return e.json(200, { ok: false, message: t(L, "err.testConnectFailed") });
+  }
 }, $apis.requireAuth());
 
 // Výchozí skin instance (kolekce instance_settings, jediný záznam). Platí pro
@@ -3849,7 +3958,8 @@ kbRoute("POST", "/ai-test", (e) => {
   if (!jeAdmin(e.auth)) {
     return e.json(403, { error: t(L, "err.aiSettingsAdminOnly") });
   }
-  const { aiConfig, aiHostBlocked } = require(`${__hooks}/helpers.js`);
+  const { aiConfig, aiHostBlocked, env, puvodUrl } = require(`${__hooks}/helpers.js`);
+  if (env("HOSTED") === "1") return e.json(403, { error: t(L, "err.aiSettingsHosted") });
   const saved = aiConfig($app);
   const info = e.requestInfo().body || {};
   // „Otestovat obrázek“ (30. 9. 2026): jen ULOŽENÉ nastavení, výsledek se zapíše (zapne/vypne obrázky v asistentovi)
@@ -3869,7 +3979,9 @@ kbRoute("POST", "/ai-test", (e) => {
   const provider = String(info.provider || saved.provider || "none").toLowerCase();
   const url = String(info.url || "").trim() || saved.url;
   const model = String(info.model || "").trim() || saved.model;
-  const token = String(info.token || "").trim() || saved.token;
+  // uložený token se doplní JEN k adrese téhož původu jako uložená — jinak test připojení posloužil jako
+  // vynášečka klíče: adresa z požadavku + klíč ze serveru (nález panelu 20. 8. 2026, opraveno 14. 10. 2026)
+  const token = String(info.token || "").trim() || (puvodUrl(url) && puvodUrl(url) === puvodUrl(saved.url) ? saved.token : "");
 
   if (provider === "none") {
     return e.json(200, { ok: true, message: t(L, "err.aiTestDisabled") });
@@ -3894,9 +4006,11 @@ kbRoute("POST", "/ai-test", (e) => {
     if (provider === "openai") {
       const { openaiBase } = require(`${__hooks}/llm.js`);
       const base = openaiBase(url);
+      // bez klíče hlavičku neposílat (prázdné „Bearer “ není klíč; služby bez klíče — vlastní vLLM/llama-server — ji nečekají)
+      const bearer = token ? { "Authorization": "Bearer " + token } : {};
       const res = $http.send({
         url: base + "/models", method: "GET",
-        headers: { "Authorization": "Bearer " + token }, timeout: 8,
+        headers: bearer, timeout: 8,
       });
       if (res.statusCode === 401 || res.statusCode === 403) {
         return e.json(200, { ok: false, message: t(L, "err.serviceInvalidToken") });
@@ -3911,7 +4025,7 @@ kbRoute("POST", "/ai-test", (e) => {
         const zk = $http.send({
           url: base + "/chat/completions", method: "POST",
           body: JSON.stringify({ model: model, messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          headers: Object.assign({ "Content-Type": "application/json" }, bearer),
           timeout: 15,
         });
         if (zk.statusCode === 401 || zk.statusCode === 403) {
@@ -3930,7 +4044,7 @@ kbRoute("POST", "/ai-test", (e) => {
     }
     if (provider === "api") {
       const base = url.replace(/\/v1\/advisor\/?$/, "").replace(/\/+$/, "");
-      const res = $http.send({ url: base + "/v1/status", method: "GET", headers: { "X-KB-Token": token }, timeout: 8 });
+      const res = $http.send({ url: base + "/v1/status", method: "GET", headers: token ? { "X-KB-Token": token } : {}, timeout: 8 });
       if (res.statusCode === 401) return e.json(200, { ok: false, message: t(L, "err.serviceInvalidToken") });
       if (res.statusCode !== 200) return e.json(200, { ok: false, message: t(L, "err.serviceHttp", { status: res.statusCode }) });
       const j = res.json || {};

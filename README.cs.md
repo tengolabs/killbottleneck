@@ -18,7 +18,7 @@
 > Nainstalujte si ho (Rychlý start níže), klidně ho zkuste rozbít a napište nám,
 > co se stalo: chyby → Issues, nápady → Discussions. v1.0 vyjde, až beta ztichne.
 
-Grafické zobrazení projektů, firmy a procesů — mapy cílů, nad kterými pracují lidé i AI, **plně na vašem serveru: data neopouštějí firmu**. Otevřený kód v duchu open source, jen bez práva přeprodávat ho jako hostovanou službu — viz [Licence](#licence--fair-code).
+Grafické zobrazení projektů, firmy a procesů — mapy cílů, nad kterými pracují lidé i AI, **plně na vašem serveru: data neopouštějí firmu**. **Zdarma u sebe, s REST API a MCP serverem v ceně.** Otevřený kód v duchu open source, jen bez práva přeprodávat ho jako hostovanou službu — viz [Licence](#licence--fair-code).
 
 ![Editor mapy cílů](assets/mapa-cs.jpg)
 

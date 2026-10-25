@@ -34,7 +34,7 @@ function Skupina({ t, nazev, s, celkem, testid }) {
   );
 }
 
-export default function AiKredityKarta() {
+export default function AiKredityKarta({ vlastniModel = false }) {
   const { t } = useTranslation('admin', { keyPrefix: 'aiKredity' });
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -81,6 +81,7 @@ export default function AiKredityKarta() {
         <Coins className="w-4 h-4 text-primary" /> {t('heading')}
       </h2>
       <p className="text-xs text-muted-foreground mb-3">{t('description', { kc: fmtN(data?.kredit_kc ?? 0.08, 2) })}</p>
+      {vlastniModel && <p className="text-xs text-primary mb-3" data-testid="ai-kredity-vlastni">{t('vlastniNote')}</p>}
 
       {failed && <p className="text-sm text-destructive" data-testid="ai-kredity-chyba">{t('loadError')}</p>}
       {!data && !failed && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}

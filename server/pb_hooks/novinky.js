@@ -11,6 +11,20 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.89-beta": {
+    cs: [
+      "V cloudu můžete asistenta přepnout na vlastní model: ve Správě organizace → Vlastní model nebo API klíč zadáte adresu OpenAI-kompatibilního API (třeba váš počítač s grafickou kartou za tunelem, nebo poskytovatel podle vaší volby), název modelu a klíč.",
+      "Tahy na vlastním modelu se do týdenní kvóty nepočítají — výkon je váš. Fotky a hlasovky zůstávají na naší AI.",
+      "Klíč nikdy neopustí server: ukládá se šifrovaně a odchází jen na adresu, pro kterou jste ho zadali.",
+      "Když vlastní model neodpovídá, asistent to řekne rovnou — nic se potichu nepřepíná.",
+    ],
+    en: [
+      "In the cloud you can switch the assistant to your own model: in Organization settings → Own model or API key enter the address of an OpenAI-compatible API (say your PC with a graphics card behind a tunnel, or a provider of your choice), the model name and a key.",
+      "Turns on your own model do not count towards the weekly quota — the compute is yours. Photos and voice notes stay on our AI.",
+      "The key never leaves the server: it is stored encrypted and only ever goes to the address you entered it for.",
+      "When the own model does not respond, the assistant says so right away — nothing switches over silently.",
+    ],
+  },
   "v0.88-beta": {
     cs: [
       "Asistent vám napíše stránku: prezentaci pro vedení, přehled pro tým, shrnutí pro zákazníka, časovou osu nebo report — tlačítko Nová stránka nabídne šablony, vyberete projekt a vzhled; zadání složí aplikace.",

@@ -30,6 +30,7 @@ const SEKCE = [
   { nadpis: 'Fakturační údaje',       hosted: true,  self: false, proc: 'self-host si u nás nic neobjednává — IČO a DIČ tam nedávají smysl' },
   { nadpis: 'Členství a platba',      hosted: true,  self: false, proc: 'košík je jen pro hostovanou službu' },
   { nadpis: 'AI funkce',              hosted: false, self: true,  proc: 'na hostované instanci AI dodáváme my; zákazník ji nesmí přesměrovat (SSRF na sousedy)' },
+  { nadpis: 'Vlastní model nebo API klíč', hosted: true,  self: false, proc: 'zákazník cloudu si může připojit VLASTNÍ model (14. 10. 2026); self-host má plnou dlaždici AI' },
   { nadpis: 'Výchozí vzhled instance', hosted: true,  self: true,  proc: 'produktová funkce — patří do obou' },
 ];
 

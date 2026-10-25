@@ -143,13 +143,18 @@ const MAX_ZN_PDF_STARE = 300; // starší PDF v historii se modelu i do úloži�
 const MAX_NAHRAD_PDF = 20;
 
 // ---------- konfigurace modelu ----------
+const VLASTNI_TIMEOUT_S = 120; // tah na vlastním modelu zákazníka (tunel utne ~100 s)
 // KB_CHAT_* → KB_SUMMARY_* → obecná AI (ai_settings / KB_AI_*). Model z UI smí
 // přepsat jen správce (kontroluje routa) a jen u ollama/openai.
 function chatAiConfig(app, modelOverride) {
-  const { env, summaryAiConfig, extraJson } = require(`${__hooks}/helpers.js`);
+  const { env, summaryAiConfig, extraJson, vlastniAiConfig } = require(`${__hooks}/helpers.js`);
   let cfg;
+  // vlastní model zákazníka (hostovaná, 14. 10. 2026) má přednost před KB_CHAT_* provozovatele
+  const vl = vlastniAiConfig(app);
   const p = String(env("CHAT_PROVIDER") || "").toLowerCase();
-  if (p) {
+  if (vl) {
+    cfg = Object.assign({}, vl); // kopie: řádky níž cfg mění a `vl.extra` se ještě čte (sdílený objekt dědil env extra, test 14. 10.)
+  } else if (p) {
     cfg = { source: "env-chat", provider: p, url: env("CHAT_URL") || "", model: env("CHAT_MODEL") || "", token: env("CHAT_TOKEN") || "" };
   } else {
     cfg = summaryAiConfig(app);
@@ -173,6 +178,13 @@ function chatAiConfig(app, modelOverride) {
   // Potvrzení karty (5. 10. 2026, rozhodnutí Richarda 4. 10.): u jednoduchých akcí dopoví aplikace („Hotovo.“ + čipy) bez volání
   // modelu — ušetří 1–2 volání (≈ 13k tokenů každé) na každý zápis. KB_CHAT_POTVRZENI=model = původní chování (model dopovídá vždy).
   cfg.potvrzeni = String(env("CHAT_POTVRZENI") || "app").toLowerCase() === "model" ? "model" : "app";
+  if (cfg.vlastni) {
+    // vlastní model zákazníka: hybrid (lehký model), rozjezd (druhý model) i myšlení/pole navíc z env patří NAŠÍ
+    // sestavě a nesou náš token → nic z toho; celý tah jde na jeho model. Timeout kratší: Cloudflare Tunnel
+    // utne odpověď po ~100 s, čekat 300 s by byla jen delší nejistota.
+    cfg.think = false; cfg.numCtx = 0; cfg.extra = vl.extra || null; cfg.tier = "heavy"; cfg.timeout = VLASTNI_TIMEOUT_S;
+    return cfg;
+  }
   const strategie = String(env("CHAT_HYBRID") || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
   const lp = String(env("CHAT_LIGHT_PROVIDER") || "").toLowerCase();
   if (strategie.length && ["ollama", "openai"].includes(lp)) {
@@ -2857,7 +2869,8 @@ function zavolejModel(cfg, zpravy, nastroje, L, stats) {
     stats.calls += 1; stats.in += s.in || 0; stats.out += s.out || 0; stats.cached = (stats.cached || 0) + (s.cached || 0); stats.model = s.model || cfg.model || "";
     stats.modely = stats.modely || []; if (stats.modely.indexOf(stats.model) < 0) stats.modely.push(stats.model);
     // rozpad po voláních → kredity podle modelu (lokální = 0), zahozený pokus lehkého se označí v smyckaHybrid
-    (stats.volani = stats.volani || []).push({ model: stats.model, provider: cfg.provider || "", in: s.in || 0, cached: s.cached || 0, out: s.out || 0, tier: cfg.tier || "heavy" });
+    // `vlastni`: volání modelu ZÁKAZNÍKA (0 kreditů); vize a přepis v témže tahu jdou na naši AI a účtují se dál
+    (stats.volani = stats.volani || []).push({ model: stats.model, provider: cfg.provider || "", in: s.in || 0, cached: s.cached || 0, out: s.out || 0, tier: cfg.tier || "heavy", vlastni: !!cfg.vlastni });
     return r;
   }
   return null;
@@ -3328,7 +3341,8 @@ function zapisLog(app, auth, rec, cfg, stats, ms, chyba) {
     l.set("skupiny", (stats.skupiny || []).join(",").slice(0, 300));
     // kredity tahu podle modelů (lokální = 0, zahozený pokus lehkého / chyba / #app = 0) + rozpad po voláních
     const K = require(`${__hooks}/kredity.js`);
-    l.set("kredity", Math.round(K.kredityTahu(stats, chyba) * 10000) / 10000);
+    l.set("kredity", Math.round(K.kredityTahu(stats, chyba, cfg) * 10000) / 10000);
+    l.set("zdroj", cfg.vlastni ? "vlastni" : "nas"); // vlastní model zákazníka × naše AI (kvóta, přehledy)
     l.set("volani", JSON.stringify((stats.volani || []).slice(0, 40)));
     app.save(l);
   } catch (err) {
@@ -3783,13 +3797,17 @@ function zkontrolujPdf(body, L) {
   if (zn < 1) throw chyba("err.chatPdfEmpty");
   return { name: ocisti(String(body.pdf_name || "").replace(/[\r\n\]\[]/g, " "), 120) || "PDF", pages: Math.max(strany.length, Number(body.pdf_pages) || 0), text: bloky.join("\n") };
 }
-function chatBrzda(e, L, body) {
+function chatBrzda(e, L, body, cfg) {
   const { env } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   // týdenní kvóta AI kreditů organizace (správci × ostatní) — před hodinovým
-  // počítadlem, ať odmítnutý tah nespotřebuje ani hodinový strop
+  // počítadlem, ať odmítnutý tah nespotřebuje ani hodinový strop.
+  // Vlastní model zákazníka (cfg.vlastni) kvótu nečerpá (Richard 14. 10. 2026) — hodinová brzda proti smyčce zůstává.
+  // Výjimka platí jen pro TEXT: fotka (vize) i hlasovka (přepis) jdou na NAŠI AI i při vlastním modelu, takže tah
+  // s přílohou kvótu čerpá dál — jinak by vlastní adresa (klidně falešná) odemkla neomezenou vizi a přepis (audit 25. 10. 2026)
   const { kvotaBrzda } = require(`${__hooks}/kredity.js`);
-  const kv = kvotaBrzda($app, e.auth, L);
+  const priloha = !!(body && (body.image_base64 || body.audio_base64) && !jeRezim(body.mode));
+  const kv = cfg && cfg.vlastni && !priloha ? null : kvotaBrzda($app, e.auth, L);
   if (kv) return kv;
   const strop = parseInt(env("AI_MAX_PER_HOUR"), 10);
   const limit = strop > 0 ? strop : 60;
@@ -3827,7 +3845,7 @@ function vratitTahDok(app, zmeny) {
   require(`${__hooks}/stranky.js`).vratitTah(app, vr.filter((z) => z.stranka));
 }
 function chatCfg(e, body, L) {
-  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { jeAdmin, aiHostBlocked } = require(`${__hooks}/helpers.js`);
   const { chatAiConfig } = require(`${__hooks}/chat.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const model = body && body.model ? String(body.model) : "";
@@ -3839,6 +3857,11 @@ function chatCfg(e, body, L) {
     cfg.hybrid = st.length && st[0] !== "none" ? st : null;
   }
   if (!["ollama", "openai"].includes(cfg.provider)) return { chyba: { status: 503, body: { error: t(L, "err.aiDisabled") } } };
+  // adresa z DB (ai_settings / ai_vlastni) se ověří znovu TĚSNĚ před voláním — záznam jde změnit i mimo routy
+  // (stejná pojistka jako /advisor; do 14. 10. 2026 ji chat neměl)
+  if ((cfg.source === "db" || cfg.vlastni) && aiHostBlocked(cfg.url)) return { chyba: { status: 503, body: { error: t(L, "err.aiHostPrivate") } } };
+  // uložený klíč zákazníka nejde přečíst (změněný klíč instance): ani bez klíče ven, ani tiše na naši AI
+  if (cfg.vlastni && cfg.tokenNecitelny) return { chyba: { status: 503, body: { error: t(L, jeAdmin(e.auth) ? "err.aiVlastniKeyUnreadableAdmin" : "err.aiVlastniKeyUnreadable"), code: "ai_vlastni" } } };
   cfg.podrobneChyby = jeAdmin(e.auth);
   // session token přihlášeného: nástroje nastavení s ním volají vlastní routy aplikace (chat-nastaveni.js) — stejná
   // práva, hooky a validace jako UI. Žije jen v `cfg` tohoto požadavku; zapisLog ani llm.js ho neberou (vyjmenovaná pole)
@@ -3849,7 +3872,7 @@ function chatCfg(e, body, L) {
 // tak, jak jsou. Ostatní (doprava k modelu, výjimka nástroje) dostane doslova JEN
 // správce — text výjimky goja z $http.send nese celé URL brány i rozlišenou IP
 // (S1b-02, 27. 9. 2026); běžný člen dostane obecnou hlášku, plné znění je v logu.
-function chatChyba(e, err, L) {
+function chatChyba(e, err, L, cfg) {
   const { t } = require(`${__hooks}/i18n.js`);
   const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const m = String(err && err.message ? err.message : err);
@@ -3858,6 +3881,9 @@ function chatChyba(e, err, L) {
   if (err && err.status) return { status: err.status, body: Object.assign(err.code ? { error: m, code: err.code } : { error: m }, navic) };
   try { $app.logger().warn("chat: kolo selhalo", "user", e.auth.id, "error", m); } catch (e2) { /* log je bonus */ }
   const podrobne = jeAdmin(e.auth);
+  // vlastní model zákazníka (hostovaná): selhání dopravy = jeho stroj/tunel, ne naše AI → řekneme to rovnou a BEZ tichého
+  // přepnutí na naši AI (zákazník si vlastní model vybral záměrně — rozhodnutí 14. 10. 2026); správce vidí i text chyby
+  if (cfg && cfg.vlastni) return { status: 502, body: Object.assign({ code: "ai_vlastni", error: podrobne ? t(L, "err.aiVlastniDownAdmin", { msg: m }) : t(L, "err.aiVlastniDown") }, navic) };
   return { status: 502, body: Object.assign({ error: podrobne ? t(L, "err.chatFailed", { msg: m }) : t(L, "err.chatFailedShort") }, navic) };
 }
 

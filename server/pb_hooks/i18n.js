@@ -779,6 +779,43 @@ const STRINGS = {
     en: "Only an administrator can change AI settings.",
   },
   "err.unknownProvider": { cs: "Neznámý provider.", en: "Unknown provider." },
+  // vlastní model zákazníka na hostované instanci (14. 10. 2026)
+  "err.aiSettingsHosted": {
+    cs: "Na hostované instanci nastavuje AI provozovatel. Vlastní model připojíte v sekci „Vlastní model nebo API klíč“.",
+    en: "On a hosted instance the AI is run by the operator. Connect your own model in the “Own model or API key” section.",
+  },
+  "err.aiVlastniUrl": {
+    cs: "Adresa musí začínat http:// nebo https:// (např. https://moje-gpu.example.com/v1).",
+    en: "The address must start with http:// or https:// (e.g. https://my-gpu.example.com/v1).",
+  },
+  "err.aiVlastniNoKey": {
+    cs: "Instance nemá šifrovací klíč (KB_ENCRYPTION_KEY), takže váš API klíč nejde bezpečně uložit. Napište podpoře.",
+    en: "This instance has no encryption key (KB_ENCRYPTION_KEY), so your API key cannot be stored safely. Contact support.",
+  },
+  "err.aiVlastniExtra": {
+    cs: "Pole navíc musí být platný JSON objekt, např. {\"reasoning_effort\":\"none\"}.",
+    en: "Extra fields must be a valid JSON object, e.g. {\"reasoning_effort\":\"none\"}.",
+  },
+  "err.aiVlastniDown": {
+    cs: "Vlastní model vaší organizace neodpovídá. Dejte vědět správci — může zkontrolovat počítač s modelem a tunel, nebo vlastní model vypnout.",
+    en: "Your organization's own model is not responding. Tell your administrator — they can check the machine running it and the tunnel, or turn the own model off.",
+  },
+  "err.aiVlastniExtraKeys": {
+    cs: "Pole navíc nesmí přepisovat model, messages, tools, tool_choice, stream, n ani response_format.",
+    en: "Extra fields must not override model, messages, tools, tool_choice, stream, n or response_format.",
+  },
+  "err.aiVlastniKeyUnreadable": {
+    cs: "Vlastní model vaší organizace teď nejde použít: uložený API klíč nejde přečíst. Dejte vědět správci, ať ho zadá znovu.",
+    en: "Your organization's own model cannot be used right now: the stored API key cannot be read. Tell your administrator to enter it again.",
+  },
+  "err.aiVlastniKeyUnreadableAdmin": {
+    cs: "Uložený API klíč vlastního modelu nejde přečíst (změnil se šifrovací klíč instance). Zadejte klíč znovu v Správě organizace → Vlastní model nebo API klíč.",
+    en: "The stored API key of the own model cannot be read (the instance encryption key changed). Enter the key again in Organization settings → Own model or API key.",
+  },
+  "err.aiVlastniDownAdmin": {
+    cs: "Váš vlastní model neodpovídá: {msg} Zkontrolujte počítač s modelem a tunel, nebo vlastní model v administraci vypněte.",
+    en: "Your own model is not responding: {msg} Check the machine running it and the tunnel, or turn the own model off in administration.",
+  },
   "err.apexRequired": {
     cs: "Hlavní uzel mapy nejde odstranit — smazat lze jen celý projekt.",
     en: "The main node of a map cannot be removed — only the whole project can be deleted.",

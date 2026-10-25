@@ -464,7 +464,7 @@ function overNastaveni(app, auth, name, a) {
     }
     case "set_ai_settings": {
       if (!H.jeAdmin(auth)) return "Error: only an administrator changes the AI settings.";
-      if (hosted) return "Error: on a hosted instance the AI is run by the operator — these settings are not available here. Tell the user plainly.";
+      if (hosted) return "Error: on a hosted instance the AI is run by the operator — these settings are not available here. An administrator can connect their own model under Organization management → Own model or API key (not through the assistant). Tell the user plainly.";
       const pole = ["provider", "url", "model", "transcribe_url", "transcribe_model", "vision_enabled", "vision_model"].filter((k) => a[k] !== undefined);
       if (!pole.length) return "Error: pass at least one field to change.";
       if (a.provider !== undefined && AI_PROVIDERS.indexOf(a.provider) < 0) return `Error: provider must be one of ${AI_PROVIDERS.join(", ")}.`;

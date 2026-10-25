@@ -18,7 +18,7 @@
 const MAX_AUDIO_MB_CHAT = 3;   // hlasovka v asistentovi: 5 min opusu ≈ 1,2 MB, m4a ze Safari víc
 const HLAS_MAX_S = 300;        // délka hlasovky (klient zastaví nahrávání; server hlídá velikost)
 
-const puvod = (u) => { const m = String(u || "").match(/^(https?:\/\/[^/?#]+)/i); return m ? m[1].toLowerCase() : ""; };
+const puvod = (u) => require(`${__hooks}/helpers.js`).puvodUrl(u); // původ adresy (schéma + host[:port]) — jedna definice v helpers
 
 function prepisConfig(app) {
   const { env, aiConfig, aiHostBlocked } = require(`${__hooks}/helpers.js`);
