@@ -108,7 +108,8 @@ const openSkinDialog = async (page) => {
     await overPrepinacRezimu(page, expect);
     expect((await page.$$('[data-skin-card]')).length >= 4, 'dialog nabízí aspoň 4 vestavěné skiny');
     // závoj kolem okna jen naznačený, ať je změna skinu na aplikaci vidět (Richard 19. 10. 2026: „kolem tak hodně tmavo“)
-    const zavoj = await page.evaluate(() => { const o = [...document.querySelectorAll('[data-state="open"]')].find((e) => e.className.includes('fixed inset-0')); const a = o ? (getComputedStyle(o).backgroundColor.match(/[\d.]+/g) || []).map(Number) : []; return a.length === 4 ? a[3] : (a.length ? 1 : null); });
+    // od 27. 10. 2026 je dialog z panáčka nemodální POD lištou → závoj je vlastní prvek [data-dialog-zavoj] (ne Radix Overlay)
+    const zavoj = await page.evaluate(() => { const o = document.querySelector('[data-dialog-zavoj]') || [...document.querySelectorAll('[data-state="open"]')].find((e) => e.className.includes('fixed inset-0')); const a = o ? (getComputedStyle(o).backgroundColor.match(/[\d.]+/g) || []).map(Number) : []; return a.length === 4 ? a[3] : (a.length ? 1 : null); });
     expect(zavoj !== null && zavoj <= 0.15, `závoj kolem výběru vzhledu je průhledný (krytí ${zavoj})`);
     await page.click('[data-skin-card="sepia"]');
     await sleep(800);

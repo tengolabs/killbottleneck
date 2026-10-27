@@ -81,7 +81,7 @@ const AsistentHost = ({ children }) => {
   const strankaOkno = location.pathname.startsWith('/stranka/');
   const zobrazit = !!user && !lite && !strankaOkno;
   const liteOtevren = lite && !!user && A.liteOpen;
-  const odsun = zobrazit && A.dostupny && A.open && typeof window !== 'undefined' && window.innerWidth >= 640 ? A.width : 0;
+  const odsun = zobrazit ? A.odsun : 0; // šířku a práh 640 px počítá kontext (čtou ho i horní lišty)
   // odchod z lite (odkaz z karty do mapy, karta „celá aplikace") → příště v lite nenaskočí panel sám
   const { setLiteOpen } = A;
   useEffect(() => { if (!lite && A.liteOpen && setLiteOpen) setLiteOpen(false); }, [lite, A.liteOpen, setLiteOpen]);

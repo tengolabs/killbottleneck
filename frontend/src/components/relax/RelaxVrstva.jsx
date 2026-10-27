@@ -6,11 +6,12 @@ import { useAuth } from '@/lib/AuthContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useRelaxOdpocet, formatOdpocet, cinkni } from './useRelaxOdpocet';
 import RelaxZamek from './RelaxZamek';
+import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 
 // Relax (Richard 14. 10. 2026): „pustí se akvárko nebo úl“ s odpočtem 5 / 15 minut.
 // Dvě rozložení:
 //   cela  — přes celou obrazovku (z-[60]: nad panelem asistenta, pod toasty); jde zamknout PINem a odejít od PC
-//   vedle — vlevo od chatu místo mapy (stejný vzor jako DokumentyPanel: fixed, right = šířka chatu, pod hlavičkou),
+//   vedle — vlevo od chatu místo mapy (stejný vzor jako DokumentyPanel: fixed, right = šířka chatu, POD horní lištou),
 //           mapa pod tím zůstává namountovaná, jen není vidět; v chatu se dál pracuje
 // Scény = statické soubory public/relax/*.html od GPT Astra (1:1, jen embed dodatek) v iframe — cizí kód
 // s globálními posluchači a styly zůstává izolovaný a do balíku aplikace nic nepřidává.
@@ -65,6 +66,8 @@ export default function RelaxVrstva({ lite = false }) {
     return () => { if (ro) ro.disconnect(); };
   }, [uzke, lite, otevren, r && r.rozlozeni]);
   const nadListou = uzke && !lite && !otevren && A.dostupny && vyskaListy > 0;
+  // scéna začíná pod ukotvenou horní lištou (lite ji nemá → 0)
+  const spodek = useSpodekHlavicky(!lite);
   const vedleMozne = (otevren && A.dostupny && (uzke || lite || A.width > 0)) || nadListou;
   const vedle = !!r && r.rozlozeni === 'vedle' && vedleMozne && !zamceno;
   const nad = vedle && (uzke || lite);
@@ -166,8 +169,9 @@ export default function RelaxVrstva({ lite = false }) {
 
   if (!r) return null;
   const ztlumeno = !!r.hotovo;
-  // vedle: celá levá část od horního okraje (Richard 15. 10.: „na vodu je pruh aplikace, to ne“) — hlavička aplikace zůstává pod vrstvou
-  const styl = nad ? (nadListou ? { top: 0, left: 0, right: 0, bottom: vyskaListy } : { top: 0, left: 0, right: 0, height: NAD_PODIL }) : vedle ? { top: 0, right: A.width, left: 0, bottom: 0 } : undefined;
+  // vedle: celá levá část POD horní lištou (Richard 27. 10. 2026: „ať pořád máš notifikace a víš, kde jsi“ — ruší
+  // 15. 10. „na vodu je pruh aplikace, to ne“); i telefonní „nad“ začíná pod lištou. Celá obrazovka (zámek s PINem) lištu zakrývá dál.
+  const styl = nad ? (nadListou ? { top: spodek, left: 0, right: 0, bottom: vyskaListy } : { top: spodek, left: 0, right: 0, height: NAD_PODIL }) : vedle ? { top: spodek, right: A.width, left: 0, bottom: 0 } : undefined;
   const tridy = vedle ? 'fixed z-40' : 'fixed inset-0 z-[60]';
   // na úzkém okně (telefon) má scéna vlastní hlavičku přes celou šířku → lišta je pruh NAD scénou, ne přes ni
   const lista = pruh

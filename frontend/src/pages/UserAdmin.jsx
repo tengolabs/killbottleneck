@@ -7,6 +7,7 @@ import { getMembers, resetUserPassword, memberDeputy, savePurpose } from '@/api/
 import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAuth } from '@/lib/AuthContext';
+import AppHeader from '@/components/shared/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -314,11 +315,10 @@ export default function UserAdmin() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* horní lišta i ve Správě organizace (Richard 27. 10. 2026: „i v nastavení ať máš pořád horní lištu“) — šipka zpět je v ní */}
+      <AppHeader backTo="/" />
       <div className="max-w-5xl mx-auto px-4 py-8 sm:py-12">
         <div className="flex items-center gap-3 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
           <ShieldCheck className="w-6 h-6 text-primary" />
           <h1 className="font-heading text-2xl font-bold">{t('userAdmin.title')}</h1>
         </div>

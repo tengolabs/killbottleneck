@@ -146,7 +146,7 @@
     "advancedShow": "Pokročilé: pole navíc pro model",
     "advancedHide": "Skrýt pokročilé",
     "extraLabel": "Pole navíc do každého volání (JSON) — např. vypnutí přemýšlení u llama-serveru",
-    "dataWhere": "<b>Kam data odcházejí:</b> text rozhovorů asistenta a výtahy z map jdou na adresu, kterou zadáte — mimo naše zpracování v EU, za službu ručíte vy. Fotky pro asistenta a přepis hlasu zůstávají na naší AI a čerpají kvótu.",
+    "dataWhere": "<b>Kam data odcházejí:</b> text rozhovorů asistenta, výtahy z map a podklady pro stránky jdou na adresu, kterou zadáte — mimo naše zpracování v EU, za službu ručíte vy. Fotky pro asistenta a přepis hlasu zůstávají na naší AI a čerpají kvótu.",
     "tunnelHelp": "<b>Počítač doma:</b> nikdy neotvírejte port rovnou do internetu. Dejte před model tunel (Cloudflare Tunnel, Tailscale Funnel) a zapněte u modelu klíč (<c>llama-server --api-key</c>). Adresy v místní síti (192.168.…, 10.…) ani adresy Tailscale (100.x) odsud nejdou — box je vidět nesmí. Odpověď musí přijít do 100 s.",
     "noKey": "Instance nemá šifrovací klíč, takže váš API klíč nejde bezpečně uložit. Napište podpoře — do té doby zůstává naše AI.",
     "loadFailed": "Nastavení vlastního modelu se nepodařilo načíst. Obnovte stránku — Uložit je zamčené, aby se uložené údaje nepřepsaly prázdnými.",

@@ -12,6 +12,7 @@ import TimeOverviewDialog from '@/components/time/TimeOverviewDialog';
 import AccountDialog from '@/components/shared/AccountDialog';
 import ClientsDialog from '@/components/time/ClientsDialog';
 import ReportDialog from '@/components/shared/ReportDialog';
+import { PodListouProvider } from '@/components/ui/dialog';
 import { useReportConfig } from '@/hooks/useReportConfig';
 import { saveMode, MODE_LITE } from '@/lib/liteMode';
 import { Button } from '@/components/ui/button';
@@ -69,6 +70,10 @@ export default function UserMenu({ onInvited }) {
   }, []);
   const [timeOpen, setTimeOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  // Dialogy z nabídky jsou od 27. 10. 2026 nemodální (pod lištou) a lišta zůstává klikací → z nabídky by šel otevřít
+  // druhý dialog přes první (dva závoje nad sebou). Otevření jednoho zavře ostatní (nález panelu kvality 27. 10.).
+  const settery = [setInviteOpen, setAboutOpen, setSkinOpen, setApiKeysOpen, setAgentSetupOpen, setAiAgentsOpen, setAccountOpen, setKlientiOpen, setTimeOpen, setReportOpen];
+  const otevri = (setter) => { settery.forEach((f) => { if (f !== setter) f(false); }); setter(true); };
   // Hlásit chyby jde jen tam, kam je komu poslat (KB_REPORT_TO + SMTP).
   // V cizím self-hostu se položka vůbec neukáže — nic nemá odcházet ven
   // bez vědomí toho, kdo instanci provozuje.
@@ -137,7 +142,7 @@ export default function UserMenu({ onInvited }) {
           <DropdownMenuItem onClick={() => { saveMode(MODE_LITE); navigate('/lite'); }}>
             <Smartphone className="w-4 h-4 mr-2" /> {tLite('switch.toLite')}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setSkinOpen(true)} data-skin-menu-item>
+          <DropdownMenuItem onClick={() => otevri(setSkinOpen)} data-skin-menu-item>
             <Palette className="w-4 h-4 mr-2" /> {t('menu.appearance')}
           </DropdownMenuItem>
           {(orgMapId || smiSpravovatStrukturu) && (
@@ -160,27 +165,27 @@ export default function UserMenu({ onInvited }) {
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setAccountOpen(true)}>
+          <DropdownMenuItem onClick={() => otevri(setAccountOpen)}>
             <UserCog className="w-4 h-4 mr-2" /> {t('menu.myAccount')}
           </DropdownMenuItem>
           {/* Pozvat do týmu ZŮSTÁVÁ samostatně: zvát smí i manažer,
               který na Správu organizace nedosáhne (ta je jen pro admina). */}
           {canInvite && (
-            <DropdownMenuItem onClick={() => setInviteOpen(true)}>
+            <DropdownMenuItem onClick={() => otevri(setInviteOpen)}>
               <UserPlus className="w-4 h-4 mr-2" /> {t('menu.inviteTeam')}
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => setTimeOpen(true)}>
+          <DropdownMenuItem onClick={() => otevri(setTimeOpen)}>
             <Clock className="w-4 h-4 mr-2" /> {t('menu.workedTime')}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setAgentSetupOpen(true)} data-testid="menu-connect-agent">
+          <DropdownMenuItem onClick={() => otevri(setAgentSetupOpen)} data-testid="menu-connect-agent">
             <Cable className="w-4 h-4 mr-2" /> {t('menu.connectAgent')}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setApiKeysOpen(true)}>
+          <DropdownMenuItem onClick={() => otevri(setApiKeysOpen)}>
             <KeyRound className="w-4 h-4 mr-2" /> {t('menu.apiKeys')}
           </DropdownMenuItem>
           {(user?.is_ai_manager || user?.role === 'admin') && (
-            <DropdownMenuItem onClick={() => setAiAgentsOpen(true)}>
+            <DropdownMenuItem onClick={() => otevri(setAiAgentsOpen)}>
               <Bot className="w-4 h-4 mr-2" /> {t('menu.aiAgents')}
             </DropdownMenuItem>
           )}
@@ -201,11 +206,11 @@ export default function UserMenu({ onInvited }) {
             </a>
           </DropdownMenuItem>
           {reportCfg.enabled && (
-            <DropdownMenuItem onClick={() => setReportOpen(true)} data-menu-report>
+            <DropdownMenuItem onClick={() => otevri(setReportOpen)} data-menu-report>
               <Bug className="w-4 h-4 mr-2" /> {t('menu.report')}
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => setAboutOpen(true)}>
+          <DropdownMenuItem onClick={() => otevri(setAboutOpen)}>
             <Info className="w-4 h-4 mr-2" /> {t('menu.about')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -215,6 +220,10 @@ export default function UserMenu({ onInvited }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* všechno z menu panáčka se otevírá POD ukotvenou lištou a lišta zůstává klikací (Richard 27. 10. 2026:
+          „i v nastavení ať máš pořád horní lištu“) — viz PodListouProvider v ui/dialog.jsx; brána AgentSetupGate
+          (první přihlášení) ten obal nemá a zůstává modální */}
+      <PodListouProvider>
       <InviteDialog
         open={inviteOpen}
         currentRole={user?.role}
@@ -239,6 +248,7 @@ export default function UserMenu({ onInvited }) {
         userEmail={user?.email}
         version={reportCfg.version}
       />
+      </PodListouProvider>
     </>
   );
 }

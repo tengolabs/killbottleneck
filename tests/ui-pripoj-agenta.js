@@ -29,7 +29,9 @@ const dialog = (page) => page.$('[data-testid="agent-setup-dialog"]');
 const auth = async (inst, email) => (await inst.api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: H.PW } })).json;
 
 H.beh(async () => {
-  const inst = await H.startInstance({ slug: 'pripoj-agenta', env: { KB_PURPOSE_ASK: null } });
+  // KB_START_RELAX=0: dotazník účelu tu musí běžet (KB_PURPOSE_ASK zapnuté), a s ním i start s akváriem (v0.88) —
+  // po reloadu by akvárium překrylo menu u jména (regrese v0.89: menu-connect-agent nenalezen)
+  const inst = await H.startInstance({ slug: 'pripoj-agenta', env: { KB_PURPOSE_ASK: null, KB_START_RELAX: 0 } });
   const B = inst.base;
   const { page, chyby, novaStranka } = await H.browser();
   await stubKopirovani(page);

@@ -500,7 +500,10 @@ H.beh(async () => {
   const pohovor = (await udalosti()).find((e) => e.title === 'Pohovor');
   expect(!!pohovor && pohovor.time === '11:00' && pohovor.end_time === '12:00', `API: Pohovor 11:00–12:00 bez kolize (${JSON.stringify(pohovor)})`);
   // správce upraví cizí firemní akci v detailu (can_edit)
-  await page.click(chipSel('18:00 Večírek'));
+  // v neděli je dnešek vpravo dole a čip zakryjí oznámení „Událost … založena“ z kroků výše → klik myší trefil oznámení
+  // a dialog se neotevřel (regrese v0.89 v neděli 25. 10. 2026; čekat na zmizení nejde — buňka se mezitím přeskládá)
+  // → klik přímo na prvek
+  await page.$eval(chipSel('18:00 Večírek'), (el) => el.click());
   await page.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 8000 }).catch(() => {});
   expect(!(await page.$eval('[data-testid="udalost-nazev"]', (el) => el.readOnly).catch(() => true)), 'správce může cizí firemní akci upravit (pole nejsou jen ke čtení)');
   await page.keyboard.press('Escape');

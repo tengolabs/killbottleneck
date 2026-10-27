@@ -328,7 +328,7 @@ export default function DokumentyPanel({ mobil }) {
   // zpráva složená formulářem jde do chatu přes žádost kontextu (panel chatu je líný, vyřídí ji, až je volný)
   const posliZpravu = useCallback((text) => { A.setDokId(''); A.spust('zprava', { text }); }, [A]);
   const [okno, setOkno] = useState(() => window.innerWidth);
-  const spodek = useSpodekHlavicky(!mobil);
+  const spodek = useSpodekHlavicky();
   // neuložené změny hlídá kontext (A.hlidac / A.opatrne / A.odchod) — jde přes něj i samootevření,
   // karty v chatu, přepínač v hlavičce a minimalizace chatu (checkup 1. 10.)
   const { hlidac, opatrne, odchod, setOdchod, zahodZmeny } = A;
@@ -370,8 +370,9 @@ export default function DokumentyPanel({ mobil }) {
     <aside
       // z-[45]: NAD relaxem „vedle“ (z-40, kreslí se později a Dokumenty dřív zakryl — klik-test 19. 10.), pod relaxem přes celou
       // obrazovku (z-[60]) a pod dialogy (z-50)
-      className={mobil ? 'fixed inset-0 z-50 flex flex-col bg-card' : 'fixed bottom-0 z-[45] flex flex-col bg-card border-l border-t shadow-2xl'}
-      style={mobil ? undefined : { top: spodek, right: A.width, width: sirka, maxWidth: DOK_MAX_W }}
+      // i na telefonu POD lištou (rozhodnutí Richarda 27. 10. 2026 „i na telefonu panel pod lištou“ platí i pro Dokumenty)
+      className={mobil ? 'fixed left-0 right-0 bottom-0 z-50 flex flex-col bg-card' : 'fixed bottom-0 z-[45] flex flex-col bg-card border-l border-t shadow-2xl'}
+      style={mobil ? { top: spodek } : { top: spodek, right: A.width, width: sirka, maxWidth: DOK_MAX_W }}
       data-testid="chat-dokumenty"
       aria-label={t('dok.title')}
     >

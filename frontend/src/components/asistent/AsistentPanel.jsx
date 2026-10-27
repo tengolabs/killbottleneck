@@ -11,6 +11,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/lib/AuthContext';
+import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useAsistent, MIN_W, MAX_W, sirkaDokumentu, RELAX_SABLONY } from '@/lib/AsistentContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAiModes, stavAsistenta, refreshAiModes } from '@/hooks/useAiEnabled';
@@ -315,6 +316,8 @@ export default function AsistentPanel({ lite = false }) {
   }, []);
   // lite = telefonní rozvržení vždy (sloupec max-w-xl se neodsouvá, Dokumenty nemají hlavičku plné appky)
   const mobil = lite || uzkeOkno;
+  // panel začíná pod ukotvenou horní lištou (Richard 27. 10. 2026) — i na telefonu v plné aplikaci; lite lištu nemá → 0
+  const spodek = useSpodekHlavicky(!lite);
 
   // Nabídka ranní porady (Richard 13. 9. 2026: „ráno otevřu a zeptá se mě"):
   // ukáže se při prvním otevření aplikace v daném dni nebo po víc než 8 h
@@ -495,14 +498,15 @@ export default function AsistentPanel({ lite = false }) {
   // panel na desktopu posune výřez toastů vlevo o svou šířku (CSS proměnná čtená v toast.jsx).
   // Telefon: toasty jsou NAHOŘE a ležely přes hlavičku panelu (robot, Nový, historie, šipka
   // dolů) — pár vteřin po každé provedené akci nešlo panel zmenšit, klepnutí bralo oznámení
-  // (klik-test 29. 9. 2026). Otevřený panel je posune pod svou hlavičku (h-12 = 48 px).
+  // (klik-test 29. 9. 2026). Otevřený panel je posune pod svou hlavičku (h-12 = 48 px) — a ta je od 27. 10. 2026
+  // pod ukotvenou horní lištou (spodek), takže o ni navíc.
   useEffect(() => {
     const el = document.documentElement;
     // otevřené dokumenty leží vlevo od chatu → toasty ještě o jejich šířku dál (orientačně; na úzkém okně je panel užší)
     if (panel.open && !mobil) el.style.setProperty('--kb-toast-right', `${panel.width + (panel.dokOpen ? sirkaDokumentu(window.innerWidth, panel.width, panel.dokWidth) : 0)}px`); else el.style.removeProperty('--kb-toast-right');
-    if (panel.open && mobil) el.style.setProperty('--kb-toast-top', '48px'); else el.style.removeProperty('--kb-toast-top');
+    if (panel.open && mobil) el.style.setProperty('--kb-toast-top', `${spodek + 48}px`); else el.style.removeProperty('--kb-toast-top');
     return () => { el.style.removeProperty('--kb-toast-right'); el.style.removeProperty('--kb-toast-top'); };
-  }, [panel.open, panel.width, panel.dokOpen, panel.dokWidth, mobil]);
+  }, [panel.open, panel.width, panel.dokOpen, panel.dokWidth, mobil, spodek]);
   // Dokumenty (30. 9. 2026): když asistent v tahu dokument založí (draft_text) nebo přepíše
   // (update_document), panel dokumentů se na počítači sám otevře s ním — jako artefakt v Claude.
   // Jen po DOKONČENÉM tahu (loading true → false), ne při načtení starého rozhovoru z historie, a jen na
@@ -614,7 +618,10 @@ export default function AsistentPanel({ lite = false }) {
         title={nabidnoutPoradu ? t('poradaOffer') : relaxNabidka ? t('relaxOffer') : t('toggle')}
         aria-label={t('toggle')}
         data-testid="chat-tab"
-        className="fixed right-0 top-24 z-30 flex items-center gap-1.5 rounded-l-lg border border-r-0 bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all"
+        // 40 px pod spodní hranou lišty (dřív pevných 96 px od okraje — s proužkem „Zkušební verze“ na telefonu
+        // ouško leželo přes panáčka; nález panelu 27. 10. 2026)
+        style={{ top: spodek + 40 }}
+        className="fixed right-0 z-30 flex items-center gap-1.5 rounded-l-lg border border-r-0 bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all"
       >
         <Bot className="w-4 h-4 text-primary" />
         <span className="hidden sm:inline text-xs font-medium">{nabidnoutPoradu ? t('poradaTab') : relaxNabidka ? t('relaxTab') : t('tab')}</span>
@@ -665,8 +672,8 @@ export default function AsistentPanel({ lite = false }) {
     <>
     {panel.dokOpen && <DokumentyPanel mobil={mobil} />}
     <aside
-      className={`fixed right-0 top-0 bottom-0 z-40 flex flex-col bg-card border-l shadow-xl w-full ${mobil ? '' : 'sm:w-auto'}`}
-      style={mobil ? (relaxNad ? { top: NAD_PODIL } : undefined) : { width: A.width, minWidth: MIN_W, maxWidth: MAX_W }}
+      className={`fixed right-0 bottom-0 z-40 flex flex-col bg-card border-l shadow-xl w-full ${mobil ? '' : 'sm:w-auto'}`}
+      style={mobil ? { top: relaxNad ? `calc(${spodek}px + ${NAD_PODIL})` : spodek } : { top: spodek, width: A.width, minWidth: MIN_W, maxWidth: MAX_W }}
       data-testid="chat-panel"
       aria-label={t('title')}
     >

@@ -242,7 +242,7 @@ H.beh(async () => {
   await page.click('[data-testid="chat-koncept-otevrit"]');
   expect(await cekej('[data-testid="chat-dok-detail"][data-kind="email"]'), '„Otevřít vedle“ otevře dokument z karty');
 
-  console.log('== telefon: přes celou obrazovku nad chatem, samo se neotevírá ==');
+  console.log('== telefon: pod lištou přes zbytek obrazovky nad chatem, samo se neotevírá ==');
   await page.setViewport({ width: 400, height: 800 });
   await page.evaluate(() => { localStorage.setItem('kb-chat-open', '1'); localStorage.setItem('kb-chat-dok-open', '0'); });
   await page.goto(`${inst.base}/map/${map.id}`, { waitUntil: 'networkidle2' });
@@ -255,7 +255,10 @@ H.beh(async () => {
   await page.click('[data-testid="chat-dokumenty-btn"]');
   expect(await cekej('[data-testid="chat-dokumenty"]'), 'telefon: tlačítko Dokumenty otevře panel');
   const bm = await box('[data-testid="chat-dokumenty"]');
-  expect(bm.width >= 399 && bm.height >= 799, `telefon: dokumenty přes celou obrazovku (${Math.round(bm.width)}×${Math.round(bm.height)})`);
+  // od 27. 10. 2026 (ukotvená lišta, rozhodnutí Richarda „i na telefonu pod lištou“): Dokumenty začínají pod lištou editoru a jdou až dolů
+  const listaDole = await page.evaluate(() => Math.round((document.querySelector('[data-app-header]')?.closest('[data-app-header-obal]') || document.querySelector('[data-app-header]'))?.getBoundingClientRect().bottom || 0));
+  expect(bm.width >= 399 && listaDole >= 40 && Math.round(bm.y) === listaDole && Math.round(bm.y + bm.height) >= 799,
+    `telefon: dokumenty pod lištou přes zbytek obrazovky (horní hrana ${Math.round(bm.y)} = lišta ${listaDole}, ${Math.round(bm.width)}×${Math.round(bm.height)})`);
   expect(await cekejTextDok('Souhrn MOBIL'), 'telefon: nový souhrn v seznamu');
   await page.click('[data-testid="chat-dok-zpet-chat"]');
   expect(await zmizi('[data-testid="chat-dokumenty"]') && !!(await page.$('[data-testid="chat-panel"]')), '„Zpět do chatu“ vrátí rozhovor');

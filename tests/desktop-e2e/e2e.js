@@ -4,8 +4,11 @@
 // Spuštění (mimo plnou regresi — leží v podsložce, run-all ji nehledá; Electron potřebuje
 // vlastní obraz a `npm install` v product/desktop):
 //   KB_TEST_IMAGE=kb-desktop node product/tests/desktop-e2e/e2e.js
-// Scénář „starší server“ (web bez desktopové části) bere KB_DESKTOP_STARY_IMAGE,
-// výchozí product-flowmap:latest. Prázdná hodnota ho přeskočí.
+// Scénář „starší server“ (web bez desktopové části) bere KB_DESKTOP_STARY_IMAGE, výchozí
+// zmrazený kb-desktop-stary-web (`docker tag kb-app:20261014 kb-desktop-stary-web` — web
+// ze 14. 10. 2026, před desktopovou částí). Prázdná hodnota nebo chybějící obraz ho přeskočí
+// s varováním. Dřív byl výchozí product-flowmap:latest — ten ale run-all chvíli předtím
+// postaví z aktuálního stromu, takže „starší“ server byl nový web (3 ❌ v regresi 26. 10. 2026).
 //
 // Rám se ovládá přes stdin (jen vývojová stavba s KB_DESKTOP_E2E=1: skryj, ukaz, popredi,
 // klikni <id>, obnov, probuzeni, ukonci) a své kroky zapisuje do JSONL logu (toast, odznak,
@@ -21,7 +24,14 @@ const { expect, sleep, waitFor } = H;
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const DESKTOP = path.join(ROOT, 'product', 'desktop');
 const OBRAZ_ELECTRON = 'kb-desktop-electron';
-const STARY_IMAGE = process.env.KB_DESKTOP_STARY_IMAGE ?? 'product-flowmap:latest';
+const STARY_IMAGE = process.env.KB_DESKTOP_STARY_IMAGE ?? 'kb-desktop-stary-web';
+
+const obrazId = (obraz) => {
+  if (!/^[a-zA-Z0-9._/:-]+$/.test(obraz)) throw new Error(`neplatný název obrazu: ${obraz}`);
+  try {
+    return execSync(`docker image inspect --format '{{.Id}}' ${obraz}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch { return ''; }
+};
 
 const volnyPort = () => new Promise((hotovo) => {
   const s = net.createServer();
@@ -351,7 +361,10 @@ H.beh(async () => {
     expect(origin(stranka.url()) === inst.base, 'klik na uloženou organizaci → zpět na server');
 
     // --- starší server (web bez desktopové části): okno i upozornění fungují, klik jde na seznam
-    if (STARY_IMAGE) {
+    const staryId = STARY_IMAGE ? obrazId(STARY_IMAGE) : '';
+    if (STARY_IMAGE && !staryId) console.log(`  ⚠️  scénář „starší server“ PŘESKOČEN: obraz ${STARY_IMAGE} tu není`);
+    if (staryId) {
+      expect(staryId !== obrazId(process.env.KB_TEST_IMAGE), `starší server běží na jiném obrazu než testovaný (${STARY_IMAGE})`);
       const stary = await H.startInstance({ slug: 'desktop-stary', image: STARY_IMAGE });
       const suS = await stary.superuser();
       await stary.register('bara@e2e.cz');

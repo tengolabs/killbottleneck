@@ -171,6 +171,47 @@ H.beh(async () => {
     const kr = await inst.api('GET', '/api/kb/ai-kredity', { token: A });
     expect(kr.status === 200 && kr.json.celkem.n === 2, `přehled kreditů zná oba tahy (n=${kr.json && kr.json.celkem && kr.json.celkem.n})`);
 
+    console.log('== stránky píše vlastní model (bod 7, Richard 26. 10. 2026): bez kvóty, 0 kreditů, strop 4 000 / celá 8 000 ==');
+    // stránka ve frontě jako po create_page; psaní = samostatný požadavek /chat/stranka/napsat
+    const adminId = (await inst.api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'admin@example.com', password: H.PW } })).json.record.id;
+    const novaStranka = async (title) => (await inst.api('POST', '/api/collections/ai_pages/records', { token: SU, body: { user: adminId, title, zadani: 'Přehled projektu pro vedení.', stav: 'ceka' } })).json.id;
+    const str1 = await novaStranka('Přehled pro vedení');
+    const nasPredS = volaniNas.length, vlPredS = volaniVlastni.length;
+    // osnova nevyjde (ani JSON, ani HTML) → záloha „celá stránka jedním voláním“ = volání s plným stropem stránky
+    fronta.push({ content: 'tohle není osnova' }, { content: '```html\n<!doctype html><html lang="cs"><head><meta charset="utf-8"><title>STR-VL</title></head><body><h1>STR-VL</h1></body></html>\n```' });
+    r = await inst.api('POST', '/api/kb/chat/stranka/napsat', { token: A, body: { id: str1 } });
+    expect(r.status === 200 && r.json.stranka && r.json.stranka.stav === 'hotovo' && /STR-VL/.test(r.json.stranka.html || ''), `stránka na vlastním modelu projde i s VYČERPANOU kvótou (${r.status} ${JSON.stringify(r.json).slice(0, 140)})`);
+    const vStr = volaniVlastni.slice(vlPredS).filter((v) => /chat\/completions/.test(v.url));
+    expect(vStr.length === 2 && volaniNas.length === nasPredS, `psaly ji jen vlastní model (${vStr.length} volání), naše AI nic`);
+    // gpt-oss = uvažující model → llm.js posílá max_completion_tokens = strop + rezerva na úvahu (KB_AI_REASONING_BUDGET 4000)
+    const strop = (v) => (v.body.max_tokens !== undefined ? v.body.max_tokens : v.body.max_completion_tokens - 4000);
+    expect(vStr.length === 2 && strop(vStr[0]) <= 4000 && strop(vStr[1]) === 8000, `strop na vlastním modelu: osnova/části ≤ 4 000, záloha celé stránky 8 000 (místo 12 000) (${vStr.map(strop).join(',')})`);
+    log = await inst.api('GET', '/api/collections/ai_chat_log/records?sort=-created&perPage=1', { token: SU });
+    const radekS = log.json && log.json.items && log.json.items[0];
+    expect(!!radekS && radekS.zdroj === 'vlastni' && Number(radekS.kredity) === 0 && Number(radekS.tokens_in) > 0, `log stránky: zdroj=vlastni, 0 kreditů (${radekS && JSON.stringify({ zdroj: radekS.zdroj, kredity: radekS.kredity, tokens_in: radekS.tokens_in })})`);
+    // vlastní model padne → stránka skončí chybou s jasnou hláškou, bez přepadu na naši AI
+    const str2 = await novaStranka('Stránka, která spadne');
+    fronta.push({ status: 500 }, { status: 500 });
+    r = await inst.api('POST', '/api/kb/chat/stranka/napsat', { token: A, body: { id: str2 } });
+    expect(r.status === 502 && r.json.code === 'ai_vlastni' && /vlastní model|own model/i.test(r.json.error || ''), `pád vlastního modelu u stránky → 502 ai_vlastni s hláškou o vlastním modelu (${r.status} ${r.json && r.json.code} ${r.json && r.json.error})`);
+    expect(volaniNas.length === nasPredS, 'ani u stránky žádný tichý přepad na naši AI');
+    fronta.length = 0;
+    // psaní po částech: osnova ≤ 2 000, kostra 6 000 (jako na naší AI — na 4 000 se v ostrém průchodu usekla), část 4 000
+    const vlPredC = volaniVlastni.length;
+    fronta.push({ content: '{"sections": [{"id": "uvod", "heading": "Úvod", "content": "Dílna: 5 kroků"}]}' },
+      { content: '```html\n<!doctype html><html lang="cs"><head><meta charset="utf-8"><title>Po částech</title></head><body><h1>Po částech</h1><main><section id="sec-uvod"></section></main></body></html>\n```' },
+      { content: '```html\n<h2>Úvod</h2><p>CAST-VL</p>\n```' });
+    r = await inst.api('POST', '/api/kb/chat/stranka/napsat', { token: A, body: { id: await novaStranka('Po částech') } });
+    const vC = volaniVlastni.slice(vlPredC).filter((v) => /chat\/completions/.test(v.url));
+    expect(r.status === 200 && r.json.stranka.stav === 'hotovo' && /CAST-VL/.test(r.json.stranka.html || ''), `po částech na vlastním modelu → hotovo (${r.status} ${r.json && (r.json.error || r.json.stranka.stav)})`);
+    expect(vC.length === 3 && strop(vC[0]) === 2000 && strop(vC[1]) === 6000 && strop(vC[2]) === 4000, `stropy: osnova 2 000, kostra 6 000, část 4 000 (${vC.map(strop).join(',')})`);
+    fronta.length = 0;
+    // model odpověděl, jen ne HTML → obsahová chyba stránky, NE „vlastní model neodpovídá“ (code ai_vlastni jen při pádu spojení)
+    fronta.push({ content: 'tohle není osnova' }, { content: 'a tohle není HTML' });
+    r = await inst.api('POST', '/api/kb/chat/stranka/napsat', { token: A, body: { id: await novaStranka('Stránka bez HTML') } });
+    expect(r.status === 502 && r.json.code === undefined && !/vlastní model neodpovídá/i.test(r.json.error || ''), `model bez HTML → 502 bez code ai_vlastni (${r.status} ${r.json && r.json.code} ${r.json && r.json.error})`);
+    fronta.length = 0;
+
     console.log('== test připojení: klíč jen na uloženou adresu ==');
     r = await inst.api('POST', '/api/kb/ai-vlastni/test', { token: A, body: { url: 'http://cizi.test/v1', model: 'gpt-oss:20b' } });
     expect(r.status === 200 && volaniCizi.length > 0 && volaniCizi.every((v) => !v.auth), `cizí původ bez klíče v požadavku → ŽÁDNÁ Authorization (${volaniCizi.map((v) => v.auth || '—').join(',')})`);
@@ -210,6 +251,8 @@ H.beh(async () => {
     expect(cfg.json.chat_vlastni === false, '/config: chat_vlastni=false');
     r = await chat(A, 'Zase ty');
     expect(r.status === 429 && r.json.code === 'ai_kvota', `po vypnutí platí zase kvóta naší AI (${r.status})`);
+    r = await inst.api('POST', '/api/kb/chat/stranka/napsat', { token: A, body: { id: await novaStranka('Stránka na naší AI') } });
+    expect(r.status === 429 && r.json.code === 'ai_kvota', `…i pro stránky: na naší AI stránka kvótu čerpá (${r.status} ${r.json && r.json.code})`);
     r = await inst.api('POST', '/api/kb/ai-vlastni', { token: A, body: { enabled: false, url: 'http://vlastni.test/v1', model: 'gpt-oss:20b', clear_token: true } });
     expect(r.status === 200 && r.json.token_set === false, 'clear_token smaže klíč');
 

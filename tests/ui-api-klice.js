@@ -21,6 +21,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
     const page = await browser.newPage();
+    // okno počítače: v 800×600 leží oznámení „Klíč vytvořen“ přes tlačítko Kopírovat (dialog pod lištou je od 27. 10. 2026 o pár px níž)
+    await page.setViewport({ width: 1280, height: 800 });
     // ne-secure context jako na self-hostu přes LAN http → jde se záložní cestou
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(window, 'isSecureContext', { get: () => false });
@@ -78,6 +80,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await btns2[1].click(); await sleep(300);
     z = await page.evaluate(() => window.__copy);
     expect(z[z.length - 1].sel === cmd2, 'zkopírovaný příkaz obsahuje token');
+    // oznámení leží přes okno; klik do něj dialog NEZAVŘE (nemodální dialog pod lištou, 27. 10. 2026 — jinak by zmizel i čerstvý klíč)
+    const oznameni = await page.$('[data-testid="toast-viewport"] > div.pointer-events-auto');
+    expect(!!oznameni, 'po kopírování je na obrazovce oznámení');
+    if (oznameni) { await oznameni.click(); await sleep(300); }
+    expect(!!(await page.$('[data-testid="api-keys-connect"]')), 'klik do oznámení dialog API klíčů nezavře');
   } catch (e) {
     fail++; console.log('  ❌ výjimka', e.message);
   } finally {

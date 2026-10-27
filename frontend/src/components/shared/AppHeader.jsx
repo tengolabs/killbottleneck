@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import TrialBanner from '@/components/shared/TrialBanner';
 import UserMenu from '@/components/shared/UserMenu';
 import { saveMode, MODE_LITE } from '@/lib/liteMode';
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Smartphone, Bot } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
 import { useAiModes, stavAsistenta } from '@/hooks/useAiEnabled';
-import { PAGE_CONTAINER } from '@/lib/layout';
+import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 
 // Jednotná hlavička přihlášené aplikace (Home i Úkoly) — stejné logo, navigace
 // a uživatelské menu všude, ať přepínání stránek nepůsobí jako „přeneslo mě to jinam".
@@ -50,19 +50,28 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
     { key: 'templates', label: t('nav.templates'), to: '/?view=templates' },
   ];
   const [orgOwn, setOrgOwn] = useState(null);
+  const obal = useRef(null);
+  useOhlasSpodekHlavicky(obal);
   const org = orgProp !== undefined ? orgProp : orgOwn;
 
   useEffect(() => {
     if (orgProp === undefined) base44.org.get().then(setOrgOwn).catch(() => {});
   }, [orgProp]);
 
+  // Ukotvená lišta (Richard 27. 10. 2026: „ať je v celé aplikaci ukotvení horní lišty s panáčkem a zvonečkem,
+  // ať pořád máš notifikace a víš, kde jsi“): obal je sticky přes celou šířku okna — odsun obsahu o otevřený
+  // panel asistenta (AsistentHost) si bere záporným okrajem zpět, panel začíná POD lištou (useSpodekHlavicky).
+  // `bg-card` na obalu je nutné: proužek je průsvitný a při rolování by jím prosvítal obsah.
   return (
-    <>
+    <div ref={obal} className="sticky top-0 z-30 bg-card transition-[margin]" style={asistent.odsun ? { marginRight: -asistent.odsun } : undefined} data-app-header-obal>
     {/* Pruh o zkušební době patří NAD hlavičku, ať ho vidí každá stránka
         s AppHeaderem — jinak by se musel opakovat na pěti místech. */}
     <TrialBanner />
     <header className="border-b bg-card" data-app-header>
-      <div className={`${PAGE_CONTAINER} min-h-14 sm:h-14 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 py-1.5 sm:py-0`}>
+      {/* Lišta využívá CELOU šířku okna, stejně jako lišta editoru mapy (px-3 sm:px-4, bez max-w):
+          Richard 27. 10. 2026 „líbí se mi víc využití plného prostoru, panáček vpravo jako v mapě“.
+          Obsah stránek pod ní má dál PAGE_CONTAINER — jen lišta jede od kraje ke kraji. */}
+      <div className="min-h-14 sm:h-14 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0">
         <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
           {backTo && (
             <Button variant="ghost" size="icon" onClick={() => navigate(backTo)} className="shrink-0">
@@ -154,6 +163,6 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
         </div>
       </div>
     </header>
-    </>
+    </div>
   );
 }

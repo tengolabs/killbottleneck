@@ -146,7 +146,7 @@
     "advancedShow": "Advanced: extra fields for the model",
     "advancedHide": "Hide advanced",
     "extraLabel": "Extra fields sent with every call (JSON) — e.g. turning thinking off in llama-server",
-    "dataWhere": "<b>Where the data goes:</b> the assistant's conversations and map extracts are sent to the address you enter — outside our EU processing, and you are responsible for that service. Photos for the assistant and voice transcription stay on our AI and use the quota.",
+    "dataWhere": "<b>Where the data goes:</b> the assistant's conversations, map extracts and the material for pages are sent to the address you enter — outside our EU processing, and you are responsible for that service. Photos for the assistant and voice transcription stay on our AI and use the quota.",
     "tunnelHelp": "<b>A PC at home:</b> never open a port straight to the internet. Put a tunnel in front of the model (Cloudflare Tunnel, Tailscale Funnel) and enable a key on the model (<c>llama-server --api-key</c>). Local network addresses (192.168.…, 10.…) and Tailscale addresses (100.x) cannot be used from here — the server must not see them. The reply has to arrive within 100 s.",
     "noKey": "This instance has no encryption key, so your API key cannot be stored safely. Contact support — until then our AI stays on.",
     "loadFailed": "The own-model settings could not be loaded. Reload the page — Save is locked so the stored values are not overwritten with empty ones.",

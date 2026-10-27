@@ -57,7 +57,8 @@ async function kosik(browser) {
   await page.type('input[type="password"]', HESLO, { delay: 10 });
   await page.click('button[type="submit"]');
   await page.waitForFunction(() => !location.pathname.includes('/login'), { timeout: 30000 }).catch(() => {});
-  await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle0', timeout: 60000 });
+  // networkidle2, ne 0: Správa organizace má od 27. 10. 2026 horní lištu se zvonečkem (trvalé realtime spojení) → „nula spojení“ nikdy nenastane
+  await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2', timeout: 60000 });
   await page.waitForSelector('[data-testid="membership-section"]', { timeout: 20000 });
   await page.$eval('[data-testid="membership-section"]', (el) => el.scrollIntoView());
   return { page, ctx };

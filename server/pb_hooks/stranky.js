@@ -522,6 +522,11 @@ function slozZadani(brief, content) {
 }
 
 const MAX_SEKCI = 10;
+// Vlastní model zákazníka (bod 7 po v0.89, Richard 26. 10. 2026: stránky píše i jeho model): strop výstupu na volání
+// a timeout jako tah chatu (cfg.timeout = 120 s) — Cloudflare Tunnel k domácímu počítači utne odpověď kolem 100 s
+// Záloha „celá stránka jedním voláním“ smí víc (ostrý průchod 26. 10.: na 4 000 se usekla bez </html> → chyba; Strata ~105 tok/s
+// stihne 8 000 za ~76 s, pomalejší stroj utne timeout); kostra jako na naší AI 6 000 (na 4 000 se taky usekla) — schválil Richard 26. 10. 2026
+const VLASTNI_PAGE_NUM_PREDICT = 4000, VLASTNI_PAGE_CELA = 8000;
 const MAX_CELKEM_MS = 15 * 60 * 1000;   // celkový rozpočet jednoho psaní (až 22 volání × KB_PAGE_TIMEOUT by jinak dalo hodiny)
 const MAX_SOUBEH_NA_UZIVATELE = 2;      // souběžné writery jednoho uživatele (každý = až 22 volání modelu)
 const MAX_PREPIS_VCELKU = 100 * 1024;   // stránka bez značek (od agenta) se modelu posílá celá → nad tohle odmítnout
@@ -659,16 +664,21 @@ function napsat(app, e, body) {
   store.setFunc(klicU, (n) => { const c = Number(n) || 0; if (c >= MAX_SOUBEH_NA_UZIVATELE) { moc = true; return n; } return c + 1; });
   const uvolni = () => { store.set(klic, 0); store.setFunc(klicU, (n) => Math.max(0, (Number(n) || 0) - 1)); };
   if (moc) { store.set(klic, 0); return { status: 429, body: { error: t(L, "err.pageTooManyWriting", { max: MAX_SOUBEH_NA_UZIVATELE }) } }; }
-  const brzda = C.chatBrzda(e, L, { _stranka: true });
-  if (brzda) { uvolni(); return brzda; }
+  // konfigurace PŘED brzdou: na vlastním modelu zákazníka stránka kvótu nečerpá (jako tah chatu), hodinová brzda zůstává
   const cfgR = C.chatCfg(e, body || {}, L);
   if (cfgR.chyba) { uvolni(); return cfgR.chyba; }
   const cfg = cfgR.cfg;
+  const brzda = C.chatBrzda(e, L, { _stranka: true }, cfg);
+  if (brzda) { uvolni(); return brzda; }
+  const timeout = cfg.vlastni ? Math.min(l.timeout, Number(cfg.timeout) || l.timeout) : l.timeout;
+  const numPredict = cfg.vlastni ? Math.min(l.numPredict, VLASTNI_PAGE_NUM_PREDICT) : l.numPredict;
+  const numPredictCela = cfg.vlastni ? Math.min(l.numPredict, VLASTNI_PAGE_CELA) : l.numPredict;
 
   const prepis = !!rec.getString("html");
   const stats = { calls: 0, in: 0, out: 0, cached: 0, tools: ["page_writer"], skupiny: ["stranky"], modely: [], volani: [] };
   const t0 = Date.now();
   let chyba = null;
+  let padVlastniho = false; // selhalo spojení s vlastním modelem zákazníka (ne obsah odpovědi) → code ai_vlastni
   const kroky = [];
   let doc = "";
   // krok = {k: osnova|kostra|sekce|cela, t: nadpis části, s: ceka|bezi|hotovo|chyba, ms}
@@ -679,7 +689,7 @@ function napsat(app, e, body) {
     app.save(rec);
     store.set(klic, Date.now());
   };
-  const zavolej = (system, user, numPredict, krokRec) => {
+  const zavolej = (system, user, nVolani, krokRec) => {
     const s = {};
     if (Date.now() - t0 > MAX_CELKEM_MS) throw chybaS(504, "err.pageBudget", { min: Math.round(MAX_CELKEM_MS / 60000) });
     krokRec.s = "bezi"; krokRec.od = Date.now();
@@ -687,19 +697,19 @@ function napsat(app, e, body) {
     let out;
     try {
       out = llmChat(cfg, system, user, {
-        numPredict: numPredict + (cfg.think ? 4000 : 0), timeout: l.timeout, lang: L, stats: s, temperature: 0.4,
+        numPredict: nVolani + (cfg.think ? 4000 : 0), timeout: timeout, lang: L, stats: s, temperature: 0.4,
         think: cfg.think === undefined ? false : cfg.think,
       });
     } finally {
       stats.calls += 1; stats.in += s.in || 0; stats.out += s.out || 0; stats.cached += s.cached || 0;
       stats.model = s.model || cfg.model || ""; if (!stats.modely.includes(stats.model)) stats.modely.push(stats.model);
-      stats.volani.push({ model: stats.model, provider: cfg.provider || "", in: s.in || 0, cached: s.cached || 0, out: s.out || 0, tier: "heavy", druh: "stranka" });
+      stats.volani.push({ model: stats.model, provider: cfg.provider || "", in: s.in || 0, cached: s.cached || 0, out: s.out || 0, tier: "heavy", druh: "stranka", vlastni: !!cfg.vlastni }); // vlastní model = 0 kreditů (kredity.js)
       krokRec.ms = Date.now() - krokRec.od;
     }
     return out;
   };
   const hotovKrok = (k) => { k.s = "hotovo"; };
-  const nPlan = Math.min(l.numPredict, 2000), nKostra = Math.min(l.numPredict, 6000), nSekce = Math.min(l.numPredict, 4000);
+  const nPlan = Math.min(numPredict, 2000), nKostra = Math.min(numPredictCela, 6000), nSekce = Math.min(numPredict, 4000);
   nastavStav(app, rec, "pise", "");
   // do ai_chat_prubeh (ukazatel průběhu TAHU) writer nezapisuje: uživatel mezitím chatuje a tah i writer by si ukazatel
   // navzájem nulovaly; panel Stránek má vlastní `prubeh` v záznamu (/checkup 25. 10. 2026)
@@ -717,7 +727,7 @@ function napsat(app, e, body) {
     // celá stránka jedním voláním (záloha)
     const cela = () => {
       const k = krok("cela", "");
-      const html = vytahniHtml(zavolej(W.system, prepis ? W.prepis(p) : W.nova(p), l.numPredict, k));
+      const html = vytahniHtml(zavolej(W.system, prepis ? W.prepis(p) : W.nova(p), numPredictCela, k));
       if (!html) { k.s = "chyba"; throw chybaS(502, "err.pageNoHtml"); }
       hotovKrok(k);
       return html;
@@ -789,7 +799,10 @@ function napsat(app, e, body) {
   } catch (err) {
     chyba = err && err.klic ? t(L, err.klic, err.params || {}) : String(err && err.message ? err.message : err);
     // obecná chyba dopravy k modelu nese URL brány → člen dostane krátkou hlášku, správce plné znění (jako chatChyba)
-    if (!(err && err.klic) && !cfg.podrobneChyby) chyba = t(L, "err.chatFailedShort");
+    // vlastní model zákazníka: selhal jeho stroj/tunel → říct to rovnou (jako chatChyba), bez přepnutí na naši AI
+    padVlastniho = !(err && err.klic) && !!cfg.vlastni;
+    if (padVlastniho) chyba = cfg.podrobneChyby ? t(L, "err.aiVlastniDownAdmin", { msg: chyba }) : t(L, "err.aiVlastniDown");
+    else if (!(err && err.klic) && !cfg.podrobneChyby) chyba = t(L, "err.chatFailedShort");
     for (const k of kroky) if (k.s === "bezi") k.s = "chyba";
     try { rec.set("prubeh", { kroky: kroky, od: t0 }); rec.set("rozepsano", doc); nastavStav(app, rec, "chyba", chyba); } catch (e2) { /* záznam mezitím smazán */ }
   } finally {
@@ -797,7 +810,7 @@ function napsat(app, e, body) {
   }
   C.zapisLog(app, e.auth, { id: rec.getString("chat") }, cfg, stats, Date.now() - t0, chyba);
   const fresh = najdi(app, e.auth.id, rec.id) || rec;
-  return { status: chyba ? 502 : 200, body: chyba ? { error: chyba, stranka: dto(fresh, false) } : { stranka: dto(fresh, true) } };
+  return { status: chyba ? 502 : 200, body: chyba ? Object.assign({ error: chyba, stranka: dto(fresh, false) }, padVlastniho ? { code: "ai_vlastni" } : {}) : { stranka: dto(fresh, true) } };
 }
 
 // ---------- texty pro model (nástroje list_pages / get_page) ----------

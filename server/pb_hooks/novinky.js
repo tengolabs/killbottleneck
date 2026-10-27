@@ -11,6 +11,20 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.90-beta": {
+    cs: [
+      "Horní lišta se zvonečkem a vaším panáčkem zůstává nahoře všude — při rolování Projektů a Úkolů, ve Správě organizace i s otevřeným asistentem.",
+      "Asistent, akvárium vedle chatu, Dokumenty, zásobník nápadů a stopky začínají pod lištou, takže notifikace a nabídka účtu jsou pořád po ruce.",
+      "Okna z nabídky panáčka (Můj účet, Vzhled, Pozvat, Odpracovaný čas…) se otevírají pod lištou — zvoneček jde otevřít, aniž by se okno zavřelo; klik do ztmaveného pozadí ho zavře.",
+      "Lišta jede od kraje ke kraji jako v mapě, panáček je vpravo na stejném místě na každé stránce.",
+    ],
+    en: [
+      "The top bar with the bell and your avatar stays at the top everywhere — while scrolling Projects and Tasks, in Organization settings and with the assistant open.",
+      "The assistant, the aquarium next to the chat, Documents, the idea buffer and the time log start below the bar, so notifications and your account menu are always within reach.",
+      "Windows from the avatar menu (My account, Appearance, Invite, Time worked…) open below the bar — you can open notifications without closing the window; a click on the dark background closes it.",
+      "The bar runs from edge to edge like in the map, with the avatar at the right on every page.",
+    ],
+  },
   "v0.89-beta": {
     cs: [
       "V cloudu můžete asistenta přepnout na vlastní model: ve Správě organizace → Vlastní model nebo API klíč zadáte adresu OpenAI-kompatibilního API (třeba váš počítač s grafickou kartou za tunelem, nebo poskytovatel podle vaší volby), název modelu a klíč.",

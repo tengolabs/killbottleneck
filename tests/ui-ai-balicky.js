@@ -71,7 +71,7 @@ H.beh(async () => {
   });
   expect(!!poloha && poloha.blok >= poloha.nocni, `AI blok je POD rámečkem Nočního plánování (${JSON.stringify(poloha)})`);
   const tlacitka = await page.$$eval('[data-testid^="chat-blok-"]', (els) => els.map((e) => e.getAttribute('data-testid')));
-  expect(tlacitka.join(',') === 'chat-blok-trideni,chat-blok-novy-projekt,chat-blok-po-schuzce,chat-blok-revize,chat-blok-priprava,chat-blok-tym', `tlačítka pomocníků — správce vidí i Týmovou poradu (${tlacitka.join(',')})`);
+  expect(tlacitka.join(',') === 'chat-blok-trideni,chat-blok-novy-projekt,chat-blok-po-schuzce,chat-blok-revize,chat-blok-priprava,chat-blok-tym,chat-blok-stranka', `tlačítka pomocníků — správce vidí i Týmovou poradu a Stránku ze šablony (v0.88) (${tlacitka.join(',')})`);
   expect(!(await page.$('[data-testid="chat-ai-blok-rozbalit"]')), 'na počítači se blok nesbaluje');
   const blokText = await page.$eval('[data-testid="chat-ai-blok"]', (el) => el.innerText);
   expect(/AI pomocníci/.test(blokText) && /Roztřídit poznámky/.test(blokText) && /Nový projekt s AI/.test(blokText) && /Po schůzce/.test(blokText) && /Týdenní revize/.test(blokText), 'blok: nadpis a názvy pomocníků');
@@ -192,7 +192,8 @@ H.beh(async () => {
   expect(!chyby.some((c) => /is not a function|TypeError/i.test(c)), 'po kliku žádný TypeError');
 
   console.log('== Můj den → asistent: „Probrat na ranní poradě“ a u úkolu po termínu „Zasekl ses?“ (fáze D) ==');
-  const vcera = new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
+  // včera podle KALENDÁŘE, ne „před 24 h“: v den změny času (25. 10. 2026, 25 h) vyšlo Date.now() − 86400000 večer jako dnešek
+  const vcera = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - 1); return d.toLocaleDateString('en-CA'); })();
   await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: { title: 'Sklad', nodes: [
     { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { nodeType: 'apex', apexText: 'Sklad', title: 'Sklad', status: 'todo' } },
     { id: 's1', type: 'goalNode', position: { x: 0, y: 200 }, data: { title: 'Inventura regálů', status: 'todo', owner: 'a@example.com', deadline: vcera } },
@@ -222,9 +223,9 @@ H.beh(async () => {
   await mobil.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
   await otevriPanel(mobil);
   await mobil.click('[data-testid="chat-novy"]').catch(() => {});
-  expect(await cekej('[data-testid="chat-ai-blok-rozbalit"]', 10000, mobil), 'telefon: řádek „AI pomocníci (6)“');
+  expect(await cekej('[data-testid="chat-ai-blok-rozbalit"]', 10000, mobil), 'telefon: řádek „AI pomocníci (7)“');
   const radek = await mobil.$eval('[data-testid="chat-ai-blok-rozbalit"]', (el) => el.innerText.trim());
-  expect(radek === 'AI pomocníci (6)' && !(await mobil.$('[data-testid="chat-blok-trideni"]')), `sbaleno: jen řádek, tlačítka schovaná (${radek})`);
+  expect(radek === 'AI pomocníci (7)' && !(await mobil.$('[data-testid="chat-blok-trideni"]')), `sbaleno: jen řádek, tlačítka schovaná (${radek})`);
   await mobil.click('[data-testid="chat-ai-blok-rozbalit"]');
   expect(await cekej('[data-testid="chat-blok-novy-projekt"]', 3000, mobil), 'po klepnutí se blok rozbalí');
   const sirka = await mobil.$eval('[data-testid="chat-ai-blok"]', (el) => ({ w: el.scrollWidth, c: el.clientWidth }));
@@ -290,7 +291,7 @@ H.beh(async () => {
   expect(await otevriPanel(pc), 'člen: panel asistenta');
   expect(await cekej('[data-testid="chat-ai-blok"]', 10000, pc), 'člen: AI blok');
   const tlacClen = await pc.$$eval('[data-testid^="chat-blok-"]', (els) => els.map((e) => e.getAttribute('data-testid')));
-  expect(tlacClen.length === 5 && !tlacClen.includes('chat-blok-tym') && tlacClen.includes('chat-blok-priprava'), `člen: 5 pomocníků, bez Týmové porady (${tlacClen.join(',')})`);
+  expect(tlacClen.length === 6 && tlacClen.includes('chat-blok-stranka') && !tlacClen.includes('chat-blok-tym') && tlacClen.includes('chat-blok-priprava'), `člen: 6 pomocníků, bez Týmové porady (${tlacClen.join(',')})`);
   await pc.close();
   await kontextClena.close();
   await page.bringToFront();

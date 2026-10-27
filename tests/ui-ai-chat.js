@@ -62,6 +62,12 @@ H.beh(async () => {
   console.log('== ouško → panel, stav přežije reload ==');
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-tab"]'), 'zavřený panel = ouško na pravém okraji');
+  {
+    // ouško 40 px pod spodní hranou lišty (dřív pevných 96 px od okraje — s proužkem „Zkušební verze“ leželo přes panáčka; 27. 10. 2026)
+    const spodekListy = await page.evaluate(() => Math.round(document.querySelector('[data-app-header]').getBoundingClientRect().bottom));
+    const ousko = await (await page.$('[data-testid="chat-tab"]')).boundingBox();
+    expect(Math.round(ousko.y) === spodekListy + 40, `ouško 40 px pod lištou (lišta do ${spodekListy}, ouško od ${Math.round(ousko.y)})`);
+  }
   await (await page.$('[data-testid="chat-tab"]')).click();
   expect(await cekej('[data-testid="chat-panel"]'), 'kliknutí na ouško otevře panel');
   expect(await cekejText('S čím pomoct?'), 'prázdný panel nabízí úvod a čipy');
@@ -369,34 +375,41 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-tab"]'), 'tlačítko v hlavičce panel zavře (ouško zpět)');
   await page.goto(`${inst.base}/map/${map.id}`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-tab"]'), 'ouško i v editoru mapy');
-  // LIŠTA MAPY × PANEL ASISTENTA (Richard 2. 10. 2026: „když otevřu asistenta,
-  // posune se vše a přijdu o tlačítko zpět… asistent neposouvá lištu, ale je
-  // přes ní"). Široká textová lišta (≥1850 px) se nehne a panel leží přes její
-  // pravý konec; ikonová lišta (<1850) se vedle panelu vejde celá, takže se
-  // jen zúží — překrytí by jí schovalo „+", zvonek a ⋮ menu.
+  // LIŠTA MAPY × PANEL ASISTENTA (Richard 27. 10. 2026: „ať pořád máš notifikace a víš, kde jsi, i v asistentovi“):
+  // lišta je ukotvená přes CELÉ okno a panel začíná POD její spodní hranou — v obou šířkách (ikonová < 1850 px
+  // i textová ≥ 1850 px). Nahrazuje pravidlo z 2. 10. („asistent neposouvá lištu, ale je přes ní“), které na
+  // široké liště panelem zakrývalo právě zvonek a panáčka. Šipka Zpět, směr i Zarovnat se nehnou, mapa se zúží.
   const polohaListy = () => page.evaluate(() => {
     const h = document.querySelector('[data-app-header]');
     const zpet = [...h.querySelectorAll('button')].find((b) => b.querySelector('svg.lucide-arrow-left'));
     const r = (el) => { const x = el?.getBoundingClientRect(); return x ? `${Math.round(x.left)}+${Math.round(x.width)}` : null; };
-    const vidne = [...h.querySelectorAll('button')].filter((b) => b.offsetParent);
+    // vypnuté tlačítko (Vrátit zpět bez historie) má pointer-events none → elementFromPoint ho nevidí, zakryté není
+    const vidne = [...h.querySelectorAll('button')].filter((b) => b.offsetParent && !b.disabled);
+    const nahore = (b) => { const x = b.getBoundingClientRect(); const el = document.elementFromPoint(x.x + x.width / 2, x.y + x.height / 2); return !!el && b.contains(el); };
+    const zvonek = vidne.find((b) => b.querySelector('svg.lucide-bell'));
+    const panacek = h.querySelector('button[data-user-menu]');
     return {
       zpet: r(zpet), smer: r(h.querySelector('button[data-dir="vertical"]')),
       zarovnat: r(vidne.find((b) => (b.getAttribute('data-testid') || '').startsWith('toolbar-zarovnat'))),
-      lista: r(h), okno: window.innerWidth,
+      lista: r(h), okno: window.innerWidth, spodek: Math.round(h.getBoundingClientRect().bottom),
       nejpravejsi: Math.round(Math.max(...vidne.map((b) => b.getBoundingClientRect().right))),
+      zakryto: vidne.filter((b) => !nahore(b)).length,
+      zvonek: !!zvonek && nahore(zvonek), panacek: !!panacek && nahore(panacek),
       platno: Math.round(document.querySelector('.react-flow').getBoundingClientRect().right),
     };
   });
-  const panelOd = () => page.$eval('[data-testid="chat-panel"]', (p) => Math.round(p.getBoundingClientRect().left));
+  const panelOd = () => page.$eval('[data-testid="chat-panel"]', (p) => ({ l: Math.round(p.getBoundingClientRect().left), t: Math.round(p.getBoundingClientRect().top) }));
   await sleep(600);
   const uzkaPred = await polohaListy();
   await (await page.$('[data-testid="chat-tab"]')).click();
   await cekej('[data-testid="chat-panel"]');
   await sleep(600); // doběhne přechod odsunu
   const uzkaPo = await polohaListy();
-  let panelL = await panelOd();
+  let panelP = await panelOd();
   expect(!!uzkaPred.zpet && uzkaPo.zpet === uzkaPred.zpet, `ikonová lišta (1400 px): šipka Zpět zůstala na místě (${uzkaPred.zpet} → ${uzkaPo.zpet})`);
-  expect(uzkaPo.nejpravejsi <= panelL + 1 && uzkaPo.platno <= panelL + 1, `ikonová lišta se vedle panelu vešla celá, nic pod ním (poslední tlačítko končí ${uzkaPo.nejpravejsi}, panel od ${panelL})`);
+  expect(uzkaPo.lista === '0+1400' && panelP.t === uzkaPo.spodek, `lišta přes celé okno, panel začíná pod ní (lišta ${uzkaPo.lista}, spodek ${uzkaPo.spodek}, panel od y=${panelP.t})`);
+  expect(uzkaPo.zakryto === 0 && uzkaPo.zvonek && uzkaPo.panacek, `žádné tlačítko lišty není pod panelem, zvonek i panáček klikací (zakryto ${uzkaPo.zakryto})`);
+  expect(uzkaPo.platno <= panelP.l + 1, `mapa pod lištou se zúžila vedle panelu (plátno ${uzkaPo.platno}, panel od ${panelP.l})`);
   await page.setViewport({ width: 1920, height: 900 });
   await sleep(800);
   await page.click('[data-testid="chat-zavrit"]');
@@ -407,10 +420,10 @@ H.beh(async () => {
   await cekej('[data-testid="chat-panel"]');
   await sleep(600);
   const sirokaPo = await polohaListy();
-  panelL = await panelOd();
+  panelP = await panelOd();
   expect(!!sirokaPred.zarovnat && ['zpet', 'smer', 'zarovnat'].every((k) => sirokaPo[k] === sirokaPred[k]), `široká lišta (1920 px): otevřený asistent s ní nepohnul — Zpět, směr i Zarovnat na místě (${JSON.stringify(sirokaPred)} → ${JSON.stringify(sirokaPo)})`);
-  expect(sirokaPo.lista === '0+1920' && sirokaPo.nejpravejsi > panelL, `lišta dál vede přes celé okno a panel leží přes její pravý konec (lišta ${sirokaPo.lista}, panel od ${panelL})`);
-  expect(sirokaPo.platno <= panelL + 1 && sirokaPo.platno < sirokaPred.platno, `mapa pod lištou se zúžila vedle panelu (plátno ${sirokaPred.platno} → ${sirokaPo.platno})`);
+  expect(sirokaPo.lista === '0+1920' && panelP.t === sirokaPo.spodek && sirokaPo.zakryto === 0 && sirokaPo.zvonek && sirokaPo.panacek, `lišta přes celé okno, panel POD ní, zvonek i panáček klikací (lišta ${sirokaPo.lista}, panel od y=${panelP.t}, zakryto ${sirokaPo.zakryto})`);
+  expect(sirokaPo.platno <= panelP.l + 1 && sirokaPo.platno < sirokaPred.platno, `mapa pod lištou se zúžila vedle panelu (plátno ${sirokaPred.platno} → ${sirokaPo.platno})`);
   await page.setViewport({ width: 1400, height: 900 });
   await sleep(800);
   fronta.push(text('Z-MAPY.'));
@@ -733,7 +746,9 @@ H.beh(async () => {
   // robot vlevo nahoře minimalizuje stejně jako šipka vpravo (Richard 29. 9. 2026)
   // hned po provedené akci svítí nahoře toast — dřív ležel přes hlavičku panelu a klepnutí bral on;
   // otevřený panel ho na telefonu posune pod svou hlavičku (CSS proměnná čtená ve výřezu toastů)
-  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--kb-toast-top') === '48px' && getComputedStyle(document.querySelector('[data-testid="toast-viewport"]')).top === '48px'), 'toasty na telefonu leží pod hlavičkou otevřeného panelu (48 px), ne přes její tlačítka');
+  // hlavička panelu je pod ukotvenou horní lištou (27. 10. 2026) → toasty o její výšku níž
+  const toastTop = await page.evaluate(() => ({ ocek: `${Math.round(document.querySelector('[data-app-header]').getBoundingClientRect().bottom) + 48}px`, prom: document.documentElement.style.getPropertyValue('--kb-toast-top'), css: getComputedStyle(document.querySelector('[data-testid="toast-viewport"]')).top }));
+  expect(toastTop.prom === toastTop.ocek && toastTop.css === toastTop.ocek, `toasty na telefonu leží pod hlavičkou otevřeného panelu (lišta + 48 px = ${toastTop.ocek}, je ${toastTop.prom}/${toastTop.css}), ne přes její tlačítka`);
   await page.click('[data-testid="chat-robot-zavrit"]');
   expect(await cekej('[data-testid="chat-bar"]'), 'klepnutí na robota v hlavičce chat zmenší do lišty (i s toastem na obrazovce)');
   await page.click('[data-testid="chat-bar-rozbalit"]');

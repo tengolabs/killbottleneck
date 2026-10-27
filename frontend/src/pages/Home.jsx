@@ -135,7 +135,7 @@ export default function Home() {
   }
 
   return (
-    <div className={`min-h-screen bg-background relative transition-[padding] ${bufferOpen ? 'sm:pl-72' : timeLogOpen ? 'sm:pl-80' : ''}`}>
+    <div className="min-h-screen bg-background relative">
       <SkinPattern />
       <AppHeader
         active={view === 'templates' ? 'templates' : 'projects'}
@@ -148,6 +148,8 @@ export default function Home() {
       <BufferPanel buffer={buffer} canEdit={false} onConvert={(item) => navigate(`/tasks?convert=${item.id}`)} open={bufferOpen} onToggle={toggleBuffer} fixed leftOffset={timeLogOpen ? 320 : 0} />
       {user && <TimeLogPanel fixed open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />}
       {user && <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />}
+      {/* odsun o levý panel (zásobník / stopky) nese OBSAH, ne kořen — ukotvená lišta nad panely je přes celou šířku (27. 10. 2026) */}
+      <div data-testid="obsah" className={`transition-[padding] ${bufferOpen ? 'sm:pl-72' : timeLogOpen ? 'sm:pl-80' : ''}`}>
       <div className={`${PAGE_CONTAINER} py-6 sm:py-8`}>
         {view === 'templates' ? (
           <TemplatesSection />
@@ -379,6 +381,7 @@ export default function Home() {
             )}
           </>
         )}
+      </div>
       </div>
       <ShareDialog
         open={!!shareMapId}

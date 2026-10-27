@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Loader2, Check, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
@@ -376,16 +378,15 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   // data-app-header: pod spodní hranu lišty se staví panely „fixed“ (Dokumenty asistenta, 30. 9. 2026)
   // `sticky top-0`: obě řady lišty drží nahoře, i kdyby se stránka přece jen
   // dala posunout (pojistka k `h-dvh` v GoalMapEditor — Richard 1. 10. 2026)
-  // Otevřený panel asistenta lištu NEPOSOUVÁ, leží PŘES ni (Richard 2. 10. 2026:
-  // „když otevřu asistenta, posune se vše a přijdu o tlačítko zpět… asistent
-  // neposouvá lištu, ale je přes ní"). Obsah stránky odsouvá AsistentHost
-  // (App.jsx, paddingRight = šířka panelu) — lišta si ten odsun záporným okrajem
-  // vezme zpět, takže zůstává přes celé okno a její pravý konec schová panel
-  // (z-40 nad z-10). Mapa pod lištou se dál zúží, ať je vedle panelu celá vidět.
-  // JEN u široké textové lišty (≥1850 px) — tam se vedle panelu nevešla a logo
-  // se šipkou Zpět zmizely. Ikonová lišta (<1850) se vedle panelu vejde celá;
-  // překrytí by jí naopak schovalo „+", zvonek a ⋮ menu (v něm Zpět a Sdílet).
-  const odsunPanelu = sirokaLista && user && asistent.dostupny && asistent.open ? asistent.width : 0;
+  // Lišta je přes celé okno a panel asistenta začíná POD ní (Richard 27. 10. 2026: „ať pořád máš
+  // notifikace a víš, kde jsi, i v asistentovi“) — nahrazuje pravidlo z 2. 10. („asistent neposouvá
+  // lištu, ale je přes ní“, jen ≥ 1850 px), které panelem zakrývalo právě zvonek a panáčka.
+  // Obsah stránky odsouvá AsistentHost (App.jsx, paddingRight = šířka panelu) — lišta si ten odsun
+  // záporným okrajem vezme zpět a svou výšku ohlásí (useOhlasSpodekHlavicky), panel se pod ni postaví.
+  // Mapa pod lištou se dál zúží, ať je vedle panelu celá vidět.
+  const odsunPanelu = user ? asistent.odsun : 0;
+  const obalListy = useRef(null);
+  useOhlasSpodekHlavicky(obalListy);
   // Stav ukládání v ikonové liště (640–1849 px): jen ikona, absolutně vlevo od
   // přepínače směru — nezabírá místo, takže se při uložení nic nepohne (dřív
   // text uprostřed řady odsouval přepínač směru o ~65 px). Text zůstává pro
@@ -402,7 +403,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
     </span>
   ) : null;
   return (
-      <header data-app-header style={odsunPanelu ? { marginRight: -odsunPanelu } : undefined} className="transition-[margin] sticky top-0 min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-10 shrink-0">
+      <header ref={obalListy} data-app-header style={odsunPanelu ? { marginRight: -odsunPanelu } : undefined} className="transition-[margin] sticky top-0 min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-30 shrink-0">
         <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
           {/* Značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
               U názvu projektu být nesmí — dvě loga vedle sebe by si konkurovala,

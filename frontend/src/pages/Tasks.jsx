@@ -407,7 +407,7 @@ export default function Tasks({ kalendar = false }) {
   }
 
   return (
-    <div className={`min-h-screen bg-background relative transition-[padding] ${bufferOpen ? 'sm:pl-72' : timeLogOpen ? 'sm:pl-80' : ''}`}>
+    <div className="min-h-screen bg-background relative">
       <SkinPattern />
       <AppHeader
         active={kalendar ? 'kalendar' : 'tasks'}
@@ -423,6 +423,8 @@ export default function Tasks({ kalendar = false }) {
       <TimeLogPanel fixed open={timeLogOpen} onToggle={toggleTimeLog} leftOffset={bufferOpen ? 288 : 0} />
       <ReportRailButton fixed top="top-40" leftOffset={bufferOpen ? 288 : timeLogOpen ? 320 : 0} />
 
+      {/* odsun o levý panel (zásobník / stopky) nese OBSAH, ne kořen — ukotvená lišta nad panely je přes celou šířku (27. 10. 2026) */}
+      <div data-testid="obsah" className={`transition-[padding] ${bufferOpen ? 'sm:pl-72' : timeLogOpen ? 'sm:pl-80' : ''}`}>
       <div className={`${PAGE_CONTAINER} py-6`}>
         {!kalendar && (
         <MyDaySection
@@ -750,6 +752,7 @@ export default function Tasks({ kalendar = false }) {
             }}
           />
         )}
+      </div>
       </div>
 
       {novyKalendarOpen && (

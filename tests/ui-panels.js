@@ -84,7 +84,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     console.log('== odsouvání obsahu + výlučnost panelů ==');
     const rootPad = () => page.evaluate(() => {
-      const el = document.querySelector('.min-h-screen');
+      const el = document.querySelector('[data-testid="obsah"]'); // odsun nese obal obsahu, ne kořen stránky (27. 10. 2026)
       return el ? el.className.match(/sm:pl-\d+/)?.[0] || '' : '?';
     });
     await (await page.$('button[title*="Měření času — záznamy"]')).click();

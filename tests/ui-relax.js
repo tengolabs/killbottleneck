@@ -44,6 +44,13 @@ H.beh(async () => {
   const atr = (sel, a) => page.evaluate((s, x) => document.querySelector(s)?.getAttribute(x), sel, a);
   const odpocet = () => page.evaluate(() => document.querySelector('[data-testid="relax-odpocet"]')?.textContent || '');
   const vrstva = () => page.$('[data-testid="relax-vrstva"]');
+  // ukotvená horní lišta (27. 10. 2026): scéna „vedle“ i telefonní „nad“ začínají pod její spodní hranou
+  const spodekListy = () => page.evaluate(() => Math.round(document.querySelector('[data-app-header]')?.getBoundingClientRect().bottom ?? -1));
+  const listaKlikaci = () => page.evaluate(() => {
+    const h = document.querySelector('[data-app-header]'); if (!h) return { zvonek: false, panacek: false };
+    const nahore = (b) => { if (!b) return false; const x = b.getBoundingClientRect(); const el = document.elementFromPoint(x.x + x.width / 2, x.y + x.height / 2); return !!el && b.contains(el); };
+    return { zvonek: nahore([...h.querySelectorAll('button')].find((b) => b.querySelector('svg.lucide-bell'))), panacek: nahore(h.querySelector('button[data-user-menu]')) };
+  });
   const klicRelax = `kb-relax:${me.id}`;
   const klicAktivita = `kb-relax-aktivita:${me.id}`;
   const napis = async (s) => { await page.click('[data-testid="chat-input"]'); await page.keyboard.type(s); await page.keyboard.press('Enter'); };
@@ -54,6 +61,12 @@ H.beh(async () => {
   expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="vedle"][data-scena="akvarium"]', 15000), 'po spuštění běží akvárium vedle chatu (bez odpočtu)');
   expect(await cekej('[data-testid="relax-vrstva"][data-nacteno="1"]', 20000), 'scéna se načetla');
   expect((await odpocet()) === '', `bez odpočtu (${await odpocet()})`);
+  {
+    // Richard 27. 10. 2026: lišta s panáčkem a zvonečkem je vidět a klikací i při startu s akváriem (ruší 15. 10. „na vodu je pruh aplikace“)
+    const sp = await spodekListy(); const bv0 = await (await vrstva()).boundingBox(); const bp0 = await (await page.$('[data-testid="chat-panel"]')).boundingBox(); const kl = await listaKlikaci();
+    expect(sp > 0 && Math.abs(bv0.y - sp) <= 1 && Math.abs(bp0.y - sp) <= 1, `akvárium i panel začínají pod horní lištou (lišta do ${sp}, scéna od ${Math.round(bv0.y)}, panel od ${Math.round(bp0.y)})`);
+    expect(kl.zvonek && kl.panacek, 'zvonek i panáček v liště jsou při akváriu klikací (nic je nezakrývá)');
+  }
   if (await page.$('[data-testid="chat-porada-ne"]')) await page.click('[data-testid="chat-porada-ne"]');
   // křížek přímo ve scéně (vedle „Denní světlo“): scéna pošle rodiči kb-relax-zavrit
   const scenaFr = page.frames().find((f) => /\/relax\/akvarium\.html/.test(f.url()));
@@ -120,7 +133,8 @@ H.beh(async () => {
   expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="vedle"]'), 'rozložení vedle');
   const bv = await (await vrstva()).boundingBox();
   const bp = await (await page.$('[data-testid="chat-panel"]')).boundingBox();
-  expect(bv.x === 0 && bv.y === 0 && Math.abs(bv.x + bv.width - bp.x) <= 1, `scéna od horního okraje až k levé hraně chatu, bez pruhu aplikace (vrstva do ${Math.round(bv.x + bv.width)}, chat od ${Math.round(bp.x)}, y ${Math.round(bv.y)})`);
+  const spV = await spodekListy();
+  expect(bv.x === 0 && spV > 0 && Math.abs(bv.y - spV) <= 1 && Math.abs(bv.x + bv.width - bp.x) <= 1, `scéna od spodní hrany lišty až k levé hraně chatu (vrstva do ${Math.round(bv.x + bv.width)}, chat od ${Math.round(bp.x)}, y ${Math.round(bv.y)} / lišta ${spV})`);
   fronta.push(text('VEDLE-MOCK: rybičky plavou, pracujeme dál.'));
   await napis('Co mám dnes dělat?');
   expect(await cekejText('VEDLE-MOCK'), 'chat vedle scény odpovídá (zpráva šla modelu)');
@@ -403,12 +417,13 @@ H.beh(async () => {
   expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="nad"][data-nad-listou="1"]', 5000), 'scéna zůstala, nad lištou');
   const bl2 = await (await vrstva()).boundingBox();
   const bb = await (await page.$('[data-testid="chat-bar"]')).boundingBox();
-  expect(bl2.y === 0 && Math.abs(bl2.y + bl2.height - bb.y) <= 2 && bb.y + bb.height >= 840, `scéna od 0 do ${Math.round(bl2.height)} px, lišta od ${Math.round(bb.y)} px do spodku (klikací, hlasovky dostupné)`);
+  const spT = await spodekListy();
+  expect(spT > 0 && Math.abs(bl2.y - spT) <= 1 && Math.abs(bl2.y + bl2.height - bb.y) <= 2 && bb.y + bb.height >= 840, `scéna od horní lišty (${spT}) do ${Math.round(bl2.y + bl2.height)} px, lišta chatu od ${Math.round(bb.y)} px do spodku (klikací, hlasovky dostupné)`);
   await page.click('[data-testid="chat-bar-otevrit"]');
   expect(await cekej('[data-testid="chat-panel"]') && await cekej('[data-testid="relax-vrstva"][data-rozlozeni="nad"][data-nad-listou="0"]', 5000), 'otevření z lišty → zpět 40 % nad chatem');
   const bn = await (await vrstva()).boundingBox();
   const bpn = await (await page.$('[data-testid="chat-panel"]')).boundingBox();
-  expect(bn.y === 0 && Math.abs(bn.height - 844 * 0.4) <= 2 && Math.abs(bpn.y - bn.height) <= 2 && bpn.y + bpn.height >= 840, `scéna 40 % výšky (${Math.round(bn.height)} px), chat od ${Math.round(bpn.y)} px do spodku`);
+  expect(Math.abs(bn.y - spT) <= 1 && Math.abs(bn.height - 844 * 0.4) <= 2 && Math.abs(bpn.y - (bn.y + bn.height)) <= 2 && bpn.y + bpn.height >= 840, `scéna pod lištou (od ${Math.round(bn.y)}) 40 % výšky (${Math.round(bn.height)} px), chat od ${Math.round(bpn.y)} px do spodku`);
   await page.click('[data-testid="relax-rozlozeni"]');
   expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="cela"]'), 'přepínač: přes celý displej');
   await page.click('[data-testid="relax-zpet-vedle"]');
@@ -416,8 +431,8 @@ H.beh(async () => {
   await page.setViewport({ width: 844, height: 390 });
   expect(await cekej('[data-testid="relax-vrstva"][data-rozlozeni="vedle"]', 5000), 'telefon na ležato: vedle sebe jako na počítači');
   await sleep(400);
-  const lezato = await page.evaluate(() => { const l = document.querySelector('[data-testid="relax-lista"]').getBoundingClientRect(); const v = document.querySelector('[data-testid="relax-vrstva"]').getBoundingClientRect(); return { listaY: l.y, listaW: l.width, vrstvaW: v.width, sloupec: !!document.querySelector('[data-testid="relax-sceny"]'), ikonaVListe: !!document.querySelector('[data-testid="relax-lista"] [data-testid="relax-scena-ul"]'), fokus: document.activeElement && document.activeElement.getAttribute('data-testid'), dotyk: matchMedia('(pointer: coarse)').matches }; });
-  expect(lezato.listaY === 0 && Math.abs(lezato.listaW - lezato.vrstvaW) <= 1 && !lezato.sloupec && lezato.ikonaVListe, `na ležato je lišta jeden pruh nahoře se scénami uvnitř, bez sloupce (${JSON.stringify(lezato)})`);
+  const lezato = await page.evaluate(() => { const l = document.querySelector('[data-testid="relax-lista"]').getBoundingClientRect(); const v = document.querySelector('[data-testid="relax-vrstva"]').getBoundingClientRect(); return { listaY: l.y, vrstvaY: v.y, listaW: l.width, vrstvaW: v.width, sloupec: !!document.querySelector('[data-testid="relax-sceny"]'), ikonaVListe: !!document.querySelector('[data-testid="relax-lista"] [data-testid="relax-scena-ul"]'), fokus: document.activeElement && document.activeElement.getAttribute('data-testid'), dotyk: matchMedia('(pointer: coarse)').matches }; });
+  expect(lezato.vrstvaY > 0 && lezato.listaY === lezato.vrstvaY && Math.abs(lezato.listaW - lezato.vrstvaW) <= 1 && !lezato.sloupec && lezato.ikonaVListe, `na ležato je lišta jeden pruh na horní hraně scény (pod lištou aplikace) se scénami uvnitř, bez sloupce (${JSON.stringify(lezato)})`);
   expect(!lezato.dotyk || lezato.fokus !== 'chat-input', `po otočení se políčko chatu samo nezaostří (klávesnice nevyskočí) — dotyk ${lezato.dotyk}, fokus ${lezato.fokus}`);
   await page.setViewport({ width: 390, height: 844 });
   await cekej('[data-testid="relax-vrstva"][data-rozlozeni="nad"]', 5000);

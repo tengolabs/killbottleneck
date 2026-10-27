@@ -123,7 +123,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
   }
 
   return (
-    <div className={`${pos} left-0 top-0 bottom-0 z-20 w-full sm:w-80 bg-card border-r shadow-xl flex flex-col`}>
+    <div data-testid="timelog-panel" style={fixed ? { top: spodek } : undefined} className={`${pos} left-0 ${fixed ? '' : 'top-0'} bottom-0 z-20 w-full sm:w-80 bg-card border-r shadow-xl flex flex-col`}>
       <div className="h-12 px-3 flex items-center gap-2 border-b shrink-0">
         {/* klik na ikonku/název zavírá stejně jako křížek — jedním klikem tam i zpět */}
         <button onClick={onToggle} title={t('timeLog.closeTitle')} className="flex items-center gap-2 hover:opacity-70 transition-opacity">

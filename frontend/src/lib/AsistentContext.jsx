@@ -1,3 +1,4 @@
+import { useMedia } from '@/lib/useMedia';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { nactiKlic, ulozKlic, smazKlic, KEY_RELAX, KEY_RELAX_SCENA, KEY_RELAX_ROZLOZENI, KEY_RELAX_AKTIVITA } from '@/lib/storageKeys';
 import { useAuth } from '@/lib/AuthContext';
@@ -65,6 +66,11 @@ export function AsistentProvider({ children }) {
   // AI asistentovi právě odpovídá (19. 10. 2026) — na tomhle visí tlačítka, která asistenta odjinud SPOUŠTĚJÍ
   // (Roztřídit s AI, Můj den, kalendář); `dostupny` drží jen rozložení stránky
   const [funkcni, setFunkcni] = useState(false);
+  // Odsun obsahu stránky o otevřený panel (27. 10. 2026): dřív si ho počítal AsistentHost sám; teď ho čtou i obě horní
+  // lišty (AppHeader, EditorToolbar), které si ho záporným okrajem berou zpět — lišta je ukotvená přes celé okno a panel
+  // začíná pod ní (useSpodekHlavicky). Na telefonu (< 640 px) panel překryje celou šířku, obsah se neodsouvá.
+  const siroke = useMedia('(min-width: 640px)'); // = Tailwind `sm:`
+  const odsun = dostupny && open && siroke ? width : 0;
   // Zjednodušené zobrazení (4. 10. 2026): VLASTNÍ, NEperzistentní stav otevření. `kb-chat-open`
   // patří plné aplikaci — kdo tam nechal panel otevřený, nesmí na telefonu v lite dostat chat
   // přes celou obrazovku místo seznamu (a chunk panelu by jel hned při startu, lite-bundle.js).
@@ -173,17 +179,17 @@ export function AsistentProvider({ children }) {
   }), [zapisRelax]);
 
   const value = useMemo(() => ({
-    open, setOpen, width, setWidth, dostupny, setDostupny, funkcni, setFunkcni, uzel, setUzel, liteOpen, setLiteOpen,
+    open, setOpen, width, setWidth, odsun, dostupny, setDostupny, funkcni, setFunkcni, uzel, setUzel, liteOpen, setLiteOpen,
     dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
     zadost, spust, vyridZadost,
     relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax,
-  }), [open, setOpen, width, setWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax]);
+  }), [open, setOpen, width, setWidth, odsun, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {} };
+const PRAZDNO = { open: false, width: 0, odsun: 0, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }

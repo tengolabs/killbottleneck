@@ -9,6 +9,28 @@ below before you jump several versions.
 
 ---
 
+## v0.90-beta — 2026-10-27
+
+**The top bar with the bell and your avatar now stays put everywhere: the assistant panel, the start-up aquarium, the left
+panels and the dialogs from the avatar menu all start below it, and Organization settings has the bar too.**
+
+- **Sticky top bar across the whole window.** Projects, Tasks, Calendar, Organization, Archive, Notifications and
+  Organization settings keep the bar at the top while you scroll. It spans the full window width like the map editor's
+  bar, so the avatar sits at the right edge on every page.
+- **Assistant below the bar.** The side panel, the aquarium shown next to the chat, the Documents panel, the idea buffer
+  and the time log all begin at the bottom edge of the bar — the bell and the avatar are never covered. This replaces two
+  earlier behaviours (the panel over the editor bar on wide screens, the aquarium over the bar). Full-screen relax with
+  the PIN lock still covers everything, as before.
+- **Dialogs from the avatar menu** (My account, Appearance, Invite, Time worked, API keys, AI agents, Connect agent,
+  Report a problem, About) open below the bar and the bar stays clickable: opening notifications keeps the dialog,
+  clicking the dark veil closes it. Only one of these dialogs is open at a time.
+- **Organization settings** has the application bar (with the back arrow in it) like every other page.
+- **Editor banners** (“map changed elsewhere”, “project is archived”) move the bar and everything below it together.
+- **Phone:** the assistant panel and Documents start below the two-row bar. Lite mode is unchanged.
+- Hosted instances: assistant Pages are generated on the customer's own model too (no quota), when one is set.
+
+**Upgrade notes:** none — no migrations, no new variables.
+
 ## v0.89-beta — 2026-10-25
 
 **Own model in the cloud: a hosted instance can run the assistant on the customer's own OpenAI-compatible service (home GPU behind a tunnel, own server or a provider of their choice); AI settings of the operator are now locked server-side**
