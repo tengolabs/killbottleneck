@@ -2505,7 +2505,7 @@ routerUse((e) => {
   // /api/settings, /api/crons i /_/ (viz tenant-add.sh), a self-host zkušebku
   // nemá, takže tam je trialExpired() vždy false.
   if (e.hasSuperuserAuth()) return e.next();
-  const { trialExpired, userLimitExceeded, stehujeme } = require(`${__hooks}/helpers.js`);
+  const { trialExpired, userLimitExceeded, stehujeme, predplatneSkoncilo } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   // Stěhování má přednost před vším ostatním: instance se za chvíli přesune
   // a zápis by se ztratil. 503 = dočasné, ne chyba zákazníka.
@@ -2514,6 +2514,10 @@ routerUse((e) => {
   }
   if (trialExpired() && !jeCteciPost()) {
     return e.json(402, { error: t(userLang(e.auth), "err.trialExpired") });
+  }
+  // Předplatné skončilo = stejný zámek jako vypršená zkušebka, jiná hláška (KB_PREDPLATNE_SKONCILO=1)
+  if (predplatneSkoncilo() && !jeCteciPost()) {
+    return e.json(402, { error: t(userLang(e.auth), "err.predplatneSkoncilo"), code: "subscription_ended" });
   }
   // Účtů je víc, než na kolik je tarif. Stane se přechodem ze zkušebky (ta počet
   // lidí neomezuje) na Cloud Lite (dva). Zápis se zamkne, dokud si zákazník
@@ -2718,6 +2722,8 @@ kbRoute("GET", "/config", (e) => {
     trial_until: (() => { const { trialUntil } = require(`${__hooks}/helpers.js`);
       const ms = trialUntil(); return ms ? new Date(ms).toISOString().slice(0, 10) : null; })(),
     trial_expired: (() => { const { trialExpired } = require(`${__hooks}/helpers.js`); return trialExpired(); })(),
+    // předplatné skončilo (KB_PREDPLATNE_SKONCILO=1): frontend ukáže červený pruh „zápis pozastaven" s exportem
+    subscription_ended: (() => { const { predplatneSkoncilo } = require(`${__hooks}/helpers.js`); return predplatneSkoncilo(); })(),
     // kolik lidí se ještě vejde (null = bez omezení) — FE to řekne adminovi dřív,
     // než mu pozvánku odmítne server
     max_users: (() => { const { userLimit } = require(`${__hooks}/helpers.js`); return userLimit() || null; })(),

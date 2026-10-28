@@ -179,7 +179,7 @@ function pracovatSeNesmi() {
   // ta ztráta práce, kvůli které zámek vznikl. Naměřeno A/B na téže šabloně:
   // vypršená zkušebka {"created":0}, stěhování {"created":1}.
   // (Nález kontrolního panelu 6. 8. 2026.)
-  try { return trialExpired() || stehujeme(); } catch (err) {
+  try { return trialExpired() || stehujeme() || predplatneSkoncilo(); } catch (err) {
     // Nejde-li stav zjistit, rozhoduje to, ČÍ je to riziko: instance se
     // zkušebkou raději nepracuje (jinak by při chybě běžela dál na náš účet),
     // instance bez zkušebky (self-host, placené tarify) pracuje normálně —
@@ -229,6 +229,15 @@ function userCount(app) {
 // (Richard 6. 8. 2026: „v tu dobu bych ho nenechal pracovat v tom starém.")
 function stehujeme() {
   const v = (env("STEHUJEME") || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "ano";
+}
+
+// Předplatné skončilo (Stripe platbu vzdal, nebo zákazník zrušil) — orchestrátor
+// `zamknout` nastaví KB_PREDPLATNE_SKONCILO=1: instance JEN PRO ČTENÍ jako po
+// vypršení zkušebky (data zůstávají k exportu, zápis 402), jen s jinou hláškou.
+// Richard 28. 10. 2026: neplatič do té doby jel naplno dalších 90 dnů až do smazání.
+function predplatneSkoncilo() {
+  const v = (env("PREDPLATNE_SKONCILO") || "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "ano";
 }
 
@@ -7760,7 +7769,7 @@ function formatSeriesTitle(fmt, n, baseTitle) {
 module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
   buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

@@ -16,7 +16,9 @@ import { Clock, Lock } from 'lucide-react';
 //   · SPRÁVCE organizace: nenápadný odpočet dní po CELOU zkušebku,
 //   · všichni: výrazný pruh posledních 7 dní (dřív by členy jen otravoval),
 //   · všichni: po vypršení vždy — to už je vysvětlení, ne upomínka.
-// Instance bez zkušebky (self-host, placené tarify) pruh nikdy neuvidí.
+// Instance bez zkušebky (self-host, placené tarify) pruh nikdy neuvidí —
+// VÝJIMKA: placená instance po konci předplatného (config.subscription_ended,
+// 28. 10. 2026): týž červený pruh „zápis pozastaven" + export, jen jiný text a CTA.
 const CENIK = 'https://killbottleneck.cz/ceny';
 const DNI_PRED = 7;
 
@@ -41,7 +43,9 @@ export default function TrialBanner() {
     let zivy = true;
     loadKbConfig()
       .then((cfg) => {
-        if (!zivy || !cfg?.trial_until) return;
+        if (!zivy) return;
+        if (cfg?.subscription_ended) { setStav({ vyprselo: true, predplatne: true, zbyva: 0, konec: null }); return; }
+        if (!cfg?.trial_until) return;
         const konec = new Date(cfg.trial_until + 'T23:59:59Z');
         const zbyva = Math.ceil((konec - Date.now()) / 86400000);
         setStav({ vyprselo: !!cfg.trial_expired, zbyva, konec: cfg.trial_until });
@@ -82,11 +86,11 @@ export default function TrialBanner() {
       <Ikona className="w-4 h-4 shrink-0" aria-hidden="true" />
       <span className="font-medium">
         {vyprselo
-          ? t('trial.expired')
+          ? t(stav.predplatne ? 'subscription.ended' : 'trial.expired')
           : t('trial.remaining', { count: Math.max(stav.zbyva, 0) })}
       </span>
       <a {...cta} className="underline underline-offset-2 font-semibold whitespace-nowrap">
-        {t('trial.cta')}
+        {t(stav.predplatne ? 'subscription.cta' : 'trial.cta')}
       </a>
       {/* po vypršení je cesta k datům hned v pruhu — slib „data zůstanou k exportu" (P2-03) */}
       {vyprselo && (

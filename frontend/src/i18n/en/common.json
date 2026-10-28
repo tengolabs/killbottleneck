@@ -169,6 +169,10 @@
     "exportCta": "Download data",
     "exportFailed": "Downloading the data failed, try again in a moment."
   },
+  "subscription": {
+    "ended": "The subscription has ended — your data is safe, writing is paused",
+    "cta": "Renew subscription"
+  },
   "links": {
     "inDescription": "Links in the description:"
   }

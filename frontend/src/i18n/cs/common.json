@@ -169,6 +169,10 @@
     "exportCta": "Stáhnout data",
     "exportFailed": "Stažení dat se nepodařilo, zkuste to za chvíli."
   },
+  "subscription": {
+    "ended": "Předplatné skončilo — data jsou v bezpečí, zápis je pozastavený",
+    "cta": "Obnovit předplatné"
+  },
   "links": {
     "inDescription": "Odkazy v popisu:"
   }

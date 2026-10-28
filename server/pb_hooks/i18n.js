@@ -1581,6 +1581,12 @@ const STRINGS = {
     en: "The trial has ended. Your data is safe and can be exported; to keep editing, move to a paid plan — killbottleneck.com/pricing.",
   },
 
+  // předplatné skončilo (Stripe to vzdal / zákazník zrušil) — KB_PREDPLATNE_SKONCILO=1, jen pro čtení
+  "err.predplatneSkoncilo": {
+    cs: "Předplatné skončilo. Vaše data zůstávají a jdou vyexportovat; pro další úpravy stačí předplatné obnovit — killbottleneck.cz/ceny.",
+    en: "The subscription has ended. Your data is safe and can be exported; to keep editing, renew the subscription — killbottleneck.com/pricing.",
+  },
+
   // strop uživatelů (zkušebka a tarif Cloud Lite mají 2 křesla)
   "err.userLimitReached": {
     cs: "Tenhle killBottleneck má obsazená všechna místa. Uvolněte místo smazáním účtu, nebo přejděte na tarif bez omezení počtu lidí — killbottleneck.cz/ceny.",

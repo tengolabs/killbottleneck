@@ -97,6 +97,18 @@ async function textPoPrihlaseni(browser, email = EMAIL) {
     expect(/data jsou v bezpečí/i.test(t), 'uklidňuje, že data zůstala');
     expect(!/smaz/i.test(t), 'NEmluví o mazání — nic se nemaže');
 
+    console.log('== placená instance po konci předplatného (KB_PREDPLATNE_SKONCILO=1, 28. 10. 2026) ==');
+    execSync(`docker volume rm ${VOLUME} 2>/dev/null; true`);
+    await start('', { volume: true });
+    await ucet();
+    await start('-e KB_PREDPLATNE_SKONCILO=1', { volume: true });
+    t = await textPoPrihlaseni(browser);
+    expect(/Předplatné skončilo/.test(t), 'pruh o konci předplatného');
+    expect(/data jsou v bezpečí/i.test(t), 'uklidňuje, že data zůstala');
+    expect(/Obnovit předplatné/.test(t), 'nabízí obnovu předplatného');
+    expect(/Stáhnout data/.test(t), 'export dat přímo v pruhu');
+    expect(!/Zkušební/.test(t), 'NEmluví o zkušebce — je to placený zákazník');
+
     console.log('== instance bez zkušebky ==');
     await start('');
     await ucet();
