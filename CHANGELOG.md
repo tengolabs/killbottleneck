@@ -11,19 +11,9 @@ below before you jump several versions.
 
 ## v0.92-beta — 2026-10-28
 
-**KB Cloud: when a subscription ends, the instance switches to read-only instead of disappearing — and you are told
-about a failed payment right away.**
+**Maintenance release for the hosted service. Nothing changes for self-hosted servers.**
 
-- **Read-only after the subscription ends.** If a renewal payment keeps failing, or you cancel the subscription, the
-  instance stays reachable in read-only mode: you can still sign in, browse your maps and tasks and download all your
-  data. A red bar at the top says what happened and offers **Renew subscription** and **Download data**. Renewing
-  unlocks the same instance with all its data; nothing is deleted at that point.
-- **E-mail about a failed payment.** Every time a renewal payment is declined by your bank, you get an e-mail with the
-  reason, the date of the next automatic attempt and a button to pay the invoice straight away, with another card if
-  needed. When the last attempt fails, the e-mail says the subscription is ending and how to continue.
-- Self-hosted servers are not affected.
-
-**Upgrade notes:** none — no migrations. One new hosting-only switch (`KB_PREDPLATNE_SKONCILO`), not meant for your own server.
+**Upgrade notes:** none — no migrations, no new variables for your own server.
 
 ## v0.91-beta — 2026-10-28
 

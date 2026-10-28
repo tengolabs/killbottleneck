@@ -13,14 +13,10 @@ module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
   "v0.92-beta": {
     cs: [
-      "KB Cloud: když předplatné skončí (platba opakovaně neprošla, nebo jste ho zrušili), instance se přepne jen pro čtení — mapy a úkoly si dál prohlédnete a stáhnete, v pruhu nahoře je „Obnovit předplatné“ a „Stáhnout data“. Po obnovení se otevře se všemi daty.",
-      "KB Cloud: o neúspěšné platbě za obnovu dostanete e-mail s důvodem, datem dalšího pokusu a tlačítkem k okamžitému zaplacení (i jinou kartou).",
-      "Vlastního serveru se nic z toho netýká.",
+      "Údržbové vydání pro hostovanou službu — pro vlastní server bez změn.",
     ],
     en: [
-      "KB Cloud: when a subscription ends (payment kept failing, or you cancelled), the instance switches to read-only — you can still browse and download your maps and tasks; the bar at the top offers “Renew subscription” and “Download data”. Renewing reopens it with all data.",
-      "KB Cloud: a declined renewal payment gets you an e-mail with the reason, the next attempt date and a button to pay right away (another card works too).",
-      "Self-hosted servers are not affected.",
+      "Maintenance release for the hosted service — nothing changes for self-hosted servers.",
     ],
   },
   "v0.91-beta": {
