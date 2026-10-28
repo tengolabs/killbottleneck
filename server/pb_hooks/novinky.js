@@ -11,6 +11,18 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.91-beta": {
+    cs: [
+      "Opraveno rolování: Projekty, Úkoly, Kalendář i ostatní stránky jdou zase posouvat kolečkem myši a posuvníkem — od v0.90 to nešlo a položky dole byly nedostupné.",
+      "Horní lišta se zvonečkem a panáčkem drží nahoře jako ukotvený řádek v tabulce a obsah pod ní se posouvá.",
+      "Okna z nabídky panáčka (Můj účet, Vzhled…) stránku pod sebou znehybní jen po dobu, kdy jsou otevřená.",
+    ],
+    en: [
+      "Scrolling fixed: Projects, Tasks, Calendar and all other pages scroll again with the mouse wheel and the scrollbar — since v0.90 they did not, and items further down were out of reach.",
+      "The top bar with the bell and your avatar stays at the top like a frozen header row, and the content below it scrolls.",
+      "Windows from the avatar menu (My account, Appearance…) freeze the page behind them only while they are open.",
+    ],
+  },
   "v0.90-beta": {
     cs: [
       "Horní lišta se zvonečkem a vaším panáčkem zůstává nahoře všude — při rolování Projektů a Úkolů, ve Správě organizace i s otevřeným asistentem.",

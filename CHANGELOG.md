@@ -9,6 +9,19 @@ below before you jump several versions.
 
 ---
 
+## v0.91-beta — 2026-10-28
+
+**Fix: pages scroll again with the mouse wheel. Since v0.90-beta, Projects, Tasks, Calendar and every other page with the
+top bar could not be scrolled with the wheel or the scrollbar, so items further down were out of reach.**
+
+- **Scrolling restored.** The scroll lock meant for an *open* dialog from the avatar menu (My account, Appearance, …) was
+  applied permanently, because those dialogs are mounted even while closed. The lock now applies only while such a dialog
+  is actually open and is released when it closes.
+- The pinned top bar behaves as intended: like a frozen header row — the bar stays at the top and the content below it
+  scrolls with the wheel.
+
+**Upgrade notes:** none — no migrations, no new variables.
+
 ## v0.90-beta — 2026-10-27
 
 **The top bar with the bell and your avatar now stays put everywhere: the assistant panel, the start-up aquarium, the left

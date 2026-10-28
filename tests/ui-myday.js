@@ -111,7 +111,13 @@ const clickButtonWithText = async (page, text) => {
     await sleep(1200);
     const homeText = await page.evaluate(() => document.body.innerText);
     expect(homeText.includes('Můj den'), 'panel „Můj den" je na Home');
-    expect(homeText.includes('svátek má'), `hlavička ukazuje jmeniny (${(homeText.match(/svátek má \S+/) || [''])[0]})`);
+    // ⚠️ Dny bez jmeniny (státní svátky: 1. 1., 1. 5., 8. 5., 5.–6. 7., 28. 9., 28. 10., 17. 11., 24.–26. 12.) řádek záměrně
+    // NEMAJÍ (lib/nameDays.js) — 28. 10. 2026 byla regrese červená jen kvůli datu. Očekávání ze stejného kalendáře jako appka
+    // (jako ui-lite.js), den bez jmeniny se kontroluje obráceně.
+    const { todayNameDay } = await import('file://' + require('path').resolve(__dirname, '../frontend/src/lib/nameDays.js'));
+    const dnesJmeno = todayNameDay();
+    if (dnesJmeno) expect(homeText.includes(`svátek má ${dnesJmeno}`), `hlavička ukazuje jmeniny (${(homeText.match(/svátek má \S+/) || [''])[0]} — čekáno ${dnesJmeno})`);
+    else expect(!homeText.includes('svátek má'), 'dnes je den bez jmeniny → řádek „svátek má“ se nezobrazuje');
     expect(homeText.includes('PRESLY-UKOL-XYZ') && homeText.includes('Po termínu'), 'sekce Po termínu ukazuje úkol jménem');
     // „Zadal jsem": delegovaný úkol je vidět v samostatné sekci s e-mailem řešitele,
     // ale NEmíchá se do mých sekcí (Po termínu ukazuje jen mé úkoly)

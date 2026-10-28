@@ -36,11 +36,16 @@ H.beh(async () => {
   expect(await cekej('[data-app-header]'), 'lišta na titulce');
   let l = await lista();
   expect(l.sticky === 'sticky' && l.obalTop === 0 && l.proužek >= 20 && l.left === 0 && l.right === l.okno, `obal lišty (i s proužkem ${l.proužek} px) je sticky přes celé okno (${l.sticky}, od ${l.obalTop}, ${l.left}–${l.right} / ${l.okno})`);
-  await page.evaluate(() => { const d = document.createElement('div'); d.style.height = '3000px'; d.setAttribute('data-testid', 'vycpavka'); document.querySelector('[data-testid="obsah"]').appendChild(d); window.scrollTo(0, 600); });
-  await sleep(300);
+  // ⚠️ Rolovat KOLEČKEM, ne window.scrollTo: programové rolování projde i přes `body{overflow:hidden}`, takže zámek
+  // rolování z dialogů pod lištou (platil trvale, v0.90-beta — Richard 28. 10. 2026: „nefunguje posun obrazovky dolů“)
+  // by tu zůstal neviděn. Kolečko = to, co dělá uživatel.
+  const kolecko = async (dy = 600) => { await page.mouse.move(700, 450); await page.mouse.wheel({ deltaY: dy }); await sleep(400); return page.evaluate(() => window.scrollY); };
+  const zamekTela = () => page.evaluate(() => getComputedStyle(document.body).overflow);
+  expect((await zamekTela()) !== 'hidden', `bez otevřeného dialogu tělo stránky NEMÁ zamčené rolování (body overflow ${await zamekTela()})`);
+  await page.evaluate(() => { const d = document.createElement('div'); d.style.height = '3000px'; d.setAttribute('data-testid', 'vycpavka'); document.querySelector('[data-testid="obsah"]').appendChild(d); });
+  let scrollY = await kolecko();
   l = await lista();
-  const scrollY = await page.evaluate(() => window.scrollY);
-  expect(scrollY >= 500 && l.obalTop === 0 && l.zvonek && l.panacek, `po odrolování o ${scrollY} px lišta i proužek zůstaly nahoře (obal od ${l.obalTop}), zvonek i panáček klikací`);
+  expect(scrollY >= 500 && l.obalTop === 0 && l.zvonek && l.panacek, `po odrolování KOLEČKEM o ${scrollY} px lišta i proužek zůstaly nahoře (obal od ${l.obalTop}), zvonek i panáček klikací`);
   await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector('[data-testid="vycpavka"]')?.remove(); });
 
   console.log('== otevřený asistent: lišta přes celé okno, panel pod ní, nic z lišty nezakryté ==');
@@ -147,6 +152,13 @@ H.beh(async () => {
   await page.keyboard.press('Escape');
   await sleep(300);
   expect(!(await page.$('[role="dialog"]')), `Escape dialog zavřel (${await page.evaluate(() => [...document.querySelectorAll('[role="dialog"]')].map((d) => (d.getAttribute('data-pod-listou') || '-') + ':' + d.textContent.slice(0, 50)).join(' | ') + ' fokus=' + (document.activeElement && document.activeElement.tagName))})`);
+  // po zavření dialogu se rolování těla odemkne a kolečko zase posouvá stránku (dialogy z nabídky zůstávají namontované zavřené)
+  await sleep(400); // dojíždí zavírací animace (Presence) — až pak se zámek pouští
+  expect((await zamekTela()) !== 'hidden', `po zavření dialogu je rolování těla odemčené (body overflow ${await zamekTela()})`);
+  await page.evaluate(() => { const d = document.createElement('div'); d.style.height = '3000px'; d.setAttribute('data-testid', 'vycpavka'); document.body.appendChild(d); });
+  scrollY = await kolecko();
+  expect(scrollY >= 500, `po zavření dialogu stránka roluje kolečkem (${scrollY} px)`);
+  await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector('[data-testid="vycpavka"]')?.remove(); });
 
   console.log('== editor mapy: pruh nad lištou posouvá i panel (archivovaný projekt + pruh za běhu) ==');
   const mapa = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: {

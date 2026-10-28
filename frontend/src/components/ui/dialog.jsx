@@ -14,9 +14,23 @@ import { useSpodekHlavicky } from "@/hooks/useSpodekHlavicky"
 const PodListouCtx = React.createContext(false)
 const PodListouProvider = ({ children }) => <PodListouCtx.Provider value={true}>{children}</PodListouCtx.Provider>
 
-const Dialog = (props) => {
+// Zámek rolování těla po dobu OTEVŘENÉHO dialogu pod lištou (Radix ho v nemodálním režimu nedrží).
+// Sedí na kořeni (zná `open`), NE na DialogContent: ten je v DOM stromu React i u zavřeného dialogu
+// (UserMenu drží všech 10 dialogů namontovaných s open=false) a zámek pak platil trvale → od v0.90-beta
+// nešlo kolečkem rolovat na titulce, v úkolech ani v kalendáři (Richard 28. 10. 2026). Nekontrolovaný
+// dialog (bez `open`) si stav hlídá sám přes onOpenChange.
+const Dialog = ({ open, defaultOpen, onOpenChange, ...props }) => {
   const podListou = React.useContext(PodListouCtx)
-  return <DialogPrimitive.Root {...props} modal={podListou ? false : props.modal} />
+  const [vnitrni, setVnitrni] = React.useState(!!defaultOpen)
+  const otevren = open !== undefined ? open : vnitrni
+  const zmena = React.useCallback((v) => { setVnitrni(v); if (onOpenChange) onOpenChange(v) }, [onOpenChange])
+  React.useEffect(() => {
+    if (!podListou || !otevren) return undefined
+    const puvodni = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => { document.body.style.overflow = puvodni }
+  }, [podListou, otevren])
+  return <DialogPrimitive.Root {...props} open={open} defaultOpen={defaultOpen} onOpenChange={zmena} modal={podListou ? false : props.modal} />
 }
 
 const DialogTrigger = DialogPrimitive.Trigger
@@ -40,7 +54,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 // n8n styl — Richard 14. 8. 2026). Default beze změny: max-w-lg, přebíjí se
 // className (mimo PodListouProvider se žádný stávající dialog nemění).
 // Pod lištou (PodListouProvider, 27. 10. 2026) je dialog NEMODÁLNÍ: Radix pak nezamyká rolování těla ani nedrží
-// fokus uvnitř okna — rolování těla zamykáme sami (effect níž), ztráta focus-trapu je vědomý kompromis za
+// fokus uvnitř okna — rolování těla zamyká kořen Dialog (jen OTEVŘENÝ), ztráta focus-trapu je vědomý kompromis za
 // klikací lištu (zvoneček, panáček) nad otevřeným dialogem.
 // overlayClassName = jiný závoj kolem okna (výběr vzhledu: skoro průhledný, ať je změna skinu vidět — Richard 19. 10. 2026)
 const DialogContent = React.forwardRef(({ className, children, size, overlayClassName, onInteractOutside, ...props }, ref) => {
@@ -48,12 +62,6 @@ const DialogContent = React.forwardRef(({ className, children, size, overlayClas
   const spodek = useSpodekHlavicky(podListou)
   // v nemodálním režimu Radix závoj nekreslí → vlastní, od spodní hrany lišty; okno vystředěné v pásu pod lištou
   const stylPod = podListou ? { top: `calc(50% + ${spodek / 2}px)`, ...(size === "full" ? { height: `calc(100dvh - ${spodek}px - 2rem)` } : { maxHeight: `calc(100dvh - ${spodek}px - 2rem)` }) } : undefined
-  React.useEffect(() => {
-    if (!podListou) return undefined
-    const puvodni = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    return () => { document.body.style.overflow = puvodni }
-  }, [podListou])
   const mimo = (e) => {
     if (podListou) {
       const cil = e.target
