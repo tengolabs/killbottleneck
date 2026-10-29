@@ -1172,9 +1172,13 @@ onRecordCreateRequest((e) => {
 
 // clients: autor z přihlášení (stejný vzor jako uploads/tasks — bez hooku by
 // klient z UI vznikl s prázdným owner a autor by si ho nemohl upravit)
+// 29. 10. 2026: fakturační pole přes přímý REST (dialog Klienti) se ověřují i na serveru — měna 3 písmena, registrační číslo
+// písmena/číslice/pomlčka (asistent jde přes klientUloz, tenhle hook kryje UI; dřív se „€€€“ tiše spolklo a při vystavení
+// ignorovalo). ⚠️ Logika je v faktury.js (klientRestOver): obsluhy běží v odděleném VM, funkce z úrovně tohoto souboru tam nejsou.
 onRecordCreateRequest((e) => {
   e.record.set("owner", e.auth.id);
   e.record.set("owner_email", e.auth.email());
+  require(`${__hooks}/faktury.js`).klientRestOver(e);
   e.next();
 }, "clients");
 
@@ -1182,6 +1186,7 @@ onRecordUpdateRequest((e) => {
   const orig = e.record.original();
   e.record.set("owner", orig.getString("owner")); // autorství nejde přepsat
   e.record.set("owner_email", orig.getString("owner_email"));
+  require(`${__hooks}/faktury.js`).klientRestOver(e);
   e.next();
 }, "clients");
 
@@ -2346,7 +2351,7 @@ kbRoute("GET", "/invoicing-profile/me", (e) => {
   const F = require(`${__hooks}/faktury.js`);
   const own = F.profilVlastniNacti($app, e.auth.id);
   const sp = F.profilNacti($app);
-  return e.json(200, { own: own ? F.profilDto(own) : null, shared: { complete: F.profilKompletni(sp), name: sp.name || "" }, active: own ? "vlastni" : "spolecny" });
+  return e.json(200, { own: own ? F.profilDto(own) : null, shared: { complete: F.profilKompletni(sp), name: sp.name || "" }, active: own && F.profilKompletni(own) ? "vlastni" : "spolecny" }); // neúplné vlastní = platí společné
 }, $apis.requireAuth());
 
 kbRoute("POST", "/invoicing-profile/me", (e) => {
@@ -2363,7 +2368,7 @@ kbRoute("POST", "/invoicing-profile/me", (e) => {
   if (r.chyba) return e.json(400, { error: t(L, r.chyba), field: r.pole });
   F.profilVlastniUloz($app, e.auth.id, r.profil);
   const sp = F.profilNacti($app);
-  return e.json(200, { success: true, own: F.profilDto(r.profil), shared: { complete: F.profilKompletni(sp), name: sp.name || "" }, active: "vlastni" });
+  return e.json(200, { success: true, own: F.profilDto(r.profil), shared: { complete: F.profilKompletni(sp), name: sp.name || "" }, active: F.profilKompletni(r.profil) ? "vlastni" : "spolecny" });
 }, $apis.requireAuth());
 
 // vystavené faktury: vlastní (správce všechny); ?year=2026&unpaid=1

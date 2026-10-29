@@ -31,10 +31,11 @@ export default function ClientsDialog({ open, onClose, onChanged, vybranyId }) {
   const [editColor, setEditColor] = useState('');
   // fakturační údaje klienta (9. 10. 2026): nepovinná pole pro faktury vystavené asistentem — rozbalovací
   // blok v úpravě řádku, aby zakládání zůstalo jen jméno + barva (anti-bloat: žádné povinné pole navíc)
-  const PRAZDNE_FAKT = { address: '', ico: '', dic: '', email: '' };
+  // `currency` (27. 10. 2026): výchozí měna faktur tohoto klienta (německý klient v EUR); prázdná = měna dodavatele
+  const PRAZDNE_FAKT = { address: '', ico: '', dic: '', email: '', currency: '' };
   const [editFakt, setEditFakt] = useState(PRAZDNE_FAKT);
   const [faktOpen, setFaktOpen] = useState(false);
-  const FAKT_POLE = ['address', 'ico', 'dic', 'email'];
+  const FAKT_POLE = ['address', 'ico', 'dic', 'email', 'currency'];
   // jen zakládání nového klienta; `loading` (načtení seznamu) a úpravy/mazání
   // řádků mají vlastní mechaniku
   const f = useDialogForm({ open, onClose, submit: () => create(), onError: (e) => toast({ title: t('clients.createFailed'), description: e?.message, variant: 'destructive' }) });
@@ -64,8 +65,10 @@ export default function ClientsDialog({ open, onClose, onChanged, vybranyId }) {
 
   const saveEdit = async () => {
     if (!editName.trim()) return;
+    const mena = String(editFakt.currency || '').trim().toUpperCase();
+    if (mena && !/^[A-Z]{3}$/.test(mena)) { toast({ title: t('clients.currencyInvalid'), variant: 'destructive' }); return; }
     try {
-      await base44.entities.Client.update(editId, { name: editName.trim(), color: editColor, address: editFakt.address.trim(), ico: editFakt.ico.trim(), dic: editFakt.dic.trim(), email: editFakt.email.trim() });
+      await base44.entities.Client.update(editId, { name: editName.trim(), color: editColor, address: editFakt.address.trim(), ico: editFakt.ico.trim(), dic: editFakt.dic.trim(), email: editFakt.email.trim(), currency: mena });
       setEditId(null);
       load();
       onChanged?.();
@@ -141,10 +144,10 @@ export default function ClientsDialog({ open, onClose, onChanged, vybranyId }) {
                           <Label htmlFor="client-address" className="text-xs">{t('clients.address')}</Label>
                           <Textarea id="client-address" rows={2} value={editFakt.address} onChange={(e) => setEditFakt((fk) => ({ ...fk, address: e.target.value }))} maxLength={300} className="mt-1 text-sm" data-testid="client-address" />
                         </div>
-                        {['ico', 'dic', 'email'].map((k) => (
+                        {['ico', 'dic', 'email', 'currency'].map((k) => (
                           <div key={k}>
                             <Label htmlFor={`client-${k}`} className="text-xs">{t(`clients.${k}`)}</Label>
-                            <Input id={`client-${k}`} value={editFakt[k]} onChange={(e) => setEditFakt((fk) => ({ ...fk, [k]: e.target.value }))} maxLength={k === 'email' ? 120 : 20} className="mt-1 h-8 text-sm" data-testid={`client-${k}`} />
+                            <Input id={`client-${k}`} value={editFakt[k]} onChange={(e) => setEditFakt((fk) => ({ ...fk, [k]: k === 'currency' ? String(e.target.value || '').toUpperCase() : e.target.value }))} maxLength={k === 'email' ? 120 : (k === 'currency' ? 3 : 20)} placeholder={k === 'currency' ? t('clients.currencyHint') : undefined} className={`mt-1 h-8 text-sm${k === 'currency' ? ' uppercase' : ''}`} data-testid={`client-${k}`} />
                           </div>
                         ))}
                       </div>

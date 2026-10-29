@@ -110,10 +110,8 @@
     "hint": "Společné údaje dodavatele organizace, které se tisknou na faktury vystavené asistentem vašim klientům. Fakturu vystaví kdokoli z týmu; kdo si v Můj účet nastaví vlastní údaje, fakturuje na ně a má vlastní číselnou řadu.",
     "name": "Jméno / firma na faktuře *",
     "address": "Adresa (ulice, PSČ a město) *",
-    "ico": "IČO",
-    "dic": "DIČ",
-    "vatPayer": "Jsem plátce DPH",
-    "vatRate": "Sazba DPH (%)",
+    "vatPayer": "Jsem plátce {{dan}}",
+    "vatRate": "Sazba {{dan}} (%)",
     "bankAccount": "Bankovní účet",
     "bankAccountHint": "Např. 19-2000145399/0800 nebo IBAN. IBAN pro QR platbu dopočítá aplikace.",
     "iban": "IBAN {{iban}}",
@@ -136,6 +134,19 @@
       "removeButton": "Smazat vlastní, používat společné",
       "archive": "Faktury vystavené vámi ponesou tyto údaje. Aplikace faktury neuchovává jako zákonný archiv dokladů (10 let) — PDF si uložte.",
       "openInvoices": "Vystavené faktury v Dokumentech"
-    }
+    },
+    "country": "Země, ze které fakturujete",
+    "countryDefault": "Česko (výchozí)",
+    "countryOther": "Jiná země (zadám kód)",
+    "countryCodeHint": "Dvoupísmenný kód země (IT, ES, SE…). Předvolby jako u jiné země EU: EUR, VAT 20 %, IBAN + BIC.",
+    "countryHint": "Předvolí měnu, daň, názvy identifikátorů a platební údaje. Vše jde níže přepsat.",
+    "currency": "Výchozí měna faktur",
+    "currencyHint": "Kód ISO (CZK, EUR, USD…). Klient může mít svoji měnu, faktura taky.",
+    "taxLabel": "Název daně na faktuře",
+    "taxLabelHint": "Jen když předvolba nesedí (GST, MwSt.…). Prázdné = předvolba.",
+    "bankAccountHintWorld": "IBAN (u EUR dá evropský QR kód), nebo platební údaje volně: routing + account number, sort code + account… Bez QR.",
+    "bic": "BIC / SWIFT",
+    "bicHint": "Pro zahraniční platby a evropský QR kód (8 nebo 11 znaků).",
+    "taxDisclaimer": "Aplikace nekontroluje daňové předpisy vaší země — za náležitosti dokladu (DPH, sales tax, přenesená povinnost…) odpovídá vystavitel."
   }
 }

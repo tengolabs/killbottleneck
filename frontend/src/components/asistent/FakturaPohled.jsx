@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, ChevronLeft, Download, Loader2, Receipt, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { faktury as apiFaktury, faktura as apiFaktura, fakturaZaplaceno } from '@/api/asistentApi';
+import { castka as castkaZeme, datum as datumZeme, popiskyZeme, souctyPoMenach } from '@/lib/faktura/zeme';
 
 // Faktury v panelu Dokumentů (9. 10. 2026): seznam vystavených faktur (vlastní; správce všechny) a detail
 // jedné — položky, součty, odběratel, platba, Stáhnout PDF (prohlížeč, lib/faktura líně), přepínač Zaplaceno.
@@ -11,15 +12,9 @@ import { faktury as apiFaktury, faktura as apiFaktura, fakturaZaplaceno } from '
 
 export const FAKTURA_PREFIX = 'faktura:';
 
-function castka(n, mena, lang) {
-  try { return new Intl.NumberFormat(lang === 'en' ? 'en-GB' : 'cs-CZ', { style: 'currency', currency: mena || 'CZK', minimumFractionDigits: 2 }).format(Number(n || 0)); }
-  catch { return `${Number(n || 0).toFixed(2)} ${mena || 'CZK'}`; }
-}
-function datum(ymd, lang) {
-  const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return String(ymd || '');
-  return lang === 'en' ? `${m[3]}/${m[2]}/${m[1]}` : `${Number(m[3])}. ${Number(m[2])}. ${m[1]}`;
-}
+// částky a datumy stejně jako v PDF (lib/faktura/zeme.js): 1 600,00 Kč · $1,600.00; datum podle země dodavatele (US = MM/DD/YYYY)
+const castka = (n, mena, lang) => castkaZeme(n, lang === 'en' ? 'en' : 'cs', mena);
+const datum = (ymd, lang, country) => datumZeme(ymd, lang === 'en' ? 'en' : 'cs', country);
 
 export function FakturySeznam({ verze, onOtevri }) {
   const { t, i18n } = useTranslation('asistent');
@@ -39,7 +34,8 @@ export function FakturySeznam({ verze, onOtevri }) {
   const nazevMesice = (m) => { try { return new Intl.DateTimeFormat(i18n.language === 'en' ? 'en' : 'cs', { month: 'long', year: 'numeric' }).format(new Date(`${m}-01T12:00:00`)); } catch { return m; } };
   useEffect(() => { if (mesic && rows && !mesice.includes(mesic)) setMesic(''); }, [mesic, mesice, rows]); // po „jen nezaplacené“ může měsíc zmizet
   const videt = (rows || []).filter((f) => !mesic || String(f.issued || '').startsWith(mesic));
-  const nezaplaceno = videt.filter((f) => !f.paid_on).reduce((s, f) => s + Number(f.total || 0), 0);
+  // nezaplaceno PO MĚNÁCH („1 950,00 Kč + 200,00 €“) — nikdy jedno číslo přes měny
+  const nezaplaceno = souctyPoMenach(videt.filter((f) => !f.paid_on), i18n.language === 'en' ? 'en' : 'cs', (videt[0] || {}).currency || 'CZK');
   // zobrazené faktury jako PDF v jednom ZIPu (lib/faktura/zip líně — pdf-lib + fflate mimo hlavní balík)
   const [zip, setZip] = useState(null); // null | { hotovo, celkem } | 'chyba'
   const stahniVse = async () => {
@@ -59,7 +55,7 @@ export function FakturySeznam({ verze, onOtevri }) {
         </div>
       )}
       <div className="flex items-center justify-between gap-2 px-1 pb-1 text-[11px] text-muted-foreground">
-        <span>{rows ? t('faktura.listTotal', { count: videt.length, unpaid: castka(nezaplaceno, 'CZK', i18n.language) }) : ''}</span>
+        <span>{rows ? t('faktura.listTotal', { count: videt.length, unpaid: nezaplaceno }) : ''}</span>
         <span className="inline-flex items-center gap-2">
           {videt.length > 0 && (
             <button type="button" className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60" onClick={stahniVse} disabled={!!zip && zip !== 'chyba'} data-testid="chat-faktury-zip">
@@ -84,7 +80,7 @@ export function FakturySeznam({ verze, onOtevri }) {
             <span className="text-sm font-medium truncate flex-1">{f.cislo} · {f.customer_name}</span>
             <span className="text-sm shrink-0">{castka(f.total, f.currency, i18n.language)}</span>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5 pl-6">{f.paid_on ? t('faktura.paid', { date: datum(f.paid_on, i18n.language) }) : `${t('faktura.unpaid')} · ${t('faktura.due', { date: datum(f.due, i18n.language) })}`}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 pl-6">{f.paid_on ? t('faktura.paid', { date: datum(f.paid_on, i18n.language, f.country) }) : `${t('faktura.unpaid')} · ${t('faktura.due', { date: datum(f.due, i18n.language, f.country) })}`}</p>
         </button>
       ))}
     </div>
@@ -124,17 +120,19 @@ export function FakturaDetail({ id, onZpet }) {
   );
   if (!f) return <Loader2 className="w-4 h-4 animate-spin m-4" />;
   const s = f.supplier || {}; const c = f.customer || {};
+  const Z = popiskyZeme(s.country, lang, s.tax_label); // popisky podle země dodavatele (bez země = CZ)
+  const dat = (ymd) => datum(ymd, lang, s.country);
   return (
     <div className="flex-1 flex flex-col min-h-0" data-testid="chat-faktura-detail" data-id={f.id} data-cislo={f.cislo}>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 text-sm">
         <div>
           <h2 className="text-base font-semibold inline-flex items-center gap-1.5" data-testid="chat-faktura-titulek"><Receipt className="w-4 h-4 text-primary" />{t('faktura.card', { cislo: f.cislo })}</h2>
-          <p className="text-xs text-muted-foreground">{t('faktura.issued', { date: datum(f.issued, lang) })} · {t('faktura.due', { date: datum(f.due, lang) })}</p>
-          <p className={`text-xs font-medium ${f.paid_on ? 'text-emerald-600' : 'text-amber-600'}`} data-testid="chat-faktura-stav">{f.paid_on ? t('faktura.paid', { date: datum(f.paid_on, lang) }) : t('faktura.unpaid')}</p>
+          <p className="text-xs text-muted-foreground">{t('faktura.issued', { date: dat(f.issued) })} · {t('faktura.due', { date: dat(f.due) })}</p>
+          <p className={`text-xs font-medium ${f.paid_on ? 'text-emerald-600' : 'text-amber-600'}`} data-testid="chat-faktura-stav">{f.paid_on ? t('faktura.paid', { date: dat(f.paid_on) }) : t('faktura.unpaid')}</p>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs">
-          <div><p className="text-muted-foreground font-semibold uppercase text-[10px]">{t('faktura.supplier')}</p><p className="font-medium">{s.name}</p><p className="whitespace-pre-line">{s.address}</p>{s.ico && <p>IČO {s.ico}</p>}{s.dic && <p>DIČ {s.dic}</p>}</div>
-          <div><p className="text-muted-foreground font-semibold uppercase text-[10px]">{t('faktura.customer')}</p><p className="font-medium" data-testid="chat-faktura-odberatel">{c.name}</p><p className="whitespace-pre-line">{c.address}</p>{c.ico && <p>IČO {c.ico}</p>}{c.dic && <p>DIČ {c.dic}</p>}</div>
+          <div><p className="text-muted-foreground font-semibold uppercase text-[10px]">{t('faktura.supplier')}</p><p className="font-medium">{s.name}</p><p className="whitespace-pre-line">{s.address}</p>{s.ico && <p>{Z.ico} {s.ico}</p>}{s.dic && <p>{Z.dic} {s.dic}</p>}</div>
+          <div><p className="text-muted-foreground font-semibold uppercase text-[10px]">{t('faktura.customer')}</p><p className="font-medium" data-testid="chat-faktura-odberatel">{c.name}</p><p className="whitespace-pre-line">{c.address}</p>{c.ico && <p>{Z.ico} {c.ico}</p>}{c.dic && <p>{Z.dic} {c.dic}</p>}</div>
         </div>
         <div>
           <p className="text-muted-foreground font-semibold uppercase text-[10px]">{t('faktura.items')}</p>
@@ -153,9 +151,9 @@ export function FakturaDetail({ id, onZpet }) {
             {f.vat_payer ? (
               <>
                 <p className="flex justify-between"><span className="text-muted-foreground">{t('faktura.net')}</span><span>{castka(f.subtotal, f.currency, lang)}</span></p>
-                <p className="flex justify-between"><span className="text-muted-foreground">{t('faktura.vat', { rate: f.vat_rate })}</span><span>{castka(f.vat, f.currency, lang)}</span></p>
+                <p className="flex justify-between"><span className="text-muted-foreground">{t('faktura.vat', { dan: Z.dan, rate: f.vat_rate })}</span><span>{castka(f.vat, f.currency, lang)}</span></p>
               </>
-            ) : <p className="text-muted-foreground">{t('faktura.nonVat')}</p>}
+            ) : (Z.neplatce ? <p className="text-muted-foreground">{Z.neplatce}</p> : null)}
             <p className="flex justify-between font-semibold text-sm"><span>{t('faktura.total')}</span><span data-testid="chat-faktura-celkem">{castka(f.total, f.currency, lang)}</span></p>
           </div>
         </div>
@@ -163,10 +161,11 @@ export function FakturaDetail({ id, onZpet }) {
         <div className="rounded-md bg-secondary/60 px-2.5 py-1.5 text-xs">
           {s.iban || s.bank_account ? (
             <>
-              {s.bank_account && <p>{t('faktura.account')}: <span className="font-medium">{s.bank_account}</span></p>}
+              {s.bank_account && <p className="whitespace-pre-line">{t('faktura.account')}: <span className="font-medium">{s.bank_account}</span></p>}
               {s.iban && <p>IBAN: {s.iban}</p>}
-              <p>{t('faktura.vs')}: <span className="font-medium">{f.vs}</span></p>
-              {f.spayd && <p className="text-muted-foreground">{t('faktura.qr')} — {t('faktura.qrHint')}</p>}
+              {s.bic && <p>BIC: {s.bic}</p>}
+              {Z.vs ? <p>{t('faktura.vs')}: <span className="font-medium">{f.vs}</span></p> : <p>{t('faktura.reference')}: <span className="font-medium">{f.cislo}</span></p>}
+              {(f.spayd || f.epc) && <p className="text-muted-foreground">{t('faktura.qr')} — {t('faktura.qrHint')}</p>}
             </>
           ) : <p className="text-muted-foreground">{t('faktura.noAccount')}</p>}
         </div>

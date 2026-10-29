@@ -41,7 +41,7 @@ expect(/quantity must be a positive/.test(F.validujPolozky([{ description: 'a', 
 expect(/unit_price must be/.test(F.validujPolozky([{ description: 'a', unit_price: -1 }]).error) && /unit_price must be/.test(F.validujPolozky([{ description: 'a', unit_price: 'abc' }]).error), 'cena záporná / text = chyba');
 expect(F.validujPolozky([{ description: 'a', unit_price: 5 }]).items[0].quantity === 1, 'množství chybí = 1');
 expect(/at most 50/.test(F.validujPolozky(Array.from({ length: 51 }, (_, i) => ({ description: 'p' + i, unit_price: 1 }))).error), '51 položek = chyba');
-expect(F.castka(1600) === '1 600,00 Kč' && F.castka(1234567.891) === '1 234 567,89 Kč' && F.castka(0) === '0,00 Kč', 'formát částky 1 600,00 Kč');
+expect(F.castka(1600) === '1\u00a0600,00\u00a0Kč' && F.castka(1234567.891) === '1\u00a0234\u00a0567,89\u00a0Kč' && F.castka(0) === '0,00\u00a0Kč', 'formát částky 1 600,00 Kč');
 expect(F.datumPlus('2026-10-09', 14) === '2026-10-23' && F.datumPlus('2026-12-25', 10) === '2027-01-04', 'splatnost = +dní přes konec roku');
 expect(F.slozCislo('', 2026, 1) === '20260001' && F.slozCislo('FV', 2026, 123) === 'FV20260123' && F.slozCislo('', 2026, 12345) === '202612345', 'číslo = předpona + rok + pořadí na 4 místa');
 expect(F.variabilni('FV20260123') === '20260123' && F.variabilni('20260001') === '20260001', 'VS = jen číslice');
@@ -70,7 +70,8 @@ expect(r.chyba === 'err.invAccount', 'neplatný IBAN v poli účtu = chyba');
 r = F.profilOcisti({ bank_account: '' }, { bank_account: '19-2000145399/0800', iban: 'CZ6508000000192000145399', name: 'a' });
 expect(!r.chyba && !r.profil.bank_account && !r.profil.iban, 'smazání účtu smaže i IBAN');
 r = F.profilOcisti({ vat_rate: 150 }, {}); expect(r.chyba === 'err.invVatRate', 'sazba 150 = chyba');
-r = F.profilOcisti({ currency: 'EUR' }, {}); expect(r.chyba === 'err.invCurrency', 'EUR zatím ne');
+r = F.profilOcisti({ currency: 'EUR' }, {}); expect(!r.chyba && r.profil.currency === 'EUR', 'EUR projde (27. 10. 2026: faktury pro celý svět)');
+r = F.profilOcisti({ currency: 'eu' }, {}); expect(r.chyba === 'err.invCurrency', 'měna musí být 3 písmena ISO');
 r = F.profilOcisti({ prefix: 'FAKTURA2026' }, {}); expect(r.chyba === 'err.invPrefix', 'předpona 11 znaků = chyba');
 r = F.profilOcisti({ ico: '12a' }, {}); expect(r.chyba === 'err.invIco', 'IČO s písmenem = chyba');
 expect(F.profilKompletni({ name: 'a', address: 'b' }) && !F.profilKompletni({ name: 'a' }) && JSON.stringify(F.profilChybi({})) === '["name","address"]', 'kompletní = jméno + adresa');
@@ -84,6 +85,64 @@ expect(d.profil.vat_payer === false && d.profil.vat_rate === 21 && d.profil.due_
   expect(vz.items[0].quantity === 1.001 && vz.items[0].total === 1001 && sz.subtotal === 1001, `řádek i součet z TÉHOŽ zaokrouhleného množství (${vz.items[0].total} / ${sz.subtotal})`);
   expect(F.profilOcisti({ name: 'A', address: 'B', vat_payer: true }, {}).chyba === 'err.invDicRequired' && !F.profilOcisti({ name: 'A', address: 'B', vat_payer: true, dic: 'cz 123' }, {}).chyba && F.profilOcisti({ ico: '1234 5678' }, {}).profil.ico === '12345678', 'plátce bez DIČ = chyba; DIČ/IČO bez mezer');
 
+
+console.log('== faktury pro celý svět (27. 10. 2026): země, měna, obecná daň, volný účet, symboly ==');
+expect(F.castka(1600, 'EUR') === '1\u00a0600,00\u00a0€' && F.castka(1600, 'USD') === '1\u00a0600,00\u00a0$' && F.castka(1600, 'CHF') === '1\u00a0600,00\u00a0CHF' && F.castka(1600, 'PLN') === '1\u00a0600,00\u00a0zł', 'cs: symbol za číslem (1 600,00 €), neznámá měna kódem');
+expect(F.castka(1600, 'USD', 'en') === '$1,600.00' && F.castka(1600, 'EUR', 'en') === '€1,600.00' && F.castka(1600, 'GBP', 'en') === '£1,600.00' && F.castka(1600, 'CZK', 'en') === '1,600.00 CZK' && F.castka(1234567.891, 'CHF', 'en') === '1,234,567.89 CHF', 'en: $1,600.00 · €1,600.00 · 1,600.00 CZK');
+expect(F.castka(1600) === '1\u00a0600,00\u00a0Kč' && F.castka(1600, 'CZK', 'cs') === '1\u00a0600,00\u00a0Kč', 'CZK cs beze změny (v0.86 1:1)');
+expect(F.predvolba('').currency === 'CZK' && F.predvolba('cz').currency === 'CZK' && F.predvolba('US').currency === 'USD' && F.predvolba('GB').currency === 'GBP' && F.predvolba('DE').currency === 'EUR' && F.predvolba('XX').currency === 'EUR' && F.predvolba('PL').currency === 'PLN' && F.predvolba('DE').vat_rate === 19 && F.predvolba('CH').currency === 'CHF', 'předvolba: bez země = CZ, US/GB/DE 19 %/PL zł/CH, neznámá = EU');
+expect(F.danPopisek({}, 'cs') === 'DPH' && F.danPopisek({}, 'en') === 'VAT' && F.danPopisek({ country: 'US' }, 'en') === 'Sales tax' && F.danPopisek({ country: 'DE', tax_label: 'MwSt.' }, 'en') === 'MwSt.', 'popisek daně: DPH/VAT, US Sales tax, vlastní přebíjí');
+r = F.profilOcisti({ country: 'US', name: 'Acme Consulting LLC', address: '1 Main St\nAustin, TX 78701', ico: '12-3456789', bank_account: 'Routing 021000021, Account 123456789', vat_payer: true, vat_rate: 8.25 }, {});
+expect(!r.chyba && r.profil.country === 'US' && r.profil.currency === 'USD' && r.profil.ico === '12-3456789' && r.profil.bank_account === 'Routing 021000021, Account 123456789' && !r.profil.iban && r.profil.vat_rate === 8.25 && !r.profil.dic, `US: EIN s pomlčkou, účet volný text bez IBAN, sales tax bez daňového čísla (${JSON.stringify(r)})`);
+r = F.profilOcisti({ country: 'US' }, { name: 'A', address: 'B', currency: 'CZK', vat_rate: 21 });
+expect(!r.chyba && r.profil.currency === 'USD' && r.profil.vat_rate === 0, 'změna země přednastaví měnu a sazbu');
+r = F.profilOcisti({ country: 'US', currency: 'EUR', vat_rate: 5 }, { currency: 'CZK' });
+expect(!r.chyba && r.profil.currency === 'EUR' && r.profil.vat_rate === 5, 'co přijde v téže změně, předvolba nepřepíše');
+r = F.profilOcisti({ name: 'A' }, { country: 'US', currency: 'USD', vat_rate: 0, name: 'X' });
+expect(!r.chyba && r.profil.currency === 'USD' && r.profil.vat_rate === 0, 'úprava bez země předvolbu znovu neaplikuje');
+r = F.profilOcisti({ country: 'GB', name: 'Ltd', address: 'x', ico: 'SC123456', vat_payer: true }, {});
+expect(r.chyba === 'err.invDicRequired', 'GB plátce bez VAT No. = chyba (jako CZ)');
+r = F.profilOcisti({ country: 'DE', bank_account: 'DE89 3704 0044 0532 0130 00', bic: 'cobadeffxxx' }, {});
+expect(!r.chyba && r.profil.iban === 'DE89370400440532013000' && r.profil.bic === 'COBADEFFXXX' && r.profil.currency === 'EUR', 'DE: IBAN + BIC (velká písmena), EUR');
+r = F.profilOcisti({ bic: 'COBA' }, {}); expect(r.chyba === 'err.invBic', 'BIC 4 znaky = chyba');
+r = F.profilOcisti({ country: 'USA' }, {}); expect(r.chyba === 'err.invCountry', 'země 3 písmena = chyba');
+r = F.profilOcisti({ bank_account: 'Routing 021000021' }, {}); expect(r.chyba === 'err.invAccount', 'CZ (bez země): volný text účtu dál odmítne (v0.86 1:1)');
+r = F.profilOcisti({ ico: '12-3456789' }, {}); expect(r.chyba === 'err.invIco', 'CZ: IČO s pomlčkou dál chyba');
+r = F.profilOcisti({ country: 'CZ', bank_account: '19-2000145399/0800' }, {}); expect(!r.chyba && r.profil.iban === 'CZ6508000000192000145399' && r.profil.currency === 'CZK', 'CZ výslovně = totéž co bez země');
+expect(F.jeIco('12345678', true) && !F.jeIco('12-3', true) && F.jeIco('12-3456789', false) && F.jeIco('SC123456', false) && !F.jeIco('a b', false), 'jeIco: přísně jen číslice, volně písmena a pomlčka');
+expect(F.profilDto({ country: 'US' }).profil.currency === 'USD' && F.profilDto({}).profil.currency === 'CZK' && F.profilDto({}).profil.country === '', 'DTO: výchozí měna podle země');
+
+console.log('== QR: SPAYD jen CZK, EPC (SEPA) jen EUR + IBAN ==');
+const fe = { supplier: { name: 'Hans Muster GmbH', iban: 'DE89 3704 0044 0532 0130 00', bic: 'cobadeffxxx' }, total: 2320.5, currency: 'EUR', cislo: '20260001', due: '2026-10-23' };
+const epc = F.epcQr(fe);
+expect(epc === 'BCD\n002\n1\nSCT\nCOBADEFFXXX\nHans Muster GmbH\nDE89370400440532013000\nEUR2320.50\n\n\nInvoice 20260001', `EPC přesný řetězec (${JSON.stringify(epc)})`);
+expect(F.epcQr({ ...fe, supplier: { name: 'Jan', iban: 'CZ6508000000192000145399' } }).split('\n')[4] === '' && F.epcQr({ ...fe, supplier: { name: 'Jan', iban: 'CZ6508000000192000145399' } }).includes('CZ6508000000192000145399'), 'bez BIC prázdný řádek (SEPA BIC nepovinný), český IBAN v EUR = EPC');
+expect(F.epcQr({ ...fe, currency: 'CZK' }) === '' && F.epcQr({ ...fe, currency: 'USD' }) === '' && F.epcQr({ ...fe, supplier: { name: 'x' } }) === '' && F.epcQr({ ...fe, total: 0 }) === '' && F.epcQr({ ...fe, total: 1e9 }) === '', 'EPC jen EUR + IBAN + částka 0,01–999 999 999,99');
+expect(F.epcQr({ ...fe, supplier: { name: 'x'.repeat(100), iban: fe.supplier.iban } }).split('\n')[5].length === 70, 'jméno ořezáno na 70');
+expect(F.spayd({ supplier: { iban: 'CZ6508000000192000145399' }, total: 10, currency: 'EUR', cislo: '1' }) === '' && F.spayd({ supplier: { iban: 'CZ6508000000192000145399' }, total: 10, currency: 'USD', cislo: '1' }) === '', 'SPAYD v EUR/USD prázdný (banky cizí měnu z CZK účtu odmítají)');
+expect(F.spayd({ supplier: { iban: 'CZ6508000000192000145399' }, total: 10, cislo: '1' }).startsWith('SPD*1.0*') && F.spayd({ supplier: { iban: 'CZ6508000000192000145399' }, total: 10, currency: 'CZK', cislo: '1' }).includes('CC:CZK'), 'SPAYD bez měny / CZK jako dosud');
+
+console.log('== slovenský dodavatel: domácí číslo → IBAN SK (ne CZ!), vzor SK31 1200 0000 1987 4263 7541; strop řádků účtu ==');
+expect(F.czIban('19-8742637541/1200', 'SK').iban === 'SK3112000000198742637541' && F.overIban('SK3112000000198742637541'), 'SK: 19-8742637541/1200 → SK31 1200 0000 1987 4263 7541 (ověřený mod 97)');
+expect(F.czIban('19-8742637541/1200').iban.startsWith('CZ') && F.czIban('19-2000145399/0800', 'cz').iban === 'CZ6508000000192000145399', 'bez země / CZ = český IBAN jako dosud');
+{
+  const sk = F.profilOcisti({ country: 'SK', name: 'Ján Novák', address: 'Hlavná 1\n811 01 Bratislava', bank_account: '19-8742637541/1200' }, {});
+  expect(!sk.chyba && sk.profil.iban === 'SK3112000000198742637541' && sk.profil.currency === 'EUR' && sk.profil.bank_account === '19-8742637541/1200', `profil SK: IBAN SK31…, EUR (${JSON.stringify(sk.profil).slice(0, 120)})`);
+  const epc = F.epcQr({ supplier: sk.profil, total: 100, currency: 'EUR', cislo: '20260001' });
+  expect(/\nSK3112000000198742637541\nEUR100\.00\n/.test(epc), 'EPC QR nese slovenský IBAN');
+  const chyba = F.profilOcisti({ country: 'SK', bank_account: '18-8742637541/1200' }, sk.profil);
+  expect(chyba.chyba === 'err.invAccountChecksum', 'SK: chybná kontrolní číslice = chyba (mod 11 jako CZ)');
+  const prepnuti = F.profilOcisti({ country: 'CZ', bank_account: '19-2000145399/0800' }, sk.profil);
+  expect(prepnuti.profil.iban === 'CZ6508000000192000145399', 'přepnutí země na CZ + český účet = CZ IBAN');
+  const hodne = F.profilOcisti({ country: 'US', bank_account: Array(60).fill('a').join('\n') }, {});
+  expect(hodne.profil.bank_account.split('\n').length === 4, `volný účet: nejvýš 4 řádky (bylo 60, je ${hodne.profil.bank_account.split('\n').length})`);
+  const adr = F.profilOcisti({ address: Array(40).fill('x').join('\n') }, {});
+  expect(adr.profil.address.split('\n').length === 8, 'adresa: nejvýš 8 řádků');
+}
+console.log('== popisky podle země (server = zrcadlo frontendu): IČO · EIN · Company No. · Reg. č.; Neplátce / Not VAT registered / US nic ==');
+expect(F.popiskyZeme('', 'cs').ico === 'IČO' && F.popiskyZeme('', 'en').ico === 'Company ID' && F.popiskyZeme('US', 'cs').ico === 'EIN' && F.popiskyZeme('GB', 'cs').ico === 'Company No.' && F.popiskyZeme('DE', 'cs').ico === 'Reg. č.' && F.popiskyZeme('DE', 'en').dic === 'VAT ID', 'ico/dic podle skupiny');
+expect(F.popiskyZeme('', 'cs').neplatce === 'Neplátce DPH' && F.popiskyZeme('GB', 'en').neplatce === 'Not VAT registered' && F.popiskyZeme('US', 'en').neplatce === '' && F.popiskyZeme('DE', 'en', 'MwSt.').neplatce === 'Not a MwSt. payer', 'neplátce: DPH / Not VAT registered / US nic / vlastní název daně');
+expect(F.SYMBOLY.CAD === undefined && F.castka(1600, 'CAD', 'en') === '1,600.00 CAD' && F.castka(1600, 'USD', 'en') === '$1,600.00', 'CAD kódem, USD symbolem (součty po měnách rozlišitelné)');
 
 console.log(`\n${fail ? '🔴' : '🟢'} FAKTURA-CISLA PASS ${pass} / FAIL ${fail}`);
 process.exit(fail ? 1 : 0);

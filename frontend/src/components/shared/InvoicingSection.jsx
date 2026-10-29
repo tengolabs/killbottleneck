@@ -8,6 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Receipt, Loader2, Check, ChevronDown, ChevronRight, PanelLeftOpen } from 'lucide-react';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { invoicingProfile, invoicingProfileUloz, invoicingProfileMe, invoicingProfileMeUloz } from '@/api/asistentApi';
+import { ZEME_SEZNAM, MENY, predvolba, popiskyZeme, skupina } from '@/lib/faktura/zeme';
+
+const JINA = '__jina'; // volba „Jiná země“ v selectu → pole pro dvoupísmenný kód
 
 // Údaje DODAVATELE na faktury, které asistent vystavuje klientům (9. 10. 2026). Dva režimy (24. 10. 2026):
 //  • rezim="org" (výchozí): SPOLEČNÉ údaje organizace, jen správce, Správa organizace; GET/POST /invoicing-profile
@@ -17,18 +20,21 @@ import { invoicingProfile, invoicingProfileUloz, invoicingProfileMe, invoicingPr
 // (= fakturační údaje odběratele killBottlenecku, jen hostované instance). Tahle sekce je i na self-hostu.
 // `vychoziOtevreno`: sekci rovnou rozbalit a nascrollovat (odkaz z karty asistenta „Otevřít údaje dodavatele“)
 // `onOtevritFaktury`: proklik „Vystavené faktury v Dokumentech“ (Můj účet i Správa organizace — Richard 24. 10. 2026)
+// Země (27. 10. 2026, „faktury pro kohokoli na světě“): předvolí měnu a sazbu, mění popisky IČO/DIČ (EIN, Company No.…)
+// a nápovědu k účtu (mimo CZ/SK volný text); daňovou legislativu země aplikace nekontroluje — říká to i nápověda.
 export default function InvoicingSection({ rezim = 'org', vychoziOtevreno = false, onOtevritFaktury = null }) {
   const nsReady = useLazyNs('billing');
-  const { t } = useTranslation('billing');
+  const { t, i18n } = useTranslation('billing');
   const { user } = useAuth();
   const me = rezim === 'me';
-  const PRAZDNY = { name: '', address: '', ico: '', dic: '', vat_payer: false, vat_rate: 21, bank_account: '', iban: '', email: '', prefix: '', due_days: 14 };
+  const PRAZDNY = { name: '', address: '', country: '', currency: '', ico: '', dic: '', vat_payer: false, vat_rate: 21, tax_label: '', bank_account: '', iban: '', bic: '', email: '', prefix: '', due_days: 14 };
   const [form, setForm] = useState(PRAZDNY);
   const [stav, setStav] = useState({ complete: false, missing: [] });
   const [vlastni, setVlastni] = useState(false); // režim me: má uživatel vlastní profil?
   const [spolecny, setSpolecny] = useState({ complete: false, name: '' }); // režim me: stav společného
   const [open, setOpen] = useState(!!vychoziOtevreno);
   const [loading, setLoading] = useState(true);
+  const [jinaKod, setJinaKod] = useState(false); // uživatel zvolil „Jiná země“ a píše kód
   const ref = useRef(null);
   useEffect(() => { if (vychoziOtevreno) { setOpen(true); setTimeout(() => ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50); } }, [vychoziOtevreno]);
   const [saving, setSaving] = useState(false);
@@ -39,6 +45,7 @@ export default function InvoicingSection({ rezim = 'org', vychoziOtevreno = fals
   // jinak by další uložení (třeba jen e-mailu) poslalo prázdný účet a server IBAN smazal (/checkup 24. 10. 2026)
   const sForm = (profil) => { const p = { ...PRAZDNY, ...(profil || {}) }; if (!p.bank_account && p.iban) p.bank_account = p.iban; return p; };
   const prevezmi = (r) => {
+    setJinaKod(false); // po načtení/uložení rozhoduje uložená země (neznámý kód ukáže „Jiná země“ sám)
     if (me) {
       setVlastni(r.active === 'vlastni');
       setSpolecny(r.shared || { complete: false, name: '' });
@@ -61,6 +68,16 @@ export default function InvoicingSection({ rezim = 'org', vychoziOtevreno = fals
   if ((!me && user?.role !== 'admin') || !nsReady) return null;
 
   const set = (k) => (e) => { const v = e && e.target ? (e.target.type === 'checkbox' ? e.target.checked : e.target.value) : e; setForm((f) => ({ ...f, [k]: v })); setSaved(false); };
+  // změna země = předvolba měny a sazby (jako na serveru), ostatní pole zůstávají
+  const setZeme = (e) => { const c = e.target.value; if (c === JINA) { setJinaKod(true); setForm((f) => ({ ...f, country: '' })); setSaved(false); return; } setJinaKod(false); const pv = predvolba(c); setForm((f) => ({ ...f, country: c, currency: pv.currency, vat_rate: pv.vat_rate })); setSaved(false); };
+  const lang = i18n.language === 'en' ? 'en' : 'cs';
+  const Z = popiskyZeme(form.country, lang, form.tax_label);
+  const mimoCz = skupina(form.country) !== 'CZ'; // BIC a název daně: vše mimo Česko (slovenský dodavatel dává EPC QR s BIC)
+  const cizina = mimoCz && skupina(form.country) !== 'SK'; // volný text účtu: jen mimo CZ/SK (tam platí české číslo účtu / IBAN)
+  const jinaZeme = jinaKod || (!!form.country && !ZEME_SEZNAM.some(([k]) => k === form.country));
+  // „Jiná země“: dvoupísmenný kód; předvolby se použijí, až je kód celý
+  // pole kódu zůstává otevřené i po smazání (jinak by select skočil na Česko a nechal cizí měnu); celý kód nebo prázdno = předvolba
+  const setKod = (e) => { const c = String(e.target.value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2); const pv = predvolba(c); setJinaKod(true); setForm((f) => ({ ...f, country: c, ...(c.length === 2 || c === '' ? { currency: pv.currency, vat_rate: pv.vat_rate } : {}) })); setSaved(false); };
   const save = async () => {
     setSaving(true); setError('');
     try {
@@ -105,15 +122,39 @@ export default function InvoicingSection({ rezim = 'org', vychoziOtevreno = fals
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2"><Label htmlFor="inv-name">{t('invoicing.name')}</Label><Input id="inv-name" value={form.name || ''} onChange={set('name')} autoComplete="off" className="mt-1" maxLength={200} data-testid="invoicing-name" /></div>
                 <div className="sm:col-span-2"><Label htmlFor="inv-address">{t('invoicing.address')}</Label><Textarea id="inv-address" rows={2} value={form.address || ''} onChange={set('address')} className="mt-1" maxLength={300} data-testid="invoicing-address" /></div>
-                <div><Label htmlFor="inv-ico">{t('invoicing.ico')}</Label><Input id="inv-ico" value={form.ico || ''} onChange={set('ico')} className="mt-1" maxLength={20} data-testid="invoicing-ico" /></div>
-                <div><Label htmlFor="inv-dic">{t('invoicing.dic')}</Label><Input id="inv-dic" value={form.dic || ''} onChange={set('dic')} className="mt-1" maxLength={20} data-testid="invoicing-dic" /></div>
-                <div className="flex items-center gap-2 pt-5"><input id="inv-vat" type="checkbox" checked={!!form.vat_payer} onChange={set('vat_payer')} data-testid="invoicing-vat-payer" /><Label htmlFor="inv-vat">{t('invoicing.vatPayer')}</Label></div>
-                <div><Label htmlFor="inv-vat-rate">{t('invoicing.vatRate')}</Label><Input id="inv-vat-rate" type="number" min={0} max={100} value={form.vat_rate ?? 21} onChange={set('vat_rate')} disabled={!form.vat_payer} className="mt-1" data-testid="invoicing-vat-rate" /></div>
+                <div>
+                  <Label htmlFor="inv-country">{t('invoicing.country')}</Label>
+                  <select id="inv-country" value={jinaZeme ? JINA : (form.country || '')} onChange={setZeme} className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" data-testid="invoicing-country">
+                    <option value="">{t('invoicing.countryDefault')}</option>
+                    {ZEME_SEZNAM.map(([k, cs, en]) => <option key={k} value={k}>{lang === 'en' ? en : cs} ({k})</option>)}
+                    <option value={JINA}>{t('invoicing.countryOther')}</option>
+                  </select>
+                  {jinaZeme && <Input id="inv-country-code" value={form.country || ''} onChange={setKod} className="mt-1 uppercase" maxLength={2} placeholder="IT" data-testid="invoicing-country-code" />}
+                  <p className="text-xs text-muted-foreground mt-1">{jinaZeme ? t('invoicing.countryCodeHint') : t('invoicing.countryHint')}</p>
+                </div>
+                <div>
+                  <Label htmlFor="inv-currency">{t('invoicing.currency')}</Label>
+                  <Input id="inv-currency" list="inv-currency-list" value={form.currency || ''} onChange={(e) => set('currency')(String(e.target.value || '').toUpperCase())} className="mt-1 uppercase" maxLength={3} placeholder={predvolba(form.country).currency} data-testid="invoicing-currency" />
+                  <datalist id="inv-currency-list">{MENY.map((m) => <option key={m} value={m} />)}</datalist>
+                  <p className="text-xs text-muted-foreground mt-1">{t('invoicing.currencyHint')}</p>
+                </div>
+                <div><Label htmlFor="inv-ico">{Z.ico}</Label><Input id="inv-ico" value={form.ico || ''} onChange={set('ico')} className="mt-1" maxLength={20} data-testid="invoicing-ico" /></div>
+                <div><Label htmlFor="inv-dic">{Z.dic}</Label><Input id="inv-dic" value={form.dic || ''} onChange={set('dic')} className="mt-1" maxLength={20} data-testid="invoicing-dic" /></div>
+                <div className="flex items-center gap-2 pt-5"><input id="inv-vat" type="checkbox" checked={!!form.vat_payer} onChange={set('vat_payer')} data-testid="invoicing-vat-payer" /><Label htmlFor="inv-vat">{t('invoicing.vatPayer', { dan: Z.dan })}</Label></div>
+                <div><Label htmlFor="inv-vat-rate">{t('invoicing.vatRate', { dan: Z.dan })}</Label><Input id="inv-vat-rate" type="number" min={0} max={100} step="0.01" value={form.vat_rate ?? 21} onChange={set('vat_rate')} disabled={!form.vat_payer} className="mt-1" data-testid="invoicing-vat-rate" /></div>
+                {mimoCz && (
+                  <div className="sm:col-span-2"><Label htmlFor="inv-tax-label">{t('invoicing.taxLabel')}</Label><Input id="inv-tax-label" value={form.tax_label || ''} onChange={set('tax_label')} className="mt-1" maxLength={24} placeholder={popiskyZeme(form.country, lang, '').dan} data-testid="invoicing-tax-label" /><p className="text-xs text-muted-foreground mt-1">{t('invoicing.taxLabelHint')}</p></div>
+                )}
                 <div className="sm:col-span-2">
                   <Label htmlFor="inv-account">{t('invoicing.bankAccount')}</Label>
-                  <Input id="inv-account" value={form.bank_account || form.iban || ''} onChange={set('bank_account')} autoComplete="off" className="mt-1" maxLength={40} data-testid="invoicing-account" />
-                  <p className="text-xs text-muted-foreground mt-1">{t('invoicing.bankAccountHint')}{form.iban ? ` ${t('invoicing.iban', { iban: form.iban })}` : ''}</p>
+                  {cizina
+                    ? <Textarea id="inv-account" rows={2} value={form.bank_account || form.iban || ''} onChange={set('bank_account')} autoComplete="off" className="mt-1" maxLength={120} data-testid="invoicing-account" />
+                    : <Input id="inv-account" value={form.bank_account || form.iban || ''} onChange={set('bank_account')} autoComplete="off" className="mt-1" maxLength={40} data-testid="invoicing-account" />}
+                  <p className="text-xs text-muted-foreground mt-1">{cizina ? t('invoicing.bankAccountHintWorld') : t('invoicing.bankAccountHint')}{form.iban ? ` ${t('invoicing.iban', { iban: form.iban })}` : ''}</p>
                 </div>
+                {mimoCz && (
+                  <div><Label htmlFor="inv-bic">{t('invoicing.bic')}</Label><Input id="inv-bic" value={form.bic || ''} onChange={(e) => set('bic')(String(e.target.value || '').toUpperCase())} className="mt-1 uppercase" maxLength={11} data-testid="invoicing-bic" /><p className="text-xs text-muted-foreground mt-1">{t('invoicing.bicHint')}</p></div>
+                )}
                 <div className="sm:col-span-2"><Label htmlFor="inv-email">{t('invoicing.email')}</Label><Input id="inv-email" type="email" value={form.email || ''} onChange={set('email')} className="mt-1" maxLength={120} data-testid="invoicing-email" /></div>
                 <div><Label htmlFor="inv-prefix">{t('invoicing.prefix')}</Label><Input id="inv-prefix" value={form.prefix || ''} onChange={set('prefix')} className="mt-1" maxLength={6} data-testid="invoicing-prefix" /><p className="text-xs text-muted-foreground mt-1">{t('invoicing.prefixHint')}</p></div>
                 <div><Label htmlFor="inv-due">{t('invoicing.dueDays')}</Label><Input id="inv-due" type="number" min={0} max={365} value={form.due_days ?? 14} onChange={set('due_days')} className="mt-1" data-testid="invoicing-due" /></div>
@@ -129,6 +170,7 @@ export default function InvoicingSection({ rezim = 'org', vychoziOtevreno = fals
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-3">{me ? t('invoicing.me.archive') : t('invoicing.archive')}</p>
+              <p className="text-xs text-muted-foreground mt-1" data-testid={`${T}-dane`}>{t('invoicing.taxDisclaimer')}</p>
             </>
           )}
         </div>

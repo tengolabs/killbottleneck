@@ -110,10 +110,8 @@
     "hint": "The organization's shared supplier details printed on invoices the assistant issues to your clients. Anyone on the team can issue an invoice; whoever sets their own details in My account invoices with those and gets their own number series.",
     "name": "Name / company on the invoice *",
     "address": "Address (street, ZIP and city) *",
-    "ico": "Company ID",
-    "dic": "VAT ID",
-    "vatPayer": "I am a VAT payer",
-    "vatRate": "VAT rate (%)",
+    "vatPayer": "I charge {{dan}}",
+    "vatRate": "{{dan}} rate (%)",
     "bankAccount": "Bank account",
     "bankAccountHint": "E.g. 19-2000145399/0800 or an IBAN. The app derives the IBAN for the QR payment.",
     "iban": "IBAN {{iban}}",
@@ -136,6 +134,19 @@
       "removeButton": "Remove mine, use shared",
       "archive": "Invoices you issue will carry these details. The app does not keep invoices as the legal archive (10 years) — save the PDF.",
       "openInvoices": "Issued invoices in Documents"
-    }
+    },
+    "country": "Country you invoice from",
+    "countryDefault": "Czech Republic (default)",
+    "countryOther": "Other country (enter the code)",
+    "countryCodeHint": "Two-letter country code (IT, ES, SE…). Presets as for another EU country: EUR, VAT 20 %, IBAN + BIC.",
+    "countryHint": "Presets the currency, tax, ID labels and payment details. Everything below can be changed.",
+    "currency": "Default invoice currency",
+    "currencyHint": "ISO code (CZK, EUR, USD…). A client may have their own currency, and so may an invoice.",
+    "taxLabel": "Tax name on the invoice",
+    "taxLabelHint": "Only if the preset does not fit (GST, MwSt.…). Empty = preset.",
+    "bankAccountHintWorld": "An IBAN (gives a SEPA QR code for EUR), or free-form payment details: routing + account number, sort code + account… No QR.",
+    "bic": "BIC / SWIFT",
+    "bicHint": "For foreign payments and the SEPA QR code (8 or 11 characters).",
+    "taxDisclaimer": "The app does not check the tax rules of your country — the issuer is responsible for what the invoice must contain (VAT, sales tax, reverse charge…)."
   }
 }

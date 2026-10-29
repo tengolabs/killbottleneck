@@ -286,7 +286,10 @@
     "ico": "Company ID",
     "dic": "VAT ID",
     "email": "E-mail",
-    "billingSaveFailed": "The billing details could not be saved"
+    "billingSaveFailed": "The billing details could not be saved",
+    "currency": "Invoice currency",
+    "currencyInvalid": "The currency must be a three-letter code (CZK, EUR, USD…) or empty.",
+    "currencyHint": "e.g. EUR"
   },
   "timeOverview": {
     "recentHeading": "Recent entries — a project/client can be assigned retroactively",

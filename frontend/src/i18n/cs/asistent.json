@@ -445,8 +445,7 @@
     "supplier": "Dodavatel",
     "items": "Položky",
     "net": "Základ",
-    "vat": "DPH {{rate}} %",
-    "nonVat": "Neplátce DPH",
+    "vat": "{{dan}} {{rate}} %",
     "note": "Poznámka",
     "qr": "QR platba",
     "qrHint": "Naskenujte bankovní aplikací.",
@@ -454,7 +453,7 @@
     "account": "Účet",
     "noAccount": "Bez bankovního účtu v profilu — bez platebního bloku a QR.",
     "archiveHint": "Aplikace faktury neuchovává jako zákonný archiv dokladů (10 let) — PDF si uložte.",
-    "empty": "Zatím žádné faktury. Řekněte asistentovi: „Vystav fakturu na Karla za konzultaci 2 h po 800 Kč.“",
+    "empty": "Zatím žádné faktury. Řekněte asistentovi: „Vystav fakturu na Karla za konzultaci 2 h po 800.“",
     "notFound": "Faktura nenalezena.",
     "errorLoad": "Faktury se nepodařilo načíst.",
     "errorSave": "Změnu se nepodařilo uložit.",
@@ -464,7 +463,8 @@
     "downloadAll": "Stáhnout vše (ZIP)",
     "zipping": "Připravuji {{done}}/{{total}}…",
     "month": "Měsíc vystavení",
-    "monthAll": "Všechny měsíce"
+    "monthAll": "Všechny měsíce",
+    "reference": "Reference"
   },
   "relaxDal": "Relaxovat dál",
   "stav": {

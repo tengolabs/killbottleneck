@@ -1,0 +1,18 @@
+{
+ "neplatce-cs": {
+  "text": "FAKTURA  č. 20260001  DODAVATEL  Jan Novák – konzultace  Dlouhá 12 110 00 Praha 1 IČO: 12345678 E-mail: jan@example.com  ODBĚRATEL  Karel Dvořák  Krátká 3 602 00 Brno IČO: 87654321 E-mail: karel@example.com  Neplátce DPH  Datum vystavení  9. 10. 2026  Datum splatnosti  23. 10. 2026  Popis   Množství   Cena / j.   Částka  Konzultace – příprava kampaně   2 h   800,00 Kč   1 600,00 Kč Cestovné   1   350,00 Kč   350,00 Kč  Celkem k úhradě   1 950,00 Kč  POZNÁMKA  Děkuji za spolupráci.  PLATEBNÍ ÚDAJE  Bankovní účet:   19-2000145399/0800  IBAN:   CZ65 0800 0000 1920 0014 5399 Variabilní symbol:   20260001  Celkem k úhradě:   1 950,00 Kč  QR platba  Strana 1 / 1 Jan Novák – konzultace · Faktura 20260001",
+  "spayd": "SPD*1.0*ACC:CZ6508000000192000145399*AM:1950.00*CC:CZK*X-VS:20260001*DT:20261023*MSG:Faktura 20260001"
+ },
+ "neplatce-en": {
+  "text": "INVOICE  No. 20260001  SUPPLIER  Jan Novák – konzultace  Dlouhá 12 110 00 Praha 1 Company ID: 12345678 E-mail: jan@example.com  CUSTOMER  Karel Dvořák  Krátká 3 602 00 Brno Company ID: 87654321 E-mail: karel@example.com  Not a VAT payer  Date of issue  09/10/2026  Due date  23/10/2026  Description   Quantity   Unit price   Amount  Konzultace – příprava kampaně   2 h   800.00 CZK   1,600.00 CZK Cestovné   1   350.00 CZK   350.00 CZK  Total due   1,950.00 CZK  NOTE  Děkuji za spolupráci.  PAYMENT DETAILS  Bank account:   19-2000145399/0800  IBAN:   CZ65 0800 0000 1920 0014 5399 Variable symbol:   20260001  Total due:   1,950.00 CZK  QR payment  Page 1 / 1 Jan Novák – konzultace · Invoice 20260001",
+  "spayd": "SPD*1.0*ACC:CZ6508000000192000145399*AM:1950.00*CC:CZK*X-VS:20260001*DT:20261023*MSG:Faktura 20260001"
+ },
+ "platce-cs": {
+  "text": "Faktura – daňový doklad  č. 20260001  DODAVATEL  Jan Novák – konzultace  Dlouhá 12 110 00 Praha 1 IČO: 12345678 DIČ: CZ12345678 E-mail: jan@example.com  ODBĚRATEL  Karel Dvořák  Krátká 3 602 00 Brno IČO: 87654321 E-mail: karel@example.com  Datum vystavení  9. 10. 2026  Datum splatnosti  23. 10. 2026  Datum zdan. plnění  9. 10. 2026  Popis   Množství   Cena / j.   Částka  Konzultace – příprava kampaně   2 h   800,00 Kč   1 600,00 Kč Cestovné   1   350,00 Kč   350,00 Kč Základ daně   1 950,00 Kč DPH 21 %   409,50 Kč  Celkem k úhradě   2 359,50 Kč Zaplaceno 15. 10. 2026  POZNÁMKA  Děkuji za spolupráci.  PLATEBNÍ ÚDAJE  Bankovní účet:   19-2000145399/0800  IBAN:   CZ65 0800 0000 1920 0014 5399 Variabilní symbol:   20260001  Celkem k úhradě:   2 359,50 Kč  QR platba  Strana 1 / 1 Jan Novák – konzultace · Faktura 20260001",
+  "spayd": "SPD*1.0*ACC:CZ6508000000192000145399*AM:2359.50*CC:CZK*X-VS:20260001*DT:20261023*MSG:Faktura 20260001"
+ },
+ "platce-en": {
+  "text": "Invoice – tax document  No. 20260001  SUPPLIER  Jan Novák – konzultace  Dlouhá 12 110 00 Praha 1 Company ID: 12345678 VAT ID: CZ12345678 E-mail: jan@example.com  CUSTOMER  Karel Dvořák  Krátká 3 602 00 Brno Company ID: 87654321 E-mail: karel@example.com  Date of issue  09/10/2026  Due date  23/10/2026  Date of taxable supply  09/10/2026  Description   Quantity   Unit price   Amount  Konzultace – příprava kampaně   2 h   800.00 CZK   1,600.00 CZK Cestovné   1   350.00 CZK   350.00 CZK Net amount   1,950.00 CZK VAT 21 %   409.50 CZK  Total due   2,359.50 CZK Paid 15/10/2026  NOTE  Děkuji za spolupráci.  PAYMENT DETAILS  Bank account:   19-2000145399/0800  IBAN:   CZ65 0800 0000 1920 0014 5399 Variable symbol:   20260001  Total due:   2,359.50 CZK  QR payment  Page 1 / 1 Jan Novák – konzultace · Invoice 20260001",
+  "spayd": "SPD*1.0*ACC:CZ6508000000192000145399*AM:2359.50*CC:CZK*X-VS:20260001*DT:20261023*MSG:Faktura 20260001"
+ }
+}

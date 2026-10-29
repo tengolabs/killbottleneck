@@ -286,7 +286,10 @@
     "ico": "IČO",
     "dic": "DIČ",
     "email": "E-mail",
-    "billingSaveFailed": "Fakturační údaje se nepodařilo uložit"
+    "billingSaveFailed": "Fakturační údaje se nepodařilo uložit",
+    "currency": "Měna faktur",
+    "currencyInvalid": "Měna musí být třípísmenný kód (CZK, EUR, USD…) nebo prázdná.",
+    "currencyHint": "např. EUR"
   },
   "timeOverview": {
     "recentHeading": "Poslední záznamy — projekt/klienta jde přiřadit i zpětně",

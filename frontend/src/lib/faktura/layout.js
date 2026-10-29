@@ -3,6 +3,11 @@
 // datumy, tabulka položek (přetéká na další strany), součty, poznámka, platební blok s QR (SPAYD), patička.
 // Neplátce: „Faktura“ + „Neplátce DPH“; plátce: „Faktura – daňový doklad“, DIČ, DUZP, základ / DPH / celkem.
 // Popisky cs/en tady (ne v i18n katalogu) — PDF musí jít vyrobit i mimo React (test) a text je jedna věc s rozvržením.
+// Země dodavatele (data.supplier.country, 27. 10. 2026) mění jen to, co je v zeme.js: symbol a pozici měny, US datum,
+// názvy identifikátorů a daně, „neplátce“, DUZP/VS jen CZ/SK, BIC a volný účet v platebním bloku, QR SPAYD/EPC.
+// Bez země = CZ → faktura z v0.86 vychází 1:1 (tests/fixtures/faktura-cz-v086.json).
+import { castka, datum, popiskyZeme } from './zeme.js';
+export { castka, datum };
 const A4 = [595.28, 841.89];
 const OKRAJ = 42;
 const SIRKA = A4[0] - 2 * OKRAJ;
@@ -10,33 +15,20 @@ const SPODEK = 60;
 
 export const POPISKY = {
   cs: {
-    titul: 'FAKTURA', danovy: 'Faktura – daňový doklad', cislo: 'č.', dodavatel: 'Dodavatel', odberatel: 'Odběratel', ico: 'IČO', dic: 'DIČ',
-    email: 'E-mail', neplatce: 'Neplátce DPH', vystaveni: 'Datum vystavení', splatnost: 'Datum splatnosti', duzp: 'Datum zdan. plnění',
+    titul: 'FAKTURA', cislo: 'č.', dodavatel: 'Dodavatel', odberatel: 'Odběratel',
+    email: 'E-mail', vystaveni: 'Datum vystavení', splatnost: 'Datum splatnosti', duzp: 'Datum zdan. plnění',
     popis: 'Popis', mnozstvi: 'Množství', cenaJ: 'Cena / j.', castka: 'Částka', zaklad: 'Základ daně', dph: 'DPH', celkem: 'Celkem k úhradě',
-    poznamka: 'Poznámka', platba: 'Platební údaje', ucet: 'Bankovní účet', iban: 'IBAN', vs: 'Variabilní symbol', qr: 'QR platba',
-    zaplaceno: 'Zaplaceno', strana: 'Strana', bezUctu: 'Platbu domluvte s dodavatelem.', mena: 'Kč',
+    poznamka: 'Poznámka', platba: 'Platební údaje', ucet: 'Bankovní účet', iban: 'IBAN', bic: 'BIC / SWIFT', vs: 'Variabilní symbol', ref: 'Reference platby', qr: 'QR platba',
+    zaplaceno: 'Zaplaceno', strana: 'Strana', bezUctu: 'Platbu domluvte s dodavatelem.',
   },
   en: {
-    titul: 'INVOICE', danovy: 'Invoice – tax document', cislo: 'No.', dodavatel: 'Supplier', odberatel: 'Customer', ico: 'Company ID', dic: 'VAT ID',
-    email: 'E-mail', neplatce: 'Not a VAT payer', vystaveni: 'Date of issue', splatnost: 'Due date', duzp: 'Date of taxable supply',
+    titul: 'INVOICE', cislo: 'No.', dodavatel: 'Supplier', odberatel: 'Customer',
+    email: 'E-mail', vystaveni: 'Date of issue', splatnost: 'Due date', duzp: 'Date of taxable supply',
     popis: 'Description', mnozstvi: 'Quantity', cenaJ: 'Unit price', castka: 'Amount', zaklad: 'Net amount', dph: 'VAT', celkem: 'Total due',
-    poznamka: 'Note', platba: 'Payment details', ucet: 'Bank account', iban: 'IBAN', vs: 'Variable symbol', qr: 'QR payment',
-    zaplaceno: 'Paid', strana: 'Page', bezUctu: 'Agree the payment with the supplier.', mena: 'CZK',
+    poznamka: 'Note', platba: 'Payment details', ucet: 'Bank account', iban: 'IBAN', bic: 'BIC / SWIFT', vs: 'Variable symbol', ref: 'Payment reference', qr: 'QR payment',
+    zaplaceno: 'Paid', strana: 'Page', bezUctu: 'Agree the payment with the supplier.',
   },
 };
-
-// 1 600,00 Kč (cs) · 1,600.00 CZK (en)
-export function castka(n, L, mena) {
-  const [cela, des] = Number(n || 0).toFixed(2).split('.');
-  const m = mena && mena !== 'CZK' ? mena : POPISKY[L].mena;
-  if (L === 'en') return `${cela.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${des} ${m}`;
-  return `${cela.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')},${des}\u00a0${m}`;
-}
-export function datum(ymd, L) {
-  const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return String(ymd || '');
-  return L === 'en' ? `${m[3]}/${m[2]}/${m[1]}` : `${Number(m[3])}. ${Number(m[2])}. ${m[1]}`;
-}
 function mnozstvi(q, L) {
   const s = String(Number(q || 0));
   return L === 'en' ? s : s.replace('.', ',');
@@ -71,6 +63,9 @@ export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr
   const seda = rgb(0.42, 0.45, 0.5); const cerna = rgb(0.1, 0.1, 0.12); const linka = rgb(0.82, 0.84, 0.87); const pozadi = rgb(0.95, 0.96, 0.97);
   const mena = data.currency || 'CZK';
   const platce = !!data.vat_payer;
+  const dod = data.supplier || {};
+  const Z = popiskyZeme(dod.country, L, dod.tax_label); // popisky podle země dodavatele (bez země = CZ)
+  const dat = (ymd) => datum(ymd, L, dod.country);
   let page = doc.addPage(A4);
   let y = A4[1] - OKRAJ;
   const text = (s, x, yy, o = {}) => page.drawText(String(s == null ? '' : s), { x, y: yy, size: o.size || 9.5, font: o.bold ? fb : f, color: o.color || cerna });
@@ -79,7 +74,7 @@ export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr
   const cara = (yy, x0 = OKRAJ, x1 = OKRAJ + SIRKA, barva = linka) => page.drawLine({ start: { x: x0, y: yy }, end: { x: x1, y: yy }, thickness: 0.6, color: barva });
 
   // ---- hlavička ----
-  const titul = platce ? T.danovy : T.titul;
+  const titul = platce ? Z.titulDanovy : T.titul;
   let hlavaVyska = 0;
   if (logo && logo.image) {
     const max = { w: 150, h: 48 };
@@ -100,8 +95,8 @@ export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr
     text(nadpis.toUpperCase(), x, yy, { size: 8, color: seda, bold: true }); yy -= 14;
     text(s.name || '', x, yy, { size: 11, bold: true }); yy -= 14;
     for (const r of zalom(s.address || '', f, 9.5, sirka)) { if (r) { text(r, x, yy); yy -= 12; } }
-    if (s.ico) { text(`${T.ico}: ${s.ico}`, x, yy); yy -= 12; }
-    if (s.dic) { text(`${T.dic}: ${s.dic}`, x, yy); yy -= 12; }
+    if (s.ico) { text(`${Z.ico}: ${s.ico}`, x, yy); yy -= 12; }
+    if (s.dic) { text(`${Z.dic}: ${s.dic}`, x, yy); yy -= 12; }
     if (s.email) { text(`${T.email}: ${s.email}`, x, yy, { color: seda }); yy -= 12; }
     return yy;
   };
@@ -109,12 +104,12 @@ export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr
   const y1 = sloupec(T.dodavatel, data.supplier || {}, OKRAJ, polovina);
   const y2 = sloupec(T.odberatel, data.customer || {}, OKRAJ + SIRKA / 2 + 10, polovina);
   y = Math.min(y1, y2) - 6;
-  if (!platce) { text(T.neplatce, OKRAJ, y, { color: seda, size: 9 }); }
+  if (!platce && Z.neplatce) { text(Z.neplatce, OKRAJ, y, { color: seda, size: 9 }); }
   y -= 14;
 
   // ---- datumy ----
-  const datumy = [[T.vystaveni, datum(data.issued, L)], [T.splatnost, datum(data.due, L)]];
-  if (platce) datumy.push([T.duzp, datum(data.issued, L)]);
+  const datumy = [[T.vystaveni, dat(data.issued)], [T.splatnost, dat(data.due)]];
+  if (platce && Z.duzp) datumy.push([T.duzp, dat(data.issued)]);
   page.drawRectangle({ x: OKRAJ, y: y - 22, width: SIRKA, height: 30, color: pozadi });
   let dx = OKRAJ + 10;
   for (const [n, v] of datumy) { text(n, dx, y - 4, { size: 8, color: seda }); text(v, dx, y - 16, { size: 10, bold: true }); dx += SIRKA / 3; }
@@ -148,14 +143,14 @@ export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr
 
   // ---- součty ----
   const souhrn = [];
-  if (platce) { souhrn.push([T.zaklad, castka(data.subtotal, L, mena)]); souhrn.push([`${T.dph} ${Number(data.vat_rate || 0)} %`, castka(data.vat, L, mena)]); }
+  if (platce) { souhrn.push([T.zaklad, castka(data.subtotal, L, mena)]); souhrn.push([`${Z.dan} ${Number(data.vat_rate || 0)} %`, castka(data.vat, L, mena)]); }
   if (y - (souhrn.length + 1) * 16 - 30 < SPODEK) novaStrana();
   for (const [n, v] of souhrn) { vpravo(n, sl.cenaJ, y, { color: seda }); vpravo(v, sl.castka - 4, y); y -= 15; }
   if (souhrn.length) y -= 8; // rámeček celkem nesmí překrýt řádek DPH
   page.drawRectangle({ x: OKRAJ + SIRKA * 0.5, y: y - 8, width: SIRKA * 0.5, height: 24, color: pozadi });
   vpravo(T.celkem, sl.cenaJ, y, { bold: true, size: 10.5 });
   vpravo(castka(data.total, L, mena), sl.castka - 4, y, { bold: true, size: 12 });
-  if (data.paid_on) { text(`${T.zaplaceno} ${datum(data.paid_on, L)}`, OKRAJ, y, { color: rgb(0.1, 0.5, 0.25), bold: true }); }
+  if (data.paid_on) { text(`${T.zaplaceno} ${dat(data.paid_on)}`, OKRAJ, y, { color: rgb(0.1, 0.5, 0.25), bold: true }); }
   y -= 34;
 
   // ---- poznámka ----
@@ -167,20 +162,26 @@ export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr
     y -= 10;
   }
 
-  // ---- platební blok + QR ----
-  const s = data.supplier || {};
+  // ---- platební blok + QR (SPAYD pro CZK, EPC/SEPA pro EUR; jinak jen údaje) ----
+  const s = dod;
   const maUcet = !!(s.iban || s.bank_account);
-  const qrVelikost = qr && data.spayd ? 100 : 0;
-  const blokVyska = Math.max(qrVelikost + 10, 72);
+  const qrVelikost = qr && (data.spayd || data.epc) ? 100 : 0;
+  // řádky bloku: účet (i víceřádkový volný text: routing + account), IBAN, BIC, VS (CZ/SK) nebo reference, celkem
+  // volný účet (až 120 zn. na řádek: routing + account, sort code…) se zalomí na šířku bloku vedle QR, ať nepřeteče stránku
+  const sirkaUctu = SIRKA - 120 - 10 - (qrVelikost ? qrVelikost + 16 : 0);
+  const radkyUctu = String(s.bank_account || '').split('\n').map((r) => r.trim()).filter(Boolean).flatMap((r) => zalom(r, fb, 9.5, sirkaUctu));
+  const pocetRadku = radkyUctu.length + (s.iban ? 1 : 0) + (s.bic ? 1 : 0) + 1 + 1;
+  const blokVyska = Math.max(qrVelikost + 10, 72, 22 + pocetRadku * 13 + 6);
   if (y - blokVyska < SPODEK) novaStrana();
   page.drawRectangle({ x: OKRAJ, y: y - blokVyska, width: SIRKA, height: blokVyska, borderColor: linka, borderWidth: 0.8 });
   let py = y - 14;
   text(T.platba.toUpperCase(), OKRAJ + 10, py, { size: 8, color: seda, bold: true }); py -= 14;
   if (maUcet) {
-    const radek = (n, v, o) => { text(`${n}:`, OKRAJ + 10, py, { color: seda }); text(v, OKRAJ + 120, py, o || {}); py -= 13; };
-    if (s.bank_account) radek(T.ucet, s.bank_account, { bold: true });
+    const radek = (n, v, o) => { if (n) text(`${n}:`, OKRAJ + 10, py, { color: seda }); text(v, OKRAJ + 120, py, o || {}); py -= 13; };
+    radkyUctu.forEach((r, i) => radek(i === 0 ? T.ucet : '', r, { bold: true }));
     if (s.iban) radek(T.iban, String(s.iban).replace(/(.{4})/g, '$1 ').trim());
-    if (data.vs) radek(T.vs, data.vs, { bold: true });
+    if (s.bic) radek(T.bic, String(s.bic));
+    if (Z.vs) { if (data.vs) radek(T.vs, data.vs, { bold: true }); } else radek(T.ref, String(data.cislo || ''), { bold: true });
     radek(T.celkem, castka(data.total, L, mena), { bold: true });
   } else {
     text(T.bezUctu, OKRAJ + 10, py, { color: seda });

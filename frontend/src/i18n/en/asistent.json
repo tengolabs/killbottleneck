@@ -445,8 +445,7 @@
     "supplier": "Supplier",
     "items": "Items",
     "net": "Net",
-    "vat": "VAT {{rate}} %",
-    "nonVat": "Not a VAT payer",
+    "vat": "{{dan}} {{rate}} %",
     "note": "Note",
     "qr": "QR payment",
     "qrHint": "Scan with your banking app.",
@@ -454,7 +453,7 @@
     "account": "Account",
     "noAccount": "No bank account in the profile — no payment block or QR.",
     "archiveHint": "The app does not keep invoices as the legal archive (10 years) — save the PDF.",
-    "empty": "No invoices yet. Tell the assistant: \"Issue an invoice to Karel for 2 hours of consulting at 800 CZK.\"",
+    "empty": "No invoices yet. Tell the assistant: \"Issue an invoice to Karel for 2 hours of consulting at 800.\"",
     "notFound": "Invoice not found.",
     "errorLoad": "The invoices could not be loaded.",
     "errorSave": "The change could not be saved.",
@@ -464,7 +463,8 @@
     "downloadAll": "Download all (ZIP)",
     "zipping": "Preparing {{done}}/{{total}}…",
     "month": "Month issued",
-    "monthAll": "All months"
+    "monthAll": "All months",
+    "reference": "Reference"
   },
   "relaxDal": "Keep relaxing",
   "stav": {

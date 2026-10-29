@@ -11,6 +11,20 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.93-beta": {
+    cs: [
+      "Faktury pro kohokoli na světě: v údajích dodavatele zvolíte zemi a aplikace předvyplní měnu, daň, názvy identifikátorů (IČO/DIČ, EIN, Company No.) i podobu platebních údajů — vše jde přepsat.",
+      "Fakturujete v libovolné měně: klient může mít svoji (německý klient EUR), faktura taky („fakturu v dolarech“); částky mají symbol (1 600,00 €, $1,600.00) a součty v seznamu jsou po měnách.",
+      "QR platba podle měny: koruny český QR jako dosud, eura evropský SEPA QR kód (čtou ho banky v Německu, Rakousku, na Slovensku…), jiné měny jen platební údaje.",
+      "Mimo Česko a Slovensko se bankovní údaje zadávají volně (routing + account, sort code…) a daň je obecná (VAT, sales tax, GST) — daňové předpisy své země si hlídáte sami. Česká faktura vypadá přesně jako dřív.",
+    ],
+    en: [
+      "Invoices for anyone in the world: pick the country in your supplier details and the app presets the currency, tax, ID labels (IČO/DIČ, EIN, Company No.) and the payment block — everything can be changed.",
+      "Invoice in any currency: a client may have their own (EUR for a German client), and so may an invoice (\"invoice in dollars\"); amounts carry a symbol ($1,600.00, €1,600.00) and list totals are per currency.",
+      "QR payment by currency: CZK keeps the Czech QR code, EUR gets a European SEPA QR code (read by banks in Germany, Austria, Slovakia…), other currencies print the payment details only.",
+      "Outside the Czech Republic and Slovakia the bank details are free text (routing + account, sort code…) and the tax is generic (VAT, sales tax, GST) — the tax rules of your country are yours to follow. A Czech invoice looks exactly as before.",
+    ],
+  },
   "v0.92-beta": {
     cs: [
       "Údržbové vydání pro hostovanou službu — pro vlastní server bez změn.",

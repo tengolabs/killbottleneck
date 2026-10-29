@@ -9,6 +9,45 @@ below before you jump several versions.
 
 ---
 
+## v0.93-beta — 2026-10-29
+
+**Invoices for anyone in the world: supplier country, any currency (EUR, USD, GBP…), generic tax, free-form bank details, SEPA QR**
+
+**Upgrade notes:** migration `1793096888_clients_mena` runs automatically on start (adds the optional `clients.currency`);
+no new variables. Existing supplier profiles and invoices are unchanged (no country = Czech Republic, CZK, SPAYD QR as before).
+
+- **Supplier country.** The supplier profile (shared or own) has a `country` (ISO 3166-1 alpha-2; empty = CZ, so
+  profiles from v0.86 are unchanged). It presets the currency, tax rate and label, the ID labels (IČO/DIČ · EIN/Tax ID ·
+  Company No./VAT No.) and the payment block; everything can be overridden (`currency`, `vat_rate`, `tax_label`, `bic`).
+  Presets (one table for the form and the assistant): CZ, SK, US, GB, DE, AT, PL, NL, FR, IE, CH, CA, AU; any other
+  country = EU (EUR, VAT, IBAN + BIC). Outside CZ/SK the bank account is **free text**
+  (routing + account, sort code…) — the server no longer rejects it; a Czech account number or an IBAN is still
+  recognized and validated. `ico` outside CZ/SK accepts letters and dashes (EIN `12-3456789`, `SC123456`); a tax ID is
+  required for charging VAT except in the US. New tool fields `country`, `currency`, `tax_label`, `bic` on
+  `set_invoicing_profile`; the English first-invoice form asks for the country first.
+- **Currency per invoice.** `create_invoice` takes an optional `currency`; otherwise the client's currency (new optional
+  `clients.currency`, set in the clients dialog or by `save_client`), then the supplier's default. The invoice stores
+  its currency; cards, the assistant's texts, the list and the PDF print it with a symbol (`1 600,00 €`, `$1,600.00`,
+  `1,600.00 CZK`). `list_invoices` and the Documents list give totals **per currency**, never summed across currencies.
+- **QR payment by currency.** SPAYD only for CZK; EUR invoices with an IBAN get an **EPC (SEPA) QR code** (EPC069-12, BIC
+  optional) read by banks across the EU; other currencies print the payment details without a QR code. DTO: `epc` next
+  to `spayd`.
+- **PDF by country.** Labels follow the invoice language as before; the supplier's country adds the currency symbol and
+  position, US date order (`10/09/2026`, English invoice only), the ID labels, the tax name ("Sales tax 8.25 %"), no "Not a VAT payer" line
+  in the US ("Not VAT registered" in GB), date of taxable supply and variable symbol only for CZ/SK (others print a
+  payment reference), BIC and multi-line bank details in the payment block. **A Czech invoice renders byte-for-text
+  identically to v0.86** — `tests/faktura-pdf.js` compares against `tests/fixtures/faktura-cz-v086.json`.
+- **UI.** Organization settings / My account → invoice details: country select, currency, tax name, BIC, free-form
+  bank details and a tax disclaimer ("the app does not check the tax rules of your country"). Clients dialog: invoice
+  currency. Documents → Invoices: labels and dates by the supplier's country, unpaid totals per currency.
+- Docs: *Invoices to clients* → new section *Invoicing outside the Czech Republic* (preset table, tax disclaimer).
+- A Slovak supplier's domestic account number (`19-8742637541/1200`) yields a **Slovak IBAN** (SK31…) for the EPC QR code;
+  free-form bank details are capped at 4 lines (address 8). `clients.currency` / `ico` are validated on the server for direct
+  REST writes too (clients dialog). CAD/AUD print with the code (`1,600.00 CAD`) so totals per currency stay distinguishable.
+- Migration `1793096888_clients_mena` (`clients.currency`, text 3). Tests: `faktura-cisla` +25, `faktura-pdf` +17
+  (US, EUR with decoded EPC QR, GB, Czech supplier in EUR, v0.86 fixture), `ai-faktury` +2 sections (client currency →
+  EUR invoice, explicit USD, per-currency totals, invalid currency, US member profile, routes).
+
 ## v0.92-beta — 2026-10-28
 
 **Maintenance release for the hosted service. Nothing changes for self-hosted servers.**

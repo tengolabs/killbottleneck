@@ -37,7 +37,8 @@ export async function fakturaPdf(data, { lang = 'cs', logoUrl = '' } = {}) {
       obrazek = { image: img, w: img.width, h: img.height };
     } catch { obrazek = null; }
   }
-  const qr = data.spayd ? await qrMatice(data.spayd) : null;
+  const qrText = data.spayd || data.epc || ''; // SPAYD (CZK) nebo EPC/SEPA (EUR); jiné měny bez QR
+  const qr = qrText ? await qrMatice(qrText) : null;
   sestavFakturu({ doc, rgb: PDFLib.rgb, fonty, data, L: lang === 'en' ? 'en' : 'cs', logo: obrazek, qr, kresliQr });
   return doc.save();
 }
