@@ -6,7 +6,7 @@ import { cisloProjektu } from '@/lib/projectColors';
 // ⚠️ Číslo projektu (#12) se tu NEPÍŠE — Richard 3. 10. 2026: je to sériové označení pro
 // asistenta, API a Archiv, poroste do velkých čísel a u názvu by rušilo („není dominanta“).
 // Člověk ho najde jen v nápovědě po najetí na název a v dashboardu projektu.
-export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevEditace, canEdit, title, projectNumber, setTitle, setNazevEditace }) {
+export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevEditace, canEdit, title, projectNumber, setTitle, setNazevEditace, mapKind = null }) {
   const { t } = useTranslation('editor');
   const cislo = cisloProjektu({ project_number: projectNumber });
   return (
@@ -41,6 +41,7 @@ export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevE
                   font-heading text-lg sm:text-xl font-bold tracking-tight border border-input"
               />
             ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
               <button
                 type="button"
                 onClick={() => canEdit && setNazevEditace(true)}
@@ -52,6 +53,14 @@ export default function TitleStrip({ dashboardOpen, railLeft, searchOpen, nazevE
               >
                 {title || t('toolbar.titlePlaceholder')}
               </button>
+              {/* styl mapy (Projekt × Proces, 21. 10. 2026) — org mapa a Moje mapa štítek nemají */}
+              {mapKind !== null && (
+                <span data-testid="map-style-chip" data-kind={mapKind || 'project'}
+                  className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full border ${mapKind === 'process' ? 'bg-primary/10 text-primary border-primary/30' : 'bg-card text-muted-foreground'}`}>
+                  {mapKind === 'process' ? `🔁 ${t('process.styleProcessCap')}` : `🎯 ${t('process.styleProjectCap')}`}
+                </span>
+              )}
+              </div>
             )}
           </div>
         )}

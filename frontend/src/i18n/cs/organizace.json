@@ -28,7 +28,9 @@
       "open_many": "{{count}} otevřené položky",
       "open_other": "{{count}} otevřených položek",
       "people": "Lidí s resty",
-      "peopleSub": "mají něco po termínu"
+      "peopleSub": "mají něco po termínu",
+      "processes": "Procesů",
+      "processesSub": "běží trvale"
     },
     "sections": {
       "overdue": "Po termínu napříč projekty",
@@ -39,7 +41,9 @@
       "people": "Lidé s nejvíc resty",
       "changes": "Co se změnilo za 7 dní napříč projekty",
       "bottlenecks": "Kde to nejvíc stojí",
-      "bottlenecksSub": "úzká hrdla — drží další nehotové kroky"
+      "bottlenecksSub": "úzká hrdla — drží další nehotové kroky",
+      "processes": "Procesy",
+      "processesSort": "nejvíc kroků po termínu nahoře"
     },
     "cols": {
       "what": "Co",
@@ -54,7 +58,11 @@
       "when": "Kdy",
       "change": "Změna",
       "blocked": "Blokuje",
-      "why": "Proč stojí"
+      "why": "Proč stojí",
+      "process": "Proces",
+      "processLate": "Po termínu",
+      "processOk": "Včas",
+      "processLast": "Naposledy prošlo"
     },
     "days_one": "{{count}} den",
     "days_few": "{{count}} dny",
@@ -112,6 +120,7 @@
     "whyOverdue": "po termínu {{days}}",
     "reportPdf": "PDF (k poslání)",
     "pdfFailed": "PDF se nepodařilo vytvořit",
-    "reportPdfSkin": "PDF (v mém vzhledu)"
+    "reportPdfSkin": "PDF (v mém vzhledu)",
+    "processDescribesOnly": "jen popis procesu"
   }
 }

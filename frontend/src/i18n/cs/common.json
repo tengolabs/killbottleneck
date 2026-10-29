@@ -175,5 +175,36 @@
   },
   "links": {
     "inDescription": "Odkazy v popisu:"
+  },
+  "rhythm": {
+    "daily": "každý den",
+    "dailyN": "každý {{n}}. den",
+    "workdays": "každý všední den",
+    "weekly": "každý týden",
+    "weeklyN": "každý {{n}}. týden",
+    "monthly": "každý měsíc",
+    "monthlyN": "každý {{n}}. měsíc",
+    "monthlyDay": "každý měsíc {{d}}.",
+    "monthlyNDay": "každý {{n}}. měsíc {{d}}.",
+    "each": {
+      "1": "každé pondělí",
+      "2": "každé úterý",
+      "3": "každou středu",
+      "4": "každý čtvrtek",
+      "5": "každý pátek",
+      "6": "každou sobotu",
+      "7": "každou neděli"
+    },
+    "dow": {
+      "1": "Po",
+      "2": "Út",
+      "3": "St",
+      "4": "Čt",
+      "5": "Pá",
+      "6": "So",
+      "7": "Ne"
+    },
+    "today": "dnes",
+    "yesterday": "včera"
   }
 }

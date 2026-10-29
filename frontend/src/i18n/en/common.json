@@ -175,5 +175,36 @@
   },
   "links": {
     "inDescription": "Links in the description:"
+  },
+  "rhythm": {
+    "daily": "every day",
+    "dailyN": "every {{n}} days",
+    "workdays": "every weekday",
+    "weekly": "every week",
+    "weeklyN": "every {{n}} weeks",
+    "monthly": "every month",
+    "monthlyN": "every {{n}} months",
+    "monthlyDay": "every month on day {{d}}",
+    "monthlyNDay": "every {{n}} months on day {{d}}",
+    "each": {
+      "1": "every Monday",
+      "2": "every Tuesday",
+      "3": "every Wednesday",
+      "4": "every Thursday",
+      "5": "every Friday",
+      "6": "every Saturday",
+      "7": "every Sunday"
+    },
+    "dow": {
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat",
+      "7": "Sun"
+    },
+    "today": "today",
+    "yesterday": "yesterday"
   }
 }

@@ -661,6 +661,7 @@ const STRINGS = {
 
   // sdílení map (share routa) + veřejné mapy
   "err.mapNotFound": { cs: "Mapa nebyla nalezena.", en: "Map not found." },
+  "err.badMapKind": { cs: "Neplatný styl mapy — povolené hodnoty jsou project (dokončit) a process (nepřetržitý běh).", en: "Invalid map kind — allowed values are project (to finish) and process (keeps running)." },
   "err.taskCreateDisabled": {
     cs: "Samostatné položky úkolů už nejde zakládat — úkol je cíl v mapě s řešitelem nebo termínem. Založte nový uzel.",
     en: "Standalone task items can no longer be created — a task is a map goal with an assignee or deadline. Create a new node instead.",

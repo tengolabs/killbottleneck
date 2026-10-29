@@ -71,6 +71,8 @@ export function buildMapExport({ map, nodes, edges, tasks = [], rules = [], incl
     map: {
       title: map?.title || '',
       description: map?.description || '',
+      // styl Proces (nepřetržitý běh) patří ke schématu — přenáší se; projekt pole nemá
+      ...(map?.kind === 'process' ? { kind: 'process' } : {}),
       nodes: cleanNodes,
       edges: edges,
     },
@@ -80,7 +82,6 @@ export function buildMapExport({ map, nodes, edges, tasks = [], rules = [], incl
       description: t.description || '',
       status: t.status || 'todo',
       deadline: t.deadline || '',
-      recurrence: t.recurrence || '',
       assignee_email: includePeople ? (t.assignee_email || '') : '',
       node_id: t.node_id || '',
       parent_id: t.parent_id || '',

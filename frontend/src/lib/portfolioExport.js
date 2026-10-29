@@ -53,8 +53,19 @@ export function exportPortfolioMarkdown({ data, nameOf, orgName }) {
 
   // Úzká hrdla (v2): jen fakta — kolik kroků drží a proč (dny), žádné skóre
   md += `\n## ${t('sections.projects')}\n`;
-  for (const p of s.projects) {
+  for (const p of s.projects.filter((x) => x.kind !== 'process')) {
     md += `- **${esc(p.title)}** [${accessLabel(p)}] ${p.pct} % (${t('projMeta', { done: p.done, total: p.total })}) · ${t('projOverdue', { count: p.overdue })} · ${t('projStuck', { count: p.stuck })} · ${t('projOpen', { count: p.open })}\n`;
+  }
+  // PROCESY (21. 10. 2026): bez % — zdraví běhu (po termínu / včas / poslední průchod)
+  const procesy = s.projects.filter((x) => x.kind === 'process');
+  if (procesy.length) {
+    md += `\n## ${t('sections.processes')}\n`;
+    for (const p of procesy) {
+      const h = p.health || {};
+      md += h.recurring > 0
+        ? `- **${esc(p.title)}** [${accessLabel(p)}] ${t('cols.processLate')}: ${h.late} · ${t('cols.processOk')}: ${h.ok} · ${t('cols.processLast')}: ${h.last ? h.last.at.slice(0, 10) : '—'}\n`
+        : `- **${esc(p.title)}** [${accessLabel(p)}] ${t('processDescribesOnly')}\n`;
+    }
   }
 
   md += `\n## ${t('sections.bottlenecks')} (${data.counts.bottlenecks || 0})\n`;
@@ -87,7 +98,13 @@ export function exportPortfolioCsv({ data, nameOf }) {
   const who = (email, row) => (email ? nameOf(email, row) : t('unassigned'));
   const rows = [];
   rows.push([t('export.colSection'), t('cols.project'), t('export.colAccess'), t('export.colPct'), t('export.colDone'), t('cols.overdue'), t('cols.stuck'), t('cols.open')]);
-  for (const p of s.projects) rows.push([t('sections.projects'), p.title, accessLabel(p), p.pct, `${p.done}/${p.total}`, p.overdue, p.stuck, p.open]);
+  for (const p of s.projects) {
+    if (p.kind === 'process') {
+      const h = p.health || {};
+      // proces: místo % a hotovo/celkem „po termínu / včas" opakovaných kroků
+      rows.push([t('sections.processes'), p.title, accessLabel(p), '', h.recurring > 0 ? `${t('cols.processLate')} ${h.late} / ${t('cols.processOk')} ${h.ok}` : t('processDescribesOnly'), p.overdue, '', p.open]);
+    } else rows.push([t('sections.projects'), p.title, accessLabel(p), p.pct, `${p.done}/${p.total}`, p.overdue, p.stuck, p.open]);
+  }
   rows.push([]);
   rows.push([t('export.colSection'), t('cols.what'), t('cols.project'), t('cols.who'), t('cols.deadline'), t('cols.overdue'), t('cols.idle'), t('cols.blocked')]);
   for (const o of s.overdue) rows.push([t('sections.overdue'), o.title, o.mapTitle, who(o.owner, o), o.deadline, o.daysOver, '', '']);

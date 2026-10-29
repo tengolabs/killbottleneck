@@ -25,6 +25,8 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { mapToTemplateNodes } from '@/lib/templateConvert';
+import { recurrenceOf } from '@/lib/recurrenceRule';
+import { remapRuleIds } from '@/lib/ruleRemap';
 import { categoryLabels } from '@/lib/templateCategories';
 
 // labely dnů přes common:weekdayAcc.* (4. pád)
@@ -34,7 +36,7 @@ const NEW = '__new__';
 
 // Uložení aktuální mapy jako šablony organizace. Termíny uzlů se převedou
 // na „dny od startu" (počítáno ode dneška) — šablona je tak opakovatelná.
-export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClose }) {
+export default function SaveTemplateDialog({ open, mapTitle, mapKind = '', rules = [], nodes, edges, onClose }) {
   const { t } = useTranslation('editor');
   const { user } = useAuth();
   const { toast } = useToast();
@@ -69,7 +71,16 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
   const handleSave = () => {
     if (!name.trim()) return;
     return f.run(async () => {
-      const { ai_nodes: aiNodes, nodeIdMap } = mapToTemplateNodes(nodes, edges);
+      const { ai_nodes: aiNodesRaw, nodeIdMap } = mapToTemplateNodes(nodes, edges);
+      // opakované kroky (čistá opakovací pravidla) jdou do šablony jako pravidla
+      // s šablonovými id; jejich termín si projekt dopočítá z rytmu (první
+      // výskyt), ne z ofsetu — jinak by se z šablony procesu stala šablona
+      // s harmonogramem (styl Proces, 21. 10. 2026)
+      const opakovani = (nodes || []).map((n) => ({ n, st: recurrenceOf(rules, n.id) }))
+        .filter((x) => x.st && !x.st.custom && nodeIdMap[x.n.id]);
+      const opakovaneId = new Set(opakovani.map((x) => nodeIdMap[x.n.id]));
+      const aiNodes = aiNodesRaw.map((n) => (opakovaneId.has(n.id) ? { ...n, deadline_offset_days: null } : n));
+      const tplRules = opakovani.map((x, i) => ({ id: `r${i + 1}`, ...remapRuleIds(x.st.rule, nodeIdMap) }));
       const rootTitle = aiNodes.find((n) => !n.parentId)?.title || name.trim();
       const payload = {
         title: name.trim(),
@@ -87,6 +98,8 @@ export default function SaveTemplateDialog({ open, mapTitle, nodes, edges, onClo
         task_seeds: [],
         auto_create: autoCreate,
         auto_day: autoCreate ? autoDay : 0,
+        map_kind: mapKind === 'process' ? 'process' : '',
+        ...(tplRules.length ? { rules: tplRules } : {}),
       };
       if (target === NEW) {
         await base44.entities.Template.create(payload);

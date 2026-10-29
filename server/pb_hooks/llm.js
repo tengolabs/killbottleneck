@@ -391,7 +391,60 @@ function naDratOpenAI(z) {
   if (z.role === "tool") out.tool_call_id = z.toolCallId || "";
   return out;
 }
-function zDratu(calls, argsJsouRetezec) {
+// PROSÁKLÉ XML VOLÁNÍ NÁSTROJE (25. 10. 2026, lokální model z rodiny Qwen, ~1 z 5 tahů „založ proces“): model napíše
+// volání napůl ve svém XML tvaru a serverový parser ho vloží celé do jednoho řetězce, např.
+//   goal: "Dílna je vždy čistá</goal>\n<parameter name=\"kind\">process"
+// → karta „nový projekt“ místo procesu a v cíli technický text. Oprava: řetězec se utne před první značkou a
+// parametry za ní se doplní — jen ty, které nástroj ve schématu má a model je nevyplnil; hodnota podle typu
+// ze schématu. Bez schématu (neznámý nástroj) se jen uklidí konec řetězce, nic se nedomýšlí.
+const XML_PARAM = /<parameter(?:\s+name\s*=\s*"([A-Za-z_][\w]*)"|=([A-Za-z_][\w]*))\s*>/;
+// konec pole: jen značky volání a značka TÉHOŽ pole — obecné „</div>“ může být obsah (HTML dokumentu).
+// Jméno pole posílá model: do regexu jde jen platný identifikátor (klíč „c++“ / „a(“ by regex shodil a s ním
+// celý tah asistenta — /checkup 29. 10. 2026); jiný klíč dostane jen značky volání.
+const JMENO_POLE = /^[A-Za-z_]\w*$/;
+const xmlKonec = (pole) => new RegExp("\\s*(?:</(?:parameter|function|tool_call" + (JMENO_POLE.test(pole) ? "|" + pole : "") + ")>\\s*)+$");
+function xmlHodnota(raw, typ, pole) {
+  const t = String(raw).replace(xmlKonec(pole), "").trim();
+  if (typ === "boolean") return t === "true" ? true : (t === "false" ? false : undefined);
+  if (typ === "integer" || typ === "number") { const n = Number(t); return t !== "" && isFinite(n) && (typ === "number" || Number.isInteger(n)) ? n : undefined; }
+  if (typ === "array" || typ === "object") {
+    try { const v = JSON.parse(t); return (typ === "array" ? Array.isArray(v) : (v && typeof v === "object" && !Array.isArray(v))) ? v : undefined; } catch (err) { return undefined; }
+  }
+  return t;
+}
+function opravXmlArgumenty(args, parametry) {
+  const vlastnosti = (parametry && parametry.properties) || null;
+  let opraveno = 0;
+  for (const k of Object.keys(args)) {
+    const v = args[k];
+    if (typeof v !== "string") continue;
+    const m = XML_PARAM.exec(v);
+    if (!m) {
+      // jen uklizený konec („…text</goal>“) — a jen když je to opravdu XML značka na konci, ne text uživatele
+      if (xmlKonec(k).test(v)) { args[k] = v.replace(xmlKonec(k), "").trim(); opraveno++; }
+      continue;
+    }
+    args[k] = v.slice(0, m.index).replace(xmlKonec(k), "").trim();
+    opraveno++;
+    if (!vlastnosti) continue;
+    // zbytek: <parameter name="a">…</parameter><parameter=b>…
+    const zbytek = v.slice(m.index);
+    const re = new RegExp(XML_PARAM.source, "g");
+    const nalezy = [];
+    let x;
+    while ((x = re.exec(zbytek))) nalezy.push({ jmeno: x[1] || x[2], od: x.index + x[0].length, zacatek: x.index });
+    for (let i = 0; i < nalezy.length; i++) {
+      const n = nalezy[i];
+      const def = vlastnosti[n.jmeno];
+      if (!def || (args[n.jmeno] !== undefined && args[n.jmeno] !== "")) continue;
+      const hodnota = xmlHodnota(zbytek.slice(n.od, i + 1 < nalezy.length ? nalezy[i + 1].zacatek : zbytek.length), def.type, n.jmeno);
+      if (hodnota !== undefined && (!Array.isArray(def.enum) || def.enum.indexOf(hodnota) >= 0)) args[n.jmeno] = hodnota;
+    }
+  }
+  return opraveno;
+}
+
+function zDratu(calls, argsJsouRetezec, nastroje, stats) {
   const out = [];
   for (const c of Array.isArray(calls) ? calls : []) {
     const f = (c && c.function) || {};
@@ -401,6 +454,13 @@ function zDratu(calls, argsJsouRetezec) {
       try { args = JSON.parse(String(args || "{}")); } catch (err) { args = { _parse_error: String(args).slice(0, 200) }; }
     }
     if (!args || typeof args !== "object" || Array.isArray(args)) args = {};
+    const def = (nastroje || []).find((n) => n && n.name === f.name);
+    let opraveno = 0;
+    try { opraveno = opravXmlArgumenty(args, def && def.parameters); } catch (err) { /* oprava je bonus — tah nesmí spadnout */ }
+    if (opraveno) {
+      if (stats) stats.xmlOprava = (stats.xmlOprava || 0) + opraveno;
+      try { $app.logger().warn("llm: prosáklé XML v argumentech nástroje opraveno", "tool", String(f.name), "pole", String(opraveno)); } catch (err) { /* log je bonus (testy v node) */ }
+    }
     out.push({ id: String(c.id || ("call_" + $security.randomString(8))), name: String(f.name), args: args });
   }
   return out;
@@ -425,7 +485,7 @@ function llmChatTools(cfg, zpravyIn, nastroje, opts) {
     if (res.statusCode < 200 || res.statusCode >= 300) throw chybaSluzby(res, lang, !!(cfg && cfg.podrobneChyby));
     const volba = (res.json && res.json.choices && res.json.choices[0]) || null;
     const m = (volba && volba.message) || {};
-    const toolCalls = zDratu(m.tool_calls, true);
+    const toolCalls = zDratu(m.tool_calls, true, nastroje, stats);
     const content = String(m.content || m.refusal || "");
     if (!content && !toolCalls.length) {
       if (volba && volba.finish_reason === "length") throw new Error(msg(lang, "emptyThinking"));
@@ -457,7 +517,7 @@ function llmChatTools(cfg, zpravyIn, nastroje, opts) {
     throw new Error(msg(lang, "ollamaHttp", { status: res.statusCode, model: model }));
   }
   const m = (res.json && res.json.message) || {};
-  const toolCalls = zDratu(m.tool_calls, false);
+  const toolCalls = zDratu(m.tool_calls, false, nastroje, stats);
   const content = String(m.content || "");
   if (!content && !toolCalls.length) {
     // diagnostika do logu: co model vlastně poslal (klíče, důvod konce, tokeny)
@@ -531,4 +591,4 @@ function llmPredehrej(cfg, zpravyIn, nastroje, opts) {
   } catch (err) { return { ok: false, ms: Date.now() - t0, chyba: String(err && err.message ? err.message : err).slice(0, 200) }; }
 }
 
-module.exports = { llmChat, llmChatTools, llmTranscribe, llmVision, openaiBase, MAX_AUDIO_MB, llmPredehrej };
+module.exports = { llmChat, llmChatTools, llmTranscribe, llmVision, openaiBase, MAX_AUDIO_MB, llmPredehrej, opravXmlArgumenty };

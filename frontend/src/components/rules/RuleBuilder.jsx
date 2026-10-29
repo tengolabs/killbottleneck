@@ -21,7 +21,9 @@ const isDynamicTarget = (v) => v === 'deputy_of_node_owner'
 // Výčty a limity drží server (validateRuleInput) — builder nabízí totéž a chybu
 // serveru ukáže doslova. Žádný měsíční metr na běhy neexistuje (závazné).
 const TRIGGERS = ['node_status_changed', 'node_unblocked', 'deadline_approaching', 'node_created', 'file_uploaded', 'schedule'];
-const ACTIONS = ['set_status', 'set_owner', 'set_deadline', 'move_node', 'create_subnodes', 'notify', 'offer_assistant', 'run_agent'];
+const ACTIONS = ['set_status', 'set_owner', 'set_deadline', 'move_node', 'create_subnodes', 'notify', 'offer_assistant', 'run_agent', 'reset_subtree'];
+// dny v týdnu pro rytmus set_deadline.advance weekly (1 = po … 7 = ne)
+const DNY_TYDNE = [1, 2, 3, 4, 5, 6, 7];
 // balíčky asistenta, které jde nabídnout pravidlem (= ASSIST_MODES v helpers.js; týmová porada a nový projekt ne)
 const ASSIST_MODES = ['rozbor', 'po_schuzce', 'priprava', 'revize', 'trideni', 'porada', 'nocni'];
 const COND_FIELDS = ['status', 'owner', 'deadline', 'executor_kind', 'parent'];
@@ -330,7 +332,8 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
                         : type === 'create_subnodes' ? { type, _outline: '' }
                           : type === 'notify' ? { type, to: 'map_owner', message: '' }
                             : type === 'offer_assistant' ? { type, mode: 'rozbor', to: 'node_owner' }
-                              : { type, agent_name: '' };
+                              : type === 'reset_subtree' ? { type }
+                                : { type, agent_name: '' };
                 setActions((p) => p.map((x, xi) => (xi === i ? fresh : x)));
               }}>
                 {ACTIONS.map((ac) => <option key={ac} value={ac}>{t(`rules.actions.${ac}`)}</option>)}
@@ -386,21 +389,45 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
                   onChange={(e) => setAct(i, e.target.value === 'advance'
                     ? { advance: 'weekly', relative_days: undefined, date: undefined }
                     : (e.target.value === 'relative'
-                      ? { relative_days: 7, date: undefined, advance: undefined }
-                      : { date: '', relative_days: undefined, advance: undefined }))}>
+                      ? { relative_days: 7, date: undefined, advance: undefined, every: undefined, days: undefined }
+                      : { date: '', relative_days: undefined, advance: undefined, every: undefined, days: undefined }))}>
                   <option value="advance">{t('rules.dlAdvance')}</option>
                   <option value="relative">{t('rules.dlRelative')}</option>
                   <option value="date">{t('rules.dlFixed')}</option>
                 </select>
                 {a.advance !== undefined
                   ? (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <select className={`${selectCls} w-auto`} value={a.advance}
-                        onChange={(e) => setAct(i, { advance: e.target.value })}>
+                        onChange={(e) => setAct(i, { advance: e.target.value, ...(e.target.value === 'weekly' ? {} : { days: undefined }) })}>
                         <option value="daily">{t('rules.dlAdvanceDaily')}</option>
                         <option value="weekly">{t('rules.dlAdvanceWeekly')}</option>
                         <option value="monthly">{t('rules.dlAdvanceMonthly')}</option>
                       </select>
+                      {/* rytmus procesu (21. 10. 2026): každý N-tý + u týdne vybrané dny */}
+                      <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {t('rules.dlEvery')}
+                        <select className={`${selectCls} w-auto`} value={a.every || 1} data-testid="rule-advance-every"
+                          onChange={(e) => setAct(i, { every: Number(e.target.value) > 1 ? Number(e.target.value) : undefined })}>
+                          {[1, 2, 3, 4].map((v) => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </label>
+                      {a.advance === 'weekly' && (
+                        <span className="inline-flex flex-wrap gap-0.5" data-testid="rule-advance-days">
+                          {DNY_TYDNE.map((d) => {
+                            const on = (a.days || []).includes(d);
+                            return (
+                              <button key={d} type="button" aria-pressed={on}
+                                onClick={() => {
+                                  const dny = on ? (a.days || []).filter((x) => x !== d) : [...(a.days || []), d].sort();
+                                  setAct(i, { days: dny.length ? dny : undefined });
+                                }}
+                                className={`w-8 h-7 text-[11px] rounded border ${on ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-secondary'}`}
+                              >{t(`common:rhythm.dow.${d}`)}</button>
+                            );
+                          })}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">{t('rules.dlAdvanceHint')}</span>
                     </div>
                   )
@@ -416,6 +443,9 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
                     : <DatePicker value={a.date || ''} onChange={(v) => setAct(i, { date: v })} className="h-9 w-40" />}
               </div>
               </div>
+            )}
+            {a.type === 'reset_subtree' && (
+              <p className="text-xs text-muted-foreground">{t('rules.resetSubtreeHint')}</p>
             )}
             {a.type === 'move_node' && (
               <div className="space-y-1">

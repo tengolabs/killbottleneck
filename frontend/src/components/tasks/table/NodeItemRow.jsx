@@ -4,6 +4,7 @@ import { ChevronRight, Pencil, Plus, Calendar, ExternalLink, Inbox, CalendarChec
 import TaskRowActions from '@/components/shared/TaskRowActions';
 import { planState } from '@/lib/taskActions';
 import { formatDeadline } from '@/lib/nodeMeta';
+import { rhythmLabel } from '@/lib/rhythm';
 import { useTranslation } from 'react-i18next';
 import { useTaskTable } from './TaskTableContext';
 import AssigneePicker from './AssigneePicker';
@@ -16,10 +17,12 @@ export default function NodeItemRow({ item, depth = 0, hasChildren, collapsed, o
   const {
     members,
     onRowAction,
+    rhythms,
     node: { onEdit, onCycle, onAssign, onAddChild, onOpen: onOpenNode, onSetIcon: onSetNodeIcon, onStash: onStashNodeItem },
   } = useTaskTable();
   const isDone = item.status === 'done';
   const planned = planState(item.plannedOn);
+  const rytmus = item.inProcess ? rhythms?.[item.map_id]?.[item.node_id] : null;
   return (
     <TableRow className="group cursor-pointer bg-secondary/20 hover:bg-secondary/40" onClick={() => onOpenNode(item)}>
       <TableCell className="w-[110px]">
@@ -55,7 +58,12 @@ export default function NodeItemRow({ item, depth = 0, hasChildren, collapsed, o
           )}
           {depth === 0 && (
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
-              {item.isApex ? t('taskTable.apexBadge') : t('taskTable.nodeBadge')}
+              {t(`taskTable.${item.isApex ? 'apexBadge' : 'nodeBadge'}${item.inProcess ? 'Process' : ''}`)}
+            </span>
+          )}
+          {rytmus && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground shrink-0" data-testid="task-node-rhythm">
+              🔁 {rhythmLabel(t, rytmus, item.deadline)}
             </span>
           )}
           {item.waiting && (

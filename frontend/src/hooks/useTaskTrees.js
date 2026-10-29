@@ -58,6 +58,7 @@ export function useTaskTrees({
           id: `node-item-${m.id}-${n.id}`,
           isNode: true,
           isApex: n.type === 'apexNode' || d.nodeType === 'apex',
+          inProcess: m.kind === 'process',   // styl Proces: „cíl procesu“ / „krok procesu“ + rytmus
           icon: d.icon || '',
           title: d.title || (d.apexText || '').slice(0, 60) || t('common:misc.untitled'),
           status: d.status || 'todo',

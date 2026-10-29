@@ -65,7 +65,8 @@
       "notify": "send a notification",
       "run_agent": "run an agent",
       "move_node": "move the node",
-      "offer_assistant": "offer the assistant"
+      "offer_assistant": "offer the assistant",
+      "reset_subtree": "Put sub-steps back to To do"
     },
     "dlRelative": "in N days from today",
     "dlFixed": "fixed date",
@@ -176,6 +177,8 @@
       "trideni": "Sort notes",
       "porada": "Morning briefing",
       "nocni": "Evening planning"
-    }
+    },
+    "resetSubtreeHint": "Sub-goals and tasks of the trigger goal go back to To do — the checklist of a recurring step starts over.",
+    "dlEvery": "every"
   }
 }

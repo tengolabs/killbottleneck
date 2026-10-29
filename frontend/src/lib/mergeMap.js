@@ -72,9 +72,26 @@ function lisiSeJenStavem(a, b) {
 }
 
 // Slití jedné sady (uzly nebo hrany). Vrací null = kolize.
+// Pole uzlu, která plní VÝHRADNĚ server (goalmaps hook stampAssignedBy):
+// plátno je u uzlu založeného v téže relaci nemá — základna (odpověď PATCHe)
+// ano. Prázdná hodnota na plátně proto NENÍ moje úprava; bez tohohle se
+// každý nový krok s termínem tvářil „změněný mnou" a první zásah pravidla
+// (opakování, kanban) skončil pruhem „Mapu změnil někdo jiný" místo tichého
+// slití (nalezeno klik-testem stylu Proces 25. 10. 2026).
+const SERVEROVA_POLE_UZLU = ['assignedBy'];
+const doplnServerova = (m, b) => {
+  if (!m || !b || !m.data || !b.data) return m;
+  let d = null;
+  for (const k of SERVEROVA_POLE_UZLU) {
+    if (!m.data[k] && b.data[k]) { d = d || { ...m.data }; d[k] = b.data[k]; }
+  }
+  return d ? { ...m, data: d } : m;
+};
+
 function slijSadu(zaklad, moje, server, sPozici) {
   const idx = (a) => new Map((a || []).map((x) => [x.id, x]));
-  const B = idx(zaklad); const M = idx(moje); const S = idx(server);
+  const B = idx(zaklad); const S = idx(server);
+  const M = idx(sPozici ? (moje || []).map((x) => doplnServerova(x, B.get(x.id))) : moje);
 
   // Pořadí výsledku drží server (aby se merge zbytečně nelišil od uložené
   // podoby), moje přírůstky jdou za ním.

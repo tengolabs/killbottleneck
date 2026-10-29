@@ -4,6 +4,8 @@ import { pb } from '@/api/pb';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { remapRuleIds } from '@/lib/ruleRemap';
 import { rulesApi } from '@/components/rules/rulesApi';
+import { recurrenceOf } from '@/lib/recurrenceRule';
+import { firstOccurrence, todayStr } from '@/lib/rhythm';
 
 // Jediné místo, kde vzniká projekt (= mapa s vrcholovým uzlem): createProjectRecord.
 // Volají ho všechny cesty — prázdný projekt, šablona z dialogu, AI náhled
@@ -44,9 +46,11 @@ export function applyEmojiToApex(nodes, emoji) {
 // seznam = nesdílí se nikomu (prázdný i AI projekt), klíče se pak neposílají,
 // aby cesta zůstala 1:1 s dřívějškem. `series` = id šablony s číslovanou řadou:
 // pořadové číslo a finální název složí server (goalmaps create hook).
-export function createProjectRecord({ title, nodes, edges, color = '', client = '', owners = [], series = '', emoji = '' }) {
+// `kind` = styl: '' projekt (dokončit) | 'process' proces (nepřetržitý běh, 21. 10. 2026)
+export function createProjectRecord({ title, nodes, edges, color = '', client = '', owners = [], series = '', emoji = '', kind = '' }) {
   return base44.entities.GoalMap.create({
     title,
+    ...(kind === 'process' ? { kind: 'process' } : {}),
     description: '',
     nodes: applyEmojiToApex(nodes, emoji),
     edges,
@@ -56,9 +60,9 @@ export function createProjectRecord({ title, nodes, edges, color = '', client = 
   });
 }
 
-export async function createEmptyProject(title, { emoji = '', color = '', client = '' } = {}) {
+export async function createEmptyProject(title, { emoji = '', color = '', client = '', kind = '' } = {}) {
   const apex = buildApexNode(title, Date.now(), emoji);
-  return createProjectRecord({ title, nodes: [apex], edges: [], color, client });
+  return createProjectRecord({ title, nodes: [apex], edges: [], color, client, kind });
 }
 
 // Komu se projekt ze šablony nasdílí: lidem přiřazeným na uzlech (kromě mě).
@@ -73,6 +77,27 @@ export function ownersFromNodes(nodes) {
   )];
 }
 
+// Opakovaný krok šablony bez termínu dostane PRVNÍ VÝSKYT svého rytmu (od
+// dneška) — jinak by „každé pondělí" nemělo kdy začít. V šabloně PROCESU ho
+// navíc hlídá zakladatel (systémová šablona řešitele znát nemůže; vzor makety
+// 8099/kb-proces). Rytmus se čte z pravidel šablony (šablonová id → idMap).
+// Sdílí dialog Nový projekt i „Použít šablonu" z náhledu v editoru.
+export function seedRecurringNodes(nodes, tplRules, idMap, kind = '') {
+  if (!Array.isArray(tplRules) || !tplRules.length) return nodes;
+  const me = pb.authStore.record?.email || '';
+  const tplIdOf = {};
+  for (const k of Object.keys(idMap || {})) tplIdOf[idMap[k]] = k;
+  return nodes.map((n) => {
+    const st = tplIdOf[n.id] ? recurrenceOf(tplRules, tplIdOf[n.id]) : null;
+    if (!st || st.custom || n.type === 'apexNode') return n;
+    return { ...n, data: {
+      ...n.data,
+      deadline: n.data.deadline || firstOccurrence(todayStr(), st),
+      owner: n.data.owner || (kind === 'process' ? me : ''),
+    } };
+  });
+}
+
 // Šablona → projekt (konverze přes lib/templateConvert — jediný zdroj pravdy).
 // U procesní šablony: startDate řídí dopočet termínů z ofsetů a projekt se
 // automaticky nasdílí (edit) všem přiřazeným osobám — server pak pošle
@@ -82,15 +107,18 @@ export function ownersFromNodes(nodes) {
 // mrtvý kanban"). Dřív to spadlo jen do console.error a uživatel viděl úspěch.
 export async function createProjectFromTemplate(tpl, titleOverride, startDate, { emoji = '', color = '', client = '', onRulesResult } = {}) {
   const title = (titleOverride || '').trim() || tpl.title || i18next.t('home:newMap.newProject');
-  const { nodes, edges, idMap } = templateToMap(tpl, { startDate });
+  const { nodes: nodesRaw, edges, idMap } = templateToMap(tpl, { startDate });
+  const tplRules = templateForLang(tpl).rules;
+  const kind = tpl.map_kind === 'process' ? 'process' : '';
+  const nodes = seedRecurringNodes(nodesRaw, tplRules, idMap, kind);
   const map = await createProjectRecord({
-    title, nodes, edges, color, client, emoji,
+    title, nodes, edges, color, client, emoji, kind,
     owners: ownersFromNodes(nodes),
     series: tpl.number_format && tpl.id ? tpl.id : '',
   });
-  // vestavěná pravidla šablony (kanban varianty) — název dle jazyka UI,
-  // odkazy na uzly se přemapují přes idMap a založí normální cestou /rules/save
-  const vysledek = await createRulesFromTemplate(templateForLang(tpl).rules, idMap, map.id);
+  // vestavěná pravidla šablony (kanban varianty, opakování procesu) — název dle
+  // jazyka UI, odkazy na uzly se přemapují přes idMap a založí cestou /rules/save
+  const vysledek = await createRulesFromTemplate(tplRules, idMap, map.id);
   if (onRulesResult) onRulesResult(vysledek);
   return map;
 }

@@ -41,7 +41,11 @@
     "bottleneckBadge_few": "bottleneck · holding {{count}} steps",
     "bottleneckBadge_many": "bottleneck · holding {{count}} steps",
     "bottleneckBadge_other": "bottleneck · holding {{count}} steps",
-    "bottleneckTitle": "This overdue goal is holding up further unfinished steps — until it moves, others wait."
+    "bottleneckTitle": "This overdue goal is holding up further unfinished steps — until it moves, others wait.",
+    "stuckProcessNote_one": "Process steps without a rhythm do not count as \"Not moving\" ({{count}}: {{list}}). They describe the process; they are not stuck work.",
+    "stuckProcessNote_few": "Process steps without a rhythm do not count as \"Not moving\" ({{count}}: {{list}}). They describe the process; they are not stuck work.",
+    "stuckProcessNote_many": "Process steps without a rhythm do not count as \"Not moving\" ({{count}}: {{list}}). They describe the process; they are not stuck work.",
+    "stuckProcessNote_other": "Process steps without a rhythm do not count as \"Not moving\" ({{count}}: {{list}}). They describe the process; they are not stuck work."
   },
   "sections": {
     "overdue": "Overdue",

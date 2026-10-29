@@ -12,8 +12,8 @@ import { useLazyNs } from '@/i18n/lazyNs';
 export function useMapRules({ activeMapId, canEdit, isPublicView, setNodes, mapRulesNow }) {
   // automatizační pravidla mapy — pro badge blesku na uzlech a kategorii
   // Automatizace v okně uzlu. Jen editor (routa /rules je editor-only);
-  // bez realtime — pravidla se mění výhradně přes RulesDialog, který po
-  // změně zavolá reload (onRulesChanged).
+  // bez realtime — RulesDialog po změně zavolá reload (onRulesChanged) a asistent
+  // (provedená karta → kb-map-changed s mapIds) přenačte pravidla níž.
   const [rulesOpen, setRulesOpen] = useState(false);
   const [rulesDefaults, setRulesDefaults] = useState({});
   const [mapRules, setMapRules] = useState([]);
@@ -21,6 +21,18 @@ export function useMapRules({ activeMapId, canEdit, isPublicView, setNodes, mapR
   useEffect(() => {
     if (!activeMapId || !canEdit || isPublicView) { setMapRules([]); return; }
     rulesApi.list(activeMapId).then(setMapRules).catch(() => setMapRules([]));
+  }, [activeMapId, canEdit, isPublicView]);
+  // asistent mění pravidla i mimo RulesDialog (create_rule, set_step_rhythm, přepnutí stylu) —
+  // bez přenačtení zůstal krok s novým rytmem „jednorázově“ a bez blesku (klik-test 25. 10. 2026)
+  useEffect(() => {
+    if (!activeMapId || !canEdit || isPublicView) return undefined;
+    const h = (ev) => {
+      const ids = ev?.detail?.mapIds;
+      if (!Array.isArray(ids) || !ids.includes(activeMapId)) return;
+      rulesApi.list(activeMapId).then(setMapRules).catch(() => {});
+    };
+    window.addEventListener('kb-map-changed', h);
+    return () => window.removeEventListener('kb-map-changed', h);
   }, [activeMapId, canEdit, isPublicView]);
   const ruleNodes = useMemo(() => new Set(mapRules.filter((r) => r.node_id).map((r) => r.node_id)), [mapRules]);
   // 🔁 uzly s čistým opakovacím pravidlem (v0.35) — badge na kartě cíle

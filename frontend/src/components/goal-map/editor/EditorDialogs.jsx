@@ -67,6 +67,10 @@ export default function EditorDialogs({ mapa, access, node, dialogs }) {
             nodeTitle={editNode.data?.title || ''}
             rules={mapRules}
             onRulesChanged={setMapRules}
+            processMap={mapKind === 'process'}
+            deadline={editNode.data?.deadline || ''}
+            childCount={edges.filter((e) => e.source === editNode.id).length}
+            onDeadline={(d) => setNodes((prev) => prev.map((n) => (n.id === editNode.id ? { ...n, data: { ...n.data, deadline: d } } : n)))}
           />
         ) : undefined}
         extraBehaviorContent={canEdit && editNode && editNode.type !== 'apexNode' ? (
@@ -102,6 +106,8 @@ export default function EditorDialogs({ mapa, access, node, dialogs }) {
       <SaveTemplateDialog
         open={saveTplOpen}
         mapTitle={title}
+        mapKind={mapKind}
+        rules={mapRules}
         nodes={nodes}
         edges={edges}
         onClose={() => setSaveTplOpen(false)}

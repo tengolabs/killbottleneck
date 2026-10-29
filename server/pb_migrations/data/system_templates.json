@@ -5162,5 +5162,154 @@
         "title": "Work experience and internships"
       }
     ]
+  },
+  {
+    "title": "Týdenní provoz kanceláře",
+    "description": "Proces: tři opakované kroky — úklid kuchyňky, objednat kávu, vynést tříděný odpad. Odškrtnutý krok se vrátí s dalším termínem.",
+    "category": "prace",
+    "icon": "RotateCw",
+    "goal": "Kancelář běží sama",
+    "node_type": "",
+    "map_kind": "process",
+    "ai_nodes": [
+      {
+        "id": "root",
+        "parentId": null,
+        "title": "Týdenní provoz kanceláře",
+        "description": "Kancelář běží sama: co se opakuje, má svůj rytmus a někoho, kdo to hlídá."
+      },
+      {
+        "id": "d1",
+        "parentId": "root",
+        "title": "Úklid kuchyňky",
+        "description": "Nádobí, linka, lednice."
+      },
+      {
+        "id": "d2",
+        "parentId": "root",
+        "title": "Objednat kávu",
+        "description": "Zkontrolovat zásobu a objednat."
+      },
+      {
+        "id": "d3",
+        "parentId": "root",
+        "title": "Vynést tříděný odpad",
+        "description": "Papír, plast, sklo."
+      }
+    ],
+    "title_en": "Weekly office operations",
+    "description_en": "Process: three recurring steps — tidy the kitchen, order coffee, take out the recycling. A ticked-off step comes back with its next due date.",
+    "goal_en": "The office runs itself",
+    "ai_nodes_en": [
+      {
+        "id": "root",
+        "parentId": null,
+        "title": "Weekly office operations",
+        "description": "The office runs itself: whatever repeats has its rhythm and someone who keeps an eye on it."
+      },
+      {
+        "id": "d1",
+        "parentId": "root",
+        "title": "Tidy the kitchen",
+        "description": "Dishes, counter, fridge."
+      },
+      {
+        "id": "d2",
+        "parentId": "root",
+        "title": "Order coffee",
+        "description": "Check the stock and order."
+      },
+      {
+        "id": "d3",
+        "parentId": "root",
+        "title": "Take out the recycling",
+        "description": "Paper, plastic, glass."
+      }
+    ],
+    "rules": [
+      {
+        "id": "r1",
+        "node_id": "d1",
+        "name": "Opakovat: Úklid kuchyňky",
+        "name_en": "Repeat: Tidy the kitchen",
+        "trigger": {
+          "type": "node_status_changed",
+          "status": "done"
+        },
+        "conditions": [],
+        "actions": [
+          {
+            "type": "set_status",
+            "status": "todo"
+          },
+          {
+            "type": "set_deadline",
+            "advance": "weekly",
+            "days": [
+              1,
+              4
+            ]
+          },
+          {
+            "type": "reset_subtree"
+          }
+        ]
+      },
+      {
+        "id": "r2",
+        "node_id": "d2",
+        "name": "Opakovat: Objednat kávu",
+        "name_en": "Repeat: Order coffee",
+        "trigger": {
+          "type": "node_status_changed",
+          "status": "done"
+        },
+        "conditions": [],
+        "actions": [
+          {
+            "type": "set_status",
+            "status": "todo"
+          },
+          {
+            "type": "set_deadline",
+            "advance": "weekly",
+            "every": 2,
+            "days": [
+              3
+            ]
+          },
+          {
+            "type": "reset_subtree"
+          }
+        ]
+      },
+      {
+        "id": "r3",
+        "node_id": "d3",
+        "name": "Opakovat: Vynést tříděný odpad",
+        "name_en": "Repeat: Take out the recycling",
+        "trigger": {
+          "type": "node_status_changed",
+          "status": "done"
+        },
+        "conditions": [],
+        "actions": [
+          {
+            "type": "set_status",
+            "status": "todo"
+          },
+          {
+            "type": "set_deadline",
+            "advance": "weekly",
+            "days": [
+              5
+            ]
+          },
+          {
+            "type": "reset_subtree"
+          }
+        ]
+      }
+    ]
   }
 ]

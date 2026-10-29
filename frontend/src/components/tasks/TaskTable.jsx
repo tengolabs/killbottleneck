@@ -21,11 +21,12 @@ import TaskRow from './table/TaskRow';
 import BufferRow from './table/BufferRow';
 import AppearancePopover from './table/AppearancePopover';
 import { SortHead } from './table/RowBits';
+import { useProcessRhythms } from '@/hooks/useProcessHealth';
 
 const STATUS_ORDER = { todo: 0, in_progress: 1, done: 2 };
 
 // Průběžná osnova: řádek pro rychlé psaní cílů projektu (Enter = uložit a psát dál)
-function QuickAddNodeRow({ onAdd }) {
+function QuickAddNodeRow({ onAdd, process = false }) {
   const { t } = useTranslation('tasks');
   const [val, setVal] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +49,7 @@ function QuickAddNodeRow({ onAdd }) {
             value={val}
             onChange={(e) => setVal(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
-            placeholder={t('taskTable.quickAddPlaceholder')}
+            placeholder={t(process ? 'taskTable.quickAddPlaceholderProcess' : 'taskTable.quickAddPlaceholder')}
             disabled={busy}
             className="flex-1 h-7 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
           />
@@ -187,6 +188,7 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
   // Handlery a sdílená data pro řádky (F3-07) — dřív 18 props prodrátovaných
   // přes NodeItemRow/TaskRow/BufferRow. Obal onCycle (cycleStatus) je tentýž,
   // jaký dřív dostával každý TaskRow inline.
+  const rhythms = useProcessRhythms(maps);
   const tableCtx = useMemo(() => ({
     members,
     meEmail,
@@ -211,7 +213,8 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
     buffer: { onEdit: onEditBuffer, onDelete: onDeleteBuffer, onConvert: onConvertBuffer },
     project: { onEditAppearance, onSetProjectIcon },
     onRowAction,
-  }), [members, meEmail, commentCounts, onEditNodeItem, onCycleNodeItem, onAssignNodeItem, onAddChildNode, onOpenNode, onSetNodeIcon, onStashNodeItem, onEdit, onCycle, onDelete, onAssign, onOpenTaskMap, onStashTask, onEditBuffer, onDeleteBuffer, onConvertBuffer, onEditAppearance, onSetProjectIcon, onRowAction]);
+    rhythms,
+  }), [rhythms, members, meEmail, commentCounts, onEditNodeItem, onCycleNodeItem, onAssignNodeItem, onAddChildNode, onOpenNode, onSetNodeIcon, onStashNodeItem, onEdit, onCycle, onDelete, onAssign, onOpenTaskMap, onStashTask, onEditBuffer, onDeleteBuffer, onConvertBuffer, onEditAppearance, onSetProjectIcon, onRowAction]);
 
   if (tasks.length === 0 && Object.keys(nodeTrees).length === 0 && bufferItems.length === 0) {
     return (
@@ -269,6 +272,9 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                     ) : (
                       t('taskTable.noMapSection')
                     )}
+                    {sec.map?.kind === 'process' && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0" data-testid="task-section-process">🔁 {t('taskTable.processBadge')}</span>
+                    )}
                     <span className="text-xs font-normal text-muted-foreground tabular-nums px-1.5 py-0.5 rounded-full bg-background/70">
                       {sectionCount(sec)}
                     </span>
@@ -294,7 +300,7 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                 <Fragment>
               {renderNodeRows(sec.nodeRoots, 0)}
               {sec.mapId && onQuickAddNode && (
-                <QuickAddNodeRow onAdd={(title) => onQuickAddNode(sec.mapId, title)} />
+                <QuickAddNodeRow process={sec.map?.kind === 'process'} onAdd={(title) => onQuickAddNode(sec.mapId, title)} />
               )}
               {sec.tasks.map((task) => (
                 <Fragment key={task.id}>

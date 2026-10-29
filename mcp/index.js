@@ -104,14 +104,34 @@ function renderMap(m) {
   const acc = m.access ? `, access: ${m.access}` : '';
   const num = m.project_number > 0 ? `#${m.project_number}, ` : '';
   const arch = m.archived ? ', ARCHIVED' : '';
+  const kind = m.kind === 'process' ? ', kind: process' : '';
   const head = m.title
-    ? `Map "${m.title}" (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`
-    : `Map (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`;
+    ? `Map "${m.title}" (${num}id: ${m.id}, updated: ${m.updated}${acc}${kind}${arch})`
+    : `Map (${num}id: ${m.id}, updated: ${m.updated}${acc}${kind}${arch})`;
   const body = (m.tree || []).map((r) => renderNode(r, 0)).join('\n');
   const notes = (m.notes || []).length
     ? '\nNotes:\n' + m.notes.map((n) => `  • ${n.text.slice(0, 200)} (id: ${n.id})`).join('\n')
     : '';
-  return `${DATA_FENCE}\n\n${head}\n${body}${notes}`;
+  return `${DATA_FENCE}\n\n${head}${renderHealth(m.health)}\n${body}${notes}`;
+}
+// PROCES (kind process): cílem je nepřetržitý běh, ne dokončení — místo % zdraví
+// běhu (opakované kroky včas / po termínu, poslední průchod)
+function rhythmText(r) {
+  if (!r) return '';
+  const unit = { daily: 'day', weekly: 'week', monthly: 'month' }[r.freq] || r.freq;
+  const every = r.every > 1 ? `every ${r.every} ${unit}s` : `every ${unit}`;
+  const dny = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return r.days && r.days.length ? `${every} on ${r.days.map((d) => dny[d - 1]).join(', ')}` : every;
+}
+function renderHealth(h) {
+  if (!h) return '';
+  if (!h.recurring) return '\nProcess (keeps running, no % done): no recurring steps yet — the map describes the process.';
+  const last = h.last ? `last run ${h.last.at.slice(0, 16)} UTC (${h.last.title})` : 'no run recorded yet';
+  const lines = [`\nProcess (keeps running, no % done): ${h.ok} recurring step(s) on time, ${h.late} overdue, ${h.runs30} run(s) in 30 days, ${last}.`];
+  for (const st of h.steps || []) {
+    lines.push(`  🔁 ${st.title} (id: ${st.id}) — ${rhythmText(st.rhythm)}, next due ${st.deadline || '—'}${st.late ? ' OVERDUE' : ''}, ${st.runs90} run(s) in 90 days${st.late90 ? ` (${st.late90} late)` : ''}`);
+  }
+  return lines.join('\n');
 }
 // souhrn Organizace (get_portfolio) — 1:1 s HTTP serverem (server/pb_hooks/mcp-tools.js)
 function renderPortfolio(p) {
@@ -119,10 +139,17 @@ function renderPortfolio(p) {
   const sc = p.scope || {};
   const s = p.sections || {};
   const who = (r) => (r.owner_label ? `${r.owner_label} (${r.owner})` : (r.owner || 'unassigned'));
-  const out = [`Portfolio as of ${p.today}: ${c.projects || 0} projects (team ${sc.team || 0}, shared ${sc.shared || 0}), ${c.open || 0} open items, ${c.overdue || 0} overdue, ${c.stuck || 0} stuck, ${c.people || 0} people with overdue work.`];
+  const out = [`Portfolio as of ${p.today}: ${c.projects || 0} projects, ${c.processes || 0} processes (team ${sc.team || 0}, shared ${sc.shared || 0}), ${c.open || 0} open items, ${c.overdue || 0} overdue, ${c.stuck || 0} stuck, ${c.people || 0} people with overdue work.`];
   const projects = s.projects || [];
   out.push('', projects.length ? 'Projects:' : 'Projects: none (no team or shared maps visible to the key owner).');
   for (const pr of projects) {
+    if (pr.kind === 'process') {
+      const h = pr.health || {};
+      const run = !h.recurring ? 'no recurring steps (describes the process)'
+        : `${h.ok} step(s) on time, ${h.late} overdue, last run ${h.last ? h.last.at.slice(0, 10) : '—'}`;
+      out.push(`• ${pr.project_number > 0 ? `#${pr.project_number} ` : ''}${pr.title} (id: ${pr.id}, ${pr.access}) — process (keeps running, no % done): ${run}, open ${pr.open}, overdue ${pr.overdue}, owner @${pr.owner_email || '?'}`);
+      continue;
+    }
     out.push(`• ${pr.project_number > 0 ? `#${pr.project_number} ` : ''}${pr.title} (id: ${pr.id}, ${pr.access}) — ${pr.pct}% done (${pr.done}/${pr.total}), open ${pr.open}, overdue ${pr.overdue}, stuck ${pr.stuck}, owner @${pr.owner_email || '?'}`);
   }
   const overdue = (s.overdue || []).slice(0, 20);
@@ -217,7 +244,7 @@ server.registerTool('list_maps', {
     const r = await call('GET', `/api/kb/v1/maps${archived ? '?archived=1' : ''}`);
     if (!r.maps.length) return text(archived ? 'No archived maps.' : 'No maps.');
     return text(DATA_FENCE + '\n\n'
-      + r.maps.map((m) => `• ${m.project_number > 0 ? `#${m.project_number} ` : ''}${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || 'owner'})`).join('\n'));
+      + r.maps.map((m) => `• ${m.project_number > 0 ? `#${m.project_number} ` : ''}${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || 'owner'}${m.kind === 'process' ? ', kind: process' : ''})`).join('\n'));
   } catch (e) { return errText(e.message); }
 });
 
@@ -237,12 +264,13 @@ server.registerTool('create_map', {
     outline: z.array(treeItem).describe('Top-level items under the apex, each may have children'),
     description: z.string().optional().describe('Map description'),
     apex_text: z.string().optional().describe('Root goal statement, defaults to title'),
+    kind: z.enum(['project', 'process']).optional().describe('Map style: "project" (default) = work to finish, shows % done and offers archiving when everything is done; "process" = a mapped operation that keeps running — steps usually repeat (add recurrence with create_rule: on done → set_status todo + set_deadline advance), no % done, health = recurring steps on time vs overdue.'),
   }),
-}, async ({ title, outline, description, apex_text }) => {
+}, async ({ title, outline, description, apex_text, kind }) => {
   try {
-    const r = await call('POST', '/api/kb/v1/maps', { title, tree: outline, description, apex_text });
+    const r = await call('POST', '/api/kb/v1/maps', { title, tree: outline, description, apex_text, kind });
     lastUpdated.set(r.id, r.updated);
-    return text(`Map created.\n\n${renderMap({ id: r.id, title, updated: r.updated, tree: r.tree, notes: [] })}`);
+    return text(`Map created.\n\n${renderMap({ id: r.id, title, updated: r.updated, kind: r.kind, tree: r.tree, notes: [] })}`);
   } catch (e) { return errText(e.message); }
 });
 
@@ -313,14 +341,17 @@ const ruleCondition = z.object({
   value: z.string().optional(),
 }).strict();
 const ruleAction = z.object({
-  type: z.enum(['set_status', 'set_owner', 'set_deadline', 'move_node', 'create_subnodes', 'notify', 'run_agent'])
-    .describe('What to do. run_agent and move_node target the trigger node; set_status/set_owner/set_deadline target the trigger node by default but accept `target` (a schedule rule needs node_id unless `target` is an explicit node id).'),
+  type: z.enum(['set_status', 'set_owner', 'set_deadline', 'move_node', 'create_subnodes', 'notify', 'run_agent', 'reset_subtree'])
+    .describe('What to do. reset_subtree = put the trigger node\'s sub-goals and tasks back to todo (a recurring step\'s checklist starts over; no parameters). run_agent and move_node target the trigger node; set_status/set_owner/set_deadline target the trigger node by default but accept `target` (a schedule rule needs node_id unless `target` is an explicit node id).'),
   status: z.enum(['todo', 'in_progress', 'done']).optional().describe('set_status only'),
   target: z.string().optional().describe('set_status/set_owner/set_deadline only: which node the action modifies — "trigger_node" (default), "parent" (one level up), or a node id. A missing parent / vanished node is logged as a skipped action'),
   owner: z.string().optional().describe('set_owner only: e-mail of an instance member (empty string clears), or a dynamic target resolved when the rule runs: "deputy_of_node_owner", "position:<nodeId>" (holder of an org-structure position), "deputy_of_position:<nodeId>". An unresolvable target is logged as a skipped action'),
   date: z.string().optional().describe('set_deadline only: YYYY-MM-DD (alternative to relative_days)'),
   relative_days: z.number().int().optional().describe('set_deadline only: today + N days (0-3650)'),
   advance: z.enum(['daily', 'weekly', 'monthly']).optional().describe('set_deadline only: advance the node\'s CURRENT deadline by one interval — daily|weekly|monthly. Keeps the rhythm anchored to the original deadline (every Monday stays a Monday; the 31st stays the 31st, clamped in shorter months); past occurrences are skipped to the nearest future one. Use for recurring goals (\"repeat weekly\" = on done → set_status todo + set_deadline advance).'),
+  every: z.number().int().optional().describe('set_deadline with advance only: every N-th day/week/month (1-4, default 1)'),
+  days: z.array(z.number().int()).optional().describe('set_deadline with advance weekly only: weekdays 1 = Monday … 7 = Sunday (e.g. [2,4] = Tuesday and Thursday); default = the weekday of the current deadline'),
+  month_day: z.number().int().optional().describe('set_deadline with advance monthly only: day of the month 1-31 (a shorter month gets its last day, the next month this day again); default = the day of the current deadline'),
   parent: z.string().optional().describe('create_subnodes only: node id to attach under, or "trigger_node" (default)'),
   items: z.array(treeItem).optional().describe('create_subnodes only: subtree template, same shape as add_nodes items, max 50 nodes'),
   to: z.string().optional().describe('notify: "node_owner", "deputy_of_node_owner", "position:<nodeId>", "deputy_of_position:<nodeId>" (resolved at run time), "map_owner" or an e-mail. move_node (kanban): id of the new parent node the trigger node moves under — appended at the end of the new siblings row; moving the apex, a vanished target or a move creating a cycle is logged as a skipped action'),

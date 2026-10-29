@@ -8,7 +8,7 @@ import { buildMapExport, downloadJson, exportFilename } from '@/lib/mapPortable'
 // (kanonický tvar + úkoly + pravidla). `exporting` zároveň schovává ovládací
 // prvky plátna při snímání. Vytaženo z GoalMapEditor.jsx (analýza kódu
 // 27. 8. 2026, F1-07) BEZE ZMĚNY chování — vše ostatní přichází parametry.
-export function useMapExport({ visibleNodes, title, cleanMapData, activeMapId, user, t, toast }) {
+export function useMapExport({ visibleNodes, title, cleanMapData, activeMapId, user, t, toast, mapKind = '' }) {
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async (format) => {
@@ -40,7 +40,7 @@ export function useMapExport({ visibleNodes, title, cleanMapData, activeMapId, u
         exportRules = await rulesApi.list(activeMapId);
       } catch (err) { /* bez práv na pravidla → export bez nich */ }
       downloadJson(exportFilename(title), buildMapExport({
-        map: { title, description: '' },
+        map: { title, description: '', kind: mapKind },
         nodes: cleanNodes,
         edges: cleanEdges,
         tasks: exportTasks,

@@ -586,7 +586,9 @@ onRecordCreateRequest((e) => {
   e.record.set("project_number", 0); // přidělí model hook onRecordCreate, klient ho neposílá
   e.record.set("archived", false); // archivace i razítko jen přes update (owner-only)
   e.record.set("archived_at", "");
-  e.record.set("kind", ""); // typ mapy je server-spravovaný — org mapu zakládá jen /api/kb/org-map
+  // typ mapy: "org" zakládá jen /api/kb/org-map; "process" (styl Proces) si
+  // zakladatel volí sám — každá jiná hodnota z requestu se zahodí
+  e.record.set("kind", e.record.getString("kind") === "process" ? "process" : "");
   const seriesTplId = e.record.getString("series");
   if (seriesTplId) {
     try {
@@ -640,8 +642,14 @@ onRecordUpdateRequest((e) => {
   for (const f of ["series", "series_number", "series_title", "series_year", "project_number"]) {
     e.record.set(f, orig.get(f));
   }
-  // typ mapy (org struktura) drží server — běžná mapa se nesmí „prohlásit" za org
-  e.record.set("kind", orig.get("kind"));
+  // typ mapy (org struktura) drží server — běžná mapa se nesmí „prohlásit" za org.
+  // Styl Projekt ↔ Proces přepíná JEN vlastník a jen "" ↔ "process" (Richard
+  // 21. 10. 2026: kdykoliv, oběma směry); org mapa ani do/z org nikdy.
+  const kindNew = e.record.getString("kind");
+  const kindOld = orig.getString("kind");
+  if (!(isOwner && kindOld !== "org" && (kindNew === "" || kindNew === "process"))) {
+    e.record.set("kind", orig.get("kind"));
+  }
   if (orig.getString("kind") === "org") {
     // org strukturu edituje JEN admin nebo správce struktury — edit sdílení
     // (map_shares) tu nestačí: degradovaný admin by si ho jinak podržel a dál
@@ -740,6 +748,15 @@ onRecordUpdateRequest((e) => {
     try { e.app.logger().warn("goalmaps update: srovnání požadavků na automatizaci selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
   e.next();
+  // styl Projekt ↔ Proces: tvar opakovacích pravidel (obnova podkroků) sleduje styl — na serveru, ať platí pro
+  // editor, asistenta, REST i budoucí v1/MCP stejně
+  if (e.record.getString("kind") !== kindOld) {
+    try {
+      require(`${__hooks}/helpers.js`).prepniObnovuPodkroku(e.app, e.record.id, e.record.getString("kind") === "process");
+    } catch (err) {
+      try { e.app.logger().warn("goalmaps update: úprava pravidel po přepnutí stylu selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
   // A3: co se v mapě pohnulo → záznamník změn (uzly nemají vlastní razítko).
   // Rozdíl proti origNodes se tu stejně počítá kvůli notifikacím níž.
   try {
@@ -1730,6 +1747,7 @@ kbRoute("GET", "/my-day", (e) => {
     today: day.today,
     counts: day.counts,
     sections: day.sections,
+    stuckProcess: day.stuckProcess, // kroky procesů vynechané z „nehýbe se" (jen vysvětlivka)
     truncated: day.truncated, // null, když se vešlo všechno
   });
 }, $apis.requireAuth());
@@ -1743,6 +1761,65 @@ kbRoute("GET", "/my-day", (e) => {
 //
 // Okno se NEPOSOUVÁ tím, že se podíváš (to by po druhém otevření ukázalo prázdno) —
 // je to vždy „posledních N dní od teď". range: 7 | 30 | all.
+// Rytmus a ZDRAVÍ BĚHU jedné mapy (styl Proces, Richard 21. 10. 2026) — pro
+// vrchol procesu, přehled „Zdraví běhu" a čtecí větu „Opakuje se každé pondělí"
+// u kroku. Na rozdíl od /rules (jen editor) ho vidí KAŽDÝ, kdo mapu vidí, i ve
+// veřejném náhledu: vrací jen rytmus kroků a historii průchodů, ne pravidla.
+// Funguje i u projektu (opakované kroky existují i tam), zdraví ale kreslí jen proces.
+kbRoute("GET", "/process-health", (e) => {
+  const { userSeesMap, processHealth, minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const q = e.request.url.query();
+  const mapId = String(q.get("map") || "");
+  if (!mapId) return e.json(400, { error: t(L, "err.mapNotFound") });
+  const who = e.auth ? e.auth.id : (e.realIP() || "anon");
+  if (minuteLimitHit($app.store(), "phrl:" + who, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  let map;
+  try {
+    map = e.app.findFirstRecordByFilter("goalmaps", "id = {:id}", { id: mapId });
+  } catch (err) {
+    return e.json(404, { error: t(L, "err.mapNotFound") });
+  }
+  const sees = e.auth
+    ? userSeesMap(e.app, map, e.auth.id, e.auth.email(), { includePublic: true })
+    : map.getBool("is_public");
+  if (!sees) return e.json(404, { error: t(L, "err.mapNotFound") });
+  const h = processHealth(e.app, map, { today: q.get("today") || "" });
+  e.response.header().set("Cache-Control", "private, no-store");
+  // veřejný náhled (anonym / cizí přes is_public): jen rytmus a včas / po termínu — historie průchodů
+  // (kdy kdo odškrtl) je provozní pohled jako /map-changes (Richard 29. 10. 2026 po /checkup)
+  const zevnitr = !!e.auth && userSeesMap(e.app, map, e.auth.id, e.auth.email());
+  if (!zevnitr) {
+    return e.json(200, { kind: map.getString("kind"), recurring: h.recurring, late: h.late, ok: h.ok, today: h.today,
+      steps: h.steps.map((s) => ({ id: s.id, title: s.title, rhythm: s.rhythm, deadline: s.deadline, status: s.status, late: s.late })) });
+  }
+  return e.json(200, Object.assign({ kind: map.getString("kind") }, h));
+});
+
+// Rytmus kroků víc map naráz (Úkoly: štítek „🔁 každé pondělí“ u procesů) — jen čistá opakovací pravidla,
+// bez historie průchodů; jeden dotaz místo /process-health za každý proces (/checkup 29. 10. 2026: N+1 → 429).
+// Mapy, které uživatel nevidí, se tiše vynechají. { maps: { mapId: { nodeId: rytmus } } }
+kbRoute("GET", "/process-rhythms", (e) => {
+  const { userSeesMap, recurrenceByMaps, minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (minuteLimitHit($app.store(), "prrl:" + e.auth.id, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const ids = String(e.request.url.query().get("maps") || "").split(",").map((x) => x.trim()).filter((x) => /^[a-z0-9]{1,32}$/.test(x)).slice(0, 200);
+  const viditelne = [];
+  for (const id of ids) {
+    try {
+      const m = e.app.findRecordById("goalmaps", id);
+      if (userSeesMap(e.app, m, e.auth.id, e.auth.email(), { includePublic: true })) viditelne.push(id);
+    } catch (err) { /* neexistuje → vynechat */ }
+  }
+  const rec = recurrenceByMaps(e.app, viditelne);
+  const maps = {};
+  for (const id of viditelne) maps[id] = rec[id] || {};
+  e.response.header().set("Cache-Control", "private, no-store");
+  return e.json(200, { maps: maps });
+}, $apis.requireAuth());
+
 // Stagnace uzlů JEDNÉ mapy pro editor (odznak „Úzké hrdlo") — jen obal nad
 // helpers.js:mapStagnantNodes, TÝŽ předpis jako sekce „Nehýbe se". Viditelnost
 // jako /map-changes: userSeesMap BEZ includePublic (veřejný náhled mapy odznaky
@@ -5367,6 +5444,7 @@ kbRoute("GET", "/v1/maps", (e) => {
       node_count: jsonVal(mp, "nodes", []).length,
       updated: mp.getString("updated"),
       access: mp.getString("owner") === a.user.id ? "owner" : level,
+      kind: mp.getString("kind") === "org" ? "org" : (mp.getString("kind") === "process" ? "process" : "project"),   // = detail
     });
   }
   return e.json(200, { maps: maps });
@@ -5524,7 +5602,7 @@ kbRoute("GET", "/v1/maps/{id}", (e) => {
   if (!r) return e.json(404, { error: t(a.lang, "err.mapNotFound") });
   const map = r.map;
   const tr = mapToTree(jsonVal(map, "nodes", []), jsonVal(map, "edges", []));
-  return e.json(200, {
+  return e.json(200, Object.assign({
     id: map.id,
     title: map.getString("title"),
     project_number: Number(map.get("project_number")) || 0,
@@ -5532,9 +5610,16 @@ kbRoute("GET", "/v1/maps/{id}", (e) => {
     archived: map.getBool("archived"),
     updated: map.getString("updated"),
     access: r.isOwner ? "owner" : r.level,
+    // styl: project = dokončit (% hotovo), process = nepřetržitý běh (zdraví místo %)
+    kind: map.getString("kind") === "org" ? "org" : (map.getString("kind") === "process" ? "process" : "project"),
     tree: tr.tree,
     notes: tr.notes,
-  });
+  }, map.getString("kind") === "process" ? (() => {
+    const { processHealth } = require(`${__hooks}/helpers.js`);
+    const h = processHealth($app, map, {});
+    return { health: { recurring: h.recurring, late: h.late, ok: h.ok, runs30: h.runs30, last: h.last,
+      steps: h.steps.map((st) => ({ id: st.id, title: st.title, rhythm: st.rhythm, deadline: st.deadline, late: st.late, last_at: st.last_at, runs90: st.runs90, late90: st.late90 })) } };
+  })() : {}));
 });
 
 // /v1/tasks ODSTRANĚNO (slovník, Richard 17. 8. 2026): úkol = uzel s řešitelem
@@ -5579,6 +5664,8 @@ kbRoute("POST", "/v1/maps", (e) => {
   if (H.checkTreePlans(info.tree)) return e.json(400, { error: t(a.lang, "err.badPlan") });
   const title = String(info.title || "").trim().slice(0, 200);
   if (!title) return e.json(400, { error: t(a.lang, "err.titleRequired") });
+  // styl: "project" (výchozí) | "process"; org mapu přes API založit nejde
+  if (info.kind !== undefined && ["", "project", "process"].indexOf(info.kind) < 0) return e.json(400, { error: t(a.lang, "err.badMapKind") });
   // řešitel musí být člen nebo viditelný externí kontakt (nález P6-01)
   const ownerErr = require(`${__hooks}/helpers.js`).resolveTreeOwners($app, info.tree, a.user.id, a.lang);
   if (ownerErr) return e.json(400, { error: ownerErr });
@@ -5610,7 +5697,7 @@ kbRoute("POST", "/v1/maps", (e) => {
   rec.set("series_title", "");
   rec.set("series_year", 0);
   rec.set("project_number", 0); // přidělí model hook onRecordCreate
-  rec.set("kind", ""); // org mapu zakládá jen /api/kb/org-map
+  rec.set("kind", info.kind === "process" ? "process" : ""); // org mapu zakládá jen /api/kb/org-map
   const saved = v1SaveMapData($app, rec, nodes, edges, a.lang, true, a.user.email(), { isOwner: true, via: a.via });
   if (saved.error) return e.json(saved.status, { error: saved.error });
   // řešitelé dostanou mapu nasdílenou jako spolupracovníci (work) — jinak by
@@ -5627,7 +5714,7 @@ kbRoute("POST", "/v1/maps", (e) => {
   }
   const tr = mapToTree(jsonVal(rec, "nodes", []), jsonVal(rec, "edges", []));
   // `shared` = komu se mapa právě nasdílela (work); prázdné i když aktér sdílet nesmí
-  return e.json(200, { id: rec.id, title: title, updated: rec.getString("updated"), shared: shared, tree: tr.tree });
+  return e.json(200, { id: rec.id, title: title, kind: info.kind === "process" ? "process" : "project", updated: rec.getString("updated"), shared: shared, tree: tr.tree });
 });
 
 // přidání podstromu: {parent_id?, items:[...], base_updated?} — bez parent_id se

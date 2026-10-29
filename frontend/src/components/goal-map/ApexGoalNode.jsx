@@ -9,6 +9,7 @@ import { statusConfig } from '@/lib/statusMeta';
 import { getActiveSkin } from '@/lib/theme';
 import { tridaVrcholu, tridyCitelnosti } from '@/lib/citelnost';
 import { PATTERN_ART } from '@/components/shared/SkinPattern';
+import { fmtRun } from '@/components/goal-map/proces/processFormat';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -46,7 +47,10 @@ function ApexGoalNode({ id, data, selected }) {
   }, []);
   // orgMap: vrchol ORG STRUKTURY není projekt — bez štítku Projekt, stavu,
   // pokroku, AI kouzel i stopek (nález Richardova klik-testu 15. 8.)
-  const { onAddChild, onEditNode, onExpandNode, onToggleCollapse, onCycleStatus, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, taskStats, onShowNodeTasks, activeMapId, direction, citelnost, orgMap } = useGoalMap();
+  const { onAddChild, onEditNode, onExpandNode, onToggleCollapse, onCycleStatus, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, taskStats, onShowNodeTasks, activeMapId, direction, citelnost, orgMap, processMap, processHealth } = useGoalMap();
+  // PROCES (21. 10. 2026): cílem je běh, ne dokončení — místo prstence % a stavu
+  // vrchol ukazuje zdraví běhu (včas / po termínu / naposledy prošlo)
+  const bezPokroku = orgMap || processMap;
   const isH = direction === 'horizontal';
   // Měření času na vrcholu = práce na projektu jako celku; stav uzlu nemění
   const timer = useTimer();
@@ -101,7 +105,7 @@ function ApexGoalNode({ id, data, selected }) {
       {/* prstenec celkového pokroku po obvodu */}
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="absolute inset-0 -rotate-90">
         <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="hsl(var(--secondary))" strokeWidth="8" />
-        {hasChildren && progress > 0 && !orgMap && (
+        {hasChildren && progress > 0 && !bezPokroku && (
           <circle
             cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none"
             stroke={ringColor} strokeWidth="8" strokeLinecap="round"
@@ -125,9 +129,9 @@ function ApexGoalNode({ id, data, selected }) {
         {!jenNazev && (
         <div className="relative z-10 flex items-center gap-2">
           <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: accent + '1a', color: accent }}>
-            {t(orgMap ? 'node.orgBadge' : 'node.projectBadge')}
+            {t(orgMap ? 'node.orgBadge' : processMap ? 'process.styleProcessCap' : 'node.projectBadge')}
           </span>
-          {!orgMap && (
+          {!bezPokroku && (
           <button
             onClick={(e) => { e.stopPropagation(); onCycleStatus?.(id); }}
             disabled={readOnly}
@@ -145,7 +149,22 @@ function ApexGoalNode({ id, data, selected }) {
           {data.icon && <span className="mr-1.5 leading-none">{data.icon}</span>}
           {titleText}
         </p>
-        {hasChildren && !jenNazev && !orgMap && (
+        {processMap && !jenNazev && (
+          <div className="relative z-10 flex flex-wrap justify-center gap-1 max-w-[200px]" data-testid="apex-process-health">
+            {processHealth && processHealth.recurring > 0 ? (
+              <>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-700 dark:text-green-400">{t('process.okCount', { count: processHealth.ok })}</span>
+                {processHealth.late > 0 && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-700 dark:text-red-400">{t('process.lateCount', { count: processHealth.late })}</span>
+                )}
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground">{t('process.lastRun', { when: processHealth.last ? fmtRun(processHealth.last.at, t) : '—' })}</span>
+              </>
+            ) : processHealth ? (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground">{t('process.describesOnly')}</span>
+            ) : null}
+          </div>
+        )}
+        {hasChildren && !jenNazev && !bezPokroku && (
           <p className="relative z-10 text-xl font-bold tabular-nums leading-none" style={{ color: ringColor }}>
             {progress}%
             <span className="block text-[10px] font-medium text-muted-foreground mt-0.5">{t('node.overallProgress')}</span>
@@ -155,7 +174,7 @@ function ApexGoalNode({ id, data, selected }) {
           <div className="relative z-10 flex items-center gap-1.5 mt-0.5">
             <button
               onClick={(e) => { e.stopPropagation(); onAddChild(id); }}
-              title={t(orgMap ? 'node.orgAddSub' : 'tasks:taskTable.addSubgoal')}
+              title={t(orgMap ? 'node.orgAddSub' : processMap ? 'process.addStepButton' : 'tasks:taskTable.addSubgoal')}
               className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
             >
               <Plus className="w-4 h-4" />

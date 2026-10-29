@@ -33,13 +33,15 @@ const RULE_CONDITION = {
 const RULE_ACTION = {
   type: "object",
   properties: {
-    type: { type: "string", enum: ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant"], description: "offer_assistant = notification whose link opens the AI assistant in the given package (mode) for the trigger node — nothing runs until the person clicks" },
+    type: { type: "string", enum: ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant", "reset_subtree"], description: "reset_subtree = sub-goals and tasks of the trigger node back to todo (checklist of a recurring step starts over). offer_assistant = notification whose link opens the AI assistant in the given package (mode) for the trigger node — nothing runs until the person clicks" },
     status: { type: "string", enum: ["todo", "in_progress", "done"] },
     target: { type: "string", description: "\"trigger_node\" (default), \"parent\" or a node id" },
     owner: { type: "string", description: "set_owner: member e-mail, or deputy_of_node_owner / position:<nodeId>" },
     date: { type: "string", description: "set_deadline: YYYY-MM-DD" },
     relative_days: { type: "integer" },
     advance: { type: "string", enum: ["daily", "weekly", "monthly"] },
+    every: { type: "integer", description: "set_deadline with advance only: every N-th day/week/month (1-4, default 1)" },
+    days: { type: "array", items: { type: "integer" }, description: "set_deadline with advance weekly only: weekdays 1 = Monday … 7 = Sunday (e.g. [2,4] = Tuesday and Thursday); default = the weekday of the current deadline" },
     parent: { type: "string" },
     items: { type: "array", items: { $ref: "#/$defs/treeItem" } },
     to: { type: "string", description: "REQUIRED for notify and move_node. notify: node_owner (only if the node has an owner) / map_owner / an e-mail; move_node: new parent node id" },
@@ -130,7 +132,131 @@ const NASTROJE = [
     parameters: { type: "object", properties: { map_id: { type: "string", description: "the exact map title" }, name: { type: "string" }, node_id: { type: "string", description: "the exact node title (omit = whole map)" }, trigger: RULE_TRIGGER, conditions: { type: "array", items: RULE_CONDITION }, actions: { type: "array", items: RULE_ACTION } }, required: ["map_id", "name", "trigger", "actions"], additionalProperties: false, $defs: { treeItem: SPOL().TREE_ITEM } } },
   { name: "set_rule_enabled", skupina: "pravidla", kind: "write", description: "Enable or disable a rule of a map. The user confirms first.",
     parameters: { type: "object", properties: { map_id: { type: "string" }, rule_id: { type: "string" }, enabled: { type: "boolean" } }, required: ["map_id", "rule_id", "enabled"], additionalProperties: false } },
+  { name: "set_step_rhythm", skupina: "pravidla", kind: "write", description: "Make a step repeat, change its rhythm or stop it repeating — the same as the Recurrence switch in the step's window. A ticked-off step returns to To do and its deadline moves to the next occurrence (in a process map its sub-steps start over too); a step without a deadline gets its first occurrence. Use this, never create_rule, whenever a step should repeat (\"every Monday\", \"every weekday\", \"monthly on the 5th\"). One call per step; several steps = several calls side by side. The user confirms first.",
+    parameters: { type: "object", properties: {
+      map_id: { type: "string", description: "the exact map title" },
+      node_id: { type: "string", description: "the exact step title" },
+      freq: { type: "string", enum: ["none", "daily", "weekly", "monthly"], description: "none = stop repeating" },
+      every: { type: "integer", description: "every N-th day/week/month, 1-4 (default 1)" },
+      days: { type: "array", items: { type: "integer" }, description: "weekly only: weekdays 1 = Monday … 7 = Sunday; every weekday = [1,2,3,4,5]; default = the weekday of the deadline" },
+      month_day: { type: "integer", description: "monthly only: day of the month 1-31 (moves the deadline to the nearest such day)" },
+    }, required: ["map_id", "node_id", "freq"], additionalProperties: false } },
 ];
+
+// Rytmus kroku přes asistenta (styl Proces, 25. 10. 2026): totéž co přepínač Opakování v okně kroku
+// (RecurrenceSwitch.jsx) — čisté opakovací pravidlo jako buildRecurrenceRule (lib/recurrenceRule.js)
+// a první výskyt jako firstOccurrence/terminProDen (lib/rhythm.js). Model z obecného create_rule tvar
+// neposkládal (lokální model 25. 10.: schedule → set_deadline denně místo „každý všední den“).
+const RYTMUS_TEXT = {
+  cs: { daily: "každý den", dailyN: "každý {n}. den", workdays: "každý všední den", weekly: "každý týden", weeklyN: "každý {n}. týden", monthlyDay: "každý měsíc {d}.", monthlyNDay: "každý {n}. měsíc {d}.",
+    each: { 1: "každé pondělí", 2: "každé úterý", 3: "každou středu", 4: "každý čtvrtek", 5: "každý pátek", 6: "každou sobotu", 7: "každou neděli" }, dow: { 1: "Po", 2: "Út", 3: "St", 4: "Čt", 5: "Pá", 6: "So", 7: "Ne" } },
+  en: { daily: "every day", dailyN: "every {n} days", workdays: "every weekday", weekly: "every week", weeklyN: "every {n} weeks", monthlyDay: "every month on day {d}", monthlyNDay: "every {n} months on day {d}",
+    each: { 1: "every Monday", 2: "every Tuesday", 3: "every Wednesday", 4: "every Thursday", 5: "every Friday", 6: "every Saturday", 7: "every Sunday" }, dow: { 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun" } },
+};
+const RYTMUS_PRAVIDLO = { cs: { daily: "Opakování (denně): ", weekly: "Opakování (týdně): ", monthly: "Opakování (měsíčně): " }, en: { daily: "Recurrence (daily): ", weekly: "Recurrence (weekly): ", monthly: "Recurrence (monthly): " } };
+const DEN_MS = 86400000;
+// „dnes“ serverového rytmu (helpers.js dnesRytmu) = den v pásmu instance (TZ kontejneru), ne UTC (/checkup 29. 10.)
+const dnesUtc = () => { const n = new Date(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0"); };
+const plusDny = (s, k) => new Date(Date.parse(s + "T00:00:00Z") + k * DEN_MS).toISOString().slice(0, 10);
+const denTydne = (s) => { const x = new Date(s + "T00:00:00Z").getUTCDay(); return x === 0 ? 7 : x; };
+const jeDatum = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
+
+function rytmusText(r, termin, L) {
+  const T = RYTMUS_TEXT[L === "en" ? "en" : "cs"];
+  const n = r.every > 1 ? r.every : 1;
+  if (r.freq === "daily") return n === 1 ? T.daily : T.dailyN.replace("{n}", n);
+  if (r.freq === "weekly") {
+    const ds = (r.days && r.days.length ? r.days : (jeDatum(termin) ? [denTydne(termin)] : [])).slice().sort();
+    if (n === 1 && ds.join() === "1,2,3,4,5") return T.workdays;
+    if (n === 1 && ds.length === 7) return T.daily;
+    if (n === 1 && ds.length === 1) return T.each[ds[0]];
+    const hlava = n === 1 ? T.weekly : T.weeklyN.replace("{n}", n);
+    return ds.length ? `${hlava}: ${ds.map((d) => T.dow[d]).join(", ")}` : hlava;
+  }
+  const md = Number.isInteger(r.day) ? r.day : (jeDatum(termin) ? Number(termin.slice(8, 10)) : 1);
+  return n === 1 ? T.monthlyDay.replace("{d}", md) : T.monthlyNDay.replace("{n}", n).replace("{d}", md);
+}
+
+// argumenty → { rytmus, md } nebo { chyba }
+function rytmusZArgumentu(a, termin) {
+  const freq = String(a.freq || "");
+  if (["daily", "weekly", "monthly"].indexOf(freq) < 0) return { chyba: "Error: freq must be none, daily, weekly or monthly." };
+  const every = a.every === undefined || a.every === null ? 1 : Number(a.every);
+  if (!Number.isInteger(every) || every < 1 || every > 4) return { chyba: "Error: every must be a whole number 1-4." };
+  const r = { freq, every };
+  if (freq === "weekly") {
+    let days = Array.isArray(a.days) && a.days.length ? a.days.map(Number) : [denTydne(jeDatum(termin) ? termin : dnesUtc())];
+    if (days.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) return { chyba: "Error: days are weekdays 1 = Monday … 7 = Sunday." };
+    r.days = days.filter((d, i) => days.indexOf(d) === i).sort();
+  } else if (Array.isArray(a.days) && a.days.length) return { chyba: "Error: days work only with freq weekly." };
+  let md = 0;
+  if (a.month_day !== undefined && a.month_day !== null) {
+    md = Number(a.month_day);
+    if (freq !== "monthly") return { chyba: "Error: month_day works only with freq monthly." };
+    if (!Number.isInteger(md) || md < 1 || md > 31) return { chyba: "Error: month_day must be 1-31." };
+    r.day = md;   // kotva dne v pravidle (set_deadline.month_day): 31. po únoru zase 31.
+  }
+  return { rytmus: r, md };
+}
+
+// výskyt v den `s` při kotvě `kotva` (zrcadlo isOccurrence v lib/rhythm.js)
+function jeVyskyt(s, r, kotva) {
+  const n = r.every > 1 ? r.every : 1;
+  const rozdil = Math.round((Date.parse(s + "T00:00:00Z") - Date.parse(kotva + "T00:00:00Z")) / DEN_MS);
+  if (r.freq === "daily") return ((rozdil % n) + n) % n === 0;
+  if (r.freq === "weekly") {
+    if ((r.days || [denTydne(kotva)]).indexOf(denTydne(s)) < 0) return false;
+    const tydnu = Math.round((Date.parse(plusDny(s, 1 - denTydne(s)) + "T00:00:00Z") - Date.parse(plusDny(kotva, 1 - denTydne(kotva)) + "T00:00:00Z")) / (7 * DEN_MS));
+    return ((tydnu % n) + n) % n === 0;
+  }
+  return Number(s.slice(8, 10)) === Number(kotva.slice(8, 10));
+}
+// nový termín: den v měsíci → nejbližší takový den od dneška (v kratším měsíci poslední); krok s termínem ho drží;
+// bez termínu první výskyt ode dneška — stejně jako přepínač v okně kroku
+function novyTerminRytmu(r, md, termin) {
+  const dnes = dnesUtc();
+  if (md) {
+    let s = dnes;
+    for (let i = 0; i < 62; i++, s = plusDny(s, 1)) {
+      const d = new Date(s + "T00:00:00Z");
+      const posledni = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+      if (d.getUTCDate() === Math.min(md, posledni)) return s;
+    }
+    return dnes;
+  }
+  if (jeDatum(termin)) return termin;
+  let s = dnes;
+  for (let i = 0; i < 800; i++, s = plusDny(s, 1)) if (jeVyskyt(s, r, dnes)) return s;
+  return dnes;
+}
+
+// stav kroku pro set_step_rhythm: mapa, uzel, jeho termín a pravidla, která termínem hýbou
+function stavRytmu(app, auth, a) {
+  const H = require(`${__hooks}/helpers.js`);
+  const R = require(`${__hooks}/rules-api.js`);
+  const mid = SPOL().mapaId(app, auth, a.map_id);
+  if (!mid) return { chyba: `Error: map "${String(a.map_id || "")}" not found or not accessible (use list_maps; pass the id or the exact title).` };
+  const nid = SPOL().uzelId(app, auth, mid, a.node_id);
+  if (!nid) return { chyba: `Error: step "${String(a.node_id || "")}" not found in the map (use get_map; pass the node id or its exact title).` };
+  let map;
+  try { map = app.findRecordById("goalmaps", mid); } catch (err) { return { chyba: "Error: map not found." }; }
+  if (!H.mapEditAccess(app, map, auth)) return { chyba: "Error: only editors of the map can change how a step repeats." };
+  const uzel = H.jsonVal(map, "nodes", []).find((n) => n && n.id === nid);
+  if (!uzel || uzel.type === "apexNode") return { chyba: "Error: the apex of the map cannot repeat — pick one of its steps." };
+  const rules = ((R.listRules(app, map) || {}).body || {}).rules || [];
+  const posun = rules.filter((r) => r.node_id === nid && (r.actions || []).some((x) => x && x.type === "set_deadline" && x.advance !== undefined));
+  const cisty = posun.find((r) => H.recurrenceOfRule(r)) || null;
+  return { mid, nid, map, uzel, termin: String(((uzel.data || {}).deadline) || "").slice(0, 10), cisty, vlastni: !cisty && posun.length ? posun[0] : null };
+}
+
+function chybaRytmu(app, auth, a) {
+  const st = stavRytmu(app, auth, a);
+  if (st.chyba) return st.chyba;
+  if (st.vlastni) return `Error: this step repeats by a manually edited rule "${st.vlastni.name}" — change it with update_rule (list_rules), set_step_rhythm does not touch it.`;
+  if (String(a.freq) === "none") return st.cisty ? null : "Error: this step does not repeat — nothing to stop.";
+  const v = rytmusZArgumentu(a, st.termin);
+  return v.chyba || null;
+}
 
 function vykonej(app, auth, L, name, args, ktx) {
   const H = require(`${__hooks}/helpers.js`);
@@ -209,6 +335,44 @@ function vykonej(app, auth, L, name, args, ktx) {
         return { text: `Rule ${a.enabled ? "enabled" : "disabled"}: ${M.renderRule(r.json.rule || {})}` };
       });
     }
+    case "set_step_rhythm": {
+      const st = stavRytmu(app, auth, a);
+      if (st.chyba) return { text: st.chyba };
+      const titul = SPOL().ocisti(((st.uzel.data || {}).title) || "", 60);
+      return SPOL().sDocasnymKlicem(app, auth, (v1) => {
+        const pravidla = `/v1/maps/${encodeURIComponent(st.mid)}/rules`;
+        if (String(a.freq) === "none") {
+          if (!st.cisty) return { text: "This step did not repeat." };
+          const r = v1("POST", `${pravidla}/${encodeURIComponent(st.cisty.id)}/delete`, {});
+          if (r.status !== 200) return { text: SPOL().chybaV1(r) };
+          return { text: `"${titul}" no longer repeats (deadline unchanged).`, karta: { type: "vysledek", map_id: st.mid, map_title: "", node_id: st.nid } };
+        }
+        const v = rytmusZArgumentu(a, st.termin);
+        if (v.chyba) return { text: v.chyba };
+        const termin = novyTerminRytmu(v.rytmus, v.md, st.termin);
+        if (termin !== st.termin) {
+          const m = v1("GET", `/v1/maps/${encodeURIComponent(st.mid)}`);
+          if (m.status !== 200) return { text: SPOL().chybaV1(m) };
+          const u = v1("POST", `/v1/maps/${encodeURIComponent(st.mid)}/nodes/${encodeURIComponent(st.nid)}`, { base_updated: m.json.updated, deadline: termin });
+          if (u.status !== 200) return { text: SPOL().chybaV1(u) };
+        }
+        // obnova podkroků: v procesu vždy; jinde jen když ji pravidlo už mělo (RecurrenceSwitch)
+        const H = require(`${__hooks}/helpers.js`);
+        const reset = st.map.getString("kind") === "process" || !!(st.cisty && (H.recurrenceOfRule(st.cisty) || {}).reset);
+        const dl = { type: "set_deadline", advance: v.rytmus.freq };
+        if (v.rytmus.every > 1) dl.every = v.rytmus.every;
+        if (v.rytmus.days) dl.days = v.rytmus.days;
+        if (v.rytmus.freq === "monthly") dl.month_day = v.rytmus.day || Number(termin.slice(8, 10));   // = přepínač (rytmusPro / den)
+        const body = { name: RYTMUS_PRAVIDLO[L === "en" ? "en" : "cs"][v.rytmus.freq] + titul, node_id: st.nid, trigger: { type: "node_status_changed", status: "done" }, conditions: [],
+          actions: [{ type: "set_status", status: "todo" }, dl].concat(reset ? [{ type: "reset_subtree" }] : []) };
+        const r = v1("POST", st.cisty ? `${pravidla}/${encodeURIComponent(st.cisty.id)}` : pravidla, body);
+        if (r.status !== 200) return { text: SPOL().chybaV1(r) };
+        // názvy z UI v jazyce uživatele — model je opíše do odpovědi (lokální model 25. 10.: „vrátí do To do“)
+        const en = L === "en";
+        return { text: `"${titul}" now repeats ${rytmusText(v.rytmus, termin, L)} (wording shown in the app); deadline ${termin}${reset ? "; its sub-steps start over each time" : ""}. When ticked off it returns to the status "${en ? "To do" : "Založeno"}" and its deadline moves to the next occurrence.`,
+          karta: { type: "vysledek", map_id: st.mid, map_title: "", node_id: st.nid } };
+      });
+    }
     default: return { text: "Error: unknown tool " + name };
   }
 }
@@ -237,6 +401,7 @@ function overZapis(app, auth, name, a) {
       return null;
     }
     case "delete_rule_template": return SPOL().sablonaDto(app, a.template_id) ? null : `Error: template "${String(a.template_id || "")}" not found (list_rule_templates; pass the id or the exact name).`;
+    case "set_step_rhythm": return chybaMapy(a.map_id) || chybaRytmu(app, auth, a);
     case "set_rule_enabled": return chybaMapy(a.map_id) || (SPOL().pravidloId(app, SPOL().mapaId(app, auth, a.map_id), a.rule_id) ? null : `Error: rule "${String(a.rule_id || "")}" not found in "${SPOL().titulMapy(app, auth, a.map_id)}" (use list_rules; pass the id or the exact name).`);
     default: return null;
   }
@@ -270,6 +435,16 @@ function popisAkce(app, auth, L, name, a) {
     case "save_rule_template": return cs
       ? `${a.template_id ? "Změnit" : "Uložit"} šablonu pravidla „${SPOL().ocisti(a.name, 120)}“ (${(a.trigger || {}).type} → ${(a.actions || []).map((x) => x.type).join(", ")})`
       : `${a.template_id ? "Change" : "Save"} the rule template "${SPOL().ocisti(a.name, 120)}" (${(a.trigger || {}).type} → ${(a.actions || []).map((x) => x.type).join(", ")})`;
+    case "set_step_rhythm": {
+      const st = stavRytmu(app, auth, a);
+      const uzel = SPOL().ocisti(st.uzel ? ((st.uzel.data || {}).title || "") : String(a.node_id || ""), 80);
+      if (String(a.freq) === "none") return cs ? `Přestat opakovat „${uzel}“ v projektu „${nazevMapy(a.map_id)}“ (termín zůstane)` : `Stop repeating "${uzel}" in "${nazevMapy(a.map_id)}" (deadline stays)`;
+      const v = rytmusZArgumentu(a, st.termin || "");
+      if (v.chyba) return "";
+      const termin = novyTerminRytmu(v.rytmus, v.md, st.termin || "");
+      const kdy = termin !== st.termin ? (cs ? ` · první termín ${SPOL().datumKratce(termin, "cs")}` : ` · first due ${SPOL().datumKratce(termin, "en")}`) : "";
+      return cs ? `Opakovat „${uzel}“ ${rytmusText(v.rytmus, termin, "cs")} (projekt „${nazevMapy(a.map_id)}“)${kdy}` : `Repeat "${uzel}" ${rytmusText(v.rytmus, termin, "en")} (in "${nazevMapy(a.map_id)}")${kdy}`;
+    }
     case "delete_rule_template": {
       const t = SPOL().sablonaDto(app, a.template_id);
       return cs ? `Smazat šablonu pravidla „${SPOL().ocisti(t ? t.name : a.template_id, 120)}“ z knihovny` : `Delete the rule template "${SPOL().ocisti(t ? t.name : a.template_id, 120)}" from the library`;
@@ -278,4 +453,4 @@ function popisAkce(app, auth, L, name, a) {
   }
 }
 
-module.exports = { NASTROJE, vykonej, overZapis, popisAkce, RULE_TRIGGER, RULE_CONDITION, RULE_ACTION, chybaTvaruPravidla, terminovaPravidlaUzly, chybaTerminovehoPravidla, kdyVystreli };
+module.exports = { NASTROJE, vykonej, overZapis, popisAkce, rytmusText, novyTerminRytmu, RULE_TRIGGER, RULE_CONDITION, RULE_ACTION, chybaTvaruPravidla, terminovaPravidlaUzly, chybaTerminovehoPravidla, kdyVystreli };

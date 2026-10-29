@@ -159,6 +159,23 @@ const mapa = (nodes, edges = [], title = 'M', color = '') => ({ title, color, no
     ok(!r.prevzateUzly.includes('D1'), 'pouhé přerovnání pozic se do seznamu nepočítá');
   }
 
+  // ---------- 9b. pole plněné serverem (assignedBy) není moje úprava ----------
+  // Krok s termínem založený v téže relaci: server do něj dopíše assignedBy
+  // (základna je má), plátno ne. Pravidlo opakování ho pak vrátí na todo
+  // s novým termínem — to se musí slít tiše, ne skončit pruhem (klik-test
+  // stylu Proces 25. 10. 2026).
+  {
+    const zaklad = mapa([uzel('root', 'P', 'todo'), uzel('K', 'Vynést koše', 'done', 0, 120, { deadline: '2026-10-25', assignedBy: 'a@x.cz' })]);
+    const moje = mapa([uzel('root', 'P', 'todo'), uzel('K', 'Vynést koše', 'done', 0, 120, { deadline: '2026-10-25' })]);
+    const server = mapa([uzel('root', 'P', 'todo'), uzel('K', 'Vynést koše', 'todo', 0, 120, { deadline: '2026-10-27', assignedBy: 'a@x.cz' })]);
+    const r = trojcestnyMerge(zaklad, moje, server);
+    ok(r.ok && najdi(r, 'K').data.status === 'todo' && najdi(r, 'K').data.deadline === '2026-10-27' && najdi(r, 'K').data.assignedBy === 'a@x.cz',
+      `chybějící assignedBy na plátně nebrání převzetí zásahu pravidla (${JSON.stringify(r).slice(0, 80)})`);
+    const mojeJinak = mapa([uzel('root', 'P', 'todo'), uzel('K', 'Vynést koše přejmenováno', 'done', 0, 120, { deadline: '2026-10-25' })]);
+    const r2 = trojcestnyMerge(zaklad, mojeJinak, server);
+    ok(!r2.ok, 'skutečná moje úprava téhož uzlu dál končí kolizí');
+  }
+
   // ---------- 10. stableJson: pořadí klíčů a prázdné hodnoty ----------
   {
     ok(stableJson({ b: 1, a: '' }) === stableJson({ a: null, b: 1 }),

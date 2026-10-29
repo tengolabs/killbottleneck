@@ -48,7 +48,8 @@ async function waitHealthy() {
 
     const list = (await api('GET', `/api/collections/templates/records?perPage=200&filter=${encodeURIComponent("owner = ''")}`, { token: ST })).json;
     const tpls = list?.items || [];
-    expect(tpls.length === 40, `systémových šablon je 40 (je ${tpls.length})`);
+    // 41 = 40 + „Týdenní provoz kanceláře“ (styl Proces, migrace 1792928875_kind_process)
+    expect(tpls.length === 41, `systémových šablon je 41 (je ${tpls.length})`);
 
     // 1) kompletnost _en polí + parita stromů
     let missing = [], treeMismatch = [];

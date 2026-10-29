@@ -90,20 +90,15 @@ const cizihoPuvodu = (m) => {
     await sleep(600);
     let telo = await page.evaluate(() => document.body.innerText);
     expect(/Opakování/.test(telo) && /Neopakuje se/.test(telo), 'přepínač Opakování je v Zadání a stojí na „Neopakuje se"');
-    // otevřít select (shadcn combobox) a vybrat Týdně
-    const otevriSwitch = () => page.evaluate(() => {
-      const trig = document.querySelector('[role="dialog"] [data-testid="recurrence-switch"]');
-      if (!trig) return false;
-      trig.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-      trig.click();
+    // od 25. 10. 2026 (styl Proces, maketa 8099/kb-proces) jsou frekvence záložky
+    // Neopakuje se / Denně / Týdně / Měsíčně — klik rovnou uloží pravidlo
+    const zalozka = (f) => page.evaluate((k) => {
+      const b = document.querySelector(`[role="dialog"] [data-testid="recurrence-freq-${k}"]`);
+      if (!b) return false;
+      b.click();
       return true;
-    });
-    expect(await otevriSwitch(), 'přepínač jde otevřít');
-    await sleep(600);
-    await page.evaluate(() => {
-      const o = [...document.querySelectorAll('[role="option"]')].find((x) => /Týdně/.test(x.innerText || ''));
-      if (o) o.click();
-    });
+    }, f);
+    expect(await zalozka('weekly'), 'záložka Týdně je v přepínači');
     await sleep(1500);
     let pravidla = await rulesOf();
     const opak = pravidla.find((r) => r.node_id === 'n1' && (r.actions || []).some((a) => a.type === 'set_deadline' && a.advance === 'weekly'));
@@ -112,20 +107,19 @@ const cizihoPuvodu = (m) => {
     await page.keyboard.press('Escape');
     await sleep(800);
     expect(!!(await page.$('[data-testid="node-recurrence-badge"]')), 'na kartě cíle svítí 🔁');
+    // rytmus slovy dorazí ze serveru (/process-health) s odstupem po změně pravidel
+    let stitek = '';
+    for (let i = 0; i < 16 && !stitek; i++) { await sleep(500); stitek = await page.evaluate(() => (document.querySelector('[data-testid="node-rhythm-label"]') || {}).innerText || ''); }
+    expect(/každé pondělí/.test(stitek), `🔁 nese rytmus slovy podle termínu (${stitek})`);
 
     console.log('== přepínač si stav pamatuje; vypnutí pravidlo smaže ==');
     expect(await dblclickNa('Týdenní report'), 'dialog znovu otevřen');
     await sleep(1000);
     await otevriKategorii('assignment');
     await sleep(600);
-    telo = await page.evaluate(() => document.body.innerText);
-    expect(/Týdně/.test(telo), 'přepínač ukazuje Týdně');
-    expect(await otevriSwitch(), 'přepínač jde otevřít podruhé');
-    await sleep(600);
-    await page.evaluate(() => {
-      const o = [...document.querySelectorAll('[role="option"]')].find((x) => /Neopakuje se/.test(x.innerText || ''));
-      if (o) o.click();
-    });
+    const stoji = await page.evaluate(() => (document.querySelector('[role="dialog"] [data-testid="recurrence-freq-weekly"]') || {}).getAttribute?.('aria-pressed'));
+    expect(stoji === 'true', `přepínač ukazuje Týdně (${stoji})`);
+    expect(await zalozka('none'), 'záložka Neopakuje se');
     await sleep(1500);
     pravidla = await rulesOf();
     expect(!pravidla.some((r) => r.node_id === 'n1'), `vypnutí pravidlo smazalo (${pravidla.length})`);

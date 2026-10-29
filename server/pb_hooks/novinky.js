@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.94-beta": {
+    cs: [
+      "Dva styly projektu: při zakládání vyberete 🎯 Projekt (chci něco dokončit) nebo 🔁 Proces (chci, aby něco běželo — kroky se opakují, nic se „nedokončuje“). Styl jde kdykoliv přepnout v menu ⋮.",
+      "Proces místo „% hotovo“ ukazuje zdraví běhu: kolik kroků je včas, kolik po termínu a kdy proběhl naposledy — na vrcholu mapy, v přehledu i v Organizaci.",
+      "Bohatší opakování: vybrané dny v týdnu (třeba út a čt), den v měsíci, každý 2. týden… V procesu se při opakování obnoví i podkroky, takže kontrolní seznam „každé pondělí“ začíná znovu.",
+      "Na titulce přepínač Vše · Projekty · Procesy a v Úkolech je proces poznat (🔁 Proces, krok procesu, rytmus kroku).",
+      "Asistent rozumí procesům: „ať se Inventura opakuje každý pátek“ nastaví rytmus, „změň to na projekt“ přepne styl.",
+    ],
+    en: [
+      "Two map styles: when creating one, pick 🎯 Project (finish something) or 🔁 Process (keep something running — steps repeat, nothing gets \"finished\"). The style can be switched any time in the ⋮ menu.",
+      "Instead of \"% done\", a process shows its run health: how many steps are on time, how many overdue and when it last ran — on the map's apex, in the overview and in Organization.",
+      "Richer recurrence: chosen weekdays (e.g. Tue and Thu), a day of the month, every 2nd week… In a process a repeating step also resets its sub-steps, so a \"every Monday\" checklist starts over.",
+      "The home page has an All · Projects · Processes switch, and Tasks show which items belong to a process (🔁 Process, process step, the step's rhythm).",
+      "The assistant knows processes: \"make Stock check repeat every Friday\" sets the rhythm, \"change it to a project\" switches the style.",
+    ],
+  },
   "v0.93-beta": {
     cs: [
       "Faktury pro kohokoli na světě: v údajích dodavatele zvolíte zemi a aplikace předvyplní měnu, daň, názvy identifikátorů (IČO/DIČ, EIN, Company No.) i podobu platebních údajů — vše jde přepsat.",

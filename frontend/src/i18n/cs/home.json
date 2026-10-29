@@ -13,11 +13,23 @@
   "sections": {
     "myProjects": "Moje projekty",
     "myProjectsDesc": "Projekty, které jste založili.",
+    "myProcesses": "Moje procesy",
+    "myProcessesDesc": "Procesy, které jste založili.",
     "participating": "Kde působím",
     "participatingDesc": "Cizí projekty sdílené s vámi nebo s vaším úkolem či cílem.",
+    "participatingProcessesDesc": "Cizí procesy sdílené s vámi nebo s vaším úkolem či cílem.",
     "orgProjects": "Projekty organizace",
     "orgProjectsDesc": "Sdílené s celou organizací.",
+    "orgProcesses": "Procesy organizace",
     "archiveLink": "Archiv ({{count}})"
+  },
+  "kindFilter": {
+    "label": "Zobrazit",
+    "all": "Vše",
+    "project": "Projekty",
+    "process": "Procesy",
+    "emptyProjects": "Projekty tu zatím nejsou, máte jen procesy.",
+    "emptyProcesses": "Procesy tu zatím nejsou."
   },
   "badges": {
     "private": "Privátní mapa — vidíte ji jen vy",
@@ -50,7 +62,9 @@
     "projectNumberTitle": "Číslo projektu",
     "searchPlaceholder": "Hledat v archivu (název nebo #číslo)",
     "searchEmpty": "Nic v archivu neodpovídá „{{q}}“.",
-    "archivedOn": "archivováno {{date}}"
+    "archivedOn": "archivováno {{date}}",
+    "processEnded": "proces ukončen",
+    "processEndedOn": "proces ukončen {{date}}"
   },
   "dashboard": {
     "aiPrompt": "Shrň prosím stav projektu „{{title}}\" v 5–8 větách: co je hotové, co probíhá, kde jsou skluzy (termíny v minulosti), a doporuč 3 konkrétní další kroky. NEPROVÁDĚJ žádné změny mapy (operations nech prázdné).",
@@ -124,7 +138,7 @@
     "clientLabel": "Klient (volitelně)",
     "clientHint": "Měřený čas na projektu se pak počítá i tomuto klientovi.",
     "autoName": "Projekt se pojmenuje automaticky: „{{title}}\".",
-    "processTemplate": "Procesní šablona",
+    "processTemplate": "Šablona s harmonogramem",
     "startDateLabel": "Datum startu (termíny se dopočítají)",
     "goalsCount_one": "{{count}} cíl",
     "goalsCount_few": "{{count}} cíle",
@@ -133,7 +147,18 @@
     "firstDeadline": "první termín {{date}}",
     "autoShareNote": "Projekt se přiřazeným automaticky nasdílí (úpravy) a každému přijde notifikace.",
     "orFromText": "Nebo nechte projekt navrhnout s AI…",
-    "createButton": "Založit projekt"
+    "createButton": "Založit projekt",
+    "kindLabel": "Styl projektu",
+    "kindProject": "Projekt",
+    "kindProjectHint": "Chci něco dokončit. Úkoly se splní a projekt jde do archivu.",
+    "kindProcess": "Proces",
+    "kindProcessHint": "Chci, aby něco běželo. Kroky se opakují, nic se nedokončuje.",
+    "processGoalLabel": "Co má běžet",
+    "processGoalPlaceholder": "Např. Úklid kanceláře",
+    "processGoalHint": "Vznikne mapa procesu. Kroky přidáte na plátně; u těch, které se opakují, nastavíte rytmus.",
+    "processTemplateChip": "šablona procesu",
+    "createProcessButton": "Založit proces",
+    "processCreated": "Proces „{{title}}“ je založený. Přidejte kroky a těm opakovaným nastavte rytmus."
   },
   "newMap": {
     "newProject": "Nový projekt",
@@ -173,5 +198,14 @@
     "loadFailed": "Přehled změn se nepodařilo načíst.",
     "historyNote": "Záznamník běží od nasazení téhle verze — starší změny v něm nejsou."
   },
-  "confirmArchiveProject": "Opravdu archivovat tento projekt? Zmizí z titulní strany, najdete ho v Archivu."
+  "confirmArchiveProject": "Opravdu archivovat tento projekt? Zmizí z titulní strany, najdete ho v Archivu.",
+  "process": {
+    "badge": "Proces",
+    "onTime": "běží včas",
+    "describesOnly": "jen popis",
+    "lateCount_one": "{{count}} po termínu",
+    "lateCount_few": "{{count}} po termínu",
+    "lateCount_many": "{{count}} po termínu",
+    "lateCount_other": "{{count}} po termínu"
+  }
 }

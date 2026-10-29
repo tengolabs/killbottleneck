@@ -13,6 +13,7 @@ import { cisloProjektu } from '@/lib/projectColors';
 import ChangesSection from '@/components/goal-map/ChangesSection';
 import { saveDashboardPdf } from '@/lib/dashboardPdf';
 import { useToast } from '@/components/ui/use-toast';
+import ProcessHealthCard from '@/components/goal-map/proces/ProcessHealthCard';
 
 // interní klíč pro skupinu „bez vlastníka" (nesmí kolidovat s e-mailem);
 // zobrazuje se přeložený přes t('dashboard.unassigned')
@@ -45,7 +46,7 @@ function StatusDot({ status }) {
 // je uzel s řešitelem nebo termínem (slovník v0.34/v0.35). Kolekce `tasks` je od
 // 17. 8. 2026 prázdná legacy; dashboard ji četl a u projektu s osmi úkoly hlásil
 // „Zatím žádné úkoly" (nález P2-01, analýza 20. 8. 2026).
-export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId = '', projectNumber = 0 }) {
+export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId = '', projectNumber = 0, processMap = false, processHealth = null }) {
   const { t } = useTranslation('home');
   // Číslo projektu (#12) — Richard 3. 10. 2026: NE u názvu na kartě ani v hlavičce mapy („není
   // dominanta“), ale schované tady, ať ho člověk najde; v PDF se pak hodí příjemci.
@@ -362,6 +363,10 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
           </div>
         </div>
 
+        {/* PROCES (21. 10. 2026): místo % hotovo, úkolů v % a pilířů v % —
+            zdraví běhu. Proces se nedokončuje, procenta by lhala. */}
+        {processMap && <ProcessHealthCard health={processHealth} />}
+        {!processMap && (<>
         {/* Overall + status counts */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-xl border bg-card p-4 space-y-3">
@@ -431,6 +436,8 @@ export default function ProgressDashboard({ nodes, edges, mapTitle = '', mapId =
             </div>
           </div>
         )}
+
+        </>)}
 
         {/* Owner breakdown */}
         {stats.owners.length > 0 && (

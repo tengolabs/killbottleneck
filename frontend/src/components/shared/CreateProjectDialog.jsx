@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FolderPlus, Loader2, FileText, Sparkles, Users, Calendar, Lock, Building2, LayoutGrid, Hash, AlarmClock, Briefcase, Zap } from 'lucide-react';
+import { FolderPlus, Loader2, FileText, Sparkles, Users, Calendar, Lock, Building2, LayoutGrid, Hash, AlarmClock, Briefcase, Zap, RotateCw } from 'lucide-react';
 import BusyIcon from '@/components/shared/BusyIcon';
 import { useDialogForm } from '@/hooks/useDialogForm';
 import {
@@ -50,6 +50,9 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
   const asistent = useAsistent();
   const { user } = useAuth();
   const [tab, setTab] = useState('empty');
+  // STYL (Richard 21. 10. 2026): projekt = dokončit, proces = nepřetržitý běh.
+  // Výchozí projekt — žádné povinné rozhodnutí navíc (anti-bloat).
+  const [kind, setKind] = useState('');
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('');
   const [color, setColor] = useState('');
@@ -64,6 +67,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
   useEffect(() => {
     if (!open) return;
     setTab('empty');
+    setKind('');
     setName('');
     setEmoji('');
     setColor('');
@@ -84,6 +88,9 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
   }, [open, tab]);
 
   const canCreate = tab === 'empty' ? !!name.trim() : !!selectedTpl;
+  // styl výsledné mapy: u šablony rozhoduje šablona (šablona procesu → proces)
+  const vyslednyStyl = tab === 'empty' ? kind : (selectedTpl?.map_kind === 'process' ? 'process' : '');
+  const jeProces = vyslednyStyl === 'process';
 
   // function (ne const): hook výš ji dostává jako `submit` — deklarace je hoistovaná
   function handleCreate() {
@@ -93,7 +100,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
       // neshodí (mapa už existuje), ale mlčet se o něm nesmí.
       let pravidlaChybi = 0;
       const map = tab === 'empty'
-        ? await createEmptyProject(name.trim(), { emoji, color, client: clientId })
+        ? await createEmptyProject(name.trim(), { emoji, color, client: clientId, kind })
         : await createProjectFromTemplate(selectedTpl, name, startDate ? new Date(startDate + 'T00:00:00') : undefined, {
           emoji, color, client: clientId,
           onRulesResult: ({ zalozeno, celkem }) => { pravidlaChybi = celkem - zalozeno; },
@@ -104,10 +111,21 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
         await ensureNs('rules');
         toast({ title: tr('editor:toasts.mapSaved'), description: i18next.t('rules:rules.templateRulesFailed', { count: pravidlaChybi }) });
       }
+      if (jeProces) toast({ title: tr('createProject.processCreated', { title: map.title || name.trim() }) });
       onCreated(map);
       onClose();
     });
   }
+  const dlazdice = (k, emojiStyl, titulek, popis) => (
+    <button
+      type="button" key={k || 'project'} data-testid={`create-kind-${k || 'project'}`} aria-pressed={kind === k}
+      onClick={() => setKind(k)}
+      className={`text-left p-2.5 rounded-lg border-2 transition-all ${kind === k ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}`}
+    >
+      <p className="text-sm font-semibold">{emojiStyl} {titulek}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">{popis}</p>
+    </button>
+  );
 
   return (
     <Dialog open={open} onOpenChange={f.onOpenChange}>
@@ -117,6 +135,11 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
             <FolderPlus className="w-4 h-4 text-primary" /> {tr('createProject.title')}
           </DialogTitle>
         </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label={tr('createProject.kindLabel')}>
+          {dlazdice('', '🎯', tr('createProject.kindProject'), tr('createProject.kindProjectHint'))}
+          {dlazdice('process', '🔁', tr('createProject.kindProcess'), tr('createProject.kindProcessHint'))}
+        </div>
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid grid-cols-2 w-full">
@@ -128,7 +151,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
         <div className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
           <div className="space-y-1.5">
             <Label htmlFor="project-name">
-              {tab === 'empty' ? tr('createProject.goalLabel') : tr('createProject.nameLabelTemplate')}
+              {tab === 'empty' ? tr(kind === 'process' ? 'createProject.processGoalLabel' : 'createProject.goalLabel') : tr('createProject.nameLabelTemplate')}
             </Label>
             <div className="flex items-center gap-2">
               <EmojiPicker value={emoji} onChange={setEmoji} />
@@ -137,13 +160,13 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={f.onEnter}
-                placeholder={tab === 'empty' ? tr('createProject.goalPlaceholder') : tr('createProject.namePlaceholder')}
+                placeholder={tab === 'empty' ? tr(kind === 'process' ? 'createProject.processGoalPlaceholder' : 'createProject.goalPlaceholder') : tr('createProject.namePlaceholder')}
                 autoFocus
               />
             </div>
             {tab === 'empty' && (
               <p className="text-xs text-muted-foreground">
-                {tr('createProject.goalHint')}
+                {tr(kind === 'process' ? 'createProject.processGoalHint' : 'createProject.goalHint')}
               </p>
             )}
           </div>
@@ -204,7 +227,16 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
                             <DynamicIcon name={tpl.icon} className="w-4 h-4 text-primary" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium">{disp.title}</p>
+                            <p className="text-sm font-medium flex flex-wrap items-center gap-1.5">
+                              {disp.title}
+                              {tpl.map_kind === 'process' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary" data-testid="tpl-kind-process">
+                                  <RotateCw className="w-2.5 h-2.5" /> {tr('createProject.processTemplateChip')}
+                                </span>
+                              ) : isProcessTemplate(tpl) && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground">{tr('createProject.processTemplate')}</span>
+                              )}
+                            </p>
                             {tpl.number_format && (
                               <p className="text-xs text-primary flex items-center gap-1">
                                 <Hash className="w-3 h-3" /> {tr('templates.numberedNext', { next: nextSeriesTitle(tpl) })}
@@ -295,7 +327,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
               data-testid="create-project-ai"
               onClick={() => {
                 onClose();
-                asistent.spust('novy_projekt', { cil: name.trim(), meta: { emoji, color, client: clientId } });
+                asistent.spust('novy_projekt', { cil: name.trim(), meta: { emoji, color, client: clientId, ...(kind === 'process' ? { kind } : {}) } });
               }}
             >
               <Sparkles className="w-3 h-3" /> {tr('createProject.orFromText')}
@@ -307,7 +339,7 @@ export default function CreateProjectDialog({ open, onClose, onCreated }) {
           <Button variant="outline" onClick={onClose}>{tr('common:actions.cancel')}</Button>
           <Button onClick={handleCreate} disabled={!canCreate || f.busy}>
             <BusyIcon busy={f.busy} icon={FileText} />
-            {tr('createProject.createButton')}
+            {tr(jeProces ? 'createProject.createProcessButton' : 'createProject.createButton')}
           </Button>
         </DialogFooter>
       </DialogContent>

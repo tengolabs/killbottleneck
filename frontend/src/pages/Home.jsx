@@ -41,6 +41,10 @@ export default function Home() {
     ulozKlic('kb-home-collapsed', JSON.stringify(next));
     return next;
   });
+  // filtr Vše · Projekty · Procesy (Richard 29. 10. 2026, varianta A) — jeden nad všemi sekcemi,
+  // pamatuje se v localStorage; ukáže se jen tomu, kdo má na titulce aspoň jeden proces
+  const [kindFilter, setKindFilter] = useState(() => nactiKlic('kb-home-kind') || 'all');
+  const zvolKind = (k) => { setKindFilter(k); ulozKlic('kb-home-kind', k); };
   const [searchParams] = useSearchParams();
   const view = searchParams.get('view') === 'templates' ? 'templates' : 'maps'; // taby řídí URL (naviguje se sem i z /tasks)
   const [org, setOrg] = useState(null);
@@ -93,11 +97,21 @@ export default function Home() {
   // vstup má pod panáčkem a ve Správě organizace.
   const activeMaps = maps.filter((m) => !m.archived && m.kind !== 'org');
   const archivedCount = maps.filter((m) => m.archived).length;
-  const myMaps = activeMaps.filter((m) => m.created_by_id === user?.id);
+  const myAll = activeMaps.filter((m) => m.created_by_id === user?.id);
   // projekty, kde mám roli: sdílené se mnou, nebo mám přiřazený cíl/úkol
-  const participatingMaps = activeMaps.filter((m) => m.created_by_id !== user?.id && isParticipating(m));
+  const participatingAll = activeMaps.filter((m) => m.created_by_id !== user?.id && isParticipating(m));
   // mapy sdílené celé organizaci, kde žádnou roli nemám
-  const orgMaps = activeMaps.filter((m) => m.created_by_id !== user?.id && !isParticipating(m) && m.team_access);
+  const orgAll = activeMaps.filter((m) => m.created_by_id !== user?.id && !isParticipating(m) && m.team_access);
+  const naTitulce = [...myAll, ...participatingAll, ...orgAll];
+  const pocetProcesu = naTitulce.filter((m) => m.kind === 'process').length;
+  // bez procesu filtr není vidět a uložená volba se neuplatní (po archivaci posledního procesu nezůstane prázdno)
+  const filtr = pocetProcesu > 0 && ['project', 'process'].includes(kindFilter) ? kindFilter : 'all';
+  const podleFiltru = (list) => (filtr === 'all' ? list : list.filter((m) => (m.kind === 'process') === (filtr === 'process')));
+  const myMaps = podleFiltru(myAll);
+  const participatingMaps = podleFiltru(participatingAll);
+  const orgMaps = podleFiltru(orgAll);
+  // nadpisy sekcí se řídí filtrem: „Procesy“ → „Moje procesy“, „Procesy organizace“
+  const sekce = (klic) => t(`sections.${filtr === 'process' ? klic.replace('Projects', 'Processes') : klic}`);
 
   const handleArchive = async (mapId) => {
     // Potvrzení stejně jako u mazání — archivace projekt schová z titulky
@@ -212,16 +226,32 @@ export default function Home() {
           </div>
             ) : (
               <div className="space-y-10">
+              {pocetProcesu > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 -mb-4" role="group" aria-label={t('kindFilter.label')} data-testid="home-kind-filter">
+                  {[['all', naTitulce.length], ['project', naTitulce.length - pocetProcesu], ['process', pocetProcesu]].map(([k, n]) => (
+                    <button
+                      key={k} type="button" data-testid={`home-kind-${k}`} aria-pressed={filtr === k}
+                      onClick={() => zvolKind(k)}
+                      className={`px-3 py-1 rounded-full border text-xs font-medium transition-colors ${filtr === k ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'}`}
+                    >
+                      {t(`kindFilter.${k}`)} <span className="font-normal opacity-75">({n})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {myMaps.length + participatingMaps.length + orgMaps.length === 0 && (
+                <p className="text-sm text-muted-foreground" data-testid="home-kind-empty">{t(filtr === 'process' ? 'kindFilter.emptyProcesses' : 'kindFilter.emptyProjects')}</p>
+              )}
               {myMaps.length > 0 && (
                 <div>
                   <button onClick={() => toggleSection('my')} className="w-full flex items-center justify-between mb-4 group">
                     <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide group-hover:text-foreground">
-                      {t('sections.myProjects')} <span className="normal-case font-normal">({myMaps.length})</span>
+                      {sekce('myProjects')} <span className="normal-case font-normal">({myMaps.length})</span>
                     </h2>
                     {collapsedSections.my ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />}
                   </button>
                   {!collapsedSections.my && (<>
-                  <p className="text-xs text-muted-foreground -mt-3 mb-4">{t('sections.myProjectsDesc')}</p>
+                  <p className="text-xs text-muted-foreground -mt-3 mb-4">{sekce('myProjectsDesc')}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {myMaps.map((m) => (
                       <MapCard
@@ -315,7 +345,7 @@ export default function Home() {
                     {collapsedSections.participating ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />}
                   </button>
                   {!collapsedSections.participating && (<>
-                  <p className="text-xs text-muted-foreground -mt-3 mb-4">{t('sections.participatingDesc')}</p>
+                  <p className="text-xs text-muted-foreground -mt-3 mb-4">{sekce(filtr === 'process' ? 'participatingProcessesDesc' : 'participatingDesc')}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {participatingMaps.map((m) => {
                       const count = myOpenCount(m);
@@ -346,7 +376,7 @@ export default function Home() {
                   <button onClick={() => toggleSection('org')} className="w-full flex items-center justify-between mb-4 group">
                     <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2 group-hover:text-foreground">
                       <Building2 className="w-4 h-4" />
-                      {t('sections.orgProjects')} <span className="normal-case font-normal">({orgMaps.length})</span>
+                      {sekce('orgProjects')} <span className="normal-case font-normal">({orgMaps.length})</span>
                     </h2>
                     {collapsedSections.org ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />}
                   </button>

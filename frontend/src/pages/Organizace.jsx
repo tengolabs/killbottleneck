@@ -11,8 +11,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Flame, PauseCircle, Folder, Users, Download, ChevronDown, Map as MapIcon, Target, CheckSquare,
-  Building2, Share2, History, Shield, ArrowLeft, Loader2, UserPlus, Lock, AlertTriangle,
+  Building2, Share2, History, Shield, ArrowLeft, Loader2, UserPlus, Lock, AlertTriangle, RotateCw,
 } from 'lucide-react';
+import { fmtRun } from '@/components/goal-map/proces/processFormat';
 import AppHeader from '@/components/shared/AppHeader';
 import SkinPattern from '@/components/shared/SkinPattern';
 import { Button } from '@/components/ui/button';
@@ -120,7 +121,12 @@ export default function Organizace() {
     { key: 'stuck', label: t('kpi.stuck'), sub: t('kpi.stuckSub'), value: c.stuck, icon: PauseCircle, cls: 'text-muted-foreground', href: '#s-stuck' },
     { key: 'projects', label: t('kpi.projects'), sub: t('kpi.open', { count: c.open }), value: c.projects, icon: Folder, cls: 'text-blue-600 dark:text-blue-400', href: '#s-projects' },
     { key: 'people', label: t('kpi.people'), sub: t('kpi.peopleSub'), value: c.people, icon: Users, cls: 'text-violet-600 dark:text-violet-400', href: '#s-people' },
+    // PROCESY (21. 10. 2026) — dlaždice jen když nějaké jsou (anti-bloat)
+    ...(c.processes > 0 ? [{ key: 'processes', label: t('kpi.processes'), sub: t('kpi.processesSub'), value: c.processes, icon: RotateCw, cls: 'text-emerald-600 dark:text-emerald-400', href: '#s-processes' }] : []),
   ] : [];
+  // projekty k dokončení (podle %) a procesy (podle zdraví běhu) jsou dvě různé karty
+  const projekty = (s?.projects || []).filter((p) => p.kind !== 'process');
+  const procesy = (s?.projects || []).filter((p) => p.kind === 'process');
   const barCls = (pct) => (pct === 100 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-primary');
   const th = 'text-left font-medium text-muted-foreground text-xs px-2 py-1.5 border-b';
   const td = 'px-2 py-2 border-b border-border/60 align-middle';
@@ -163,7 +169,7 @@ export default function Organizace() {
               </DropdownMenu>
             </div>
 
-            {c.projects === 0 ? (
+            {c.projects === 0 && !(c.processes > 0) ? (
               <div className="rounded-xl border bg-card p-4 text-center py-12 flex flex-col items-center gap-2" data-testid="organizace-empty">
                 <Folder className="w-10 h-10 text-muted-foreground" />
                 <p className="font-semibold">{t('emptyTitle')}</p>
@@ -172,7 +178,7 @@ export default function Organizace() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6" data-testid="organizace-kpis">
+                <div className={`grid grid-cols-2 ${kpis.length > 4 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-2 mb-6`} data-testid="organizace-kpis">
                   {kpis.map((k) => (
                     <a key={k.key} href={k.href} className="rounded-lg border bg-background p-2.5 hover:border-primary/50 hover:bg-secondary/40 transition-colors flex flex-col" data-testid={`organizace-kpi-${k.key}`}>
                       <span className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide ${k.cls}`}><k.icon className="w-3 h-3" /> {k.label}</span>
@@ -185,12 +191,13 @@ export default function Organizace() {
                 {/* Pořadí sekcí = rozhodnutí Richarda 2. 9. 2026 (staging):
                     1. Projekty podle % hotovo, 2. Kde to nejvíc stojí, 3. Po termínu,
                     dál beze změny. Hlídá ui-organizace-hrdla.js. */}
+                {projekty.length > 0 && (
                 <section className="rounded-xl border bg-card p-4 mb-4" id="s-projects" data-testid="organizace-projects">
                   <h2 className="flex items-center gap-2 text-sm font-heading font-semibold mb-3">
                     <Folder className="w-4 h-4" /> {t('sections.projects')} <span className="text-xs font-normal text-muted-foreground">{t('sections.projectsSort')}</span>
                   </h2>
                   <div className="flex flex-col gap-2">
-                    {s.projects.map((p) => (
+                    {projekty.map((p) => (
                       <Link key={p.id} to={`/map/${p.id}?view=dashboard`} className="block rounded-lg border bg-background px-3.5 py-3 hover:border-primary/50 transition-colors" data-testid="organizace-project">
                         <div className="flex items-center gap-2.5 mb-1.5">
                           <MapIcon className="w-4 h-4 text-primary shrink-0" />
@@ -213,6 +220,48 @@ export default function Organizace() {
                     ))}
                   </div>
                 </section>
+                )}
+
+                {/* PROCESY (Richard 21. 10. 2026, maketa 8099/kb-proces): proces se
+                    nedokončuje — místo % zdraví běhu. Nejvíc kroků po termínu
+                    nahoře, „jen popis procesu" (bez opakovaných kroků) dole. */}
+                {procesy.length > 0 && (
+                <section className="rounded-xl border bg-card p-4 mb-4" id="s-processes" data-testid="organizace-processes">
+                  <h2 className="flex flex-wrap items-center gap-2 text-sm font-heading font-semibold mb-3">
+                    <RotateCw className="w-4 h-4" /> {t('sections.processes')}
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-secondary text-foreground">{procesy.length}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{t('sections.processesSort')}</span>
+                  </h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr><th className={th}>{t('cols.process')}</th><th className={`${th} text-right`}>{t('cols.processLate')}</th><th className={`${th} text-right`}>{t('cols.processOk')}</th><th className={th}>{t('cols.processLast')}</th></tr></thead>
+                      <tbody>
+                        {procesy.map((p) => {
+                          const h = p.health || {};
+                          return (
+                            <tr key={p.id} className="hover:bg-secondary/50" data-testid="organizace-process">
+                              <td className={td}><Link to={`/map/${p.id}?view=dashboard`} className="inline-flex items-center gap-1.5 font-medium hover:underline"><MapIcon className="w-3.5 h-3.5 text-primary" />{p.title}</Link></td>
+                              {h.recurring > 0 ? (
+                                <>
+                                  <td className={`${td} text-right tabular-nums ${h.late ? 'text-red-600 dark:text-red-400 font-semibold' : ''}`} data-testid="organizace-process-late">{h.late}</td>
+                                  <td className={`${td} text-right tabular-nums`}>{h.ok}</td>
+                                  <td className={`${td} whitespace-nowrap`}>{h.last ? fmtRun(h.last.at, t) : '—'}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className={`${td} text-right text-muted-foreground`}>—</td>
+                                  <td className={`${td} text-right text-muted-foreground`}>—</td>
+                                  <td className={`${td} text-muted-foreground`}>{t('processDescribesOnly')}</td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+                )}
 
                 {/* ÚZKÁ HRDLA v2 (9/2026, schváleno stagingem): reálná hrdla
                     napříč projekty — hned pod Projekty

@@ -110,6 +110,7 @@ function publicMapDto(m) {
     nodes: nodes,
     edges: edges,
     is_public: true,
+    kind: m.getString("kind") === "process" ? "process" : "", // styl Proces: veřejný náhled bez % a s rytmem
     created_date: m.getString("created"),
     updated_date: m.getString("updated"),
   };
@@ -968,10 +969,24 @@ function vlastniAiDto(app) {
 // Tím se liší od dřívější funkce advanceDate (posouvala základ na dnešek, takže
 // pozdní odbavení rytmus lámalo; smazána 27. 9. 2026 — nikdo ji nevolal). Bez
 // termínu se rytmus zakládá ode dneška.
-// „Dnes" = serverový den v UTC (kontejner) — viz past UTC×hostitel.
-function dalsiTermin(base, rec) {
+// „Dnes" = den v pásmu instance (TZ kontejneru, jako crony; výchozí UTC) — /checkup
+// 29. 10. 2026: v Praze po půlnoci počítal server ještě se včerejškem (UTC).
+// Rytmus procesu (Richard 21. 10. 2026): `opt` = { every, days } — každý N-tý
+// den/týden/měsíc (1–4) a u týdne vybrané dny (1 = po … 7 = ne). Další termín
+// = první výskyt rytmu PO max(termín, dnes); kotva rytmu (sudý/lichý týden,
+// den v měsíci) je stávající termín. Bez `opt` (každý 1., týden bez dnů)
+// beze změny původní výpočet níž.
+// `opt.monthDay` (1–31) = den v měsíci z pravidla; bez něj den termínu.
+function dnesRytmu() {
   const n = new Date();
-  const today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+  return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()); // místní den instance jako UTC půlnoc
+}
+function dalsiTermin(base, rec, opt) {
+  const every = opt && Number.isInteger(opt.every) && opt.every > 1 ? opt.every : 1;
+  const days = opt && rec === "weekly" && Array.isArray(opt.days) && opt.days.length ? opt.days : null;
+  const monthDay = opt && rec === "monthly" && Number.isInteger(opt.monthDay) && opt.monthDay >= 1 && opt.monthDay <= 31 ? opt.monthDay : 0;
+  if (every > 1 || days) return dalsiTerminRytmus(base, rec, every, days, monthDay);
+  const today = dnesRytmu();
   let anchor = base && /^\d{4}-\d{2}-\d{2}$/.test(base) ? new Date(base + "T00:00:00Z") : new Date(today);
   // tvarem validní nesmysl („2026-02-31" → Invalid Date) nebo prehistorická
   // kotva (monthly strop 1200 iterací by vrátil "" a termín tiše smazal)
@@ -986,13 +1001,50 @@ function dalsiTermin(base, rec) {
     return fmt(new Date(anchor.getTime() + k * krokMs));
   }
   if (rec === "monthly") {
-    const den = anchor.getUTCDate(); // kotva dne v měsíci: 31. zůstává 31.
+    const den = monthDay || anchor.getUTCDate(); // kotva dne v měsíci: s month_day 31. zůstává 31.
     let y = anchor.getUTCFullYear(), m = anchor.getUTCMonth();
     for (let i = 0; i < 1200; i++) {
       m += 1; if (m > 11) { m -= 12; y += 1; }
       const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
       const d = new Date(Date.UTC(y, m, Math.min(den, last)));
       if (d.getTime() > today) return fmt(d);
+    }
+    return "";
+  }
+  return base || "";
+}
+
+function dalsiTerminRytmus(base, rec, every, days, monthDay) {
+  const today = dnesRytmu();
+  let anchor = base && /^\d{4}-\d{2}-\d{2}$/.test(base) ? new Date(base + "T00:00:00Z") : new Date(today);
+  if (isNaN(anchor.getTime()) || anchor.getUTCFullYear() < 1990) anchor = new Date(today);
+  const p2 = (x) => (x < 10 ? "0" + x : "" + x);
+  const fmt = (d) => d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate());
+  const DAY = 86400000;
+  const od = Math.max(anchor.getTime(), today); // hledá se výskyt PŘÍSNĚ po tomhle dni
+  const dow = (t) => { const x = new Date(t).getUTCDay(); return x === 0 ? 7 : x; };
+  if (rec === "daily") {
+    const k = Math.floor((od - anchor.getTime()) / (every * DAY)) + 1;
+    return fmt(new Date(anchor.getTime() + k * every * DAY));
+  }
+  if (rec === "weekly") {
+    const dny = days || [dow(anchor.getTime())];
+    const pondeliKotvy = anchor.getTime() - (dow(anchor.getTime()) - 1) * DAY;
+    for (let t = od + DAY, i = 0; i < 7 * 4 * 2 + 7; i++, t += DAY) {
+      if (dny.indexOf(dow(t)) < 0) continue;
+      const tydnu = Math.round((t - (dow(t) - 1) * DAY - pondeliKotvy) / (7 * DAY));
+      if (tydnu % every === 0) return fmt(new Date(t));
+    }
+    return base || "";
+  }
+  if (rec === "monthly") {
+    const den = monthDay || anchor.getUTCDate();
+    let y = anchor.getUTCFullYear(), m = anchor.getUTCMonth();
+    for (let i = 0; i < 1200; i++) {
+      m += every; while (m > 11) { m -= 12; y += 1; }
+      const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      const d = new Date(Date.UTC(y, m, Math.min(den, last)));
+      if (d.getTime() > od) return fmt(d);
     }
     return "";
   }
@@ -1409,7 +1461,7 @@ const V1_NODE_FIELDS = ["title", "status", "description", "deadline", "planned_o
   "wait_for_children", "executor_kind", "executor_name", "automation_wanted", "automation_note"];
 const V1_TREE_ITEM_FIELDS = V1_NODE_FIELDS.concat(["children"]);
 const V1_BODY_FIELDS = {
-  createMap: ["title", "tree", "description", "apex_text"],
+  createMap: ["title", "tree", "description", "apex_text", "kind"],
   addNodes: ["parent_id", "items", "base_updated"],
   updateNode: V1_NODE_FIELDS.concat(["base_updated"]),
   deleteNode: ["base_updated"],
@@ -1425,7 +1477,7 @@ const V1_BODY_FIELDS = {
 // tvar pravidla — zrcadlo RULE_TRIGGER / RULE_CONDITION / RULE_ACTION v mcp-tools.js
 const RULE_TRIGGER_FIELDS = ["type", "status", "when", "days", "freq", "weekday", "hour"];
 const RULE_CONDITION_KEYS = ["field", "op", "value"];
-const RULE_ACTION_FIELDS = ["type", "status", "target", "owner", "date", "relative_days", "advance", "parent", "items", "to", "message", "agent_name"];
+const RULE_ACTION_FIELDS = ["type", "status", "target", "owner", "date", "relative_days", "advance", "every", "days", "month_day", "parent", "items", "to", "message", "agent_name"];
 
 // Cizí pojmy, které agenti (naučení na Jiře/Asaně/Todoistu) předpokládají —
 // místo holého „neznámé pole" dostanou náš ekvivalent a opraví se sami
@@ -3179,6 +3231,7 @@ function instantiateTemplate(app, tpl, startDate) {
   // dřív dostávali tichou plnou editaci, zatímco ruční cesta dává work
   rec.set("shared_with_edit", []);
   rec.set("shared_with_work", shared);
+  rec.set("kind", tpl.getString("map_kind") === "process" ? "process" : ""); // šablona procesu → proces
   const numbered = assignSeriesNumber(app, rec, tpl);
   if (!numbered) {
     // bez číslování aspoň datum, ať se pondělní projekty nejmenují stejně
@@ -4420,7 +4473,9 @@ function failStaleAgentRuns(app) {
 // Výčty drží server (NE databáze) — v2 typy přibudou bez migrace. Sdílí je
 // vyhodnocovač i validace v routách save (M3) a popisy MCP tools.
 const RULE_TRIGGERS = ["node_status_changed", "node_unblocked", "deadline_approaching", "node_created", "file_uploaded", "schedule"];
-const RULE_ACTIONS = ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant"];
+const RULE_ACTIONS = ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant", "reset_subtree"];
+// reset_subtree (21. 10. 2026, styl Proces): podcíle a úkoly spouštěcího uzlu zpět na „Založeno" —
+// kontrolní seznam opakovaného kroku („každé pondělí") se tím při opakování obnoví.
 // offer_assistant (5. 10. 2026, bod 4 prověrky): pravidlo NEspouští AI — jen pošle notifikaci s odkazem, který otevře
 // asistenta v daném balíčku (úvod skládá aplikace, 0 kreditů do kliknutí; člověk vždy potvrzuje kartou). Režimy = klíče
 // REZIM v chat.js bez týmové porady (jen vedoucí) a nového projektu (potřebuje cíl z dialogu) — hlídá test ai-chat.
@@ -4701,7 +4756,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       let date = "";
       if (a.advance !== undefined) {
         // opakování: další výskyt od PŮVODNÍHO termínu cíle (rytmus), viz dalsiTermin
-        date = dalsiTermin(String((tn.data || {}).deadline || ""), String(a.advance));
+        date = dalsiTermin(String((tn.data || {}).deadline || ""), String(a.advance), { every: a.every, days: a.days, monthDay: a.month_day });
       } else if (a.relative_days !== undefined) {
         const days = Math.trunc(Number(a.relative_days));
         if (!Number.isFinite(days) || days < 0 || days > 3650) throw new Error("set_deadline: invalid relative_days");
@@ -4711,7 +4766,50 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("set_deadline: invalid date");
       }
       if ((tn.data || {}).deadline !== date) { tn.data = Object.assign({}, tn.data, { deadline: date }); changed = true; }
+      // opakování: plán „kdy to chci řešit" patřil k minulému výskytu — vyčistit
+      // (jinak by krok ležel v Můj den pod starým dnem; Richard 21. 10. 2026)
+      if (a.advance !== undefined && ((tn.data || {}).plannedOn || (tn.data || {}).pinnedOn)) {
+        tn.data = Object.assign({}, tn.data, { plannedOn: "", pinnedOn: "" });
+        changed = true;
+      }
       done.push({ type: a.type, date: date, node: tn.id });
+    } else if (a.type === "reset_subtree") {
+      // OBNOVA PODKROKŮ (styl Proces, Richard 21. 10. 2026): opakovaný krok se
+      // vrací i se svým kontrolním seznamem — podcíle (celý podstrom) a úkoly
+      // na uzlech podstromu i na kroku samém zpět na „Založeno". Krok sám řeší
+      // set_status v témže pravidle.
+      const tn = needTarget(a.type);
+      const pod = {};
+      pod[tn.id] = true;
+      let pribylo = true;
+      while (pribylo) {
+        pribylo = false;
+        for (const ed of edges) {
+          if (ed && pod[ed.source] && !pod[ed.target]) { pod[ed.target] = true; pribylo = true; }
+        }
+      }
+      let uzlu = 0;
+      for (const n2 of nodes) {
+        if (!n2 || n2.id === tn.id || !pod[n2.id] || n2.type === "note") continue;
+        const st2 = (n2.data || {}).status || "todo";
+        if (st2 !== "todo") { n2.data = Object.assign({}, n2.data, { status: "todo" }); uzlu++; changed = true; }
+      }
+      let ukolu = 0;
+      const ids = Object.keys(pod);
+      try {
+        for (let i0 = 0; i0 < ids.length; i0 += 40) {
+          const params = { m: map.id };
+          const parts = ids.slice(i0, i0 + 40).map((id, k) => { params["n" + k] = id; return "node_id = {:n" + k + "}"; });
+          for (const t of app.findRecordsByFilter("tasks", "map = {:m} && status != 'todo' && (" + parts.join(" || ") + ")", "", 500, 0, params)) {
+            t.set("status", "todo");
+            app.save(t);
+            ukolu++;
+          }
+        }
+      } catch (err) {
+        skips.push({ type: a.type, reason: "úkoly kroku se nepodařilo obnovit" });
+      }
+      done.push({ type: a.type, nodes: uzlu, tasks: ukolu, node: tn.id });
     } else if (a.type === "move_node") {
       // KANBAN POSUN: přesune TRIGGER uzel pod uzel `to` (přepis rodičovské
       // hrany). Zmizelý cíl / cyklus / vrchol = přiznaný skip, ne failed —
@@ -5319,7 +5417,7 @@ function validateRuleInput(app, map, body, opts) {
     if ((a.type === "move_node" || a.type === "create_subnodes") && map && map.getString("kind") === "org") {
       return { error: "structural actions (move_node, create_subnodes) are not allowed on the org structure map" };
     }
-    const needsTrigger = a.type === "run_agent" || a.type === "move_node"
+    const needsTrigger = a.type === "run_agent" || a.type === "move_node" || a.type === "reset_subtree"
       || ((a.type === "set_status" || a.type === "set_owner" || a.type === "set_deadline") && (target === undefined || target === "parent"));
     if (mapLevelSchedule && needsTrigger) {
       return { error: "action " + a.type + " targets the trigger node — a schedule rule needs node_id for that (or an explicit action.target node id)" };
@@ -5334,6 +5432,8 @@ function validateRuleInput(app, map, body, opts) {
       const ownerRefErr = validatePositionRef(app, owner);
       if (ownerRefErr) return { error: ownerRefErr };
       actions.push(Object.assign({ type: a.type, owner: owner }, target ? { target: target } : {}));
+    } else if (a.type === "set_deadline" && a.advance === undefined && (a.every !== undefined || a.days !== undefined || a.month_day !== undefined)) {
+      return { error: "set_deadline.every, days and month_day need advance" };
     } else if (a.type === "set_deadline") {
       if (a.advance !== undefined) {
         // opakování: posun stávajícího termínu cíle o interval, rytmus drží.
@@ -5341,13 +5441,33 @@ function validateRuleInput(app, map, body, opts) {
         // přednostně a tichá přednost by lhala o tom, co pravidlo dělá.
         if (a.relative_days !== undefined || a.date !== undefined) return { error: "set_deadline: advance cannot be combined with date or relative_days" };
         if (!["daily", "weekly", "monthly"].includes(a.advance)) return { error: "set_deadline.advance must be daily|weekly|monthly" };
-        actions.push(Object.assign({ type: a.type, advance: a.advance }, target ? { target: target } : {}));
+        // rytmus procesu: každý N-tý (1–4) a u týdne vybrané dny (1 = po … 7 = ne)
+        if (a.every !== undefined && (!Number.isInteger(a.every) || a.every < 1 || a.every > 4)) return { error: "set_deadline.every must be an integer 1-4" };
+        if (a.days !== undefined) {
+          if (a.advance !== "weekly") return { error: "set_deadline.days is only allowed with advance weekly" };
+          if (!Array.isArray(a.days) || !a.days.length || a.days.some((d) => !Number.isInteger(d) || d < 1 || d > 7) || new Set(a.days).size !== a.days.length) {
+            return { error: "set_deadline.days must be a non-empty list of distinct weekdays 1-7 (1 = Monday)" };
+          }
+        }
+        // den v měsíci (kotva měsíčního rytmu): 31. v kratším měsíci = poslední den, další měsíc zase 31.
+        if (a.month_day !== undefined) {
+          if (a.advance !== "monthly") return { error: "set_deadline.month_day is only allowed with advance monthly" };
+          if (!Number.isInteger(a.month_day) || a.month_day < 1 || a.month_day > 31) return { error: "set_deadline.month_day must be an integer 1-31" };
+        }
+        actions.push(Object.assign({ type: a.type, advance: a.advance },
+          a.every !== undefined && a.every > 1 ? { every: a.every } : {},
+          a.days !== undefined ? { days: a.days.slice().sort() } : {},
+          a.month_day !== undefined ? { month_day: a.month_day } : {},
+          target ? { target: target } : {}));
       } else if (a.relative_days !== undefined) {
         if (!Number.isInteger(a.relative_days) || a.relative_days < 0 || a.relative_days > 3650) return { error: "set_deadline.relative_days must be an integer 0-3650" };
         actions.push(Object.assign({ type: a.type, relative_days: a.relative_days }, target ? { target: target } : {}));
       } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(a.date || ""))) {
         actions.push(Object.assign({ type: a.type, date: String(a.date) }, target ? { target: target } : {}));
       } else return { error: "set_deadline needs date YYYY-MM-DD, relative_days, or advance daily|weekly|monthly" };
+    } else if (a.type === "reset_subtree") {
+      // obnova podkroků opakovaného kroku — bez parametrů, vždy spouštěcí uzel
+      actions.push({ type: a.type });
     } else if (a.type === "move_node") {
       // KANBAN POSUN (Richard 14. 8.): přesune TRIGGER uzel pod jiného rodiče
       // (`to` = id uzlu mapy). Šablona konkrétní id mít nemůže (viz target).
@@ -5826,6 +5946,11 @@ function syncNodeReminders(app, map) {
   const byId = {};
   for (const n of nodes) if (n && n.id) byId[n.id] = n;
   const pristup = {}; // owner id → smí mapu vidět (jeden dotaz na člověka)
+  // OPAKOVANÝ krok se „Hotovo" jen průchodem: pravidlo ho hned vrátí na Založeno
+  // s dalším termínem — připomínka musí přežít (tenhle hook běží po uložení
+  // uživatele DŘÍV než pravidlo; dřív ji tu smazal). Posun dne zařídí další
+  // uložení (pravidla), takže hotový opakovaný krok se tady jen přeskočí.
+  let opakovane = null;
   for (const rm of rows) {
     try {
       const oid = rm.getString("owner");
@@ -5836,6 +5961,10 @@ function syncNodeReminders(app, map) {
       }
       const node = byId[rm.getString("node_id")];
       const d = node ? (node.data || {}) : null;
+      if (node && d.status === "done" && pristup[oid]) {
+        if (opakovane === null) opakovane = mapRecurrence(app, map.id);
+        if (opakovane[node.id]) continue;
+      }
       // bez přístupu k mapě připomínka končí (odsdílení nesmí dál vynášet termíny)
       if (!pristup[oid] || !node || d.status === "done" || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.deadline || ""))) {
         app.delete(rm);
@@ -6196,6 +6325,9 @@ function mapStagnantNodes(app, mapRec, opts) {
   const o = opts || {};
   const stuckDays = stuckDaysOf(o);
   const dm = dayMath(o.today);
+  // PROCES nestagnuje: kroky bez rytmu jsou popis procesu, opakovaný krok má
+  // vždy blízký termín a propadlý výskyt patří do „po termínu" (Richard 21. 10. 2026)
+  if (mapRec.getString("kind") === "process") return { stagnant: {}, stuckDays: stuckDays, today: dm.today };
   const nodes = jsonVal(mapRec, "nodes", []);
   const candidates = [];
   for (const n of (Array.isArray(nodes) ? nodes : [])) {
@@ -6272,6 +6404,188 @@ function mapCompletion(nodes, edges) {
   };
   const c = roots.length ? walk(roots[0].id) : { total: 0, done: 0 };
   return { total: c.total, done: c.done, pct: c.total > 0 ? Math.round((c.done / c.total) * 100) : 0 };
+}
+
+// ---------- PROCES (styl mapy kind="process", Richard 21. 10. 2026) ----------
+// Proces = zmapovaný provoz: kroky se opakují a cílem je nepřetržitý běh, ne
+// dokončení. Místo „% hotovo" se měří ZDRAVÍ BĚHU: kolik opakovaných kroků je
+// včas / po termínu a kdy krok naposledy prošel. Opakování zůstává obyčejným
+// automatizačním pravidlem (v0.35) — „opakovaný krok" = uzel s čistým
+// opakovacím pravidlem, poznaný STRUKTUROU (zrcadlo fe lib/recurrenceRule.js).
+
+// Rytmus z akce set_deadline s `advance`: { freq, every, days? } nebo null.
+// every 1–4 (každý N-tý den/týden/měsíc), days = dny v týdnu 1–7 (po–ne), jen weekly.
+function rhythmOfAction(a) {
+  if (!a || a.type !== "set_deadline" || ["daily", "weekly", "monthly"].indexOf(a.advance) < 0) return null;
+  const every = a.every === undefined ? 1 : Number(a.every);
+  if (!Number.isInteger(every) || every < 1 || every > 4) return null;
+  const r = { freq: a.advance, every: every };
+  if (a.days !== undefined) {
+    if (a.advance !== "weekly" || !Array.isArray(a.days) || !a.days.length) return null;
+    const seen = {};
+    for (const d of a.days) {
+      if (!Number.isInteger(d) || d < 1 || d > 7 || seen[d]) return null;
+      seen[d] = true;
+    }
+    r.days = a.days.slice().sort();
+  }
+  if (a.month_day !== undefined) {
+    if (a.advance !== "monthly" || !Number.isInteger(a.month_day) || a.month_day < 1 || a.month_day > 31) return null;
+    r.day = a.month_day;
+  }
+  return r;
+}
+
+// Čisté opakovací pravidlo → rytmus, jinak null. Čistý tvar: Hotovo → Založeno
+// + posun termínu (+ volitelně reset_subtree), vše na spouštěcím uzlu, bez
+// podmínek, zapnuté. Ručně upravené pravidlo se za opakování NEpovažuje.
+function recurrenceOfRule(r) {
+  if (!r || !r.node_id || r.enabled === false) return null;
+  const trig = r.trigger || {};
+  if (trig.type !== "node_status_changed" || trig.status !== "done") return null;
+  if (Array.isArray(r.conditions) && r.conditions.length) return null;
+  const acts = Array.isArray(r.actions) ? r.actions : [];
+  if (acts.length < 2 || acts.length > 3) return null;
+  const onTrigger = (a) => a.target === undefined || a.target === "" || a.target === "trigger_node";
+  let st = 0, dl = 0, rs = 0, rhythm = null;
+  for (const a of acts) {
+    if (!a || !onTrigger(a)) return null;
+    if (a.type === "set_status" && a.status === "todo") st++;
+    else if (a.type === "set_deadline") {
+      const rh = rhythmOfAction(a);
+      if (!rh) return null;
+      rhythm = rh;
+      dl++;
+    } else if (a.type === "reset_subtree") rs++;
+    else return null;
+  }
+  if (st !== 1 || dl !== 1 || rs > 1) return null;
+  return Object.assign({}, rhythm, { reset: rs === 1 });
+}
+
+// Přepnutí stylu mapy (/checkup 29. 10. 2026 — dřív jen v editoru a asistentovi, tiše): na proces dostanou
+// čistá opakovací pravidla obnovu podkroků (reset_subtree), zpátky na projekt ji ztratí — tvar pravidla
+// sleduje styl, ať přepnutí tam a zpět projekt nezmění. Ručně upravená pravidla zůstávají, jak jsou.
+// Vrací počet upravených pravidel.
+function prepniObnovuPodkroku(app, mapId, naProces) {
+  let rows = [];
+  try {
+    rows = app.findRecordsByFilter("automation_rules", "map = {:m} && enabled = true && node_id != ''", "created", 500, 0, { m: mapId });
+  } catch (err) { rows = []; }
+  let n = 0;
+  for (const r of rows) {
+    const actions = ruleJson(r, "actions", []);
+    const rh = recurrenceOfRule({
+      node_id: r.getString("node_id"), enabled: r.getBool("enabled"),
+      trigger: ruleJson(r, "trigger", {}), conditions: ruleJson(r, "conditions", []), actions: actions,
+    });
+    if (!rh || rh.reset === !!naProces) continue;
+    r.set("actions", naProces ? actions.concat([{ type: "reset_subtree" }]) : actions.filter((a) => a.type !== "reset_subtree"));
+    try { app.save(r); n++; } catch (err) {
+      try { app.logger().warn("přepnutí stylu: pravidlo opakování neupraveno", "rule", r.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
+  return n;
+}
+
+// { nodeId: rytmus } pro všechna čistá opakovací pravidla mapy.
+function mapRecurrence(app, mapId) {
+  return recurrenceByMaps(app, [mapId])[mapId] || {};
+}
+
+// Totéž pro víc map naráz (přehledy): { mapId: { nodeId: rytmus } }, dávky po 40.
+function recurrenceByMaps(app, mapIds) {
+  const out = {};
+  const ids = (mapIds || []).filter((x) => !!x);
+  for (let i = 0; i < ids.length; i += 40) {
+    const chunk = ids.slice(i, i + 40);
+    const params = {};
+    const parts = chunk.map((id, k) => { params["m" + k] = id; return "map = {:m" + k + "}"; });
+    let rows = [];
+    try {
+      rows = app.findRecordsByFilter("automation_rules", "enabled = true && node_id != '' && (" + parts.join(" || ") + ")", "created", 50 * chunk.length, 0, params);
+    } catch (err) { rows = []; }
+    for (const r of rows) {
+      const rh = recurrenceOfRule({
+        node_id: r.getString("node_id"), enabled: r.getBool("enabled"),
+        trigger: ruleJson(r, "trigger", {}), conditions: ruleJson(r, "conditions", []), actions: ruleJson(r, "actions", []),
+      });
+      if (!rh) continue;
+      const m = (out[r.getString("map")] = out[r.getString("map")] || {});
+      if (!m[r.getString("node_id")]) m[r.getString("node_id")] = rh;
+    }
+  }
+  return out;
+}
+
+// ZDRAVÍ BĚHU procesu — z dat mapy (termíny) a záznamníku map_changes
+// (průchody = změny stavu na „hotovo", drží se 400 dní). Kroky bez rytmu se
+// nepočítají (jsou to popis procesu). Výskyt, který nikdo nesplnil, se počítá
+// jen dokud je otevřený po termínu. „Po termínu při splnění" = termín platný
+// v okamžiku odškrtnutí byl dřív než den odškrtnutí (v UTC).
+function processHealth(app, mapRec, opts) {
+  const o = opts || {};
+  const dm = dayMath(o.today);
+  const rec = o.recurrence || mapRecurrence(app, mapRec.id);
+  const steps = [];
+  const byId = {};
+  for (const n of jsonVal(mapRec, "nodes", [])) {
+    if (!n || n.type === "note" || !rec[n.id]) continue;
+    const d = n.data || {};
+    const deadline = String(d.deadline || "");
+    const st = {
+      id: n.id, title: d.title || String(d.apexText || "").slice(0, 60), rhythm: rec[n.id],
+      deadline: deadline, status: d.status || "todo",
+      late: !!deadline && deadline < dm.today && (d.status || "todo") !== "done",
+      last_at: "", runs30: 0, runs90: 0, late90: 0,
+    };
+    steps.push(st);
+    byId[n.id] = st;
+  }
+  const out = { recurring: steps.length, late: 0, ok: 0, runs30: 0, last: null, steps: steps, today: dm.today };
+  for (const st of steps) { if (st.late) out.late++; else out.ok++; }
+  if (!steps.length) return out;
+  const since90 = pbDateString(new Date(dm.today0.getTime() - 90 * 86400000));
+  const since30 = pbDateString(new Date(dm.today0.getTime() - 30 * 86400000));
+  // jen opakované kroky (podkroky s obnovou by jinak strop zahltily) a OD NEJNOVĚJŠÍCH — strop odřízne
+  // nejstarší, ne poslední průchody (/checkup 29. 10. 2026); pak chronologicky
+  let rows = [];
+  const ids = Object.keys(byId);
+  for (let c = 0; c < ids.length; c += 40) {
+    const params = { m: mapRec.id, since: since90 };
+    const parts = ids.slice(c, c + 40).map((id, k) => { params["i" + k] = id; return "item_id = {:i" + k + "}"; });
+    try {
+      rows = rows.concat(app.findRecordsByFilter("map_changes",
+        "map = {:m} && kind = 'node' && (field = 'status' || field = 'deadline') && created >= {:since} && (" + parts.join(" || ") + ")",
+        "-created", 2000, 0, params));
+    } catch (err) { /* zdraví je bonus — bez historie jen bez průchodů */ }
+  }
+  rows.sort((a, b) => (a.getString("created") < b.getString("created") ? -1 : (a.getString("created") > b.getString("created") ? 1 : 0)));
+  // termín v okamžiku splnění bez dřívějšího posunu = „from" nejbližšího DALŠÍHO posunu termínu (jedním průchodem odzadu)
+  const dalsiFrom = new Array(rows.length);
+  const posledniFrom = {};
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const id = rows[i].getString("item_id");
+    dalsiFrom[i] = posledniFrom[id];
+    if (rows[i].getString("field") === "deadline") posledniFrom[id] = rows[i].getString("from");
+  }
+  const lastDl = {};
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const st = byId[r.getString("item_id")];
+    if (!st) continue;
+    if (r.getString("field") === "deadline") { lastDl[st.id] = r.getString("to"); continue; }
+    if (r.getString("to") !== "done") continue;
+    const at = r.getString("created");
+    let dl = lastDl[st.id];
+    if (dl === undefined) dl = dalsiFrom[i];
+    st.runs90++;
+    if (at >= since30) { st.runs30++; out.runs30++; }
+    if (dl && dl < at.slice(0, 10)) st.late90++;
+    if (at > st.last_at) st.last_at = at;
+    if (!out.last || at > out.last.at) out.last = { at: at, node_id: st.id, title: st.title };
+  }
+  return out;
 }
 
 // Levná minutová brzda (fixní okno, bez atomicity) — jeden vzor pro Můj den,
@@ -6630,7 +6944,7 @@ function importJednuMapu(app, auth, L, info, opts) {
   rec.set("series_year", 0);
   rec.set("project_number", 0); // číslo ze souboru se nepřenáší — přidělí model hook (nová řada této instance)
   rec.set("client", "");
-  rec.set("kind", ""); // import nikdy nezakládá org mapu
+  rec.set("kind", src.kind === "process" ? "process" : ""); // import nikdy nezakládá org mapu; styl Proces se přenáší
   app.save(rec);
 
   // Pravidla ze souboru: remap přes idMap → osoby z cizí instance ven (jako u
@@ -6768,9 +7082,11 @@ function buildMyDay(app, userId, email, opts) {
   // úkol se nepočítá podruhé. Osiřelý node_id (uzel smazán) v lookupu není,
   // takže se takový úkol počítá samostatně a položka se neztratí.
   const nodeByKey = {};
+  const processMaps = {}; // styl Proces — kroky nestagnují (viz „nehýbe se" níž)
   for (const m of maps) {
     titleByMap[m.id] = m.getString("title");
     if (m.getBool("archived")) { archived[m.id] = true; continue; }
+    if (m.getString("kind") === "process") processMaps[m.id] = true;
     for (const n of jsonVal(m, "nodes", [])) {
       if (n.type === "note") continue;
       const d = n.data || {};
@@ -6963,6 +7279,16 @@ function buildMyDay(app, userId, email, opts) {
   // „later" = má termín, ale dál než týden · „noDate" = termín nemá vůbec.
   // Rozdělené na dvě sekce (Richard 27. 7. 2026): dřív to leželo v jedné
   // „Ostatní" a při jedenácti položkách se v tom nedalo vyznat.
+  // 🔁 opakovaný krok: rytmus k řádku (jen mapy, kde mám uzel — jeden dávkový dotaz)
+  {
+    const recMapIds = {};
+    for (const it of items) if (it.kind === "node" && it.mapId) recMapIds[it.mapId] = true;
+    const rec = recurrenceByMaps(app, Object.keys(recMapIds));
+    for (const it of items) {
+      const rh = it.kind === "node" && rec[it.mapId] ? rec[it.mapId][it.id] : null;
+      if (rh) it.rhythm = rh;
+    }
+  }
   const buckets = { overdue: [], today: [], tomorrow: [], week: [], blocking: [], later: [], noDate: [] };
   for (const it of items) buckets[bucketFor(it)].push(it);
   for (const it of ideas) {
@@ -6987,12 +7313,18 @@ function buildMyDay(app, userId, email, opts) {
   const stuckBefore = new Date(today0.getTime() - stuckDays * 86400000);
   const candidates = [].concat(buckets.later, buckets.noDate);
   const nodeMoved = nodeLastMoved(app, candidates);
-  const stuck = candidates.filter((it) => {
+  const stuckAll = candidates.filter((it) => {
     const stampRaw = it.kind === "task" ? it.updated : nodeMoved[it.mapId + ":" + it.id];
     if (!stampRaw) return false;
     const u = parsePbDate(stampRaw);
     return !!u && u < stuckBefore;
   });
+  // Kroky PROCESŮ se za zaseknuté nepovažují (popis procesu, ne zaseknutá
+  // práce — Richard 21. 10. 2026). Zůstávají ve svých sekcích (později / bez
+  // termínu) a panel jen řekne, kolik jich vynechal a proč.
+  const stuck = stuckAll.filter((it) => !processMaps[it.mapId]);
+  const stuckProcess = stuckAll.filter((it) => processMaps[it.mapId])
+    .map((it) => ({ title: it.title, mapTitle: it.mapTitle }));
   const stuckIds = {};
   for (const it of stuck) stuckIds[it.kind + ":" + it.id] = true;
   // počty se počítají z FINÁLNÍCH polí, ne z kbelíků — jinak si kontrakt
@@ -7137,7 +7469,10 @@ function buildMyDay(app, userId, email, opts) {
       // (nález P3-01). Z dat „Zadal jsem" = vlastní delegace, soukromí map drží.
       delegatedOverdue: delegated.filter((it) => it.deadline && diffOf(it.deadline) < 0).length,
       stuck: stuck.length,
+      stuckProcess: stuckProcess.length,
     },
+    // kroky procesů, které by jinak padly do „Tohle se nehýbe" (jen pro vysvětlivku)
+    stuckProcess: stuckProcess.slice(0, 5),
     sections: {
       overdue: buckets.overdue,
       today: buckets.today,
@@ -7275,7 +7610,9 @@ function buildPortfolio(app, userId, email, opts) {
       (g.children[ed.source] = g.children[ed.source] || []).push(ed.target);
     }
     mapGraph[m.id] = g;
-    const c = mapCompletion(nodes, edges);
+    const isProcess = m.getString("kind") === "process";
+    // proces se nedokončuje — % hotovo nemá smysl (místo něj zdraví běhu níž)
+    const c = isProcess ? { pct: null, done: null, total: null } : mapCompletion(nodes, edges);
     let open = 0;
     for (const n of nodes) {
       if (!n || n.type === "note") continue;
@@ -7296,6 +7633,7 @@ function buildPortfolio(app, userId, email, opts) {
       id: m.id, title: titleByMap[m.id], project_number: Number(m.get("project_number")) || 0,
       access: sm.access, team_access: m.getString("team_access"),
       owner_email: m.getString("owner_email"), updated: m.getString("updated"),
+      kind: isProcess ? "process" : "project", // styl mapy pro API (v DB je projekt "")
       pct: c.pct, done: c.done, total: c.total, open: open, overdue: 0, stuck: 0,
     });
   }
@@ -7350,7 +7688,11 @@ function buildPortfolio(app, userId, email, opts) {
   const nodeMoved = nodeLastMoved(app, candidates);
   const stuckBefore = new Date(today0.getTime() - stuckDays * 86400000);
   const stuck = [];
+  // kroky PROCESŮ nestagnují (stejný předpis jako Můj den a mapStagnantNodes)
+  const processIds = {};
+  for (const p of projects) if (p.kind === "process") processIds[p.id] = true;
   for (const it of candidates) {
+    if (processIds[it.mapId]) continue;
     const stampRaw = it.kind === "task" ? it.updated : nodeMoved[it.mapId + ":" + it.id];
     if (!stampRaw) continue;
     const u = parsePbDate(stampRaw);
@@ -7413,7 +7755,22 @@ function buildPortfolio(app, userId, email, opts) {
     p.overdue = overdue.filter((x) => x.mapId === p.id).length;
     p.stuck = stuck.filter((x) => x.mapId === p.id).length;
   }
-  projects.sort((a, b) => ((b.total > 0) - (a.total > 0)) || (a.pct - b.pct) || byTitle(a, b)); // prázdný projekt až na konec
+  // ZDRAVÍ BĚHU procesů (místo %): včas / po termínu / poslední průchod
+  {
+    const procs = projects.filter((p) => p.kind === "process");
+    const rec = recurrenceByMaps(app, procs.map((p) => p.id));
+    for (const p of procs) {
+      const sm = scoped.find((x) => x.rec.id === p.id);
+      const h = processHealth(app, sm.rec, { today: today, recurrence: rec[p.id] || {} });
+      p.health = { recurring: h.recurring, late: h.late, ok: h.ok, runs30: h.runs30, last: h.last };
+    }
+  }
+  // projekty od nejnižšího % (prázdný až na konec); procesy za nimi — nejvíc
+  // kroků po termínu nahoře, „jen popis" (bez opakovaných kroků) úplně dole
+  projects.sort((a, b) => ((a.kind === "process") - (b.kind === "process"))
+    || (a.kind === "process"
+      ? (((b.health.recurring > 0) - (a.health.recurring > 0)) || (b.health.late - a.health.late) || byTitle(a, b))
+      : (((b.total > 0) - (a.total > 0)) || (a.pct - b.pct) || byTitle(a, b))));
 
   // lidé — podle řešitele; „bez řešitele" jako vlastní řádek (owner "")
   const byPerson = {};
@@ -7499,7 +7856,9 @@ function buildPortfolio(app, userId, email, opts) {
     counts: {
       overdue: overdue.length,
       stuck: stuck.length,
+      // projects = VŠECHNY mapy jako dřív (kontrakt API, /checkup 29. 10. 2026), processes = z toho procesy
       projects: projects.length,
+      processes: projects.filter((p) => p.kind === "process").length,
       people: peopleWithOverdue,
       open: items.length,
       changes: changes.length,
@@ -7770,7 +8129,7 @@ module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

@@ -111,7 +111,6 @@ const toDto = (name, r) => {
         deadline: r.deadline,
         // „kdy to chci řešit" — YYYY-MM-DD; NENÍ to termín (ten se mění vědomě)
         planned_on: r.planned_on || '',
-        recurrence: r.recurrence || '',
         assignee_email: r.assignee_email,
         map_id: r.map || '',
         node_id: r.node_id,

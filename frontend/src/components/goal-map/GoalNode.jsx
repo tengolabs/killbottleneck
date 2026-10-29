@@ -10,6 +10,7 @@ import { useTimer } from '@/lib/TimerContext';
 import { useToast } from '@/components/ui/use-toast';
 import { getDeadlineStatus, getInitials, formatDeadline } from '@/lib/nodeMeta';
 import { popisJakoText } from '@/lib/popisFormat';
+import { rhythmLabel } from '@/lib/rhythm';
 import { statusConfig } from '@/lib/statusMeta';
 import { tridyCitelnosti } from '@/lib/citelnost';
 import {
@@ -31,7 +32,14 @@ const aiMenuItems = [
 function GoalNode({ id, data, selected }) {
   const { t } = useTranslation('editor');
   useLazyNs('bottleneck'); // texty důvodů hrdel (tooltip) — líný ns, ať se neveze do lite
-  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, statusCycleNodeIds, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, fileCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap, showBottlenecks, bottleneckNodeIds, bottleneckAnalysisMap } = useGoalMap();
+  const { onAddChild, onEditNode, onDeleteNode, onExpandNode, onToggleCollapse, onCycleStatus, statusCycleNodeIds, childCount, collapsed, expandingNodeId, searchQuery, readOnly, getProgress, myTasksOnly, currentUserEmail, commentCounts, fileCounts, onStashNode, onDetachNode, hasParent, taskStats, onShowNodeTasks, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, activeMapId, direction, compactNode, citelnost, orgMap, processMap, processStepIds, rhythmById, showBottlenecks, bottleneckNodeIds, bottleneckAnalysisMap } = useGoalMap();
+  // rytmus opakovaného kroku (ze serveru, vidí ho každý — i čtenář; 21. 10. 2026)
+  const rytmus = rhythmById?.[id] || null;
+  // PROCES: krok bez rytmu a bez termínu je POPIS procesu, s termínem jednorázový úkol
+  // (jen u KROKŮ — podkroky opakovaného kroku jsou jeho kontrolní seznam, štítek by šuměl)
+  const jeKrokProcesu = processMap && !!processStepIds?.has(id);
+  const procesPopis = jeKrokProcesu && !rytmus && !data.deadline && data.status !== 'done';
+  const procesJednou = jeKrokProcesu && !rytmus && !!data.deadline;
   // směr stromu: 'horizontal' = strom doprava (mobil) → konektory vlevo/vpravo, jinak nahoře/dole
   const isH = direction === 'horizontal';
   // velikost písma v uzlu (tlačítko Čitelnost v liště) — šířka karty se NEMĚNÍ,
@@ -326,7 +334,7 @@ function GoalNode({ id, data, selected }) {
         ))}
       </div>
 
-      {(deadlineStatus || planovano || waitingSet?.has(id) || data.owner || data.blocks || isAutomated || wantsAutomation) && (
+      {(deadlineStatus || planovano || waitingSet?.has(id) || data.owner || data.blocks || isAutomated || wantsAutomation || rytmus || procesPopis || procesJednou) && (
         <div className="px-3 pb-1 flex items-center gap-1.5 flex-wrap">
           {deadlineStatus && (
             <span title={`${t('tasks:taskDialog.labelDeadline')}: ${formatDeadline(data.deadline)}`} className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${deadlineBadgeClass}`}>
@@ -385,15 +393,18 @@ function GoalNode({ id, data, selected }) {
               detail v okně uzlu (kategorie Automatizace) a v přehledu na liště */}
           {/* 🔁 = cíl se opakuje: po Hotovo se sám vrátí s termínem posunutým
               v rytmu původního termínu (v0.35; spravuje přepínač v Zadání) */}
-          {recurrenceNodes?.has(id) && (
+          {(rytmus || recurrenceNodes?.has(id)) && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 max-w-[12rem]"
               title={t('editor:node.recurrenceBadgeHint')}
               data-testid="node-recurrence-badge"
             >
               <RotateCw className="w-2.5 h-2.5 shrink-0" />
+              {rytmus && <span className="truncate" data-testid="node-rhythm-label">{rhythmLabel(t, rytmus, data.deadline)}</span>}
             </span>
           )}
+          {procesPopis && <span className="text-[10px] text-muted-foreground" data-testid="node-process-plain">{t('process.stepPlain')}</span>}
+          {procesJednou && <span className="text-[10px] text-muted-foreground" data-testid="node-process-once">{t('process.stepOnce')}</span>}
           {ruleNodes?.has(id) && (
             <span
               className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"
@@ -477,7 +488,7 @@ function GoalNode({ id, data, selected }) {
         </div>
       )}
 
-      {hasChildren && !compactNode && !cit.skrytPokrok && (
+      {hasChildren && !compactNode && !cit.skrytPokrok && !processMap && (
         <div className="px-3 pb-1">
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
@@ -490,9 +501,9 @@ function GoalNode({ id, data, selected }) {
 
       {!readOnly && (
         <div className="px-3 pb-3 flex gap-2">
-          <button title={t('tasks:taskTable.addSubgoal')} onClick={(e) => { e.stopPropagation(); onAddChild(id); }} className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+          <button title={t(processMap ? 'process.addSubStep' : 'tasks:taskTable.addSubgoal')} onClick={(e) => { e.stopPropagation(); onAddChild(id); }} className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
             <Plus className="w-3.5 h-3.5" />
-            {t('tasks:taskTable.addSubgoal')}
+            {t(processMap ? 'process.addSubStep' : 'tasks:taskTable.addSubgoal')}
           </button>
           {onExpandNode && (
             <DropdownMenu>

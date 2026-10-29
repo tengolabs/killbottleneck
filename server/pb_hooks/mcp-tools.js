@@ -56,13 +56,16 @@ const RULE_CONDITION = {
 const RULE_ACTION = {
   type: "object",
   properties: {
-    type: { type: "string", enum: ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant"], description: "What to do. offer_assistant = send the recipient a notification whose link opens the AI assistant in the given package (mode) for the trigger node/map — nothing runs until they click. run_agent and move_node target the trigger node; set_status/set_owner/set_deadline target the trigger node by default but accept `target` (a schedule rule needs node_id unless `target` is an explicit node id)." },
+    type: { type: "string", enum: ["set_status", "set_owner", "set_deadline", "move_node", "create_subnodes", "notify", "run_agent", "offer_assistant", "reset_subtree"], description: "What to do. reset_subtree = put the trigger node's sub-goals and tasks back to todo (a recurring step's checklist starts over; no parameters). offer_assistant = send the recipient a notification whose link opens the AI assistant in the given package (mode) for the trigger node/map — nothing runs until they click. run_agent and move_node target the trigger node; set_status/set_owner/set_deadline target the trigger node by default but accept `target` (a schedule rule needs node_id unless `target` is an explicit node id)." },
     status: { type: "string", enum: ["todo", "in_progress", "done"], description: "set_status only" },
     target: { type: "string", description: "set_status/set_owner/set_deadline only: which node the action modifies — \"trigger_node\" (default), \"parent\" (one level up), or a node id. A missing parent / vanished node is logged as a skipped action" },
     owner: { type: "string", description: "set_owner only: e-mail of an instance member (empty string clears), or a dynamic target resolved when the rule runs: \"deputy_of_node_owner\", \"position:<nodeId>\" (holder of an org-structure position), \"deputy_of_position:<nodeId>\". An unresolvable target is logged as a skipped action" },
     date: { type: "string", description: "set_deadline only: YYYY-MM-DD (alternative to relative_days)" },
     relative_days: { type: "integer", description: "set_deadline only: today + N days (0-3650)" },
     advance: { type: "string", enum: ["daily", "weekly", "monthly"], description: "set_deadline only: advance the node's CURRENT deadline by one interval — daily|weekly|monthly. Keeps the rhythm anchored to the original deadline (every Monday stays a Monday; the 31st stays the 31st, clamped in shorter months); past occurrences are skipped to the nearest future one. Use for recurring goals (\"repeat weekly\" = on done → set_status todo + set_deadline advance)." },
+    every: { type: "integer", description: "set_deadline with advance only: every N-th day/week/month (1-4, default 1)" },
+    days: { type: "array", items: { type: "integer" }, description: "set_deadline with advance weekly only: weekdays 1 = Monday … 7 = Sunday (e.g. [2,4] = Tuesday and Thursday); default = the weekday of the current deadline" },
+    month_day: { type: "integer", description: "set_deadline with advance monthly only: day of the month 1-31 (a shorter month gets its last day, the next month this day again); default = the day of the current deadline" },
     parent: { type: "string", description: "create_subnodes only: node id to attach under, or \"trigger_node\" (default)" },
     items: { type: "array", items: { $ref: "#/$defs/treeItem" }, description: "create_subnodes only: subtree template, same shape as add_nodes items, max 50 nodes" },
     to: { type: "string", description: "notify: \"node_owner\", \"deputy_of_node_owner\", \"position:<nodeId>\", \"deputy_of_position:<nodeId>\" (resolved at run time), \"map_owner\" or an e-mail. move_node (kanban): id of the new parent node the trigger node moves under — appended at the end of the new siblings row; moving the apex, a vanished target or a move creating a cycle is logged as a skipped action" },
@@ -97,6 +100,7 @@ const TOOLS = [
         outline: { type: "array", items: { $ref: "#/$defs/treeItem" }, description: "Top-level items under the apex, each may have children" },
         description: { type: "string", description: "Map description" },
         apex_text: { type: "string", description: "Root goal statement, defaults to title" },
+        kind: { type: "string", enum: ["project", "process"], description: "Map style: \"project\" (default) = work to finish, shows % done and offers archiving when everything is done; \"process\" = a mapped operation that keeps running — steps usually repeat (add recurrence with create_rule: on done → set_status todo + set_deadline advance), no % done, health = recurring steps on time vs overdue." },
       },
       required: ["title", "outline"],
       additionalProperties: false,
@@ -390,14 +394,34 @@ function renderMap(m) {
   const acc = m.access ? `, access: ${m.access}` : "";
   const num = m.project_number > 0 ? `${formatProjectNumber(m.project_number)}, ` : "";
   const arch = m.archived ? ", ARCHIVED" : "";
+  const kind = m.kind === "process" ? ", kind: process" : "";
   const head = m.title
-    ? `Map "${m.title}" (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`
-    : `Map (${num}id: ${m.id}, updated: ${m.updated}${acc}${arch})`;
+    ? `Map "${m.title}" (${num}id: ${m.id}, updated: ${m.updated}${acc}${kind}${arch})`
+    : `Map (${num}id: ${m.id}, updated: ${m.updated}${acc}${kind}${arch})`;
   const body = (m.tree || []).map((r) => renderNode(r, 0)).join("\n");
   const notes = (m.notes || []).length
     ? "\nNotes:\n" + m.notes.map((n) => `  • ${n.text.slice(0, 200)} (id: ${n.id})`).join("\n")
     : "";
-  return `${DATA_FENCE}\n\n${head}\n${body}${notes}`;
+  return `${DATA_FENCE}\n\n${head}${renderHealth(m.health)}\n${body}${notes}`;
+}
+// PROCES (kind process): cílem je nepřetržitý běh, ne dokončení — místo % zdraví
+// běhu (opakované kroky včas / po termínu, poslední průchod)
+function rhythmText(r) {
+  if (!r) return "";
+  const unit = { daily: "day", weekly: "week", monthly: "month" }[r.freq] || r.freq;
+  const every = r.every > 1 ? `every ${r.every} ${unit}s` : `every ${unit}`;
+  const dny = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return r.days && r.days.length ? `${every} on ${r.days.map((d) => dny[d - 1]).join(", ")}` : every;
+}
+function renderHealth(h) {
+  if (!h) return "";
+  if (!h.recurring) return "\nProcess (keeps running, no % done): no recurring steps yet — the map describes the process.";
+  const last = h.last ? `last run ${h.last.at.slice(0, 16)} UTC (${h.last.title})` : "no run recorded yet";
+  const lines = [`\nProcess (keeps running, no % done): ${h.ok} recurring step(s) on time, ${h.late} overdue, ${h.runs30} run(s) in 30 days, ${last}.`];
+  for (const st of h.steps || []) {
+    lines.push(`  🔁 ${st.title} (id: ${st.id}) — ${rhythmText(st.rhythm)}, next due ${st.deadline || "—"}${st.late ? " OVERDUE" : ""}, ${st.runs90} run(s) in 90 days${st.late90 ? ` (${st.late90} late)` : ""}`);
+  }
+  return lines.join("\n");
 }
 // kompaktní řádek události (create/list_events)
 function renderEvent(e) {
@@ -444,10 +468,17 @@ function renderPortfolio(p) {
   const sc = p.scope || {};
   const s = p.sections || {};
   const who = (r) => (r.owner_label ? `${r.owner_label} (${r.owner})` : (r.owner || "unassigned"));
-  const out = [`Portfolio as of ${p.today}: ${c.projects || 0} projects (team ${sc.team || 0}, shared ${sc.shared || 0}), ${c.open || 0} open items, ${c.overdue || 0} overdue, ${c.stuck || 0} stuck, ${c.people || 0} people with overdue work.`];
+  const out = [`Portfolio as of ${p.today}: ${c.projects || 0} projects, ${c.processes || 0} processes (team ${sc.team || 0}, shared ${sc.shared || 0}), ${c.open || 0} open items, ${c.overdue || 0} overdue, ${c.stuck || 0} stuck, ${c.people || 0} people with overdue work.`];
   const projects = s.projects || [];
   out.push("", projects.length ? "Projects:" : "Projects: none (no team or shared maps visible to the key owner).");
   for (const pr of projects) {
+    if (pr.kind === "process") {
+      const h = pr.health || {};
+      const run = !h.recurring ? "no recurring steps (describes the process)"
+        : `${h.ok} step(s) on time, ${h.late} overdue, last run ${h.last ? h.last.at.slice(0, 10) : "—"}`;
+      out.push(`• ${prefixProjectNumber(pr.project_number)}${pr.title} (id: ${pr.id}, ${pr.access}) — process (keeps running, no % done): ${run}, open ${pr.open}, overdue ${pr.overdue}, owner @${pr.owner_email || "?"}`);
+      continue;
+    }
     out.push(`• ${prefixProjectNumber(pr.project_number)}${pr.title} (id: ${pr.id}, ${pr.access}) — ${pr.pct}% done (${pr.done}/${pr.total}), open ${pr.open}, overdue ${pr.overdue}, stuck ${pr.stuck}, owner @${pr.owner_email || "?"}`);
   }
   const overdue = (s.overdue || []).slice(0, 20);
@@ -526,12 +557,12 @@ const EXEC = {
     const r = vcall(auth, "GET", `/api/kb/v1/maps${a.archived ? "?archived=1" : ""}`);
     if (!r.maps.length) return text(a.archived ? "No archived maps." : "No maps.");
     return text(DATA_FENCE + "\n\n"
-      + r.maps.map((m) => `• ${prefixProjectNumber(m.project_number)}${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || "owner"})`).join("\n"));
+      + r.maps.map((m) => `• ${prefixProjectNumber(m.project_number)}${m.title} (id: ${m.id}, nodes: ${m.node_count}, updated: ${m.updated}, access: ${m.access || "owner"}${m.kind === "process" ? ", kind: process" : ""})`).join("\n"));
   },
   get_map: (auth, a) => text(renderMap(freshMap(auth, a.map_id))),
   create_map: (auth, a) => {
-    const r = vcall(auth, "POST", "/api/kb/v1/maps", { title: a.title, tree: a.outline, description: a.description, apex_text: a.apex_text });
-    return text(`Map created.\n\n${renderMap({ id: r.id, title: a.title, updated: r.updated, tree: r.tree, notes: [] })}`);
+    const r = vcall(auth, "POST", "/api/kb/v1/maps", { title: a.title, tree: a.outline, description: a.description, apex_text: a.apex_text, kind: a.kind });
+    return text(`Map created.\n\n${renderMap({ id: r.id, title: a.title, updated: r.updated, kind: r.kind, tree: r.tree, notes: [] })}`);
   },
   add_nodes: (auth, a) => mapWrite(auth, a.map_id, (base) => {
     const r = vcall(auth, "POST", `/api/kb/v1/maps/${enc(a.map_id)}/nodes`, { parent_id: a.parent_id, items: a.items, base_updated: base });

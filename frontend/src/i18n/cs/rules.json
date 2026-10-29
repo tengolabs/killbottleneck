@@ -65,7 +65,8 @@
       "notify": "pošli notifikaci",
       "run_agent": "spusť agenta",
       "move_node": "přesuň uzel",
-      "offer_assistant": "nabídni asistenta"
+      "offer_assistant": "nabídni asistenta",
+      "reset_subtree": "Vrátit podkroky na Založeno"
     },
     "dlRelative": "za N dní ode dneška",
     "dlFixed": "pevné datum",
@@ -176,6 +177,8 @@
       "trideni": "Roztřídit poznámky",
       "porada": "Ranní porada",
       "nocni": "Noční plánování"
-    }
+    },
+    "resetSubtreeHint": "Podcíle a úkoly spouštěcího cíle se vrátí na Založeno — kontrolní seznam opakovaného kroku začne znovu.",
+    "dlEvery": "každý"
   }
 }

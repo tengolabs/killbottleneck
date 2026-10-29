@@ -51,7 +51,7 @@ import { getDeadlineStatus } from '@/lib/nodeMeta';
 import BulkEditDialog from '@/components/goal-map/BulkEditDialog';
 import { templateToMap, templateForLang } from '@/lib/templateConvert';
 import { ALIGN_OPTS, stylNoveMapy } from '@/lib/alignStyles';
-import { createRulesFromTemplate, ownersFromNodes, createProjectRecord } from '@/lib/createProject';
+import { createRulesFromTemplate, ownersFromNodes, createProjectRecord, seedRecurringNodes } from '@/lib/createProject';
 import { computeWaitingSet } from '@/lib/waitStatus';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 import { useSidePanels } from '@/hooks/useSidePanels';
@@ -59,6 +59,12 @@ import { useMapCounts } from '@/hooks/useMapCounts';
 import { useMapHistory } from '@/hooks/useMapHistory';
 import { useMapExport } from '@/hooks/useMapExport';
 import { useMapRules } from '@/hooks/useMapRules';
+import { useProcessHealth } from '@/hooks/useProcessHealth';
+import ProcessStyleDialog from '@/components/goal-map/proces/ProcessStyleDialog';
+import AddStepDialog from '@/components/goal-map/proces/AddStepDialog';
+import { recurrenceOf, buildRecurrenceRule } from '@/lib/recurrenceRule';
+import { rulesApi } from '@/components/rules/rulesApi';
+import { nextDue, todayStr, formatDay } from '@/lib/rhythm';
 import { useAiActions } from '@/hooks/useAiActions';
 import { useMapLayoutRefs } from '@/hooks/useMapLayoutRefs';
 import { useMapLayout } from '@/hooks/useMapLayout';
@@ -155,7 +161,9 @@ function EditorContent({ mapId, personalMap = false }) {
   // po změně adresáře kontaktů (onContactsChanged z OwnerSelect)
   const [members, reloadMembers] = useMembersWithContacts(user);
   const [mapShare, setMapShare] = useState(null); // {ownerEmail, sharedWith, teamAccess}
-  const [mapKind, setMapKind] = useState(''); // '' běžná | 'org' organizační struktura
+  const [mapKind, setMapKind] = useState(''); // '' projekt | 'process' proces (nepřetržitý běh) | 'org' organizační struktura
+  const [styleDialogOpen, setStyleDialogOpen] = useState(false); // přepnutí Projekt ↔ Proces (jen vlastník)
+  const [styleBusy, setStyleBusy] = useState(false);
   const [archived, setArchived] = useState(false);
   const [isMapOwner, setIsMapOwner] = useState(false);
   // spolupracovník (work): mapa read-only, ale smí cyklovat stav SVÝCH uzlů routou /node-status
@@ -398,6 +406,7 @@ function EditorContent({ mapId, personalMap = false }) {
     // Příznaky si zapíná až ta větev, které patří.
     setIsTemplatePreview(false);
     setIsPublicView(false);
+    setMapKind(''); // styl si nastaví až větev, které patří (jinak by přežil z minulé mapy)
     sablonaCistaRef.current = null;
     templateSeedsRef.current = null;
     templateSeriesRef.current = null;
@@ -435,6 +444,7 @@ function EditorContent({ mapId, personalMap = false }) {
           setTitle(tpl.title || t('defaults.newMapTitle'));
           // číslovaná série: zapamatovat PŘED replaceState (ten location.state maže)
           templateSeriesRef.current = tpl.number_format && tpl.id ? tpl.id : null;
+          setMapKind(tpl.map_kind === 'process' ? 'process' : ''); // šablona procesu → náhled i projekt jako proces
           window.history.replaceState({}, document.title);
 
           // konverze sjednocena v lib/templateConvert (vč. procesních metadat)
@@ -525,6 +535,7 @@ function EditorContent({ mapId, personalMap = false }) {
             // mate (Richardův nález 6. 8.). Chování zůstává stejné (nic se
             // neukládá), mění se jen to, co se návštěvníkovi říká.
             setIsPublicView(true);
+            setMapKind(map.kind === 'process' ? 'process' : '');
             skipNextSave.current = true;
             setTitle(map.title || '');
             setColor(map.color || '');
@@ -700,12 +711,15 @@ function EditorContent({ mapId, personalMap = false }) {
       // Ze šablony" (Richard 17. 8.: cesty sjednotit) — server pak rozešle
       // notifikace node_assigned. Vlastníci se berou z ČISTÉ šablony, ne
       // z plátna: co si kdo naklikal v náhledu, se nepřenáší ani tady.
+      const seeds = templateSeedsRef.current;
+      const nodesProjektu = seeds ? seedRecurringNodes(cleanNodes, seeds.rules, seeds.idMap, mapKind) : cleanNodes;
       const newMap = await createProjectRecord({
         title: nazev,
-        nodes: cleanNodes,
+        nodes: nodesProjektu,
         edges: cleanEdges,
-        owners: ownersFromNodes(cleanNodes), // řešitel ze šablony = spolupracovník (Richard 7. 8. 2026; nález S5-03)
+        owners: ownersFromNodes(nodesProjektu), // řešitel ze šablony = spolupracovník (Richard 7. 8. 2026; nález S5-03)
         series: templateSeriesRef.current || '',
+        kind: mapKind === 'process' ? 'process' : '',
       });
       setIsTemplatePreview(false);
       setActiveMapId(newMap.id);
@@ -778,7 +792,7 @@ function EditorContent({ mapId, personalMap = false }) {
     } finally {
       setSavingTemplate(false);
     }
-  }, [nodes, edges, title, toast, user, navigate, nasadNaPlatno]);
+  }, [nodes, edges, title, toast, user, navigate, nasadNaPlatno, mapKind]);
 
   // Archivace (jen vlastník; server hlídá totéž). Update jde přes stejný
   // konfliktní mechanismus jako autosave (base_updated → 409).
@@ -792,16 +806,61 @@ function EditorContent({ mapId, personalMap = false }) {
       baseUpdated.current = updated.updated_date;
       setArchived(!!updated.archived);
       toast(updated.archived
-        ? { title: t('toasts.archived'), description: t('toasts.archivedDesc') }
+        ? (mapKind === 'process'
+          ? { title: t('process.archived', { title }), description: t('toasts.archivedDesc') }
+          : { title: t('toasts.archived'), description: t('toasts.archivedDesc') })
         : { title: t('toasts.unarchived') });
     } catch (e) {
       toast({ title: t('toasts.changeFailed'), description: e?.message, variant: 'destructive' });
     }
-  }, [activeMapId, archived, toast]);
+  }, [activeMapId, archived, toast, mapKind, title]);
+
+  // Styl mapy přepnul asistent (set_map_style, karta provedena → kb-map-changed s mapIds):
+  // hlídač změn převezme uzly, styl si editor načte sám — jinak by otevřená mapa
+  // ukazovala starý styl až do znovunačtení.
+  useEffect(() => {
+    if (!activeMapId || isPublicView || isTemplatePreview) return undefined;
+    const h = (ev) => {
+      const ids = ev?.detail?.mapIds;
+      if (!Array.isArray(ids) || !ids.includes(activeMapId)) return;
+      base44.entities.GoalMap.get(activeMapId, { fields: 'kind' }).then((m) => { if (m) setMapKind(m.kind === 'process' ? 'process' : ''); }).catch(() => {});
+    };
+    window.addEventListener('kb-map-changed', h);
+    return () => window.removeEventListener('kb-map-changed', h);
+  }, [activeMapId, isPublicView, isTemplatePreview]);
+
+  // PŘEPNUTÍ STYLU Projekt ↔ Proces (Richard 21. 10. 2026: kdykoliv, oběma
+  // směry, jen vlastník — server hlídá totéž). Kroky ani termíny se nemění;
+  // obnovu podkroků u opakovacích pravidel přidá/odebere SERVER podle stylu
+  // (/checkup 29. 10. 2026) — tady se jen přenačtou pravidla.
+  const handleSwitchStyle = useCallback(async () => {
+    if (!activeMapId) return;
+    const doProcesu = mapKind !== 'process';
+    setStyleBusy(true);
+    try {
+      const updated = await base44.entities.GoalMap.update(activeMapId, {
+        kind: doProcesu ? 'process' : '',
+        base_updated: baseUpdated.current,
+      });
+      baseUpdated.current = updated.updated_date;
+      setMapKind(updated.kind || '');
+      if ((mapRulesNow.current || []).length) {
+        try { setMapRules(await rulesApi.list(activeMapId)); } catch { /* pravidla se přenačtou s mapou */ }
+      }
+      toast({ title: t(doProcesu ? 'process.switchedToProcess' : 'process.switchedToProject') });
+      setStyleDialogOpen(false);
+    } catch (e) {
+      toast({ title: t('toasts.changeFailed'), description: e?.message, variant: 'destructive' });
+    } finally {
+      setStyleBusy(false);
+    }
+  }, [activeMapId, mapKind, toast, t]);
 
   // Vše hotovo → jednorázová nabídka archivace (jen vlastník, poznámky se nepočítají)
   useEffect(() => {
     if (!isMapOwner || !activeMapId || archived || isPublicView || isTemplatePreview) return;
+    // PROCES se nedokončuje — nabídka „Vše hotovo → archivovat" se u něj nikdy neukáže
+    if (mapKind === 'process') return;
     if (archiveOfferShown.current) return;
     const goals = nodes.filter((n) => n.type !== 'note');
     if (goals.length === 0 || !goals.every((n) => n.data?.status === 'done')) return;
@@ -811,7 +870,7 @@ function EditorContent({ mapId, personalMap = false }) {
       description: t('toasts.allDoneDesc'),
       action: <ToastAction altText={t('toasts.archiveAction')} onClick={handleToggleArchive}>{t('toasts.archiveAction')}</ToastAction>,
     });
-  }, [nodes, isMapOwner, activeMapId, archived, isPublicView, isTemplatePreview, toast, handleToggleArchive]);
+  }, [nodes, isMapOwner, activeMapId, archived, isPublicView, isTemplatePreview, toast, handleToggleArchive, mapKind]);
 
   // Hlavní uzel NEJDE smazat (Richard 2. 8.): přejmenovat ano, pryč jen s celou
   // mapou. Vrchol JE projekt — mapa bez něj je nesmysl (a MCP/API ho taky odmítá).
@@ -982,7 +1041,7 @@ function EditorContent({ mapId, personalMap = false }) {
   );
 
   const handleAddChild = useCallback(
-    (parentId) => {
+    (parentId, extra = null) => {
       const newId = `node-${Date.now()}`;
       const edgeId = `edge-${Date.now()}`;
       pushHistory(); // přidání musí jít Vrátit zpět (mazání to umělo, tohle ne)
@@ -1002,9 +1061,10 @@ function EditorContent({ mapId, personalMap = false }) {
             selected: true,
             data: {
               // org struktura: nový uzel je POZICE, ne podcíl (nález Richardova klik-testu)
-              title: mapKind === 'org' ? t('editor:node.orgNewPosition') : t('tasks:tasksPage.newSubgoal'),
+              title: mapKind === 'org' ? t('editor:node.orgNewPosition') : mapKind === 'process' ? t('editor:process.newStep') : t('tasks:tasksPage.newSubgoal'),
               status: 'todo', description: '', color: parent?.data?.color || '',
               ...(mapKind === 'org' ? { positionKind: 'position' } : {}),
+              ...(extra || {}), // nový krok procesu z dialogu: název a první termín rytmu
             },
           },
         ];
@@ -1013,9 +1073,44 @@ function EditorContent({ mapId, personalMap = false }) {
       // najet na nový uzel — když volné místo padne mimo výřez, uživatel by ho
       // jinak vůbec neviděl (stejná mechanika jako deep-link ?node=)
       centerOnNode(newId, { pos: position, delay: 120 });
+      return newId;
     },
     [nodes, edges, setNodes, setEdges, pushHistory, centerOnNode, mapKind]
   );
+
+  // NOVÝ KROK PROCESU (maketa 8099/kb-proces): „+" v procesu otevře dialog
+  // s názvem a nepovinným rytmem. Opakování je pravidlo mapy a server ho
+  // přijme jen k uzlu, který už v uložené mapě je — proto se nejdřív vynutí
+  // uložení (stejný flush jako před zavřením okna) a teprve pak se pravidlo založí.
+  const [addStep, setAddStep] = useState(null); // { parentId } | null
+  const handleAddStep = useCallback(async ({ title: nazev, rytmus, deadline }) => {
+    const parentId = addStep?.parentId;
+    setAddStep(null);
+    if (!parentId) return;
+    // řešitel = já, jako v prototypu (saveAdd: owner ME; /checkup 29. 10. — dorovnáno 1:1)
+    const newId = handleAddChild(parentId, { title: nazev, ...(deadline ? { deadline } : {}), ...(user?.email ? { owner: user.email } : {}) });
+    if (!rytmus || !activeMapId) return;
+    const ulozeno = async () => {
+      await new Promise((res) => setTimeout(res, 60)); // nechat autosave naplánovat zápis
+      let zapis = null;
+      window.dispatchEvent(new CustomEvent('kb-desktop-flush', { detail: { wait: (p) => { zapis = p; } } }));
+      if (zapis) await zapis;
+    };
+    const payload = { map: activeMapId, ...buildRecurrenceRule(newId, rytmus, t(`recurrence.ruleName.${rytmus.freq}`, { title: nazev.slice(0, 60) }), { reset: true }) };
+    try {
+      await ulozeno();
+      try {
+        await rulesApi.save(payload);
+      } catch {
+        await new Promise((res) => setTimeout(res, 1500)); // zápis mapy mohl ještě letět
+        await ulozeno();
+        await rulesApi.save(payload);
+      }
+      setMapRules(await rulesApi.list(activeMapId));
+    } catch {
+      toast({ title: t('recurrence.saveFailed'), description: t('process.rhythmLater'), variant: 'destructive' });
+    }
+  }, [addStep, handleAddChild, activeMapId, t, toast, user?.email]);
 
   const handleDeleteNode = useCallback(
     (nodeId) => {
@@ -1092,6 +1187,22 @@ function EditorContent({ mapId, personalMap = false }) {
     rulesOpen, setRulesOpen, rulesDefaults, setRulesDefaults, mapRules, setMapRules,
     ruleNodes, recurrenceNodes, kanbanAktivni, kanbanNsReady, openRulesFromNode, handleEnableWaiting,
   } = useMapRules({ activeMapId, canEdit, isPublicView, setNodes, mapRulesNow });
+  // rytmus kroků + zdraví běhu (proces) — vidí ho i čtenář, na rozdíl od pravidel
+  const { health: processHealth, rhythmById: rytmusZeServeru } = useProcessHealth({
+    mapId: activeMapId, enabled: !!activeMapId && !personalMap && !isTemplatePreview && mapKind !== 'org', nodes, rules: mapRules,
+  });
+  // editor má pravidla v ruce → rytmus z nich HNED (bez čekání na server);
+  // čtenář a veřejný náhled pravidla nevidí → rytmus ze serveru
+  const rhythmById = useMemo(() => {
+    if (!canEdit || isPublicView) return rytmusZeServeru;
+    const out = {};
+    for (const r of mapRules) {
+      if (!r?.node_id || out[r.node_id]) continue;
+      const st = recurrenceOf(mapRules, r.node_id);
+      if (st && !st.custom) out[r.node_id] = { freq: st.freq, every: st.every, reset: !!st.reset, ...(st.days ? { days: st.days } : {}), ...(st.day ? { day: st.day } : {}) };
+    }
+    return out;
+  }, [canEdit, isPublicView, mapRules, rytmusZeServeru]);
 
   // spolupracovník: stav vlastního uzlu přes cílenou routu (RLS mu PATCH mapy nedá)
   const handleCycleStatusWork = useCallback(
@@ -1121,6 +1232,34 @@ function EditorContent({ mapId, personalMap = false }) {
     [nodes, activeMapId, waitingSet, toast, t, setNodes]
   );
 
+  // PRŮCHOD opakovaného kroku (maketa 8099/kb-proces): po odškrtnutí říct, co
+  // se stane — krok se vrátí s dalším termínem (a s obnovenými podkroky). Vrací
+  // ho pravidlo na serveru; plátno to dorovná slitím změn.
+  const ohlasPruchod = useCallback((node) => {
+    const rytmus = node && rhythmById[node.id];
+    if (!rytmus) return;
+    const dnes = todayStr();
+    const dl = node.data?.deadline || '';
+    const potomci = [];
+    const fronta = [node.id];
+    while (fronta.length) {
+      const cur = fronta.shift();
+      for (const e of edges) if (e.source === cur && !potomci.includes(e.target)) { potomci.push(e.target); fronta.push(e.target); }
+    }
+    const obnoveno = rytmus.reset   // jen když pravidlo obnovu opravdu má (ne podle stylu mapy)
+      ? nodes.filter((n) => potomci.includes(n.id) && (n.data?.status || 'todo') !== 'todo').length : 0;
+    toast({
+      title: t('process.passedTitle', { title: node.data?.title || '' }) + (dl && dl < dnes ? ` ${t('process.passedLate')}` : ''),
+      description: t('process.passedNext', { date: formatDay(nextDue(dl, rytmus, dnes), i18next.language) })
+        + (obnoveno ? ` · ${t('process.passedSubs', { count: obnoveno })}` : ''),
+    });
+    // Krok vrací pravidlo na serveru PO uložení — hlídač změn by si toho všiml
+    // až za 45 s a plátno by zatím ukazovalo „Hotovo". Po autosave (1,2 s)
+    // si o slití řekneme hned; je to vlastní akce uživatele (vzor AI chatu,
+    // kb-map-changed), druhý pokus pro pomalejší síť.
+    for (const ms of [3000, 6500]) setTimeout(() => window.dispatchEvent(new Event('kb-map-changed')), ms);
+  }, [rhythmById, edges, nodes, mapKind, toast, t]);
+
   const handleCycleStatus = useCallback(
     (nodeId) => {
       const node = nodes.find((n) => n.id === nodeId);
@@ -1128,6 +1267,7 @@ function EditorContent({ mapId, personalMap = false }) {
       if (current === 'todo' && waitingSet.has(nodeId)) {
         if (!window.confirm(t('tasks:tasksPage.confirmStartWaiting'))) return;
       }
+      if (cycleStatus(current) === 'done') ohlasPruchod(node);
       setNodes((prev) =>
         prev.map((n) => {
           if (n.id !== nodeId) return n;
@@ -1135,7 +1275,7 @@ function EditorContent({ mapId, personalMap = false }) {
         })
       );
     },
-    [setNodes, nodes, waitingSet]
+    [setNodes, nodes, waitingSet, ohlasPruchod]
   );
 
   const progressMap = useMemo(() => computeProgressMap(nodes, childrenMap), [nodes, childrenMap]);
@@ -1152,12 +1292,13 @@ function EditorContent({ mapId, personalMap = false }) {
       // (rámeček mapy, prstenec vrcholu, nadpis). Dřív skončila jen v
       // data.color vrcholu a nikam viditelně nevedla (Richard 6. 8. 2026 večer).
       const uzel = nodes.find((n) => n.id === nodeId);
+      if (newData.status === 'done' && (uzel?.data?.status || 'todo') !== 'done') ohlasPruchod(uzel);
       if (uzel?.type === 'apexNode' && newData.color !== undefined) {
         setColor(newData.color || '');
       }
       setEditNodeId(null);
     },
-    [setNodes, nodes]
+    [setNodes, nodes, ohlasPruchod]
   );
 
   // AI: rozpad/přepis uzlu z jeho menu — hooks/useAiActions.js (F1-07).
@@ -1250,12 +1391,14 @@ function EditorContent({ mapId, personalMap = false }) {
   // (ne u ostatních useState nahoře): visibleNodes a cleanMapData vznikají
   // až pod nimi a `exporting` čte jen JSX, takže pořadí hodnot nic nemění.
   const { exporting, handleExport, handleExportJson } = useMapExport({
-    visibleNodes, title, cleanMapData, activeMapId, user, t, toast,
+    visibleNodes, title, cleanMapData, activeMapId, user, t, toast, mapKind,
   });
 
   const contextValue = useMemo(
     () => ({
-      onAddChild: canEdit ? handleAddChild : undefined,
+      onAddChild: canEdit ? (mapKind === 'process'
+        ? (pid) => (isApexNode(pid) ? setAddStep({ parentId: pid }) : handleAddChild(pid, { title: t('editor:process.newSubStep') }))
+        : handleAddChild) : undefined,
       // spolupracovník (work) uzel od 14. 8. 2026 OTEVÍRÁ taky — dostane
       // zjednodušené okno (variant="work" níže); cyklování stavu klikem na
       // odznak zůstává beze změny (anti-bloat: žádný klik navíc).
@@ -1296,12 +1439,17 @@ function EditorContent({ mapId, personalMap = false }) {
       compactNode: personalMap, // „Moje mapa": název 1 řádek + bez progress baru → jednotná výška
       citelnost, // stupeň velikosti písma v uzlu (tlačítko Čitelnost)
       orgMap: mapKind === 'org', // organizační struktura: uzel = pozice/funkce (jiná karta)
+      processMap: mapKind === 'process', // proces: bez %, vrchol ukazuje zdraví běhu
+      // KROKY procesu = přímé děti vrcholu; hlubší uzly jsou jejich podkroky (kontrolní seznam)
+      processStepIds: mapKind === 'process' ? new Set(edges.filter((e) => isApexNodeShared(nodes.find((n) => n.id === e.source))).map((e) => e.target)) : null,
+      processHealth,
+      rhythmById,
       showBottlenecks,
       bottleneckNodeIds: bottleneckAnalysis.bottleneckNodeIds,
       bottleneckAnalysisMap: bottleneckAnalysis.nodeAnalysisMap,
       totalBottlenecks: bottleneckAnalysis.totalBottlenecks,
     }),
-    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, ctenarSPraci, mojePracovniUzly, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, fileCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind, showBottlenecks, bottleneckAnalysis]
+    [handleAddChild, handleDeleteNode, handleDeleteEdge, handleExpandNode, handleToggleCollapse, handleCycleStatus, handleCycleStatusWork, canWork, ctenarSPraci, mojePracovniUzly, progressMap, hiddenCounts, nodes, edges, searchQuery, canEdit, expandingNodeId, myTasksOnly, user, commentCounts, fileCounts, handleUpdateNote, bufferEnabled, handleStashNode, handleDetachNode, taskStats, activeMapId, isPublicView, ai, waitingSet, runningAgentNodes, ruleNodes, recurrenceNodes, direction, personalMap, citelnost, mapKind, showBottlenecks, bottleneckAnalysis, processHealth, rhythmById]
   );
 
   if (loading) {
@@ -1368,9 +1516,22 @@ function EditorContent({ mapId, personalMap = false }) {
         actions={{
           setShareOpen, handleUndo,
           setPersonalView, handleExport, handleExportJson,
-          setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
+          setSaveTplOpen, handleToggleArchive, setShowBottlenecks,
+          handleAddGoal: mapKind === 'process' && nodes.some((n) => isApexNodeShared(n))
+            ? () => setAddStep({ parentId: nodes.find((n) => isApexNodeShared(n)).id })
+            : handleAddGoal,
+          openStyleDialog: () => setStyleDialogOpen(true),
         }}
       />
+      <ProcessStyleDialog
+        open={styleDialogOpen}
+        title={title}
+        toProcess={mapKind !== 'process'}
+        busy={styleBusy}
+        onConfirm={handleSwitchStyle}
+        onClose={() => setStyleDialogOpen(false)}
+      />
+      <AddStepDialog open={!!addStep} onAdd={handleAddStep} onClose={() => setAddStep(null)} />
       <DelegatedGroupingBar personalMap={personalMap} personalView={personalView} delegatedGrouping={delegatedGrouping} setDelegatedGrouping={setDelegatedGrouping} />
       <div
         className="flex-1 relative bg-background"
@@ -1396,9 +1557,10 @@ function EditorContent({ mapId, personalMap = false }) {
           projectNumber={projectNumber}
           setTitle={setTitle}
           setNazevEditace={setNazevEditace}
+          mapKind={personalMap || isTemplatePreview || mapKind === 'org' || !activeMapId ? null : mapKind}
         />
         {dashboardOpen ? (
-          <ProgressDashboard nodes={nodes} edges={edges} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} projectNumber={projectNumber} />
+          <ProgressDashboard nodes={nodes} edges={edges} mapTitle={title} mapId={personalMap ? '' : (activeMapId || '')} projectNumber={projectNumber} processMap={mapKind === 'process'} processHealth={processHealth} />
         ) : (
         <GoalMapContext.Provider value={contextValue}>
         {/* adresář členů pro uzly: iniciály a bublina garanta ze ZOBRAZOVANÉHO

@@ -13,6 +13,7 @@ import { planState } from '@/lib/taskActions';
 import { intlLocale } from '@/lib/locale';
 import { focusStateOf, sortFocusFirst } from '@/lib/focus';
 import { useAuth } from '@/lib/AuthContext';
+import { rhythmLabel } from '@/lib/rhythm';
 
 const SECTIONS = {
   today: [
@@ -64,13 +65,15 @@ function Row({ item, onChanged, onFailed }) {
     <div className={`flex items-center gap-3 px-4 py-3 border-b last:border-b-0 ${focusCls}`}>
       <Icon className="w-4 h-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] leading-snug">{item.title}</p>
+        <p className="text-[15px] leading-snug">{item.rhythm ? '🔁 ' : ''}{item.title}</p>
         {/* Řádek podrobností na TELEFONU. Ustupovat smí jen název projektu —
             všechno ostatní je krátké a nesmí se lámat (Richardovy snímky
             27. 7. 2026: datum se lámalo na „3." / „8." a dlouhý e-mail sežral
             celý řádek). Proto `min-w-0` jen u projektu a `shrink-0` u zbytku. */}
         <p className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
           {item.mapTitle && <span className="truncate min-w-0">{item.mapTitle}</span>}
+          {/* rytmus opakovaného kroku (styl Proces) — krátký, za projektem */}
+          {item.rhythm && <span className="shrink-0 whitespace-nowrap" data-testid="lite-rhythm">{rhythmLabel(tc, item.rhythm, item.deadline)}</span>}
           {item.deadline && (
             <span className={`inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${deadlineCls}`}>
               <Calendar className="w-3 h-3" />{formatDeadline(item.deadline)}

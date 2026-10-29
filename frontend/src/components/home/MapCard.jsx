@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Target } from 'lucide-react';
 import { projectIcon, projectName, apexTitle } from '@/lib/projectColors';
 import { fmtDateShort } from '@/lib/locale';
+import ProcessCardBadge from '@/components/goal-map/proces/ProcessCardBadge';
 
 // Jedna karta projektu na titulní straně.
 //
@@ -55,6 +56,8 @@ export default function MapCard({ map, icon: Icon, iconWrapClass = 'bg-primary/1
           <span className="line-clamp-2">{hlavniCil}</span>
         </p>
       )}
+      {/* styl Proces (21. 10. 2026): štítek + jestli běží včas; projekt beze změny */}
+      {map.kind === 'process' && <div className="mb-1.5"><ProcessCardBadge map={map} archived={!!map.archived} /></div>}
       <p className="text-xs text-muted-foreground">{meta}</p>
       {map.updated_date && (
         <p className="text-xs text-muted-foreground/70 mt-2">

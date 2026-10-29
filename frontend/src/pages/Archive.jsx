@@ -98,7 +98,10 @@ export default function Archive() {
 
   const cardMeta = (m) =>
     t('misc.goalsMeta', { count: m.nodes?.length || 0 })
-    + (m.archived_at ? ` · ${t('archive.archivedOn', { date: fmtDateShort(m.archived_at) })}` : '');
+    // proces se nedokončuje — v archivu je „ukončený", ne hotový (21. 10. 2026)
+    + (m.kind === 'process'
+      ? ` · ${m.archived_at ? t('archive.processEndedOn', { date: fmtDateShort(m.archived_at) }) : t('archive.processEnded')}`
+      : (m.archived_at ? ` · ${t('archive.archivedOn', { date: fmtDateShort(m.archived_at) })}` : ''));
 
   const grid = (items) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

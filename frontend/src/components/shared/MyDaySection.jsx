@@ -42,6 +42,7 @@ import { dateStamp } from '@/lib/saveFile';
 import { getDeadlineStatus, formatDeadline } from '@/lib/nodeMeta';
 import { todayNameDay } from '@/lib/nameDays';
 import { intlLocale } from '@/lib/locale';
+import { rhythmLabel } from '@/lib/rhythm';
 import { useToast } from '@/components/ui/use-toast';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 
@@ -381,6 +382,12 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
                           ? <Lightbulb className="w-4 h-4 text-amber-500 shrink-0" />
                           : <CheckSquare className="w-4 h-4 text-muted-foreground shrink-0" />}
                     <span className="text-sm font-medium truncate">{item.title}</span>
+                    {/* 🔁 opakovaný krok + jeho rytmus (styl Proces, 21. 10. 2026) */}
+                    {item.rhythm && (
+                      <span data-testid="myday-rhythm" className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 shrink-0 max-w-[160px]">
+                        <span className="truncate">🔁 {rhythmLabel(t, item.rhythm, item.deadline)}</span>
+                      </span>
+                    )}
                     {focusStateOf(user, item) && (
                       <span
                         data-focus-badge={focusStateOf(user, item)}
@@ -489,6 +496,17 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
               </div>
             </div>
           ))}
+
+          {/* Kroky PROCESŮ bez rytmu server do „Tohle se nehýbe" nepočítá —
+              panel to přizná, ať nikdo nehledá, kam zmizely (21. 10. 2026) */}
+          {(day?.stuckProcess || []).length > 0 && (
+            <p className="text-xs text-muted-foreground" data-testid="myday-stuck-process">
+              {t('panel.stuckProcessNote', {
+                count: day.counts?.stuckProcess || day.stuckProcess.length,
+                list: day.stuckProcess.slice(0, 3).map((x) => (String(i18n.language).startsWith('en') ? `"${x.title}"` : `„${x.title}“`)).join(', ') + ((day.counts?.stuckProcess || 0) > 3 ? ' …' : ''),
+              })}
+            </p>
+          )}
 
           <div className="flex items-center gap-4">
             <button onClick={() => onChipClick?.('open')} className="text-xs font-medium text-primary hover:underline">

@@ -1,6 +1,6 @@
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Pencil, Trash2, Calendar, MessageSquare, Inbox, RotateCw, CalendarCheck } from 'lucide-react';
+import { ChevronRight, Pencil, Trash2, Calendar, MessageSquare, Inbox, CalendarCheck } from 'lucide-react';
 import TaskRowActions from '@/components/shared/TaskRowActions';
 import { planState } from '@/lib/taskActions';
 import { formatDeadline } from '@/lib/nodeMeta';
@@ -44,9 +44,6 @@ export default function TaskRow({ task, sub, subCount, expanded, onToggle, nodeL
             >
               <CalendarCheck className="w-2.5 h-2.5" />{t('common:rowActions.plannedBadge')}
             </span>
-          )}
-          {task.recurrence && (
-            <RotateCw className="w-3.5 h-3.5 text-muted-foreground shrink-0" title={t('taskTable.recurringTitle')} />
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(task); }}

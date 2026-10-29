@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Check, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot, RotateCw, Target } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
 import { stavAsistenta } from '@/hooks/useAiEnabled';
 import { useMedia } from '@/lib/useMedia';
@@ -92,8 +92,9 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   const {
     setShareOpen, handleUndo,
     setPersonalView, handleExport, handleExportJson,
-    setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks,
+    setSaveTplOpen, handleToggleArchive, handleAddGoal, setShowBottlenecks, openStyleDialog,
   } = actions;
+  const jeProces = mapKind === 'process';
   // Asistent i bez fungující AI (19. 10. 2026) — mapa nemá AppHeader, tlačítko je jen tady
   const stavAs = stavAsistenta(ai);
   const popisAs = stavAs === 'vypadek' ? t(ai.hosted ? 'nav:nav.aiChatVypadek' : 'nav:nav.aiChatVlastniVypadek') : t('toolbar.asistent');
@@ -336,11 +337,21 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
       onClick: () => setSaveTplOpen(true),
     },
     {
+      // STYL Projekt ↔ Proces (Richard 21. 10. 2026): kdykoliv, oběma směry,
+      // jen vlastník; org struktura styl nemá. Potvrzuje se dialogem.
+      klic: 'styl',
+      sekceListy: 'export',
+      viditelna: user && activeMapId && !isPublicView && isMapOwner && !archived && mapKind !== 'org' && !personalMap && !!openStyleDialog,
+      Ikona: jeProces ? Target : RotateCw,
+      popisek: jeProces ? t('process.switchToProjectMenu') : t('process.switchToProcessMenu'),
+      onClick: openStyleDialog,
+    },
+    {
       klic: 'archiv',
       sekceListy: 'export',
       viditelna: user && activeMapId && !isPublicView && isMapOwner,
       Ikona: archived ? ArchiveRestore : Archive,
-      popisek: archived ? t('toolbar.restoreFromArchive') : t('toolbar.archiveProject'),
+      popisek: archived ? t('toolbar.restoreFromArchive') : t(jeProces ? 'process.archiveProcess' : 'toolbar.archiveProject'),
       onClick: handleToggleArchive,
     },
   ];
@@ -553,7 +564,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
           </DropdownMenu>
           {canEdit && (
             <Button onClick={handleAddGoal} size="sm">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t('toolbar.addGoal')}</span>
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t(jeProces ? 'process.addStepButton' : 'toolbar.addGoal')}</span>
             </Button>
           )}
           {/* Úzká hrdla: přepínač zvýraznění. Viditelný vždy (i pod 1850 px) —

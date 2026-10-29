@@ -28,7 +28,9 @@
       "open_many": "{{count}} open items",
       "open_other": "{{count}} open items",
       "people": "People behind",
-      "peopleSub": "have something overdue"
+      "peopleSub": "have something overdue",
+      "processes": "Processes",
+      "processesSub": "keep running"
     },
     "sections": {
       "overdue": "Overdue across projects",
@@ -39,7 +41,9 @@
       "people": "People with the most backlog",
       "changes": "What changed in the last 7 days across projects",
       "bottlenecks": "Where it stalls most",
-      "bottlenecksSub": "bottlenecks — holding up further unfinished steps"
+      "bottlenecksSub": "bottlenecks — holding up further unfinished steps",
+      "processes": "Processes",
+      "processesSort": "most overdue steps first"
     },
     "cols": {
       "what": "What",
@@ -54,7 +58,11 @@
       "when": "When",
       "change": "Change",
       "blocked": "Blocking",
-      "why": "Why it stalls"
+      "why": "Why it stalls",
+      "process": "Process",
+      "processLate": "Overdue",
+      "processOk": "On time",
+      "processLast": "Last run"
     },
     "days_one": "{{count}} day",
     "days_few": "{{count}} days",
@@ -112,6 +120,7 @@
     "whyOverdue": "overdue by {{days}}",
     "reportPdf": "PDF (to share)",
     "pdfFailed": "Could not create the PDF",
-    "reportPdfSkin": "PDF (as I see it)"
+    "reportPdfSkin": "PDF (as I see it)",
+    "processDescribesOnly": "describes the process only"
   }
 }

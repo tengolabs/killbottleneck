@@ -9,6 +9,30 @@ below before you jump several versions.
 
 ---
 
+## v0.94-beta — 2026-10-29
+
+**Two map styles: a project to finish, or a process that keeps running**
+
+**Upgrade notes:** migration `1792928875_kind_process` runs automatically on start (adds `process` to `goalmaps.kind`,
+`map_kind` to `templates` and the system template *Weekly office operations* — once; a system template you deleted is not
+restored); no new variables. Existing maps stay projects and are unchanged; existing recurrence rules keep working. The
+"today" a recurring step's next deadline is counted from now follows the instance's `TZ` (default UTC), like scheduled jobs.
+
+- **Project or process** — *New project* offers two tiles: 🎯 **Project** (finish something: % done, archive when everything is done) and 🔁 **Process** (keep something running: steps repeat, nothing gets finished). The style can be switched any time in ⋮ (owner only); steps and deadlines stay, recurring steps keep repeating (in a process they also reset their sub-steps — the server adds or removes that on the switch). A step added with **Add step** is assigned to you. See [Project and process](https://killbottleneck.com/features/project-and-process).
+- **Run health instead of %** — a process's apex shows *N on time · M overdue · last run*, the map overview has a **Run health** card (on time, overdue, runs in 30 days, a table of steps), Organization a **Processes** card and tile. Process steps never count as "Not moving".
+- **Richer recurrence** — weekdays (e.g. Tue and Thu), day of the month and every N-th (every 2 weeks…). "Every month on the 31st" now really stays on the 31st — a shorter month gets its last day, the next month the 31st again (before, it slid to the 28th for good). A recurring step coming back also clears the "when I'll work on it" plan; in a process its sub-steps start over (new rule action `reset_subtree`). The rhythm shows in words on the card for everyone who can see the map, and in My day.
+- **Fixed:** a reminder on a recurring goal was deleted when the goal was ticked off; it now stays and moves with the deadline.
+- **Fixed:** the next deadline of a recurring goal is counted from *today* in the instance's time zone (`TZ`, as the scheduled jobs already were), not in UTC — just after midnight in Prague a late step ticked off no longer comes back due "today".
+- **API / MCP / assistant** — `kind: "project" | "process"` on `POST /v1/maps` and `create_map`, `kind` on the map list and detail (the org map reads `org` in both), `health` on a process's detail and in the portfolio (a process has `pct`, `done`, `total` = `null`; `counts.projects` still counts all maps, the new `counts.processes` how many are processes), `every` / `days` / `month_day` on `set_deadline` with `advance`. On a public map a visitor who is not signed in sees a process's rhythm and on time / overdue, not when steps were ticked off. A new system template *Weekly office operations*; the former "Process template" label is now **Template with a schedule**.
+- **Assistant knows processes** — "make *Stock check* repeat every Friday" sets the step's rhythm the same way as the Recurrence switch (new tool `set_step_rhythm`, one card per step, first due date included), "change it to a project" switches the map style (`set_map_style`, owner only), and reading a map tells the assistant it is a process and how it runs.
+- **Projects and processes apart** — the home page has an **All · Projects · Processes** switch (shown once you have a process, remembered), and in Tasks a process is marked *🔁 Process* with *process goal* / *process step* rows and the step's rhythm.
+- Migration adds the `process` value to `goalmaps.kind` and `map_kind` to `templates` (no action needed).
+- **Fixed:** with some local models (Qwen family, e.g. on llama.cpp-style servers) the assistant occasionally got a tool call
+  half in the model's own XML form — the rest of the call ended up inside one text field (a project goal reading
+  `…</goal><parameter name="…">`) and the other fields were lost. The server now cuts the field at the first such tag and
+  fills in the parameters behind it, only those the tool really has, typed by its schema and never overwriting a value the
+  model did give. An odd parameter name from the model can no longer break the assistant's reply.
+
 ## v0.93-beta — 2026-10-29
 
 **Invoices for anyone in the world: supplier country, any currency (EUR, USD, GBP…), generic tax, free-form bank details, SEPA QR**
