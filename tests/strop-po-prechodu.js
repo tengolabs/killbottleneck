@@ -34,7 +34,7 @@ async function api(method, path, { token, body } = {}) {
 
 async function start(env) {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} -v ${VOLUME}:/app/pb_data ${env} -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`,
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -v ${VOLUME}:/app/pb_data ${env} -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`,
     { stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try { const r = await fetch(`${BASE}/api/health`); if (r.ok) return; } catch (e) { /* ještě ne */ }

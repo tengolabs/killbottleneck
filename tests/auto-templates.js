@@ -44,7 +44,7 @@ const pragueDow = () => { const d = new Date(new Date().toLocaleString('en-US', 
   // --- E2E: force routa v pražské TZ ---
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e TZ=Europe/Prague -e FLOWMAP_AUTO_HOUR=5 -p 20493:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e TZ=Europe/Prague -e FLOWMAP_AUTO_HOUR=5 -p 20493:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
 
     // superuser (force routa) + běžný uživatel = vlastník šablony/projektu

@@ -26,7 +26,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
 (async () => {
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20500:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20500:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
     await reg('a@x.cz'); await reg('b@x.cz');
     const A = await login('a@x.cz'), B = await login('b@x.cz');

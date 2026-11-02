@@ -71,7 +71,7 @@ const sekce = (prompt, nadpis) => {
     await new Promise((r) => mock.listen(MOCK_PORT, '0.0.0.0', r));
 
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e KB_UVODNI_MAPA=0 `
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_UVODNI_MAPA=0 `
       // ⚠️ prefix KB_ je povinný — helpers.env() čte jen KB_* / FLOWMAP_*,
       // bez něj se konfigurace tiše ignoruje a routa vrátí 503 „AI vypnutá"
       + `-e KB_SUMMARY_PROVIDER=api -e KB_SUMMARY_URL=http://host.docker.internal:${MOCK_PORT} `

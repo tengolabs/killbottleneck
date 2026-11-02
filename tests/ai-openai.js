@@ -123,7 +123,7 @@ const api = async (path, { token, body, method } = {}) => {
     await new Promise((r) => mock.listen(MOCK_PORT, '0.0.0.0', r));
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     const URL_MOCK = `http://host.docker.internal:${MOCK_PORT}/v1`;
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 --add-host=host.docker.internal:host-gateway \
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 --add-host=host.docker.internal:host-gateway \
       -e KB_AI_PROVIDER=openai -e KB_AI_URL=${URL_MOCK} -e KB_AI_TOKEN=${KLIC} \
       -e KB_AI_MODEL=kb-test-model -e KB_UVODNI_MAPA=0 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
@@ -315,7 +315,7 @@ const api = async (path, { token, body, method } = {}) => {
     const NAME2 = NAME + '-strop', PORT2 = 20560, BASE2 = `http://127.0.0.1:${PORT2}`;  // 20559 drží mock
     try {
       execSync(`docker rm -f ${NAME2} 2>/dev/null; true`);
-      execSync(`docker run -d --name ${NAME2} -p ${PORT2}:8090 --add-host=host.docker.internal:host-gateway \
+      execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME2} -p ${PORT2}:8090 --add-host=host.docker.internal:host-gateway \
         -e KB_AI_PROVIDER=openai -e KB_AI_URL=${URL_MOCK} -e KB_AI_TOKEN=${KLIC} \
         -e KB_AI_MODEL=kb-test-model -e KB_AI_MAX_PER_HOUR=2 -e KB_UVODNI_MAPA=0 \
         ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });

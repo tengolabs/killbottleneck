@@ -3963,7 +3963,11 @@ function prelozenyHost(host) {
 function isPrivateHost(url, prisne) {
   let host = "";
   try {
-    host = String(url).replace(/^https?:\/\//i, "").split("/")[0].split("@").pop().toLowerCase();
+    // Autorita končí u PRVNÍHO z /, ? nebo # — ne jen u „/". Jinak
+    // `169.254.169.254?@example.com` (i `#@…`) obešlo guard: `split("@").pop()`
+    // vzalo „example.com" (veřejné), ale Go se připojilo na 169.254.169.254.
+    // Audit S4 (14. 10. 2026, ověřeno průnikem na past na docker-bridge).
+    host = String(url).replace(/^https?:\/\//i, "").split(/[/?#]/)[0].split("@").pop().toLowerCase();
     // IPv6 v hranatých závorkách má vlastní tvar; u ostatních useknout :port
     if (host[0] === "[") {
       host = host.slice(1, host.indexOf("]") > 0 ? host.indexOf("]") : undefined);
@@ -8131,7 +8135,18 @@ function formatSeriesTitle(fmt, n, baseTitle) {
   return out;
 }
 
+// S7 (audit 14. 10. 2026): zruší všechny API klíče uživatele. Volá se při změně/resetu
+// hesla — jinak útočníkův klíč po kompromitaci účtu přežije reset a přístup zůstane.
+// (Relace řeší refreshTokenKey, klíče nikdo.) Vrací počet zrušených.
+function zrusApiKlice(app, userId) {
+  let n = 0;
+  const rows = app.findRecordsByFilter("api_keys", "owner = {:o}", "", 500, 0, { o: userId });
+  for (const r of rows) { app.delete(r); n++; }
+  return n;
+}
+
 module.exports = { ASSIST_MODES,
+  zrusApiKlice,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,

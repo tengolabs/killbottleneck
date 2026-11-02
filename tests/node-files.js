@@ -56,7 +56,7 @@ const uploadFile = async (token, mapId, nodeId, name, content) => {
   try {
     await new Promise((r) => mock.listen(MOCK_PORT, '0.0.0.0', r));
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 --add-host=host.docker.internal:host-gateway \
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 --add-host=host.docker.internal:host-gateway \
       -e FLOWMAP_PUBLIC_URL=http://127.0.0.1:${PORT} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 

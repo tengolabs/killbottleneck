@@ -10,6 +10,23 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.97-beta": {
+    cs: [
+      "Bezpečnostní aktualizace: nová verze serverového jádra (PocketBase 0.39.11) opravuje veřejně známou chybu, kdy šel server shodit speciálně sestaveným požadavkem. Self-host: aktualizujte prosím co nejdřív.",
+      "Přihlášení má brzdu: po 20 špatných pokusech za minutu ze stejné adresy server chvíli odmítá další — hádání hesla už nejde zkoušet donekonečna. Self-host za Caddy/nginx: nastavte KB_TRUSTED_PROXY_HEADER=X-Forwarded-For (viz návod HTTPS).",
+      "Kontrola adresy vlastního AI serveru už nejde obelstít speciálně zapsanou adresou — ověřuje přesně to, kam se server připojí.",
+      "U komentáře už po odeslání nejde přes API změnit autora ani mapu, jen text.",
+      "Změna nebo reset hesla (i přes „Zapomenuté heslo“) zruší vaše API klíče a připojené AI agenty — klíč vydaný před změnou dál nefunguje, agenta připojíte znovu.",
+    ],
+    en: [
+      "Security update: the server core (PocketBase 0.39.11) fixes a publicly known bug where a crafted request could crash the server. Self-hosters: please upgrade soon.",
+      "Sign-in has a brake: after 20 wrong attempts within a minute from the same address the server refuses further ones for a moment — password guessing can no longer run forever. Self-host behind Caddy/nginx: set KB_TRUSTED_PROXY_HEADER=X-Forwarded-For (see the HTTPS guide).",
+      "The own-AI-server address check can no longer be fooled by a specially formed address — it now checks exactly where the server will connect.",
+      "After posting, a comment's author and map can no longer be changed through the API — only the text.",
+      "Changing or resetting your password (also through “Forgotten password”) revokes your API keys and connected AI agents — a key issued before the change stops working, connect the agent again.",
+    ],
+  },
   "v0.96-beta": {
     cs: [
       "Kancelář v asistentovi: ikona kufříku otevře panel se záložkami Dokumenty, Stránky a PDF; tlačítko Nový nabídne prezentaci, přání, pozvánku, plakát, poděkování, e-mail, body k poradě, poznámku, souhrn nebo fakturu — vyplníte pár polí a asistent to připraví.",

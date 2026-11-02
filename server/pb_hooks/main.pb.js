@@ -269,6 +269,39 @@ onRecordUpdate((e) => {
   e.next();
 }, "users");
 
+// S7 (audit 14. 10. 2026): změní-li uživatel heslo (vlastní PATCH s `password`),
+// zruš mu API klíče — jinak útočníkův klíč po kompromitaci účtu přežije reset hesla.
+// Ruší se VŠECHNY řádky api_keys vč. OAuth klientů napojených agentů (rozhodnutí
+// Richarda 2. 11. 2026: po změně hesla se agent připojí znovu, bezpečnější).
+// Admin reset jde přes routu /reset-user-password, která klíče ruší zvlášť; reset
+// e-mailem („Zapomenuté heslo“) přes PB routu confirm-password-reset má hook níže.
+onRecordUpdateRequest((e) => {
+  let menilHeslo = false;
+  try { menilHeslo = !!((e.requestInfo().body || {}).password); } catch (err) { menilHeslo = false; }
+  e.next();
+  if (menilHeslo) {
+    try {
+      const { zrusApiKlice } = require(`${__hooks}/helpers.js`);
+      zrusApiKlice(e.app, e.record.id);
+    } catch (err) {
+      try { e.app.logger().warn("S7: úklid API klíčů po změně hesla selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    }
+  }
+}, "users");
+
+// S7 (checkup 2. 11. 2026): reset přes e-mail jde PB routou confirm-password-reset,
+// která onRecordUpdateRequest NEVOLÁ (ukládá přímo) → bez tohoto hooku klíč útočníka
+// přežil přesně ten reset, kterým se oběť „čistí“. Sada audit-vlna0 (S7b).
+onRecordConfirmPasswordResetRequest((e) => {
+  e.next();
+  try {
+    const { zrusApiKlice } = require(`${__hooks}/helpers.js`);
+    zrusApiKlice(e.app, e.record.id);
+  } catch (err) {
+    try { e.app.logger().warn("S7: úklid API klíčů po resetu hesla e-mailem selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+  }
+}, "users");
+
 // roli smí měnit jen admin
 onRecordUpdateRequest((e) => {
   const { NOTIFY_TYPES, NOTIFY_ALWAYS, jeAdmin } = require(`${__hooks}/helpers.js`);
@@ -860,6 +893,21 @@ onRecordCreateRequest((e) => {
   }
 }, "comments");
 
+// S6 (audit 14. 10. 2026): po vytvoření se nesmí měnit autor ani struktura komentáře.
+// updateRule pouští jen autora (`author = @request.auth.id`), ale sám o sobě nebrání
+// autorovi PATCHnout `author_email` (to UI zobrazuje → vydávání se za jiného) nebo
+// `goalmap`/`node_id` (přesun komentáře do cizí mapy). Editovat jde jen `text`.
+onRecordUpdateRequest((e) => {
+  const o = e.record.original();
+  for (const f of ["author", "author_email", "goalmap", "node_id"]) e.record.set(f, o.get(f));
+  e.next();
+}, "comments");
+onRecordUpdateRequest((e) => {
+  const o = e.record.original();
+  for (const f of ["author", "author_email", "task"]) e.record.set(f, o.get(f));
+  e.next();
+}, "task_comments");
+
 onRecordCreateRequest((e) => {
   e.record.set("user", e.auth.id);
   e.record.set("email", e.auth.email());
@@ -1307,6 +1355,69 @@ onBootstrap((e) => {
   } catch (err) {
     // špatná konfigurace OAuth nesmí nikdy zabránit startu serveru
     $app.logger().warn("Google OAuth se nepodařilo nastavit: " + (err && err.message ? err.message : err));
+  }
+});
+
+// Serverové brzdy + trustedProxy podle nasazení (audit 8. 10. 2026, B1-1/B1-2).
+// JEDEN zdroj pravdy (ne migrace), aby šlo pro testy brzdy vypnout a aby se stav
+// srovnal při každém startu.
+//  · KB_RATE_LIMITS (default "1" = ZAPNUTO): PocketBase má rozumná výchozí pravidla
+//    (*:create 20/5 s, /api/ 300/10 s), jen byla vypnutá → bez nich nic nebrzdilo
+//    hádání hesla. Testy posílají "0" (z jedné IP rychle přihlašují víc uživatelů).
+//    ⚠️ Výchozí *:auth 2/3 s je PER IP: produkční profil sad 2. 11. 2026 (kalendare,
+//    ai-balicky) narazil na 429 při 3. přihlášení do 3 s z jedné adresy = ráno za
+//    firemním NATem. Rozhodnutí Richarda 2. 11. 2026: *:auth 20 pokusů / 60 s —
+//    kancelář se přihlásí, hádání hesla zůstane na desítkách pokusů za minutu.
+//  · KB_TRUSTED_PROXY_HEADER: aby brzdy počítaly SKUTEČNOU IP klienta, ne IP proxy.
+//    Za Caddy/Cloudflare bez toho `e.realIP()` vrací adresu proxy → všechny požadavky
+//    sdílejí jeden kbelík. Cloud i self-host za Caddy/nginx: "X-Forwarded-For" (Caddy ji
+//    od klienta nepřebírá a přepíše IP spojení; nginx: proxy_set_header X-Forwarded-For
+//    $proxy_add_x_forwarded_for). ⚠️ NE Cf-Connecting-Ip: tenanti nejsou za Cloudflare
+//    proxy (ověřeno 2. 11. 2026), hlavičku by poslal jen útočník a brzdu tím obešel.
+//    PRÁZDNÉ = self-host bez proxy, kde je IP ze socketu správně a hlavičce klienta se
+//    VĚŘIT NESMÍ. useLeftmostIP=false: pravý (= od naší proxy) výskyt.
+onBootstrap((e) => {
+  e.next();
+  try {
+    const { env } = require(`${__hooks}/helpers.js`);
+    const s = e.app.settings();
+    let zmena = false;
+
+    const chtiBrzdy = (env("RATE_LIMITS") || "1").trim() !== "0";
+    if (s.rateLimits.enabled !== chtiBrzdy) {
+      s.rateLimits.enabled = chtiBrzdy;
+      zmena = true;
+    }
+    // *:auth 20/60 s místo PB výchozích 2/3 s (viz hlavička). Ostatní pravidla PB nechat.
+    const AUTH_MAX = 20, AUTH_SEK = 60;
+    const pravidla = (s.rateLimits.rules || []).map((p) => ({ label: p.label, maxRequests: p.maxRequests, duration: p.duration, audience: p.audience || "" }));
+    const auth = pravidla.find((p) => p.label === "*:auth");
+    if (!auth) { pravidla.push({ label: "*:auth", maxRequests: AUTH_MAX, duration: AUTH_SEK, audience: "" }); zmena = true; }
+    else if (auth.maxRequests !== AUTH_MAX || auth.duration !== AUTH_SEK) { auth.maxRequests = AUTH_MAX; auth.duration = AUTH_SEK; zmena = true; }
+    if (zmena) s.rateLimits.rules = pravidla;
+
+    const hdr = (env("TRUSTED_PROXY_HEADER") || "").trim();
+    const cur = s.trustedProxy.headers || [];
+    if (hdr) {
+      if (cur.length !== 1 || cur[0] !== hdr || s.trustedProxy.useLeftmostIP) {
+        s.trustedProxy.headers = [hdr];
+        s.trustedProxy.useLeftmostIP = false;
+        zmena = true;
+      }
+    } else if (cur.length) {
+      s.trustedProxy.headers = [];
+      zmena = true;
+    }
+
+    if (zmena) e.app.save(s);
+    // Do logu, co platí — ručně vymazaná pravidla v admin UI by jinak tiše znamenala „nic nebrzdí“.
+    const pocet = (s.rateLimits.rules || []).length;
+    const zdrojIp = hdr ? ("IP z hlavičky " + hdr) : "IP ze socketu";
+    if (chtiBrzdy && !pocet) e.app.logger().warn("brzdy: KB_RATE_LIMITS zapnuto, ale settings.rateLimits.rules je prázdné — nic nebrzdí (" + zdrojIp + ")");
+    else e.app.logger().info("brzdy: " + (chtiBrzdy ? "ZAP, " + pocet + " pravidel" : "VYP") + ", " + zdrojIp);
+  } catch (err) {
+    // špatná konfigurace brzd/proxy nesmí nikdy zabránit startu serveru
+    try { $app.logger().warn("rateLimits/trustedProxy se nepodařilo nastavit: " + (err && err.message ? err.message : err)); } catch (e2) { /* log je bonus */ }
   }
 });
 
@@ -4425,6 +4536,12 @@ kbRoute("POST", "/reset-user-password", (e) => {
   // zůstal přihlášený i po výměně hesla a oprava by byla jen zdánlivá.
   rec.refreshTokenKey();
   $app.save(rec);
+  // S7 (audit 14. 10. 2026): totéž pro API klíče — relace zneplatní refreshTokenKey,
+  // ale klíč by jinak útočníkovi přežil reset hesla a přístup by zůstal.
+  try {
+    const { zrusApiKlice } = require(`${__hooks}/helpers.js`);
+    zrusApiKlice($app, rec.id);
+  } catch (err) { /* úklid klíčů je bonus, heslo je změněné */ }
 
   try {
     const { notify } = require(`${__hooks}/helpers.js`);

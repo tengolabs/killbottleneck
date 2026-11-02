@@ -84,7 +84,13 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
   // sada, která ho testuje, dá env: { KB_PURPOSE_ASK: null }
   // KB_CHAT_POTVRZENI=model je výchozí pro sady (ověřené chování „model dopoví po potvrzení“ zůstává testované);
   // produkční výchozí je app (aplikace dopoví „Hotovo.“) — sada, která to testuje, dá env: { KB_CHAT_POTVRZENI: null }
-  const envAll = Object.assign({ KB_PURPOSE_ASK: 0, KB_CHAT_POTVRZENI: 'model' }, env);
+  // Produkce má serverové brzdy ZAPNUTÉ (audit 8. 10. 2026, B1-1). Sady ale z jedné
+  // IP rychle přihlašují víc uživatelů → narazily by na *:auth 2/3 s. Testy se proto
+  // z brzdy odhlašují (KB_RATE_LIMITS: 0); sada, která brzdu TESTUJE, dá env: { KB_RATE_LIMITS: 1 }.
+  // KB_TEST_BRZDA=1 = „produkční profil“: brzdy ZAP jako naostro (checkup 2. 11. 2026 — regrese jinak
+  // produkční nastavení nikdy neprojde); sada, která brzdu vypíná výslovně, má přednost.
+  const brzdaVychozi = process.env.KB_TEST_BRZDA === '1' ? 1 : 0;
+  const envAll = Object.assign({ KB_PURPOSE_ASK: 0, KB_CHAT_POTVRZENI: 'model', KB_RATE_LIMITS: brzdaVychozi }, env);
   const envArgs = Object.entries(envAll).filter(([, v]) => v !== null && v !== undefined)
     // hodnota v apostrofech (escapování apostrofu uvnitř): mezera, `;`, `$` ani uvozovky
     // (JSON v KB_*_OPENAI_EXTRA) tak nerozbijí docker run (T1-02, 27. 9. 2026)

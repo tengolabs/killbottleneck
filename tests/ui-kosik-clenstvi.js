@@ -35,7 +35,7 @@ const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, con
 
 async function start(env) {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -e KB_HOSTED=1 -e KB_SETUP_CODE=e2e-kod ${env} `
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_PURPOSE_ASK=0 -e KB_HOSTED=1 -e KB_SETUP_CODE=e2e-kod ${env} `
     + `-p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try { const r = await fetch(`${BASE}/api/health`); if (r.ok) break; } catch (e) { /* ještě ne */ }

@@ -31,7 +31,7 @@ const api = async (base, method, path, { token, body } = {}) => {
 
 async function start(inst, env) {
   execSync(`docker rm -f ${inst.name} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${inst.name} -p ${inst.port}:8090 ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${inst.name} -p ${inst.port}:8090 ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
   const base = `http://127.0.0.1:${inst.port}`;
   for (let i = 0; i < 40; i++) {
     try { if ((await fetch(`${base}/api/health`)).ok) return base; } catch { /* startuje */ }

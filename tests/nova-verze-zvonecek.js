@@ -30,11 +30,11 @@ const api = async (method, path, { token, body } = {}) => {
 
 const spust = (env) => {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 ${env} -v ${NAME}-data:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 ${env} -v ${NAME}-data:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
 };
 const restartuj = (env) => {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 ${env} -v ${NAME}-data:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 ${env} -v ${NAME}-data:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
 };
 const pockej = async () => {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) return true; } catch { /* startuje */ } await sleep(1000); }
@@ -102,12 +102,12 @@ const zvonecek = async (token) => {
     // oznámení. Nikdy se nic nedomýšlí — co není zapsané, se neposílá.
     execSync(`docker volume rm -f ${NAME}-body 2>/dev/null; true`);
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 -e KB_VERSION=v0.37 -v ${NAME}-body:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 -e KB_VERSION=v0.37 -v ${NAME}-body:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     ok(await pockej(), 'čistá instance na v0.37 naběhla');
     await api('POST', '/api/collections/users/records', { body: { email: 'b@example.com', password: PW, passwordConfirm: PW } });
     const auth2 = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'b@example.com', password: PW } });
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 -e KB_VERSION=v0.38-beta -v ${NAME}-body:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 -e KB_VERSION=v0.38-beta -v ${NAME}-body:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     ok(await pockej(), 'aktualizace na v0.38-beta proběhla');
     await sleep(2500);
     const sBody = await zvonecek(auth2.json.token);

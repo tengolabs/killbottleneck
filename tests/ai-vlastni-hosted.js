@@ -47,7 +47,7 @@ function openaiMock(seznam, { model, hugeUsage = false } = {}) {
   };
 }
 
-const relay = (jmeno, ip, port) => execSync(`docker run -d --name ${jmeno} --network ${SIT} --ip ${ip} --add-host=host.docker.internal:host-gateway alpine/socat tcp-listen:80,fork,reuseaddr tcp:host.docker.internal:${port}`, { stdio: 'ignore' });
+const relay = (jmeno, ip, port) => execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${jmeno} --network ${SIT} --ip ${ip} --add-host=host.docker.internal:host-gateway alpine/socat tcp-listen:80,fork,reuseaddr tcp:host.docker.internal:${port}`, { stdio: 'ignore' });
 const uklidSite = () => { try { execSync(`docker rm -f kbt-relay-v-${process.pid} kbt-relay-c-${process.pid} 2>/dev/null; docker network rm ${SIT} 2>/dev/null; true`, { stdio: 'ignore' }); } catch { /* nic */ } };
 
 H.beh(async () => {

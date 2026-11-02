@@ -36,7 +36,7 @@ const notifs = async (token, type) => ((await api('GET', '/api/collections/notif
 (async () => {
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20561:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20561:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
     await reg('anna@x.cz'); await reg('bara@x.cz'); await reg('cyril@x.cz');
     const A = await login('anna@x.cz'), B = await login('bara@x.cz'), C = await login('cyril@x.cz');

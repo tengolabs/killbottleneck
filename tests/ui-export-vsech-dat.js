@@ -11,7 +11,7 @@ const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, con
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const start = async (env) => {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} -v ${VOLUME}:/app/pb_data -e KB_UVODNI_MAPA=0 -e KB_PURPOSE_ASK=0 ${env || ''} -p 20568:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -v ${VOLUME}:/app/pb_data -e KB_UVODNI_MAPA=0 -e KB_PURPOSE_ASK=0 ${env || ''} -p 20568:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
   for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) return; } catch { /* startuje */ } await sleep(1000); }
 };
 

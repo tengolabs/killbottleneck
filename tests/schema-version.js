@@ -34,7 +34,7 @@ const api = async (path, { token, body } = {}) => {
     await new Promise((r) => mock.listen(MOCK_PORT, '0.0.0.0', r));
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     // provider custom → advisor POST jde přímo na náš mock (host bridge IP)
-    execSync(`docker run -d --name ${NAME} -p ${PORT}:8090 --add-host=host.docker.internal:host-gateway \
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 --add-host=host.docker.internal:host-gateway \
       -e FLOWMAP_AI_PROVIDER=custom -e FLOWMAP_AI_URL=http://host.docker.internal:${MOCK_PORT}/v1/advisor ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
 

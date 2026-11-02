@@ -38,7 +38,7 @@ async function ucet(email, role) {
 
 (async () => {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} -e TZ=Europe/Prague -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e TZ=Europe/Prague -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch (e) { /* startuje */ }
     await sleep(1000);

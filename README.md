@@ -574,6 +574,10 @@ killbottleneck.your-domain.com {
 }
 ```
 
+Behind a proxy add `KB_TRUSTED_PROXY_HEADER=X-Forwarded-For` to `.env`: the instance rate-limits
+sign-in attempts per client IP and would otherwise see only the proxy's address (details in the
+[HTTPS guide](https://killbottleneck.com/guide/https)).
+
 Add it to compose through `docker-compose.override.yml` (that file is not overwritten by
 updates):
 

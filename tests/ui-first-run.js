@@ -20,7 +20,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let browser;
   try {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} -e KB_PURPOSE_ASK=0 -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_PURPOSE_ASK=0 -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
     const cfg = await (await fetch(`${BASE}/api/kb/config`)).json();
@@ -58,7 +58,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     // na /register vůbec neposílá.
     const NAME2 = NAME + '-hosted';
     execSync(`docker rm -f ${NAME2} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME2} -e KB_HOSTED=1 -p ${PORT + 1}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME2} -e KB_HOSTED=1 -p ${PORT + 1}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     const BASE2 = `http://127.0.0.1:${PORT + 1}`;
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE2}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
     const reg2 = await fetch(`${BASE2}/api/collections/users/records`, {
@@ -74,7 +74,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     console.log('== HOSTOVANÝ box S kódem: redirect ano, registrace jen s kódem ==');
     const NAME3 = NAME + '-kod';
     execSync(`docker rm -f ${NAME3} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME3} -e KB_HOSTED=1 -e KB_SETUP_CODE=tajny-kod-123 -p ${PORT + 2}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME3} -e KB_HOSTED=1 -e KB_SETUP_CODE=tajny-kod-123 -p ${PORT + 2}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     const BASE3 = `http://127.0.0.1:${PORT + 2}`;
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE3}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
     const regBez = await fetch(`${BASE3}/api/collections/users/records`, {

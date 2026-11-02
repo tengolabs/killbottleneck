@@ -29,7 +29,7 @@ const register = async (email) => {
 };
 const start = (env) => {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${NAME} -v ${VOLUME}:/app/pb_data -e KB_UVODNI_MAPA=0 -e KB_PURPOSE_ASK=0 ${env || ''} -p 20567:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -v ${VOLUME}:/app/pb_data -e KB_UVODNI_MAPA=0 -e KB_PURPOSE_ASK=0 ${env || ''} -p 20567:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
 };
 const waitUp = async () => { for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) return; } catch { /* startuje */ } await sleep(1000); } };
 const titles = (maps) => (maps || []).map((m) => m.map.title);

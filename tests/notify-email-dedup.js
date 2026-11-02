@@ -61,7 +61,7 @@ const proKoho = (adresa) => maily.filter((m) => new RegExp(adresa.replace('.', '
   try {
     await new Promise((r) => server.listen(SMTP_PORT, '0.0.0.0', r));
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d --name ${NAME} --add-host=host.docker.internal:host-gateway -e KB_UVODNI_MAPA=0 -e KB_PURPOSE_ASK=0 -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} --add-host=host.docker.internal:host-gateway -e KB_UVODNI_MAPA=0 -e KB_PURPOSE_ASK=0 -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     expect(await cekejNaHealth(), 'instance nastartovala');
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert ${SU.email} ${SU.pw}`, { stdio: 'ignore' });
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: SU.email, password: SU.pw } })).json.token;

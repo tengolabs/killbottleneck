@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.96-beta}
+        KB_VERSION: ${KB_VERSION:-v0.97-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -58,6 +58,13 @@ services:
       # administrator pointing the AI service into a private network. On your own
       # server leave this empty — a local Ollama is the normal setup there.
       KB_HOSTED: ${KB_HOSTED:-${FLOWMAP_HOSTED:-}}
+      # Server-side rate limits per client IP (sign-in 20 attempts / 60 s, record creation
+      # 20 / 5 s, 300 API requests / 10 s) — slows down password guessing. On by default,
+      # 0 = off. Behind a reverse proxy (Caddy, nginx) set KB_TRUSTED_PROXY_HEADER to the
+      # header the proxy fills with the client's IP (X-Forwarded-For), otherwise the
+      # whole company counts as one client. Without a proxy leave it empty.
+      KB_RATE_LIMITS: ${KB_RATE_LIMITS:-}
+      KB_TRUSTED_PROXY_HEADER: ${KB_TRUSTED_PROXY_HEADER:-}
       # Cap on uploaded attachments across the whole instance, in MB. Empty = no
       # limit, 0 = uploading disabled (attachments as links only).
       KB_FILES_MB: ${KB_FILES_MB:-${FLOWMAP_FILES_MB:-}}

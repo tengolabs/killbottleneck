@@ -33,7 +33,7 @@ async function api(method, path, { token, body } = {}) {
 async function start() {
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
   // ⚠️ bez úvodní mapy: sada měří POČTY cizích úkolů, výchozí obsah by je posunul
-  execSync(`docker run -d --name ${NAME} -e TZ=Europe/Prague -e KB_UVODNI_MAPA=0 -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`,
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e TZ=Europe/Prague -e KB_UVODNI_MAPA=0 -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`,
     { stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try { const r = await fetch(`${BASE}/api/health`); if (r.ok) return; } catch (e) { /* ještě ne */ }

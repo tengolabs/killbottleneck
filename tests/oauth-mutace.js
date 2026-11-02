@@ -47,7 +47,7 @@ const mock = http.createServer((req, res) => {
 
 const run = (c, env) => {
   execSync(`docker rm -f ${c.name} 2>/dev/null; true`);
-  execSync(`docker run -d --name ${c.name} -p ${c.port}:8090 --add-host=host.docker.internal:host-gateway ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+  execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${c.name} -p ${c.port}:8090 --add-host=host.docker.internal:host-gateway ${env} ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
 };
 const waitReady = async (port) => {
   for (let i = 0; i < 30; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) return; } catch {} await sleep(1000); }

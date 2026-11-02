@@ -9,6 +9,31 @@ below before you jump several versions.
 
 ---
 
+## v0.97-beta — 2026-11-03
+
+**Security update — please upgrade**
+
+**Upgrade notes:** the bundled PocketBase moves from 0.39.6 to **0.39.11** (fixes a publicly known bug where a crafted
+request could crash the server — GHSA-84vh-m24q-wjjx) and the base image to Alpine 3.22; the download is verified by
+checksum during the build. Migration `1791700000_uploads_protected` runs automatically on start (once). **Sign-in rate
+limiting is now on** (20 attempts / 60 s, 20 record creations / 5 s, 300 API requests / 10 s, per client IP). If you run
+behind a reverse proxy (Caddy, nginx — see [HTTPS](https://killbottleneck.com/guide/https)), add
+`KB_TRUSTED_PROXY_HEADER=X-Forwarded-For` to `.env`, otherwise the whole company counts as one client; `KB_RATE_LIMITS=0`
+turns the limits off. No data changes. Self-hosters: `git pull && docker compose up -d --build`.
+
+- **Security:** PocketBase 0.39.11 — a crafted request can no longer crash the instance.
+- **Security:** sign-in and the API have server-side rate limits per client IP — password guessing is slowed down
+  (new variables `KB_RATE_LIMITS`, `KB_TRUSTED_PROXY_HEADER`, see the upgrade notes).
+- **Security:** the "own AI server" address check could be tricked by a specially formed address into reaching the hosting
+  provider's internal network; the check now reads the address the same way the connection does.
+- **Security:** comments — after posting, the author and the map a comment belongs to can no longer be changed through
+  the API (only the text can).
+- **Security:** API keys — and the OAuth clients of connected AI agents — are revoked when the owner changes their
+  password, resets it through "Forgotten password", or an administrator resets it. Connect the agent again afterwards.
+- **Security:** the legacy `uploads` collection (not used by the app — attachments live in `node_files`) is closed:
+  its files are no longer readable without signing in and nothing new can be uploaded into it.
+---
+
 ## v0.96-beta — 2026-11-02
 
 **Office in the assistant: a presentation (PowerPoint or PDF), a greeting card, invitation, poster or certificate (PDF), and every document as PDF or Word**

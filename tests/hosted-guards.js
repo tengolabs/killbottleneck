@@ -75,7 +75,11 @@ HN.beh(async () => {
                        'http://[2002:7f00:1::]/', 'http://[::ffff:0:7f00:1]/', 'http://[::7f00:1]/', 'http://[ff02::1]/',
                        'http://169.254.169.254.nip.io/latest/meta-data/',
                        'http://10-0-0-5.nip.io:8090/', 'http://metadata.google.internal/',
-                       'http://metadata/computeMetadata/v1/', 'http://neco.internal/']) {
+                       'http://metadata/computeMetadata/v1/', 'http://neco.internal/',
+                       // S4 (audit 14. 10. 2026): guard parsoval autoritu jen po „/", takže
+                       // `host?@public` / `host#@public` vzaly veřejné jméno za `@`, ale Go se připojilo na host.
+                       'http://169.254.169.254?@example.com', 'http://169.254.169.254#@example.com',
+                       'http://10.1.2.3?x=@example.com', 'http://[::1]#@example.com']) {
       const t = await api(H, 'POST', '/api/flowmap/ai-vlastni/test', { token: A, body: { url, model: 'm' } });
       const blocked = t.status === 200 && t.json && t.json.ok === false && /privátní|private/i.test(t.json.message || '');
       expect(blocked, `privátní cíl odmítnut: ${url}`);

@@ -103,7 +103,7 @@ const predmetZ = (raw) => {
     const aiEnv = ['KB_AI_PROVIDER', 'KB_AI_URL', 'KB_AI_MODEL', 'KB_AI_TOKEN', 'KB_AI_OPENAI_EXTRA']
       .filter((k) => process.env[k]).map((k) => `-e ${k}='${String(process.env[k]).replace(/'/g, "'\\''")}'`).join(' ');
     // KB_NOTIFY_EMAIL_DEFAULT=1: notifikace jdou hned mailem (náhled notifikačního mailu)
-    execSync(`docker run -d --name ${NAME} --add-host=host.docker.internal:host-gateway -e TZ=Europe/Prague -e KB_UVODNI_MAPA=0 -e KB_NOTIFY_EMAIL_DEFAULT=1 ${aiEnv} -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
+    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} --add-host=host.docker.internal:host-gateway -e TZ=Europe/Prague -e KB_UVODNI_MAPA=0 -e KB_NOTIFY_EMAIL_DEFAULT=1 ${aiEnv} -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert ${SU.email} ${SU.pw}`, { stdio: 'ignore' });
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: SU.email, password: SU.pw } })).json.token;
