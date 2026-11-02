@@ -162,10 +162,17 @@ H.beh(async () => {
   await page.click('[data-testid="chat-dok-polozka"][data-kind="email"]');
   await cekej('[data-testid="chat-dok-detail"]');
 
-  console.log('== bez ruční „Nové poznámky“, filtr, smazání ==');
+  console.log('== Nový = formulář pro asistenta (ne ruční poznámka), filtr, smazání ==');
   await page.click('[data-testid="chat-dok-zpet"]');
   await cekej('[data-testid="chat-dok-seznam"]');
-  expect(!(await page.$('[data-testid="chat-dok-novy"]')) && !(await textDok()).includes('Nová'), 'tlačítko „+ Nová“ v panelu NENÍ — dokumenty zakládá jen asistent (Richard 1. 10. 2026)');
+  // 1. 10. 2026 platilo „žádné + Nová, dokumenty zakládá jen asistent“; 1. 11. 2026 Richard chce tlačítko Nový jako u Stránek —
+  // otevírá formulář, který složí zadání asistentovi (dokument pořád píše asistent, ručně se nezakládá)
+  expect(!!(await page.$('[data-testid="chat-dok-novy"]')), 'tlačítko Nový v seznamu (Richard 1. 11. 2026)');
+  await page.click('[data-testid="chat-dok-novy"]');
+  expect(await cekej('[data-testid="chat-dok-novy-form"]'), 'Nový otevře formulář pro asistenta, ne prázdný dokument k ručnímu psaní');
+  expect(!(await page.$('[data-testid="chat-dok-detail"]')), 'žádný ručně založený dokument nevznikl');
+  await page.click('[data-testid="chat-dok-novy-zpet"]');
+  await cekej('[data-testid="chat-dok-seznam"]');
   fronta.push(nastroj('draft_text', { kind: 'note', title: 'Rozměry kuchyně', text: 'Linka 3,2 m', map: 'Truhlářství' }), text('Zapsáno.'));
   await napis('Zapiš si rozměry kuchyně');
   expect(await cekej('[data-testid="chat-dok-detail"][data-kind="note"]', 15000), 'poznámka od asistenta se otevřela vedle');
@@ -201,9 +208,9 @@ H.beh(async () => {
   expect(!(await page.$('[data-testid="chat-dok-pamet"]')), 've filtru paměť připnutá není');
   await page.click('[data-testid="chat-dok-filtr"][data-skupina="vse"]');
 
-  console.log('== paměť připnutá v Dokumentech (Richard 1. 10. 2026: bez vlastního tlačítka) ==');
+  console.log('== paměť v Dokumentech (Richard 1. 10. 2026: bez vlastního tlačítka; 2. 11. 2026: až pod seznamem, ne první) ==');
   expect(!(await page.$('[data-testid="chat-pamet-btn"]')), 'tlačítko Paměť v hlavičce asistenta není');
-  expect(await cekej('[data-testid="chat-dok-pamet"]'), 've „Vše“ je nahoře připnutá paměť');
+  expect(await cekej('[data-testid="chat-dok-pamet"]'), 've „Vše“ je pod seznamem odkaz na paměť');
   await page.click('[data-testid="chat-dok-pamet"]');
   expect(await cekej('[data-testid="chat-pamet-text"]'), 'klik otevře paměť v panelu dokumentů');
   await page.click('[data-testid="chat-dok-zpet"]');

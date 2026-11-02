@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowDown, BookOpen, CalendarClock, Check, CheckCheck, ClipboardList, Copy, CornerDownRight, Download, ExternalLink, FileText, Folder, Inbox, Lightbulb, Loader2, Mail, MapPin, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, Plus, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, Award, BookOpen, CalendarClock, Check, CheckCheck, ClipboardList, Copy, CornerDownRight, Download, ExternalLink, FileText, Folder, Gift, Inbox, Lightbulb, Loader2, Mail, MapPin, Megaphone, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, Plus, Presentation, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
@@ -642,6 +642,50 @@ function Odstavec({ text, className }) {
     </div>
   );
 }
+// Kancelář (14. 10. 2026): draft_presentation / draft_card → dokument v Dokumentech + karta se stažením souboru.
+// Soubor (PPTX / PDF / Word) vzniká až po kliknutí V PROHLÍŽEČI z DTO dokumentu (líný import lib/kancelar/stahni —
+// knihovny nesmí do hlavního balíku, lite-bundle.js). Neuložený dokument (plné Dokumenty) = karta bez tlačítek.
+const SOUBOR_IKONA = { presentation: Presentation, greeting: Gift, invitation: Mail, poster: Megaphone, certificate: Award };
+function KartaSoubor({ karta, onOtevriDokument }) {
+  const { t, i18n } = useTranslation('asistent');
+  const [stav, setStav] = useState({ format: '', chyba: '' });
+  const Ikona = SOUBOR_IKONA[karta.druh === 'card' ? karta.template : karta.druh] || FileText;
+  const stahni = async (format) => {
+    if (stav.format) return;
+    setStav({ format, chyba: '' });
+    try {
+      const { stahniDokument } = await import('@/lib/kancelar/stahni');
+      await stahniDokument(karta.doc_id, format, { lang: i18n.language === 'en' ? 'en' : 'cs' });
+      setStav({ format: '', chyba: '' });
+    } catch (e) {
+      setStav({ format: '', chyba: e && e.status === 404 ? t('dok.notFound') : t('soubor.error') });
+    }
+  };
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-background/80 text-xs" data-testid="chat-soubor" data-druh={karta.druh} data-template={karta.template || ''} data-doc-id={karta.doc_id || ''}>
+      <div className="flex items-center gap-2 border-b border-border px-2.5 py-1.5">
+        <Ikona className="w-3.5 h-3.5 text-primary shrink-0" />
+        <span className="font-medium truncate flex-1">{karta.title}</span>
+        {karta.druh === 'presentation' && karta.pocet > 0 && <span className="text-muted-foreground shrink-0">{t('soubor.slides', { count: karta.pocet })}</span>}
+      </div>
+      <div className="px-2.5 py-2 flex flex-wrap items-center gap-1.5">
+        {karta.doc_id ? (karta.formaty || []).map((f) => (
+          <button key={f} type="button" disabled={!!stav.format} onClick={() => stahni(f)} className="inline-flex items-center gap-1 rounded-md border border-primary/60 px-2 py-1 font-medium text-primary hover:bg-primary/10 disabled:opacity-60" data-testid={`chat-soubor-${f}`}>
+            {stav.format === f ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}{t(`soubor.${f}`)}
+          </button>
+        )) : <span className="text-muted-foreground" data-testid="chat-soubor-neulozeno">{t('soubor.notSaved')}</span>}
+        {karta.doc_id && onOtevriDokument && (
+          <button type="button" onClick={() => onOtevriDokument(karta.doc_id)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline ml-auto" data-testid="chat-soubor-otevrit">
+            <PanelLeftOpen className="w-3.5 h-3.5" />{t('dok.openBeside')}
+          </button>
+        )}
+      </div>
+      {karta.doc_id && <p className="px-2.5 pb-2 text-[11px] text-muted-foreground">{t(karta.druh === 'card' ? 'soubor.hintCard' : 'soubor.hintDeck')}</p>}
+      {stav.chyba && <p className="px-2.5 pb-2 text-destructive" data-testid="chat-soubor-chyba">{stav.chyba}</p>}
+    </div>
+  );
+}
+
 function Text({ text }) {
   const casti = rozdelSekce(text);
   if (!casti.some((c) => c.nazev)) return <Odstavec text={text} />;
@@ -789,6 +833,7 @@ export default function AsistentZprava({ zprava, posledni, odkazDole, loading, o
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} extra={extraNavrh} />;
           if (k.type === 'relax') return <p key={i} className="mt-1.5 text-xs text-muted-foreground" data-testid="chat-relax-karta" data-minut={k.minutes}>{k.minutes ? t('relaxKarta', { count: k.minutes }) : t('relaxKartaVolny')}</p>;
           if (k.type === 'koncept') return <KartaKoncept key={i} karta={k} onOtevriDokument={onOtevriDokument} />;
+          if (k.type === 'soubor') return <KartaSoubor key={i} karta={k} onOtevriDokument={onOtevriDokument} />;
           {/* stránka asistenta (create_page / update_page): karta nese jen id — HTML píše server po tahu, panel ji ukáže (14. 10. 2026) */}
           if (k.type === 'stranka') return (
             <button key={i} type="button" onClick={() => onOtevriDokument && onOtevriDokument(STRANKA + k.page_id)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-secondary" data-testid="chat-stranka-karta" data-id={k.page_id} data-akce={k.akce}>

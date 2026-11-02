@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Check, ChevronLeft, Copy, Download, ExternalLink, FileText, FolderKanban, Loader2, Mail, Pencil, Phone, ScrollText, Search, Trash2, Undo2, Users, X, NotebookPen, ClipboardList } from 'lucide-react';
+import { Brain, Check, ChevronLeft, Copy, Download, ExternalLink, Eye, EyeOff, FileText, FolderKanban, Gift, ImagePlus, Loader2, Mail, Pencil, Phone, Plus, Presentation, ScrollText, Search, Trash2, Undo2, Users, X, NotebookPen, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useAsistent, DOK_MAX_W, PAMET, STRANKA, sirkaDokumentu } from '@/lib/AsistentContext';
+import { useAsistent, DOK_MAX_W, PAMET, STRANKA, NOVY_DOK, sirkaDokumentu } from '@/lib/AsistentContext';
+import NovyDokument, { DRUHY_PRO_FILTR } from './NovyDokument';
+import PdfPohled from './PdfPohled';
+import { useLazyNs } from '@/i18n/lazyNs';
 import { useKbConfig } from '@/hooks/useKbConfig';
 import { SeznamStranek, DetailStranky, NovaStranka, NOVA } from './StrankyPohled';
-import { LayoutTemplate } from 'lucide-react';
+import { LayoutTemplate, Files } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { dokumenty as apiSeznam, dokument as apiDokument, dokumentUloz, dokumentVratit, dokumentSmazat } from '@/api/asistentApi';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
@@ -24,14 +27,20 @@ import { zacniTah } from '@/lib/tahSirky';
 // Na počítači začíná POD horní lištou stránky: přes celou výšku zakrýval pravou část
 // lišty (tlačítko asistenta, menu účtu, v editoru Sdílet/Export) — lišta musí zůstat klikací.
 // Soukromé (vidí jen vlastník), e-mail jen koncept (Kopírovat / Otevřít v poště).
-// Paměť asistenta (co asistent ČTE) je tu připnutá nahoře jako `dokId = PAMET` — vlastní tlačítko
-// v hlavičce asistenta zrušeno 1. 10. 2026 (Richard).
+// Paměť asistenta (co asistent ČTE) je tu jako `dokId = PAMET` — vlastní tlačítko v hlavičce asistenta
+// zrušeno 1. 10. 2026 (Richard); 2. 11. 2026 přesunuta z prvního místa na nenápadný řádek pod seznam.
 // Nové dokumenty zakládá JEN asistent (Richard 1. 10. 2026, varianta A): ruční „Nová poznámka“
 // by se tloukla se zásobníkem nápadů — úkoly v poznámce by z porad a plánování vypadly.
 
-const IKONA = { note: NotebookPen, email: Mail, summary: ClipboardList, meeting: Users, call: Phone, other: ScrollText };
+const IKONA = { note: NotebookPen, email: Mail, summary: ClipboardList, meeting: Users, call: Phone, other: ScrollText, presentation: Presentation, card: Gift };
 // faktury (9. 10. 2026): vystavené faktury vedle dokumentů — jiný zdroj (/chat/faktury), stejné místo pro uživatele
-const SKUPINY = ['', 'poznamky', 'emaily', 'sumare', 'faktury'];
+const SKUPINY = ['', 'poznamky', 'emaily', 'sumare', 'kancelar', 'faktury'];
+// kancelář (14. 10. 2026): pole mimo text podle druhu — prezentace podtitul + publikum, přání šablona, kdy, kde, odkaz, podpis
+const META_POLE = { presentation: ['subtitle', 'audience'], card: ['date', 'place', 'link', 'signature'] };
+const SABLONY = ['greeting', 'invitation', 'poster', 'certificate'];
+const FOTKA_MAX = 4 * 1024 * 1024;
+const PRAZDNA_META = {};
+const stejnaMeta = (a, b) => JSON.stringify(a || PRAZDNA_META) === JSON.stringify(b || PRAZDNA_META);
 // mailto: s dlouhým tělem prohlížeče / poštovní programy uříznou (limit URL ~2000 znaků) — měří se
 // ZAKÓDOVANÁ délka (č = %C4%8D, 6 znaků; checkup 1. 10.)
 const MAILTO_MAX = 1800;
@@ -60,8 +69,11 @@ function datum(iso, lang) {
 
 
 // filtr a hledání drží panel (ne seznam) — po návratu z dokumentu zůstanou, jak byly
-function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
+function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ }) {
   const { t, i18n } = useTranslation('asistent');
+  // názvy druhů pro čipy prázdného stavu (líný ns kancelar — stejné texty jako formulář Nový dokument)
+  const kancReady = useLazyNs('kancelar');
+  const { t: tk } = useTranslation('kancelar');
   const [hledat, setHledat] = useState('');
   const [rows, setRows] = useState(null);
   const [chyba, setChyba] = useState('');
@@ -78,7 +90,8 @@ function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="px-3 pt-3 pb-2 space-y-2 border-b shrink-0">
-        <div className="flex flex-wrap gap-1.5" role="tablist">
+        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap gap-1.5 flex-1" role="tablist">
           {SKUPINY.map((s) => (
             <button
               key={s || 'vse'}
@@ -94,6 +107,9 @@ function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
             </button>
           ))}
         </div>
+          {/* Nový dokument tlačítkem jako u Stránek (Richard 1. 11. 2026) — v každé podsekci, předvolený druh podle filtru */}
+          <Button size="sm" className="h-7 text-xs shrink-0" onClick={() => onNova((DRUHY_PRO_FILTR[skupina] || [])[0] || '')} data-testid="chat-dok-novy"><Plus className="w-3.5 h-3.5 mr-1" />{t('dok.novy')}</Button>
+        </div>
         {skupina !== 'faktury' && <div className="relative">
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('dok.search')} className="h-8 pl-8 text-sm" data-testid="chat-dok-hledat" />
@@ -107,17 +123,17 @@ function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
           <div className="px-3 py-6 text-center text-sm text-muted-foreground" data-testid="chat-dok-prazdno">
             <FileText className="w-6 h-6 mx-auto mb-2 opacity-60" />
             <p>{hledat || skupina ? t('dok.emptyFiltered') : t('dok.empty')}</p>
+            {/* čipy druhů místo věty „zkuste napsat…“ — jde na ně kliknout (1. 11. 2026) */}
+            {!hledat && kancReady && (DRUHY_PRO_FILTR[skupina] || []).length > 0 && (
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5" data-testid="chat-dok-prazdno-sablony">
+                {DRUHY_PRO_FILTR[skupina].filter((d) => d !== 'volne').map((d) => (
+                  <button key={d} type="button" onClick={() => onNova(d)} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary text-foreground" data-testid="chat-dok-sablona-cip" data-druh={d}>
+                    {tk(`druhy.${d}.nazev`)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-        {/* připnutá paměť — jen v „Vše“ bez hledání */}
-        {!skupina && !hledat && (
-          <button type="button" onClick={() => onOtevri(PAMET)} className="w-full text-left rounded-lg border border-dashed border-primary/50 px-2.5 py-2 hover:bg-secondary transition-colors mb-1" data-testid="chat-dok-pamet">
-            <div className="flex items-center gap-2 min-w-0">
-              <Brain className="w-4 h-4 text-primary shrink-0" />
-              <span className="text-sm font-medium truncate flex-1">{t('dok.memory')}</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5 pl-6">{t('dok.memoryHint')}</p>
-          </button>
         )}
         {(rows || []).map((d) => {
           const Ikona = IKONA[d.kind] || ScrollText;
@@ -141,8 +157,98 @@ function Seznam({ verze, onOtevri, skupina, setSkupina, q, setQ }) {
             </button>
           );
         })}
+        {/* paměť asistenta — nenápadný řádek AŽ POD seznamem, jen v „Vše“ bez hledání (Richard 2. 11. 2026:
+            nahoře mátla a většina lidí ji vidět nepotřebuje) */}
+        {!skupina && !hledat && (
+          <button type="button" onClick={() => onOtevri(PAMET)} title={t('dok.memoryHint')} className="w-full text-left rounded-md px-2.5 py-1.5 mt-2 flex items-center gap-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors" data-testid="chat-dok-pamet">
+            <Brain className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{t('dok.memory')}</span>
+          </button>
+        )}
       </div>
       )}
+    </div>
+  );
+}
+
+// Kancelář: stažení souboru (PDF / Word / PowerPoint), u přání šablona, barva a fotka, náhled první strany.
+// Soubor vzniká v prohlížeči (lib/kancelar líně); fotka se drží jen v paměti panelu — nikam se neposílá.
+// Šablona a barva se ukládají do meta dokumentu hned (jedna routa jako úprava textu).
+function KancelarOvladani({ dok, onMeta, uklada }) {
+  const { t, i18n } = useTranslation('asistent');
+  const lang = i18n.language === 'en' ? 'en' : 'cs';
+  const [formaty, setFormaty] = useState(null);
+  const [beh, setBeh] = useState('');
+  const [chyba, setChyba] = useState('');
+  const [fotka, setFotka] = useState(null); // { bytes, name }
+  const [nahled, setNahled] = useState(''); // data URL nebo ''
+  const meta = dok.meta || PRAZDNA_META;
+  const jeKarta = dok.kind === 'card';
+  useEffect(() => { let z = true; import('@/lib/kancelar').then((K) => { if (z) setFormaty(K.formaty(dok.kind)); }); return () => { z = false; }; }, [dok.kind]);
+  useEffect(() => { setNahled(''); }, [dok.updated, fotka]); // změna textu, barvy nebo fotky = starý náhled neplatí
+  const stahni = async (format) => {
+    if (beh) return;
+    setBeh(format); setChyba('');
+    try {
+      const { stahniDokument } = await import('@/lib/kancelar/stahni');
+      await stahniDokument(dok, format, { lang, barva: jeKarta ? meta.color || '' : '', fotka: fotka ? fotka.bytes : null });
+    } catch { setChyba(t('dok.fileError')); }
+    setBeh('');
+  };
+  const ukazNahled = async () => {
+    if (nahled) { setNahled(''); return; }
+    if (beh) return;
+    setBeh('nahled'); setChyba('');
+    try {
+      const { nahledDokumentu } = await import('@/lib/kancelar/stahni');
+      setNahled(await nahledDokumentu(dok, { lang, barva: jeKarta ? meta.color || '' : '', fotka: fotka ? fotka.bytes : null, sirka: 560 }));
+    } catch { setChyba(t('dok.previewError')); }
+    setBeh('');
+  };
+  const vyberFotku = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (!/^image\/(png|jpe?g)$/i.test(f.type) || f.size > FOTKA_MAX) { setChyba(t('dok.photoBad')); return; }
+    setChyba('');
+    setFotka({ bytes: new Uint8Array(await f.arrayBuffer()), name: f.name });
+  };
+  return (
+    <div className="rounded-md border border-border bg-secondary/40 px-2.5 py-2 space-y-2 text-xs" data-testid="chat-dok-kancelar">
+      {jeKarta && (
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex items-center gap-1.5">
+            <span className="text-muted-foreground">{t('dok.template')}:</span>
+            <select value={SABLONY.includes(meta.template) ? meta.template : 'greeting'} disabled={uklada} onChange={(e) => onMeta({ ...meta, template: e.target.value })} className="h-7 rounded-md border border-input bg-background px-1.5 text-xs" data-testid="chat-dok-sablona">
+              {SABLONY.map((sb) => <option key={sb} value={sb}>{t(`dok.templateName.${sb}`)}</option>)}
+            </select>
+          </label>
+          <label className="inline-flex items-center gap-1.5">
+            <span className="text-muted-foreground">{t('dok.color')}:</span>
+            <input type="color" value={/^#[0-9a-f]{6}$/i.test(meta.color || '') ? meta.color : '#2563eb'} disabled={uklada} onChange={(e) => onMeta({ ...meta, color: e.target.value })} className="h-7 w-9 rounded-md border border-input bg-background p-0.5" data-testid="chat-dok-barva" aria-label={t('dok.color')} />
+          </label>
+          {meta.color && <button type="button" className="text-primary hover:underline" disabled={uklada} onClick={() => { const m = { ...meta }; delete m.color; onMeta(m); }} data-testid="chat-dok-barva-vzhled">{t('dok.colorSkin')}</button>}
+          <label className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 cursor-pointer hover:bg-secondary">
+            <ImagePlus className="w-3.5 h-3.5" />{fotka ? fotka.name : t('dok.photo')}
+            <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={vyberFotku} data-testid="chat-dok-fotka" />
+          </label>
+          {fotka && <button type="button" className="text-primary hover:underline" onClick={() => setFotka(null)} data-testid="chat-dok-fotka-pryc">{t('dok.photoRemove')}</button>}
+        </div>
+      )}
+      {jeKarta && <p className="text-[11px] text-muted-foreground">{t('dok.photoHint')}</p>}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-muted-foreground">{t('dok.downloadAs')}:</span>
+        {(formaty || []).map((f) => (
+          <Button key={f} size="sm" variant="outline" className="h-7 px-2" disabled={!!beh} onClick={() => stahni(f)} data-testid={`chat-dok-soubor-${f}`}>
+            {beh === f ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1" />}{f === 'pptx' ? 'PowerPoint' : f === 'docx' ? 'Word' : 'PDF'}
+          </Button>
+        ))}
+        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={!!beh && beh !== 'nahled'} onClick={ukazNahled} data-testid="chat-dok-nahled">
+          {beh === 'nahled' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : nahled ? <EyeOff className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}{nahled ? t('dok.previewHide') : t('dok.preview')}
+        </Button>
+      </div>
+      {nahled && <img src={nahled} alt={t('dok.previewAlt')} className="w-full rounded-md border border-border bg-white" data-testid="chat-dok-nahled-obrazek" />}
+      {chyba && <p className="text-destructive" data-testid="chat-dok-kancelar-chyba">{chyba}</p>}
     </div>
   );
 }
@@ -152,7 +258,7 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
   const [dok, setDok] = useState(null);
   const [chyba, setChyba] = useState('');
   const [uprava, setUprava] = useState(false);
-  const [pole, setPole] = useState({ title: '', text: '', email_to: '', email_subject: '' });
+  const [pole, setPole] = useState({ title: '', text: '', email_to: '', email_subject: '', meta: PRAZDNA_META });
   const [uklada, setUklada] = useState(false);
   const [zkopirovano, setZkopirovano] = useState(false);
   const [potvrdSmazat, setPotvrdSmazat] = useState(false);
@@ -160,7 +266,7 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
   const [cizi, setCizi] = useState(false); // asistent dokument změnil, zatímco ho uživatel upravuje
   const upravaRef = useRef(false);
   upravaRef.current = uprava;
-  const zmeneno = !!dok && uprava && ['title', 'text', 'email_to', 'email_subject'].some((k) => (pole[k] || '') !== (dok[k] || ''));
+  const zmeneno = !!dok && uprava && (['title', 'text', 'email_to', 'email_subject'].some((k) => (pole[k] || '') !== (dok[k] || '')) || !stejnaMeta(pole.meta, dok.meta));
   // panel se ptá před odchodem (Zpět / zavřít / jiný dokument), když jsou neuložené změny
   useEffect(() => { hlidac.current = zmeneno; return () => { hlidac.current = false; }; }, [zmeneno, hlidac]);
 
@@ -170,7 +276,7 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
       const r = await apiDokument(id);
       if (upravaRef.current) { setCizi(true); return; }
       setDok(r.dokument); setChyba(''); setCizi(false);
-      setPole({ title: r.dokument.title || '', text: r.dokument.text || '', email_to: r.dokument.email_to || '', email_subject: r.dokument.email_subject || '' });
+      setPole({ title: r.dokument.title || '', text: r.dokument.text || '', email_to: r.dokument.email_to || '', email_subject: r.dokument.email_subject || '', meta: r.dokument.meta || PRAZDNA_META });
     } catch (e) { setChyba(e.status === 404 ? t('dok.notFound') : (e.message || t('dok.errorLoad'))); }
   }, [id, t]);
   useEffect(() => { setDok(null); setUprava(false); setPotvrdSmazat(false); setHlaska(''); nacti(); }, [id, nacti]);
@@ -182,7 +288,15 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
     if (upravaRef.current) setCizi(true); else nacti();
   }, [verze, zmenene, id, nacti]);
 
-  const zacniUpravu = () => { if (!dok) return; setPole({ title: dok.title || '', text: dok.text || '', email_to: dok.email_to || '', email_subject: dok.email_subject || '' }); setUprava(true); setHlaska(''); };
+  const zacniUpravu = () => { if (!dok) return; setPole({ title: dok.title || '', text: dok.text || '', email_to: dok.email_to || '', email_subject: dok.email_subject || '', meta: dok.meta || PRAZDNA_META }); setUprava(true); setHlaska(''); };
+  // šablona / barva z ovládání kanceláře: uloží se hned (meta celá), text se nemění
+  const ulozMeta = async (meta) => {
+    setUklada(true); setHlaska('');
+    try { const r = await dokumentUloz({ id, meta }); setDok(r.dokument); } catch (e) { setHlaska(e.message || t('dok.errorSave')); }
+    setUklada(false);
+  };
+  // QR odkaz kreslí jen pozvánka a plakát (pranicko.js) — u přání a diplomu pole neukazovat, jinak se vstup tiše ztratí (/checkup 2. 11. 2026)
+  const metaPole = (META_POLE[dok ? dok.kind : ''] || []).filter((k) => k !== 'link' || !dok || !dok.meta || ['invitation', 'poster'].includes(dok.meta.template));
   const uloz = async () => {
     setUklada(true); setHlaska('');
     try {
@@ -249,6 +363,10 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
                 <Input value={pole.email_subject} onChange={(e) => setPole((p) => ({ ...p, email_subject: e.target.value }))} placeholder={t('dok.subject')} maxLength={300} data-testid="chat-dok-predmet" />
               </>
             )}
+            {metaPole.map((k) => (
+              <Input key={k} value={pole.meta[k] || ''} onChange={(e) => setPole((p) => ({ ...p, meta: { ...p.meta, [k]: e.target.value } }))} placeholder={t(`dok.meta.${k}`)} maxLength={300} data-testid={`chat-dok-meta-${k}`} />
+            ))}
+            {dok.kind === 'presentation' && <p className="text-[11px] text-muted-foreground">{t('dok.outlineHint')}</p>}
             <Textarea value={pole.text} onChange={(e) => setPole((p) => ({ ...p, text: e.target.value }))} className="min-h-[50vh] text-sm leading-relaxed" maxLength={20000} data-testid="chat-dok-text" />
           </>
         ) : (
@@ -266,6 +384,13 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
                 {dok.email_subject && <><dt className="text-muted-foreground">{t('dok.subject')}:</dt><dd className="break-words" data-testid="chat-dok-predmet-cteni">{dok.email_subject}</dd></>}
               </dl>
             )}
+            {metaPole.some((k) => dok.meta && dok.meta[k]) && (
+              <dl className="text-xs grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded-md bg-secondary/60 px-2.5 py-1.5" data-testid="chat-dok-meta-cteni">
+                {metaPole.filter((k) => dok.meta[k]).map((k) => <Fragment key={k}><dt className="text-muted-foreground">{t(`dok.meta.${k}`)}:</dt><dd className="break-words">{dok.meta[k]}</dd></Fragment>)}
+              </dl>
+            )}
+            {/* kancelář: stažení souboru, u přání šablona / barva / fotka, náhled — pro všechny druhy (PDF + Word) */}
+            <KancelarOvladani dok={dok} onMeta={ulozMeta} uklada={uklada} />
             {/* dvojklik do textu = upravit (jako v Claude) */}
             <div onDoubleClick={zacniUpravu} className="cursor-text">
               {dok.text ? <DokText text={dok.text} /> : <p className="text-sm text-muted-foreground italic">{t('dok.emptyText')}</p>}
@@ -322,7 +447,25 @@ export default function DokumentyPanel({ mobil }) {
   // 'stranka:nova' / 'stranka:nova:<šablona>' = formulář nové stránky ze šablony (15. 10. 2026)
   const novaStranka = jeStranka && A.dokId.slice(STRANKA.length).split(':')[0] === NOVA;
   const novaSablona = novaStranka ? (A.dokId.split(':')[2] || '') : '';
-  useEffect(() => { if (jeStranka) setZalozka('stranky'); }, [jeStranka]);
+  // otevření dokumentu z karty v chatu přepne na jeho záložku (jinak „Zpět“ ze záložky PDF vrátilo do PDF — /checkup 2. 11. 2026)
+  useEffect(() => { if (jeStranka) setZalozka('stranky'); else if (A.dokId && A.dokId !== PAMET && !A.dokId.startsWith(NOVY_DOK)) setZalozka('dokumenty'); }, [A.dokId, jeStranka]);
+  // 'novy' / 'novy:<druh>' = formulář Nový dokument (Kancelář, 1. 11. 2026)
+  const novyDok = !!A.dokId && (A.dokId === NOVY_DOK || A.dokId.startsWith(NOVY_DOK + ':'));
+  const novyDruh = novyDok ? (A.dokId.split(':')[1] || '') : '';
+  const otevriNovy = useCallback((d) => A.setDokId(NOVY_DOK + (d ? ':' + d : '')), [A]);
+  // záložky panelu Kancelář: Dokumenty | Stránky (když instance stránky má) | PDF — PDF sem přešlo z hlavičky chatu (Richard 1. 11. 2026: dvě ikonky „dokument“ a „složka“ mátly)
+  const ZALOZKY = [['dokumenty', FileText, 'str.tabDocs'], ...(strankyOn ? [['stranky', LayoutTemplate, 'str.tabPages']] : []), ['pdf', Files, 'dok.tabPdf']];
+  const zalozky = (
+    <div className="flex items-center gap-1" role="tablist" data-testid="chat-dok-zalozky">
+      {ZALOZKY.map(([z, Ik, klic]) => (
+        <button key={z} type="button" role="tab" aria-selected={zalozka === z} onClick={() => setZalozka(z)}
+          className={`text-sm font-semibold inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${zalozka === z ? 'bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
+          data-testid="chat-dok-zalozka" data-zalozka={z}>
+          <Ik className={`w-4 h-4 ${zalozka === z ? 'text-primary' : ''}`} />{t(klic)}
+        </button>
+      ))}
+    </div>
+  );
   const location = useLocation();
   const mapaZAdresy = (location.pathname.match(/^\/map\/([^/]+)/) || [])[1] || '';
   // zpráva složená formulářem jde do chatu přes žádost kontextu (panel chatu je líný, vyřídí ji, až je volný)
@@ -374,7 +517,7 @@ export default function DokumentyPanel({ mobil }) {
       className={mobil ? 'fixed left-0 right-0 bottom-0 z-50 flex flex-col bg-card' : 'fixed bottom-0 z-[45] flex flex-col bg-card border-l border-t shadow-2xl'}
       style={mobil ? { top: spodek } : { top: spodek, right: A.width, width: sirka, maxWidth: DOK_MAX_W }}
       data-testid="chat-dokumenty"
-      aria-label={t('dok.title')}
+      aria-label={t('dok.kancelarTitle')}
     >
       {!mobil && (
         <div onPointerDown={naTah} title={t('resize')} data-testid="chat-dok-resize" className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30" />
@@ -383,28 +526,17 @@ export default function DokumentyPanel({ mobil }) {
         <div className="flex items-center gap-1.5 min-w-0">
           {mobil ? (
             <Button variant="ghost" size="sm" className="h-8 px-2 -ml-1" onClick={A.dokId ? zpet : zavri} data-testid="chat-dok-zpet-chat">
-              <ChevronLeft className="w-4 h-4 mr-0.5" />{A.dokId ? (novaStranka ? t('str.nova') : jeStranka ? t('str.back') : t('dok.back')) : t('dok.backToChat')}
+              <ChevronLeft className="w-4 h-4 mr-0.5" />{A.dokId ? (novyDok ? t('dok.back') : novaStranka ? t('str.nova') : jeStranka ? t('str.back') : t('dok.back')) : t('dok.backToChat')}
             </Button>
           ) : A.dokId ? (
             <Button variant="ghost" size="sm" className="h-8 px-2 -ml-1" onClick={zpet} data-testid="chat-dok-zpet"><ChevronLeft className="w-4 h-4 mr-0.5" />{novaStranka ? t('str.nova') : jeStranka ? t('str.back') : t('dok.back')}</Button>
-          ) : strankyOn ? (
-            <div className="flex items-center gap-1" role="tablist" data-testid="chat-dok-zalozky">
-              {[['dokumenty', FileText, 'str.tabDocs'], ['stranky', LayoutTemplate, 'str.tabPages']].map(([z, Ik, klic]) => (
-                <button key={z} type="button" role="tab" aria-selected={zalozka === z} onClick={() => setZalozka(z)}
-                  className={`text-sm font-semibold inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${zalozka === z ? 'bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
-                  data-testid="chat-dok-zalozka" data-zalozka={z}>
-                  <Ik className={`w-4 h-4 ${zalozka === z ? 'text-primary' : ''}`} />{t(klic)}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="text-sm font-semibold inline-flex items-center gap-1.5"><FileText className="w-4 h-4 text-primary" />{t('dok.title')}</span>
-          )}
+          ) : zalozky}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {!mobil && <Button variant="ghost" size="icon" className="h-8 w-8" title={t('dok.close')} aria-label={t('dok.close')} onClick={zavri} data-testid="chat-dok-zavrit"><X className="w-4 h-4" /></Button>}
+          {!mobil && <Button variant="ghost" size="icon" className="h-8 w-8" title={t('dok.kancelarClose')} aria-label={t('dok.kancelarClose')} onClick={zavri} data-testid="chat-dok-zavrit"><X className="w-4 h-4" /></Button>}
         </div>
       </div>
+      {mobil && !A.dokId && <div className="h-10 border-b flex items-center px-3 shrink-0">{zalozky}</div>}
       {odchod && (
         <div className="border-b bg-amber-500/10 px-3 py-2 text-xs flex flex-wrap items-center gap-2 shrink-0" data-testid="chat-dok-neulozeno">
           <span className="flex-1">{t('dok.unsaved')}</span>
@@ -414,6 +546,10 @@ export default function DokumentyPanel({ mobil }) {
       )}
       {A.dokId === PAMET
         ? <PametPohled />
+        : novyDok
+        ? <NovyDokument key={A.dokId} druh={novyDruh} mapId={mapaZAdresy} onOdeslat={posliZpravu} onZpet={() => A.setDokId('')} />
+        : !A.dokId && zalozka === 'pdf'
+        ? <PdfPohled onZpet={() => setZalozka('dokumenty')} onOpravit={A.funkcni ? (priloha) => A.spust('pdf_oprava', { priloha }) : undefined} loading={false} soubory={A.pdfSoubory} setSoubory={A.setPdfSoubory} />
         : novaStranka
         ? <NovaStranka key={A.dokId} sablona={novaSablona} mapId={mapaZAdresy} onOdeslat={posliZpravu} onZpet={() => A.setDokId('')} />
         : jeStranka
@@ -424,7 +560,7 @@ export default function DokumentyPanel({ mobil }) {
         ? <FakturaDetail key={A.dokId} id={A.dokId.slice(FAKTURA_PREFIX.length)} onZpet={() => { setSkupina('faktury'); A.setDokId(''); }} />
         : A.dokId
         ? <Detail key={A.dokId} id={A.dokId} verze={A.dokVerze} zmenene={A.dokZmenene} hlidac={hlidac} onProjekt={naProjekt} onZpet={() => A.setDokId('')} onSmazano={() => { A.setDokId(''); A.obnovDokumenty(); }} />
-        : <Seznam verze={A.dokVerze} onOtevri={(id) => A.setDokId(id)} skupina={skupina} setSkupina={setSkupina} q={q} setQ={setQ} />}
+        : <Seznam verze={A.dokVerze} onOtevri={(id) => A.setDokId(id)} onNova={otevriNovy} skupina={skupina} setSkupina={setSkupina} q={q} setQ={setQ} />}
     </aside>
   );
 }

@@ -165,7 +165,9 @@
     "copy": "Kopírovat",
     "copied": "Zkopírováno",
     "note": "Poznámka",
-    "summary": "Sumář"
+    "summary": "Sumář",
+    "presentation": "Prezentace",
+    "card": "Přání"
   },
   "chipPorada": "Ranní porada",
   "chipRozbor": "Rozebrat projekt",
@@ -218,7 +220,9 @@
     "tym": "Týmová porada",
     "tymHint": "Kdo je přetížený, co hoří a předání práce",
     "stranka": "Stránka ze šablony",
-    "strankaHint": "Prezentace, přehled nebo report z projektu k nasdílení"
+    "strankaHint": "Prezentace, přehled nebo report z projektu k nasdílení",
+    "kancelar": "Prezentace, přání, pozvánka",
+    "kancelarHint": "Soubor ke stažení: PowerPoint, PDF nebo Word"
   },
   "modeRozbor": "Rozbor",
   "actionOpenNode": "Ukázat v mapě",
@@ -369,7 +373,8 @@
       "poznamky": "Poznámky",
       "emaily": "E-maily",
       "sumare": "Sumáře",
-      "faktury": "Faktury"
+      "faktury": "Faktury",
+      "kancelar": "Kancelář"
     },
     "kind": {
       "note": "Poznámka",
@@ -377,7 +382,9 @@
       "summary": "Sumář",
       "meeting": "Body k poradě",
       "call": "Body k telefonátu",
-      "other": "Text"
+      "other": "Text",
+      "presentation": "Prezentace",
+      "card": "Přání / pozvánka"
     },
     "empty": "Zatím žádné dokumenty. Co vám asistent napíše — e-mail, zápis z porady, sumář projektu — najdete tady a můžete to upravit. Rychlé nápady a úkoly patří do zásobníku nápadů.",
     "emptyFiltered": "Nic tu není.",
@@ -412,7 +419,39 @@
     "savedOverAssistant": "Uloženo — přepsalo verzi asistenta (Vrátit ji obnoví).",
     "mailtoLongNoCopy": "Text je na odkaz do pošty moc dlouhý a zkopírovat se nepodařilo — zkopírujte ho tlačítkem Kopírovat nebo ručně.",
     "copyFailed": "Zkopírovat se nepodařilo — označte text a zkopírujte ho ručně.",
-    "saveOverwrites": "Uložením ji přepíšete (půjde vrátit)."
+    "saveOverwrites": "Uložením ji přepíšete (půjde vrátit).",
+    "downloadAs": "Stáhnout jako",
+    "preview": "Náhled",
+    "previewHide": "Skrýt náhled",
+    "previewAlt": "Náhled první strany",
+    "previewError": "Náhled se nepodařilo vyrobit.",
+    "fileError": "Soubor se nepodařilo vyrobit.",
+    "template": "Šablona",
+    "color": "Barva",
+    "colorSkin": "Barva vzhledu",
+    "photo": "Přidat fotku",
+    "photoRemove": "Bez fotky",
+    "photoHint": "Fotka se nikam neukládá — jde jen do souboru, který si stáhnete.",
+    "photoBad": "Fotka musí být PNG nebo JPG do 4 MB.",
+    "meta": {
+      "subtitle": "Podtitul",
+      "date": "Kdy",
+      "place": "Kde",
+      "link": "Odkaz (QR kód)",
+      "signature": "Podpis",
+      "audience": "Pro koho"
+    },
+    "templateName": {
+      "greeting": "Přání",
+      "invitation": "Pozvánka",
+      "poster": "Plakát",
+      "certificate": "Diplom / poděkování"
+    },
+    "outlineHint": "Osnova: „# Název“, „## Snímek“, „- odrážka“, „> poznámka řečníka“.",
+    "kancelarTitle": "Kancelář",
+    "kancelarClose": "Zavřít Kancelář",
+    "tabPdf": "PDF",
+    "novy": "Nový"
   },
   "rizika": {
     "titulek": "Rizika v projektu „{{title}}“",
@@ -494,5 +533,15 @@
   "dodavatel": {
     "openOrg": "Otevřít ve Správě organizace",
     "openMe": "Otevřít v Můj účet"
+  },
+  "soubor": {
+    "pdf": "Stáhnout PDF",
+    "pptx": "Stáhnout PowerPoint",
+    "docx": "Stáhnout Word",
+    "slides": "{{count}} snímků",
+    "notSaved": "Dokument se neuložil (plné Dokumenty) — text je v odpovědi.",
+    "error": "Soubor se nepodařilo vyrobit.",
+    "hintDeck": "Osnovu upravíte v Dokumentech a soubor stáhnete znovu.",
+    "hintCard": "Barvu, fotku a text doladíte v Dokumentech."
   }
 }

@@ -358,7 +358,7 @@ H.beh(async () => {
   await page.click('[data-testid="chat-dokumenty-btn"]');
   await cekej('[data-testid="chat-dokumenty"]');
   if (await page.$('[data-testid="chat-dok-zpet"]')) await page.click('[data-testid="chat-dok-zpet"]'); // panel si pamatuje naposledy otevřený dokument
-  expect(await cekej('[data-testid="chat-dok-pamet"]'), 'v Dokumentech je nahoře připnutá paměť');
+  expect(await cekej('[data-testid="chat-dok-pamet"]'), 'v Dokumentech je (pod seznamem) odkaz na paměť');
   await page.click('[data-testid="chat-dok-pamet"]');
   expect(await cekej('[data-testid="chat-pamet-text"]'), 'pohled paměti');
   await page.click('[data-testid="chat-pamet-text"]');

@@ -1,0 +1,131 @@
+{
+  "intro": "Pick what should be created. The app composes the request for the assistant — it reads the project, writes the document and you download or edit it.",
+  "druh": "What to create",
+  "submit": "Prepare",
+  "zpet": "Back",
+  "projekt": "Project",
+  "bezProjektuVolba": "— no project —",
+  "nepovinne": "optional",
+  "druhy": {
+    "presentation": {
+      "nazev": "Project presentation",
+      "popis": "PowerPoint and PDF to download: goal, status, what is urgent, next steps",
+      "zprava": "Make a project presentation to download as PowerPoint and PDF."
+    },
+    "greeting": {
+      "nazev": "Greeting card",
+      "popis": "Season's greetings, Christmas, birthday, anniversary — a PDF to print or send",
+      "zprava": "Write a greeting card as a PDF to print."
+    },
+    "invitation": {
+      "nazev": "Invitation",
+      "popis": "When, where and a QR link to sign up — A5 PDF",
+      "zprava": "Make an invitation as a PDF."
+    },
+    "poster": {
+      "nazev": "Poster",
+      "popis": "A4 to print: an event, an offer, a notice",
+      "zprava": "Make a poster as a PDF."
+    },
+    "certificate": {
+      "nazev": "Thank-you / certificate",
+      "popis": "A formal A4 with a frame to hand over or frame",
+      "zprava": "Prepare a formal thank-you or certificate as a PDF."
+    },
+    "email": {
+      "nazev": "E-mail",
+      "popis": "An e-mail draft in Documents — PDF or Word on a letterhead",
+      "zprava": "Write an e-mail and save it to Documents."
+    },
+    "meeting": {
+      "nazev": "Meeting points",
+      "popis": "Points for a meeting or meeting notes",
+      "zprava": "Prepare meeting points and save them to Documents."
+    },
+    "note": {
+      "nazev": "Note",
+      "popis": "A short text to keep at hand",
+      "zprava": "Write a note to Documents."
+    },
+    "summary": {
+      "nazev": "Project summary",
+      "popis": "Status, deadlines, what is stuck — to send or file",
+      "zprava": "Make a project summary and save it to Documents."
+    },
+    "faktura": {
+      "nazev": "Invoice",
+      "popis": "An invoice to a client with a QR payment — PDF",
+      "zprava": "Issue an invoice. Who and for what is below; ask for anything missing."
+    },
+    "volne": {
+      "nazev": "Something else",
+      "popis": "Say in your own words what should be created",
+      "zprava": "Prepare this for me:"
+    }
+  },
+  "pole": {
+    "komu": "For whom",
+    "prilezitost": "Occasion",
+    "podpis": "Signed by",
+    "ton": "Tone",
+    "doplneni": "Details",
+    "akce": "Event name",
+    "kdy": "When",
+    "kde": "Where",
+    "odkaz": "Link (QR code)",
+    "oCem": "About",
+    "zaCo": "For what",
+    "publikum": "Audience",
+    "zadani": "Request"
+  },
+  "placeholder": {
+    "komu": "e.g. clients, John Smith, the team",
+    "podpis": "e.g. Smith Carpentry",
+    "akce": "e.g. Company Christmas party",
+    "kdy": "e.g. 12 Dec 2026, 6 pm",
+    "kde": "e.g. our workshop, 12 Long St",
+    "odkaz": "https://…",
+    "oCem": "what it should be about",
+    "zaCo": "e.g. ten years of cooperation",
+    "doplneni": "what to include, what to leave out…",
+    "zadani": "e.g. quote for Brown: logo 6,500 and 3 h of consulting at 900",
+    "komuEmail": "e.g. Mrs Brown, client"
+  },
+  "volby": {
+    "publikum": {
+      "klient": "For the client",
+      "vedeni": "For management",
+      "tym": "For the team"
+    },
+    "prilezitost": {
+      "pf": "New year",
+      "vanoce": "Christmas",
+      "narozeniny": "Birthday",
+      "vyroci": "Anniversary",
+      "podekovani": "Thank-you",
+      "jine": "Other"
+    },
+    "ton": {
+      "pratelsky": "Friendly",
+      "formalni": "Formal",
+      "slavnostni": "Festive"
+    }
+  },
+  "veta": {
+    "projekt": "Base it on the project \"{{v}}\" — read it and use only facts from it.",
+    "bezProjektu": "No project — use only what I write and ask about anything missing.",
+    "komu": "For whom: {{v}}.",
+    "prilezitost": "Occasion: {{v}}.",
+    "podpis": "Signed by: {{v}}.",
+    "ton": "Tone: {{v}}.",
+    "doplneni": "Details: {{v}}",
+    "akce": "Event: {{v}}.",
+    "kdy": "When: {{v}}.",
+    "kde": "Where: {{v}}.",
+    "odkaz": "Link for the QR code: {{v}}",
+    "oCem": "About: {{v}}",
+    "zaCo": "For what: {{v}}.",
+    "publikum": "Audience: {{v}}.",
+    "zadani": "{{v}}"
+  }
+}

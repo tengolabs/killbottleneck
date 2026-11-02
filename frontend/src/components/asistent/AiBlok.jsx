@@ -5,7 +5,7 @@
 // Fáze D (1. 10. 2026): + Po schůzce, Týdenní revize. Fáze E: + Příprava na schůzku, Týmová porada (vedoucí).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CalendarCheck, ChevronDown, ChevronUp, ClipboardList, LayoutTemplate, ListTree, NotebookPen, Sparkles, Users } from 'lucide-react';
+import { CalendarCheck, ChevronDown, ChevronUp, ClipboardList, LayoutTemplate, ListTree, NotebookPen, Presentation, Sparkles, Users } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_AI_BLOK } from '@/lib/storageKeys';
 
 const POMOCNICI = [
@@ -14,6 +14,8 @@ const POMOCNICI = [
   { id: 'poSchuzce', mode: 'po_schuzce', Ikona: NotebookPen, testid: 'chat-blok-po-schuzce' },
   { id: 'revize', mode: 'revize', Ikona: CalendarCheck, testid: 'chat-blok-revize' },
   { id: 'priprava', mode: 'priprava', Ikona: ClipboardList, testid: 'chat-blok-priprava' },
+  // kancelář (14. 10. 2026): prezentace / přání / pozvánka / plakát / diplom → soubor (PPTX, PDF, Word)
+  { id: 'kancelar', mode: 'kancelar', Ikona: Presentation, testid: 'chat-blok-kancelar' },
   // jen správce a vedoucí (server roli hlídá sám — tlačítko je jen nabídka)
   { id: 'tym', mode: 'tymova_porada', Ikona: Users, testid: 'chat-blok-tym', vedouci: true },
   // stránka ze šablony (15. 10. 2026) — otevře formulář v panelu Stránek, ne režim chatu; jen s config.pages

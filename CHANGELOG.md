@@ -9,6 +9,50 @@ below before you jump several versions.
 
 ---
 
+## v0.96-beta — 2026-11-02
+
+**Office in the assistant: a presentation (PowerPoint or PDF), a greeting card, invitation, poster or certificate (PDF), and every document as PDF or Word**
+
+- **Presentation** — "Make a presentation of project #12 for the client": the assistant takes the facts from the map and writes
+  the slide outline into **Documents** (editable text: `# title`, `## slide`, `- bullet`, `> speaker note`); the card and the
+  Documents panel offer **PowerPoint (.pptx)**, **PDF** (16:9) and **Word**. The deck uses your skin colour and the organization logo;
+  speaker notes go into the PPTX. Ask for changes ("shorten slide 3") — the assistant rewrites the outline, the previous version stays.
+  (A web page shared by link is still the assistant's Pages; this is a file to download.)
+- **Greeting card, invitation, poster, certificate** — "Write season's greetings to clients", "an invitation to the Christmas party
+  on 12 Dec at 6 pm": a printable **PDF** from one of four vector templates (A5 card, A5 invitation with When / Where and a QR code for
+  a link, A4 poster, A4 certificate). In Documents you pick the template and colour and can add your own photo (PNG/JPG — it goes only
+  into the file, nothing is stored). No AI pictures — the design is vector, logo and your photo.
+- **Every document as PDF or Word** — e-mails, notes, meeting points and summaries download on a letterhead (organization name + logo),
+  with a page footer; e-mails carry To / Subject. Download as text stays.
+- **AI helper "Presentation, card, invitation"** in the AI block: the app asks first what to prepare, for whom and in which tone (no
+  model call), then the assistant continues. The assistant also offers a deck after a project summary or meeting preparation.
+- All files are generated **in the browser**; the server never stores them. New document kinds `presentation` and `card` and a `meta`
+  field on `ai_documents` (migration, no action needed). Private like all documents.
+- **Office panel.** The Documents button in the assistant header is now **Office** (briefcase) with the tabs **Documents**,
+  **Pages** and **PDF** — the separate PDF button is gone (two look-alike icons were confusing). PDF files chosen in the tab
+  survive switching tabs and closing the panel. **New** next to the filter (in every section, Invoices included) opens a
+  **New document** form composed by the app (no model call): pick the kind — presentation, greeting card, invitation,
+  poster, thank-you, e-mail, meeting points, note, project summary, invoice or free text — fill in a few details and
+  **Prepare** sends the request to the assistant. An empty filter shows the kinds as chips; the AI-block helper opens the
+  same form. After the assistant reads a map without writing anything, the app adds the chip **Turn this into a
+  presentation** (the model rarely offered it on its own).
+- **Fixed (local models):** when the model asked to open a tool group that was already open, the server re-asked it with the
+  same prompt and the model repeated the same request until the rounds ran out — the reply came back empty. The model now
+  gets a one-line note naming the tools it already has and continues; a tool call "written" in the last round without
+  tools yields a readable sentence instead of an empty bubble. A tool call written as text (`[Tool: name] {…}`, seen with
+  Qwen-family models with low reasoning) is converted into a real call — only when it stands at the very start of the reply,
+  and never for tools that change data without a confirmation card.
+
+### Upgrade notes
+
+- Migration `1792001345_ai_documents_kancelar` adds the document kinds `presentation` and `card` and a JSON field `meta` on
+  `ai_documents` (empty for existing documents). Its timestamp is older than the already applied `1792621271`, `1792928875`
+  and `1793096888`; PocketBase applies it anyway. Nothing to do.
+- New npm dependencies `pptxgenjs` and `docx` (both MIT) are listed in `THIRD-PARTY-LICENSES.md`; the usual
+  `docker compose up -d --build` picks them up.
+
+---
+
 ## v0.95-beta — 2026-11-02
 
 **From an invitation to the calendar: a photo, PDF or e-mail with several dates becomes events on one card**

@@ -25,6 +25,11 @@ const LOADERS = {
     cs: () => import('./cs/stranky.json'),
     en: () => import('./en/stranky.json'),
   },
+  // Kancelář (1. 11. 2026) — formulář „Nový dokument“ v panelu; líně ze stejného důvodu jako stranky (lite 543/560 kB)
+  kancelar: {
+    cs: () => import('./cs/kancelar.json'),
+    en: () => import('./en/kancelar.json'),
+  },
   billing: {
     cs: () => import('./cs/billing.json'),
     en: () => import('./en/billing.json'),

@@ -1,0 +1,131 @@
+{
+  "intro": "Vyberte, co má vzniknout. Aplikace z toho složí zadání pro asistenta — ten si načte projekt, dokument napíše a vy si ho stáhnete nebo upravíte.",
+  "druh": "Co má vzniknout",
+  "submit": "Připravit",
+  "zpet": "Zpět",
+  "projekt": "Projekt",
+  "bezProjektuVolba": "— bez projektu —",
+  "nepovinne": "nepovinné",
+  "druhy": {
+    "presentation": {
+      "nazev": "Prezentace projektu",
+      "popis": "PowerPoint a PDF ke stažení: cíl, stav, co hoří, další kroky",
+      "zprava": "Udělej prezentaci projektu ke stažení jako PowerPoint a PDF."
+    },
+    "greeting": {
+      "nazev": "Přání / PF",
+      "popis": "PF, Vánoce, narozeniny, výročí — PDF k tisku i poslání",
+      "zprava": "Napiš přání jako PDF k tisku."
+    },
+    "invitation": {
+      "nazev": "Pozvánka",
+      "popis": "Kdy, kde a QR odkaz na přihlášení — PDF A5",
+      "zprava": "Udělej pozvánku jako PDF."
+    },
+    "poster": {
+      "nazev": "Plakát",
+      "popis": "A4 k vytištění: akce, nabídka, oznámení",
+      "zprava": "Udělej plakát jako PDF."
+    },
+    "certificate": {
+      "nazev": "Poděkování / diplom",
+      "popis": "Slavnostní A4 s rámečkem k předání nebo zarámování",
+      "zprava": "Připrav slavnostní poděkování nebo diplom jako PDF."
+    },
+    "email": {
+      "nazev": "E-mail",
+      "popis": "Koncept e-mailu do Dokumentů — PDF nebo Word na hlavičce",
+      "zprava": "Napiš e-mail a ulož ho do Dokumentů."
+    },
+    "meeting": {
+      "nazev": "Body k poradě",
+      "popis": "Body k jednání nebo zápis z porady",
+      "zprava": "Připrav body k poradě a ulož je do Dokumentů."
+    },
+    "note": {
+      "nazev": "Poznámka",
+      "popis": "Krátký text, který chcete mít po ruce",
+      "zprava": "Napiš poznámku do Dokumentů."
+    },
+    "summary": {
+      "nazev": "Souhrn projektu",
+      "popis": "Stav, termíny, co stojí — k poslání nebo založení",
+      "zprava": "Udělej souhrn projektu a ulož ho do Dokumentů."
+    },
+    "faktura": {
+      "nazev": "Faktura",
+      "popis": "Faktura klientovi s QR platbou — PDF",
+      "zprava": "Vystav fakturu. Komu a za co uvádím níže; na co chybí, se zeptej."
+    },
+    "volne": {
+      "nazev": "Něco jiného",
+      "popis": "Napište vlastními slovy, co má vzniknout",
+      "zprava": "Připrav mi tohle:"
+    }
+  },
+  "pole": {
+    "komu": "Pro koho",
+    "prilezitost": "Příležitost",
+    "podpis": "Podepisuje",
+    "ton": "Tón",
+    "doplneni": "Doplnění",
+    "akce": "Název akce",
+    "kdy": "Kdy",
+    "kde": "Kde",
+    "odkaz": "Odkaz (QR kód)",
+    "oCem": "O čem",
+    "zaCo": "Za co",
+    "publikum": "Pro koho",
+    "zadani": "Zadání"
+  },
+  "placeholder": {
+    "komu": "např. klienti, Karel Dvořák, tým",
+    "podpis": "např. Truhlářství Novák",
+    "akce": "např. Firemní vánoční večírek",
+    "kdy": "např. 12. 12. 2026 v 18:00",
+    "kde": "např. naše dílna, Dlouhá 12, Praha 1",
+    "odkaz": "https://…",
+    "oCem": "o čem to má být",
+    "zaCo": "např. deset let spolupráce",
+    "doplneni": "co má zaznít, co vynechat…",
+    "zadani": "např. nabídka Hruškovi: logo 6 500 Kč a 3 h konzultací po 900 Kč",
+    "komuEmail": "např. paní Nováková, klient"
+  },
+  "volby": {
+    "publikum": {
+      "klient": "Pro klienta",
+      "vedeni": "Pro vedení",
+      "tym": "Pro tým"
+    },
+    "prilezitost": {
+      "pf": "PF / nový rok",
+      "vanoce": "Vánoce",
+      "narozeniny": "Narozeniny",
+      "vyroci": "Výročí",
+      "podekovani": "Poděkování",
+      "jine": "Jiná"
+    },
+    "ton": {
+      "pratelsky": "Přátelský",
+      "formalni": "Formální",
+      "slavnostni": "Slavnostní"
+    }
+  },
+  "veta": {
+    "projekt": "Vycházej z projektu „{{v}}“ — načti si ho a použij jen fakta z něj.",
+    "bezProjektu": "Bez projektu — vycházej jen z toho, co píšu, a na chybějící věci se zeptej.",
+    "komu": "Pro koho: {{v}}.",
+    "prilezitost": "Příležitost: {{v}}.",
+    "podpis": "Podepisuje: {{v}}.",
+    "ton": "Tón: {{v}}.",
+    "doplneni": "Doplnění: {{v}}",
+    "akce": "Akce: {{v}}.",
+    "kdy": "Kdy: {{v}}.",
+    "kde": "Kde: {{v}}.",
+    "odkaz": "Odkaz pro QR kód: {{v}}",
+    "oCem": "O čem: {{v}}",
+    "zaCo": "Za co: {{v}}.",
+    "publikum": "Publikum: {{v}}.",
+    "zadani": "{{v}}"
+  }
+}

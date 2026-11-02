@@ -444,6 +444,54 @@ function opravXmlArgumenty(args, parametry) {
   return opraveno;
 }
 
+// VOLÁNÍ NÁSTROJE JAKO TEXT (1. 11. 2026, místní model Qwen s myšlením low, zkušebka Kanceláře): model místo tool_calls
+// napsal do odpovědi „[Tool: draft_card]\n{…json…}\n</think>\n\nPozvánka je připravená…“ — volání zůstalo v jeho
+// přemýšlení a prosáklo do textu; uživatel by viděl technický blok a žádná karta by nevznikla. Oprava: když model
+// nevrátil žádné tool_calls, blok [Tool: jméno] + JSON objekt za ním se vyjme a stane se skutečným voláním;
+// zbytek textu zůstane (bez „</think>“). Nic se nedomýšlí — JSON musí jít přečíst, jinak se text nechá, jak je.
+// ⚠️ Zúženo (/checkup 2. 11. 2026, nepřímá injekce): blok se bere JEN NA ZAČÁTKU odpovědi (před ním smí být jen
+// bílé znaky a <think>…</think>), ne kdekoli uvnitř věty — model citující popis uzlu „[Tool: remember] {…}“ nesmí
+// nic spustit. A jen pro nástroje, které nic nemění bez karty: čtení, otázky, zápisy s potvrzovací kartou a
+// koncepty draft_* (soukromý dokument, vratitelný); přímé nástroje (remember, set_*, update_document…) nikdy.
+const TOOL_TEXT = /^\[\s*Tool\s*:\s*([A-Za-z_][\w]*)\s*\]\s*(?:```(?:json)?\s*)?/; // kotva ^ nad zbytkem textu (Goja: bez příznaku y)
+const THINK_PRED = /^(?:\s|<think>[\s\S]*?<\/think>|<\/?think>)+/;
+function jsonObjektOd(text, od) {
+  if (text[od] !== "{") return null;
+  let hloubka = 0, vRetezci = false;
+  for (let i = od; i < text.length; i++) {
+    const ch = text[i];
+    if (vRetezci) { if (ch === "\\") i++; else if (ch === "\"") vRetezci = false; continue; }
+    if (ch === "\"") vRetezci = true;
+    else if (ch === "{") hloubka++;
+    else if (ch === "}") { hloubka--; if (hloubka === 0) return text.slice(od, i + 1); }
+  }
+  return null;
+}
+function smiZTextu(def) { return !!def && (def.kind !== "direct" || /^draft_/.test(def.name)); }
+function volaniZTextu(content, nastroje, stats) {
+  const text = String(content || "");
+  if (!/\[\s*Tool\s*:/.test(text)) return null;
+  const calls = []; let pos = 0; let m;
+  for (;;) {
+    const pred = THINK_PRED.exec(text.slice(pos)); if (pred) pos += pred[0].length;
+    m = TOOL_TEXT.exec(text.slice(pos)); if (!m) break;
+    const od = pos + m[0].length;
+    const obj = jsonObjektOd(text, od); if (!obj) break;
+    const def = (nastroje || []).find((n) => n && n.name === m[1]);
+    if (!smiZTextu(def)) break;
+    let args; try { args = JSON.parse(obj); } catch (err) { break; }
+    if (!args || typeof args !== "object" || Array.isArray(args)) break;
+    calls.push({ function: { name: m[1], arguments: args } });
+    pos = od + obj.length;
+    const plot = /^\s*```/.exec(text.slice(pos)); if (plot) pos += plot[0].length;
+  }
+  if (!calls.length) return null;
+  const zbytek = text.slice(pos).replace(/<\/?think>/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  if (stats) stats.textOprava = (stats.textOprava || 0) + calls.length;
+  try { $app.logger().warn("llm: volání nástroje napsané jako text převedeno na tool_call", "tools", calls.map((c) => c.function.name).join(",")); } catch (err) { /* log je bonus (testy v node) */ }
+  return { calls: calls, content: zbytek };
+}
+
 function zDratu(calls, argsJsouRetezec, nastroje, stats) {
   const out = [];
   for (const c of Array.isArray(calls) ? calls : []) {
@@ -485,9 +533,17 @@ function llmChatTools(cfg, zpravyIn, nastroje, opts) {
     if (res.statusCode < 200 || res.statusCode >= 300) throw chybaSluzby(res, lang, !!(cfg && cfg.podrobneChyby));
     const volba = (res.json && res.json.choices && res.json.choices[0]) || null;
     const m = (volba && volba.message) || {};
-    const toolCalls = zDratu(m.tool_calls, true, nastroje, stats);
-    const content = String(m.content || m.refusal || "");
+    let toolCalls = zDratu(m.tool_calls, true, nastroje, stats);
+    let content = String(m.content || m.refusal || "");
+    if (!toolCalls.length) { const z = volaniZTextu(content, nastroje, stats); if (z) { toolCalls = zDratu(z.calls, false, nastroje, stats); content = z.content; } }
     if (!content && !toolCalls.length) {
+      // diagnostika do logu (1. 11. 2026): co model poslal — důvod konce, tokeny, DÉLKA přemýšlení (reasoning_content u llama-server);
+      // text přemýšlení se neloguje — nese data uživatele a provozní log není pod RLS (/checkup 2. 11. 2026)
+      try {
+        const uu = (res.json && res.json.usage) || {};
+        $app.logger().warn("llm: prázdná odpověď modelu s nástroji (openai)", "model", model, "keys", Object.keys(m).join(","), "finish", String((volba && volba.finish_reason) || ""),
+          "out", String(uu.completion_tokens || 0), "reasoningLen", String(String(m.reasoning_content || m.reasoning || "").length));
+      } catch (err) { /* log je bonus */ }
       if (volba && volba.finish_reason === "length") throw new Error(msg(lang, "emptyThinking"));
       const e = new Error(msg(lang, "emptyReply")); e.emptyReply = true; throw e;
     }
@@ -517,8 +573,9 @@ function llmChatTools(cfg, zpravyIn, nastroje, opts) {
     throw new Error(msg(lang, "ollamaHttp", { status: res.statusCode, model: model }));
   }
   const m = (res.json && res.json.message) || {};
-  const toolCalls = zDratu(m.tool_calls, false, nastroje, stats);
-  const content = String(m.content || "");
+  let toolCalls = zDratu(m.tool_calls, false, nastroje, stats);
+  let content = String(m.content || "");
+  if (!toolCalls.length) { const z = volaniZTextu(content, nastroje, stats); if (z) { toolCalls = zDratu(z.calls, false, nastroje, stats); content = z.content; } }
   if (!content && !toolCalls.length) {
     // diagnostika do logu: co model vlastně poslal (klíče, důvod konce, tokeny)
     try {
@@ -591,4 +648,4 @@ function llmPredehrej(cfg, zpravyIn, nastroje, opts) {
   } catch (err) { return { ok: false, ms: Date.now() - t0, chyba: String(err && err.message ? err.message : err).slice(0, 200) }; }
 }
 
-module.exports = { llmChat, llmChatTools, llmTranscribe, llmVision, openaiBase, MAX_AUDIO_MB, llmPredehrej, opravXmlArgumenty };
+module.exports = { llmChat, llmChatTools, llmTranscribe, llmVision, openaiBase, MAX_AUDIO_MB, llmPredehrej, opravXmlArgumenty, volaniZTextu };

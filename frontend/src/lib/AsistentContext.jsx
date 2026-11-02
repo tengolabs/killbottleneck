@@ -24,6 +24,7 @@ export const sirkaDokumentu = (okno, sirkaChatu, dokWidth) => Math.max(Math.min(
 export const PAMET = 'pamet';
 // stránka asistenta otevřená v panelu Dokumentů (dokId = 'stranka:<id>', 14. 10. 2026)
 export const STRANKA = 'stranka:';
+export const NOVY_DOK = 'novy';  // dokId 'novy' nebo 'novy:<druh>' = formulář Nový dokument (Kancelář, 1. 11. 2026)
 
 // Relax (Richard 14. 10. 2026): hlídaná pauza s akváriem / úlem a odpočtem — přes celou obrazovku (jde zamknout
 // PINem a odejít od PC) nebo „vedle“ (vlevo místo mapy, vpravo chat). Scény jsou statické soubory v iframe
@@ -84,6 +85,8 @@ export function AsistentProvider({ children }) {
   // „Roztřídit s AI“, 1. 10. 2026). Panel je líný, proto jen žádost: vyřídí ji, jakmile je
   // načtený a volný.
   const [zadost, setZadost] = useState(null);
+  // soubory v záložce PDF panelu Kancelář (bytes jen v paměti) — přežijí přepnutí záložek i zavření panelu (1. 11. 2026)
+  const [pdfSoubory, setPdfSoubory] = useState([]);
   const [dokOpen, setDokOpenState] = useState(() => nactiKlic(KEY_DOK_OPEN) === '1');
   const [dokWidth, setDokWidthState] = useState(ctiSirkuDok);
   const [dokId, setDokId] = useState('');      // otevřený dokument ('' = seznam)
@@ -182,14 +185,14 @@ export function AsistentProvider({ children }) {
     open, setOpen, width, setWidth, odsun, dostupny, setDostupny, funkcni, setFunkcni, uzel, setUzel, liteOpen, setLiteOpen,
     dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
-    zadost, spust, vyridZadost,
+    zadost, spust, vyridZadost, pdfSoubory, setPdfSoubory,
     relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax,
-  }), [open, setOpen, width, setWidth, odsun, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax]);
+  }), [open, setOpen, width, setWidth, odsun, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, odsun: 0, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {} };
+const PRAZDNO = { open: false, width: 0, odsun: 0, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }

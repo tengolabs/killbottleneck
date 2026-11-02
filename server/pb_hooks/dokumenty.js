@@ -20,12 +20,18 @@ const MAX_SUBJECT = 300;
 const MAX_DOKUMENTU = 200;
 const MAX_SEZNAM = MAX_DOKUMENTU;
 const NAHLED = 160;
-const DRUHY = ["note", "email", "summary", "meeting", "call", "other"];
+// kancelář (14. 10. 2026): presentation = osnova snímků (# titul, ## snímek, - odrážky, > poznámky řečníka),
+// card = přání / pozvánka / plakát / diplom; co je mimo text (šablona, barva, datum, místo, odkaz…), nese `meta`
+const DRUHY = ["note", "email", "summary", "meeting", "call", "other", "presentation", "card"];
+const MAX_META = 4000;
+const SABLONY = ["greeting", "invitation", "poster", "certificate"];
+const META_RADKY = { template: 20, color: 7, subtitle: 200, date: 60, place: 200, link: 300, signature: 120, audience: 120, lang: 2, author: 120 };
 // filtr v panelu: Poznámky = vše kromě e-mailů a sumářů (body k poradě/telefonátu jsou poznámky)
 const SKUPINY = {
   poznamky: ["note", "meeting", "call", "other"],
   emaily: ["email"],
   sumare: ["summary"],
+  kancelar: ["presentation", "card"],
 };
 
 function chybaS(status, klic, params) {
@@ -43,6 +49,23 @@ function radek(s, max) {
   return ocisti(s, max * 2).replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
 function norm(s) { return require(`${__hooks}/helpers.js`).normText(s); }
+// `meta` od modelu i z panelu: jen známé klíče, jednořádkové, se stropy; šablona z whitelistu, barva #rrggbb,
+// odkaz jen http(s) (jde do QR kódu a na tlačítko — javascript: apod. nesmí projít). Vrací {} nebo objekt.
+function ocistiMeta(m) {
+  if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+  const out = {};
+  for (const k of Object.keys(META_RADKY)) {
+    if (m[k] == null || m[k] === "") continue;
+    let v = radek(m[k], META_RADKY[k]);
+    if (k === "template" && !SABLONY.includes(v)) continue;
+    if (k === "color" && !/^#[0-9a-fA-F]{6}$/.test(v)) continue;
+    if (k === "link" && !/^https?:\/\/\S+$/i.test(v)) continue;
+    if (k === "lang" && v !== "cs" && v !== "en") continue;
+    if (v) out[k] = v;
+  }
+  if (m.logo === false) out.logo = false; // výchozí = s logem organizace; jen výslovné vypnutí se ukládá
+  return JSON.stringify(out).length > MAX_META ? {} : out;
+}
 function jsonPole(rec, pole) {
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   return jsonVal(rec, pole, null);
@@ -73,6 +96,7 @@ function dto(rec, cely) {
     map: rec.getString("map"),
     chat: rec.getString("chat"),
     ma_predchozi: !!jsonPole(rec, "predchozi"),
+    meta: jsonPole(rec, "meta", null) || {},
     created: rec.getString("created"),
     updated: rec.getString("updated"),
   };
@@ -147,10 +171,10 @@ function podleOdkazu(app, userId, ref, presne) {
 }
 
 function snimek(rec) {
-  return { title: rec.getString("title"), text: rec.getString("text"), email_to: rec.getString("email_to"), email_subject: rec.getString("email_subject") };
+  return { title: rec.getString("title"), text: rec.getString("text"), email_to: rec.getString("email_to"), email_subject: rec.getString("email_subject"), meta: jsonPole(rec, "meta", null) || {} };
 }
 
-// Nový dokument nebo změna existujícího. `data` = {kind, title, text, email_to, email_subject, map};
+// Nový dokument nebo změna existujícího. `data` = {kind, title, text, email_to, email_subject, map, meta};
 // u změny se mění jen pole, která přišla (undefined = beze změny). Vrací záznam.
 function uloz(app, userId, data, opt) {
   const o = opt || {};
@@ -178,6 +202,7 @@ function uloz(app, userId, data, opt) {
     rec.set("email_subject", radek(d.email_subject, MAX_SUBJECT));
     rec.set("map", ocisti(d.map, 40));
     rec.set("chat", ocisti(o.chat, 40));
+    rec.set("meta", ocistiMeta(d.meta));
     app.save(rec);
     return rec;
   }
@@ -187,9 +212,11 @@ function uloz(app, userId, data, opt) {
     text: d.text != null ? ocisti(d.text, MAX_TEXT) : pred.text,
     email_to: d.email_to != null ? radek(d.email_to, MAX_TO) : pred.email_to,
     email_subject: d.email_subject != null ? radek(d.email_subject, MAX_SUBJECT) : pred.email_subject,
+    // meta se mění CELÁ (panel i model posílají celý objekt), ne po klíčích — jinak by nešlo šablonu či odkaz zrušit
+    meta: d.meta != null ? ocistiMeta(d.meta) : pred.meta,
   };
   if (!nove.text.trim() && !nove.title.trim()) throw chybaS(400, "err.docEmpty");
-  const zmena = Object.keys(nove).some((k) => nove[k] !== pred[k]);
+  const zmena = Object.keys(nove).some((k) => (k === "meta" ? JSON.stringify(nove.meta) !== JSON.stringify(pred.meta) : nove[k] !== pred[k]));
   if (!zmena) return rec; // uložení beze změny nesmí přepsat předchozí verzi sama sebou
   // o.predchozi: "zachovat" = druhá změna v TÉMŽ tahu asistenta nepřepíše verzi ze začátku tahu
   // (checkup 1. 10.: dvojí přepis vloženým pokynem by originál smazal nevratně);
@@ -211,6 +238,7 @@ function vratit(app, userId, id) {
   if (!pred || typeof pred !== "object") throw chybaS(400, "err.docNoPrevious");
   const ted = snimek(rec);
   for (const k of ["title", "text", "email_to", "email_subject"]) rec.set(k, String(pred[k] == null ? "" : pred[k]));
+  rec.set("meta", ocistiMeta(pred.meta)); // starší verze bez meta → {}
   rec.set("predchozi", ted);
   app.save(rec);
   return rec;
@@ -240,6 +268,7 @@ function vratitTah(app, zmeny) {
       const rec = app.findRecordById("ai_documents", z.id);
       if (z.novy) { app.delete(rec); continue; }
       for (const k of ["title", "text", "email_to", "email_subject"]) rec.set(k, z.pred[k]);
+      if (z.pred.meta != null) rec.set("meta", ocistiMeta(z.pred.meta));
       rec.set("predchozi", z.predPredchozi);
       app.save(rec);
     } catch (err) { /* nic k vrácení */ }
@@ -254,7 +283,7 @@ function odpovedChyby(e, err) {
 }
 
 // ---------- nástroje asistenta ----------
-const DRUH_TEXT = { note: "note", email: "e-mail", summary: "summary", meeting: "meeting points", call: "call points", other: "text" };
+const DRUH_TEXT = { note: "note", email: "e-mail", summary: "summary", meeting: "meeting points", call: "call points", other: "text", presentation: "presentation outline", card: "greeting card / invitation" };
 
 function nastrojSeznam(app, userId) {
   const rows = seznam(app, userId, { limit: 30 });
@@ -267,11 +296,13 @@ function nastrojCteni(app, userId, ref) {
   const hlavicka = [`Title: ${rec.getString("title")}`, `Kind: ${DRUH_TEXT[rec.getString("kind")] || "text"}`];
   if (rec.getString("email_to")) hlavicka.push(`To: ${rec.getString("email_to")}`);
   if (rec.getString("email_subject")) hlavicka.push(`Subject: ${rec.getString("email_subject")}`);
+  const meta = jsonPole(rec, "meta", null) || {};
+  for (const k of ["template", "subtitle", "audience", "date", "place", "link", "signature"]) if (meta[k]) hlavicka.push(`${k[0].toUpperCase() + k.slice(1)}: ${meta[k]}`);
   return hlavicka.join("\n") + "\n\n" + rec.getString("text");
 }
 
 module.exports = {
-  MAX_TEXT, MAX_TITLE, MAX_DOKUMENTU, DRUHY, SKUPINY,
+  MAX_TEXT, MAX_TITLE, MAX_DOKUMENTU, MAX_META, DRUHY, SKUPINY, SABLONY, ocistiMeta,
   dto, sProjekty, najdi, seznam, podleOdkazu, uloz, vratit, smazat, doplnChat, vratitTah, snimek,
   rozdelPredmet, nazevZTextu, odpovedChyby, jeZastupny, norm, radek, nastrojSeznam, nastrojCteni,
 };

@@ -82,7 +82,8 @@ H.beh(async () => {
   const cdp = await page.createCDPSession();
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: stazene, eventsEnabled: true });
   const cekej = async (sel, ms = 10000) => page.waitForSelector(sel, { timeout: ms }).then(() => true).catch(() => false);
-  const textPanelu = () => page.evaluate(() => document.querySelector('[data-testid="chat-panel"]')?.innerText || '');
+  // PDF je od 1. 11. 2026 záložka panelu Kancelář (vedle chatu) → text se čte z obou panelů
+  const textPanelu = () => page.evaluate(() => (document.querySelector('[data-testid="chat-panel"]')?.innerText || '') + '\n' + (document.querySelector('[data-testid="chat-dokumenty"]')?.innerText || ''));
   const cekejText = async (s, ms = 15000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if ((await textPanelu()).includes(s)) return true; await sleep(300); } return false; };
   const cekejStav = async (stav, ms = 20000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await page.$(`[data-testid="chat-akce"][data-stav="${stav}"]`)) return true; await sleep(300); } return false; };
 
@@ -100,9 +101,15 @@ H.beh(async () => {
   await (await page.$('[data-testid="chat-obrazek-input"]')).uploadFile(png);
   expect(await cekej('[data-testid="chat-obrazek-chyba"]') && /obrázky nečte/.test(await page.$eval('[data-testid="chat-obrazek-chyba"]', (el) => el.innerText)) && !(await page.$('[data-testid="chat-obrazek-nahled"] img')), 'vložený obrázek bez modelu na obrázky = místní hláška, žádný náhled ani požadavek');
   require('fs').unlinkSync(png);
-  expect(await cekej('[data-testid="chat-pdf-btn"]'), 'v hlavičce panelu je tlačítko PDF');
-  await page.click('[data-testid="chat-pdf-btn"]');
-  expect(await cekej('[data-testid="chat-pdf"]'), 'záložka PDF se otevře');
+  // od 1. 11. 2026 je PDF záložka panelu Kancelář (jedna ikonka kufříku), ne zvlášť v hlavičce chatu
+  expect(!(await page.$('[data-testid="chat-pdf-btn"]')), 'samostatné tlačítko PDF v hlavičce už není');
+  const otevriPdf = async () => {
+    if (!(await page.$('[data-testid="chat-dokumenty"]'))) await page.click('[data-testid="chat-dokumenty-btn"]');
+    await cekej('[data-testid="chat-dok-zalozka"][data-zalozka="pdf"]');
+    await page.click('[data-testid="chat-dok-zalozka"][data-zalozka="pdf"]');
+  };
+  await otevriPdf();
+  expect(await cekej('[data-testid="chat-dokumenty"] [data-testid="chat-pdf"]'), 'záložka PDF se otevře uvnitř panelu Kancelář');
   expect(await cekejText('soubor nikam neodchází'), 'záložka říká, že soubor zůstává v prohlížeči');
   await (await page.$('[data-testid="chat-pdf-input"]')).uploadFile(nabidka, priloha);
   expect(await cekej('[data-testid="chat-pdf-seznam"]'), 'vybrané soubory jsou v seznamu');
@@ -154,9 +161,9 @@ H.beh(async () => {
   await (await page.$('[data-testid="chat-obrazek-input"]')).uploadFile(zamcene);
   expect(await cekej('[data-testid="chat-obrazek-chyba"]', 15000) && /zamčené heslem nebo má zakázané úpravy/.test(await page.$eval('[data-testid="chat-obrazek-chyba"]', (e) => e.innerText)), 'zamčené PDF: hláška o zákazu úprav při přiložení (ne až na kartě)');
   expect((await page.$('[data-testid="chat-pdf-priloha"]')) === null, 'zamčené PDF se nepřiložilo');
-  await page.click('[data-testid="chat-pdf-btn"]');
+  await otevriPdf();
   await cekej('[data-testid="chat-pdf"]');
-  expect(await cekej('[data-testid="chat-pdf-opravit"]', 5000), 'seznam souborů v záložce přežil přepnutí do chatu a zpět');
+  expect(await cekej('[data-testid="chat-pdf-opravit"]', 5000), 'seznam souborů v záložce přežil přepnutí na Dokumenty a zpět');
 
   console.log('== Opravit s asistentem → příloha → karta → oprava v prohlížeči ==');
   await page.click('[data-testid="chat-pdf-opravit"]');

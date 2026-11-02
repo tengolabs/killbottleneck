@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Bot, ChevronDown, ChevronUp, FileText, Fish, FolderOpen, History, ImagePlus, Loader2, PanelRightClose, Plus, RefreshCw, Send, Sparkles, Sunrise, Moon, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Bot, Briefcase, ChevronDown, ChevronUp, FileText, Fish, History, ImagePlus, Loader2, PanelRightClose, Plus, RefreshCw, Send, Sparkles, Sunrise, Moon, Trash2, X } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA, KEY_RELAX_AKTIVITA, KEY_START_RELAX } from '@/lib/storageKeys';
 import { useRelaxOdpocet, formatOdpocet } from '@/components/relax/useRelaxOdpocet';
 import { NAD_PODIL } from '@/components/relax/RelaxVrstva';
@@ -23,9 +23,8 @@ import { loadKbConfig, useKbConfig } from '@/hooks/useKbConfig';
 import { useHlasovka, HlasovkaTlacitko, HlasovkaPruh } from './Hlasovka';
 import AsistentZprava from './AsistentZprava';
 import AiBlok from './AiBlok';
-import PdfPohled from './PdfPohled';
 import DokumentyPanel from './DokumentyPanel';
-import { STRANKA } from '@/lib/AsistentContext';
+import { STRANKA, NOVY_DOK } from '@/lib/AsistentContext';
 import { strankaNapsat } from '@/api/asistentApi';
 import { useAsistentChat } from './useAsistentChat';
 import { useToast } from '@/components/ui/use-toast';
@@ -46,7 +45,7 @@ const sKlientem = (kontext) => ({ ...kontext, klient: { theme: effectiveTheme(),
 // v požadavku (správce) zůstávají pro měření skripty.
 
 // značka režimu v historii rozhovorů
-const IKONA_REZIMU = { porada: '☀ ', nocni: '☾ ', rozbor: '⚒ ', trideni: '☰ ', novy_projekt: '✦ ', po_schuzce: '✎ ', revize: '↻ ', priprava: '☷ ', tymova_porada: '⚑ ' };
+const IKONA_REZIMU = { porada: '☀ ', nocni: '☾ ', rozbor: '⚒ ', trideni: '☰ ', novy_projekt: '✦ ', po_schuzce: '✎ ', revize: '↻ ', priprava: '☷ ', tymova_porada: '⚑ ', kancelar: '▤ ' };
 const MAX_TEXT = 8000; // strop zprávy na serveru (chat.js)
 const CHYBA_TEXTU = { textDlouhy: 'textTooLong', textPrazdny: 'textEmpty', textChyba: 'textError', zvukVelky: 'voiceTooBig' };
 
@@ -236,7 +235,6 @@ export default function AsistentPanel({ lite = false }) {
   // původní text. Drží se poslední 3 soubory (na telefonu paměť).
   const [pdf, setPdf] = useState(null);         // { name, pages, strany, bytes, stranyBezTextu }
   const [pdfCte, setPdfCte] = useState(false);
-  const [pdfSeznam, setPdfSeznam] = useState([]); // soubory v záložce PDF — přežijí přepnutí do chatu
   const pdfSoubory = useRef(new Map());        // klíč → { bytes }
   const klicPdf = (name, pages) => `${name}|${pages || 0}`;
   const najdiPdf = useCallback((name, pages) => pdfSoubory.current.get(klicPdf(name, pages)) || null, []);
@@ -518,7 +516,7 @@ export default function AsistentPanel({ lite = false }) {
   // akce se počítá až provedená (potvrzení karty s přepisem dokumentu = nový podpis)
   // Stránky (14. 10. 2026): karta `stranka` (create_page / update_page) = záznam „ceka“ — writer spouští PROHLÍŽEČ až po tahu
   // (POST /chat/stranka/napsat, minuty; odpověď se nečeká, panel čeká realtime). Karta akce se stránkou (share_page) jen otevře panel.
-  const podpisy = (msgs) => msgs.flatMap((m, i) => (m.karty || []).map((k, j) => (k.type === 'koncept' || k.type === 'dokument' ? `${k.doc_id}:${i}.${j}`
+  const podpisy = (msgs) => msgs.flatMap((m, i) => (m.karty || []).map((k, j) => ((k.type === 'koncept' || k.type === 'dokument' || k.type === 'soubor') && k.doc_id ? `${k.doc_id}:${i}.${j}`
     : k.type === 'stranka' ? `${STRANKA}${k.page_id}:${i}.${j}:ceka`
     : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.type === 'dokument' ? `${k.odkaz.doc_id}:${i}.${j}:hotovo`
     : k.type === 'akce' && k.stav === 'hotovo' && k.odkaz && k.odkaz.odkaz && k.odkaz.odkaz.type === 'stranka' ? `${STRANKA}${k.odkaz.odkaz.page_id}:${i}.${j}:hotovo`
@@ -556,6 +554,9 @@ export default function AsistentPanel({ lite = false }) {
   // Stránky ze šablony: panel Dokumentů → záložka Stránky → formulář (jen když instance stránky nabízí)
   const strankyOn = !!(kbConfig && kbConfig.pages);
   const otevriNovouStranku = useCallback(() => { panel.setDokId(STRANKA + 'nova'); panel.setDokOpen(true); }, [panel]);
+  // pomocník „Prezentace, přání, pozvánka“ otevře formulář Nový dokument v Kanceláři (jeden průvodce pro tlačítko i AI blok, 1. 11. 2026);
+  // serverový formulář režimu kancelar zůstává pro lite a API
+  const otevriNovyDokument = useCallback(() => { panel.setDokId(NOVY_DOK); panel.setDokOpen(true); }, [panel]);
   useEffect(() => {
     if (!zadost || !ready || !funkcni || A.loading) return;
     vyridZadost();
@@ -563,8 +564,10 @@ export default function AsistentPanel({ lite = false }) {
     // 'zprava' = hotová zpráva složená formulářem (Stránky → šablona, 15. 10. 2026): do běžícího rozhovoru;
     // na telefonu by panel Dokumentů chat zakryl → zavřít
     if (zadost.mode === 'zprava') { if (mobil) panel.setDokOpen(false); A.send(String((zadost.target || {}).text || ''), sKlientem(kontext), patchUser); return; }
+    // 'pdf_oprava' = „Opravit s asistentem“ ze záložky PDF v Kanceláři (1. 11. 2026): soubor jako příloha nad políčkem
+    if (zadost.mode === 'pdf_oprava') { if (mobil) panel.setDokOpen(false); naOpravit((zadost.target || {}).priloha); return; }
     A.zacniRezim(zadost.mode, zadost.target, sKlientem(kontext), patchUser);
-  }, [zadost, ready, funkcni, A, kontext, patchUser, vyridZadost, mobil, panel]);
+  }, [zadost, ready, funkcni, A, kontext, patchUser, vyridZadost, mobil, panel, naOpravit]);
 
   if (!ready || !dostupny) return null;
   // lite: zavřený panel nekreslí nic (host ho stejně odmontuje) — žádná lišta dole ani ouško
@@ -715,9 +718,8 @@ export default function AsistentPanel({ lite = false }) {
           {/* Dokumenty (30. 9. 2026): poznámky, e-maily a sumáře od asistenta — panel vlevo od chatu */}
           {/* relax (Richard 15. 10. 2026): stálý přepínač mapa ⇄ rybičky v hlavičce — bez odpočtu, vedle chatu (na telefonu celá) */}
           <Button variant={panel.relax ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('relaxToggle')} aria-label={t('relaxToggle')} aria-pressed={!!panel.relax} onClick={() => (panel.relax ? panel.ukonciRelax() : spustRelax({ minut: 0, rozlozeni: 'vedle' }))} data-testid="chat-relax-toggle"><Fish className="w-4 h-4" /></Button>
-          <Button variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('dok.title')} aria-label={t('dok.title')} aria-pressed={panel.dokOpen} onClick={() => (panel.dokOpen ? panel.opatrne(() => panel.setDokOpen(false)) : panel.setDokOpen(true))} data-testid="chat-dokumenty-btn"><FolderOpen className="w-4 h-4" /></Button>
-          {/* PDF mezi historií a pamětí (Richard 19. 9. 2026) */}
-          <Button variant={pohled === 'pdf' ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('pdf.tab')} aria-label={t('pdf.tab')} onClick={() => setPohled((p) => (p === 'pdf' ? 'chat' : 'pdf'))} data-testid="chat-pdf-btn"><FileText className="w-4 h-4" /></Button>
+          {/* Kancelář (1. 11. 2026): jedna ikonka = panel se záložkami Dokumenty | Stránky | PDF (dřív zvlášť „složka“ a „dokument“ pro PDF — mátlo) */}
+          <Button variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('dok.kancelarTitle')} aria-label={t('dok.kancelarTitle')} aria-pressed={panel.dokOpen} onClick={() => (panel.dokOpen ? panel.opatrne(() => panel.setDokOpen(false)) : panel.setDokOpen(true))} data-testid="chat-dokumenty-btn"><Briefcase className="w-4 h-4" /></Button>
           <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
           {/* minimalizace, ne zavření — rozhovor zůstává (křížek sváděl k „zavírám úplně", Richard 13. 9.) */}
           <Button variant="ghost" size="icon" className="h-8 w-8" title={t('close')} aria-label={t('close')} onClick={zavriChat} data-testid="chat-zavrit">{mobil ? <ChevronDown className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}</Button>
@@ -726,7 +728,7 @@ export default function AsistentPanel({ lite = false }) {
 
       {!funkcni && <StavAsistenta stav={stav} hosted={!!ai.hosted} spravce={spravce} blik={blik} t={t} onZkusit={() => refreshAiModes()} onRelax={() => spustRelax({ minut: 0 })} onNastaveni={naNastaveniAi} />}
 
-      {pohled === 'pdf' ? <PdfPohled onZpet={() => setPohled('chat')} onOpravit={funkcni ? naOpravit : undefined} loading={A.loading} soubory={pdfSeznam} setSoubory={setPdfSeznam} /> : (
+      {(
         <>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2" data-testid="chat-zpravy">
             {/* Výpadek: historie rovnou v panelu (schválený náhled 19. 10.) — bez AI je to hlavní, co tu jde dělat;
@@ -777,7 +779,7 @@ export default function AsistentPanel({ lite = false }) {
             {/* AI blok (fáze C, 1. 10. 2026): balíčky, které si uživatel spustí sám — pod Nočním plánováním,
                 jen v prázdném rozhovoru */}
             {zpravy.length === 0 && funkcni && !A.loading && (
-              <AiBlok mobil={mobil} userId={user?.id} vedouci={user?.role === 'admin' || user?.role === 'manager'} stranky={strankyOn} disabled={A.loading} onSpust={(mode) => { if (mode === 'stranka') { otevriNovouStranku(); return; } setPohled('chat'); A.zacniRezim(mode, {}, kontext, patchUser); }} />
+              <AiBlok mobil={mobil} userId={user?.id} vedouci={user?.role === 'admin' || user?.role === 'manager'} stranky={strankyOn} disabled={A.loading} onSpust={(mode) => { if (mode === 'stranka') { otevriNovouStranku(); return; } if (mode === 'kancelar') { otevriNovyDokument(); return; } setPohled('chat'); A.zacniRezim(mode, {}, kontext, patchUser); }} />
             )}
             {zpravy.length === 0 && funkcni && (
               <div className="pt-6 text-center space-y-3">

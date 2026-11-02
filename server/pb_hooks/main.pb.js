@@ -2293,6 +2293,7 @@ kbRoute("POST", "/chat/dokument", (e) => {
   if (!b.id) return e.json(404, { error: t(userLang(e.auth), "err.docNotFound") });
   const data = {};
   for (const k of ["title", "text", "email_to", "email_subject"]) if (b[k] != null) data[k] = String(b[k]);
+  if (b.meta != null && typeof b.meta === "object" && !Array.isArray(b.meta)) data.meta = b.meta; // kancelář: šablona, barva, datum, místo, odkaz… (celý objekt)
   try {
     const rec = D.uloz($app, e.auth.id, data, { id: String(b.id) });
     return e.json(200, { dokument: D.sProjekty($app, e.auth, [D.dto(rec, true)])[0] });

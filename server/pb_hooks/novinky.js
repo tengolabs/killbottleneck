@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v0.96-beta": {
+    cs: [
+      "Kancelář v asistentovi: ikona kufříku otevře panel se záložkami Dokumenty, Stránky a PDF; tlačítko Nový nabídne prezentaci, přání, pozvánku, plakát, poděkování, e-mail, body k poradě, poznámku, souhrn nebo fakturu — vyplníte pár polí a asistent to připraví.",
+      "Prezentace projektu ke stažení jako PowerPoint nebo PDF: asistent vezme fakta z mapy, osnovu můžete upravit a soubor stáhnout znovu; poznámky řečníka jsou v PowerPointu pod snímky.",
+      "Přání, pozvánka, plakát a diplom jako PDF k tisku ze čtyř šablon — s barvou, logem organizace, vlastní fotkou a QR kódem na pozvánce.",
+      "Každý dokument asistenta stáhnete jako PDF na hlavičkovém papíře nebo jako Word. Po shrnutí projektu asistent nabídne čip „Udělat z toho prezentaci“.",
+    ],
+    en: [
+      "Office in the assistant: the briefcase icon opens a panel with the tabs Documents, Pages and PDF; the New button offers a presentation, greeting card, invitation, poster, thank-you, e-mail, meeting points, note, summary or invoice — fill in a few fields and the assistant prepares it.",
+      "A project presentation to download as PowerPoint or PDF: the assistant takes the facts from the map, you can edit the outline and download again; speaker notes sit under the slides in PowerPoint.",
+      "Greeting card, invitation, poster and certificate as a printable PDF from four templates — with your colour, the organization logo, your own photo and a QR code on the invitation.",
+      "Every assistant document downloads as a PDF on a letterhead or as Word. After a project summary the assistant offers the chip \"Turn this into a presentation\".",
+    ],
+  },
   "v0.95-beta": {
     cs: [
       "Vyfoťte rozpis přednášek, přiložte PDF nebo vložte e-mail s pozvánkou — asistent dá všechny termíny na jednu kartu a po potvrzení je zapíše do kalendáře.",

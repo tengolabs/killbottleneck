@@ -99,7 +99,13 @@ H.beh(async () => {
   };
   const klikText = async (pg, text, sel = 'button') => {
     for (const h of await pg.$$(sel)) {
-      if ((await pg.evaluate((el) => (el.textContent || '').trim(), h)) === text) { await h.click(); await sleep(600); return true; }
+      if ((await pg.evaluate((el) => (el.textContent || '').trim(), h)) === text) {
+        // doprostřed okna: po tažení v Týdnu je stránka odrolovaná a přepínač pohledů
+        // vykoukne jen z půlky pod ukotvenou lištou → puppeteer neroluje a klik trefí
+        // „Nový projekt“ v liště (2. 11. 2026, záleželo na dni v týdnu)
+        await pg.evaluate((el) => el.scrollIntoView({ block: 'center' }), h);
+        await h.click(); await sleep(600); return true;
+      }
     }
     return false;
   };
