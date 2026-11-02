@@ -537,10 +537,11 @@ function renderEvent(e) {
   const kal = e.calendar_name ? `, calendar: ${e.calendar_name}${away}${e.status ? ', ' + e.status : ''}` : '';
   const parts = (e.participants || []).length && e.kind !== 'absence' ? `, participants: ${e.participants.join(', ')}` : '';
   const rem = e.remind ? `, reminder ${e.remind_before_min} min before` : '';
-  return `${kdy} — ${e.title} (id: ${e.id}, ${kdo}${kal}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ''}`;
+  const kde = e.place ? `, at: ${e.place}` : '';
+  return `${kdy} — ${e.title} (id: ${e.id}, ${kdo}${kal}${kde}${parts}${rem})${e.note ? ` ↳ ${String(e.note).slice(0, 120)}` : ''}`;
 }
 // argumenty události, které jdou do těla 1:1 (title/day jsou u create povinné zvlášť)
-const EVENT_ARGS = ['time', 'end_day', 'end_time', 'note', 'participants', 'remind_before_min', 'calendar'];
+const EVENT_ARGS = ['time', 'end_day', 'end_time', 'note', 'place', 'participants', 'remind_before_min', 'calendar'];
 // 409 u zdroje nese kolidující rezervaci a první volný čas téhož dne — řekneme ho rovnou
 function kolizeText(e) {
   const nf = e.json && e.json.next_free;
@@ -563,6 +564,7 @@ server.registerTool('create_event', {
     end_day: z.string().optional().describe('YYYY-MM-DD; last day of a multi-day event (vacation)'),
     end_time: z.string().optional().describe('HH:MM (24h); end of a timed event (room booking)'),
     note: z.string().optional(),
+    place: z.string().optional().describe('where it takes place (room 214, address, pitch) — max 200 characters; a room to BOOK is a shared calendar instead'),
     participants: z.array(z.string()).optional().describe('e-mails of instance members'),
     remind_before_min: z.number().int().min(0).max(10080).optional().describe('reminder N minutes before start (0 = at start); omit for no reminder'),
     calendar: z.string().optional().describe('name or id of a shared calendar (list_calendars); omit for a personal event'),
@@ -576,6 +578,32 @@ server.registerTool('create_event', {
   } catch (e) { return errText(kolizeText(e)); }
 });
 
+server.registerTool('create_events', {
+  description: 'Create SEVERAL calendar events at once — e.g. every date of a lecture schedule, a seminar invitation or a training plan ("every Tuesday until January" = list each date). All or nothing: when one item is invalid nothing is written and the error names the item. An event that is already in the calendar (same title, day and time) is skipped and reported. calendar, participants and remind_before_min apply to all items. Max 30 items; time off goes one by one via create_event.',
+  inputSchema: strict({
+    items: z.array(z.object({
+      title: z.string(),
+      day: z.string().describe('YYYY-MM-DD'),
+      time: z.string().optional().describe('HH:MM (24h); omit for all-day'),
+      end_day: z.string().optional().describe('YYYY-MM-DD'),
+      end_time: z.string().optional().describe('HH:MM (24h)'),
+      note: z.string().optional(),
+      place: z.string().optional().describe('where it takes place'),
+    }).strict()).min(1).max(30),
+    calendar: z.string().optional().describe('name or id of a shared calendar for all items; omit = personal'),
+    participants: z.array(z.string()).optional().describe('e-mails of instance members invited to all items'),
+    remind_before_min: z.number().int().min(0).max(10080).optional().describe('reminder N minutes before each start'),
+  }),
+}, async (a) => {
+  try {
+    const body = { items: a.items };
+    for (const k of ['calendar', 'participants', 'remind_before_min']) if (a[k] !== undefined) body[k] = a[k];
+    const r = await call('POST', '/api/kb/v1/events/batch', body);
+    const sk = (r.skipped || []).length ? `\nAlready in the calendar (skipped): ${r.skipped.map((x) => `${x.day}${x.time ? ' ' + x.time : ''} ${x.title}`).join('; ')}` : '';
+    return text(r.events.length ? `Created ${r.events.length} event(s)${r.series ? ` (series ${r.series})` : ''}:\n${r.events.map((x) => `• ${renderEvent(x)}`).join('\n')}${sk}` : `No new event created.${sk}`);
+  } catch (e) { return errText(e.message); }
+});
+
 server.registerTool('update_event', {
   description: 'Change an existing event by id: your own, one in a shared calendar as admin/manager, or your own time off. Only the given fields change; an empty string clears time, end_day, end_time or calendar (calendar "" = make it personal). Moving `day` of a multi-day event keeps its length. participants replaces the whole list; remind false cancels the reminder.',
   inputSchema: strict({
@@ -586,6 +614,7 @@ server.registerTool('update_event', {
     end_day: z.string().optional().describe('YYYY-MM-DD; "" = single day'),
     end_time: z.string().optional().describe('HH:MM (24h); "" = no end time'),
     note: z.string().optional(),
+    place: z.string().optional().describe('where it takes place; "" = clear'),
     participants: z.array(z.string()).optional().describe('the complete new list of member e-mails'),
     remind: z.boolean().optional().describe('false cancels the reminder'),
     remind_before_min: z.number().int().min(0).max(10080).optional(),

@@ -20,7 +20,7 @@
 // událost mění jen autor; sdílenou autor + správce/manažer; nepřítomnost i ten,
 // koho se týká. Zdroj (resource) odmítá překryv (najdiKolizi → 409 + next_free).
 
-const EVENT_FIELDS = ["title", "day", "time", "note", "participants", "remind", "remind_before_min", "calendar", "end_day", "end_time"];
+const EVENT_FIELDS = ["title", "day", "time", "note", "participants", "remind", "remind_before_min", "calendar", "end_day", "end_time", "place"];
 const CALENDAR_FIELDS = ["name", "kind", "color", "description", "write_access", "needs_approval", "archived", "visibility", "members"];
 const CALENDAR_KINDS = ["shared", "resource", "absence"];
 const NODE_REMINDER_FIELDS = ["offset_days", "time"];
@@ -36,6 +36,8 @@ const MAX_CALENDARS = 100;
 // strop výpisu událostí v okně (dřív 1000: zasedačka 3×/den + firemní + nepřítomnosti by za rok tiše schovaly nejbližší budoucí)
 const MAX_EVENTS_LIST = 3000;
 const RESOURCE_DAY_END = "20:00"; // do kdy hledat náhradní volný čas téhož dne
+// více událostí najednou (z pozvánky / rozpisu, 22. 10. 2026): „každé úterý celé pololetí“ = ~20 výskytů
+const MAX_EVENTS_BATCH = 30;
 
 // platný kalendářní den (regex pustí 2026-13-45)
 function validDay(s) {
@@ -357,6 +359,11 @@ function validateEvent(info, lang, rec) {
     if (note.length > 2000) return { error: t(lang, "err.eventNoteLong") };
     data.note = note;
   }
+  if (info.place !== undefined) {
+    const place = String(info.place || "").trim();
+    if (place.length > 200) return { error: t(lang, "err.eventPlaceLong") };
+    data.place = place;
+  }
   if (info.remind !== undefined) data.remind = !!info.remind;
   if (info.remind_before_min !== undefined) {
     const n = Number(info.remind_before_min);
@@ -519,6 +526,8 @@ function eventDto(app, rec, u, emaily, kal) {
     end_day: rec.getString("end_day"),
     end_time: rec.getString("end_time"),
     note: rec.getString("note"),
+    place: rec.getString("place"),
+    series: rec.getString("series"),
     owner_email: ownerEmail,
     participants: parts,
     remind: rec.getBool("remind"),
@@ -633,7 +642,8 @@ function saveEvent(app, user, rec, info, ctx) {
   if (!rec) {
     const { MAX_EVENTS_PER_USER } = require(`${__hooks}/helpers.js`);
     let pocet = 0;
-    try { pocet = app.findRecordsByFilter("events", "owner = {:u}", "", MAX_EVENTS_PER_USER + 1, 0, { u: user.id }).length; } catch (err) { pocet = 0; }
+    // jen spočítat (dávka volá saveEvent až 30× uvnitř transakce — načítat 2001 záznamů na položku brzdilo zápis)
+    try { pocet = app.countRecords("events", $dbx.hashExp({ owner: user.id })); } catch (err) { pocet = 0; }
     if (pocet >= MAX_EVENTS_PER_USER) return { status: 400, body: { error: t(lang, "err.eventLimit", { max: MAX_EVENTS_PER_USER }) } };
     rec = new Record(app.findCollectionByNameOrId("events"));
     rec.set("owner", user.id);
@@ -645,6 +655,9 @@ function saveEvent(app, user, rec, info, ctx) {
     rec.set("calendar", "");
     rec.set("end_day", "");
     rec.set("end_time", "");
+    rec.set("place", "");
+    // série = události založené najednou z jedné pozvánky (createEventsBatch); jinak prázdná
+    rec.set("series", String(ctx.series || ""));
     // nepřítomnost v kalendáři se schvalováním čeká na správce/manažera (výchozí vypnuto)
     rec.set("status", absence && cal.getBool("needs_approval") ? "requested" : "");
   }
@@ -809,6 +822,179 @@ function deleteEvent(app, user, rec, lang) {
   return { status: 200, body: { success: true } };
 }
 
+// ---------- více událostí najednou (z pozvánky / rozpisu, 22. 10. 2026) ----------
+
+// stejná událost už v kalendáři je = stejný název (bez velikosti písmen a diakritiky), den a čas
+// v TÉMŽE cílovém kalendáři (osobní = bez kalendáře) a uživatel ji vidí — pozvánka poslaná podruhé
+// nic nezdvojí; kolegova akce ve sdíleném kalendáři ani archiv osobní zápis nepřeskočí (/checkup 2. 11.)
+function najdiDuplicitu(app, user, item, kal, calId) {
+  const { normText } = require(`${__hooks}/helpers.js`);
+  let rows = [];
+  try {
+    rows = app.findRecordsByFilter("events", '(owner = {:u} || participants.id ?= {:u} || calendar != "") && day = {:d}', "time", 200, 0, { u: user.id, d: item.day });
+  } catch (err) { rows = []; }
+  const n = normText(item.title);
+  return rows.find((r) => {
+    const c = r.getString("calendar");
+    if (c !== String(calId || "")) return false;
+    const k = c ? kal[c] || null : null;
+    if (c && (!k || k.getBool("archived"))) return false;
+    return normText(r.getString("title")) === n && r.getString("time") === String(item.time || "") && pravaUdalosti(user, r, k).vidi;
+  }) || null;
+}
+
+// časový překryv s jinou viditelnou událostí téhož dne (jen UPOZORNĚNÍ — osobní kalendář nic neblokuje;
+// zdroj blokuje najdiKolizi). Celodenní se nepočítají (dovolená kolegy není kolize pro trénink dětí).
+function prekryvUdalosti(app, user, item, kal) {
+  if (!item.time) return null;
+  // termín jen se začátkem (u pozvánek nejčastější) = výchozí délka, jinak by měl nulovou délku a nikdy nic nepřekryl
+  const sDelkou = (x) => {
+    if (x.od < x.do) return x;
+    const H = require(`${__hooks}/helpers.js`);
+    return { od: x.od, do: H.minusMinutes(x.od.slice(0, 10), x.od.slice(11), -DEFAULT_RESOURCE_MIN) };
+  };
+  const ja = sDelkou(rozsahUdalosti({ day: item.day, time: item.time, end_day: item.end_day || "", end_time: item.end_time || "" }));
+  let rows = [];
+  try {
+    rows = app.findRecordsByFilter("events", '(owner = {:u} || participants.id ?= {:u} || calendar != "") && day <= {:d} && (end_day >= {:d} || day >= {:d}) && time != ""',
+      "time", 200, 0, { u: user.id, d: item.day });
+  } catch (err) { rows = []; }
+  return rows.find((r) => {
+    const c = kal[r.getString("calendar")] || null;
+    if (r.getString("calendar") && (!c || c.getBool("archived") || c.getString("kind") === "absence")) return false;
+    if (!pravaUdalosti(user, r, c).vidi) return false;
+    const x = sDelkou(rozsahUdalosti(r));
+    return x.od < ja.do && ja.od < x.do;
+  }) || null;
+}
+
+// Rozbor dávky BEZ zápisu (asistent ho volá před kartou, createEventsBatch před transakcí):
+// společné hodnoty (calendar, participants, remind_before_min) + items[]. Vrací { error } nebo
+// { polozky: [{ body, duplicita, prekryv }], cal } — duplicita = už v kalendáři (nezaloží se),
+// prekryv = jiná událost v tu dobu (jen upozornění).
+function rozborDavky(app, user, info, lang) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const items = Array.isArray(info && info.items) ? info.items : null;
+  if (!items || !items.length || items.length > MAX_EVENTS_BATCH) return { error: { status: 400, body: { error: t(lang, "err.eventsBatchCount", { max: MAX_EVENTS_BATCH }) } } };
+  const spolecne = {};
+  for (const k of ["calendar", "participants", "remind_before_min"]) if (info[k] !== undefined) spolecne[k] = info[k];
+  const vs = validateEvent(spolecne, lang, {
+    // úprava „bez záznamu“: společné hodnoty se validují samostatně (title/day jsou až v položkách)
+    getBool: () => false, getString: () => "", get: () => null,
+  });
+  if (vs.error) return { error: { status: 400, body: { error: vs.error } } };
+  let cal = null;
+  if (vs.data.calendar) {
+    cal = kalendarZaznam(app, vs.data.calendar, { user: user });
+    if (!cal) return { error: { status: 404, body: { error: t(lang, "err.calendarNotFound", { name: vs.data.calendar.slice(0, 80) }) } } };
+    if (cal.getString("kind") === "absence") return { error: { status: 400, body: { error: t(lang, "err.eventsBatchAbsence") } } };
+    const w = smiZapisovat(user, cal, lang);
+    if (w.error) return { error: w.error };
+  }
+  if (vs.data.participants && vs.data.participants.length) {
+    const p = resolveParticipants(app, vs.data.participants, user.id, lang);
+    if (p.error) return { error: { status: 400, body: { error: p.error } } };
+  }
+  const kal = kalendareMapa(app, user);
+  const { normText } = require(`${__hooks}/helpers.js`);
+  const polozky = [];
+  const videne = {};
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i] || {};
+    const chyba = (msg) => ({ error: { status: 400, body: { error: t(lang, "err.eventsBatchItem", { n: i + 1, title: String(it.title || "").slice(0, 80), error: msg }) } } });
+    const body = {};
+    for (const k of ["title", "day", "time", "end_day", "end_time", "note", "place"]) if (it[k] !== undefined) body[k] = it[k];
+    const v = validateEvent(body, lang, null);
+    if (v.error) return chyba(v.error);
+    const cr = checkEventRange({ day: v.data.day, time: v.data.time || "", end_day: v.data.end_day || "", end_time: v.data.end_time || "" }, cal, lang);
+    if (cr.error) return chyba(cr.error);
+    const eff = Object.assign({}, v.data, cr.data);
+    // duplicita PŘED kolizí zdroje: rozpis poslaný podruhé do Učebny se přeskočí, ne „obsazeno“ (/checkup 2. 11.)
+    const klic = normText(eff.title) + "|" + eff.day + "|" + (eff.time || "");
+    const dup = videne[klic] ? { title: eff.title, id: "" } : (() => { const r = najdiDuplicitu(app, user, eff, kal, cal ? cal.id : ""); return r ? { title: r.getString("title"), id: r.id } : null; })();
+    videne[klic] = true;
+    // zdroj: překryv s rezervací v kalendáři i s dřívější položkou TÉŽE dávky
+    if (!dup && cal && cal.getString("kind") === "resource") {
+      const k = najdiKolizi(app, cal.id, cr.data, "");
+      const ja = rozsahUdalosti(cr.data);
+      const vDavce = polozky.find((p) => !p.duplicita && (() => { const x = rozsahUdalosti(p.eff); return x.od < ja.do && ja.od < x.do; })());
+      if (k) { const kr = rozsahUdalosti(k.rec); return chyba(t(lang, "err.eventCollision", { name: cal.getString("name"), title: k.rec.getString("title"), from: kr.od.slice(11), to: kr.do.slice(11) })); }
+      if (vDavce) { const kr = rozsahUdalosti(vDavce.eff); return chyba(t(lang, "err.eventCollision", { name: cal.getString("name"), title: vDavce.eff.title, from: kr.od.slice(11), to: kr.do.slice(11) })); }
+    }
+    const pr = dup ? null : prekryvUdalosti(app, user, eff, kal);
+    polozky.push({ n: i + 1, body: Object.assign({}, vs.data, body, cal ? { calendar: cal.id } : {}), eff: eff, duplicita: dup,
+      prekryv: pr ? { title: pr.getString("title"), time: pr.getString("time"), end_time: pr.getString("end_time") } : null });
+  }
+  return { polozky: polozky, cal: cal };
+}
+
+// Založí víc událostí NAJEDNOU (všechno, nebo nic): stejná validace i práva jako saveEvent,
+// společné `series`, duplicity se přeskočí. Pozvaní dostanou JEDNU notifikaci za celou dávku.
+function createEventsBatch(app, user, info, ctx) {
+  const { notify } = require(`${__hooks}/helpers.js`);
+  const lang = ctx.lang;
+  const r = rozborDavky(app, user, info, lang);
+  if (r.error) return r.error;
+  // chronologicky: odpověď i notifikace „od {day}“ začínají nejdřívějším termínem, ať model poslal pořadí jakékoli
+  const nove = r.polozky.filter((p) => !p.duplicita)
+    .sort((a, b) => (a.eff.day + " " + (a.eff.time || "")).localeCompare(b.eff.day + " " + (b.eff.time || "")));
+  const series = nove.length > 1 ? $security.randomString(15) : "";
+  const vytvorene = [];
+  let selhani = null;
+  if (nove.length) {
+    try {
+      app.runInTransaction((tx) => {
+        for (const p of nove) {
+          const x = saveEvent(tx, user, null, p.body, { lang: lang, tise: true, series: series });
+          if (x.status !== 200) {
+            // chyba až při zápisu (strop událostí, souběžná rezervace) — i tady říct, KTERÁ položka
+            const { t } = require(`${__hooks}/i18n.js`);
+            selhani = { status: x.status, body: Object.assign({}, x.body, { error: t(lang, "err.eventsBatchItem", { n: p.n, title: String(p.eff.title || "").slice(0, 80), error: x.body.error }) }) };
+            throw new Error("davka");
+          }
+          vytvorene.push(x.body.event);
+        }
+      });
+    } catch (err) {
+      if (selhani) return selhani;
+      throw err;
+    }
+  }
+  // pozvaní: jedna notifikace za dávku (dřív by 20 tréninků = 20 zvonečků)
+  const prvni = vytvorene[0];
+  if (prvni && !ctx.tise) {
+    let ids = [];
+    try { ids = (app.findRecordById("events", prvni.id).get("participants") || []); } catch (err) { ids = []; }
+    for (const u of usersByIds(app, ids)) {
+      try {
+        notify(app, {
+          email: u.getString("email"), actorEmail: user.email(), type: "event_invited", eventId: prvni.id,
+          textKey: vytvorene.length > 1 ? "notify.eventsInvited" : "notify.eventInvited",
+          params: { by: user.email(), title: prvni.title, day: prvni.day, time: prvni.time ? " " + prvni.time : "", count: vytvorene.length },
+        });
+      } catch (err) { try { app.logger().warn("events: notifikace pozvání (dávka) selhala", "error", String(err)); } catch (e2) { /* log je bonus */ } }
+    }
+  }
+  return { status: 200, body: {
+    events: vytvorene,
+    skipped: r.polozky.filter((p) => p.duplicita).map((p) => ({ title: p.eff.title, day: p.eff.day, time: p.eff.time || "", existing_id: p.duplicita.id })),
+    series: series,
+  } };
+}
+
+// smazání celé série: jen události, které uživatel SMÍ MĚNIT (pozvaný z cizí série nic nesmaže)
+function deleteSeries(app, user, series, lang) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const s = String(series || "").trim();
+  let rows = [];
+  if (s) { try { rows = app.findRecordsByFilter("events", "series = {:s}", "day,time", MAX_EVENTS_BATCH * 4, 0, { s: s }); } catch (err) { rows = []; } }
+  const kal = kalendareMapa(app, user);
+  rows = rows.filter((r) => pravaUdalosti(user, r, kal[r.getString("calendar")] || null).meni);
+  if (!rows.length) return { status: 404, body: { error: t(lang, "err.seriesNotFound") } };
+  app.runInTransaction((tx) => { for (const r of rows) tx.delete(r); });
+  return { status: 200, body: { success: true, events_deleted: rows.length } };
+}
+
 // ---------- připomínky k uzlům ----------
 
 function nodeReminderDto(rec) {
@@ -893,6 +1079,7 @@ function deleteNodeReminder(app, user, id, lang) {
 
 module.exports = {
   EVENT_FIELDS, CALENDAR_FIELDS, CALENDAR_KINDS, NODE_REMINDER_FIELDS, TIME_RE, DAY_RE, MAX_PARTICIPANTS, MAX_REMIND_MIN, MAX_OFFSET_DAYS,
+  MAX_EVENTS_BATCH, rozborDavky, createEventsBatch, deleteSeries,
   validDay, validateEvent, checkEventRange, resolveParticipants, eventDto, findEvent, saveEvent, listEvents, deleteEvent, leaveEvent,
   kalendareMapa, kalendarZaznam, kalendarUdalosti, kalendarViditelny, calendarDto, listCalendars, saveCalendar, smiZapisovat, pravaUdalosti,
   najdiKolizi, rozsahUdalosti, whoIsAway, listAway, decideAbsence, deleteCalendar, zalozVychoziKalendare, MAX_EVENTS_LIST,

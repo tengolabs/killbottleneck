@@ -70,7 +70,7 @@ export default function LiteKalendar() {
                   <button key={ev.id} type="button" onClick={() => otevri(ev)} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left border-b last:border-b-0 active:bg-secondary" data-testid={`lite-kal-udalost-${ev.id}`}>
                     <span className="w-16 shrink-0 tabular-nums text-xs font-semibold text-sky-700 dark:text-sky-300">{cas}</span>
                     <I className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{ev.title}</span>
+                    <span className="truncate">{ev.title}{ev.place ? <span className="text-muted-foreground"> · {ev.place}</span> : null}</span>
                     {ev.calendar_name && <span className="ml-auto text-[10px] rounded px-1 bg-secondary text-muted-foreground truncate max-w-[7rem]">{ev.calendar_name}</span>}
                   </button>
                 );

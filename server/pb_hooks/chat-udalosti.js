@@ -25,12 +25,51 @@ function udalostZaznam(app, auth, ref, day, iPozvane) {
 }
 
 // tělo události pro v1 z argumentů modelu: `person` (nepřítomnost „Jana má dovolenou“) = participants
-const TELO_UDALOSTI = ["time", "end_day", "end_time", "note", "participants", "remind_before_min", "calendar"];
+const TELO_UDALOSTI = ["time", "end_day", "end_time", "note", "place", "participants", "remind_before_min", "calendar"];
 function teloUdalosti(a, klice) {
   const body = {};
   for (const k of klice) if (a[k] !== undefined) body[k] = a[k];
   if (a.person !== undefined && body.participants === undefined) body.participants = String(a.person || "").trim() ? [String(a.person).trim()] : [];
   return body;
+}
+
+// položka dávky jen s poli, která server bere (model občas přidá participants/calendar do položky — ty jsou společné)
+function polozkaDavky(x) {
+  const out = {};
+  for (const k of ["title", "day", "time", "end_day", "end_time", "note", "place"]) if (x && x[k] !== undefined) out[k] = x[k];
+  return out;
+}
+
+// „út 4. 11.“ / „Tue 4 Nov“
+const DNY_CS = ["ne", "po", "út", "st", "čt", "pá", "so"];
+const DNY_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function denTydne(day, L) {
+  const m = String(day || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay();
+  return (L === "en" ? DNY_EN : DNY_CS)[d] || "";
+}
+
+// Řádky karty create_events (všechny termíny, ať si uživatel všimne špatně přečteného data DŘÍV, než se uloží):
+// [{ kdy, title, place, stav: ""|"dup"|"prekryv"|"minulost", info }] — stav počítá stejný rozbor jako server
+function udalostiKarty(app, auth, L, a) {
+  const E = require(`${__hooks}/events-api.js`);
+  const H = require(`${__hooks}/helpers.js`);
+  const body = { items: (Array.isArray(a.items) ? a.items : []).map(polozkaDavky) };
+  for (const k of ["calendar", "participants", "remind_before_min"]) if (a[k] !== undefined) body[k] = a[k];
+  const r = E.rozborDavky(app, auth, body, L === "en" ? "en" : "cs");
+  if (r.error) return [];
+  const dnes = H.nowLocalMinute().slice(0, 10);
+  return r.polozky.map((p) => {
+    const e = p.eff;
+    const kdy = `${denTydne(e.day, L)} ${kdyUdalosti(e.day, e.time, e.end_day, e.end_time, L, true)}`.trim();
+    let stav = "";
+    let info = "";
+    if (p.duplicita) stav = "dup";
+    else if (e.day < dnes) stav = "minulost";
+    else if (p.prekryv) { stav = "prekryv"; info = `${p.prekryv.title}${p.prekryv.time ? " " + p.prekryv.time + (p.prekryv.end_time ? "–" + p.prekryv.end_time : "") : ""}`; }
+    return { kdy: kdy, title: SPOL().ocisti(e.title, 120), place: SPOL().ocisti(e.place || "", 120), stav: stav, info: SPOL().ocisti(info, 140) };
+  });
 }
 
 // kolize zdroje (409) pro model: kolidující rezervace + první volný čas téhož dne
@@ -54,11 +93,14 @@ const NASTROJE = [
   // události a časové připomínky (19. 9. 2026) — skupina `udalosti`, zápis přes v1 dočasným klíčem
   // + týmový kalendář (14. 10. 2026): sdílené kalendáře (firemní / zasedačka / nepřítomnosti), konec události, kdo je pryč
   { name: "create_event", skupina: "udalosti", kind: "write", description: "Create a calendar EVENT with a time (meeting, call, dentist, video conference…) — NOT a task and not part of any map. Personal by default; `calendar` (a shared calendar name from list_calendars) makes it a company event (kind shared), a room/car booking (kind resource — needs time, end_time defaults to +60 min, an overlapping booking is refused and the error names the next free slot) or time off (kind absence — all-day, end_day for a range, `person` = who is away, default the user). Optional participants (e-mails of instance members from list_people — each sees it in their calendar) and a reminder N minutes before (in-app + e-mail). The user confirms first.",
-    parameters: { type: "object", properties: { title: { type: "string" }, day: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM (24h); omit for an all-day event" }, end_day: { type: "string", description: "YYYY-MM-DD; last day of a multi-day event (vacation)" }, end_time: { type: "string", description: "HH:MM (24h); end of a timed event (room booking, meeting length)" }, note: { type: "string" }, participants: { type: "array", items: { type: "string" }, description: "e-mails of instance members (from list_people)" }, person: { type: "string", description: "absence only: e-mail of the person who is away (omit = the user)" }, remind_before_min: { type: "integer", description: "reminder N minutes before start (0 = at start); omit for no reminder" }, calendar: { type: "string", description: "name of a shared calendar (list_calendars); omit for a personal event" } }, required: ["title", "day"], additionalProperties: false } },
+    parameters: { type: "object", properties: { title: { type: "string" }, day: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM (24h); omit for an all-day event" }, end_day: { type: "string", description: "YYYY-MM-DD; last day of a multi-day event (vacation)" }, end_time: { type: "string", description: "HH:MM (24h); end of a timed event (room booking, meeting length)" }, note: { type: "string" }, place: { type: "string", description: "where it takes place (room 214, address, pitch); a room to BOOK is a shared calendar instead" }, participants: { type: "array", items: { type: "string" }, description: "e-mails of instance members (from list_people)" }, person: { type: "string", description: "absence only: e-mail of the person who is away (omit = the user)" }, remind_before_min: { type: "integer", description: "reminder N minutes before start (0 = at start); omit for no reminder" }, calendar: { type: "string", description: "name of a shared calendar (list_calendars); omit for a personal event" } }, required: ["title", "day"], additionalProperties: false } },
+  // z pozvánky / rozpisu (22. 10. 2026): víc termínů na JEDNÉ kartě, zápis vše nebo nic, duplicity se přeskočí
+  { name: "create_events", skupina: "udalosti", kind: "write", description: "Create SEVERAL calendar events at once on ONE card — every date of an invitation, a lecture or seminar schedule, kids' trainings or a class (a photo, PDF or pasted e-mail). Expand repetition (\"every Tuesday until January\") into single days; at most 30. Same title for the whole series. calendar / participants / remind_before_min apply to all items. An event already in the calendar (same title, day and time) is skipped. Time off goes one by one via create_event. The user confirms first.",
+    parameters: { type: "object", properties: { items: { type: "array", minItems: 1, maxItems: 30, items: { type: "object", properties: { title: { type: "string" }, day: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM (24h); omit for all-day" }, end_day: { type: "string", description: "YYYY-MM-DD; only for a multi-day item" }, end_time: { type: "string", description: "HH:MM (24h)" }, place: { type: "string", description: "where it takes place" }, note: { type: "string", description: "short: lecturer, what to bring, price" } }, required: ["title", "day"], additionalProperties: false } }, calendar: { type: "string", description: "name of a shared calendar (list_calendars); omit for personal" }, participants: { type: "array", items: { type: "string" }, description: "e-mails of instance members invited to every item" }, remind_before_min: { type: "integer", description: "reminder N minutes before each start; omit for none" } }, required: ["items"], additionalProperties: false } },
   { name: "list_events", skupina: "udalosti", kind: "read", description: "The calendar events the user sees — own, invited and every event of the shared calendars (company events, room bookings, time off) — in a day range; default today−365 … +730. Optional calendar = one shared calendar only.",
     parameters: { type: "object", properties: { from: { type: "string", description: "YYYY-MM-DD" }, to: { type: "string", description: "YYYY-MM-DD" }, calendar: { type: "string", description: "name of a shared calendar" } }, required: [], additionalProperties: false } },
   { name: "update_event", skupina: "udalosti", kind: "write", description: "Change an EXISTING calendar event: move it (new_day/time), set its end (end_day/end_time), rename it, edit the note or participants, move it between calendars (calendar; \"\" = personal), or set/change/remove its reminder (\"remind me an hour before\" on an event already created = update_event with remind_before_min 60; remind false removes it). event_id = the id from list_events or the create result, or the exact title (add day when the title repeats). The user may change their own events, events in shared calendars as admin/manager, and their own time off. Moving the day of a multi-day event keeps its length. The user confirms first.",
-    parameters: { type: "object", properties: { event_id: { type: "string" }, day: { type: "string", description: "YYYY-MM-DD, only to find the event by title when several share it; combine with new_day to move it" }, title: { type: "string" }, new_day: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM (24h); empty string = all-day" }, end_day: { type: "string", description: "YYYY-MM-DD; empty string = single day" }, end_time: { type: "string", description: "HH:MM (24h); empty string = no end time" }, note: { type: "string" }, participants: { type: "array", items: { type: "string" }, description: "the FULL new list of participant e-mails" }, remind: { type: "boolean", description: "false = remove the reminder" }, remind_before_min: { type: "integer", description: "reminder N minutes before start (0 = at start)" }, calendar: { type: "string", description: "shared calendar name; empty string = personal" } }, required: ["event_id"], additionalProperties: false } },
+    parameters: { type: "object", properties: { event_id: { type: "string" }, day: { type: "string", description: "YYYY-MM-DD, only to find the event by title when several share it; combine with new_day to move it" }, title: { type: "string" }, new_day: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM (24h); empty string = all-day" }, end_day: { type: "string", description: "YYYY-MM-DD; empty string = single day" }, end_time: { type: "string", description: "HH:MM (24h); empty string = no end time" }, note: { type: "string" }, place: { type: "string", description: "where it takes place; empty string = clear" }, participants: { type: "array", items: { type: "string" }, description: "the FULL new list of participant e-mails" }, remind: { type: "boolean", description: "false = remove the reminder" }, remind_before_min: { type: "integer", description: "reminder N minutes before start (0 = at start)" }, calendar: { type: "string", description: "shared calendar name; empty string = personal" } }, required: ["event_id"], additionalProperties: false } },
   { name: "delete_event", skupina: "udalosti", kind: "write", description: "Delete a calendar event (own; in a shared calendar as admin/manager; invitees lose it too). If the user was only invited, they leave the event instead. event_id = id from list_events or the exact title. Cannot be undone. The user confirms first.",
     parameters: { type: "object", properties: { event_id: { type: "string" }, day: { type: "string", description: "YYYY-MM-DD, only to find the event by title" } }, required: ["event_id"], additionalProperties: false } },
   { name: "list_calendars", skupina: "udalosti", kind: "read", description: "The shared calendars of the team — company events (shared), rooms and other bookable things (resource), vacations and time off (absence) — with who may add entries and whether time off needs approval. Use the names in create_event / update_event `calendar`.",
@@ -149,11 +191,26 @@ function vykonej(app, auth, L, name, args, ktx) {
         return { text: `Event created: ${M.renderEvent(ev)}.${kal}${kdy} Tell the user only this.`, karta: { type: "vysledek", udalost_id: ev.id, udalost_den: ev.day } };
       });
     }
+    case "create_events": {
+      return SPOL().sDocasnymKlicem(app, auth, (v1) => {
+        const body = { items: (Array.isArray(a.items) ? a.items : []).map(polozkaDavky) };
+        for (const k of ["calendar", "participants", "remind_before_min"]) if (a[k] !== undefined) body[k] = a[k];
+        const r = v1("POST", "/v1/events/batch", body);
+        if (r.status !== 200) return { text: SPOL().chybaV1(r) };
+        const ev = r.json.events || [];
+        const sk = r.json.skipped || [];
+        const preskoceno = sk.length ? ` Skipped ${sk.length} already in the calendar: ${sk.map((x) => `${x.day}${x.time ? " " + x.time : ""} ${x.title}`).join("; ")}.` : "";
+        const kal = ev[0] && ev[0].calendar_name ? ` In the shared calendar "${ev[0].calendar_name}" — the whole team sees them.` : "";
+        return { text: `Created ${ev.length} event(s)${ev.length ? `: ${ev.map((x) => `${x.day}${x.time ? " " + x.time : ""}`).join(", ")}` : ""}.${kal}${preskoceno} Tell the user only this.`,
+          pozvanka: { vytvoreno: ev.length, preskoceno: sk.length },
+          karta: ev.length ? { type: "vysledek", udalost_id: ev[0].id, udalost_den: ev[0].day, serie: ev.length > 1 } : undefined };
+      });
+    }
     case "update_event": {
       const ev = udalostZaznam(app, auth, a.event_id, a.day);
       if (!ev) return { text: "Error: event not found." };
       return SPOL().sDocasnymKlicem(app, auth, (v1) => {
-        const body = teloUdalosti(a, ["title", "time", "end_day", "end_time", "note", "participants", "remind", "remind_before_min", "calendar"]);
+        const body = teloUdalosti(a, ["title", "time", "end_day", "end_time", "note", "place", "participants", "remind", "remind_before_min", "calendar"]);
         if (a.new_day !== undefined) body.day = a.new_day;
         if (body.remind_before_min !== undefined && body.remind === undefined) body.remind = true;
         const r = v1("POST", `/v1/events/${encodeURIComponent(ev.id)}`, body);
@@ -258,6 +315,20 @@ function overZapis(app, auth, name, a) {
       }
       return null;
     }
+    // víc událostí: celá dávka se ověří PŘED kartou stejnou funkcí, kterou pak volá server (rozborDavky)
+    case "create_events": {
+      const E = require(`${__hooks}/events-api.js`);
+      const body = { items: (Array.isArray(a.items) ? a.items : []).map(polozkaDavky) };
+      for (const k of ["calendar", "participants", "remind_before_min"]) if (a[k] !== undefined) body[k] = a[k];
+      const r = E.rozborDavky(app, auth, body, "en");
+      if (r.error) {
+        const msg = r.error.body.error;
+        if (/calendar/i.test(msg) && body.calendar && r.error.status === 404) return `Error: ${msg} Shared calendars: ${seznamKalendaru(app, auth)}. Omit calendar for personal events.`;
+        return `Error: ${msg}${/participant|member|e-mail/i.test(msg) ? " Use list_people for valid e-mails." : ""} Nothing was written — fix the item and call create_events again with ALL items.`;
+      }
+      if (r.polozky.every((p) => p.duplicita)) return "Error: all these events are already in the calendar (same title, day and time) — nothing to add. Tell the user.";
+      return null;
+    }
     case "create_calendar": {
       const E = require(`${__hooks}/events-api.js`);
       const { jeAdminNeboManazer, normText } = require(`${__hooks}/helpers.js`);
@@ -281,9 +352,9 @@ function overZapis(app, auth, name, a) {
       const ev = udalostZaznam(app, auth, a.event_id, a.day, name === "delete_event");
       if (!ev) return `Error: event "${String(a.event_id || "")}" not found among the user's ${name === "delete_event" ? "" : "own "}events${name === "delete_event" ? "" : " (nor among shared-calendar events the user may change)"} (use list_events and pass the id${name === "delete_event" ? "" : "; an invited event can only be left — delete_event removes it from the user's calendar"}).`;
       if (name === "delete_event") return null;
-      const zmeny = teloUdalosti(a, ["title", "time", "end_day", "end_time", "note", "participants", "remind", "remind_before_min", "calendar"]);
+      const zmeny = teloUdalosti(a, ["title", "time", "end_day", "end_time", "note", "place", "participants", "remind", "remind_before_min", "calendar"]);
       if (a.new_day !== undefined) zmeny.day = a.new_day;
-      if (!Object.keys(zmeny).length) return "Error: pass at least one change (title, new_day, time, end_day, end_time, note, participants, calendar, remind or remind_before_min).";
+      if (!Object.keys(zmeny).length) return "Error: pass at least one change (title, new_day, time, end_day, end_time, note, place, participants, calendar, remind or remind_before_min).";
       if (zmeny.remind_before_min !== undefined && zmeny.remind === undefined) zmeny.remind = true;
       const v = E.validateEvent(zmeny, "en", ev);
       if (v.error) return `Error: ${v.error}`;
@@ -384,7 +455,7 @@ function popisAkce(app, auth, L, name, a) {
     }
     case "create_event": {
       const E = require(`${__hooks}/events-api.js`);
-      const cal = a.calendar ? E.kalendarZaznam(app, a.calendar) : null;
+      const cal = a.calendar ? E.kalendarZaznam(app, a.calendar, { user: auth }) : null;
       const kind = cal ? cal.getString("kind") : "";
       // zdroj bez konce = +60 min (stejně jako server) — karta ukáže skutečný rozsah rezervace
       const cr = E.checkEventRange({ day: a.day, time: a.time || "", end_day: a.end_day || "", end_time: a.end_time || "" }, cal, "en");
@@ -402,6 +473,23 @@ function popisAkce(app, auth, L, name, a) {
       if (cal && kind !== "resource") casti.push(cs ? `do kalendáře „${cal.getString("name")}“` : `in the calendar "${cal.getString("name")}"`);
       if (a.remind_before_min !== undefined) casti.push(cs ? `připomenout ${Number(a.remind_before_min) === 0 ? "v čas začátku" : `${a.remind_before_min} min předem`}` : `remind ${Number(a.remind_before_min) === 0 ? "at start" : `${a.remind_before_min} min before`}`);
       const lide = kind === "absence" ? [] : (Array.isArray(a.participants) ? a.participants : []).map((p) => SPOL().ocisti(p, 80)).filter(Boolean);
+      if (lide.length) casti.push((cs ? "pozvat: " : "invite: ") + lide.join(", "));
+      return casti.join(" · ");
+    }
+    case "create_events": {
+      const E = require(`${__hooks}/events-api.js`);
+      const items = (Array.isArray(a.items) ? a.items : []).filter((x) => x && x.day);
+      const dny = items.map((x) => String(x.day)).sort();
+      const nazvy = items.map((x) => SPOL().ocisti(x.title, 120)).filter((x, i, arr) => x && arr.indexOf(x) === i);
+      const nazev = nazvy.length === 1 ? (cs ? `„${nazvy[0]}“` : `"${nazvy[0]}"`) : "";
+      const rozsah = dny.length ? (dny[0] === dny[dny.length - 1] ? SPOL().datumKratce(dny[0], L) : `${SPOL().datumKratce(dny[0], L)}–${SPOL().datumKratce(dny[dny.length - 1], L)}`) : "";
+      const n = items.length;
+      const slovo = cs ? (n === 1 ? "událost" : n >= 2 && n <= 4 ? "události" : "událostí") : (n === 1 ? "event" : "events");
+      const casti = [cs ? `Přidat do kalendáře ${n} ${slovo}${nazev ? " " + nazev : ""} (${rozsah})` : `Add ${n} ${slovo}${nazev ? " " + nazev : ""} to the calendar (${rozsah})`];
+      const cal = a.calendar ? E.kalendarZaznam(app, a.calendar, { user: auth }) : null;
+      if (cal) casti.push(cs ? `do kalendáře „${cal.getString("name")}“` : `in the calendar "${cal.getString("name")}"`);
+      if (a.remind_before_min !== undefined) casti.push(cs ? `připomenout ${Number(a.remind_before_min) === 0 ? "v čas začátku" : `${a.remind_before_min} min předem`}` : `remind ${Number(a.remind_before_min) === 0 ? "at start" : `${a.remind_before_min} min before`}`);
+      const lide = (Array.isArray(a.participants) ? a.participants : []).map((p) => SPOL().ocisti(p, 80)).filter(Boolean);
       if (lide.length) casti.push((cs ? "pozvat: " : "invite: ") + lide.join(", "));
       return casti.join(" · ");
     }
@@ -435,7 +523,7 @@ function popisAkce(app, auth, L, name, a) {
         z.push((cs ? "přesunout na " : "move to ") + kdyUdalosti(den, cas, konecDen, konecCas, L, true));
       }
       if (a.calendar !== undefined) {
-        const c = a.calendar ? E.kalendarZaznam(app, a.calendar) : null;
+        const c = a.calendar ? E.kalendarZaznam(app, a.calendar, { user: auth }) : null;
         z.push(a.calendar ? (cs ? `do kalendáře „${c ? c.getString("name") : SPOL().ocisti(a.calendar, 80)}“` : `into the calendar "${c ? c.getString("name") : SPOL().ocisti(a.calendar, 80)}"`) : (cs ? "jako osobní událost" : "as a personal event"));
       }
       if (a.remind === false) z.push(cs ? "zrušit připomínku" : "remove the reminder");
@@ -482,4 +570,4 @@ function popisAkce(app, auth, L, name, a) {
   }
 }
 
-module.exports = { NASTROJE, vykonej, overZapis, popisAkce, udalostZaznam };
+module.exports = { NASTROJE, vykonej, overZapis, popisAkce, udalostZaznam, udalostiKarty };

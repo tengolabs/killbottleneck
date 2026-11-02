@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CalendarClock, Trash2, Bell, Users, LogOut, Plane, DoorOpen, Building2, AlertTriangle, Check, X, Sparkles } from 'lucide-react';
+import { CalendarClock, Trash2, Bell, Users, LogOut, Plane, DoorOpen, Building2, AlertTriangle, Check, X, Sparkles, MapPin, Layers } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import DatePicker from '@/components/DatePicker';
 import { useDialogForm } from '@/hooks/useDialogForm';
 import { useKbConfig } from '@/hooks/useKbConfig';
 import { memberLabel } from '@/lib/memberLabel';
-import { ulozUdalost, smazUdalost, opustUdalost, rozhodniNepritomnost } from '@/api/udalosti';
+import { ulozUdalost, smazUdalost, smazSerii, opustUdalost, rozhodniNepritomnost } from '@/api/udalosti';
 import { useAsistent } from '@/lib/AsistentContext';
 
 // Událost v kalendáři (19. 9. 2026): zubař, telekonference, hovor — s časem,
@@ -25,6 +25,9 @@ import { useAsistent } from '@/lib/AsistentContext';
 // výchozí +60 min, překryv server odmítne 409 a nabídne nejbližší volný čas),
 // nepřítomnost (absence: celý den, rozsah dní, „kdo je pryč“ — správce/manažer
 // zapíše i za kolegu). Kdo smí měnit, říká server (can_edit); dialog nehádá.
+//
+// Z pozvánky (22. 10. 2026): Místo konání (`place`) a série — události založené asistentem najednou
+// z jedné pozvánky nesou stejné `series`; dialog nabídne smazat celou sérii (počet dodá rodič).
 // Texty v líném ns `kalendar` (udalost.*).
 const PREDSTIHY = ['none', '0', '15', '30', '60', '1440'];
 const OSOBNI = '__osobni';
@@ -33,7 +36,7 @@ const DEN_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CAS_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const IKONA = { shared: Building2, resource: DoorOpen, absence: Plane };
 
-export default function DialogUdalost({ open, udalost, defaultDay = '', members = [], kalendare = [], userEmail, userRole, onClose, onSaved, toast }) {
+export default function DialogUdalost({ open, udalost, defaultDay = '', members = [], kalendare = [], pocetVSerii = 0, userEmail, userRole, onClose, onSaved, toast }) {
   const { t } = useTranslation('kalendar');
   const { t: tCommon } = useTranslation('common');
   const { config } = useKbConfig(open);
@@ -46,6 +49,8 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
   const [kalendarId, setKalendarId] = useState(OSOBNI);
   const [osoba, setOsoba] = useState('');
   const [note, setNote] = useState('');
+  const [place, setPlace] = useState('');
+  const [mazuSerii, setMazuSerii] = useState(false);
   const [ucastnici, setUcastnici] = useState([]);
   const [predstih, setPredstih] = useState('none');
   const [hledat, setHledat] = useState('');
@@ -83,6 +88,8 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
     setKalendarId(udalost?.calendar || OSOBNI);
     setOsoba(udalost?.kind === 'absence' ? ((udalost.away || [])[0] || userEmail || '') : (userEmail || ''));
     setNote(udalost?.note || '');
+    setPlace(udalost?.place || '');
+    setMazuSerii(false);
     setUcastnici(udalost?.participants || []);
     setPredstih(udalost ? (udalost.remind ? String(udalost.remind_before_min || 0) : 'none') : '30');
     setHledat('');
@@ -110,7 +117,7 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
   const handleSave = () => f.run(async () => {
     setKolize(null);
     const body = {
-      title: title.trim(), day, note,
+      title: title.trim(), day, note, place: place.trim(),
       time: absence ? '' : time,
       end_time: absence ? '' : endTime,
       end_day: viceDni ? endDay : '',
@@ -143,6 +150,21 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
       await smazUdalost(udalost.id);
       window.dispatchEvent(new CustomEvent('kb-udalosti-changed'));
       toast?.({ title: t('udalost.smazana', { title: udalost.title }) });
+      onSaved?.(null);
+      onClose();
+    } catch (e) {
+      toast?.({ title: t('udalost.ulozeniSelhalo'), description: e?.message, variant: 'destructive' });
+    }
+  };
+
+  // celá série z jedné pozvánky (dvojklik jako u smazání jedné)
+  const handleDeleteSeries = async () => {
+    if (!udalost?.series) return;
+    if (!mazuSerii) { setMazuSerii(true); return; }
+    try {
+      const r = await smazSerii(udalost.series);
+      window.dispatchEvent(new CustomEvent('kb-udalosti-changed'));
+      toast?.({ title: t('udalost.serieSmazana', { count: r?.events_deleted || pocetVSerii, title: udalost.title }) });
       onSaved?.(null);
       onClose();
     } catch (e) {
@@ -300,6 +322,13 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
               <DatePicker id="udalost-konec-den" value={endDay} onChange={setEndDay} disabled={!mine} />
             </div>
           )}
+          {!absence && (mine || place) && (
+            <div className="space-y-1.5">
+              <Label htmlFor="udalost-misto" className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {t('udalost.misto')}</Label>
+              <Input id="udalost-misto" value={place} onChange={(e) => setPlace(e.target.value)} onKeyDown={f.onEnter}
+                placeholder={t('udalost.mistoPh')} maxLength={200} readOnly={!mine} data-testid="udalost-misto" />
+            </div>
+          )}
           {kolize && (
             <div className="rounded-md border border-amber-400/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-sm space-y-1.5" data-testid="udalost-kolize">
               <p className="flex items-start gap-1.5"><AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" /> <span>{kolize.text}</span></p>
@@ -358,6 +387,14 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
             <Label htmlFor="udalost-poznamka">{t('udalost.poznamka')}</Label>
             <Textarea id="udalost-poznamka" value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={2000} readOnly={!mine} data-testid="udalost-poznamka" />
           </div>
+          {mine && udalost?.series && pocetVSerii > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-xs text-muted-foreground" data-testid="udalost-serie">
+              <span className="flex items-center gap-1"><Layers className="w-3.5 h-3.5" /> {t('udalost.serie', { count: pocetVSerii })}</span>
+              <Button type="button" size="sm" variant={mazuSerii ? 'destructive' : 'ghost'} className="h-7" onClick={handleDeleteSeries} data-testid="udalost-smazat-serii">
+                <Trash2 className="w-3.5 h-3.5" /> {mazuSerii ? t('udalost.smazatSeriiPotvrdit', { count: pocetVSerii }) : t('udalost.smazatSerii', { count: pocetVSerii })}
+              </Button>
+            </div>
+          )}
         </div>
         <DialogFooter className="gap-2 sm:justify-between">
           {mine && udalost?.id ? (

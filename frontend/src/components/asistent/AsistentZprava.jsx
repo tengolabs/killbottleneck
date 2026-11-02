@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ArrowDown, BookOpen, Check, CheckCheck, ClipboardList, Copy, CornerDownRight, Download, ExternalLink, FileText, Folder, Inbox, Lightbulb, Loader2, Mail, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, Plus, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, BookOpen, CalendarClock, Check, CheckCheck, ClipboardList, Copy, CornerDownRight, Download, ExternalLink, FileText, Folder, Inbox, Lightbulb, Loader2, Mail, MapPin, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, Plus, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
@@ -178,6 +178,41 @@ function KartaCesta({ cesta, strom }) {
   );
 }
 
+// Víc událostí z pozvánky (create_events, 22. 10. 2026): VŠECHNY termíny s dnem v týdnu, časem a místem — tady si
+// uživatel všimne špatně přečteného data dřív, než se uloží. Dlouhá série je sbalená (prvních 6 + „a dalších N“).
+const UDALOSTI_SBALENO = 6;
+function KartaUdalosti({ udalosti }) {
+  const { t } = useTranslation('asistent');
+  const [vse, setVse] = useState(false);
+  const vidim = vse ? udalosti : udalosti.slice(0, UDALOSTI_SBALENO);
+  // stejný název celé série je už v popisu karty — v řádcích by se jen opakoval (a na telefonu ořezával)
+  const stejnyNazev = udalosti.every((u) => u.title === udalosti[0].title);
+  return (
+    <ul className="mt-1.5 rounded-md border bg-background/60 px-2 py-1 text-xs divide-y" data-testid="chat-akce-udalosti">
+      {vidim.map((u, i) => (
+        <li key={i} className={`py-1 ${u.stav === 'dup' ? 'text-muted-foreground' : ''}`} data-testid="chat-akce-udalost" data-stav={u.stav || 'nova'}>
+          <div className="flex items-start gap-1.5">
+            <CalendarClock className="w-3.5 h-3.5 mt-px shrink-0 text-primary" />
+            <span className={`tabular-nums font-medium shrink-0 ${u.stav === 'dup' ? 'line-through' : ''}`}>{u.kdy}</span>
+            {!stejnyNazev && <span className={`min-w-0 break-words ${u.stav === 'dup' ? 'line-through' : ''}`}>{u.title}</span>}
+          </div>
+          {u.place && <p className="pl-5 flex items-center gap-1 text-muted-foreground"><MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{u.place}</span></p>}
+          {u.stav === 'dup' && <p className="pl-5 italic">{t('udalostDup')}</p>}
+          {u.stav === 'minulost' && <p className="pl-5 italic text-muted-foreground">{t('udalostMinulost')}</p>}
+          {u.stav === 'prekryv' && <p className="pl-5 flex items-center gap-1 text-amber-700 dark:text-amber-400"><AlertTriangle className="w-3 h-3 shrink-0" /> {t('udalostPrekryv', { co: u.info })}</p>}
+        </li>
+      ))}
+      {udalosti.length > UDALOSTI_SBALENO && (
+        <li className="py-1">
+          <button type="button" className="text-primary hover:underline" onClick={() => setVse(!vse)} data-testid="chat-akce-udalosti-vse">
+            {vse ? t('udalostiMene') : t('udalostiDalsi', { count: udalosti.length - UDALOSTI_SBALENO })}
+          </button>
+        </li>
+      )}
+    </ul>
+  );
+}
+
 function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, ulozPdf, drivejsiOpravy, onOtevriDokument, onRevertNastaveni }) {
   const { t } = useTranslation('asistent');
   const stav = karta.stav || 'ceka';
@@ -189,6 +224,7 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
     <div className={`mt-2 rounded-lg border p-2.5 text-sm ${STAV_STYL[stav] || STAV_STYL.ceka}`} data-testid="chat-akce" data-stav={stav}>
       <p className="font-medium leading-snug">{karta.popis}</p>
       {karta.detail && <p className="text-xs text-muted-foreground mt-0.5" data-testid="chat-akce-detail">{karta.detail}</p>}
+      {Array.isArray(karta.udalosti) && karta.udalosti.length > 0 && <KartaUdalosti udalosti={karta.udalosti} />}
       {karta.cesta && karta.cesta.mapa ? <KartaCesta cesta={karta.cesta} strom={karta.strom} /> : (Array.isArray(karta.strom) && karta.strom.length > 0 && <KartaStrom strom={karta.strom} />)}
       {karta.jednorazove && karta.jednorazove.temp_password && <DocasneHeslo udaj={karta.jednorazove} />}
       {stav === 'ceka' ? (
@@ -205,7 +241,7 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
           <span>{popisek}{stav === 'chyba' && karta.vysledek ? ` — ${karta.vysledek}` : ''}</span>
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.udalost_id && (
             <Link to={`/kalendar?udalost=${encodeURIComponent(karta.odkaz.udalost_id)}`} onClick={onOdkaz} className="inline-flex items-center gap-1 text-primary hover:underline" data-testid="chat-akce-odkaz">
-              {t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
+              {karta.odkaz.serie ? t('actionOpenCalendar') : t('actionOpenEvent')} <ExternalLink className="w-3 h-3" />
             </Link>
           )}
           {stav === 'hotovo' && karta.odkaz && karta.odkaz.type === 'dokument' && karta.odkaz.doc_id && onOtevriDokument && (

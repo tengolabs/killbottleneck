@@ -66,6 +66,7 @@ export function useUdalosti({ aktivni, userEmail }) {
         druh: ev.kind || '',          // '' osobní | shared | resource | absence
         calendar: ev.calendar || '',
         calendar_name: ev.calendar_name || '',
+        place: ev.place || '',
         away: ev.away || [],
         stav: ev.status || '',
         map_id: '',

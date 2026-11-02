@@ -107,7 +107,7 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const stdioTools = (await stdioRpc('tools/list', {})).result.tools;
     const httpTools = (await mcpPost(keyRW, 'tools/list', {})).json.result.tools;
-    expect(httpTools.length === 32, `HTTP tools/list → 32 nástrojů (${httpTools.length})`);
+    expect(httpTools.length === 33, `HTTP tools/list → 33 nástrojů (${httpTools.length})`);
     const podle = (arr) => Object.fromEntries(arr.map((t) => [t.name, t]));
     const S = podle(stdioTools), H = podle(httpTools);
     expect(JSON.stringify(Object.keys(S).sort()) === JSON.stringify(Object.keys(H).sort()), 'stejná JMÉNA nástrojů');

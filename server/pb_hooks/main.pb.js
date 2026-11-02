@@ -4745,14 +4745,16 @@ kbRoute("POST", "/import-all", (e) => {
   const jaEmail = e.auth.email();
   for (const ev of udalosti) {
     if (!ev || !ev.title || !ev.day || (ev.owner_email && ev.owner_email !== jaEmail)) { out.events_skipped++; continue; }
-    const body = { title: ev.title, day: ev.day, time: ev.time || "", end_day: ev.end_day || "", end_time: ev.end_time || "", note: ev.note || "",
+    const body = { title: ev.title, day: ev.day, time: ev.time || "", end_day: ev.end_day || "", end_time: ev.end_time || "", note: ev.note || "", place: ev.place || "",
       remind: !!ev.remind, remind_before_min: Number(ev.remind_before_min) || 0 };
     const cal = ev.calendar_name ? E.kalendarZaznam($app, ev.calendar_name, { user: e.auth, presne: true }) : null;
     if (cal) body.calendar = cal.id;
     const lide = Array.isArray(ev.participants) ? ev.participants : (Array.isArray(ev.away) ? ev.away : []);
     body.participants = lide.filter((p) => { try { return !!$app.findFirstRecordByFilter("users", "email = {:e}", { e: String(p) }); } catch (err) { return false; } });
     try {
-      const r = E.saveEvent($app, e.auth, null, body, { lang: L, tise: true });
+      // série z exportu zůstane (jinak by po importu zmizelo „Smazat celou sérii“); jen bezpečný tvar ID
+      const series = /^[A-Za-z0-9]{1,40}$/.test(String(ev.series || "")) ? String(ev.series) : "";
+      const r = E.saveEvent($app, e.auth, null, body, { lang: L, tise: true, series: series });
       if (r.status === 200) out.events_imported++; else out.events_skipped++;
     } catch (err) { out.events_skipped++; }
   }
@@ -4965,6 +4967,25 @@ kbRoute("POST", "/events/save", (e) => {
     rec = f.rec;
   }
   const r = E.saveEvent($app, e.auth, rec, info, { lang: L });
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+// víc událostí najednou (z pozvánky / rozpisu): {items: [...], calendar?, participants?, remind_before_min?} — vše, nebo nic
+kbRoute("POST", "/events/batch", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang, t } = require(`${__hooks}/i18n.js`);
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const L = userLang(e.auth);
+  if (minuteLimitHit($app.store(), "evsave:" + e.auth.id, 60)) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const r = E.createEventsBatch($app, e.auth, e.requestInfo().body || {}, { lang: L });
+  return e.json(r.status, r.body);
+}, $apis.requireAuth());
+
+// smazat celou sérii (události založené najednou z jedné pozvánky) — jen ty, které uživatel smí měnit
+kbRoute("POST", "/events/delete-series", (e) => {
+  const E = require(`${__hooks}/events-api.js`);
+  const { userLang } = require(`${__hooks}/i18n.js`);
+  const r = E.deleteSeries($app, e.auth, (e.requestInfo().body || {}).series, userLang(e.auth));
   return e.json(r.status, r.body);
 }, $apis.requireAuth());
 
@@ -6135,6 +6156,38 @@ kbRoute("POST", "/v1/events", (e) => {
   const badBody = unknownFieldsError(info, V1_BODY_FIELDS.event, a.lang);
   if (badBody) return e.json(400, { error: badBody });
   const r = E.saveEvent($app, a.user, null, info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
+// víc událostí najednou: {items: [{title, day, time?, end_day?, end_time?, note?, place?}], calendar?, participants?,
+// remind_before_min?} — max 30, vše, nebo nic; stejná událost už v kalendáři (název+den+čas) se přeskočí (skipped)
+kbRoute("POST", "/v1/events/batch", (e) => {
+  const { apiKeyAuth, unknownFieldsError, V1_BODY_FIELDS } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  const badBody = unknownFieldsError(info, V1_BODY_FIELDS.eventsBatch, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  // počet NEJDŘÍV — obří pole se nemá procházet pole po poli, než přijde 400
+  if (Array.isArray(info.items) && info.items.length > E.MAX_EVENTS_BATCH) {
+    const { t } = require(`${__hooks}/i18n.js`);
+    return e.json(400, { error: t(a.lang, "err.eventsBatchCount", { max: E.MAX_EVENTS_BATCH }) });
+  }
+  for (const it of Array.isArray(info.items) ? info.items : []) {
+    const bad = it && typeof it === "object" ? unknownFieldsError(it, V1_BODY_FIELDS.eventsBatchItem, a.lang) : null;
+    if (bad) return e.json(400, { error: bad });
+  }
+  const r = E.createEventsBatch($app, a.user, info, { lang: a.lang });
+  return e.json(r.status, r.body);
+});
+
+kbRoute("POST", "/v1/events/series/{series}/delete", (e) => {
+  const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
+  const E = require(`${__hooks}/events-api.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const r = E.deleteSeries($app, a.user, e.request.pathValue("series"), a.lang);
   return e.json(r.status, r.body);
 });
 

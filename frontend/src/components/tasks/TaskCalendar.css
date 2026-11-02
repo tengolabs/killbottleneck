@@ -606,7 +606,7 @@
 
 .gcal-month-weekdays-header {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   border-bottom: 1px solid var(--gcal-border);
   background-color: hsl(var(--card));
 }
@@ -623,7 +623,7 @@
 
 .gcal-month-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-template-rows: repeat(6, minmax(105px, 1fr));
   flex: 1;
 }
@@ -836,7 +836,7 @@
 
 .gcal-week-header-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   border-bottom: 1px solid var(--gcal-border);
 }
 
@@ -887,7 +887,7 @@
 
 .gcal-week-columns-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   flex: 1;
   min-height: 520px;
 }
@@ -958,6 +958,17 @@
   line-height: 1.35;
   color: hsl(var(--foreground));
   word-break: break-word;
+}
+
+.gcal-week-event-place {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: hsl(var(--muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gcal-week-card-foot {

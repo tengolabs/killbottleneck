@@ -9,6 +9,35 @@ below before you jump several versions.
 
 ---
 
+## v0.95-beta — 2026-11-02
+
+**From an invitation to the calendar: a photo, PDF or e-mail with several dates becomes events on one card**
+
+- **The assistant reads invitations and schedules.** A photo of a lecture schedule on a door, a PDF or a pasted
+  e-mail with several dates → the new tool `create_events` puts every date on **one card** (weekday, time, place;
+  *already in the calendar* and *at that time you have …* per line). Repetition ("every Tuesday until January") is
+  expanded into single days (max 30), excluded days and past dates are left out (a past date that stays is marked
+  *already passed*), a missing year means the nearest
+  future date and unclear dates are asked about. Everything or nothing is written after the card is confirmed.
+- **Then the app offers a project for the preparation** (no AI call until you click; with two or more events, or
+  one event from a photo, PDF or pasted e-mail): *Also create a project for the
+  preparation* builds a project with sign-up, payment, equipment… and the deadlines the invitation states; the event
+  dates themselves stay in the calendar.
+- **Events have a place** (`place`, ≤ 200 characters) — in the event dialog, the calendar, My day, lite, the reminder
+  text, export/import, REST and MCP. A meeting room to *book* is still a shared calendar.
+- **Event series.** Events created together share a `series`; the event dialog offers **Delete the whole series**.
+- The image transcription now copies dates, weekdays, times, places and exceptions exactly and keeps tables row by row.
+- API: `POST /api/kb/v1/events/batch` (1–30 items, all or nothing, duplicates skipped and reported, one invitation
+  notification per batch, no time off; a date already in the *same* calendar is skipped, even in a room calendar), `POST /api/kb/v1/events/series/{series}/delete`; MCP `create_events`
+  (remote `/mcp` and the stdio server in the repository; the published npm package is still 0.63) and `place` on `create_event` / `update_event`. Unknown fields `location`, `venue`,
+  `where`, `address` now hint at `place` (`location` used to hint at `calendar`).
+
+### Upgrade notes
+
+- Migration `1792621271` adds `events.place` and `events.series` (empty for existing events). Nothing to do.
+
+---
+
 ## v0.94-beta — 2026-10-29
 
 **Two map styles: a project to finish, or a process that keeps running**

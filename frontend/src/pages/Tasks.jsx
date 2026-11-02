@@ -779,6 +779,7 @@ export default function Tasks({ kalendar = false }) {
               defaultDay={udalostDialog.den}
               members={members}
               kalendare={kalendare}
+              pocetVSerii={udalostDialog.udalost?.series ? (udalosti || []).filter((u) => u.series === udalostDialog.udalost.series).length : 0}
               userEmail={user?.email}
               userRole={user?.role}
               toast={toast}

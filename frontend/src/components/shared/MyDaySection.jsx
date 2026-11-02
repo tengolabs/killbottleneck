@@ -337,6 +337,7 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
                     <button type="button" className="w-full flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-secondary text-left" onClick={() => navigate(`/kalendar?udalost=${encodeURIComponent(ev.id)}`)} data-testid={`myday-udalost-${ev.id}`}>
                       <span className="w-12 shrink-0 tabular-nums text-xs font-semibold text-sky-700 dark:text-sky-300">{ev.time || t('sections.allDay')}</span>
                       <span className="truncate">{ev.title}</span>
+                      {ev.place && <span className="text-xs text-muted-foreground truncate max-w-[9rem]" data-testid="myday-udalost-misto">· {ev.place}</span>}
                       {ev.calendar && <span className="text-[10px] rounded px-1 bg-secondary text-muted-foreground truncate max-w-[9rem]" data-testid="myday-udalost-kalendar">{ev.calendar}</span>}
                       {ev.participants > 0 && <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" />{ev.participants}</span>}
                     </button>

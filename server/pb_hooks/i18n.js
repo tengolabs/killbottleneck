@@ -513,12 +513,12 @@ const STRINGS = {
   },
   // ── časové připomínky (minutový cron reminders) + pozvání na událost ──
   "notify.reminderEvent": {
-    cs: "Připomínka: „{title}“ {day} v {time}",
-    en: "Reminder: \"{title}\" on {day} at {time}",
+    cs: "Připomínka: „{title}“ {day} v {time}{place}",
+    en: "Reminder: \"{title}\" on {day} at {time}{place}",
   },
   "notify.reminderEventAllDay": {
-    cs: "Připomínka: „{title}“ dnes ({day})",
-    en: "Reminder: \"{title}\" today ({day})",
+    cs: "Připomínka: „{title}“ dnes ({day}){place}",
+    en: "Reminder: \"{title}\" today ({day}){place}",
   },
   "notify.reminderNode": {
     cs: "Připomínka: „{title}“ v projektu „{map}“ má termín {deadline}",
@@ -527,6 +527,10 @@ const STRINGS = {
   "notify.eventInvited": {
     cs: "{by} vás pozval(a) na „{title}“ {day}{time}",
     en: "{by} invited you to \"{title}\" on {day}{time}",
+  },
+  "notify.eventsInvited": {
+    cs: "{by} vás pozval(a) na „{title}“ ({count}×, od {day})",
+    en: "{by} invited you to \"{title}\" ({count}×, from {day})",
   },
   // ── nepřítomnost se schvalováním (týmový kalendář) ──
   "notify.absenceRequested": {
@@ -1233,6 +1237,12 @@ const STRINGS = {
   "err.eventTitleRequired": { cs: "Událost potřebuje název.", en: "The event needs a title." },
   "err.eventTitleLong": { cs: "Název události je příliš dlouhý (max 200 znaků).", en: "Event title is too long (max 200 characters)." },
   "err.eventNoteLong": { cs: "Poznámka je příliš dlouhá (max 2000 znaků).", en: "Note is too long (max 2000 characters)." },
+  "err.eventPlaceLong": { cs: "Místo je příliš dlouhé (max 200 znaků).", en: "Place is too long (max 200 characters)." },
+  // více událostí najednou (z pozvánky / rozpisu, 22. 10. 2026)
+  "err.eventsBatchCount": { cs: "Najednou jde založit 1–{max} událostí.", en: "A batch takes 1–{max} events." },
+  "err.eventsBatchItem": { cs: "Událost č. {n} („{title}“): {error}", en: "Event #{n} (\"{title}\"): {error}" },
+  "err.eventsBatchAbsence": { cs: "Nepřítomnost se zapisuje po jedné (POST /v1/events), ne v dávce.", en: "Time off is recorded one at a time (POST /v1/events), not in a batch." },
+  "err.seriesNotFound": { cs: "Série událostí nenalezena (nebo ji nesmíte měnit).", en: "Event series not found (or you may not change it)." },
   "err.badDay": {
     cs: "Den „{value}“ není platné datum (RRRR-MM-DD).",
     en: "Day \"{value}\" is not a valid date (YYYY-MM-DD).",
@@ -1373,6 +1383,10 @@ const STRINGS = {
   "hint.calendar": {
     cs: "Místnost, zdroj nebo dovolená („{key}“) = událost ve SDÍLENÉM kalendáři: pole calendar (název nebo id z GET /v1/calendars / MCP list_calendars); místnost potřebuje time (+ end_time), dovolená end_day pro rozsah dní a participants = kdo je pryč.",
     en: "A room, resource or vacation (\"{key}\") is an event in a SHARED calendar: field calendar (name or id from GET /v1/calendars / MCP list_calendars); a room needs time (+ end_time), time off takes end_day for a range and participants = who is away.",
+  },
+  "hint.place": {
+    cs: "Místo konání („{key}“) se zapisuje jako place (text, max 200 znaků). Místnost k REZERVACI je sdílený kalendář (pole calendar).",
+    en: "The venue (\"{key}\") is the field place (text, max 200 characters). A room to BOOK is a shared calendar (field calendar).",
   },
   "hint.end": {
     cs: "Konec události („{key}“) se zapisuje jako end_time (HH:MM, týž den) a end_day (RRRR-MM-DD, poslední den vícedenní události).",

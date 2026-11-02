@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Plus, Diamond, CheckSquare, ArrowUpRight, CalendarCheck2, Check, ListFilter, Search, X, Clock, AlertTriangle, CheckCircle2, FolderKanban, PanelLeftClose, PanelLeftOpen, Sparkles, CalendarClock, Bell, Plane, DoorOpen, Building2, Users, Pencil,
+  CalendarDays, ChevronLeft, ChevronRight, Plus, Diamond, CheckSquare, ArrowUpRight, CalendarCheck2, Check, ListFilter, Search, X, Clock, AlertTriangle, CheckCircle2, FolderKanban, PanelLeftClose, PanelLeftOpen, Sparkles, CalendarClock, Bell, Plane, DoorOpen, Building2, Users, Pencil, MapPin,
 } from 'lucide-react';
 import { STATUSES, statusConfig } from '@/lib/statusMeta';
 import { intlLocale } from '@/lib/locale';
@@ -401,7 +401,7 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
           onOpen?.(item);
         }}
         title={jeUdalost(item)
-          ? `${item.time ? item.time + (item.end_time ? '–' + item.end_time : '') + ' ' : ''}${item.title} · ${getProjectName(item)}${item.druh === 'absence' && item.away?.length ? ' · ' + item.away.map((e) => labelForEmail(members, e) || e).join(', ') : ''}`
+          ? `${item.time ? item.time + (item.end_time ? '–' + item.end_time : '') + ' ' : ''}${item.title}${item.place ? ' · ' + item.place : ''} · ${getProjectName(item)}${item.druh === 'absence' && item.away?.length ? ' · ' + item.away.map((e) => labelForEmail(members, e) || e).join(', ') : ''}`
           : `${item.title} · ${getProjectName(item)} · ${(statusConfig[item.status] || statusConfig.todo).label}${isOverdue ? ` (${t('v2.overdue')})` : ''}`}
         {...(h?.props || {})}
       >
@@ -491,6 +491,7 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
             </span>
             {jeUdalost(item) ? (
               <>
+                {item.place && <span className="gcal-status-pill" data-testid="gcal-misto"><MapPin size={10} /> {item.place}</span>}
                 {item.participants?.length > 0 && <span className="gcal-status-pill">{t('udalost.ucastniciPocet', { count: item.participants.length })}</span>}
                 {item.remind && <span className="gcal-status-pill"><Bell size={10} /> {t('udalost.pripominkaKratce')}</span>}
               </>
@@ -1050,6 +1051,7 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
                               {maPripominku(item) && <Bell size={12} className="text-sky-600" data-testid="gcal-chip-zvonek" />}
                             </div>
                             <h4 className="gcal-week-event-title">{item.time ? `${item.time} · ` : ''}{item.title}</h4>
+                            {item.place && <p className="gcal-week-event-place" data-testid="gcal-misto"><MapPin size={10} /> {item.place}</p>}
                             <div className="gcal-week-card-foot">
                               <span className="gcal-week-status-pill">
                                 {jeUdalost(item) ? getProjectName(item) : (statusConfig[item.status] || statusConfig.todo).label}

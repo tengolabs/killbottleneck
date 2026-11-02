@@ -31,6 +31,8 @@ export const listKdoJePryc = (from, to) => {
   return kbSend(`/api/kb/away${s ? `?${s}` : ''}`, { method: 'GET' });
 };
 export const smazUdalost = (id) => kbSend('/api/kb/events/delete', { body: { id } });
+// celá série (události založené najednou z jedné pozvánky) — jen ty, které smím měnit
+export const smazSerii = (series) => kbSend('/api/kb/events/delete-series', { body: { series } });
 // pozvaný se odebere sám (vlastník maže)
 export const opustUdalost = (id) => kbSend('/api/kb/events/leave', { body: { id } });
 

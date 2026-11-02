@@ -10,7 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
-  // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.95-beta": {
+    cs: [
+      "Vyfoťte rozpis přednášek, přiložte PDF nebo vložte e-mail s pozvánkou — asistent dá všechny termíny na jednu kartu a po potvrzení je zapíše do kalendáře.",
+      "Opakování jako „každé úterý do ledna“ asistent rozepíše na jednotlivé dny, prázdniny vynechá a termíny, které už v kalendáři máte, znovu nezaloží.",
+      "Po zápisu nabídne založit i projekt s přípravou — přihláška, platba, vybavení — s termíny z pozvánky.",
+      "Události mají nově místo konání; vidíte ho v kalendáři, v Můj den i v připomínce. Sérii z jedné pozvánky smažete naráz.",
+    ],
+    en: [
+      "Take a photo of a lecture schedule, attach a PDF or paste an invitation e-mail — the assistant puts every date on one card and adds them to your calendar once you confirm.",
+      "Repetition like \"every Tuesday until January\" is expanded into single days, holidays are left out and dates already in your calendar are not added twice.",
+      "Afterwards it offers to create a project for the preparation — sign-up, payment, equipment — with the deadlines from the invitation.",
+      "Events now have a place; you see it in the calendar, in My day and in the reminder. A whole series from one invitation can be deleted at once.",
+    ],
+  },
   "v0.94-beta": {
     cs: [
       "Dva styly projektu: při zakládání vyberete 🎯 Projekt (chci něco dokončit) nebo 🔁 Proces (chci, aby něco běželo — kroky se opakují, nic se „nedokončuje“). Styl jde kdykoliv přepnout v menu ⋮.",

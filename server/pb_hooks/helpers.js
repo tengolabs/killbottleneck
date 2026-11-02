@@ -1468,7 +1468,10 @@ const V1_BODY_FIELDS = {
   rule: ["name", "node_id", "trigger", "conditions", "actions", "enabled"],
   ruleTemplate: ["id", "name", "trigger", "conditions", "actions"],
   // události a připomínky k uzlům (events-api.js: EVENT_FIELDS / NODE_REMINDER_FIELDS)
-  event: ["title", "day", "time", "note", "participants", "remind", "remind_before_min", "calendar", "end_day", "end_time"],
+  event: ["title", "day", "time", "note", "participants", "remind", "remind_before_min", "calendar", "end_day", "end_time", "place"],
+  // více událostí najednou: společné hodnoty + items[] s poli události (bez participants/calendar — ty jsou společné)
+  eventsBatch: ["items", "calendar", "participants", "remind_before_min"],
+  eventsBatchItem: ["title", "day", "time", "end_day", "end_time", "note", "place"],
   nodeReminder: ["offset_days", "time"],
   // sdílené kalendáře (events-api.js: CALENDAR_FIELDS) — zakládá/mění jen admin/manager
   calendar: ["name", "kind", "color", "description", "write_access", "needs_approval", "archived", "visibility", "members"],
@@ -1492,7 +1495,9 @@ const FOREIGN_FIELD_HINTS = {
   due_date: "hint.deadline", due: "hint.deadline", due_on: "hint.deadline", due_at: "hint.deadline", termin: "hint.deadline", end_date: "hint.deadline",
   assignee: "hint.owner", assigned_to: "hint.owner", assignee_email: "hint.owner", resitel: "hint.owner", responsible: "hint.owner",
   // místnost / dovolená = událost ve SDÍLENÉM kalendáři (pole calendar), konec = end_day / end_time
-  room: "hint.calendar", location: "hint.calendar", resource: "hint.calendar", place: "hint.calendar", mistnost: "hint.calendar", zasedacka: "hint.calendar",
+  room: "hint.calendar", resource: "hint.calendar", mistnost: "hint.calendar", zasedacka: "hint.calendar",
+  // místo konání (22. 10. 2026) = pole place; „location“ dřív mířilo na kalendář
+  location: "hint.place", venue: "hint.place", where: "hint.place", misto: "hint.place", address: "hint.place",
   vacation: "hint.calendar", absence: "hint.calendar", dovolena: "hint.calendar", out_of_office: "hint.calendar", time_off: "hint.calendar",
   end: "hint.end", until: "hint.end", end_at: "hint.end", duration: "hint.end", length: "hint.end",
   estimate: "hint.estimate", estimated_hours: "hint.estimate", estimate_hours: "hint.estimate", effort: "hint.estimate", story_points: "hint.estimate", points: "hint.estimate", odhad: "hint.estimate",
@@ -5857,7 +5862,7 @@ function runReminders(app, opts) {
           type: "reminder",
           eventId: ev.id,
           textKey: time ? "notify.reminderEvent" : "notify.reminderEventAllDay",
-          params: { title: ev.getString("title"), day: day, time: time },
+          params: { title: ev.getString("title"), day: day, time: time, place: ev.getString("place") ? " — " + ev.getString("place") : "" },
           dedupKey: "rem:ev:" + ev.id + ":" + fireAt + ":" + uid,
           // pozvaný dostane e-mail jen po vlastním zaškrtnutí (viz notifyChannels)
           bezVychozihoEmailu: uid !== ownerId,
@@ -7433,6 +7438,7 @@ function buildMyDay(app, userId, email, opts) {
         title: ev.getString("title") || untitled,
         time: ev.getString("day") === today ? ev.getString("time") : "",
         end_time: ev.getString("end_time"),
+        place: ev.getString("place"),
         calendar: ev.getString("calendar") ? kal[ev.getString("calendar")].getString("name") : "",
         mine: ev.getString("owner") === userId,
         participants: (ev.get("participants") || []).length,
