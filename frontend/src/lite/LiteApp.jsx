@@ -21,9 +21,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { fetchMyDay } from '@/api/myDay';
 import { saveMode, MODE_FULL } from '@/lib/liteMode';
 import { base44 } from '@/api/base44Client';
-import { BUILTIN_SKINS, DEFAULT_SKIN_ID, getBuiltinSkin } from '@/lib/skins';
+import { BUILTIN_SKINS, DEFAULT_SKIN_ID, getBuiltinSkin, skinDne, ROTACE_ID } from '@/lib/skins';
 import { validateSkin } from '@/lib/skinValidator';
-import { setSkin, setTheme, effectiveTheme } from '@/lib/theme';
+import { setSkin, setTheme, effectiveTheme, hlidejRotaci } from '@/lib/theme';
 import { useAsistent } from '@/lib/AsistentContext';
 import { useAiModes, stavAsistenta } from '@/hooks/useAiEnabled';
 import LiteList from './LiteList';
@@ -123,14 +123,18 @@ export default function LiteApp() {
   // Import/export vlastního skinu je práce pro plnou verzi; tady se dá vybrat
   // vestavěný (a „Vlastní", pokud už ho účet má z plné verze).
   const hasCustomSkin = validateSkin(user?.skin_custom).ok;
+  // „rotace“ = každý den jiný vestavěný skin (29. 10. 2026, stejné pole účtu jako dialog plné verze)
   const changeSkin = (ev) => {
     const id = ev.target.value;
-    const skin = id === 'custom' ? validateSkin(user?.skin_custom).clean : getBuiltinSkin(id);
+    const rotace = id === ROTACE_ID;
+    const skin = rotace ? skinDne() : id === 'custom' ? validateSkin(user?.skin_custom).clean : getBuiltinSkin(id);
     if (!skin) return;
     setSkin(skin);
+    hlidejRotaci(rotace ? { skin_rotace: true } : null);
     if (user?.id) {
-      base44.entities.User.update(user.id, { skin_id: id }).catch(() => {});
-      patchUser({ skin_id: id });
+      const pole = rotace ? { skin_rotace: true } : { skin_id: id, skin_rotace: false };
+      base44.entities.User.update(user.id, pole).catch(() => {});
+      patchUser(pole);
     }
   };
 
@@ -254,10 +258,11 @@ export default function LiteApp() {
             <Palette className="w-3.5 h-3.5" /> {t('skins.label')}
             <select
               data-skin-select
-              value={user?.skin_id || DEFAULT_SKIN_ID}
+              value={user?.skin_rotace ? ROTACE_ID : (user?.skin_id || DEFAULT_SKIN_ID)}
               onChange={changeSkin}
               className="border rounded-md bg-card text-foreground text-xs px-2 py-1.5"
             >
+              <option value={ROTACE_ID}>{t('skins.rotace')}</option>
               {BUILTIN_SKINS.map((s) => (
                 <option key={s.id} value={s.id}>{tCommon(`skins.${s.id}`)}</option>
               ))}

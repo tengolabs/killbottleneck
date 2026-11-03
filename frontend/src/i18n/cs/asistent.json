@@ -48,6 +48,7 @@
   "actionDeclined": "Zamítnuto",
   "actionError": "Nepovedlo se",
   "actionOpen": "Otevřít projekt",
+  "skinRotace": "Vzhled: každý den jiný skin",
   "skinChanged": "Vzhled přepnut: {{name}}",
   "skinRevert": "Vrátit",
   "themeChanged": "Režim přepnut: {{name}}",

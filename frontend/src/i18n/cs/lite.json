@@ -63,6 +63,7 @@
   "skins": {
     "label": "Vzhled",
     "custom": "Vlastní",
+    "rotace": "Každý den jiný",
     "toLight": "Přepnout na světlý režim",
     "toDark": "Přepnout na tmavý režim",
     "hint": "Vzhled si můžete kdykoli změnit — zkuste to hned tady.",

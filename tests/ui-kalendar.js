@@ -578,8 +578,8 @@ H.beh(async () => {
   await prihlas(page, VLASTNIK);
 
   console.log('== Správa organizace: sekce Sdílené kalendáře; Můj den: „Dnes chybí“ ==');
-  await page.goto(`${inst.base}/admin/users`, { waitUntil: 'networkidle2' });
-  const sprava = await page.waitForSelector('[data-testid="kal-sprava"]', { timeout: 15000 }).catch(() => null);
+  await page.goto(`${inst.base}/admin/users?oddil=kalendare`, { waitUntil: 'networkidle2' }); // oddíl Sdílené kalendáře
+  const sprava = await page.waitForSelector('[data-testid="kal-sprava"]', { visible: true, timeout: 15000 }).catch(() => null);
   expect(!!sprava, 'Správa organizace má sekci Sdílené kalendáře');
   expect(!!(await page.$(`[data-testid="kal-radek-${FIREMNI}"]`)) && !!(await page.$(`[data-testid="kal-radek-${NEPR}"]`)), 'tabulka ukazuje založené kalendáře');
   expect(!(await page.$('[data-testid="kal-predvolby"]')), 'všechny tři předvolby už existují → nabídka předvoleb zmizela');

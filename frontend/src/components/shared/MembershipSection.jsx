@@ -4,7 +4,7 @@ import { pb } from '@/api/pb';
 import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Loader2, CreditCard, Landmark, Check, ExternalLink, Mail } from 'lucide-react';
+import { ShoppingCart, Loader2, CreditCard, Landmark, Check, ExternalLink, Mail, ChevronDown, ChevronRight } from 'lucide-react';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { TARIFY } from '@/lib/kosikTarify';
 
@@ -34,6 +34,9 @@ export default function MembershipSection({ billingComplete }) {
   const [ordering, setOrdering] = useState(false);
   const [orderDone, setOrderDone] = useState(null);
   const [error, setError] = useState('');
+  // karty tarifů se rozbalují až na požádání (maketa Správy organizace 29. 10. 2026 — trvale
+  // zabíraly půl obrazovky); ve zkušebce jsou rozbalené rovnou, tam je výběr tarifu hlavní úkol
+  const [tarifyOtevrit, setTarifyOtevrit] = useState(null);
 
   useEffect(() => {
     loadKbConfig().then(setConfig).catch(() => {});
@@ -63,6 +66,7 @@ export default function MembershipSection({ billingComplete }) {
   const mailto = `mailto:${SUPPORT}?subject=${encodeURIComponent(t('membership.mailSubject', {
     plan: t(`membership.plan.${tier}`), period: t(`membership.periodPick.${period}`), slug,
   }))}`;
+  const tarifyVidet = tarifyOtevrit ?? zkusebka;
   const funkce = (x) => {
     const f = t(`membership.features.${x}`, { returnObjects: true });
     return Array.isArray(f) ? f : []; // chybějící klíč vrací řetězec — nespadnout s celou stránkou
@@ -85,10 +89,10 @@ export default function MembershipSection({ billingComplete }) {
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 mt-6" data-testid="membership-section">
+    <div className="rounded-xl border bg-card p-4" data-testid="membership-section">
       <div className="flex items-center gap-2 mb-1">
         <ShoppingCart className="h-4 w-4 text-primary" />
-        <h2 className="font-semibold">{t('membership.heading')}</h2>
+        <h2 className="font-heading text-sm font-semibold">{t('membership.heading')}</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
         {zkusebka
@@ -96,6 +100,13 @@ export default function MembershipSection({ billingComplete }) {
           : t('membership.hintActive')}
       </p>
 
+      <button type="button" onClick={() => setTarifyOtevrit(!tarifyVidet)} aria-expanded={tarifyVidet}
+        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline mb-3" data-testid="tarify-toggle">
+        {tarifyVidet ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        {t('membership.tarifyUkaz')}
+      </button>
+
+      {tarifyVidet && (<>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3" role="radiogroup" aria-label={t('membership.planLabel')}>
         {TARIFY.map((x) => (
           <button key={x.tier} type="button" role="radio" aria-checked={tier === x.tier}
@@ -185,6 +196,7 @@ export default function MembershipSection({ billingComplete }) {
         </div>
       )}
       {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+      </>)}
     </div>
   );
 }

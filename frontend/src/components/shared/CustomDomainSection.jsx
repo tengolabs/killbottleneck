@@ -92,10 +92,10 @@ export default function CustomDomainSection() {
   const ukazZaznamy = !!domena && (navrh || (zadost && zadost.status !== 'removed' && !(zadost.status === 'active' && aktivni === domena)));
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 mt-6" data-testid="custom-domain-section">
+    <div className="rounded-xl border bg-card p-4" data-testid="custom-domain-section">
       <div className="flex items-center gap-2 mb-1">
         <Globe className="h-4 w-4 text-primary" />
-        <h2 className="font-semibold">{t('customDomain.heading')}</h2>
+        <h2 className="font-heading text-sm font-semibold">{t('customDomain.heading')}</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
         {t('customDomain.hint', { slug: stav.slug_domain })}

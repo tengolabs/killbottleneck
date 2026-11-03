@@ -5,8 +5,8 @@ import { pb } from '@/api/pb';
 import { refreshAiModes } from '@/hooks/useAiEnabled';
 import { nahradPrepis } from '@/lib/prepisZpravy';
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
-import { setSkin, setTheme } from '@/lib/theme';
-import { getBuiltinSkin } from '@/lib/skins';
+import { setSkin, setTheme, hlidejRotaci } from '@/lib/theme';
+import { getBuiltinSkin, skinDne, ROTACE_ID } from '@/lib/skins';
 import { setLang } from '@/lib/lang';
 import { saveMode, MODE_AUTO, MODE_LITE, MODE_FULL } from '@/lib/liteMode';
 import { KLIC_CITELNOST, platnyStupen } from '@/lib/citelnost';
@@ -39,8 +39,12 @@ function projevKarty(dto, patchUser, klient, aplikovane) {
     if (k.vraceno) continue;
     let projev = null;
     if (k.type === 'skin') {
-      const s = getBuiltinSkin(k.skin_id);
-      if (s) projev = () => { setSkin(s); if (patchUser) patchUser({ skin_id: k.skin_id }); };
+      // ROTACE_ID ('daily') = rotace (každý den jiný vestavěný skin); konkrétní skin rotaci vypíná (server to už uložil)
+      if (k.skin_id === ROTACE_ID) projev = () => { setSkin(skinDne()); hlidejRotaci({ skin_rotace: true }); if (patchUser) patchUser({ skin_rotace: true }); };
+      else {
+        const s = getBuiltinSkin(k.skin_id);
+        if (s) projev = () => { setSkin(s); hlidejRotaci(null); if (patchUser) patchUser({ skin_id: k.skin_id, skin_rotace: false }); };
+      }
     } else if (k.type === 'theme') {
       projev = () => setTheme(k.theme === 'dark' ? 'dark' : 'light');
     } else if (k.type === 'relax') {

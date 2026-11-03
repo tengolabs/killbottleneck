@@ -68,9 +68,10 @@
     "changeByMail": "Změnu tarifu nebo období s vámi domluvíme e-mailem, ať neplatíte dvakrát — stávající předplatné upravíme, ne že přibude druhé.",
     "orderByTransfer": "Objednat převodem (faktura)",
     "transferYearlyOnly": "Platba převodem je jen u ročního členství.",
-    "billingFirst": "Nejdřív vyplňte a uložte fakturační údaje výš.",
+    "billingFirst": "Nejdřív vyplňte a uložte fakturační údaje níže.",
     "orderReceived": "Objednávku jsme přijali.",
-    "orderReceivedHint": "Na e-mail vám pošleme fakturu na {{amount}} Kč — po jejím zaplacení členství aktivujeme. Data i adresa zůstávají."
+    "orderReceivedHint": "Na e-mail vám pošleme fakturu na {{amount}} Kč — po jejím zaplacení členství aktivujeme. Data i adresa zůstávají.",
+    "tarifyUkaz": "Porovnat a změnit tarif"
   },
   "account": {
     "heading": "Můj účet",

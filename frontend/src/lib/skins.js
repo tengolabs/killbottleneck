@@ -877,3 +877,14 @@ export const BUILTIN_SKINS = [
 export function getBuiltinSkin(id) {
   return BUILTIN_SKINS.find((s) => s.id === id) || null;
 }
+
+// Rotace (Richard 29. 10. 2026: „automatická změna skinu — každý den jiný, ze všech vestavěných“):
+// pořadové číslo MÍSTNÍHO kalendářního dne mod počet skinů → deterministické, na všech zařízeních
+// účtu stejný skin a přes půlnoc další v pořadí; nic se kvůli tomu nezapisuje na server.
+// Místo id skinu pro rotaci (výběr v lite, nástroj asistenta set_skin, karta „Vrátit“) — stejná hodnota jako na serveru.
+export const ROTACE_ID = 'daily';
+
+export function skinDne(datum = new Date()) {
+  const den = Math.floor(Date.UTC(datum.getFullYear(), datum.getMonth(), datum.getDate()) / 86400000);
+  return BUILTIN_SKINS[den % BUILTIN_SKINS.length];
+}

@@ -48,6 +48,7 @@
   "actionDeclined": "Declined",
   "actionError": "Failed",
   "actionOpen": "Open project",
+  "skinRotace": "Look: a different skin every day",
   "skinChanged": "Look switched: {{name}}",
   "skinRevert": "Revert",
   "themeChanged": "Mode switched: {{name}}",

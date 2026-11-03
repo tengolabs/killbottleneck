@@ -12,11 +12,12 @@
 // před renderem (žádný flash výchozích barev); účet je zdroj pravdy (syncSkin).
 import { nactiKlic, ulozKlic, smazKlic } from '@/lib/storageKeys';
 import { SKIN_COLOR_TOKENS, SKIN_FONT_TOKENS, fontStack, validateSkin } from '@/lib/skinValidator';
-import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
+import { getBuiltinSkin, DEFAULT_SKIN_ID, skinDne } from '@/lib/skins';
 import { loadKbConfig } from '@/hooks/useKbConfig';
 
 const KEY = 'kb-theme';   // PŘECHOD: starý flowmap-theme se přebere
 const SKIN_KEY = 'kb-skin-cache';   // resolved skin (celý JSON, kvůli anti-FOUC)
+const ROTACE_KEY = 'kb-skin-rotace';   // '1' = účet má rotaci → initTheme rovnou skin dne, ne včerejší cache
 
 export const getStoredTheme = () => nactiKlic(KEY); // 'light' | 'dark' | null
 
@@ -121,11 +122,13 @@ export const setSkin = (skin) => {
   applySkin(skin);
 };
 
-// Priorita: vlastní skin účtu > vestavěný dle volby účtu > instanční default
+// Priorita: rotace (každý den jiný vestavěný, 29. 10. 2026) > vlastní skin účtu
+// > vestavěný dle volby účtu > instanční default
 // > vestavěný Les (DEFAULT_SKIN_ID). Richard 6. 8. 2026: výchozí vzhled je
 // les — konstanta existovala, ale tady v řetězci chyběla, takže default byl
 // ve skutečnosti holé Indigo z index.css.
 export const resolveSkin = ({ user, instanceSkin } = {}) => {
+  if (user && user.skin_rotace) return skinDne();
   if (user && user.skin_id === 'custom') {
     const r = validateSkin(user.skin_custom);
     if (r.ok) return r.clean;
@@ -144,6 +147,7 @@ export const resolveSkin = ({ user, instanceSkin } = {}) => {
 // (veřejný endpoint — skin obarví i přihlašovací obrazovku). Při výpadku sítě
 // se nechá poslední známý stav z cache.
 export const syncSkin = async (user = null) => {
+  hlidejRotaci(user); // i když config selže — skin dne z initTheme se musí přepočítat přes půlnoc
   let instanceSkin = null;
   try {
     const cfg = await loadKbConfig();
@@ -153,6 +157,42 @@ export const syncSkin = async (user = null) => {
   }
   setSkin(resolveSkin({ user, instanceSkin }));
 };
+
+// Rotace přes půlnoc: aplikace bývá otevřená celý den (i okno, které přes noc nikdo neschová)
+// → časovač na nejbližší místní půlnoc + přepočet při návratu do okna a při fokusu (uspaný počítač
+// časovač zdrží a okno, které zůstalo „visible“, visibilitychange po probuzení nepošle).
+let rotaceZapnuta = false;
+let rotaceDen = '';
+let rotaceCasovac = null;
+const denKlic = () => new Date().toDateString();
+const prepoctiRotaci = () => {
+  if (!rotaceZapnuta || denKlic() === rotaceDen) return;
+  if (nactiKlic(ROTACE_KEY) !== '1') { rotaceZapnuta = false; return; } // jiná záložka rotaci mezitím vypnula
+  rotaceDen = denKlic();
+  setSkin(skinDne());
+};
+const naplanujPulnoc = () => {
+  clearTimeout(rotaceCasovac);
+  rotaceCasovac = null;
+  if (!rotaceZapnuta) return;
+  const pulnoc = new Date();
+  pulnoc.setHours(24, 0, 1, 0);
+  rotaceCasovac = setTimeout(() => { prepoctiRotaci(); naplanujPulnoc(); }, pulnoc - Date.now());
+};
+export const hlidejRotaci = (user) => {
+  rotaceZapnuta = !!(user && user.skin_rotace);
+  rotaceDen = denKlic();
+  if (rotaceZapnuta) ulozKlic(ROTACE_KEY, '1');
+  else smazKlic(ROTACE_KEY);
+  naplanujPulnoc();
+};
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') prepoctiRotaci();
+  });
+  window.addEventListener('focus', prepoctiRotaci);
+  window.addEventListener('pageshow', prepoctiRotaci);
+}
 
 // Exporty (PNG/PDF) jsou VŽDY ve výchozím vzhledu na bílé — sdílený artefakt
 // musí být čitelný u příjemce bez ohledu na vkus odesílatele (rozhodnutí 31. 7.).
@@ -205,7 +245,8 @@ export const initTheme = () => {
   applyTheme(effectiveTheme());
   try {
     const raw = nactiKlic(SKIN_KEY);
-    if (raw) {
+    if (nactiKlic(ROTACE_KEY) === '1') applySkin(skinDne());   // první start nového dne bez záblesku včerejšího
+    else if (raw) {
       // cache PŘES VALIDÁTOR — whitelist v sectionLines drží jen klíče, hodnoty
       // vkládá do CSS surově. Kdyby cache popsalo XSS odjinud, bez validace by
       // se z něj stala perzistentní CSS injection přežívající opravu původní díry.

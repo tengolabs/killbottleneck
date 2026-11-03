@@ -20,6 +20,16 @@ const PW = 'testheslo123';
 let pass = 0, fail = 0;
 const ok = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// text ze všech oddílů Správy organizace, které rozcestník nabízí (skryté oddíly innerText nevrací)
+async function textOddilu(p) {
+  let out = '';
+  for (const id of await p.$$eval('[role="tab"][data-testid^="oddil-"]', (b) => b.map((x) => x.dataset.testid))) {
+    await p.click(`[data-testid="${id}"]`);
+    await sleep(600);
+    out += '\n' + await p.evaluate(() => document.body.innerText);
+  }
+  return out;
+}
 
 const api = async (method, path, { token, body } = {}) => {
   const res = await fetch(BASE + path, {
@@ -85,25 +95,34 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     // prošla, i kdyby se seznam vůbec nenačetl (přesně to se mi stalo)
     const radku = await page.evaluate(() => document.querySelectorAll('tbody tr').length);
     ok(radku >= 3, `tabulka lidí je NAPLNĚNÁ (${radku} řádků) — jinak nic z níže uvedeného nic nedokazuje`);
-    const txt = await page.evaluate(() => document.body.innerText);
+    // Správa organizace je od 29. 10. 2026 v oddílech — text se sbírá ze VŠECH, které rozcestník nabízí
+    const oddily = await page.$$eval('[role="tab"][data-testid^="oddil-"]', (b) => b.map((x) => x.dataset.testid));
+    ok(oddily.join(',') === 'oddil-lide,oddil-struktura', `rozcestník nabízí jen Lidé a Struktura (${oddily.join(', ')})`);
+    const txt = await textOddilu(page);
     ok(!/Nemáte oprávnění/i.test(txt), 'správce se na stránku dostane');
     ok(/Organizační struktura a zastupování/.test(txt), 'okno Organizační struktura a zastupování je tam');
-    ok(/Zástupce/.test(txt), 'sloupec Zástupce je tam (personální agenda)');
+    ok(/Zástupce/i.test(txt), 'sloupec Zástupce je tam (personální agenda)');
 
     console.log('== ale páky, které mu nepatří, nevidí ==');
-    ok(!/Správce AI/.test(txt), 'sloupec Správce AI NEVIDÍ');
-    ok(!/Správce struktury/.test(txt), 'sloupec Správce struktury NEVIDÍ (nejmenuje si nástupce)');
+    ok(!/Správce AI/i.test(txt), 'sloupec Správce AI NEVIDÍ');
+    ok(!/Správce struktury/i.test(txt), 'sloupec Správce struktury NEVIDÍ (nejmenuje si nástupce)');
     ok(!/Název organizace/.test(txt), 'název a logo organizace NEVIDÍ');
     ok(!/Fakturační|Členství/i.test(txt), 'fakturaci ani členství NEVIDÍ');
     ok(!/Vzhled instance/i.test(txt), 'vzhled instance NEVIDÍ');
     const prepinace = await page.evaluate(() => document.querySelectorAll('button[role="switch"]').length);
     ok(prepinace === 0, `v tabulce nejsou žádné přepínače správcovství (${prepinace})`);
-    const kose = await page.evaluate(() => document.querySelectorAll('svg.lucide-trash-2').length);
+    // obnova hesla a mazání jsou v menu ⋯ na konci řádku → otevřít ho u člena
+    await page.click('[data-testid="oddil-lide"]'); await sleep(400);
+    const menu = await page.$('[data-testid="akce-petr@example.com"]');
+    ok(!!menu, 'řádek člena má menu ⋯');
+    if (menu) { await menu.click(); await sleep(500); }
+    const kose = await page.evaluate(() => document.querySelectorAll('[data-testid^="smazat-"]').length);
     ok(kose === 0, `mazání účtů nenabízí (${kose})`);
 
     console.log('== co naopak umět MÁ ==');
-    const klice = await page.evaluate(() => document.querySelectorAll('svg.lucide-key-round').length);
+    const klice = await page.evaluate(() => document.querySelectorAll('[data-testid^="reset-"]').length);
     ok(klice > 0, `obnovu hesla nabízí (${klice}× — u admina a u sebe ne, to je záměr)`);
+    await page.keyboard.press('Escape'); await sleep(300);
     ok(/Pozvat/i.test(txt), 'pozvat uživatele může');
 
     console.log('== admin má pořád všechno ==');
@@ -112,8 +131,10 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     await pageA.evaluateOnNewDocument((t) => localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: {} })), A);
     await pageA.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2' });
     await sleep(3500);
-    const txtA = await pageA.evaluate(() => document.body.innerText);
-    ok(/Správce AI/.test(txtA) && /Správce struktury/.test(txtA), 'admin oba sloupce správcovství vidí');
+    const oddilyA = await pageA.$$eval('[role="tab"][data-testid^="oddil-"]', (b) => b.length);
+    ok(oddilyA === 6, `admin má v rozcestníku všech 6 oddílů (${oddilyA})`);
+    const txtA = await textOddilu(pageA);
+    ok(/Správce AI/i.test(txtA) && /Správce struktury/i.test(txtA), 'admin oba sloupce správcovství vidí');
     ok(/Název organizace/.test(txtA), 'a nastavení organizace taky');
     const radkuA = await pageA.evaluate(() => document.querySelectorAll('tbody tr').length);
     ok(radkuA >= 3, `a jeho tabulka je taky naplněná (${radkuA})`);

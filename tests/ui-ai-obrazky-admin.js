@@ -38,7 +38,7 @@ H.beh(async () => {
   }, popis);
 
   console.log('== dlaždice OpenAI + zapnutí obrázků ==');
-  await page.goto(`${inst.base}/admin/users`, { waitUntil: 'networkidle2' });
+  await page.goto(`${inst.base}/admin/users?oddil=ai`, { waitUntil: 'networkidle2' });
   const openai = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find((b) => /OpenAI/.test(b.innerText)));
   expect(!!(await openai.asElement()), 'dlaždice OpenAI je v Administraci');
   await openai.asElement().click();
@@ -64,7 +64,7 @@ H.beh(async () => {
 
   console.log('== slepý model: Otestovat obrázek → obrázky zase vypnuté ==');
   slepy = true;
-  await page.goto(`${inst.base}/admin/users`, { waitUntil: 'networkidle2' });
+  await page.goto(`${inst.base}/admin/users?oddil=ai`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="ai-vision-stav"]') && /Ověřeno/.test(await page.$eval('[data-testid="ai-vision-stav"]', (el) => el.innerText)), 'po návratu stav „Ověřeno“');
   await page.click('[data-testid="ai-vision-test"]');
   expect(await cekej('[data-testid="ai-vision-vysledek"]', 20000), 'výsledek testu obrázku');

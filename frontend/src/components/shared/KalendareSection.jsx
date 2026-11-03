@@ -69,8 +69,8 @@ export default function KalendareSection() {
   const archivovane = kalendare.filter((c) => c.archived);
 
   return (
-    <div className="rounded-xl border bg-card p-4 mb-6" data-testid="kal-sprava">
-      <h2 className="text-base font-semibold flex items-center gap-2 mb-1">
+    <div className="rounded-xl border bg-card p-4" data-testid="kal-sprava">
+      <h2 className="font-heading text-sm font-semibold flex items-center gap-2 mb-1">
         <CalendarDays className="w-4 h-4 text-primary" /> {t('kalendare.title')}
       </h2>
       <p className="text-sm text-muted-foreground mb-3">{t('kalendare.desc')}</p>

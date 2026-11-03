@@ -9,6 +9,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { PAMET, STRANKA } from '@/lib/AsistentContext';
 import { ZNACKA_PREPISU, ZNACKA_PDF, ZNACKA_HLASU } from '@/lib/prepisZpravy';
 import { ulozRizika, zrusRizika, nactiRizika, BARVY, PORADI_DRUHU } from '@/lib/rizika';
+import { ROTACE_ID } from '@/lib/skins';
 
 // Jedna zpráva chatu + její karty (otázky s volbami, akce k potvrzení, skin,
 // paměť, nápad, „nahlédl do"). Zprávy nástrojů (role tool) se nekreslí —
@@ -499,7 +500,7 @@ function KartaSkin({ karta, onRevert }) {
   const { t: tc } = useTranslation('common');
   return (
     <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs" data-testid="chat-skin">
-      <span>{t('skinChanged', { name: tc(`skins.${karta.skin_id}`, { defaultValue: karta.skin_id }) })}</span>
+      <span>{karta.skin_id === ROTACE_ID ? t('skinRotace') : t('skinChanged', { name: tc(`skins.${karta.skin_id}`, { defaultValue: karta.skin_id }) })}</span>
       <button type="button" className="inline-flex items-center gap-1 text-primary hover:underline" onClick={() => onRevert(karta.predchozi)} data-testid="chat-skin-vratit">
         <Undo2 className="w-3 h-3" />{t('skinRevert')}
       </button>

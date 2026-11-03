@@ -9,6 +9,18 @@ below before you jump several versions.
 
 ---
 
+## v0.98-beta — 2026-11-03
+
+**A different skin every day and clearer Organization settings**
+
+**Upgrade notes:** migration `1793260418_user_skin_rotace` adds the field `users.skin_rotace` (on/off, off by default)
+and runs automatically on start; no data changes and nothing to configure. Old links keep working: `/admin/users#ai`
+opens the *AI* tab and `/admin/users?fakturace=1` the *Subscription and invoices* tab. The Android app shows the new
+skin option after its next update. Self-hosters: `git pull && docker compose up -d --build`.
+
+- **A different skin every day.** New switch in *Appearance*: the built-in skins rotate on their own, the same one on all your devices in the same time zone (also in the simplified view and via the assistant).
+- **Clearer Organization settings.** The page is split into six tabs (People · Organization and look · Structure and deputies · Shared calendars · Subscription and invoices — just *Invoices* on a self-hosted server · AI) with a tab list on the left; the people table has 7 columns instead of 9 with password reset and account deletion in a ⋯ menu, and phones get a card per person. Nothing was removed and no permissions changed.
+
 ## v0.97-beta — 2026-11-03
 
 **Security update — please upgrade**

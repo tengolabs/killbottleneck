@@ -15,8 +15,9 @@ import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useAsistent, MIN_W, MAX_W, sirkaDokumentu, RELAX_SABLONY } from '@/lib/AsistentContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAiModes, stavAsistenta, refreshAiModes } from '@/hooks/useAiEnabled';
-import { setSkin, effectiveTheme } from '@/lib/theme';
-import { getBuiltinSkin, DEFAULT_SKIN_ID } from '@/lib/skins';
+import { setSkin, effectiveTheme, hlidejRotaci } from '@/lib/theme';
+import { getBuiltinSkin, DEFAULT_SKIN_ID, skinDne, ROTACE_ID } from '@/lib/skins';
+import { validateSkin } from '@/lib/skinValidator';
 import { base44 } from '@/api/base44Client';
 import { pripravObrazek, obrazekZeSchranky } from '@/lib/obrazek';
 import { loadKbConfig, useKbConfig } from '@/hooks/useKbConfig';
@@ -539,10 +540,15 @@ export default function AsistentPanel({ lite = false }) {
     if (!mobil && !(hlidac && hlidac.current)) otevriDokument(ids[ids.length - 1]);
   }, [A.loading, zpravy, mobil, otevriDokument, obnovDokumenty, hlidac]);
   const vratSkin = useCallback((predchozi) => {
+    // predchozi ROTACE_ID = před změnou běžela rotace (každý den jiný skin, 29. 10. 2026)
+    if (predchozi === ROTACE_ID) { setSkin(skinDne()); persistSkin({ skin_rotace: true }); hlidejRotaci({ skin_rotace: true }); return; }
     const id = predchozi || DEFAULT_SKIN_ID;
-    const s = getBuiltinSkin(id);
-    if (s) { setSkin(s); persistSkin({ skin_id: id }); }
-  }, [persistSkin]);
+    // vlastní skin (skin_id 'custom') žije v user.skin_custom — getBuiltinSkin by vrátil null a Vrátit nic neudělal;
+    // neplatný vlastní skin se přeskočí (ne Les s uloženým skin_id 'custom')
+    const vlastni = id === 'custom' && validateSkin(user && user.skin_custom);
+    const s = id === 'custom' ? (vlastni.ok ? vlastni.clean : null) : getBuiltinSkin(id);
+    if (s) { setSkin(s); persistSkin({ skin_id: id, skin_rotace: false }); hlidejRotaci(null); }
+  }, [persistSkin, user]);
 
   // tažení za levou hranu = šířka (bez knihovny; primitiv resizable v ui/ není)
   // tažení šířky: pointer capture + úklid i nad iframe relaxu (lib/tahSirky.js, 15. 10. 2026)
@@ -575,7 +581,7 @@ export default function AsistentPanel({ lite = false }) {
   // bez připojené AI ani ouško na kraji, ani lišta na telefonu — jen tlačítko v hlavičce (schválený náhled 19. 10.)
   if (stav === 'nepripojeno' && !A.open) return null;
   // relax (ranní akvárium vedle chatu) by Správu organizace zakryl a klik vypadal jako „nic se nestalo“ (klik-test 19. 10.)
-  const naNastaveniAi = () => { if (panel.relax && !panel.relax.zamek) panel.ukonciRelax(); navigate('/admin/users#ai'); if (mobil) zavriChat(); };
+  const naNastaveniAi = () => { if (panel.relax && !panel.relax.zamek) panel.ukonciRelax(); navigate('/admin/users?oddil=ai'); if (mobil) zavriChat(); };
   const placeholderStav = stav === 'vypadek' ? t('stav.placeholderVypadek') : stav === 'nepripojeno' ? t('stav.placeholderNepripojeno') : '';
 
   if (!A.open && mobil) {

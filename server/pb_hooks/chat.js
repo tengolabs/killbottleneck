@@ -1160,8 +1160,8 @@ const NASTROJE_ZAKLAD = [
     parameters: { type: "object", properties: { group: { type: "string", enum: SKUPINY_OTEVIRATELNE } }, required: ["group"], additionalProperties: false } },
   { name: "suggest_next", kind: "direct", description: "Offer the user 2–4 concrete next steps as one-click chips at the end of your reply (phrased as instructions to you, e.g. \"Put the blade under Workshop operations\"). Call it at the end of every reply that does not use ask_user.",
     parameters: { type: "object", properties: { suggestions: { type: "array", items: { type: "string" } } }, required: ["suggestions"], additionalProperties: false } },
-  { name: "set_skin", skupina: "vzhled", kind: "direct", description: "Switch the user's visual skin. Ids: indigo (blue), contrast, terminal (green on black), sepia, ocean, les (forest green), pulnoc (midnight), svestka (plum), broskev (peach), grafit (graphite), rubin (ruby red), ruze (rose pink).",
-    parameters: { type: "object", properties: { skin_id: { type: "string", enum: ["indigo", "contrast", "terminal", "sepia", "ocean", "les", "pulnoc", "svestka", "broskev", "grafit", "rubin", "ruze"] } }, required: ["skin_id"], additionalProperties: false } },
+  { name: "set_skin", skupina: "vzhled", kind: "direct", description: "Switch the user's visual skin. Ids: indigo (blue), contrast, terminal (green on black), sepia, ocean, les (forest green), pulnoc (midnight), svestka (plum), broskev (peach), grafit (graphite), rubin (ruby red), ruze (rose pink); daily = rotate automatically, a different built-in skin every day. Choosing a specific skin turns the rotation off.",
+    parameters: { type: "object", properties: { skin_id: { type: "string", enum: ["indigo", "contrast", "terminal", "sepia", "ocean", "les", "pulnoc", "svestka", "broskev", "grafit", "rubin", "ruze", "daily"] } }, required: ["skin_id"], additionalProperties: false } },
   { name: "set_theme", skupina: "vzhled", kind: "direct", description: "Switch light or dark mode.",
     parameters: { type: "object", properties: { theme: { type: "string", enum: ["light", "dark"] } }, required: ["theme"], additionalProperties: false } },
   // Relax (14. 10. 2026): pauza s akváriem / úlem a odpočtem — provede PROHLÍŽEČ z karty `relax` (jako set_theme);
@@ -1658,12 +1658,14 @@ function vykonej(app, auth, L, name, args, ktx) {
     case "set_skin": {
       const { KNOWN_SKIN_IDS } = require(`${__hooks}/skinValidator.js`);
       const id = String(a.skin_id || "");
-      if (!KNOWN_SKIN_IDS.includes(id)) return { text: "Error: unknown skin id." };
+      // daily = rotace (29. 10. 2026): každý den jiný vestavěný skin, vybírá prohlížeč podle data (users.skin_rotace)
+      if (id !== "daily" && !KNOWN_SKIN_IDS.includes(id)) return { text: "Error: unknown skin id." };
       const u = app.findRecordById("users", auth.id);
-      const predchozi = u.getString("skin_id") || "";
-      u.set("skin_id", id);
+      const predchozi = u.getBool("skin_rotace") ? "daily" : (u.getString("skin_id") || "");
+      if (id === "daily") u.set("skin_rotace", true);
+      else { u.set("skin_id", id); u.set("skin_rotace", false); }
       app.save(u);
-      return { text: `Skin switched to ${id}.`, karta: { type: "skin", skin_id: id, predchozi: predchozi } };
+      return { text: id === "daily" ? "Skin rotation on: a different built-in skin every day." : `Skin switched to ${id}.`, karta: { type: "skin", skin_id: id, predchozi: predchozi } };
     }
     case "draft_text": {
       const D = require(`${__hooks}/dokumenty.js`);

@@ -34,7 +34,7 @@ H.beh(async () => {
   const cekejText = async (sel, re, ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (re.test(await txt(sel))) return true; await sleep(200); } return false; };
 
   console.log('== sekce AI kredity ve Správě organizace ==');
-  await page.goto(`${inst.base}/admin/users`, { waitUntil: 'networkidle2' });
+  await page.goto(`${inst.base}/admin/users?oddil=ai`, { waitUntil: 'networkidle2' }); // oddíl AI
   expect(await cekej('[data-testid="ai-kredity"]'), 'sekce AI kredity je na stránce');
   expect(await cekej('[data-testid="ai-kredity-lide"]'), 'tabulka po lidech');
   expect(await cekejText('[data-testid="ai-kredity-celkem-n"]', /0[,.]07/), `celek organizace 4 zprávy ≈ 0,07 tahu (4 × 111/22 tokenů za ceny z kredity-ceny.json) (${await txt('[data-testid="ai-kredity-celkem-n"]')})`);

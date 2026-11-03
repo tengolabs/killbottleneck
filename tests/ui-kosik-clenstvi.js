@@ -58,8 +58,9 @@ async function kosik(browser) {
   await page.click('button[type="submit"]');
   await page.waitForFunction(() => !location.pathname.includes('/login'), { timeout: 30000 }).catch(() => {});
   // networkidle2, ne 0: Správa organizace má od 27. 10. 2026 horní lištu se zvonečkem (trvalé realtime spojení) → „nula spojení“ nikdy nenastane
-  await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2', timeout: 60000 });
-  await page.waitForSelector('[data-testid="membership-section"]', { timeout: 20000 });
+  // od 29. 10. 2026 je Správa organizace v oddílech — košík je v „Předplatné a faktury“ (odkaz ze zkušebního pruhu míří sem)
+  await page.goto(`${BASE}/admin/users?oddil=platby`, { waitUntil: 'networkidle2', timeout: 60000 });
+  await page.waitForSelector('[data-testid="membership-section"]', { visible: true, timeout: 20000 });
   await page.$eval('[data-testid="membership-section"]', (el) => el.scrollIntoView());
   return { page, ctx };
 }
@@ -146,6 +147,10 @@ const je = async (page, testid) => (await page.$(`[data-testid="${testid}"]`)) !
     ({ page, ctx } = await kosik(browser));
     t = await sekce(page);
     expect(/Členství je aktivní/.test(t), 'řekne, že členství je aktivní');
+    // placená instance: karty tarifů sbalené, rozbalí je až „Porovnat a změnit tarif“ (ve zkušebce rozbalené rovnou)
+    expect(!(await je(page, 'plan-cloud-lite')), 'aktivní členství: karty tarifů jsou sbalené');
+    await klik(page, 'tarify-toggle');
+    expect(await je(page, 'plan-cloud-lite'), '„Porovnat a změnit tarif“ karty rozbalí');
     for (const tarif of ['cloud-lite', 'cloud-pro', 'cloud-ai-agent']) {
       await klik(page, `plan-${tarif}`);
       expect(!(await je(page, 'pay-card')) && !(await je(page, 'order-transfer')) && await je(page, 'write-us'),

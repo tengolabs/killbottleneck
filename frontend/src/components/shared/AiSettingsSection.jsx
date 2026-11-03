@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { pb } from '@/api/pb';
 import { refreshAiModes } from '@/hooks/useAiEnabled';
@@ -126,20 +125,11 @@ export default function AiSettingsSection() {
     }
   };
 
-  // příchod z asistenta (/admin/users#ai): sekce se kreslí až po načtení, proto posun až teď;
-  // hash v závislostech — správce už na /admin/users mění jen kotvu a router k ní sám neposune
-  const { hash } = useLocation();
-  useEffect(() => {
-    if (loading || hash !== '#ai') return;
-    const el = document.getElementById('ai');
-    if (el) el.scrollIntoView({ block: 'start' });
-  }, [loading, hash]);
-
   if (loading) return null;
 
   return (
-    // kotva #ai: asistent bez AI („Připojit AI“, 19. 10. 2026) sem posílá správce — posun obstará useEffect výš
-    <div id="ai" className="rounded-xl border bg-card p-4 mb-6 scroll-mt-20">
+    // id="ai": test ui-ai-chat-bez-ai podle něj pozná sekci; „Připojit AI“ (19. 10. 2026) vede na /admin/users?oddil=ai
+    <div id="ai" className="rounded-xl border bg-card p-4">
       <h2 className="font-heading text-sm font-semibold flex items-center gap-2 mb-1">
         <Sparkles className="w-4 h-4 text-primary" /> {t('aiSettings.heading')}
       </h2>

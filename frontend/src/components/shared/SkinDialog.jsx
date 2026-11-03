@@ -8,11 +8,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { BUILTIN_SKINS, DEFAULT_SKIN_ID, getBuiltinSkin } from '@/lib/skins';
+import { BUILTIN_SKINS, DEFAULT_SKIN_ID, getBuiltinSkin, skinDne } from '@/lib/skins';
 import { effectiveTheme, setTheme } from '@/lib/theme';
 import { validateSkin, fontStack } from '@/lib/skinValidator';
-import { setSkin } from '@/lib/theme';
-import { Check, Download, Upload, ExternalLink, Palette, Sun as SunIcon, Moon as MoonIcon } from 'lucide-react';
+import { setSkin, hlidejRotaci } from '@/lib/theme';
+import { Switch } from '@/components/ui/switch';
+import { Check, Download, Upload, ExternalLink, Palette, Shuffle, Sun as SunIcon, Moon as MoonIcon } from 'lucide-react';
 
 // PŘED VYDÁNÍM (RENAME CHECKLIST): přepnout na veřejné repo pod org killbottleneck.
 // Do té doby privátní vývojové repo na osobním účtu (rozhodnutí 30. 7. 2026).
@@ -80,7 +81,9 @@ export default function SkinDialog({ open, onClose }) {
   const [importText, setImportText] = useState('');
   const fileRef = useRef(null);
 
-  const activeId = user?.skin_id || DEFAULT_SKIN_ID;
+  const rotace = !!user?.skin_rotace;
+  // při rotaci je „aktivní“ (zaškrtnutý) dnešní skin, ne naposledy vybraný
+  const activeId = rotace ? skinDne().id : (user?.skin_id || DEFAULT_SKIN_ID);
   const customSkin = (() => {
     const r = validateSkin(user?.skin_custom);
     return r.ok ? r.clean : null;
@@ -92,15 +95,26 @@ export default function SkinDialog({ open, onClose }) {
     patchUser(fields);
   };
 
+  // výběr konkrétního skinu rotaci vypne (jinak by ho zítra přepsala)
   const chooseBuiltin = (skin) => {
     setSkin(skin);
-    persist({ skin_id: skin.id });
+    persist({ skin_id: skin.id, skin_rotace: false });
+    hlidejRotaci(null);
   };
 
   const chooseCustom = () => {
     if (!customSkin) return;
     setSkin(customSkin);
-    persist({ skin_id: 'custom' });
+    persist({ skin_id: 'custom', skin_rotace: false });
+    hlidejRotaci(null);
+  };
+
+  // Rotace (Richard 29. 10. 2026): každý den jiný vestavěný skin; vypnutí nechá dnešní skin jako vybraný
+  const prepniRotaci = (zapnout) => {
+    const dnes = skinDne();
+    setSkin(dnes);
+    persist(zapnout ? { skin_rotace: true } : { skin_rotace: false, skin_id: dnes.id });
+    hlidejRotaci(zapnout ? { skin_rotace: true } : null);
   };
 
   const applyImport = (text) => {
@@ -121,7 +135,8 @@ export default function SkinDialog({ open, onClose }) {
       toast({ title: t('skins.importWarnings'), description: r.warnings.join(', ') });
     }
     setSkin(r.clean);
-    persist({ skin_id: 'custom', skin_custom: r.clean });
+    persist({ skin_id: 'custom', skin_custom: r.clean, skin_rotace: false });
+    hlidejRotaci(null);
     setImportOpen(false);
     setImportText('');
   };
@@ -189,6 +204,19 @@ export default function SkinDialog({ open, onClose }) {
             ))}
           </div>
         </div>
+
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 cursor-pointer" data-skin-rotace>
+          <span className="flex items-center gap-2 min-w-0">
+            <Shuffle className="w-4 h-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0">
+              <span className="block text-sm">{t('skins.rotace')}</span>
+              <span className="block text-xs text-muted-foreground truncate">
+                {rotace ? t('skins.rotaceDnes', { name: tCommon(`skins.${skinDne().id}`) }) : t('skins.rotaceHint')}
+              </span>
+            </span>
+          </span>
+          <Switch checked={rotace} onCheckedChange={prepniRotaci} aria-label={t('skins.rotace')} data-skin-rotace-switch />
+        </label>
 
         <div className="grid grid-cols-2 gap-2 max-h-[55vh] overflow-y-auto pr-1">
           {BUILTIN_SKINS.map((skin) => (

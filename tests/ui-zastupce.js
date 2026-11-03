@@ -59,7 +59,7 @@ const api = async (method, path, { token, body } = {}) => {
     console.log('== Správa organizace: sloupec Zástupce + nastavení klikem ==');
     await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2' });
     await sleep(2000);
-    ok(await page.evaluate(() => (document.body.innerText || '').includes('Zástupce')), 'tabulka má sloupec „Zástupce"');
+    ok(await page.evaluate(() => /Zástupce/i.test(document.body.innerText || '')), 'tabulka má sloupec „Zástupce"'); // záhlaví je od 29. 10. 2026 VELKÝMI (text-transform)
     const trg = await page.$('[data-testid="deputy-kolega@example.com"]');
     ok(!!trg, 'řádek kolegy má ovladač zástupce');
     if (trg) {

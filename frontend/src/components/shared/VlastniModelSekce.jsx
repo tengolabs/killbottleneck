@@ -84,7 +84,7 @@ export default function VlastniModelSekce({ onChange }) {
   const plainHttp = /^http:\/\//i.test(url.trim());
 
   return (
-    <div className="rounded-xl border bg-card p-4 mb-6" data-testid="vlastni-model">
+    <div className="rounded-xl border bg-card p-4" data-testid="vlastni-model">
       <h2 className="font-heading text-sm font-semibold flex items-center gap-2 mb-1">
         <Cpu className="w-4 h-4 text-primary" /> {t('heading')}
       </h2>
@@ -110,6 +110,9 @@ export default function VlastniModelSekce({ onChange }) {
         {active && <span className="text-[11px] rounded-full bg-primary/10 text-primary px-2 py-0.5" data-testid="vlastni-model-aktivni">{t('active')}</span>}
       </label>
 
+      {/* pole adresy, modelu a klíče až po zapnutí (maketa Správy organizace 29. 10. 2026);
+          Uložit zůstává i vypnuté — tím se vlastní model vypíná */}
+      {enabled && (
       <div className="space-y-3">
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -149,16 +152,19 @@ export default function VlastniModelSekce({ onChange }) {
           <p><Trans i18nKey="vlastniAi.tunnelHelp" ns="admin" components={{ b: <strong />, c: <code /> }} /></p>
         </div>
       </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 mt-4">
         <Button onClick={uloz} disabled={saving || !keyReady || loadFailed} data-testid="vlastni-model-ulozit">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : null}
           {saved ? t('saved') : t('save')}
         </Button>
+        {enabled && (
         <Button variant="outline" onClick={otestuj} disabled={testing || !url} data-testid="vlastni-model-test">
           {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlugZap className="w-4 h-4" />}
           {t('test')}
         </Button>
+        )}
         {result ? (
           <span className={`text-xs ${result.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} data-testid="vlastni-model-vysledek">{result.message}</span>
         ) : (

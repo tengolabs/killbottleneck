@@ -79,7 +79,10 @@
     "gallery": "Skin gallery",
     "previewMode": "Preview in mode",
     "modeLight": "Light",
-    "modeDark": "Dark"
+    "modeDark": "Dark",
+    "rotace": "A different skin every day",
+    "rotaceHint": "Skins rotate on their own — a new one each day.",
+    "rotaceDnes": "Today: {{name}} · another one tomorrow"
   },
   "externalContacts": {
     "title": "External contacts",

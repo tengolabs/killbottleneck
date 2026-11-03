@@ -303,7 +303,7 @@ function ctiNastaveni(app, auth, ktx, L) {
   const maSmtp = smtp(app);
   const out = ["User settings (the assistant can change these with set_preference / set_notification; the user confirms or can revert):"];
   out.push(`- display name: ${u.getString("name") || "(none)"}; full name: ${u.getString("full_name") || "(none)"}; e-mail: ${u.getString("email")} (e-mail and password cannot be changed by the assistant — user menu → "My account")`);
-  out.push(`- language: ${ulozenaPredvolba("language", u)} · skin: ${u.getString("skin_id") || "default"} (set_skin) · light/dark theme: ${klient("theme")} (this device) · view: ${klient("mode")} (this device; "lite" = simplified phone view; the assistant is there too) · map readability: ${klient("readability")} (this device) · alignment lock: ${ulozenaPredvolba("align_lock", u)}`);
+  out.push(`- language: ${ulozenaPredvolba("language", u)} · skin: ${u.getBool("skin_rotace") ? "daily (rotates every day)" : (u.getString("skin_id") || "default")} (set_skin) · light/dark theme: ${klient("theme")} (this device) · view: ${klient("mode")} (this device; "lite" = simplified phone view; the assistant is there too) · map readability: ${klient("readability")} (this device) · alignment lock: ${ulozenaPredvolba("align_lock", u)}`);
   out.push(`- notification e-mails: ${maSmtp ? ulozenaPredvolba("notify_email_mode", u) + " (instant | digest | none)" : "e-mail is NOT configured on this instance (notifications are in-app only; the operator sets SMTP)"}`);
   out.push("- notifications (type: in-app / e-mail):");
   for (const typ of NOTIFY_NASTAVITELNE) { const p = predvolbyUpozorneni(u, typ); out.push(`  · ${typ}: ${en(p.in_app)} / ${maSmtp ? en(p.email) : "n/a"}`); }

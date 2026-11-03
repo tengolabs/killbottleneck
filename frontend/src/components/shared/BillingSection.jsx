@@ -74,10 +74,10 @@ export default function BillingSection({ onChange }) {
   ];
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 mt-6" data-testid="billing-section">
+    <div className="rounded-xl border bg-card p-4" data-testid="billing-section">
       <div className="flex items-center gap-2 mb-1">
         <FileText className="h-4 w-4 text-primary" />
-        <h2 className="font-semibold">{t('billing.heading')}</h2>
+        <h2 className="font-heading text-sm font-semibold">{t('billing.heading')}</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-4">{t('billing.hint')}</p>
       {loading ? (

@@ -102,11 +102,11 @@ export default function InvoicingSection({ rezim = 'org', vychoziOtevreno = fals
   const T = me ? 'invoicing-me' : 'invoicing';
 
   return (
-    <div ref={ref} className={me ? 'border-t pt-3' : 'rounded-xl border border-border bg-card p-5 mt-6'} data-testid={`${T}-section`}>
+    <div ref={ref} className={me ? 'border-t pt-3' : 'rounded-xl border bg-card p-4'} data-testid={`${T}-section`}>
       <button type="button" className="w-full flex items-center gap-2 text-left" onClick={() => setOpen((v) => !v)} data-testid={`${T}-toggle`} aria-expanded={open}>
         {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
         <Receipt className="h-4 w-4 text-primary" />
-        <h2 className={me ? 'text-sm font-medium flex-1 min-w-0' : 'font-semibold flex-1 min-w-0'}>{me ? t('invoicing.me.heading') : t('invoicing.heading')}</h2>
+        <h2 className={me ? 'text-sm font-medium flex-1 min-w-0' : 'font-heading text-sm font-semibold flex-1 min-w-0'}>{me ? t('invoicing.me.heading') : t('invoicing.heading')}</h2>
         {!loading && <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 max-w-[55%] truncate ${zeleny ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`} data-testid={`${T}-stav`} data-complete={stav.complete ? '1' : '0'} data-vlastni={vlastni ? '1' : '0'}>{stitek}</span>}
       </button>
       {open && (

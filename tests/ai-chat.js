@@ -909,6 +909,18 @@ H.beh(async () => {
   const uA = (await inst.api('GET', `/api/collections/users/records/${meA.id}`, { token: A })).json;
   expect(uA.skin_id === 'sepia', 'users.skin_id = sepia');
   expect(chat.messages.flatMap((m) => m.karty || []).some((k) => k.type === 'skin' && k.skin_id === 'sepia'), 'karta skinu v odpovědi');
+  // rotace (29. 10. 2026): daily zapne users.skin_rotace, konkrétní skin ji zase vypne; předchozí stav jde do karty (Vrátit)
+  fronta.push(nastroj('set_skin', { skin_id: 'daily' }), text('Skiny se budou střídat.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Střídej mi skiny každý den' } });
+  let uR = (await inst.api('GET', `/api/collections/users/records/${meA.id}`, { token: A })).json;
+  expect(uR.skin_rotace === true && uR.skin_id === 'sepia', `set_skin daily zapne rotaci a skin_id nechá (${uR.skin_rotace}, ${uR.skin_id})`);
+  expect(r.json.chat.messages.flatMap((m) => m.karty || []).some((k) => k.type === 'skin' && k.skin_id === 'daily' && k.predchozi === 'sepia'), 'karta rotace s předchozím skinem sepia');
+  fronta.push(nastroj('set_skin', { skin_id: 'ocean' }), text('Oceán.'));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Dej mi oceán' } });
+  uR = (await inst.api('GET', `/api/collections/users/records/${meA.id}`, { token: A })).json;
+  expect(uR.skin_rotace === false && uR.skin_id === 'ocean', `konkrétní skin rotaci vypne (${uR.skin_rotace}, ${uR.skin_id})`);
+  expect(r.json.chat.messages.flatMap((m) => m.karty || []).some((k) => k.type === 'skin' && k.skin_id === 'ocean' && k.predchozi === 'daily'), 'karta oceánu pamatuje předchozí rotaci (Vrátit ji obnoví)');
+  chat = r.json.chat;
   fronta.push(nastroj('add_idea', { title: 'Zkusit olejování' }), text('Poznamenáno.'));
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: chat.id, message: 'Poznamenej si: zkusit olejování' } });
   const zas = (await inst.api('GET', '/api/collections/buffer_nodes/records', { token: A })).json;

@@ -90,6 +90,7 @@ const toDto = (name, r) => {
         notify_prefs: r.notify_prefs || {},
         notify_email_mode: r.notify_email_mode || '',
         skin_id: r.skin_id || '',
+        skin_rotace: !!r.skin_rotace,
         align_lock: r.align_lock || '',
         skin_custom: r.skin_custom || null,
         focus: r.focus || null,

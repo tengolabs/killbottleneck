@@ -50,7 +50,7 @@ const api = async (method, path, { token, body } = {}) => {
     await page.evaluateOnNewDocument((t) => localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: {} })), SEF);
 
     console.log('== založení org mapy ze Správy organizace ==');
-    await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2' });
+    await page.goto(`${BASE}/admin/users?oddil=struktura`, { waitUntil: 'networkidle2' });
     await sleep(2000);
     ok(await page.evaluate(() => !!document.querySelector('[data-testid="org-structure-section"]')), 'sekce Organizační struktura je na stránce');
     await page.evaluate(() => document.querySelector('[data-testid="org-create"]')?.click());
@@ -109,7 +109,7 @@ const api = async (method, path, { token, body } = {}) => {
       'obsazení z dialogu se uložilo do mapy');
 
     console.log('== tabulka ve Správě organizace = tentýž zdroj ==');
-    await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2' });
+    await page.goto(`${BASE}/admin/users?oddil=struktura`, { waitUntil: 'networkidle2' });
     await sleep(2000);
     ok(await page.evaluate(() => document.querySelector('[data-testid="org-holder-pos1"]')?.value === 'kolega@example.com'),
       'tabulka ukazuje držitele nastaveného v mapě');

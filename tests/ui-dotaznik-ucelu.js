@@ -86,8 +86,8 @@ const polozky = (m) => (m.nodes || []).filter((n) => n.type === 'goalNode' && (n
     expect(!(await page.$('[data-testid="purpose-dialog"]')), 'po obnovení stránky se dialog už neptá');
 
     console.log('== Správa organizace: účel jde změnit ==');
-    await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2' });
-    await page.waitForSelector('[data-testid="org-purpose"]', { timeout: 8000 });
+    await page.goto(`${BASE}/admin/users?oddil=org`, { waitUntil: 'networkidle2' }); // účel je v oddílu Organizace a vzhled
+    await page.waitForSelector('[data-testid="org-purpose"]', { visible: true, timeout: 8000 });
     expect(await page.$eval('[data-testid="org-purpose"]', (e) => e.value) === 'solo', 'select ukazuje solo');
     await page.select('[data-testid="org-purpose"]', 'family'); await sleep(800);
     expect((await api('GET', '/api/kb/config', { token: tok })).json.purpose === 'family', 'změna na rodinu se uložila');

@@ -79,7 +79,10 @@
     "gallery": "Galerie skinů",
     "previewMode": "Náhled v režimu",
     "modeLight": "Světlý",
-    "modeDark": "Tmavý"
+    "modeDark": "Tmavý",
+    "rotace": "Každý den jiný skin",
+    "rotaceHint": "Skiny se budou samy střídat — každý den další.",
+    "rotaceDnes": "Dnes: {{name}} · zítra další"
   },
   "externalContacts": {
     "title": "Externí kontakty",

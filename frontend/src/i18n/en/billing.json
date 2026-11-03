@@ -68,9 +68,10 @@
     "changeByMail": "We'll arrange a change of plan or billing period with you by e-mail so you don't pay twice — we adjust your existing subscription instead of adding a second one.",
     "orderByTransfer": "Order via bank transfer (invoice)",
     "transferYearlyOnly": "Bank transfer is only available for the yearly plan.",
-    "billingFirst": "Please fill in and save the billing details above first.",
+    "billingFirst": "Please fill in and save the billing details below first.",
     "orderReceived": "Order received.",
-    "orderReceivedHint": "We will e-mail you an invoice for {{amount}} CZK — your plan activates once it is paid. Your data and address stay unchanged."
+    "orderReceivedHint": "We will e-mail you an invoice for {{amount}} CZK — your plan activates once it is paid. Your data and address stay unchanged.",
+    "tarifyUkaz": "Compare and change plan"
   },
   "account": {
     "heading": "My account",

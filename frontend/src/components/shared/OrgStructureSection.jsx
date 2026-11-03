@@ -100,7 +100,7 @@ export default function OrgStructureSection() {
   };
 
   return (
-    <div className="rounded-xl border bg-card p-4 mt-6" data-testid="org-structure-section">
+    <div className="rounded-xl border bg-card p-4" data-testid="org-structure-section">
       <h2 className="font-heading text-sm font-semibold flex items-center gap-2 mb-1">
         <Network className="w-4 h-4 text-primary" /> {t('orgStructure.heading')}
       </h2>

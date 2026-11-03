@@ -81,9 +81,9 @@ export default function InstanceSkinSection() {
   };
 
   return (
-    <div className="bg-card border rounded-xl p-4 sm:p-6 mt-6" data-instance-skin>
-      <h2 className="font-heading font-semibold flex items-center gap-2 mb-1">
-        <Palette className="w-4 h-4" /> {t('instanceSkin.title')}
+    <div className="rounded-xl border bg-card p-4" data-instance-skin>
+      <h2 className="font-heading text-sm font-semibold flex items-center gap-2 mb-1">
+        <Palette className="w-4 h-4 text-primary" /> {t('instanceSkin.title')}
       </h2>
       <p className="text-sm text-muted-foreground mb-4">{t('instanceSkin.hint')}</p>
       {loading ? (

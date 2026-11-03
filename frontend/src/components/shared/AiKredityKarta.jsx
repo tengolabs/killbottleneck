@@ -76,7 +76,7 @@ export default function AiKredityKarta({ vlastniModel = false }) {
   const roleText = (r) => (r === 'admin' ? t('roleAdmin') : r === 'manager' ? t('roleManager') : t('roleUser'));
 
   return (
-    <div className="rounded-xl border bg-card p-4 mb-6" data-testid="ai-kredity">
+    <div className="rounded-xl border bg-card p-4" data-testid="ai-kredity">
       <h2 className="font-heading text-sm font-semibold flex items-center gap-2 mb-1">
         <Coins className="w-4 h-4 text-primary" /> {t('heading')}
       </h2>

@@ -31,6 +31,7 @@ const SEKCE = [
   { nadpis: 'Členství a platba',      hosted: true,  self: false, proc: 'košík je jen pro hostovanou službu' },
   { nadpis: 'AI funkce',              hosted: false, self: true,  proc: 'na hostované instanci AI dodáváme my; zákazník ji nesmí přesměrovat (SSRF na sousedy)' },
   { nadpis: 'Vlastní model nebo API klíč', hosted: true,  self: false, proc: 'zákazník cloudu si může připojit VLASTNÍ model (14. 10. 2026); self-host má plnou dlaždici AI' },
+  { nadpis: 'Předplatné a faktury',   hosted: true,  self: false, proc: 'oddíl Správy organizace (29. 10. 2026) — self-host nic nepředplácí, oddíl se jmenuje jen „Faktury“' },
   { nadpis: 'Výchozí vzhled instance', hosted: true,  self: true,  proc: 'produktová funkce — patří do obou' },
 ];
 
@@ -71,7 +72,13 @@ async function textAdministrace(browser, base, setupCode) {
   await page.goto(`${base}/admin/users`, { waitUntil: "networkidle2" });
   // sekce se dotahují líně (lazy i18n namespace „billing") — počkat na doběhnutí
   await sleep(2500);
-  const text = await page.evaluate(() => document.body.innerText);
+  // od 29. 10. 2026 je stránka v oddílech — sebrat text ze všech, které rozcestník nabízí
+  let text = '';
+  for (const id of await page.$$eval('[role="tab"][data-testid^="oddil-"]', (b) => b.map((x) => x.dataset.testid))) {
+    await page.click(`[data-testid="${id}"]`);
+    await sleep(600);
+    text += '\n' + await page.evaluate(() => document.body.innerText);
+  }
   await page.close();
   return text;
 }

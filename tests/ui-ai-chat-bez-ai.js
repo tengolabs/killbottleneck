@@ -237,10 +237,12 @@ H.beh(async () => {
   await sleep(500);
   expect((await p2.$('[data-testid="relax-vrstva"]')) === null, 'Připojit AI relax ukončí (nastavení není zakryté)');
   expect(await cekej2('#ai'), 'Připojit AI → sekce AI ve Správě organizace');
-  expect(p2.url().endsWith('/admin/users#ai'), `adresa ${p2.url()}`);
+  // #ai stránka hned přepíše na ?oddil=ai (oddíl se čte z adresy a drží ho F5; Správa organizace v oddílech 29. 10. 2026)
+  expect(p2.url().endsWith('/admin/users?oddil=ai'), `adresa ${p2.url()}`);
   await sleep(500);
-  const viditelna = await p2.$eval('#ai', (e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight; });
-  expect(viditelna, 'stránka se posunula na sekci AI');
+  // oddíly: vidět je jen oddíl AI (ostatní mají [hidden]) — dřív se stránka posouvala na kotvu #ai
+  const viditelneOddily = await p2.$$eval('[data-oddil]', (els) => els.filter((e) => !e.hidden && e.offsetParent !== null).map((e) => e.dataset.oddil));
+  expect(viditelneOddily.join(',') === 'ai', `viditelný je jen oddíl AI (${viditelneOddily.join(',')})`);
   // kontrolní panel 19. 10.: mapa nemá hlavičku a tlačítko v liště editoru čekalo na zdravou AI → bez AI se tam asistent nedal otevřít
   const mapaS = (await self.api('POST', '/api/collections/goalmaps/records', { token: SA, body: { title: 'Dílna', nodes: [
     { id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Dílna', title: 'Dílna', status: 'todo' } }], edges: [] } })).json;

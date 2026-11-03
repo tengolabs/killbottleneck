@@ -11,6 +11,18 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.98-beta": {
+    cs: [
+      "Každý den jiný skin: v dialogu Vzhled zapnete přepínač a vestavěné skiny se střídají samy — na všech vašich zařízeních stejný, o půlnoci další. Světlý nebo tmavý režim zůstává podle vás. Jde to i v jednoduchém zobrazení a přes asistenta.",
+      "Přehlednější Správa organizace: místo jedné dlouhé stránky šest oddílů s rozcestníkem — Lidé, Organizace a vzhled, Struktura a zástupci, Sdílené kalendáře, Předplatné a faktury (na vlastním serveru jen Faktury), AI. Mezi oddíly se dá přepínat i šipkami.",
+      "Tabulka lidí má 7 sloupců místo 9; obnova hesla a smazání účtu jsou v menu ⋯ na konci řádku a na telefonu má každý člověk vlastní kartu. Nic neubylo a oprávnění se nemění.",
+    ],
+    en: [
+      "A different skin every day: switch it on in the Appearance dialog and the built-in skins rotate on their own — the same one on all your devices, the next one at midnight. Light or dark mode stays your choice. Also in the simplified view and via the assistant.",
+      "Clearer Organization settings: six tabs with a tab list instead of one long page — People, Organization and look, Structure and deputies, Shared calendars, Subscription and invoices (just Invoices on a self-hosted server), AI. The arrow keys switch tabs too.",
+      "The people table has 7 columns instead of 9; password reset and account deletion sit in the ⋯ menu at the end of the row, and on a phone everyone gets a card. Nothing was removed and permissions are unchanged.",
+    ],
+  },
   "v0.97-beta": {
     cs: [
       "Bezpečnostní aktualizace: nová verze serverového jádra (PocketBase 0.39.11) opravuje veřejně známou chybu, kdy šel server shodit speciálně sestaveným požadavkem. Self-host: aktualizujte prosím co nejdřív.",

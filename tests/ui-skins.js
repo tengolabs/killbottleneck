@@ -415,6 +415,102 @@ const openSkinDialog = async (page) => {
     await page.goto(`${BASE}/lite`, { waitUntil: 'domcontentloaded' });
     expect(await cssVar(page, '--background') === CONTRAST_LIGHT_BG, 'volba z lite přežije reload');
 
+    console.log('== rotace: každý den jiný vestavěný skin (Richard 29. 10. 2026) ==');
+    // očekávaný skin dne počítá TÁŽ funkce, kterou volá aplikace (lib/skins.js je čisté ESM bez importů)
+    const { skinDne } = await import(require('path').join(__dirname, '../frontend/src/lib/skins.js'));
+    const zitra = (d) => new Date(d.getTime() + 86400000);
+    const dnes = skinDne(new Date());
+    const zitrejsi = skinDne(zitra(new Date()));
+    const pozitri = skinDne(zitra(zitra(new Date())));
+    // výchozí i „vybraný konkrétní“ skin musí být jiný než dnešní a zítřejší skin dne — jinak by kontroly
+    // přepnutí prošly naprázdno (pořadí rotace se opakuje, ve dnech, kdy je skin dne Papír, by Papír nic nedokázal)
+    const { BUILTIN_SKINS } = await import(require('path').join(__dirname, '../frontend/src/lib/skins.js'));
+    const jiny = BUILTIN_SKINS.find((s) => ![dnes.id, zitrejsi.id, pozitri.id].includes(s.id));
+    const naServeru = () => page.evaluate(async () => {
+      const auth = JSON.parse(localStorage.getItem('pocketbase_auth') || '{}');
+      const r = await (await fetch(`/api/collections/users/records/${auth.record?.id || auth.model?.id}`, { headers: { Authorization: auth.token } })).json();
+      return { skin_id: r.skin_id, skin_rotace: r.skin_rotace };
+    });
+    await page.setViewport(DESKTOP);
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
+    await sleep(1000);
+    await openSkinDialog(page);
+    await page.click(`[data-skin-card="${jiny.id}"]`);
+    await sleep(1000);
+    expect(await cssVar(page, '--background') === jiny.light.background, `výchozí stav: vybraný skin ${jiny.id} (jiný než skin dne)`);
+    expect(!!(await page.$('[data-skin-rotace-switch]')), 'dialog Vzhled má přepínač „Každý den jiný skin“');
+    expect((await page.$eval('[data-skin-rotace-switch]', (b) => b.getAttribute('aria-checked'))) === 'false', 'rotace je výchozí vypnutá');
+    await page.click('[data-skin-rotace-switch]');
+    await sleep(1000);
+    expect((await page.$eval('[data-skin-rotace-switch]', (b) => b.getAttribute('aria-checked'))) === 'true', 'přepínač rotace zapnutý');
+    expect(await cssVar(page, '--background') === dnes.light.background, `zapnutí hned použije skin dne ${dnes.id} (${await cssVar(page, '--background')})`);
+    const rotTxt = await page.$eval('[data-skin-rotace]', (e) => e.textContent);
+    expect(rotTxt.includes('Dnes:'), `pod přepínačem je vidět dnešní skin (${rotTxt})`);
+    expect(!!(await page.$(`[data-skin-card="${dnes.id}"].border-primary`)), `zaškrtnutá karta = dnešní skin ${dnes.id}`);
+    const srv1 = await naServeru();
+    expect(srv1.skin_rotace === true, `server má users.skin_rotace = true (${JSON.stringify(srv1)})`);
+    await page.keyboard.press('Escape');
+
+    // zítřek: podvržené datum (+1 den) — reload bere skin dalšího dne UŽ při domcontentloaded (bez záblesku včerejšího)
+    const posun = await page.evaluateOnNewDocument(() => {
+      const Puvodni = Date;
+      const D = class extends Puvodni { constructor(...a) { if (a.length) super(...a); else super(Puvodni.now() + 86400000); } static now() { return Puvodni.now() + 86400000; } };
+      window.Date = D;
+    });
+    await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+    expect(await cssVar(page, '--background') === zitrejsi.light.background, `zítra (podvržené datum) hned při startu skin ${zitrejsi.id} (${await cssVar(page, '--background')})`);
+    await sleep(1500);
+    expect(await cssVar(page, '--background') === zitrejsi.light.background, `a po načtení účtu zůstává ${zitrejsi.id}`);
+    await page.removeScriptToEvaluateOnNewDocument(posun.identifier);
+
+    // aplikace otevřená přes půlnoc: návrat do okna (visibilitychange) přepočítá skin
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
+    await sleep(1000);
+    expect(await cssVar(page, '--background') === dnes.light.background, `bez posunu data zpět dnešní ${dnes.id}`);
+    await page.evaluate(() => {
+      const Puvodni = Date;
+      window.Date = class extends Puvodni { constructor(...a) { if (a.length) super(...a); else super(Puvodni.now() + 86400000); } static now() { return Puvodni.now() + 86400000; } };
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await sleep(500);
+    expect(await cssVar(page, '--background') === zitrejsi.light.background, `přes půlnoc: návrat do okna přepne na ${zitrejsi.id}`);
+    // probuzený počítač s oknem, které zůstalo „visible“: visibilitychange nepřijde, přepočítá fokus okna
+    await page.evaluate(() => {
+      const Puvodni = window.Date;
+      window.Date = class extends Puvodni { constructor(...a) { if (a.length) super(...a); else super(Puvodni.now() + 86400000); } static now() { return Puvodni.now() + 86400000; } };
+      window.dispatchEvent(new Event('focus'));
+    });
+    await sleep(500);
+    expect(await cssVar(page, '--background') === pozitri.light.background, `po probuzení: fokus okna přepne na ${pozitri.id}`);
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
+    await sleep(1000);
+
+    // konkrétní skin rotaci vypne
+    await openSkinDialog(page);
+    await page.click(`[data-skin-card="${jiny.id}"]`);
+    await sleep(1000);
+    expect((await page.$eval('[data-skin-rotace-switch]', (b) => b.getAttribute('aria-checked'))) === 'false', 'klik na konkrétní skin rotaci vypne');
+    expect(await cssVar(page, '--background') === jiny.light.background, `a použije vybraný ${jiny.id}`);
+    const srv2 = await naServeru();
+    expect(srv2.skin_rotace === false && srv2.skin_id === jiny.id, `server: rotace vypnutá, skin_id ${jiny.id} (${JSON.stringify(srv2)})`);
+    await page.keyboard.press('Escape');
+    await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+    expect(await cssVar(page, '--background') === jiny.light.background, `po reloadu zůstává ${jiny.id} (příznak rotace v prohlížeči smazán)`);
+    await sleep(1000);
+
+    // lite: volba „Každý den jiný“ v nativním selectu
+    await page.setViewport(PHONE);
+    await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
+    await sleep(1500);
+    await page.select('select[data-skin-select]', 'daily');
+    await sleep(1200);
+    expect(await cssVar(page, '--background') === dnes.light.background, `lite: volba „Každý den jiný“ použije skin dne ${dnes.id}`);
+    const srv3 = await naServeru();
+    expect(srv3.skin_rotace === true, `lite: server má skin_rotace = true (${JSON.stringify(srv3)})`);
+    await page.goto(`${BASE}/lite`, { waitUntil: 'networkidle2' });
+    await sleep(1000);
+    expect((await page.$eval('select[data-skin-select]', (e) => e.value)) === 'daily', 'lite: po reloadu select ukazuje „Každý den jiný“');
+
     const relevant = errors.filter((e) => !e.includes('favicon') && !e.includes('ERR_NETWORK_CHANGED'));
     expect(relevant.length === 0, `konzole bez chyb (${relevant.length}${relevant.length ? ': ' + relevant[0].slice(0, 140) : ''})`);
   } finally {

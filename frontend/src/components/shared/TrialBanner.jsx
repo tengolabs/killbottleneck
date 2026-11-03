@@ -34,8 +34,8 @@ export default function TrialBanner() {
   // Správu organizace nedosáhne, ten dál míří na veřejný ceník.
   const cta = user?.role === 'admin'
     ? {
-      onClick: (e) => { e.preventDefault(); navigate('/admin/users'); },
-      href: '/admin/users',
+      onClick: (e) => { e.preventDefault(); navigate('/admin/users?oddil=platby'); },
+      href: '/admin/users?oddil=platby',
     }
     : { href: CENIK, target: '_blank', rel: 'noopener noreferrer' };
 
