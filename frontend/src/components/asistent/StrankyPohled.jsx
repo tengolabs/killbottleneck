@@ -192,7 +192,7 @@ function LideStranky({ str, uklada, akce, t }) {
   const [vybrany, setVybrany] = useState('');
   useEffect(() => {
     let zivy = true;
-    getMembers().then((r) => { if (zivy) setMembers(r.members || []); }).catch(() => { if (zivy) setMembers([]); });
+    getMembers().then((lide) => { if (zivy) setMembers(lide); }).catch(() => { if (zivy) setMembers([]); });
     return () => { zivy = false; };
   }, []);
   const lide = str.shared_with || [];

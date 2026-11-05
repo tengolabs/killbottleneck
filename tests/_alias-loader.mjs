@@ -11,6 +11,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../frontend/src');
 const STUBS = {
   '@/api/base44Client': 'export const base44 = {};',
+  // od 4. 11. 2026 (vlna A) jde externalContacts → @/api/kb → kbSend → pb.js (window) — v node totéž co base44
+  '@/api/kb': 'export const getMembers = async () => []; export const nodeStatus = () => {}; export const fetchMyDay = async () => ({}); export const fetchPortfolio = async () => ({});',
 };
 
 export async function resolve(specifier, context, next) {

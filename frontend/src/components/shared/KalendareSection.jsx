@@ -40,7 +40,8 @@ export default function KalendareSection() {
   const [mazuId, setMazuId] = useState(''); // první klik na koš = potvrzení
 
   const nacti = () => listKalendare().then((d) => setKalendare(d.calendars || [])).catch(() => {}).finally(() => setLoading(false));
-  useEffect(() => { nacti(); getMembers().then((m) => setClenove((m || []).filter((x) => !x.external && x.email))).catch(() => {}); }, []);
+  // getMembers() vrací POLE (F4-03: dřív tělo { members } → .filter padal a .catch to spolkl → seznam „jen vybraní“ byl vždy prázdný)
+  useEffect(() => { nacti(); getMembers().then((lide) => setClenove(lide.filter((x) => !x.external && x.email))).catch(() => {}); }, []);
 
   const uloz = async (body) => {
     setError('');

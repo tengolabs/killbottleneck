@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.99-beta": {
+    cs: [
+      "Kalendář „jen pro vybrané“ jde zase přidělit lidem — seznam členů ve Správě organizace byl od v0.83 vždy prázdný.",
+      "Asistent přežije čtení velkých map: do rozhovoru se ukládá jen to, co model opravdu dostane, takže čtvrté přečtení mapy už rozhovor nezabije a vaše zpráva se neztratí.",
+      "Čip „Dnes / Do týdne“ v Mém dni ukazuje stejné úkoly jako seznam po kliknutí; časová osa už nerozděluje 53. týden roku 2026 na dva.",
+      "Záloha je konzistentní i za běhu instance a obnova vadný archiv odmítne — self-host: po aktualizaci jednou přestavte image (docker compose up -d --build).",
+      "Události v archivovaném kalendáři už nejdou upravit ani smazat (stejně jako založit) — nejdřív kalendář odarchivujte.",
+    ],
+    en: [
+      "Calendars \"for selected people only\" can be assigned again — the member list in Organization settings had been empty since v0.83.",
+      "The assistant survives reading large maps: only what the model really receives is stored in the conversation, so the fourth read of a map no longer kills the chat and your message is not lost.",
+      "The \"Today / This week\" chip in My Day shows the same tasks as the list after you click it; the timeline no longer splits week 53 of 2026 in two.",
+      "Backups are consistent even while the instance runs, and restore refuses a damaged archive — self-hosters: rebuild the image once after updating (docker compose up -d --build).",
+      "Events in an archived calendar can no longer be edited or deleted (just like creating them) — unarchive the calendar first.",
+    ],
+  },
   "v0.98-beta": {
     cs: [
       "Každý den jiný skin: v dialogu Vzhled zapnete přepínač a vestavěné skiny se střídají samy — na všech vašich zařízeních stejný, o půlnoci další. Světlý nebo tmavý režim zůstává podle vás. Jde to i v jednoduchém zobrazení a přes asistenta.",

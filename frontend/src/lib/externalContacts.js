@@ -9,6 +9,7 @@
 // ostatním se totéž id ukáže jako anonymní „Externí kontakt".
 import { useCallback, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { getMembers } from '@/api/kb';
 
 const EXT_OWNER_RE = /^ext-([a-z0-9]+)@kontakt\.invalid$/;
 
@@ -26,7 +27,7 @@ export const extPseudoEmail = (contactId) => `ext-${String(contactId).toLowerCas
 // Kontakty převlečené za členy: stejný tvar jako řádky z /api/kb/members
 // (email/name/full_name), takže memberLabel, iniciály i sorty fungují beze změny.
 // Navíc `external: true` — výběry podle toho kreslí vlastní skupinu a správa
-// členů je nikdy nenačítá (ta jde mimo listMembers, přímo přes users).
+// členů je nikdy nenačítá (ta jde mimo getMembers, přímo přes users).
 export const contactsToMemberRows = (contacts) =>
   (contacts || []).map((c) => ({
     id: c.id,
@@ -49,14 +50,14 @@ export const listExternalContacts = async () => {
 };
 
 // Členové instance + externí kontakty v JEDNOM seznamu (kontakty s external:true).
-// Náhrada za holé base44.users.listMembers() na stránkách, kde se vybírá nebo
+// Náhrada za holé getMembers() na stránkách, kde se vybírá nebo
 // zobrazuje řešitel. reload() volat po změně adresáře (onContactsChanged).
 export function useMembersWithContacts(user) {
   const [members, setMembers] = useState([]);
   const reload = useCallback(() => {
     if (!user) return;
     Promise.all([
-      base44.users.listMembers().catch(() => []),
+      getMembers().catch(() => []),
       listExternalContacts(),
     ]).then(([team, contacts]) => setMembers([...team, ...contactsToMemberRows(contacts)]));
   }, [user]);

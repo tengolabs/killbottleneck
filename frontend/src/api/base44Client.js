@@ -441,11 +441,7 @@ export const base44 = {
         body: { email, role },
       });
     },
-    // adresář členů týmu (bezpečná podmnožina polí, pro každého přihlášeného)
-    async listMembers() {
-      const res = await pb.send('/api/kb/members', { method: 'GET' });
-      return res.members || [];
-    },
+    // adresář členů týmu = getMembers() v api/kb.js (jediná fasáda routy /members, F4-03)
   },
 
   // registr AI agentů — webhook URL ani tajný klíč se běžnému členovi nikdy

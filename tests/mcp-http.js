@@ -129,6 +129,33 @@ let mcp = null;
     expect(propsOk, 'stejné properties vstupů');
     expect(reqOk, 'stejná required pole');
     expect(apOk, 'additionalProperties:false na obou stranách (neznámý argument = chyba, ne tiché zahození)');
+    // Vnořené VÝČTY (enum uvnitř properties/items: akce pravidla `type` a `mode`, stav uzlu v šabloně
+    // podstromu…). Do 4. 11. 2026 se srovnávala jen JMÉNA properties, takže stdio server 4 týdny neznal
+    // akci offer_assistant ani pole mode a parita byla zelená (F6-06, 3. kolo analýzy). HTTP strana má
+    // treeItem přes $defs/$ref, zod ho vkládá inline — $ref do $defs se rozbalí jednou, rekurze (children) ne.
+    const vycty = (sch, defs, cesta, out, videno) => {
+      if (!sch || typeof sch !== 'object') return out;
+      if (typeof sch.$ref === 'string') {
+        const m = sch.$ref.match(/^#\/\$defs\/(.+)$/);
+        if (!m || videno.has(m[1])) return out;
+        return vycty(defs[m[1]], defs, cesta, out, new Set([...videno, m[1]]));
+      }
+      if (Array.isArray(sch.enum)) out[cesta] = sch.enum.slice().sort().join('|');
+      for (const [k, v] of Object.entries(sch.properties || {})) vycty(v, defs, `${cesta}.${k}`, out, videno);
+      if (sch.items) vycty(sch.items, defs, `${cesta}[]`, out, videno);
+      return out;
+    };
+    let vyctyOk = true, vyctuCelkem = 0;
+    for (const n of Object.keys(S)) {
+      if (!H[n]) continue;
+      const sv = vycty(S[n].inputSchema, (S[n].inputSchema || {}).$defs || {}, '', {}, new Set());
+      const hv = vycty(H[n].inputSchema, (H[n].inputSchema || {}).$defs || {}, '', {}, new Set());
+      for (const c of new Set([...Object.keys(sv), ...Object.keys(hv)])) {
+        vyctuCelkem++;
+        if (sv[c] !== hv[c]) { vyctyOk = false; console.log(`    drift výčtu: ${n}${c} stdio=[${sv[c] || '—'}] http=[${hv[c] || '—'}]`); }
+      }
+    }
+    expect(vyctyOk && vyctuCelkem >= 20, `stejné vnořené VÝČTY (enum uvnitř properties/items; porovnáno ${vyctuCelkem} výčtů)`);
 
     console.log('== stránky přes MCP (14. 10. 2026): create_page → get_page → share_page link_on → GET /p/ 200 → link_off → 404 ==');
     const callP = async (name, args) => { const rr = await mcpPost(keyRW, 'tools/call', { name, arguments: args }); return (rr.json.result && rr.json.result.content[0].text) || JSON.stringify(rr.json); };

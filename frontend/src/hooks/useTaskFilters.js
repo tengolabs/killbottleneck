@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getDeadlineStatus } from '@/lib/nodeMeta';
+import { odpovidaTerminu } from '@/lib/kalendar';
 import { popisJakoText } from '@/lib/popisFormat';
 
 // Popis bez značek pro hledání. ⚠️ S pamětí: predikát filtru se volá pro každou
@@ -104,17 +104,13 @@ export function useTaskFilters({ user, searchParams, setSearchParams, maps, t })
     // hlavně přes uzly (vlastník mapy přiřadí uzel osobě), proto e-mail, ne id.
     if (ownerFilter === 'delegated' && !(it.created_by === user?.email && it.assignee_email && it.assignee_email !== user?.email)) return false;
     if (statusFilter !== ALL && it.status !== statusFilter) return false;
-    if (deadlineFilter === 'overdue' && getDeadlineStatus(it.deadline, it.status) !== 'overdue') return false;
-    if (deadlineFilter === 'today') {
-      if (!it.deadline || it.status === 'done') return false;
-      const days = Math.round((new Date(it.deadline + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
-      if (days !== 0) return false;
-    }
-    if (deadlineFilter === 'week') {
-      if (!it.deadline || it.status === 'done') return false;
-      const st = getDeadlineStatus(it.deadline, it.status);
-      const days = Math.round((new Date(it.deadline + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
-      if (st === 'overdue' || days > 7) return false;
+    // Termín: z PLÁNU i termínu stejně jako sekce Můj den na serveru (lib/kalendar.js:
+    // horizontDnu = zrcadlo helpers.js:horizonOf). Dřív jen z termínu → chip „Dnes 1“
+    // (termín za 10 dní, plán dnes) po kliku ukázal prázdný seznam (F3-03).
+    // Úkol nese plán jako `planned_on`, uzel z useTaskTrees jako `plannedOn`.
+    if (deadlineFilter !== ALL) {
+      if (it.status === 'done') return false;
+      if (!odpovidaTerminu(deadlineFilter, it.planned_on ?? it.plannedOn, it.deadline)) return false;
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();

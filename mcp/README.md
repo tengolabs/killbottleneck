@@ -125,6 +125,7 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `delete_rule_template` | smazání šablony (autor nebo admin) |
 | `get_org_structure` | organizační struktura: pozice a funkce s držiteli a zástupci (jen čtení) |
 | `list_people` | lidé instance (členové + viditelné externí kontakty) — platné hodnoty `owner`; neznámý e-mail server odmítne |
+| `create_events` | více událostí naráz (rozvrh přednášek, plán školení) — vše nebo nic, duplicitní (stejný název, den a čas) se přeskočí a nahlásí |
 | `create_event` | událost v kalendáři (schůzka, zubař) s časem, pozvanými členy a připomínkou — NENÍ úkol, do mapy nepatří; `calendar` ji dá do sdíleného kalendáře (firemní akce, rezervace místnosti s `end_time`, dovolená s `end_day`) |
 | `update_event` | úprava události (vlastní, ve sdíleném kalendáři jako správce/manažer, vlastní nepřítomnost) |
 | `delete_event` | smazání události; pozvaný se jí místo toho jen odhlásí |
@@ -135,6 +136,12 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `who_is_away` | kdo je kdy pryč (nepřítomnosti) v rozsahu dní, výchozí dnes…+14 |
 | `create_reminder` | časová připomínka k uzlu relativně k termínu (den před v HH:MM); termín nemění, jedna na uzel |
 | `get_portfolio` | pohled shora jako stránka Organizace: projekty s % hotovo, po termínu, nehýbe se, lidé, změny za 7 dní — nad týmovými a sdílenými mapami, které vlastník klíče vidí |
+| `list_pages` | stránky vlastníka klíče (jednosouborové HTML artefakty od asistenta/agenta): id, název, stav, velikost, veřejný odkaz, viditelnost pro tým |
+| `get_page` | jedna stránka: metadata + celé HTML (přečíst před `update_page`) |
+| `create_page` | nová stránka z KOMPLETNÍHO jednosouborového HTML (inline CSS/JS, knihovny jen z https CDN; limit velikosti instance, typicky 300 kB); `team_visible` ukáže všem členům |
+| `update_page` | nahradí HTML a/nebo název stránky — posílá se CELÝ nový dokument, předchozí verze zůstává k obnovení |
+| `share_page` | sdílení stránky: `link_on`/`link_off`/`link_new` (veřejný odkaz), `team_on`/`team_off` (celá organizace), `user_on`/`user_off` (jeden člen přes `email`) |
+| `delete_page` | smaže stránku nenávratně |
 
 **Úkol = uzel s řešitelem (`owner`) nebo termínem** — žádný samostatný úkolový
 záznam neexistuje. Novou práci zakládejte přes `add_nodes`, odbavujte přes

@@ -482,7 +482,12 @@ back it up:
 ./backup.sh restore FILE    # restores data from a backup
 ```
 
-(By hand: to back up, copy the `pb_data` folder; to restore, put it back.)
+The instance does not have to be stopped: while the container runs, the script takes a
+consistent snapshot of the database (`sqlite3 .backup` inside the container) and packs it
+with the uploaded files, so an archive made during work is sound. `restore` checks the
+archive's database (`PRAGMA integrity_check`) before it touches the live data.
+
+(By hand: to back up, stop the instance and copy the `pb_data` folder; to restore, put it back.)
 
 Backups can be encrypted: set `KB_BACKUP_PASSPHRASE` and the script writes
 `kb-backup-….tgz.gpg` (GPG, AES-256). `restore` accepts encrypted as well as

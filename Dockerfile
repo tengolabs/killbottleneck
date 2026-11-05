@@ -15,7 +15,7 @@ ARG PB_VERSION=0.39.11
 ARG PB_SHA256=08b9fcda0d5fd42cb315dc15a36dfa121c993855bd635f01d347c31b4328ec34
 # tzdata: aby TZ env (napr. Europe/Prague) fungovalo — cron auto_templates zaklada
 # projekty v lokalni cas klienta (jinak alpine bez tzdata spadne zpet na UTC).
-RUN apk add --no-cache ca-certificates unzip tzdata \
+RUN apk add --no-cache ca-certificates unzip tzdata sqlite \
   && wget -q https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip -O /tmp/pb.zip \
   && echo "${PB_SHA256}  /tmp/pb.zip" | sha256sum -c - \
   && unzip /tmp/pb.zip -d /app \

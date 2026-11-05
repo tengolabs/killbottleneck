@@ -1563,9 +1563,12 @@ cronAdd("navrat_maily", "40 * * * *", () => {
 
 // Retence notifikací: přečtené starší 30 dní a cokoli staršího 180 dní. Bez tohohle
 // tabulka roste donekonečna (vzor prune_loginlogs). Denně ve 3:40.
+// ⚠️ Řádky `verze:<v>` zůstávají: jsou JEDINOU závorou oznamNovouVerzi (helpers.js) — po jejich
+// smazání by cron nova_verze do 5 minut poslal všem „nová verze“ znovu (S7-01, 4. 11. 2026).
+// Nerostou: nejvýš jeden na uživatele a vydání.
 cronAdd("prune_notifications", "40 3 * * *", () => {
-  $app.db().newQuery("DELETE FROM notifications WHERE read = true AND created < datetime('now','-30 days')").execute();
-  $app.db().newQuery("DELETE FROM notifications WHERE created < datetime('now','-180 days')").execute();
+  $app.db().newQuery("DELETE FROM notifications WHERE read = true AND created < datetime('now','-30 days') AND dedup_key NOT LIKE 'verze:%'").execute();
+  $app.db().newQuery("DELETE FROM notifications WHERE created < datetime('now','-180 days') AND dedup_key NOT LIKE 'verze:%'").execute();
   // účetnictví e-mailového stropu drží jen pár týdnů zpět (denní řádky)
   $app.db().newQuery("DELETE FROM mail_budget WHERE created < datetime('now','-40 days')").execute();
 });
@@ -4267,7 +4270,7 @@ kbRoute("POST", "/invite", (e) => {
   // protože tutéž cestu používá i sdílení projektu s adresou bez účtu.
   const { pozviDoOrganizace } = require(`${__hooks}/pozvaniDoOrganizace.js`);
   const info = e.requestInfo().body || {};
-  const v = pozviDoOrganizace($app, { zvouci: e.auth, email: info.email, role: info.role });
+  const v = pozviDoOrganizace($app, { zvouci: e.auth, email: info.email, role: info.role, language: info.language });
   if (!v.ok) return e.json(v.status, { error: t(L, v.errorKey) });
   return e.json(200, Object.assign({ success: true, email: v.email, role: v.role },
     v.invited_via_email ? { invited_via_email: true } : { temp_password: v.temp_password }));

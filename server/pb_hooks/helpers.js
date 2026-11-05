@@ -356,7 +356,8 @@ const NOTIFY_NIKDY_MAILEM = ["new_version"];
  * Spouští se při startu serveru. Že se pošle právě jednou, hlídá `dedupKey`
  * s verzí v klíči — unikátní index v `notifications` druhý zápis odmítne,
  * takže ani restart kontejneru nikoho nezasype podruhé. Žádné další pole
- * s „poslední oznámenou verzí" proto není potřeba.
+ * s „poslední oznámenou verzí" proto není potřeba — ale úklid notifikací
+ * (cron prune_notifications v main.pb.js) MUSÍ řádky `verze:` nechat být.
  *
  * Oznamuje se jen VYDÁNÍ (přesný tag: v0.80, v0.80-beta, v1.2-rc1). Vývojové
  * buildy (`dev`, `-dirty`) i průběžné buildy mezi vydáními (`v0.79-beta-7-g8c346b4`
@@ -3799,8 +3800,26 @@ function publicBaseUrl(app) {
 // PŘEDNOST před KB_PUBLIC_URL — stejně jako odkaz na mapu (ShareDialog skládá z adresy okna):
 // kdo aplikaci používá přes LAN, dostane LAN odkaz, přes Tailscale tailscale, v cloudu doménu.
 // KB_PUBLIC_URL zůstává jen pro požadavky bez použitelného hostu (localhost, MCP přes 127.0.0.1, cron).
+// Vlastní doména hostované instance (KB_SLUG_DOMAIN + KB_CUSTOM_DOMAIN): instance odpovídá na DVOU
+// adresách a discovery, WWW-Authenticate i návod musí říkat adresu, NA KTEROU SE KLIENT PTÁ — jinak
+// konektor připojený přes slug před přepnutím domény dostane resource vlastní domény a MCP SDK ho
+// odmítne („does not match expected“). Bere se JEN host ze známé dvojice, ne cokoli z hlavičky.
+// Do 4. 11. 2026 tuhle větev měl jen oauth-lib.zaklad, 401 z /mcp a /agent-setup.md ne (S3-09).
 const HOST_RE = /^([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/i; // hostname[:port] / [ipv6][:port]
+function hostZnameDomeny(e) {
+  const zname = [env("SLUG_DOMAIN"), env("CUSTOM_DOMAIN")].map((d) => String(d || "").trim().toLowerCase()).filter(Boolean);
+  if (!zname.length) return "";
+  let dotaz = "";
+  try {
+    // ⚠️ Go přesouvá hlavičku Host do request.host — header.get("Host") je vždy prázdné
+    const fwd = String(e.request.header.get("X-Forwarded-Host") || "").split(",")[0].trim();
+    dotaz = (HOST_RE.test(fwd) ? fwd : String(e.request.host || "")).toLowerCase().replace(/:443$/, "");
+  } catch (err) { return ""; }
+  return zname.indexOf(dotaz) >= 0 ? dotaz : "";
+}
 function publicBaseUrlFromRequest(app, e, opts) {
+  const domena = hostZnameDomeny(e);
+  if (domena) return `https://${domena}`;
   const zCfg = publicBaseUrl(app);
   const cfgOk = !!zCfg && !/^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:|\/|$)/i.test(zCfg);
   const prednostPozadavku = !!(opts && opts.prednostPozadavku);
@@ -6362,14 +6381,16 @@ function mapStagnantNodes(app, mapRec, opts) {
 }
 
 // Datumová aritmetika přehledů: `today` je datum PODLE UŽIVATELE (klient ho
-// posílá), neplatný vstup spadne na datum serveru. Sdílí Můj den a Organizace.
+// posílá), neplatný/chybějící vstup spadne na datum INSTANCE (TZ kontejneru, jako
+// dnes()/fmtDateLocal u cronů a asistenta — ne UTC: asistent, sumáře a v1 bez
+// `today` jinak mezi půlnocí a 2:00 počítaly kbelíky k včerejšku, S5-05). Sdílí Můj den a Organizace.
 function dayMath(todayRaw) {
   // tvar I platnost: „2026-13-45" tvarem projde, ale Date z něj je Invalid —
   // všechny rozdíly by byly NaN a přehled by tiše vyšel prázdný
   const raw = String(todayRaw || "");
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(raw) && !isNaN(new Date(raw + "T00:00:00Z").getTime())
     && new Date(raw + "T00:00:00Z").toISOString().slice(0, 10) === raw;
-  const today = valid ? raw : nowUtcString().slice(0, 10);
+  const today = valid ? raw : fmtDateLocal(new Date());
   const today0 = new Date(today + "T00:00:00Z");
   const diffOf = (deadline) => (deadline ? Math.round((new Date(deadline + "T00:00:00Z") - today0) / 86400000) : null);
   const planOf = (v) => { if (!v || String(v) < today) return null; return Math.round((new Date(String(v) + "T00:00:00Z") - today0) / 86400000); };

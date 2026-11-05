@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { getOrgStructure, createOrgMap, orgAssign, orgAdd, orgRemove } from '@/api/kb';
-import { base44 } from '@/api/base44Client';
+import { getOrgStructure, createOrgMap, orgAssign, orgAdd, orgRemove, getMembers } from '@/api/kb';
 import { Button } from '@/components/ui/button';
 import { Network, Loader2, ExternalLink, Plus, Check, Trash2 } from 'lucide-react';
 
@@ -36,7 +35,7 @@ export default function OrgStructureSection() {
       setRows(res.positions || []);
       setVerze((v) => v + 1);
     } catch { /* starší server bez routy */ }
-    try { setMembers(await base44.users.listMembers()); } catch { /* bez adresáře */ }
+    try { setMembers(await getMembers()); } catch { /* bez adresáře */ }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);

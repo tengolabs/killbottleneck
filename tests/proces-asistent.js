@@ -112,7 +112,11 @@ H.beh(async () => {
   r = await chatuj(A, { chat_id: chat.id, message: 'Ne, ať je to jednou měsíčně pátého' });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
   let paty = dnes; while (Number(paty.slice(8, 10)) !== 5) paty = R.addDays(paty, 1);
-  expect(!!k && k.popis === `Opakovat „Denní úklid stolů“ každý měsíc 5. (projekt „Úklid dílny“) · první termín ${datumCz(paty)}`, `karta změny rytmu (${k && k.popis})`);
+  // „· první termín“ se na kartě ukáže JEN když se termín kroku mění (chat-pravidla.js); když je dnes zrovna 5.
+  // a krok už má termín dnes z předchozího kroku, karta dovětek nemá — do 5. 11. 2026 test padal každého 5. v měsíci
+  const terminPred = (await uzel(map.id, 's1')).data.deadline;
+  const dovetek = paty !== terminPred ? ` · první termín ${datumCz(paty)}` : '';
+  expect(!!k && k.popis === `Opakovat „Denní úklid stolů“ každý měsíc 5. (projekt „Úklid dílny“)${dovetek}`, `karta změny rytmu (${k && k.popis})`);
   fronta.push(text('Hotovo.'));
   r = await potvrd(A, chat.id, k.id); chat = r.json.chat;
   const pr2 = await pravidla(map.id);

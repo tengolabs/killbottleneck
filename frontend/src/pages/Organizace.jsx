@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { fetchPortfolio } from '@/api/kb';
+import { fetchPortfolio, getMembers } from '@/api/kb';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { labelForEmail } from '@/lib/memberLabel';
 import { getInitials, formatDeadline } from '@/lib/nodeMeta';
@@ -71,7 +71,7 @@ export default function Organizace() {
   useEffect(() => {
     if (!canSee) return;
     fetchPortfolio().then((d) => { setData(d); setFailed(false); }).catch(() => setFailed(true));
-    base44.users.listMembers().then(setMembers).catch(() => {});
+    getMembers().then(setMembers).catch(() => {});
     base44.org.get().then(setOrg).catch(() => {});
   }, [canSee]);
 

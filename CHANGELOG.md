@@ -9,6 +9,39 @@ below before you jump several versions.
 
 ---
 
+## v0.99-beta — 2026-11-05
+
+**Fixes from the third code review (wave A)**
+
+**Upgrade notes:** no migration. The Docker image now includes `sqlite3` (+2.8 MB) because `backup.sh` uses it
+for consistent snapshots — rebuild with `git pull && docker compose up -d --build` before your next backup; an older
+image makes `backup.sh` stop with a clear message instead of writing a possibly broken archive. Behaviour change:
+events in an **archived calendar can no longer be edited or deleted** (unarchive first), the same rule that already
+applied to creating them.
+
+- **Backups are consistent while the instance runs.** `backup.sh` takes an `sqlite3 .backup` snapshot of the
+  databases instead of packing the live WAL files (under write load 4 of 35 such archives were silently broken);
+  `backup.sh restore` checks `PRAGMA integrity_check` before stopping the instance and refuses a damaged archive.
+- **The assistant survives reading large maps.** Tool results stored in the conversation are trimmed to what the
+  model actually receives; previously the fourth read of a 250-node map hit the 200 kB message limit, the turn failed
+  with 502 and the user's message (voice note, photo) was lost. A failed save is now logged and reported honestly.
+- **Calendars "for selected people only" can be assigned again.** The member list in Organization settings →
+  Calendars was always empty since v0.83 (`getMembers` returned an object, the list expected an array).
+- **"Today / This week" in My Day matches the task list.** The client filter mirrors the server's definition
+  (plan and deadline, "this week" = 2–7 days), so the chip count and the filtered list agree; the manual filter on the
+  Tasks page is therefore labelled "In 2–7 days" now (today and tomorrow have their own chips); overdue tasks planned
+  for later are no longer shown as overdue; the idea buffer is filtered by "Today" too.
+- **Timeline:** week 53 of 2026 is one block (ISO year in the week key) and a node's own plan moves the start of its bar.
+- **"Today" without a client date uses the instance time zone** (My Day, portfolio, assistant, summaries) instead of UTC.
+- **Archived calendars are read-only**: editing or deleting their events returns 400 like creating them did.
+- **The "new version" bell no longer repeats** every 30 days on instances that have not updated.
+- **MCP via a custom domain:** discovery and `WWW-Authenticate` answer with the address the client used
+  (slug or custom domain), so connectors created before switching the domain keep working.
+- **Invited users get the inviter's language** (or the language sent with the invitation) — invitation and welcome
+  e-mails are no longer always Czech.
+- **MCP package:** the stdio server knows the `offer_assistant` rule action and the `mode` field; its README lists all 33 tools.
+- Dev: `cloud/kontrola-env.sh` is green again and runs early in `run-all.sh` (right after the secrets check).
+
 ## v0.98-beta — 2026-11-03
 
 **A different skin every day and clearer Organization settings**

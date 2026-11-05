@@ -57,7 +57,11 @@ export const createOrgMap = () => kbSend('/api/kb/org-map');
 // Personální agenda (Správa uživatelů) — bezpečná podmnožina členů, obnova
 // hesla rukou správce, osobní zástupce a účel organizace (dotazník účelu
 // posílá replace:true = server smí nahradit nedotčenou úvodní mapu).
-export const getMembers = () => kbSend('/api/kb/members', { method: 'GET' });
+// Adresář členů týmu (bezpečná podmnožina polí, pro každého přihlášeného) —
+// JEDINÁ fasáda routy /members a vrací rovnou POLE. Dřív existovala ještě
+// base44.users.listMembers() (pole) vedle téhle (tělo { members }) a autor
+// Kalendářů sáhl po té s jiným tvarem → prázdný seznam členů (analýza kódu 3, F4-03).
+export const getMembers = () => kbSend('/api/kb/members', { method: 'GET' }).then((r) => (r && r.members) || []);
 export const resetUserPassword = (email) => kbSend('/api/kb/reset-user-password', { body: { email } });
 export const memberDeputy = (id, deputy) => kbSend('/api/kb/member-deputy', { body: { id, deputy } });
 export const savePurpose = (purpose, { replace } = {}) => kbSend('/api/kb/purpose', { body: { purpose, ...(replace ? { replace: true } : {}) } });

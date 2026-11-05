@@ -989,6 +989,7 @@ const STRINGS = {
     cs: "Tohle není nahrávka, kterou umíme přepsat (WebM, Ogg/Opus, M4A, MP3 nebo WAV).",
     en: "This is not a recording we can transcribe (WebM, Ogg/Opus, M4A, MP3 or WAV).",
   },
+  "err.chatSaveFailed": { cs: "Rozhovor se nepodařilo uložit — zprávu prosím pošlete znovu.", en: "The conversation could not be saved — please send your message again." },
   "err.chatVoiceFailed": {
     cs: "Hlasovku se teď nepodařilo přepsat — nahrávka zůstala v panelu, zkuste ji poslat znovu za chvíli.",
     en: "The voice note could not be transcribed right now — the recording stayed in the panel, try sending it again shortly.",
@@ -1188,7 +1189,7 @@ const STRINGS = {
     en: "You cannot change this event — only its creator, or an admin or manager for a shared calendar.",
   },
   "err.calendarNotFound": { cs: "Kalendář „{name}“ neexistuje. Seznam dá list_calendars.", en: "Calendar \"{name}\" does not exist. list_calendars gives the list." },
-  "err.calendarArchived": { cs: "Kalendář „{name}“ je archivovaný — nejde do něj zapisovat.", en: "Calendar \"{name}\" is archived — nothing can be added to it." },
+  "err.calendarArchived": { cs: "Kalendář „{name}“ je archivovaný — jen ke čtení, dokud ho neodarchivujete.", en: "Calendar \"{name}\" is archived — it is read-only until you unarchive it." },
   "err.calendarWriteDenied": {
     cs: "Do kalendáře „{name}“ zapisuje jen správce nebo manažer.",
     en: "Only an admin or manager can add to the calendar \"{name}\".",

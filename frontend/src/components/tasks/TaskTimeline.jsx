@@ -22,6 +22,7 @@ import {
 import { statusConfig } from '@/lib/statusMeta';
 import { intlLocale, fmtDate } from '@/lib/locale';
 import { getInitials, getDeadlineStatus, formatDeadline } from '@/lib/nodeMeta';
+import { isoTyden, klicTydne } from '@/lib/kalendar';
 
 // Pomocné funkce pro lokální manipulaci s daty bez posunu časových pásem
 const parseDateLocal = (str) => {
@@ -49,14 +50,8 @@ const diffDays = (d1, d2) => {
   return Math.round((utc2 - utc1) / 86400000);
 };
 
-// Číslo ISO týdne v roce
-function getWeekNumber(d) {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
-}
+// Číslo ISO týdne (lib/kalendar.js:isoTyden — klíč bloku i popisek z téhož ISO roku, F3-06)
+const getWeekNumber = (d) => isoTyden(d).tyden;
 
 export default function TaskTimeline({
   tasks = [],
@@ -154,9 +149,12 @@ export default function TaskTimeline({
       const traverseNodes = (nodes, depth = 0) => {
         nodes.forEach((node) => {
           const dl = node.deadline ? parseDateLocal(node.deadline) : null;
-          const created = node.created ? parseDateLocal(node.created) : (dl ? addDays(dl, -3) : null);
-          const start = node.planned_on ? parseDateLocal(node.planned_on) : (created || dl || today);
-          const end = dl || (start ? addDays(start, 1) : addDays(today, 1));
+          // uzel ze stromu (hooks/useTaskTrees.js) nese plán jako `plannedOn` (úkol má `planned_on`)
+          // a pole `created` nemá — F3-05: dřív se četlo `node.planned_on`, takže plán uzlu začátek
+          // pruhu nikdy neposunul; bez plánu zůstává dosavadní náhrada termín − 3 dny
+          const plan = node.plannedOn ? parseDateLocal(node.plannedOn) : null;
+          const start = plan || (dl ? addDays(dl, -3) : today);
+          const end = dl || addDays(start, 1);
 
           // skutečné id uzlu v mapě je `node.node_id` (`node.id` = `node-item-<mapa>-<uzel>`,
           // hooks/useTaskTrees.js) — F2-14: s `node.id` úkol na uzlu nikdy nesedl
@@ -449,8 +447,8 @@ export default function TaskTimeline({
         curMonthStart = idx;
       }
 
-      const wNum = getWeekNumber(d);
-      const wKey = `${d.getFullYear()}-W${wNum}`;
+      // klíč = ISO rok + ISO týden (F3-06: kalendářní rok rozpadl týden 53/2026 na dva bloky)
+      const wKey = klicTydne(d);
       if (curWeek !== wKey) {
         if (curWeek !== null) {
           const wStartD = datesArray[curWeekStart];
@@ -1034,6 +1032,8 @@ export default function TaskTimeline({
                                 else onEdit?.(item.raw);
                               }}
                               style={{ left: `${left}px`, width: `${width}px` }}
+                              data-testid={`osa-pruh-${item.key}`}
+                              data-od={fmtDateKey(item.startDate)}
                               className={`absolute h-6 rounded-md shadow-xs cursor-pointer flex items-center px-1.5 sm:px-2 text-[11px] font-medium transition-all group hover:ring-2 hover:ring-primary hover:z-30 ${
                                 item.status === 'done'
                                   ? 'bg-emerald-600 text-white'

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { computeWaitingSet } from '@/lib/waitStatus';
-import { getDeadlineStatus } from '@/lib/nodeMeta';
+import { odpovidaTerminu } from '@/lib/kalendar';
 import { hledaciText } from '@/hooks/useTaskFilters';
 
 // Odvozená data stránky Úkoly: aktivní mapy, stromy uzlů, položky kanbanu,
@@ -142,13 +142,8 @@ export function useTaskTrees({
   const bufferItems = useMemo(() => {
     if (!bufferVisible) return [];
     return buffer.items.filter((b) => {
-      if (deadlineFilter === 'overdue' && getDeadlineStatus(b.deadline, 'todo') !== 'overdue') return false;
-      if (deadlineFilter === 'week') {
-        if (!b.deadline) return false;
-        const st = getDeadlineStatus(b.deadline, 'todo');
-        const days = Math.round((new Date(b.deadline + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
-        if (st === 'overdue' || days > 7) return false;
-      }
+      // termín z PLÁNU i termínu, stejná množina jako server (F3-03; nápad má planned_on)
+      if (!odpovidaTerminu(deadlineFilter, b.planned_on, b.deadline)) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!(b.title || '').toLowerCase().includes(q) && !hledaciText(b.description).includes(q)) return false;

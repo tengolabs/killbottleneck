@@ -17,7 +17,7 @@
     "filterDeadlineAll": "Deadline: all",
     "filterOverdue": "Overdue",
     "filterToday": "Today",
-    "filterWeek": "Within 7 days",
+    "filterWeek": "In 2–7 days",
     "exportTitle": "Export tasks",
     "exportButton": "Export",
     "exportCsv": "CSV (current filter)",

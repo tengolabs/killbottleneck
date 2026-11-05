@@ -60,6 +60,7 @@ const MAX_IMG_MB_VYCHOZI = 1.2; // obrázek k přepisu (prohlížeč ho zmenšuj
 const MAX_NAHLED_KB = 16;   // náhled do historie (200 px WebP/JPEG ≈ 5–10 kB)
 const NAHLEDU_VYCHOZI = 3;  // kolik náhledů obrázků drží historie (ai_chats.messages má strop 200 kB)
 const STROP_MSGS = 180000;  // BAJTY (UTF-8) — maxSize pole messages je 200000 bajtů, čeština má 2 bajty na znak
+const MAX_TOOL = 12000;     // výsledek nástroje v aktuálním tahu — víc model nedostane, víc se ani neukládá (S1-01, 4. 11. 2026)
 const MAX_TOOL_STARE = 600; // starší výsledky nástrojů se modelu zkracují
 // Env knoflíky (etapa 1.7, 5. 10. 2026) pro měření A/B bez nového obrazu: KB_CHAT_MAX_TAHU (okno tahů, 2–30),
 // KB_CHAT_MAX_TOOL_STARE (ořez starších výsledků nástrojů, 200–12000); prázdné = výchozí konstanty výše
@@ -377,6 +378,20 @@ function orezNahledy(msgs) {
     const j = msgs.findIndex((m) => m.role === "user" && m.pdf && !m.pdf.orez);
     if (j < 0) break;
     zkratPdf(msgs[j]);
+  }
+  // Výsledky nástrojů: do 4. 11. 2026 se tu neořezávaly vůbec (oba cykly výš hledají jen náhledy a PDF,
+  // takže u historie plné čtení map hned skončily) a čtvrté čtení velké mapy shodilo app.save (S1-01).
+  // Starší než poslední tah uživatele se zkrátí na to, co z nich model stejně dostává (MAX_TOOL_STARE);
+  // kdyby ani to nestačilo, odpadají nejstarší tahy — rozhovor pokračuje, jen bez nejstarší historie.
+  if (bajtu(JSON.stringify(msgs)) > STROP_MSGS) {
+    const posledniUser = msgs.map((m) => m.role).lastIndexOf("user");
+    const stareMax = limitEnv("CHAT_MAX_TOOL_STARE", MAX_TOOL_STARE, 200, MAX_TOOL); // stejný knoflík jako zpravyProModel
+    for (let i = 0; i < posledniUser; i++) if (msgs[i].role === "tool") msgs[i].content = ocisti(msgs[i].content, stareMax);
+  }
+  while (bajtu(JSON.stringify(msgs)) > STROP_MSGS) {
+    const dalsiUser = msgs.findIndex((m, i) => i > 0 && m.role === "user");
+    if (dalsiUser < 0) break;
+    msgs.splice(0, dalsiUser);
   }
 }
 function zkratPdf(m) {
@@ -2916,7 +2931,7 @@ function zpravyProModel(msgs, L, mode) {
       // výsledek bez svého volání (osiřelý) nebo podruhé tentýž → modelu nepatří (OpenAI by ho odmítl)
       if (!nezodpovezena(out).some((c) => c.id === m.toolCallId)) continue;
       const stary = i < posledniTah;
-      out.push({ role: "tool", name: m.name, toolCallId: m.toolCallId, content: ocisti(m.content, stary ? limitEnv("CHAT_MAX_TOOL_STARE", MAX_TOOL_STARE, 200, 12000) : 12000) });
+      out.push({ role: "tool", name: m.name, toolCallId: m.toolCallId, content: ocisti(m.content, stary ? limitEnv("CHAT_MAX_TOOL_STARE", MAX_TOOL_STARE, 200, MAX_TOOL) : MAX_TOOL) });
     }
   }
   doplnNezodpovezena(out, T);
@@ -3250,7 +3265,9 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
         delete vysledek.karta.nahrazuje;
       }
       if (vysledek.karta) am.karty.push(vysledek.karta);
-      msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: vysledek.text });
+      // do historie jde výsledek ořezaný na to, co z něj model vůbec dostane (MAX_TOOL): celá mapa s 250 kroky
+      // má ~75 kB a tři čtení v jednom rozhovoru by přetekla strop pole messages (200 kB) — chat by umřel (S1-01)
+      msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: ocisti(vysledek.text, MAX_TOOL) });
     }
     if (nahlednuto.length) am.karty.push({ type: "nastroje", jmena: nahlednuto });
     if (konec) break;
@@ -3571,6 +3588,8 @@ function chatRun(app, auth, body, cfg, L, oprava) {
   const t0 = Date.now();
   const stats = { calls: 0, in: 0, out: 0, cached: 0, tools: [], model: "" };
   let chyba = "";
+  let chybaUlozeni = ""; // app.save ve finally selhal (viz tam)
+  let vyjimka = null;    // výjimka z tahu — finally jí při selhání uložení vezme `ulozeno`
   const bylPrvni = !msgs.some((m) => m.role === "user");
   try {
     if (imgB64) {
@@ -3648,12 +3667,22 @@ function chatRun(app, auth, body, cfg, L, oprava) {
     if (err && err.status) e2.status = err.status;
     if (err && err.code) e2.code = err.code;
     e2.ulozeno = true;
+    vyjimka = e2;
     throw e2;
   } finally {
     const po = jsonVal(rec, "messages", []); // jsonVal vrací kopii → ořezanou uložit zpět
     orezNahledy(po);
     rec.set("messages", po);
-    app.save(rec); // i při chybě modelu zůstane zpráva uživatele uložená
+    // i při chybě modelu zůstane zpráva uživatele uložená. Když selže samo uložení (strop pole, DB), nesmí
+    // výjimka z finally přebít původní výsledek: tah se zaloguje (podklad kvóty — model už byl zavolán)
+    // a klient se dozví, že zpráva uložená NENÍ (hlasovku/fotku nabídne k opakování). Do 4. 11. 2026 tu
+    // save bez try shodil i zapisLog a odpověď lhala `ulozeno: true` (S1-01).
+    try { app.save(rec); } catch (err) {
+      chybaUlozeni = String(err && err.message ? err.message : err);
+      chyba = chyba || chybaUlozeni;
+      if (vyjimka) vyjimka.ulozeno = false;
+      try { app.logger().warn("chat: uložení rozhovoru selhalo", "chat", rec.id, "error", chybaUlozeni); } catch (e3) { /* log je bonus */ }
+    }
     prubehZapis(app, auth, rec, null); // tah skončil (i chybou) → panel přestane ukazovat průběh
     // nový rozhovor dostal id až uložením → doplnit ho dokumentům z tohoto tahu
     if (stats.dok && stats.dok.length) {
@@ -3665,6 +3694,8 @@ function chatRun(app, auth, body, cfg, L, oprava) {
     // (karta AI kredity v Administraci počítá řádky jako „tahy“) jde jen to, co šlo modelu, nebo chyba
     if (stats.calls || chyba || !(uvodZprava || cekaci)) zapisLog(app, auth, rec, cfg, stats, Date.now() - t0, chyba);
   }
+  // text selhání zůstává jen v logu výš — klientovi jde kód a přeložená věta (podrobnosti výjimek dostává jen správce, S1b-02)
+  if (chybaUlozeni) { const e = new Error(t(L, "err.chatSaveFailed")); e.status = 500; e.code = "ulozeni_selhalo"; throw e; }
   return chatDto(rec);
 }
 

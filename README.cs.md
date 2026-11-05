@@ -468,7 +468,12 @@ přiložený skript:
 ./backup.sh restore SOUBOR  # obnoví data ze zálohy (funguje i staré „obnovit")
 ```
 
-(Ručně: záloha = zkopírovat složku `pb_data`, obnova = vrátit ji zpět.)
+Instanci není třeba zastavovat: nad běžícím kontejnerem si skript vezme konzistentní
+snímek databáze (`sqlite3 .backup` uvnitř kontejneru) a přibalí k němu nahrané soubory,
+takže archiv pořízený za provozu je v pořádku. `restore` databázi z archivu před zásahem
+do živých dat zkontroluje (`PRAGMA integrity_check`).
+
+(Ručně: záloha = zastavit instanci a zkopírovat složku `pb_data`, obnova = vrátit ji zpět.)
 
 Zálohu jde zašifrovat: nastavte `KB_BACKUP_PASSPHRASE` a skript vytvoří
 `kb-backup-….tgz.gpg` (GPG, AES-256). `restore` bere šifrované i starší

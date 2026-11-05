@@ -351,6 +351,12 @@ function overZapis(app, auth, name, a) {
       const E = require(`${__hooks}/events-api.js`);
       const ev = udalostZaznam(app, auth, a.event_id, a.day, name === "delete_event");
       if (!ev) return `Error: event "${String(a.event_id || "")}" not found among the user's ${name === "delete_event" ? "" : "own "}events${name === "delete_event" ? "" : " (nor among shared-calendar events the user may change)"} (use list_events and pass the id${name === "delete_event" ? "" : "; an invited event can only be left — delete_event removes it from the user's calendar"}).`;
+      // archivovaný kalendář je jen pro čtení i pro existující události (v1 by vrátilo 400 — model to má vědět hned);
+      // pozvaný, který událost jen opouští, archivem omezený není
+      const kalArch = E.kalendarUdalosti(app, ev);
+      if (kalArch && kalArch.getBool("archived") && (name === "update_event" || E.pravaUdalosti(auth, ev, kalArch).meni)) {
+        return `Error: the calendar "${kalArch.getString("name")}" is archived — its events are read-only. An admin can unarchive it first.`;
+      }
       if (name === "delete_event") return null;
       const zmeny = teloUdalosti(a, ["title", "time", "end_day", "end_time", "note", "place", "participants", "remind", "remind_before_min", "calendar"]);
       if (a.new_day !== undefined) zmeny.day = a.new_day;

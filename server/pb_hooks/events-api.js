@@ -104,11 +104,18 @@ function jeSpravce(user) {
   return require(`${__hooks}/helpers.js`).jeAdminNeboManazer(user);
 }
 
+// archivovaný kalendář je jen pro čtení: nové události (smiZapisovat) i úprava a smazání existujících
+// (saveEvent, deleteEvent, deleteSeries — do 4. 11. 2026 podle id procházely, S5-09) → 400; odarchivace to vrátí
+function chybaArchivu(cal, lang) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  return { status: 400, body: { error: t(lang, "err.calendarArchived", { name: cal.getString("name") }) } };
+}
+
 // smí uživatel do kalendáře ZAPISOVAT nové události? ({ ok } nebo { error: {status, body} })
 function smiZapisovat(user, cal, lang) {
   const { t } = require(`${__hooks}/i18n.js`);
   const name = cal.getString("name");
-  if (cal.getBool("archived")) return { error: { status: 400, body: { error: t(lang, "err.calendarArchived", { name: name }) } } };
+  if (cal.getBool("archived")) return { error: chybaArchivu(cal, lang) };
   if (cal.getString("write_access") === "admins" && !jeSpravce(user)) return { error: { status: 403, body: { error: t(lang, "err.calendarWriteDenied", { name: name }) } } };
   return { ok: true };
 }
@@ -579,6 +586,7 @@ function saveEvent(app, user, rec, info, ctx) {
   const lang = ctx.lang;
   let cal = rec ? kalendarUdalosti(app, rec) : null;
   if (rec && !pravaUdalosti(user, rec, cal).meni) return { status: 403, body: { error: t(lang, "err.eventNotEditable") } };
+  if (rec && cal && cal.getBool("archived")) return chybaArchivu(cal, lang);
   const v = validateEvent(info, lang, rec);
   if (v.error) return { status: 400, body: { error: v.error } };
   const d = v.data;
@@ -817,7 +825,9 @@ function leaveEvent(app, user, rec, lang) {
 
 function deleteEvent(app, user, rec, lang) {
   const { t } = require(`${__hooks}/i18n.js`);
-  if (!pravaUdalosti(user, rec, kalendarUdalosti(app, rec)).meni) return { status: 403, body: { error: t(lang, "err.eventNotEditable") } };
+  const cal = kalendarUdalosti(app, rec);
+  if (!pravaUdalosti(user, rec, cal).meni) return { status: 403, body: { error: t(lang, "err.eventNotEditable") } };
+  if (cal && cal.getBool("archived")) return chybaArchivu(cal, lang);
   app.delete(rec);
   return { status: 200, body: { success: true } };
 }
@@ -989,7 +999,12 @@ function deleteSeries(app, user, series, lang) {
   let rows = [];
   if (s) { try { rows = app.findRecordsByFilter("events", "series = {:s}", "day,time", MAX_EVENTS_BATCH * 4, 0, { s: s }); } catch (err) { rows = []; } }
   const kal = kalendareMapa(app, user);
-  rows = rows.filter((r) => pravaUdalosti(user, r, kal[r.getString("calendar")] || null).meni);
+  const kalendar = (r) => kal[r.getString("calendar")] || null;
+  rows = rows.filter((r) => pravaUdalosti(user, r, kalendar(r)).meni);
+  // archivovaný kalendář: když série leží JEN v něm, řekni „archivovaný“ (400) místo matoucího „série nenalezena“
+  const vArchivu = rows.filter((r) => kalendar(r) && kalendar(r).getBool("archived"));
+  rows = rows.filter((r) => !(kalendar(r) && kalendar(r).getBool("archived")));
+  if (!rows.length && vArchivu.length) return chybaArchivu(kalendar(vArchivu[0]), lang);
   if (!rows.length) return { status: 404, body: { error: t(lang, "err.seriesNotFound") } };
   app.runInTransaction((tx) => { for (const r of rows) tx.delete(r); });
   return { status: 200, body: { success: true, events_deleted: rows.length } };

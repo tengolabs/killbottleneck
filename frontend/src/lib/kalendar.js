@@ -35,6 +35,59 @@ export function posunDny(k, n) {
 export function dnesKlic(now) {
   return klicDne(now || new Date());
 }
+// Rozdíl dvou klíčů dne ve dnech (den − dnes); přes Date.UTC, takže změna letního
+// času nedá 0,96 dne. Neplatný klíč → null.
+export function rozdilDnu(den, dnes) {
+  const a = parsujDen(den), b = parsujDen(dnes);
+  if (!a || !b) return null;
+  return Math.round((Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / 86400000);
+}
+
+// ---- horizont položky = ZRCADLO SERVERU (pb_hooks/helpers.js:dayMath.horizonOf) ----
+// Dní do položky: 0 = dnes, 1 = zítra…, záporné = po termínu, null = bez termínu
+// i plánu. ⭐ PLÁN ROZHODUJE, dokud sahá nejvýš do týdne (Richard 8. 8. 2026);
+// dál než týden plán termín nezastíní (min). Plán v minulosti = žádný plán
+// (server planOf). Podle toho server skládá sekce a počty chipů v Můj den —
+// klientský filtr „Termín“ na Úkolech MUSÍ dávat tutéž množinu, jinak chip
+// „Dnes 1“ po kliku ukáže prázdný seznam (analýza kódu 3, F3-03). Paritu hlídá
+// product/tests/horizont-parity.js.
+export function horizontDnu(plan, termin, dnes = dnesKlic()) {
+  const pl = plan && String(plan) >= dnes ? rozdilDnu(plan, dnes) : null;
+  const dl = termin ? rozdilDnu(termin, dnes) : null;
+  if (pl === null) return dl;
+  if (pl <= 7) return pl;
+  return dl === null ? pl : Math.min(pl, dl);
+}
+// Filtr „Termín“ (overdue | today | week) = TATÁŽ množina jako serverové sekce
+// bucketFor (helpers.js): po termínu h < 0, dnes h = 0, do týdne h = 2…7 (dnešek
+// a zítřek mají na serveru vlastní sekce, chip „Do týdne“ je proto nepočítá).
+// Jiný filtr → true (termín neomezuje). Hotové položky vyřazuje volající.
+export function odpovidaTerminu(filtr, plan, termin, dnes) {
+  if (filtr !== 'overdue' && filtr !== 'today' && filtr !== 'week') return true;
+  const h = horizontDnu(plan, termin, dnes);
+  if (h === null) return false;
+  if (filtr === 'overdue') return h < 0;
+  if (filtr === 'today') return h === 0;
+  return h >= 2 && h <= 7;
+}
+
+// ---- ISO týden ----
+// { rok, tyden } podle ISO 8601: týden patří roku svého ČTVRTKA. Klíč týdne
+// z kalendářního roku (`${getFullYear()}-W${n}`) rozpadl týden 53/2026 na
+// „2026-W53“ + „2027-W53“ — dva sousední bloky „53. týden“ v hlavičce osy
+// (analýza kódu 3, F3-06; totéž skoro každý přelom roku, kdy 1. 1. není pondělí).
+export function isoTyden(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const rok = date.getUTCFullYear();
+  const zacatekRoku = new Date(Date.UTC(rok, 0, 1));
+  return { rok, tyden: Math.ceil((((date - zacatekRoku) / 86400000) + 1) / 7) };
+}
+export function klicTydne(d) {
+  const { rok, tyden } = isoTyden(d);
+  return rok + '-W' + tyden;
+}
 
 // ---- položky → štítky ----
 // items = calendarItems z hooks/useTaskTrees.js:

@@ -14,6 +14,9 @@
 // F2-14/F2-03 (27. 9. 2026): na kódu před opravou padne „úkol na uzlu je na ose"
 // (osa porovnávala tk.node_id s node.id = `node-item-…`, nikdy nesedlo) a
 // „podúkol úkolu bez uzlu je na ose" (větev bez uzlu byParent nečetla).
+// F3-05 (analýza kódu 3, 4. 11. 2026): uzel n5 s PLÁNEM (+8) a termínem (+10) — pruh
+// musí začínat plánem (`data-od`); před opravou osa četla `node.planned_on`, strom ale
+// nese `plannedOn`, takže začátek byl vždy termín − 3 dny (image v0.98-beta: ČERVENÁ).
 const H = require('./_harness');
 const { expect, sleep } = H;
 
@@ -40,10 +43,13 @@ H.beh(async () => {
       { id: 'n2', type: 'goalNode', position: { x: 250, y: 380 }, data: { title: 'Dnešní ochutnávka', status: 'in_progress', deadline: den(0), owner: UCET } },
       { id: 'n3', type: 'goalNode', position: { x: 500, y: 380 }, data: { title: 'Budoucí otevření', status: 'todo', deadline: den(10), owner: UCET } },
       { id: 'n4', type: 'goalNode', position: { x: 750, y: 380 }, data: { title: 'Hotové vybavení', status: 'done', deadline: den(5), owner: UCET } },
+      // F3-05: plán uzlu (+8) musí posunout začátek pruhu (termín +10)
+      { id: 'n5', type: 'goalNode', position: { x: 1000, y: 380 }, data: { title: 'Plánovaný start', status: 'todo', deadline: den(10), plannedOn: den(8), owner: UCET } },
     ],
     edges: [
       { id: 'e1', source: 'apex', target: 'n1' }, { id: 'e2', source: 'apex', target: 'n2' },
       { id: 'e3', source: 'apex', target: 'n3' }, { id: 'e4', source: 'apex', target: 'n4' },
+      { id: 'e5', source: 'apex', target: 'n5' },
     ],
   } })).json;
   expect(!!mapa.id, 'projekt s termíny založen');
@@ -103,6 +109,13 @@ H.beh(async () => {
   expect(telo.includes('Ukol-bez-uzlu-XQ'), 'úkol bez uzlu je na ose');
   expect(telo.includes('Podukol-bez-uzlu-XQ'), 'podúkol úkolu bez uzlu je na ose (F2-03)');
   expect(/\d+\. týden/.test(telo), 'týdenní hlavička ukazuje číslo ISO týdne (výchozí škála Týdny)');
+  // F3-05: začátek pruhu uzlu = jeho plán (plannedOn), bez plánu dosavadní náhrada termín − 3 dny
+  // klíč položky uzlu na ose = `node-<mapa>-<node.id>`, kde node.id ze stromu je `node-item-<mapa>-<uzel>`
+  const odPruhu = (uzel) => page.$eval(`[data-testid="osa-pruh-node-${mapa.id}-node-item-${mapa.id}-${uzel}"]`, (el) => el.getAttribute('data-od')).catch(() => null);
+  const odN5 = await odPruhu('n5');
+  expect(odN5 === den(8), `pruh uzlu s plánem začíná plánem: ${odN5} (čeká se ${den(8)}, termín je ${den(10)}) (F3-05)`);
+  const odN3 = await odPruhu('n3');
+  expect(odN3 === den(7), `pruh uzlu bez plánu začíná termín − 3 dny: ${odN3} (čeká se ${den(7)})`);
   expect(/\bDnes\b/.test(telo), 'značka/tlačítko Dnes existuje');
   // po termínu = červený prstenec (ring-red na značce, ring-rose na pruhu)
   const poTerminu = await page.evaluate(() =>

@@ -159,8 +159,8 @@ export default function UserAdmin() {
   // z /members — a sloupce, které se z ní naplnit nedají, se mu neukazují.
   const loadMembers = async () => {
     try {
-      const res = await getMembers();
-      setUsers((res.members || []).map((m) => ({
+      const lide = await getMembers();
+      setUsers(lide.map((m) => ({
         id: m.id, email: m.email, full_name: m.full_name || m.name || '',
         role: m.role, deputy: m.deputy || '',
         is_ai_manager: m.is_ai_manager, is_org_manager: m.is_org_manager,

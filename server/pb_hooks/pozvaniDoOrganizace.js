@@ -26,10 +26,12 @@ function smiZvatDoOrganizace(auth) {
  *   { ok: true, email, role, temp_password }                      bez SMTP: heslo k ručnímu předání
  *   { ok: false, status, errorKey }                               odmítnuto (klíč pro i18n)
  *
- * @param {object} o { zvouci (users record), email, role, projekt (název sdíleného projektu, volitelné) }
+ * @param {object} o { zvouci (users record), email, role, projekt (název sdíleného projektu, volitelné),
+ *                     language (cs|en, volitelné — jinak jazyk zvoucího) }
  */
 function pozviDoOrganizace(app, o) {
   const { isExternalOwner, userLimitReached, zalozUvodniMapu } = require(`${__hooks}/helpers.js`);
+  const { LANGS, userLang } = require(`${__hooks}/i18n.js`);
   const zvouci = o.zvouci;
   if (!smiZvatDoOrganizace(zvouci)) return { ok: false, status: 403, errorKey: "err.inviteAdminManagerOnly" };
   const email = String(o.email || "").trim().toLowerCase();
@@ -63,6 +65,10 @@ function pozviDoOrganizace(app, o) {
   // značka pozvánky: mailer podle ní pošle uvítací pozvánku místo „resetu
   // hesla" (samoregistrovaný účet značku nemá a reset dostane resetem)
   rec.set("invited_by", zvouci.email());
+  // jazyk účtu: z těla požadavku /invite (pole `language`, dnes ho posílá jen API), jinak jazyk zvoucího — samoregistrace ho bere z těla,
+  // pozvánka ho do 4. 11. 2026 nenastavila vůbec a EN kolega dostal pozvánku i uvítání česky (S4-06).
+  // Podle něj jde hned pozvánkový mail (mailTemplate userLang) i uvítací mail po prvním přihlášení.
+  rec.set("language", LANGS.includes(o.language) ? o.language : userLang(zvouci));
   rec.setPassword(tempPassword);
   app.save(rec);
 
