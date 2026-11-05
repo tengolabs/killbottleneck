@@ -187,7 +187,10 @@ function napisPopis(app, e, b, L) {
   const cfgR = C.chatCfg(e, {}, L);
   if (cfgR.chyba) { const err = new Error(cfgR.chyba.body.error); err.status = cfgR.chyba.status; err.odpoved = cfgR.chyba.body; throw err; }
   const cfg = cfgR.cfg;
-  const brzda = C.chatBrzda(e, L, {}, cfg); // jako textový tah (váha 1); kreslení pak samo ubere svou váhu
+  // týdenní strop obrázků dřív než model (popis by jinak stál tokeny zbytečně)
+  const tyden = tydenBrzda(app, L);
+  if (tyden) { const err = new Error(String(tyden.body.error)); err.status = tyden.status; err.odpoved = tyden.body; throw err; }
+  const brzda = C.chatBrzda(e, L, { _popisObrazku: true }, cfg); // jako textový tah (váha 1); kreslení pak samo ubere svou váhu
   if (brzda) { const err = new Error(String((brzda.body && brzda.body.error) || "")); err.status = brzda.status; err.odpoved = brzda.body; throw err; }
   const text = String((b && b.text) || "").trim();
   // české „notebook“ = laptop; model ho bez nápovědy překládal jako papírový sešit (změřeno 4. 11.)
@@ -202,7 +205,7 @@ function napisPopis(app, e, b, L) {
   }
   const prompt = chyba ? "" : vycistiPopis(out, !!text);
   if (!chyba && !prompt) chyba = "image_prompt_empty";
-  const stats = { calls: 1, in: s.in || 0, out: s.out || 0, cached: s.cached || 0, model: s.model || cfg.model || "", tools: ["image_prompt"], skupiny: ["kresleni"],
+  const stats = { calls: 1, in: s.in || 0, out: s.out || 0, cached: s.cached || 0, model: s.model || cfg.model || "", tools: ["image_prompt"], skupiny: ["kresleni"], zdarma: zdarma(),
     volani: [{ model: s.model || cfg.model || "", provider: cfg.provider || "", in: s.in || 0, cached: s.cached || 0, out: s.out || 0, tier: "heavy", druh: "obrazek_popis", vlastni: !!cfg.vlastni }] };
   C.zapisLog(app, e.auth, { id: "" }, cfg, stats, Date.now() - t0, chyba);
   if (chyba) {
@@ -318,7 +321,7 @@ function zapisLog(app, auth, rec, ms, chyba, gen, opt) {
     // vlastní služba (OpenAI Images API) = její model, ne náš FLUX
     l.set("model", (opt && opt.model ? String(opt.model).slice(0, 60) : (model === "flux3" ? "flux3-klein" : "flux2-klein")) + "#obrazek");
     l.set("tokens_in", 0); l.set("tokens_out", 0); l.set("tokens_cached", 0); l.set("ms", ms); l.set("calls", 1);
-    l.set("tools", "image_draw"); l.set("skupiny", "kresleni"); // vlastní značka (vzor page_writer) — tah s generate_image je jiný řádek
+    l.set("tools", opt && opt.system ? "image_banner" : "image_draw"); l.set("skupiny", "kresleni"); // banner = jiná značka: do týdenního stropu se nepočítá // vlastní značka (vzor page_writer) — tah s generate_image je jiný řádek
     if (gen) l.set("prepis_ms", Math.round(gen * 1000)); // čas na GPU (GPU čas jako u přepisu)
     l.set("kredity", opt && opt.system ? 0 : Math.round(require(`${__hooks}/kredity.js`).kredityTahu(stats, chyba, null) * 10000) / 10000);
     l.set("zdroj", opt && opt.model ? "vlastni" : "nas");
@@ -327,6 +330,41 @@ function zapisLog(app, auth, rec, ms, chyba, gen, opt) {
   } catch (err) {
     try { $app.logger().warn("obrazky: zápis do ai_chat_log selhal", "error", String(err).slice(0, 300)); } catch (e2) { /* log je bonus */ }
   }
+}
+
+// Týdenní strop obrázků instance (KB_OBRAZKY_TYDEN; prázdné / 0 = bez stropu; Richard 5. 11. 2026: obrázky „solo“ —
+// vlastní počet, ne kredity). Počítají se POVEDENÁ kreslení uživatelů (řádky image_draw, i Nakreslit znovu a ilustrace
+// Stránek) od pondělí 00:00 UTC — stejný týden jako kvóta kreditů (kredity.js zacatekTydne); banner sumáře (image_banner)
+// patří instanci a do stropu se nepočítá. Rozkreslené (ještě bez řádku) se nepočítají → souběh může strop přetáhnout o pár kusů.
+function stropTydne() {
+  const { env } = require(`${__hooks}/helpers.js`);
+  const n = parseInt(env("OBRAZKY_TYDEN"), 10);
+  return n > 0 ? Math.min(n, 1000000) : 0;
+}
+function nakreslenoTydne(app, ted) {
+  const od = require(`${__hooks}/kredity.js`).zacatekTydne(ted).toISOString().replace("T", " ").slice(0, 19);
+  const rows = arrayOf(new DynamicModel({ n: 0 }));
+  try {
+    app.db().newQuery("SELECT COUNT(*) AS n FROM ai_chat_log WHERE tools = 'image_draw' AND stav = 'ok' AND created >= {:od}").bind({ od: od }).all(rows);
+  } catch (err) { return 0; }
+  return rows.length ? Number(rows[0].n) || 0 : 0;
+}
+function tydenBrzda(app, L) {
+  const strop = stropTydne();
+  if (!strop) return null;
+  if (nakreslenoTydne(app) < strop) return null;
+  const { t } = require(`${__hooks}/i18n.js`);
+  return { status: 429, body: { error: t(L, "err.imageWeekLimit", { limit: strop }), code: "image_week" } };
+}
+// obrázek bez kreditů (KB_OBRAZEK_KREDITY=0): kreslení ani popis Nového obrázku pak nečerpají kvótu kreditů a ta je ani nezastaví
+function zdarma() {
+  const { env } = require(`${__hooks}/helpers.js`);
+  const p = parseFloat(env("OBRAZEK_KREDITY"));
+  return Number.isFinite(p) && p === 0;
+}
+function stavTydne(app) {
+  const strop = stropTydne();
+  return strop ? { strop: strop, nakresleno: nakreslenoTydne(app) } : null;
 }
 
 // POST /chat/obrazek/vytvorit {id, znovu?} → {status, body}. Nakreslí obrázek ve stavu ceka/chyba;
@@ -655,4 +693,4 @@ function uklid(app) {
   return smazano;
 }
 
-module.exports = { poRestartu, novy, PRESETY_NOVY, STYLY, vycistiPopis, cestyObrazku, DNI_NEPOUZITY, DNI_BANNER, pouziti, dtoSprava, seznam, ponechat, smazat, poSmazaniChatu, uklid, MAX_OBRAZKU_DOKUMENTU, BEZ_OBRAZKU, presetDokumentu, zalozProDokument, vlastniObrazky, obrazkyDokumentu, smazObrazky, PRESETY, MAX_ILUSTRACI, doplnChat, vratitTah, dosadIlustrace, maZnackyIlustraci, nakresli, MAX_PROMPT, konfigurace, dostupne, najdi, dto, zaloz, vytvorit, chybaS };
+module.exports = { tydenBrzda, stavTydne, zdarma, poRestartu, novy, PRESETY_NOVY, STYLY, vycistiPopis, cestyObrazku, DNI_NEPOUZITY, DNI_BANNER, pouziti, dtoSprava, seznam, ponechat, smazat, poSmazaniChatu, uklid, MAX_OBRAZKU_DOKUMENTU, BEZ_OBRAZKU, presetDokumentu, zalozProDokument, vlastniObrazky, obrazkyDokumentu, smazObrazky, PRESETY, MAX_ILUSTRACI, doplnChat, vratitTah, dosadIlustrace, maZnackyIlustraci, nakresli, MAX_PROMPT, konfigurace, dostupne, najdi, dto, zaloz, vytvorit, chybaS };

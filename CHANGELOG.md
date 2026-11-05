@@ -9,6 +9,21 @@ below before you jump several versions.
 
 ---
 
+## v0.100.1-beta — 2026-11-05
+
+**A weekly picture count instead of credits**
+
+**Upgrade notes:** no migration. Nothing changes unless you set the new variable.
+
+- **`KB_OBRAZKY_TYDEN`** caps the pictures of the whole instance per week (from Monday, like the credit quota; empty / 0 =
+  no cap). Every successful drawing counts — chat, New image, redraw, Office and Pages; the daily-summary banner does not.
+  Over the cap the card ends with "All N pictures of this instance for this week are used up…", before any model or
+  picture service is called.
+- **`KB_OBRAZEK_KREDITY=0`** now means pictures are outside the credit quota: neither the drawing nor the prompt that
+  the assistant writes for New image costs credits, and an exhausted weekly credit quota no longer blocks them.
+
+---
+
 ## v0.100-beta — 2026-11-05
 
 **Pictures drawn by the assistant**

@@ -57,7 +57,7 @@ function kredityVolani(v) {
 // kredity tahu ze statistik smyčky: rozpad po voláních (stats.volani); bez něj součty za cenu AKI.
 // Chybový tah a potvrzení bez modelu = 0.
 function kredityTahu(stats, chyba, cfg) {
-  if (chyba || !stats || stats.app || !(Number(stats.calls) > 0)) return 0;
+  if (chyba || !stats || stats.app || stats.zdarma || !(Number(stats.calls) > 0)) return 0; // zdarma = popis obrázku za 0 kreditů (obrazky.js)
   if (stats.obrazek) return kredityObrazku(stats.obrazek.model); // obrázek (obrazky.js): pevná cena za kus, bez tokenů
   const prepis = stats.hlas ? kredityPrepisu(stats.hlas.s) : 0; // délka nahrávky v sekundách (chat.js: stats.hlas.s)
   // vlastní model zákazníka (hostovaná, 14. 10. 2026): jeho volání (v.vlastni) = 0 kreditů, tokeny v logu zůstávají;

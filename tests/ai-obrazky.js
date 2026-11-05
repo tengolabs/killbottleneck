@@ -546,6 +546,45 @@ H.beh(async () => {
   const sysT = ((volani[volani.length - 1] || {}).messages || []).map((m) => m.content).join('\n');
   expect(/exactly once, clearly readable/.test(sysT) && /Words in the picture: "Veselé Vánoce"/.test(sysT) && !/end the prompt with "no text"/.test(sysT), 's textem model ví, jaká slova mají být v obrázku (a nepíše „no text“)');
 
+  console.log('== obrázky „solo“: týdenní strop KB_OBRAZKY_TYDEN, 0 kreditů, kvóta kreditů je nezastaví ==');
+  const tyd = await H.startInstance({ slug: 'ai-obrazky-tyden', addHostGateway: true, env: Object.assign({}, ZAKLAD, { KB_AI_PROVIDER: 'api', KB_AI_URL: brana.base + '/v1/advisor', KB_AI_TOKEN: 'kb_tok', KB_IMAGE_PROVIDER: 'api', KB_OBRAZKY_TYDEN: '2', KB_OBRAZEK_KREDITY: '0', KB_AI_KVOTA_TYDEN: '1' }) });
+  await tyd.register('admin@example.com', { name: 'Petr' });
+  const A5 = await tyd.login('admin@example.com');
+  const suT = await tyd.superuser();
+  const uT = (await tyd.api('GET', '/api/collections/users/records?filter=' + encodeURIComponent("email='admin@example.com'"), { token: suT })).json.items[0].id;
+  // kvóta kreditů týdne (1) je vyčerpaná dřívějším tahem asistenta → textový tah by narazil, obrázek ne
+  r = await tyd.api('POST', '/api/collections/ai_chat_log/records', { token: suT, body: { user: uT, stav: 'ok', kredity: 5, calls: 1, tools: 'chat', model: 'm-a' } });
+  expect(r.status === 200, `podklad: tah za 5 kreditů v logu (${r.status} ${JSON.stringify(r.json).slice(0, 120)})`);
+  const kresliTyden = async (popis) => {
+    fronta.push(text('A calm painterly scene of ' + popis + ', warm light, no text'));
+    const n = await tyd.api('POST', '/api/kb/chat/obrazek/novy', { token: A5, body: { prompt: popis, preset: 'ctverec' } });
+    if (n.status !== 200) return n;
+    return tyd.api('POST', '/api/kb/chat/obrazek/vytvorit', { token: A5, body: { id: n.json.obrazek.id } });
+  };
+  const t1 = await kresliTyden('dílna ráno');
+  const t2 = await kresliTyden('les v mlze');
+  expect(t1.status === 200 && t2.status === 200 && t1.json.obrazek.stav === 'hotovo' && t2.json.obrazek.stav === 'hotovo',
+    `KB_OBRAZEK_KREDITY=0: vyčerpaná kvóta kreditů Nový obrázek nezastaví — 2× nakresleno (${t1.status} ${t2.status})`);
+  const logT = ((await tyd.api('GET', '/api/collections/ai_chat_log/records?perPage=50', { token: suT })).json.items || []);
+  const kreslT = logT.filter((l) => l.tools === 'image_draw'), popisT = logT.filter((l) => l.tools === 'image_prompt');
+  expect(kreslT.length === 2 && kreslT.every((l) => l.kredity === 0) && popisT.length === 2 && popisT.every((l) => l.kredity === 0),
+    `obrázek i jeho popis za 0 kreditů (kreslení ${kreslT.map((l) => l.kredity).join(',')} · popis ${popisT.map((l) => l.kredity).join(',')})`);
+  const predVolani = volani.length, predBranaT = branaPozadavky.length;
+  const t3 = await kresliTyden('třetí obrázek');
+  expect(t3.status === 429 && t3.json.code === 'image_week' && /všech 2 obrázků/.test(t3.json.error || '') && /pondělí/.test(t3.json.error || ''),
+    `3. obrázek v týdnu → 429 image_week „vyčerpáno všech 2 obrázků… od pondělí“ (${t3.status} ${t3.json.code} ${t3.json.error})`);
+  expect(volani.length === predVolani && branaPozadavky.length === predBranaT, `strop odmítne DŘÍV než model popisu i brána (model ${volani.length - predVolani}×, brána ${branaPozadavky.length - predBranaT}×)`);
+  fronta.length = 0; // nespotřebovaná odpověď modelu pro 3. popis
+  const t4 = await tyd.api('POST', '/api/kb/chat/obrazek/vytvorit', { token: A5, body: { id: t1.json.obrazek.id, znovu: true } });
+  const d4 = (await tyd.api('GET', `/api/kb/chat/obrazek/${t1.json.obrazek.id}`, { token: A5 })).json.obrazek || {};
+  expect(t4.status === 429 && t4.json.code === 'image_week' && d4.stav === 'hotovo', `Nakreslit znovu se počítá taky → 429, hotový obrázek zůstává hotový (${t4.status} ${d4.stav})`);
+  // asistent v rozhovoru: zadaná karta na strop narazí při kreslení → „chyba“ s hláškou (karta nabídne Zkusit znovu)
+  r = await tyd.api('POST', '/api/collections/ai_images/records', { token: suT, body: { user: uT, prompt: 'a lighthouse, no text', title: 'Maják', model: 'klein', preset: 'ctverec', stav: 'ceka' } });
+  const idCeka = r.json.id;
+  const t5 = await tyd.api('POST', '/api/kb/chat/obrazek/vytvorit', { token: A5, body: { id: idCeka } });
+  const d5 = (await tyd.api('GET', `/api/kb/chat/obrazek/${idCeka}`, { token: A5 })).json.obrazek || {};
+  expect(t5.status === 429 && d5.stav === 'chyba' && /pondělí/.test(d5.chyba || ''), `karta asistenta nad stropem → „chyba“ s hláškou o týdnu (${t5.status} ${d5.stav} ${d5.chyba})`);
+
   console.log('== tarif brány bez image: kreslení se nenabízí ==');
   modyBrany = ['questions', 'generate', 'expand', 'chat', 'from_text', 'transcribe'];
   const tarif = await H.startInstance({ slug: 'ai-obrazky-tarif', addHostGateway: true, env: Object.assign({}, ZAKLAD, { KB_AI_PROVIDER: 'api', KB_AI_URL: brana.base + '/v1/advisor', KB_AI_TOKEN: 'kb_tok', KB_IMAGE_PROVIDER: 'api' }) });

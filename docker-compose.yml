@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.100-beta}
+        KB_VERSION: ${KB_VERSION:-v0.100.1-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -208,8 +208,9 @@ services:
       # Kreslení obrázků v asistentovi (FLUX přes AI bránu, mode=image): adresa brány (…/v1/advisor) a token,
       # nebo KB_IMAGE_PROVIDER=api = brána z KB_AI_*; none = vypnout. KB_IMAGE_TEXT=1 povolí obrázky s textem
       # (FLUX 3). Váha obrázku v hodinovém stropu (2). KB_OBRAZEK_KREDITY = pevná cena obrázku v kreditech
-      # (prázdné = referenční cena modelu).
+      # (prázdné = referenční cena modelu; 0 = obrázky kredity nestojí), KB_OBRAZKY_TYDEN = týdenní strop obrázků instance.
       KB_OBRAZEK_KREDITY: ${KB_OBRAZEK_KREDITY:-}
+      KB_OBRAZKY_TYDEN: ${KB_OBRAZKY_TYDEN:-}
       KB_IMAGE_PROVIDER: ${KB_IMAGE_PROVIDER:-}
       KB_IMAGE_URL: ${KB_IMAGE_URL:-}
       KB_IMAGE_TOKEN: ${KB_IMAGE_TOKEN:-}

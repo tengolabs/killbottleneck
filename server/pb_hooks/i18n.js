@@ -1117,6 +1117,7 @@ const STRINGS = {
   "err.pageNotFound": { cs: "Stránka nenalezena.", en: "Page not found." },
   "err.pageTooManyWriting": { cs: "Píše se už {max} vašich stránek naráz — počkejte, až některá doběhne.", en: "{max} of your pages are already being written — wait for one to finish." },
   "err.pageBudget": { cs: "Psaní stránky trvalo déle než {min} minut a bylo zastaveno; rozepsaná část zůstala, zkuste to znovu.", en: "Writing the page took longer than {min} minutes and was stopped; the partial page is kept, try again." },
+  "err.imageWeekLimit": { cs: "Tento týden už je vyčerpáno všech {limit} obrázků instance. Další půjdou nakreslit od pondělí.", en: "All {limit} pictures of this instance for this week are used up. You can draw more from Monday." },
   "err.imageInterrupted": { cs: "Kreslení přerušil restart aplikace. Zkuste to znovu.", en: "Drawing was interrupted by an application restart. Try again." },
   "err.pageInterrupted": { cs: "Psaní přerušil restart aplikace. Zkuste to znovu.", en: "Writing was interrupted by an application restart. Try again." },
   "err.pageTooBigRewrite": { cs: "Stránka bez značek částí je na přepis asistentem příliš velká (nad {max} kB) — stáhněte ji a upravte ručně.", en: "A page without section markers is too large for the assistant to rewrite (over {max} kB) — download it and edit it by hand." },

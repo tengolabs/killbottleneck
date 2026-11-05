@@ -11,6 +11,14 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.100.1-beta": {
+    cs: [
+      "Obrázky od asistenta mohou mít vlastní týdenní počet a nečerpat AI kredity asistenta; když je počet vyčerpaný, aplikace řekne, že další obrázky půjdou od pondělí.",
+    ],
+    en: [
+      "Pictures from the assistant can have their own weekly count and no longer use the assistant's AI credits; once the count is used up, the app says more pictures are possible from Monday.",
+    ],
+  },
   "v0.100-beta": {
     cs: [
       "Asistent umí kreslit: napište „nakresli ilustraci…“ nebo „udělej banner do e-mailu…“ a pod odpovědí se objeví obrázek ke stažení nebo k nakreslení znovu.",

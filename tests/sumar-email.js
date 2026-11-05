@@ -102,9 +102,9 @@ H.beh(async () => {
     `jeden banner dne pro všechny: brána 1×, banner 1200×400 ve stylu Malba bez textu (${branaPozadavky.length}×)`);
   expect(!!podvrh.id && !(imgA || '').includes(podvrh.id), `obrázek uživatele s názvem „sumar:${den}“ banner NENÍ — banner pozná server podle příznaku`);
   const bannery = ((await inst.api('GET', `/api/collections/ai_images/records?filter=${encodeURIComponent('banner=true')}`, { token: su })).json.items || []);
-  const logBan = ((await inst.api('GET', `/api/collections/ai_chat_log/records?filter=${encodeURIComponent("tools='image_draw'")}`, { token: su })).json.items || []);
+  const logBan = ((await inst.api('GET', `/api/collections/ai_chat_log/records?filter=${encodeURIComponent("tools='image_banner'")}`, { token: su })).json.items || []);
   expect(bannery.length === 1 && (imgA || '').includes(bannery[0].id) && logBan.length === 1 && logBan[0].kredity === 0,
-    `banner dne má příznak banner a za kreslení neplatí příjemce (kredity ${logBan.map((l) => l.kredity).join(',')})`);
+    `banner dne má příznak banner, v logu značku image_banner (do týdenního stropu obrázků se nepočítá) a za kreslení neplatí příjemce (kredity ${logBan.map((l) => l.kredity).join(',')})`);
   expect(/Ranní sumář e-mailem si vypnete/.test(tA), 'mail říká, kde se vypíná');
 
   console.log('== druhý běh = žádný druhý mail; režim „Nic“ přebíjí ==');

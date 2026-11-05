@@ -4012,7 +4012,11 @@ function chatBrzda(e, L, body, cfg) {
   // s přílohou kvótu čerpá dál — jinak by vlastní adresa (klidně falešná) odemkla neomezenou vizi a přepis (audit 25. 10. 2026)
   const { kvotaBrzda } = require(`${__hooks}/kredity.js`);
   const priloha = !!(body && (body.image_base64 || body.audio_base64) && !jeRezim(body.mode));
-  const kv = cfg && cfg.vlastni && !priloha ? null : kvotaBrzda($app, e.auth, L);
+  // obrázek (kreslení i popis Nového obrázku): týdenní strop obrázků instance (KB_OBRAZKY_TYDEN) před vším ostatním;
+  // obrázky za 0 kreditů (KB_OBRAZEK_KREDITY=0, „solo“) kvóta kreditů nezastaví — mají vlastní počet (Richard 5. 11. 2026)
+  const obrazkova = !!(body && (body._obrazek || body._popisObrazku));
+  if (body && body._obrazek) { const tb = require(`${__hooks}/obrazky.js`).tydenBrzda($app, L); if (tb) return tb; }
+  const kv = (cfg && cfg.vlastni && !priloha) || (obrazkova && require(`${__hooks}/obrazky.js`).zdarma()) ? null : kvotaBrzda($app, e.auth, L);
   if (kv) return kv;
   const strop = parseInt(env("AI_MAX_PER_HOUR"), 10);
   const limit = strop > 0 ? strop : 60;
