@@ -24,7 +24,14 @@ const NASTROJE = [
       text: { type: "string", description: "the outline in the `# / ## / - / >` format" },
       audience: { type: "string", description: "who the deck is for (client, team, management) — optional" },
       map: { type: "string", description: "exact map title the deck belongs to (optional)" },
-    }, required: ["title", "text"], additionalProperties: false } },
+      picture: { type: "string", description: "ENGLISH visual description of a picture for the title slide (subject, setting, style, colours; no text) — optional" },
+      slide_pictures: { type: "array", maxItems: 3, description: "pictures for up to 3 content slides (optional)", items: { type: "object", properties: {
+        slide: { type: "string", description: "exact slide heading from the outline" },
+        prompt: { type: "string", description: "ENGLISH visual description of the picture (no text)" },
+      }, required: ["slide", "prompt"], additionalProperties: false } },
+    }, required: ["title", "text"], additionalProperties: false },
+    obrazkovaPole: ["picture", "slide_pictures"],
+    popisObrazku: " PICTURES: this instance can draw pictures — by default pass `picture` for the title slide (an English visual description fitting the topic and audience, e.g. a calm flat illustration; never text in the picture) and, when it helps, `slide_pictures` for at most 3 content slides; leave them out only when the user wants no pictures. The app draws them on the chat card right after your turn and puts them into the PowerPoint and PDF." },
   { name: "draft_card", skupina: "kancelar", kind: "direct", description: "Create a printable PDF card for the user: a greeting card (greeting — Christmas / New Year 'PF', birthday, anniversary, thank-you to clients), an invitation (invitation — company party, open day, training; pass `date` and `place`, optionally `link` for a QR code), a poster (poster — A4 notice or announcement) or a certificate (certificate — diploma, award, or a formal acknowledgement / thank-you to be handed over or framed, e.g. for years of cooperation; a short seasonal or birthday wish is greeting). `title` = the big headline (short), `text` = the body: a few short sentences or lines (plain text, no markup), `signature` = who signs (company or person). Keep it warm and concrete, in the user's language; never invent dates, prices or names — ask with ask_user when missing. The card is SAVED to the user's Documents (editable text; the user picks a colour and can add a photo in the panel) and the chat card offers PDF download; in your reply add only a one-line comment.",
     parameters: { type: "object", properties: {
       kind: { type: "string", enum: SABLONY },
@@ -35,7 +42,10 @@ const NASTROJE = [
       link: { type: "string", description: "http(s) URL for a QR code (registration, map, website), max 300 characters — optional; printed only on invitation and poster" },
       signature: { type: "string", description: "who signs the card — optional" },
       map: { type: "string", description: "exact map title the card belongs to (optional)" },
-    }, required: ["kind", "title", "text"], additionalProperties: false } },
+      picture: { type: "string", description: "ENGLISH visual description of the picture on the card (greeting, invitation, poster; not certificate) — optional" },
+    }, required: ["kind", "title", "text"], additionalProperties: false },
+    obrazkovaPole: ["picture"],
+    popisObrazku: " PICTURES: this instance can draw pictures — for greeting, invitation and poster pass `picture` by default (an English visual description of a fitting illustration for the occasion, style and colours; never text in the picture); a certificate has no picture. Leave it out only when the user wants no picture. The app draws it on the chat card right after your turn and puts it into the PDF (a photo the user adds in Documents takes its place)." },
 ];
 
 // Osnova: řádky → { titul, snimky: [{ nadpis, odrazky, poznamky }] }; chyby anglicky pro model. Jen tolik, kolik
@@ -78,6 +88,34 @@ function ulozDokument(app, auth, ktx, data) {
     return { doc: null, duvod: duvod };
   }
 }
+// Zadané obrázky (stav „ceka“) pro dokument; nakreslí je karta v chatu hned po tahu. Bez služby obrázků nebo s chybným
+// popisem se dokument uloží bez nich — obrázky jsou bonus, prezentace i přání fungují i bez nich.
+function zadejObrazky(app, auth, ktx, kind, template, prani) {
+  const O = require(`${HOOKS}/obrazky.js`);
+  if (!prani.length || !O.dostupne(app) || O.BEZ_OBRAZKU.includes(template)) return [];
+  const out = [];
+  for (const p of prani.slice(0, O.MAX_OBRAZKU_DOKUMENTU)) {
+    if (out.some((x) => x.slot === p.slot)) continue;
+    try {
+      const rec = O.zalozProDokument(app, auth.id, { prompt: p.prompt, title: p.title, kind: kind, template: template }, { chat: ktx && ktx.chatId });
+      out.push({ slot: p.slot, id: rec.id });
+      if (ktx && ktx.dok) ktx.dok.push({ id: rec.id, novy: true, obrazek: true }); // id rozhovoru doplní chatRun; hybrid: předaný tah je smaže
+    } catch (err) { /* prázdný či dlouhý popis → bez toho obrázku */ }
+  }
+  return out;
+}
+function obrazkyZArgumentu(a, titul, nadpisy) {
+  const prani = [];
+  const pic = String(a.picture || "").trim();
+  if (pic) prani.push({ slot: "", prompt: pic, title: titul });
+  for (const s of Array.isArray(a.slide_pictures) ? a.slide_pictures.slice(0, 3) : []) {
+    const slot = DOK().radek(s && s.slide, 200), prompt = String((s && s.prompt) || "").trim();
+    const nadpis = nadpisy && nadpisy.find((n) => DOK().norm(n) === DOK().norm(slot));
+    if (nadpis && prompt) prani.push({ slot: nadpis, prompt: prompt, title: nadpis });
+  }
+  return prani;
+}
+
 function mapaZArgumentu(app, auth, ref) {
   if (!ref) return { mid: "" };
   const mid = SPOL().mapaId(app, auth, ref);
@@ -99,11 +137,15 @@ function vykonej(app, auth, L, name, args, ktx) {
       const m = mapaZArgumentu(app, auth, a.map);
       if (m.chyba) return { text: m.chyba };
       const meta = { subtitle: S.ocisti(a.subtitle, 200), audience: S.ocisti(a.audience, 120), lang: L };
+      const obr = zadejObrazky(app, auth, ktx, "presentation", "", obrazkyZArgumentu(a, title, os.snimky.map((s) => s.nadpis)));
+      if (obr.length) meta.images = obr;
       const u = ulozDokument(app, auth, ktx, { kind: "presentation", title: title, text: text, map: m.mid, meta: meta });
+      if (!u.doc) require(`${HOOKS}/obrazky.js`).smazObrazky(app, auth.id, obr.map((x) => x.id));
       const n = os.snimky.length;
       const kde = u.doc ? `saved to the user's Documents (kind presentation, ${n} slide${n === 1 ? "" : "s"}) and the card below offers PPTX and PDF download` : `shown on a card only (NOT saved: ${u.duvod})`;
-      return { text: `The deck outline is ${kde}${m.mid ? ", linked to the project" : ""}. Now write a one-line comment (no repetition of the outline) and offer via suggest_next to adjust a slide or add speaker notes.`,
-        karta: { type: "soubor", druh: "presentation", title: u.doc ? u.doc.getString("title") : title, doc_id: u.doc ? u.doc.id : "", pocet: n, formaty: ["pptx", "pdf"], map_id: m.mid, ...(u.nahrazuje ? { nahrazuje: true } : {}) } };
+      const sObr = u.doc && obr.length ? ` ${obr.length} picture${obr.length === 1 ? " is" : "s are"} being drawn on the card (seconds).` : "";
+      return { text: `The deck outline is ${kde}${m.mid ? ", linked to the project" : ""}.${sObr} Now write a one-line comment (no repetition of the outline) and offer via suggest_next to adjust a slide or add speaker notes.`,
+        karta: { type: "soubor", druh: "presentation", title: u.doc ? u.doc.getString("title") : title, doc_id: u.doc ? u.doc.id : "", pocet: n, formaty: ["pptx", "pdf"], map_id: m.mid, ...(u.doc && obr.length ? { obrazky: obr.map((x) => x.id) } : {}), ...(u.nahrazuje ? { nahrazuje: true } : {}) } };
     }
     case "draft_card": {
       const kind = SABLONY.includes(a.kind) ? a.kind : "";
@@ -117,10 +159,14 @@ function vykonej(app, auth, L, name, args, ktx) {
       const m = mapaZArgumentu(app, auth, a.map);
       if (m.chyba) return { text: m.chyba };
       const meta = { template: kind, date: S.ocisti(a.date, 60), place: S.ocisti(a.place, 200), link: S.ocisti(a.link, 300), signature: S.ocisti(a.signature, 120), lang: L };
+      const obr = zadejObrazky(app, auth, ktx, "card", kind, obrazkyZArgumentu(a, title, null));
+      if (obr.length) meta.images = obr;
       const u = ulozDokument(app, auth, ktx, { kind: "card", title: title, text: text, map: m.mid, meta: meta });
+      if (!u.doc) require(`${HOOKS}/obrazky.js`).smazObrazky(app, auth.id, obr.map((x) => x.id));
       const kde = u.doc ? `saved to the user's Documents (kind card, template ${kind}) and the card below offers PDF download; the user can change colour, add a photo or edit the wording in the Documents panel` : `shown on a card only (NOT saved: ${u.duvod})`;
-      return { text: `The ${kind} is ${kde}. Now write a one-line comment (do not repeat the wording).`,
-        karta: { type: "soubor", druh: "card", template: kind, title: u.doc ? u.doc.getString("title") : title, doc_id: u.doc ? u.doc.id : "", formaty: ["pdf"], map_id: m.mid, ...(u.nahrazuje ? { nahrazuje: true } : {}) } };
+      const sObr = u.doc && obr.length ? " The picture is being drawn on the card (seconds)." : "";
+      return { text: `The ${kind} is ${kde}.${sObr} Now write a one-line comment (do not repeat the wording).`,
+        karta: { type: "soubor", druh: "card", template: kind, title: u.doc ? u.doc.getString("title") : title, doc_id: u.doc ? u.doc.id : "", formaty: ["pdf"], map_id: m.mid, ...(u.doc && obr.length ? { obrazky: obr.map((x) => x.id) } : {}), ...(u.nahrazuje ? { nahrazuje: true } : {}) } };
     }
     default: return { text: "Error: unknown tool " + name };
   }

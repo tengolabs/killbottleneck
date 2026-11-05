@@ -181,18 +181,25 @@ export function AsistentProvider({ children }) {
     return { ...r, ...zbytek };
   }), [zapisRelax]);
 
+  // ---- Prohlížeč obrázků (4. 11. 2026, Richard: „ne nové okno — vlevo místo mapy, nebo přes celou obrazovku s křížkem“) ----
+  // { polozky: [dto obrázku], index, sprava (záložka Obrázky: natrvalo / smazat), onZmena } — jen v paměti, vrstva ObrazekVrstva
+  const [prohlizec, setProhlizec] = useState(null);
+  const otevriObrazek = useCallback((p) => setProhlizec(p && p.polozky && p.polozky.length ? { index: 0, ...p } : null), []);
+  const zavriObrazek = useCallback(() => setProhlizec(null), []);
+
   const value = useMemo(() => ({
     open, setOpen, width, setWidth, odsun, dostupny, setDostupny, funkcni, setFunkcni, uzel, setUzel, liteOpen, setLiteOpen,
     dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
     zadost, spust, vyridZadost, pdfSoubory, setPdfSoubory,
     relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax,
-  }), [open, setOpen, width, setWidth, odsun, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax]);
+    prohlizec, otevriObrazek, zavriObrazek, setProhlizec,
+  }), [open, setOpen, width, setWidth, odsun, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, prohlizec, otevriObrazek, zavriObrazek]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, odsun: 0, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {} };
+const PRAZDNO = { open: false, width: 0, odsun: 0, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {}, prohlizec: null, otevriObrazek: () => {}, zavriObrazek: () => {}, setProhlizec: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }

@@ -151,7 +151,8 @@
     "list_reminders": "step reminders",
     "get_timer": "timer status",
     "list_clients": "client address book",
-    "list_invoices": "issued invoices"
+    "list_invoices": "issued invoices",
+    "generate_image": "picture"
   },
   "errorGeneric": "The assistant did not respond. Please try again.",
   "errorRate": "You have used up the hourly AI cap. Try again in a while.",
@@ -452,7 +453,20 @@
     "kancelarTitle": "Office",
     "kancelarClose": "Close Office",
     "tabPdf": "PDF",
-    "novy": "New"
+    "novy": "New",
+    "imgTitle": "Pictures",
+    "imgSlotTitle": "Title slide",
+    "imgSlotCard": "Picture",
+    "imgRedraw": "Redraw",
+    "imgRemove": "Remove",
+    "imgPrompt": "What should the picture show? (e.g. a team at a whiteboard, a winter landscape)",
+    "imgAdd": "Draw",
+    "imgDrawing": "Drawing…",
+    "imgFailed": "Failed",
+    "imgHint": "The picture is drawn by AI without text — the headline and text stay in the template. Your own photo takes its place.",
+    "imgSlot": "Where",
+    "openLeft": "Open on the left",
+    "openLeftHint": "Open the document large on the left next to the chat (⛶ full screen)"
   },
   "rizika": {
     "titulek": "Risks in “{{title}}”",
@@ -535,6 +549,17 @@
     "openOrg": "Open in Organization settings",
     "openMe": "Open in My account"
   },
+  "img": {
+    "drawing": "Drawing the picture…",
+    "failed": "The picture failed.",
+    "download": "Download",
+    "redraw": "Redraw",
+    "retry": "Try again",
+    "untitled": "Picture",
+    "timeout": "Drawing takes longer than usual — try again in a moment.",
+    "textHint": "Text in the picture may come out with a typo — then click Redraw.",
+    "deleted": "The picture was deleted."
+  },
   "soubor": {
     "pdf": "Download PDF",
     "pptx": "Download PowerPoint",
@@ -543,6 +568,55 @@
     "notSaved": "The document was not saved (Documents are full) — the text is in the reply.",
     "error": "Could not create the file.",
     "hintDeck": "Edit the outline in Documents and download the file again.",
-    "hintCard": "Tune the colour, photo and wording in Documents."
+    "hintCard": "Tune the colour, photo and wording in Documents.",
+    "drawing": "Drawing the pictures…",
+    "imgFailed": "A picture failed — the file will be without it. Redraw it in Documents."
+  },
+  "obr": {
+    "tab": "Pictures",
+    "zvetsit": "Enlarge",
+    "hledat": "Search pictures…",
+    "uklidHint": "A picture you don't use anywhere is deleted after 90 days. Pictures in documents and pages stay; pin others to keep them for good.",
+    "prazdno": "No images yet — click New image, or ask the assistant, e.g. “Draw…”.",
+    "prazdnoHledani": "Nothing found.",
+    "nacistDalsi": "Load more",
+    "pouzito": "Used in: {{kde}} — kept while it is there.",
+    "pouzitoKratce": "In: {{kde}}",
+    "natrvalo": "Kept for good.",
+    "smazeSe": "Unused — will be deleted on {{datum}}. Pin it to keep it for good.",
+    "ponechat": "Keep for good",
+    "zrusitNatrvalo": "Stop keeping for good",
+    "smazat": "Delete",
+    "smazatPotvrdit": "Really delete",
+    "nelzeSmazat": "The picture is in use — remove it from the document or page first",
+    "predchozi": "Previous",
+    "dalsi": "Next",
+    "cela": "Full screen",
+    "vedle": "Back next to the chat",
+    "zavrit": "Close (Esc)",
+    "novy": "New image",
+    "novyPopis": "What should the image show? E.g. “a carpentry workshop in winter, warm light”",
+    "novyText": "Text in the image (optional, e.g. “Merry Christmas”)",
+    "format": "What for",
+    "formatNazev": {
+      "siroky": "Presentation (landscape)",
+      "banner": "E-mail (strip)",
+      "ctverec": "Post (square)",
+      "vysoky": "Story (portrait)"
+    },
+    "nakreslit": "Draw",
+    "nejdrivPopis": "First describe what should be in the picture (a style is already selected)",
+    "kreslim": "Drawing… (the assistant describes the picture first)",
+    "styl": "Style",
+    "stylNazev": {
+      "malba": "Painting (warm light)",
+      "ilustrace": "Illustration (as in presentations)",
+      "foto": "Photo",
+      "kresleny": "Cartoon",
+      "akvarel": "Watercolour",
+      "skica": "Pencil sketch",
+      "3d": "3D"
+    },
+    "nelzeZnovu": "The picture is on a page — redrawing it would remove it from there. Draw a new one instead."
   }
 }

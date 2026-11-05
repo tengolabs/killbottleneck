@@ -361,6 +361,8 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false } },
   { name: "get_page", description: "Read one page (page_id from list_pages): its metadata and the full HTML. Read it before changing a page with update_page.",
     inputSchema: { type: "object", properties: { page_id: { type: "string" } }, required: ["page_id"], additionalProperties: false } },
+  { name: "generate_image", description: "Draw a picture (illustration, banner, header image, poster) with the instance's image model and return a public link to the JPEG. Write `prompt` in English as a detailed visual description and add \"no text\". Only when readable words must be in the picture, put the exact short text into `text` (only if the instance allows pictures with text; letters may come out wrong). format: square 1024×1024 (default), banner 1200×400, header 1536×640, portrait 512×896, landscape 1792×1024. Costs AI credits like an assistant message.",
+    inputSchema: { type: "object", properties: { prompt: { type: "string" }, title: { type: "string", description: "short caption" }, text: { type: "string" }, format: { type: "string", enum: ["square", "banner", "header", "portrait", "landscape"] } }, required: ["prompt", "title"], additionalProperties: false } },
   { name: "create_page", description: "Create a page from a COMPLETE single-file HTML document you wrote yourself (inline CSS/JS; external libraries only from https CDNs; no fetch to other servers; size limit per instance, typically 300 kB). The page appears in the user's Pages panel in the app and runs sandboxed (no access to the app's session). team_visible=true shows it to all members of the organization. Returns the id and the public link if one is on.",
     inputSchema: { type: "object", properties: { title: { type: "string" }, html: { type: "string", description: "the whole HTML document" }, team_visible: { type: "boolean" } }, required: ["title", "html"], additionalProperties: false } },
   { name: "update_page", description: "Replace the HTML and/or the title of an existing page (page_id from list_pages). Send the WHOLE new document, not a diff; the previous version is kept and the user can restore it.",
@@ -534,13 +536,13 @@ const popisStranky = (p) => `${p.title} (id: ${p.id}, status: ${p.status}, ${p.s
 // interní volání vlastního v1 API — auth hlavička klienta se předává doslova:
 // autentizaci, scope, rate-limit i audit dělá apiKeyAuth ve v1 routách, tady
 // nevzniká žádná nová autorizační cesta (nulový drift)
-function vcall(auth, method, path, body) {
+function vcall(auth, method, path, body, timeoutS) {
   const res = $http.send({
     url: V1_BASE + path,
     method: method,
     body: body !== undefined ? JSON.stringify(body) : "",
     headers: { "Content-Type": "application/json", Authorization: auth },
-    timeout: 30,
+    timeout: timeoutS || 30, // obrázek: fronta FLUX 3 až ~1 min
   });
   if (res.statusCode < 200 || res.statusCode >= 300) {
     const err = new Error((res.json && res.json.error) || ("HTTP " + res.statusCode));
@@ -747,6 +749,10 @@ const EXEC = {
   },
   get_page: (auth, a) => {
     try { const p = vcall(auth, "GET", `/api/kb/v1/pages/${enc(a.page_id)}`).page; return text(popisStranky(p) + "\n\n```html\n" + p.html + "\n```"); } catch (e) { return errText(e.message); }
+  },
+  // obrázky (29. 10. 2026): zadání + kreslení v jednom volání, odkaz na JPEG (nechráněný soubor)
+  generate_image: (auth, a) => {
+    try { const o = vcall(auth, "POST", "/api/kb/v1/images", { prompt: a.prompt, title: a.title, text: a.text, format: a.format }, 100).image; return text(`Picture "${o.title}" drawn (${o.width}×${o.height}, model ${o.model === "flux3" ? "FLUX 3 Klein (with text)" : "FLUX.2 klein"}): ${o.url}`); } catch (e) { return errText(e.message); }
   },
   create_page: (auth, a) => {
     try { const r = vcall(auth, "POST", "/api/kb/v1/pages", { title: a.title, html: a.html, team_visible: !!a.team_visible }); return text("Page created. " + popisStranky(r.page)); } catch (e) { return errText(e.message); }

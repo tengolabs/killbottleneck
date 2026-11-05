@@ -20,13 +20,34 @@ export default function NotificationPrefs({ emailEnabled = false }) {
   // návratové e-maily (žebřík 3/7/14/30 dní bez přihlášení) — stav drží server
   // v users.navrat, klient smí měnit JEN `odhlaseno` (users update hook)
   const [navratOn, setNavratOn] = useState(true);
+  // ranní sumář e-mailem (29. 10. 2026): opt-in, mění ho jen vlastník účtu (users update hook)
+  const [sumarOn, setSumarOn] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setPrefs(user?.notify_prefs || {});
     setEmailMode(user?.notify_email_mode || '');
     setNavratOn(!(user?.navrat && user.navrat.odhlaseno === true));
+    setSumarOn(!!user?.sumar_email);
   }, [user]);
+
+  const changeSumar = async (on) => {
+    const prev = sumarOn;
+    setSumarOn(on); // optimisticky, stejný vzor jako changeNavrat
+    setSaving(true);
+    try {
+      const saved = await base44.entities.User.update(user.id, { sumar_email: on });
+      setSumarOn(!!saved.sumar_email);
+      patchUser?.({ sumar_email: !!saved.sumar_email });
+      toast({ title: t('prefs.saved') });
+    } catch (err) {
+      console.error(err);
+      setSumarOn(prev);
+      toast({ title: t('prefs.saveFailed'), variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const changeNavrat = async (on) => {
     const prev = navratOn;
@@ -161,6 +182,22 @@ export default function NotificationPrefs({ emailEnabled = false }) {
             onCheckedChange={changeNavrat}
             aria-label={t('prefs.navratTitle')}
             data-testid="navrat-maily-switch"
+          />
+        </div>
+      )}
+
+      {emailEnabled && emailMode !== 'none' && (
+        <div className="flex items-start justify-between gap-4 px-4 py-3 border-b" data-sumar-email>
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">{t('prefs.sumarTitle')}</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">{t('prefs.sumarDesc')}</span>
+          </span>
+          <Switch
+            checked={sumarOn}
+            disabled={saving}
+            onCheckedChange={changeSumar}
+            aria-label={t('prefs.sumarTitle')}
+            data-testid="sumar-email-switch"
           />
         </div>
       )}

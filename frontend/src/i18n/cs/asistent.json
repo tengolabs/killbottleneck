@@ -151,7 +151,8 @@
     "list_reminders": "připomínky ke krokům",
     "get_timer": "běží stopky?",
     "list_clients": "adresář klientů",
-    "list_invoices": "vystavené faktury"
+    "list_invoices": "vystavené faktury",
+    "generate_image": "obrázek"
   },
   "errorGeneric": "Asistent neodpověděl. Zkuste to prosím znovu.",
   "errorRate": "Vyčerpali jste hodinový strop AI. Zkuste to za chvíli.",
@@ -452,7 +453,20 @@
     "kancelarTitle": "Kancelář",
     "kancelarClose": "Zavřít Kancelář",
     "tabPdf": "PDF",
-    "novy": "Nový"
+    "novy": "Nový",
+    "imgTitle": "Obrázky",
+    "imgSlotTitle": "Titulní snímek",
+    "imgSlotCard": "Obrázek",
+    "imgRedraw": "Nakreslit znovu",
+    "imgRemove": "Odebrat",
+    "imgPrompt": "Co má být na obrázku? (např. tým u tabule, zimní krajina)",
+    "imgAdd": "Nakreslit",
+    "imgDrawing": "Kreslím…",
+    "imgFailed": "Nepovedlo se",
+    "imgHint": "Obrázek kreslí AI bez textu — nadpis a text zůstávají v šabloně. Vlastní fotka má přednost.",
+    "imgSlot": "Kam",
+    "openLeft": "Otevřít vlevo",
+    "openLeftHint": "Otevřít dokument velký vlevo vedle chatu (⛶ přes celou obrazovku)"
   },
   "rizika": {
     "titulek": "Rizika v projektu „{{title}}“",
@@ -535,6 +549,17 @@
     "openOrg": "Otevřít ve Správě organizace",
     "openMe": "Otevřít v Můj účet"
   },
+  "img": {
+    "drawing": "Kreslím obrázek…",
+    "failed": "Obrázek se nepovedl.",
+    "download": "Stáhnout",
+    "redraw": "Nakreslit znovu",
+    "retry": "Zkusit znovu",
+    "untitled": "Obrázek",
+    "timeout": "Kreslení trvá déle než obvykle — zkuste to za chvíli znovu.",
+    "textHint": "Text v obrázku může vyjít s překlepem — pak klikněte na Nakreslit znovu.",
+    "deleted": "Obrázek byl smazán."
+  },
   "soubor": {
     "pdf": "Stáhnout PDF",
     "pptx": "Stáhnout PowerPoint",
@@ -543,6 +568,55 @@
     "notSaved": "Dokument se neuložil (plné Dokumenty) — text je v odpovědi.",
     "error": "Soubor se nepodařilo vyrobit.",
     "hintDeck": "Osnovu upravíte v Dokumentech a soubor stáhnete znovu.",
-    "hintCard": "Barvu, fotku a text doladíte v Dokumentech."
+    "hintCard": "Barvu, fotku a text doladíte v Dokumentech.",
+    "drawing": "Kreslím obrázky…",
+    "imgFailed": "Některý obrázek se nepovedl — soubor bude bez něj. V Dokumentech ho nakreslíte znovu."
+  },
+  "obr": {
+    "tab": "Obrázky",
+    "zvetsit": "Zvětšit",
+    "hledat": "Hledat v obrázcích…",
+    "uklidHint": "Obrázek, který nikde nepoužijete, se po 90 dnech smaže. Obrázky v dokumentech a stránkách zůstávají; ostatní si můžete připíchnout natrvalo.",
+    "prazdno": "Zatím žádné obrázky — klikněte na Nový obrázek, nebo napište asistentovi třeba „Nakresli…“.",
+    "prazdnoHledani": "Nic nenalezeno.",
+    "nacistDalsi": "Načíst další",
+    "pouzito": "Použito: {{kde}} — zůstane, dokud tam je.",
+    "pouzitoKratce": "V: {{kde}}",
+    "natrvalo": "Ponecháno natrvalo.",
+    "smazeSe": "Nepoužitý — smaže se {{datum}}. Připíchnutím ho ponecháte natrvalo.",
+    "ponechat": "Ponechat natrvalo",
+    "zrusitNatrvalo": "Zrušit natrvalo",
+    "smazat": "Smazat",
+    "smazatPotvrdit": "Opravdu smazat",
+    "nelzeSmazat": "Obrázek se používá — nejdřív ho odeberte z dokumentu nebo stránky",
+    "predchozi": "Předchozí",
+    "dalsi": "Další",
+    "cela": "Přes celou obrazovku",
+    "vedle": "Zpět vedle chatu",
+    "zavrit": "Zavřít (Esc)",
+    "novy": "Nový obrázek",
+    "novyPopis": "Co má být na obrázku? Např. „truhlářská dílna v zimě, teplé světlo“",
+    "novyText": "Text v obrázku (nepovinné, např. „Veselé Vánoce“)",
+    "format": "Na co",
+    "formatNazev": {
+      "siroky": "Prezentace (na šířku)",
+      "banner": "E-mail (pruh)",
+      "ctverec": "Příspěvek (čtverec)",
+      "vysoky": "Story (na výšku)"
+    },
+    "nakreslit": "Nakreslit",
+    "nejdrivPopis": "Nejdřív napište, co má být na obrázku (styl je už vybraný)",
+    "kreslim": "Kreslím… (asistent nejdřív popíše obrázek)",
+    "styl": "Styl",
+    "stylNazev": {
+      "malba": "Malba (teplé světlo)",
+      "ilustrace": "Ilustrace (jako v prezentaci)",
+      "foto": "Fotografie",
+      "kresleny": "Kreslený",
+      "akvarel": "Akvarel",
+      "skica": "Skica tužkou",
+      "3d": "3D"
+    },
+    "nelzeZnovu": "Obrázek je ve stránce — nakreslením znovu by z ní zmizel. Nakreslete raději nový."
   }
 }

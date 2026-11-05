@@ -9,6 +9,34 @@ below before you jump several versions.
 
 ---
 
+## v0.100-beta — 2026-11-05
+
+**Pictures drawn by the assistant**
+
+**Upgrade notes:** four migrations (collection `ai_images` and its flags, `users.sumar_email`, `daily_summaries.odeslano`) run on
+start, no manual step. Drawing is **off until you connect a picture service** — without `KB_IMAGE_*` nothing new
+shows up and the assistant's prompts are unchanged. To turn it on with your own service, set
+`KB_IMAGE_PROVIDER=openai`, `KB_IMAGE_TOKEN` (API key) and optionally `KB_IMAGE_URL` / `KB_IMAGE_MODEL`
+(default `gpt-image-1`, the service must return JPEG); see `.env.example` and the Pictures guide.
+
+- **The assistant draws.** "Draw an illustration…", "make an e-mail banner…": the assistant writes a detailed
+  prompt for the picture model and a card with the picture appears under the reply (download, redraw). Pictures with
+  readable text need `KB_IMAGE_TEXT=1` and a second model; short captions work, an occasional typo is fixed by redrawing.
+- **Office → Pictures tab:** New picture without a chat (four shapes, seven styles, Painting by default), search, a
+  viewer with arrows, full screen, download, redraw, pin forever and delete. Pictures used in no document or page are
+  deleted after 90 days (the viewer says when); used and pinned ones are kept, and a used picture cannot be deleted.
+- **Office documents and Pages get pictures on their own:** a title picture and up to three slide pictures in
+  presentations, a picture on cards, invitations and posters, and up to three illustrations in assistant Pages
+  (public `/p/` pages included). Without a picture service everything works as before, just without pictures.
+- **Daily summary by e-mail** (each user turns it on in Notifications) with the day's banner when pictures are
+  on; `KB_SUMAR_EMAIL_MAX` caps summary e-mails per instance and day (default 100).
+- **API and MCP:** `POST /v1/images` and the MCP tool `generate_image` (34 tools now).
+- **Limits:** a picture counts `KB_AI_GEN_VAHA` (default 2) towards the hourly AI limit; `KB_OBRAZEK_KREDITY` sets a
+  fixed credit price per picture (empty = the model's reference price). Drawing interrupted by a restart ends as an
+  error with "Try again" instead of spinning forever.
+
+---
+
 ## v0.99-beta — 2026-11-05
 
 **Fixes from the third code review (wave A)**

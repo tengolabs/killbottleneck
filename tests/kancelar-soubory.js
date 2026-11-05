@@ -163,6 +163,50 @@ const JPG = new Uint8Array(Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4M
       expect(/sldSz cx="9144000" cy="5143500"/.test(pres), 'rozměr 16:9');
     }
 
+    console.log('== AI obrázky (3. 11. 2026): titulní pruh, panel snímku, přání / pozvánka / plakát; diplom bez ==');
+    {
+      // počet obrázků (XObject) na každé straně — logo je jeden, AI obrázek druhý
+      const xobjekty = async (bytes) => (await PDFLib.PDFDocument.load(bytes)).getPages().map((pg) => {
+        const x = pg.node.Resources() && pg.node.Resources().lookup(PDFLib.PDFName.of('XObject'));
+        return x ? x.keys().length : 0;
+      });
+      const { doc, fonty } = await novyDoc();
+      const os4 = parsujOsnovu(OSNOVA);
+      const ai = await obr(doc, JPG, false);
+      sestavPrezentaciPdf({ doc, rgb: PDFLib.rgb, fonty, osnova: os4, logo: await obr(doc, PNG, true), lang: 'cs', obrazky: { '': ai, 'Cíl zakázky': ai }, ops: PDFLib });
+      const b4 = await doc.save();
+      const x4 = await xobjekty(b4);
+      expect(JSON.stringify(x4) === '[2,2,1,1]', `PDF prezentace: obrázek na titulní straně a u snímku „Cíl zakázky“, jinde jen logo (${JSON.stringify(x4)})`);
+      const t4 = await textPdf(b4);
+      expect(/Linka do 30\. 11\. 2026/.test(t4.strany[1]) && /Rozpočet 180 000 Kč/.test(t4.strany[1]) && /Kuchyň pro Nováky/.test(t4.strany[0]), 'odrážky vedle obrázku i titul zůstaly celé');
+      const d5 = await novyDoc();
+      sestavPrezentaciPdf({ doc: d5.doc, rgb: PDFLib.rgb, fonty: d5.fonty, osnova: os4, lang: 'cs', obrazky: { '': await obr(d5.doc, JPG, false) } });
+      expect(JSON.stringify(await xobjekty(await d5.doc.save())) === '[1,0,0,0]', 'bez ops (starší volající) se obrázek vepíše a nepadá');
+
+      const dataJpg = 'data:image/jpeg;base64,' + Buffer.from(JPG).toString('base64');
+      const pptx = sestavPrezentaciPptx(PptxGenJS, { osnova: os4, lang: 'cs', obrazky: { '': dataJpg, 'Kde jsme': dataJpg } });
+      const zip = await JSZip.loadAsync(await pptx.write({ outputType: 'nodebuffer' }));
+      const pic = async (n) => ((await zip.file(`ppt/slides/slide${n}.xml`).async('string')).match(/<p:pic>/g) || []).length;
+      const pics = [await pic(1), await pic(2), await pic(3), await pic(4)];
+      expect(JSON.stringify(pics) === '[1,0,1,0]' && Object.keys(zip.files).some((f) => /^ppt\/media\/.*\.jpe?g$/.test(f)), `PPTX: obrázek na titulním snímku a u „Kde jsme“ (${JSON.stringify(pics)})`);
+      const s3 = await zip.file('ppt/slides/slide3.xml').async('string');
+      expect(/Materiál objednán/.test(s3), 'PPTX: odrážky vedle obrázku zůstaly');
+
+      for (const k of SABLONY) {
+        const data = KARTY[k];
+        const d = await novyDoc();
+        sestavPranicko({ doc: d.doc, rgb: PDFLib.rgb, fonty: d.fonty, data, logo: await obr(d.doc, PNG, true), obrazek: await obr(d.doc, JPG, false), ops: PDFLib });
+        const b = await d.doc.save();
+        const x = (await xobjekty(b))[0];
+        const tk = await textPdf(b);
+        if (k === 'certificate') expect(x === 1, `${k}: AI obrázek se nekreslí (jen logo) (${x})`);
+        else expect(x === 2 && new RegExp(data.title).test(tk.strany[0]) && new RegExp(data.text.split('\n')[0].slice(0, 12)).test(tk.strany[0]), `${k}: AI obrázek + logo, nadpis a text zůstaly (${x})`);
+      }
+      const dF = await novyDoc();
+      sestavPranicko({ doc: dF.doc, rgb: PDFLib.rgb, fonty: dF.fonty, data: KARTY.greeting, fotka: await obr(dF.doc, PNG, true), obrazek: await obr(dF.doc, JPG, false), ops: PDFLib });
+      expect((await xobjekty(await dF.doc.save()))[0] === 1, 'fotka uživatele má před AI obrázkem přednost (kreslí se jen jedna)');
+    }
+
     console.log('== DOCX ==');
     {
       const EMAIL = { kind: 'email', title: 'Poptávka spárovek', email_to: 'drevo@example.com', email_subject: 'Poptávka – spárovky', text: '# Položky\n- 12 ks spárovka dub\n\nS pozdravem\nJan Novák' };

@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v0.99-beta}
+        KB_VERSION: ${KB_VERSION:-v0.100-beta}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -205,6 +205,20 @@ services:
       KB_CHAT_HLAS_MAX_S: ${KB_CHAT_HLAS_MAX_S:-}
       KB_CHAT_MAX_AUDIO_MB: ${KB_CHAT_MAX_AUDIO_MB:-}
       KB_AI_HLAS_VAHA: ${KB_AI_HLAS_VAHA:-}
+      # Kreslení obrázků v asistentovi (FLUX přes AI bránu, mode=image): adresa brány (…/v1/advisor) a token,
+      # nebo KB_IMAGE_PROVIDER=api = brána z KB_AI_*; none = vypnout. KB_IMAGE_TEXT=1 povolí obrázky s textem
+      # (FLUX 3). Váha obrázku v hodinovém stropu (2). KB_OBRAZEK_KREDITY = pevná cena obrázku v kreditech
+      # (prázdné = referenční cena modelu).
+      KB_OBRAZEK_KREDITY: ${KB_OBRAZEK_KREDITY:-}
+      KB_IMAGE_PROVIDER: ${KB_IMAGE_PROVIDER:-}
+      KB_IMAGE_URL: ${KB_IMAGE_URL:-}
+      KB_IMAGE_TOKEN: ${KB_IMAGE_TOKEN:-}
+      KB_IMAGE_TEXT: ${KB_IMAGE_TEXT:-}
+      # vlastní služba: KB_IMAGE_PROVIDER=openai + KB_IMAGE_TOKEN (klíč), KB_IMAGE_URL (výchozí api.openai.com/v1), KB_IMAGE_MODEL
+      KB_IMAGE_MODEL: ${KB_IMAGE_MODEL:-}
+      KB_AI_GEN_VAHA: ${KB_AI_GEN_VAHA:-}
+      # Denní sumář e-mailem (uživatel si ho zapne v Notifikacích): strop mailů na instanci a den (výchozí 100)
+      KB_SUMAR_EMAIL_MAX: ${KB_SUMAR_EMAIL_MAX:-}
       # Where "Report a bug or idea" (under the person icon) sends to. EMPTY BY
       # DEFAULT — with no address the route returns 404 and the item is not even
       # shown, so a self-hosted instance never sends anything out on its own.

@@ -107,7 +107,7 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const stdioTools = (await stdioRpc('tools/list', {})).result.tools;
     const httpTools = (await mcpPost(keyRW, 'tools/list', {})).json.result.tools;
-    expect(httpTools.length === 33, `HTTP tools/list → 33 nástrojů (${httpTools.length})`);
+    expect(httpTools.length === 34, `HTTP tools/list → 34 nástrojů (${httpTools.length})`);
     const podle = (arr) => Object.fromEntries(arr.map((t) => [t.name, t]));
     const S = podle(stdioTools), H = podle(httpTools);
     expect(JSON.stringify(Object.keys(S).sort()) === JSON.stringify(Object.keys(H).sort()), 'stejná JMÉNA nástrojů');
@@ -180,6 +180,9 @@ let mcp = null;
     expect(/no public link/.test(tx) && pubP.status === 404, `link_off → 404 (${pubP.status})`);
     tx = await callP('create_page', { title: 'Bez html', html: '' });
     expect(/^Chybí|missing|needs|prázdn|HTML/i.test(tx) || /Error|error/.test(tx), `prázdné HTML = chyba textem (${tx.slice(0, 60)})`);
+    // obrázky (29. 10. 2026): instance bez KB_IMAGE_* → chyba textem, ne výjimka (kreslení hlídá ai-obrazky.js)
+    tx = await callP('generate_image', { prompt: 'a cat, no text', title: 'Kočka' });
+    expect(/disabled|vypnut/i.test(tx), `generate_image bez služby obrázků = chyba textem (${tx.slice(0, 60)})`);
     tx = await callP('delete_page', { page_id: pid });
     expect(/^Page deleted\./.test(tx) && /No pages\./.test(await callP('list_pages', {})), 'delete_page');
 

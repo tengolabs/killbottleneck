@@ -1,8 +1,10 @@
-// Přání / pozvánka / plakát / diplom jako PDF — 4 VEKTOROVÉ šablony nad pdf-lib (žádné rastry v repu; v1 bez
-// AI obrázků — KB generování nemá, FLUX neumí český text). Barva = akcent skinu nebo volba v panelu, logo
+// Přání / pozvánka / plakát / diplom jako PDF — 4 VEKTOROVÉ šablony nad pdf-lib (žádné rastry v repu; text vždy
+// vektorově — FLUX neumí spolehlivě český text, obrázek z něj je jen ilustrace). Barva = akcent skinu nebo volba v panelu, logo
 // organizace, volitelná fotka uživatele (png/jpg, neukládá se), QR z odkazu (pozvánka, plakát). Popisky cs/en tady,
 // ne v i18n — PDF musí jít vyrobit i mimo React (node test). Čistá funkce: knihovny i QR matice injektované.
-import { A4, A5, hexRgb, hexRgbSvetle, tmava, kresliBlok, kresliObrazek, vyskaBloku } from './textPdf.js';
+// AI obrázek (3. 11. 2026, `obrazek` = { image, w, h }): nakreslený FLUXem pro přání / pozvánku / plakát, vyplní místo
+// fotky (cover, `ops` = PDFLib kvůli ořezu); fotka uživatele má přednost. Diplom ho nemá.
+import { A4, A5, hexRgb, hexRgbSvetle, tmava, kresliBlok, kresliObrazek, kresliObrazekPres, vyskaBloku } from './textPdf.js';
 
 export const SABLONY = ['greeting', 'invitation', 'poster', 'certificate'];
 export const POPISKY = {
@@ -18,7 +20,7 @@ export function rozmer(template) {
 }
 
 // data = { title, text, meta: { template, color, date, place, link, signature, lang } }, logo/fotka = { image, w, h }
-export function sestavPranicko({ doc, rgb, fonty, data, logo = null, fotka = null, qr = null, kresliQr = null }) {
+export function sestavPranicko({ doc, rgb, fonty, data, logo = null, fotka = null, qr = null, kresliQr = null, obrazek = null, ops = null }) {
   const meta = data.meta || {};
   const template = SABLONY.includes(meta.template) ? meta.template : 'greeting';
   const L = meta.lang === 'en' ? 'en' : 'cs';
@@ -47,6 +49,7 @@ export function sestavPranicko({ doc, rgb, fonty, data, logo = null, fotka = nul
     const pruh = W * 0.4;
     page.drawRectangle({ x: 0, y: 0, width: pruh, height: H, color: akcent });
     if (fotka) kresliObrazek(page, fotka, { x: 18, y: 18, w: pruh - 36, h: H - 36, zarovnani: 'center' });
+    else if (obrazek) kresliObrazekPres(page, obrazek, { x: 0, y: 0, w: pruh, h: H }, ops);
     else {
       for (const [cx, cy, r] of [[pruh * 0.5, H * 0.55, 62], [pruh * 0.5, H * 0.55, 40], [pruh * 0.5, H * 0.55, 16]]) page.drawCircle({ x: cx, y: cy, size: r, borderColor: naAkcentu, borderWidth: 1.5, borderOpacity: 0.5 });
       page.drawCircle({ x: pruh * 0.5, y: H * 0.55, size: 7, color: naAkcentu, opacity: 0.8 });
@@ -63,11 +66,13 @@ export function sestavPranicko({ doc, rgb, fonty, data, logo = null, fotka = nul
     if (logo) kresliObrazek(page, logo, { x, y: 18, w: 90, h: 26, zarovnani: 'left' });
   } else if (template === 'invitation') {
     // A5 na výšku: horní pruh s nadpisem, fotka, text, blok Kdy / Kde, QR, podpis, logo
-    const pruhH = fotka ? 120 : 150;
+    const obr = fotka || obrazek;
+    const pruhH = obr ? 120 : 150;
     page.drawRectangle({ x: 0, y: H - pruhH, width: W, height: pruhH, color: akcent });
-    kresliBlok(page, { text: title, font: fonty.bold, size: fotka ? 22 : 26, x: 28, y: H - 34, sirka: W - 56, barva: naAkcentu, radkovani: 1.15, zarovnani: 'center', max: 3 });
+    kresliBlok(page, { text: title, font: fonty.bold, size: obr ? 22 : 26, x: 28, y: H - 34, sirka: W - 56, barva: naAkcentu, radkovani: 1.15, zarovnani: 'center', max: 3 });
     let y = H - pruhH - 22;
     if (fotka) { const r = kresliObrazek(page, fotka, { x: 28, y: y - 130, w: W - 56, h: 130, zarovnani: 'center' }); y = r ? r.y - 16 : y; }
+    else if (obrazek) { kresliObrazekPres(page, obrazek, { x: 28, y: y - 122, w: W - 56, h: 122 }, ops); y -= 122 + 16; }
     const sirka = W - 56;
     const blok = [meta.date ? `${T.kdy}: ${meta.date}` : '', meta.place ? `${T.kde}: ${meta.place}` : ''].filter(Boolean);
     const rezerva = 60 + (blok.length ? 30 + blok.length * 22 : 0) + (qr ? qrVelikost + 10 : 0);
@@ -93,6 +98,7 @@ export function sestavPranicko({ doc, rgb, fonty, data, logo = null, fotka = nul
     kresliBlok(page, { text: title, font: fonty.bold, size: 40, x: 40, y: H - 52, sirka: W - 80, barva: naAkcentu, radkovani: 1.1, zarovnani: 'center', max: 3 });
     let y = H - pruhH - 30;
     if (fotka) { const r = kresliObrazek(page, fotka, { x: 40, y: y - 200, w: W - 80, h: 200, zarovnani: 'center' }); y = r ? r.y - 20 : y; }
+    else if (obrazek) { kresliObrazekPres(page, obrazek, { x: 40, y: y - 214, w: W - 80, h: 214 }, ops); y -= 214 + 20; }
     const sirka = W - 100;
     let size = 18;
     while (size > 12 && vyskaBloku(telo, fonty.regular, size, sirka, 1.35) > y - 230) size -= 1;

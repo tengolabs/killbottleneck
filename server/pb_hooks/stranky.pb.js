@@ -23,5 +23,5 @@ routerAdd("GET", "/p/{token}", (e) => {
   h.set("X-Content-Type-Options", "nosniff");
   h.set("Referrer-Policy", "no-referrer");
   h.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  return e.html(200, rec.getString("html"));
+  return e.html(200, require(`${__hooks}/obrazky.js`).cestyObrazku($app, rec.getString("html"), "")); // obrázky bez adresy serveru
 });

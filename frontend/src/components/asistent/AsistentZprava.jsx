@@ -1,14 +1,16 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowDown, Award, BookOpen, CalendarClock, Check, CheckCheck, ClipboardList, Copy, CornerDownRight, Download, ExternalLink, FileText, Folder, Gift, Inbox, Lightbulb, Loader2, Mail, MapPin, Megaphone, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, Plus, Presentation, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, Award, BookOpen, CalendarClock, Check, CheckCheck, ClipboardList, Copy, CornerDownRight, Download, ExternalLink, FileText, Folder, Gift, Inbox, Lightbulb, Loader2, Mail, MapPin, Megaphone, Mic, NotebookPen, PanelLeftOpen, Pencil, Phone, Plus, Presentation, RefreshCw, ScrollText, Undo2, Upload, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
 import { copyToClipboard } from '@/lib/clipboard';
-import { PAMET, STRANKA } from '@/lib/AsistentContext';
+import { PAMET, STRANKA, useAsistent } from '@/lib/AsistentContext';
 import { ZNACKA_PREPISU, ZNACKA_PDF, ZNACKA_HLASU } from '@/lib/prepisZpravy';
 import { ulozRizika, zrusRizika, nactiRizika, BARVY, PORADI_DRUHU } from '@/lib/rizika';
+import { obrazek as nactiObrazek, obrazekVytvorit } from '@/api/asistentApi';
+import { pb } from '@/api/pb';
 import { ROTACE_ID } from '@/lib/skins';
 
 // Jedna zpráva chatu + její karty (otázky s volbami, akce k potvrzení, skin,
@@ -566,6 +568,81 @@ function KartaNavrhy({ karta, aktivni, onSend, loading, extra }) {
 // „Uložit do projektu“ (připsání do poznámek projektu) zrušeno 1. 10. 2026 (Richard): dokument si projekt
 // pamatuje sám a odkazuje na mapu; celé texty v poznámkách projektu vytlačovaly poznatky o projektu.
 const KONCEPT_IKONA = { email: Mail, meeting: Users, call: Phone, note: NotebookPen, summary: ClipboardList, other: ScrollText };
+// Obrázek asistenta (generate_image, 29. 10. 2026): karta nese jen id — zadaný obrázek („ceka“) karta sama
+// nakreslí (POST /chat/obrazek/vytvorit, sekundy). Stáhnout + Nakreslit znovu (nový seed, nahradí obrázek).
+// Kreslí-li ho jiná karta / prohlížeč („pise“), karta se za chvíli zeptá znovu.
+function KartaObrazek({ karta }) {
+  const { t } = useTranslation('asistent');
+  const { otevriObrazek } = useAsistent();
+  const [o, setO] = useState(null);
+  const [kresli, setKresli] = useState(false);
+  const [chyba, setChyba] = useState('');
+  const spusteno = useRef(false);
+  const nakresli = useCallback(async (znovu) => {
+    setKresli(true); setChyba('');
+    try {
+      const r = await obrazekVytvorit(karta.image_id, znovu);
+      setO(r.obrazek);
+    } catch (e) {
+      setChyba(e.isTimeout ? t('img.timeout') : e.message);
+      // odmítnuto dřív, než se kreslilo (síť, limit): zůstal-li „ceka“, karta ho ukáže jako chybu se Zkusit znovu — ne věčné točení
+      try {
+        const ob = (await nactiObrazek(karta.image_id)).obrazek || { id: karta.image_id, stav: 'smazano' };
+        setO(ob.stav === 'ceka' ? { ...ob, stav: 'chyba' } : ob);
+      } catch { setO((p) => (p && p.stav === 'ceka' ? { ...p, stav: 'chyba' } : p)); }
+    } finally { setKresli(false); }
+  }, [karta.image_id, t]);
+  useEffect(() => {
+    let zrus = false;
+    nactiObrazek(karta.image_id).then((r) => {
+      if (zrus) return;
+      if (!r.obrazek) { setO({ id: karta.image_id, stav: 'smazano' }); return; } // smazaný (úklid / záložka Obrázky)
+      setO(r.obrazek);
+      if (r.obrazek.stav === 'ceka' && !spusteno.current) { spusteno.current = true; nakresli(false); }
+    }).catch((e) => { if (!zrus) setChyba(e.message); });
+    return () => { zrus = true; };
+  }, [karta.image_id, nakresli]);
+  useEffect(() => { // kreslí jiná karta / prohlížeč → za 3 s zjistit, jak to dopadlo
+    if (!o || o.stav !== 'pise' || kresli) return undefined;
+    const tm = setTimeout(() => nactiObrazek(karta.image_id).then((r) => setO(r.obrazek || { id: karta.image_id, stav: 'smazano' })).catch(() => {}), 3000);
+    return () => clearTimeout(tm);
+  }, [o, kresli, karta.image_id]);
+  const src = o && o.url ? pb.baseURL.replace(/\/$/, '') + o.url : '';
+  const nazev = (o && o.title) || karta.title || t('img.untitled');
+  const stahni = async () => {
+    try { const res = await fetch(src); await saveBlob(await res.blob(), `${safeFilename(nazev)}.jpg`); } catch (e) { setChyba(e.message); }
+  };
+  const w = (o && o.width) || 1024, h = (o && o.height) || 1024;
+  const hotovo = o && o.stav === 'hotovo' && src;
+  const bezi = kresli || (o && (o.stav === 'ceka' || o.stav === 'pise'));
+  return (
+    <div className="mt-2 w-80 max-w-full rounded-lg border border-border bg-background/60 p-2 text-xs" data-testid="chat-obrazek-karta" data-id={karta.image_id} data-stav={kresli ? 'pise' : (o ? o.stav : '')} data-model={(o && o.model) || karta.model}>
+      <p className="mb-1.5 font-medium text-foreground">{nazev}</p>
+      {hotovo && !kresli ? (
+        // klik = prohlížeč vlevo místo mapy / přes celou obrazovku (4. 11. 2026), ne nové okno
+        <button type="button" className="block w-full cursor-zoom-in" title={t('obr.zvetsit')} onClick={() => otevriObrazek({ polozky: [{ ...o, title: nazev }] })} data-testid="chat-obrazek-zvetsit">
+          <img src={src} alt={nazev} width={w} height={h} loading="lazy" className="w-full h-auto rounded-md" data-testid="chat-obrazek-img" />
+        </button>
+      ) : (
+        <div className="flex w-full items-center justify-center rounded-md bg-secondary text-muted-foreground" style={{ aspectRatio: `${w} / ${h}` }}>
+          {bezi ? <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />{t('img.drawing')}</span>
+            : <span className="px-2 text-center" data-testid={o && o.stav === 'smazano' ? 'chat-obrazek-smazany' : undefined}>{o && o.stav === 'smazano' ? t('img.deleted') : (o && o.chyba) || chyba || t('img.failed')}</span>}
+        </div>
+      )}
+      {chyba && hotovo && <p className="mt-1 text-destructive" data-testid="chat-obrazek-chyba">{chyba}</p>}
+      {o && o.model === 'flux3' && hotovo && <p className="mt-1 text-muted-foreground">{t('img.textHint')}</p>}
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {hotovo && !kresli && (
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={stahni} data-testid="chat-obrazek-stahnout"><Download className="w-3.5 h-3.5 mr-1" />{t('img.download')}</Button>
+        )}
+        {o && !bezi && o.stav !== 'smazano' && (
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => nakresli(o.stav === 'hotovo')} data-testid="chat-obrazek-znovu"><RefreshCw className="w-3.5 h-3.5 mr-1" />{t(o.stav === 'hotovo' ? 'img.redraw' : 'img.retry')}</Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function KartaKoncept({ karta, onOtevriDokument }) {
   const { t } = useTranslation('asistent');
   const [zkopirovano, setZkopirovano] = useState(false);
@@ -647,9 +724,53 @@ function Odstavec({ text, className }) {
 // Soubor (PPTX / PDF / Word) vzniká až po kliknutí V PROHLÍŽEČI z DTO dokumentu (líný import lib/kancelar/stahni —
 // knihovny nesmí do hlavního balíku, lite-bundle.js). Neuložený dokument (plné Dokumenty) = karta bez tlačítek.
 const SOUBOR_IKONA = { presentation: Presentation, greeting: Gift, invitation: Mail, poster: Megaphone, certificate: Award };
+// AI obrázky prezentace / přání (3. 11. 2026): karta je hned po tahu nakreslí po jednom (zadané = stav „ceka“);
+// po reloadu jen načte stav (hotové znovu nekreslí). Stažení počká, ať soubor obrázky má.
+function useObrazkyKarty(ids) {
+  const [obr, setObr] = useState({});
+  const [kresli, setKresli] = useState(false);
+  const zive = useRef(true);
+  const spusteno = useRef(false);
+  const klic = (ids || []).join(',');
+  useEffect(() => { zive.current = true; return () => { zive.current = false; }; }, []);
+  useEffect(() => {
+    if (!klic || spusteno.current) return;
+    spusteno.current = true;
+    (async () => {
+      const seznam = klic.split(','); const stavy = {};
+      for (const id of seznam) { try { stavy[id] = (await nactiObrazek(id)).obrazek || { id, stav: 'smazano' }; } catch { stavy[id] = { id, stav: 'chyba' }; } }
+      if (zive.current) setObr({ ...stavy });
+      const cekaji = seznam.filter((id) => stavy[id].stav === 'ceka');
+      if (!cekaji.length) return;
+      if (zive.current) setKresli(true);
+      for (const id of cekaji) {
+        try { stavy[id] = (await obrazekVytvorit(id, false)).obrazek; } catch { try { stavy[id] = (await nactiObrazek(id)).obrazek || { id, stav: 'smazano' }; } catch { /* stav zůstane */ } }
+        if (zive.current) setObr({ ...stavy });
+      }
+      // kreslí jiná karta / panel (409) → počkat, jak to dopadne (nejvýš ~2 min jako timeout kreslení)
+      for (let i = 0; i < 40 && zive.current; i++) {
+        const bezi = seznam.filter((id) => ['ceka', 'pise'].includes(stavy[id].stav));
+        if (!bezi.length) break;
+        await new Promise((r) => setTimeout(r, 3000));
+        for (const id of bezi) { try { stavy[id] = (await nactiObrazek(id)).obrazek || { id, stav: 'smazano' }; } catch { /* zkusí příště */ } }
+        if (zive.current) setObr({ ...stavy });
+      }
+      // co se ani po čekání nenakreslilo (odmítnuto limitem, kreslení jinde nedoběhlo) = nepovedené, ne věčné točení
+      for (const id of seznam) if (['ceka', 'pise'].includes(stavy[id].stav)) stavy[id] = { ...stavy[id], stav: 'chyba' };
+      if (zive.current) { setObr({ ...stavy }); setKresli(false); }
+    })();
+  }, [klic]);
+  return { obr, kresli };
+}
+
 function KartaSoubor({ karta, onOtevriDokument }) {
   const { t, i18n } = useTranslation('asistent');
+  const { otevriObrazek } = useAsistent();
   const [stav, setStav] = useState({ format: '', chyba: '' });
+  const { obr, kresli } = useObrazkyKarty(karta.obrazky);
+  // smazaný obrázek (úklid, záložka Obrázky, odebraný z dokumentu) na kartě nechybí jako chyba — prostě tam není
+  const obrazky = (karta.obrazky || []).map((id) => obr[id] || { id, stav: 'ceka' }).filter((o) => o.stav !== 'smazano');
+  const nepovedlo = !kresli && obrazky.some((o) => o.stav === 'chyba');
   const Ikona = SOUBOR_IKONA[karta.druh === 'card' ? karta.template : karta.druh] || FileText;
   const stahni = async (format) => {
     if (stav.format) return;
@@ -669,9 +790,21 @@ function KartaSoubor({ karta, onOtevriDokument }) {
         <span className="font-medium truncate flex-1">{karta.title}</span>
         {karta.druh === 'presentation' && karta.pocet > 0 && <span className="text-muted-foreground shrink-0">{t('soubor.slides', { count: karta.pocet })}</span>}
       </div>
+      {obrazky.length > 0 && (
+        <div className="px-2.5 pt-2 flex flex-wrap items-center gap-1.5" data-testid="chat-soubor-obrazky" data-stav={kresli ? 'pise' : 'hotovo'}>
+          {obrazky.map((o) => (o.stav === 'hotovo' && o.url
+            ? <button key={o.id} type="button" className="cursor-zoom-in" title={t('obr.zvetsit')} onClick={() => { const h = obrazky.filter((x) => x.stav === 'hotovo' && x.url); otevriObrazek({ polozky: h, index: h.indexOf(o) }); }}>
+              <img src={pb.baseURL.replace(/\/$/, '') + o.url} alt={o.title || ''} width={o.width} height={o.height} className="h-16 w-auto rounded border border-border" data-testid="chat-soubor-obrazek" data-stav="hotovo" />
+            </button>
+            : <span key={o.id} className="inline-flex h-16 w-12 items-center justify-center rounded border border-border bg-secondary text-muted-foreground" data-testid="chat-soubor-obrazek" data-stav={o.stav}>
+              {o.stav === 'chyba' ? <AlertTriangle className="w-3.5 h-3.5" /> : <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            </span>))}
+          {kresli && <span className="text-muted-foreground">{t('soubor.drawing')}</span>}
+        </div>
+      )}
       <div className="px-2.5 py-2 flex flex-wrap items-center gap-1.5">
         {karta.doc_id ? (karta.formaty || []).map((f) => (
-          <button key={f} type="button" disabled={!!stav.format} onClick={() => stahni(f)} className="inline-flex items-center gap-1 rounded-md border border-primary/60 px-2 py-1 font-medium text-primary hover:bg-primary/10 disabled:opacity-60" data-testid={`chat-soubor-${f}`}>
+          <button key={f} type="button" disabled={!!stav.format || kresli} onClick={() => stahni(f)} className="inline-flex items-center gap-1 rounded-md border border-primary/60 px-2 py-1 font-medium text-primary hover:bg-primary/10 disabled:opacity-60" data-testid={`chat-soubor-${f}`}>
             {stav.format === f ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}{t(`soubor.${f}`)}
           </button>
         )) : <span className="text-muted-foreground" data-testid="chat-soubor-neulozeno">{t('soubor.notSaved')}</span>}
@@ -682,6 +815,7 @@ function KartaSoubor({ karta, onOtevriDokument }) {
         )}
       </div>
       {karta.doc_id && <p className="px-2.5 pb-2 text-[11px] text-muted-foreground">{t(karta.druh === 'card' ? 'soubor.hintCard' : 'soubor.hintDeck')}</p>}
+      {nepovedlo && <p className="px-2.5 pb-2 text-[11px] text-muted-foreground" data-testid="chat-soubor-obrazek-chyba">{t('soubor.imgFailed')}</p>}
       {stav.chyba && <p className="px-2.5 pb-2 text-destructive" data-testid="chat-soubor-chyba">{stav.chyba}</p>}
     </div>
   );
@@ -841,6 +975,7 @@ export default function AsistentZprava({ zprava, posledni, odkazDole, loading, o
               <PanelLeftOpen className="w-3.5 h-3.5" />{t(k.akce === 'prepis' ? 'str.cardRewrite' : 'str.card', { title: k.title })}
             </button>
           );
+          if (k.type === 'obrazek') return <KartaObrazek key={i} karta={k} />;
           if (k.type === 'dokument') return (
             <button key={i} type="button" onClick={() => onOtevriDokument && onOtevriDokument(k.doc_id)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-secondary" data-testid="chat-dokument-karta">
               <PanelLeftOpen className="w-3.5 h-3.5" />{t('dok.updatedCard', { title: k.title })}

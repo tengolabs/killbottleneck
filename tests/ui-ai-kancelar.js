@@ -101,6 +101,7 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-dok-detail"][data-kind="presentation"]', 15000), 'panel Dokumentů se sám otevřel na prezentaci');
   const docId = await page.$eval('[data-testid="chat-dok-detail"]', (el) => el.getAttribute('data-id'));
   expect(await cekejTextDok('Stav pro klienta') && await cekejTextDok('Podtitul'), 'detail ukazuje podtitul z meta');
+  expect(!(await page.$('[data-testid="chat-dok-obrazky"]')), 'bez služby obrázků (KB_IMAGE_*) panel sekci Obrázky nenabízí');
   expect(await cekej('[data-testid="chat-dok-kancelar"]') && !!(await page.$('[data-testid="chat-dok-soubor-pptx"]')) && !!(await page.$('[data-testid="chat-dok-soubor-pdf"]')) && !!(await page.$('[data-testid="chat-dok-soubor-docx"]')), 'panel: Stáhnout jako PowerPoint / PDF / Word');
 
   console.log('== skutečná stažení z karty a z panelu ==');

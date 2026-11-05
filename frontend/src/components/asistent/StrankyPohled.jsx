@@ -60,8 +60,13 @@ export function vlozKotvy(html) {
   const i = h.toLowerCase().lastIndexOf('</body>');
   return i >= 0 ? h.slice(0, i) + SKRIPT_KOTVY + h.slice(i) : h + SKRIPT_KOTVY;
 }
+// obrázky stránky mají cestu bez adresy serveru (/api/files/ai_images/…, 4. 11. 2026) → náhled ve srcdoc (aplikace v Electronu /
+// Capacitoru má jiný původ než server) i stažený soubor dostanou plnou adresu instance
+export function sAdresouObrazku(html) {
+  return String(html || '').replace(/(\bsrc\s*=\s*["'])(\/api\/files\/)/gi, `$1${pb.baseURL.replace(/\/$/, '')}$2`);
+}
 export function NahledStranky({ html, title, className, testid }) {
-  const doc = useMemo(() => vlozKotvy(html), [html]);
+  const doc = useMemo(() => vlozKotvy(sAdresouObrazku(html)), [html]);
   return (
     <iframe
       sandbox={SANDBOX}
@@ -281,7 +286,7 @@ export function DetailStranky({ id, verze, zmenene, onZpet, onSmazano }) {
     if (!(await copyToClipboard(adresa))) { setHlaska(t('copyFailed')); return; }
     setZkopirovano(true); setTimeout(() => setZkopirovano(false), 1500);
   };
-  const stahni = () => saveBlob(new Blob([str.html || ''], { type: 'text/html;charset=utf-8' }), `${safeFilename(str.title || '', 'stranka')}.html`);
+  const stahni = () => saveBlob(new Blob([sAdresouObrazku(str.html)], { type: 'text/html;charset=utf-8' }), `${safeFilename(str.title || '', 'stranka')}.html`);
 
   if (!nsReady) return <Loader2 className="w-4 h-4 animate-spin m-4" />;
   if (chyba) return (

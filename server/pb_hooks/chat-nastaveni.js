@@ -81,6 +81,7 @@ function jenKdyz(jenKdy, app) {
   if (jenKdy === "hosted") return hosted;
   if (jenKdy === "selfhost") return !hosted;
   if (jenKdy === "pages") return require(`${__hooks}/stranky.js`).limity().zapnuto; // KB_PAGES=0 → nástroje stránek se nenabízejí
+  if (jenKdy === "images") return require(`${__hooks}/obrazky.js`).dostupne(app); // bez KB_IMAGE_* (nebo mimo tarif brány) se kreslení nenabízí
   return true;
 }
 

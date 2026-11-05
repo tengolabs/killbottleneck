@@ -8092,6 +8092,10 @@ function runDailySummaries(app, opts) {
       }
     }
   }
+  // sumář e-mailem (fáze 5 obrázků, 29. 10. 2026): jen kdo si ho zapnul, jednou denně (daily_summaries.odeslano)
+  try { require(`${__hooks}/sumarMail.js`).odesli(app); } catch (err) {
+    try { app.logger().warn("sumar_email: běh selhal", "error", String(err).slice(0, 200)); } catch (e2) { /* log je bonus */ }
+  }
   return generated;
 }
 

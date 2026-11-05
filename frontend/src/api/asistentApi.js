@@ -54,6 +54,23 @@ export const strankaSdilet = (payload) => kbSend('/api/kb/chat/stranka/sdilet', 
 export const strankaTym = (payload) => kbSend('/api/kb/chat/stranka/tym', { body: payload });
 // {id, akce: 'pridat'|'odebrat', user: id člena} — jmenovité sdílení (15. 10. 2026)
 export const strankaLide = (payload) => kbSend('/api/kb/chat/stranka/lide', { body: payload });
+// Obrázky (29. 10. 2026): karta `obrazek` zadaný obrázek sama nakreslí (sekundy; FLUX 3 ve frontě až ~1 min)
+export const obrazek = (id) => kbSend(`/api/kb/chat/obrazek/${encodeURIComponent(id)}`, { method: 'GET' });
+export const obrazekVytvorit = (id, znovu) => kbSend('/api/kb/chat/obrazek/vytvorit', { body: { id, znovu: !!znovu }, timeoutMs: 120_000 });
+// Kancelář (3. 11. 2026): obrázek do prezentace / přání z panelu — {id dokumentu, slot ('' = titulní / jediný, jinak nadpis snímku), prompt}
+export const dokumentObrazek = (id, slot, prompt) => kbSend('/api/kb/chat/dokument/obrazek', { body: { id, slot, prompt } });
+// záložka Obrázky (4. 11. 2026): seznam s místem použití a dnem úklidu; natrvalo; smazat (použitý → 409)
+export const obrazky = ({ q, strana } = {}) => {
+  const p = new URLSearchParams();
+  if (q) p.set('q', q);
+  if (strana) p.set('strana', String(strana));
+  const qs = p.toString();
+  return kbSend('/api/kb/chat/obrazky' + (qs ? '?' + qs : ''), { method: 'GET' });
+};
+// „Nový obrázek“ ze záložky Obrázky: jen zadá (stav ceka); nakreslí obrazekVytvorit
+export const obrazekNovy = ({ prompt, preset, styl, text }) => kbSend('/api/kb/chat/obrazek/novy', { body: { prompt, preset, styl: styl || '', text: text || '' } });
+export const obrazekPonechat = (id, trvale) => kbSend('/api/kb/chat/obrazek/ponechat', { body: { id, trvale: !!trvale } });
+export const obrazekSmazat = (id) => kbSend('/api/kb/chat/obrazek/smazat', { body: { id } });
 // Faktury a profil dodavatele (9. 10. 2026): vystavuje je asistent (create_invoice), panel je čte a označuje
 // zaplacené; PDF vyrábí prohlížeč z DTO (lib/faktura). Profil dodavatele: společný (správce, Správa organizace) + vlastní (/me, Můj účet).
 export const faktury = ({ year, unpaid } = {}) => {

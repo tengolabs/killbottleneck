@@ -13,7 +13,7 @@
 // Historie do 4. 10. 2026: 1 kredit = „ranní porada“ (2 410/454 tokenů, Kosmik ×2, 0,0764 Kč) — skutečná
 // zpráva stála ~2 kredity, web přitom slibuje „tahy“.
 // Zatím se počítá jen chat asistenta (ai_chat_log); starší AI funkce v mapě tokeny nelogují.
-const CENY_VYCHOZI = { eur_kc: 24.3, aki: { in: 0.25, cache: 0.10, out: 1.00 }, lokalni: ["gpt-oss", "gptoss", "rig", "qwen", "gemma4:", "ollama", "llama", "m-local"], referencni_tah: { in: 17618, cached: 11452, out: 284 }, prepis: { usd_min: 0.006, usd_kc: 20.8 } };
+const CENY_VYCHOZI = { eur_kc: 24.3, aki: { in: 0.25, cache: 0.10, out: 1.00 }, lokalni: ["gpt-oss", "gptoss", "rig", "qwen", "gemma4:", "ollama", "llama", "m-local"], referencni_tah: { in: 17618, cached: 11452, out: 284 }, prepis: { usd_min: 0.006, usd_kc: 20.8 }, obrazek: { klein: 0.014, flux3: 0.03, usd_kc: 20.8 } };
 function nactiCeny() {
   try {
     const { readHooksText } = require(`${__hooks}/helpers.js`);
@@ -31,6 +31,15 @@ const UNIT_IN = CENY.referencni_tah.in, UNIT_OUT = CENY.referencni_tah.out;   //
 const PREPIS = CENY.prepis || CENY_VYCHOZI.prepis;
 const PREPIS_KC_S = PREPIS.usd_min * PREPIS.usd_kc / 60;
 const kredityPrepisu = (sekund) => (Number(sekund) > 0 ? Math.min(3600, Number(sekund)) * PREPIS_KC_S / KREDIT_KC : 0);
+// obrázek asistenta: KB_OBRAZEK_KREDITY = pevná cena za kus bez ohledu na model (nastavuje provoz); bez ní
+// „jako koupeno“ podle referenční ceny modelu v USD (kredity-ceny.json `obrazek`)
+const OBRAZEK = CENY.obrazek || CENY_VYCHOZI.obrazek;
+function kredityObrazku(model) {
+  const { env } = require(`${__hooks}/helpers.js`);
+  const pevne = parseFloat(env("OBRAZEK_KREDITY"));
+  if (Number.isFinite(pevne) && pevne >= 0) return Math.min(pevne, 1000); // překlep v env (Infinity, 1e9) nesmí zablokovat účet
+  return (Number(OBRAZEK[model === "flux3" ? "flux3" : "klein"]) || 0) * (Number(OBRAZEK.usd_kc) || 20.8) / KREDIT_KC;
+}
 // lokální model (náš hardware) — jen pro statistiku rezervy (seznam v kredity-ceny.json, podle jména modelu);
 // na kredity NEMÁ vliv (Richard 5. 10. 2026: účtovat vše jako koupeno; do 4. 10. = 0 kreditů)
 function jeLokalni(model, provider) { // eslint-disable-line no-unused-vars
@@ -49,6 +58,7 @@ function kredityVolani(v) {
 // Chybový tah a potvrzení bez modelu = 0.
 function kredityTahu(stats, chyba, cfg) {
   if (chyba || !stats || stats.app || !(Number(stats.calls) > 0)) return 0;
+  if (stats.obrazek) return kredityObrazku(stats.obrazek.model); // obrázek (obrazky.js): pevná cena za kus, bez tokenů
   const prepis = stats.hlas ? kredityPrepisu(stats.hlas.s) : 0; // délka nahrávky v sekundách (chat.js: stats.hlas.s)
   // vlastní model zákazníka (hostovaná, 14. 10. 2026): jeho volání (v.vlastni) = 0 kreditů, tokeny v logu zůstávají;
   // přepis hlasovky a vize (naše AI) se v témže tahu účtují dál (audit 25. 10. 2026)
@@ -220,4 +230,4 @@ function ulozNastaveni(app, kvota, podil) {
   app.save(rec);
 }
 
-module.exports = { kreditu, zacatekTydne, nastaveni, stavTydne, kvotaBrzda, proApi, ulozNastaveni, KREDIT_KC, PODIL_ADMIN_VYCHOZI, kredityTahu, kredityVolani, kredityPrepisu, jeLokalni, CENY, SAZBA_AKI };
+module.exports = { kreditu, zacatekTydne, nastaveni, stavTydne, kvotaBrzda, proApi, ulozNastaveni, KREDIT_KC, PODIL_ADMIN_VYCHOZI, kredityTahu, kredityVolani, kredityPrepisu, kredityObrazku, jeLokalni, CENY, SAZBA_AKI };

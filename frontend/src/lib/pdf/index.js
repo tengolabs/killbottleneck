@@ -112,6 +112,29 @@ export async function nahledStrany(file, page, { sirka = 480 } = {}) {
   }
 }
 
+// Všechny strany (do `max`) jako JPEG data URL — dokument velký v prohlížeči vlevo (4. 11. 2026); jeden průchod souborem
+export async function nahledyStran(file, { sirka = 1600, max = 30, kvalita = 0.9 } = {}) {
+  const bytes = await bajty(file);
+  const pdfjs = await getPdfjs();
+  const doc = await pdfjs.getDocument({ data: bytes.slice(0), isEvalSupported: false }).promise;
+  try {
+    const out = [];
+    for (let i = 1; i <= Math.min(doc.numPages, max); i++) {
+      const pg = await doc.getPage(i);
+      const vp = pg.getViewport({ scale: sirka / pg.getViewport({ scale: 1 }).width });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(vp.width); canvas.height = Math.ceil(vp.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); // JPEG nemá průhlednost
+      await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+      out.push({ src: canvas.toDataURL('image/jpeg', kvalita), width: canvas.width, height: canvas.height });
+    }
+    return out;
+  } finally {
+    await doc.destroy();
+  }
+}
+
 // Oprava textu „přelepkou“: nahrady [{page, find, replace}] → {blob, bytes, provedeno, nenalezeno, strany}
 export async function nahradText(file, nahrady) {
   const bytes = await bajty(file);

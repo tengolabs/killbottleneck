@@ -152,6 +152,8 @@ onRecordCreateRequest((e) => {
     const { t, userLang } = require(`${__hooks}/i18n.js`);
     throw new BadRequestError(t(userLang(null), "err.extEmailReserved"));
   }
+  // sumář e-mailem je opt-in VLASTNÍKA (jako update): při založení účtu ho nikdo jiný než superuživatel nezapne (checkup 5. 11.)
+  if (!e.hasSuperuserAuth()) e.record.set("sumar_email", false);
   const total = arrayOf(new DynamicModel({ c: 0 }));
   e.app.db().newQuery("SELECT COUNT(*) as c FROM users").all(total);
   const isFirst = total[0].c === 0;
@@ -319,7 +321,12 @@ onRecordUpdateRequest((e) => {
     e.record.set("is_org_manager", e.record.original().getBool("is_org_manager"));
     // zástupce určuje admin — člen si ho nevybírá (ani sobě, ani jiným)
     e.record.set("deputy", e.record.original().getString("deputy"));
-  } else {
+  }
+  // sumář e-mailem (29. 10. 2026) je opt-in VLASTNÍKA účtu: správce ho členovi nezapne (posílal by mu maily bez souhlasu)
+  if (!e.hasSuperuserAuth() && !(e.auth && e.auth.id === e.record.id)) {
+    e.record.set("sumar_email", e.record.original().getBool("sumar_email"));
+  }
+  if (byAdmin) {
     // admin zapisuje zástupce: jen e-mail JINÉHO existujícího člena, nebo prázdno.
     // Překlep by jinak tiše znamenal „zástupce se nikdy nerozřeší".
     const deputy = String(e.record.getString("deputy") || "").trim();
@@ -1334,6 +1341,7 @@ onBootstrap((e) => {
   e.next();
   // stránky asistenta rozepsané při pádu/restartu → chyba s vysvětlením (zámky ve store nepřežily)
   try { const n = require(`${__hooks}/stranky.js`).poRestartu(e.app); if (n) console.log(`[stranky] po restartu: ${n} rozepsaných stránek → chyba`); } catch (err) { /* bez kolekce (první start) */ }
+  try { const n = require(`${__hooks}/obrazky.js`).poRestartu(e.app); if (n) console.log(`[obrazky] po restartu: ${n} rozkreslených obrázků`); } catch (err) { /* bez kolekce (první start) */ }
   try {
     const { env } = require(`${__hooks}/helpers.js`);
     const cid = env("GOOGLE_CLIENT_ID");
@@ -1593,6 +1601,23 @@ cronAdd("prune_reports", "20 3 * * *", () => {
     }
   }
 });
+
+// AI obrázky (4. 11. 2026, rozhodnutí Richarda): nepoužité po 90 dnech (mimo „natrvalo“), bannery sumáře po 30;
+// maže se PŘES ZÁZNAMY (obrazky.uklid → app.delete), ať zmizí i soubory ve storage
+cronAdd("prune_ai_images", "5 4 * * *", () => {
+  try {
+    const n = require(`${__hooks}/obrazky.js`).uklid($app);
+    if (n) $app.logger().info("prune_ai_images: smazáno", "pocet", n);
+  } catch (err) {
+    try { $app.logger().warn("prune_ai_images selhal", "error", String(err).slice(0, 300)); } catch (e2) { /* log je bonus */ }
+  }
+});
+
+// smazaný rozhovor (ručně, úklidem i se smazaným uživatelem) → jeho nepoužité obrázky pryč hned
+onRecordAfterDeleteSuccess((e) => {
+  try { require(`${__hooks}/obrazky.js`).poSmazaniChatu(e.app, e.record.id); } catch (err) { /* úklid je bonus, mazání rozhovoru nezdrží */ }
+  e.next();
+}, "ai_chats");
 
 // Záznamník změn je jediná kolekce, která roste sama s každým uložením mapy —
 // bez úklidu by po letech provozu nabobtnala donekonečna. 400 dní = rok
@@ -2426,6 +2451,21 @@ kbRoute("POST", "/chat/dokument/smazat", (e) => {
   try { D.smazat($app, e.auth.id, String(b.id || "")); return e.json(200, { ok: true }); } catch (err) { return D.odpovedChyby(e, err); }
 }, $apis.requireAuth());
 
+// {id, slot, prompt}: obrázek do prezentace / přání z panelu (3. 11. 2026) — zadá ho; nakreslí /chat/obrazek/vytvorit
+kbRoute("POST", "/chat/dokument/obrazek", (e) => {
+  const D = require(`${__hooks}/dokumenty.js`);
+  const O = require(`${__hooks}/obrazky.js`);
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  // každé volání = nový záznam ai_images + nová verze dokumentu → strop jako u Nového obrázku (checkup 5. 11.)
+  if (minuteLimitHit($app.store(), "img:dok:" + e.auth.id, 20)) return e.json(429, { error: t(userLang(e.auth), "err.tooManyRequests") });
+  const b = e.requestInfo().body || {};
+  try {
+    const r = D.pridejObrazek($app, e.auth.id, String(b.id || ""), String(b.slot || ""), String(b.prompt || ""));
+    return e.json(200, { dokument: D.sProjekty($app, e.auth, [D.dto(r.rec, true)])[0], obrazek: O.dto(r.obrazek) });
+  } catch (err) { return D.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024));
+
 // ---------- Stránky asistenta (14. 10. 2026) ----------
 // HTML stránky, které napsal asistent (page writer) nebo připojený agent (MCP/v1); stranky.js.
 // Vlastník se hlídá v modulu (cizí id = 404). Týmové stránky (team_visible) čte člen přes
@@ -2510,6 +2550,65 @@ kbRoute("POST", "/chat/stranka/lide", (e) => {
     return e.json(200, { stranka: d });
   } catch (err) { return S.odpovedChyby(e, err); }
 }, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id/akce/název
+
+// ---------- Obrázky asistenta (29. 10. 2026, obrazky.js): FLUX na GPU serveru přes bránu ----------
+// {id, znovu?} → nakreslí zadaný obrázek (karta po tahu), znovu = nový seed místo hotového
+kbRoute("POST", "/chat/obrazek/vytvorit", (e) => {
+  const O = require(`${__hooks}/obrazky.js`);
+  const r = O.vytvorit($app, e, e.requestInfo().body || {});
+  return e.json(r.status, r.body);
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024)); // těla jsou jen id
+
+// smazaný (úklid po 90 dnech, záložka Obrázky) i cizí obrázek = {obrazek: null}: karta v historii napíše „smazán“
+// bez 404 v konzoli; cizí id se tím neprozradí (stejná odpověď jako neexistující)
+kbRoute("GET", "/chat/obrazek/{id}", (e) => {
+  const O = require(`${__hooks}/obrazky.js`);
+  const rec = O.najdi($app, e.auth.id, e.request.pathValue("id"));
+  return e.json(200, { obrazek: rec ? O.dto(rec) : null });
+}, $apis.requireAuth());
+
+// záložka Obrázky v Kanceláři (4. 11. 2026): vlastní obrázky s tím, kde se použily a kdy je úklid smaže
+// ?q=hledání &strana=0.. ; banner ranního sumáře do seznamu nepatří (obrazky.seznam)
+kbRoute("GET", "/chat/obrazky", (e) => {
+  const O = require(`${__hooks}/obrazky.js`);
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  // hledání píše s prodlevou 250 ms — 60/min stačí člověku, ne smyčce (checkup 5. 11. večer)
+  if (minuteLimitHit($app.store(), "img:sez:" + e.auth.id, 60)) return e.json(429, { error: t(userLang(e.auth), "err.tooManyRequests") });
+  const q = e.requestInfo().query || {};
+  return e.json(200, { ...O.seznam($app, e.auth.id, { q: String(q.q || ""), strana: q.strana }), dni: O.DNI_NEPOUZITY });
+}, $apis.requireAuth());
+
+// {prompt, preset, styl?, text?}: „Nový obrázek“ ze záložky Obrázky (4. 11. 2026, Richard) — jen zadá; nakreslí /chat/obrazek/vytvorit
+// (zámek, brzda, kredity jako u karty v chatu). Popis přepíše chatovací model na podrobný anglický prompt (obrazky.napisPopis).
+kbRoute("POST", "/chat/obrazek/novy", (e) => {
+  const O = require(`${__hooks}/obrazky.js`);
+  const D = require(`${__hooks}/dokumenty.js`);
+  const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  if (minuteLimitHit($app.store(), "img:novy:" + e.auth.id, 20)) return e.json(429, { error: t(userLang(e.auth), "err.tooManyRequests") });
+  const b = e.requestInfo().body || {};
+  try { return e.json(200, { obrazek: O.dto(O.novy($app, e, b, userLang(e.auth))) }); } catch (err) {
+    if (err && err.odpoved) return e.json(err.status || 503, err.odpoved); // AI vypnutá / brzda kvóty
+    return D.odpovedChyby(e, err);
+  }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024));
+
+// {id, trvale}: „Ponechat natrvalo“ — úklid nepoužitých obrázků ho pak vynechá
+kbRoute("POST", "/chat/obrazek/ponechat", (e) => {
+  const O = require(`${__hooks}/obrazky.js`);
+  const D = require(`${__hooks}/dokumenty.js`);
+  const b = e.requestInfo().body || {};
+  try { return e.json(200, { obrazek: O.dtoSprava($app, O.ponechat($app, e.auth.id, String(b.id || ""), !!b.trvale)) }); } catch (err) { return D.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024));
+
+// {id}: smazat nepoužitý obrázek; použitý v dokumentu / stránce → 409 s místy, kde je
+kbRoute("POST", "/chat/obrazek/smazat", (e) => {
+  const O = require(`${__hooks}/obrazky.js`);
+  const D = require(`${__hooks}/dokumenty.js`);
+  const b = e.requestInfo().body || {};
+  try { O.smazat($app, e.auth.id, String(b.id || "")); return e.json(200, { ok: true }); } catch (err) { return D.odpovedChyby(e, err); }
+}, $apis.requireAuth(), $apis.bodyLimit(16 * 1024));
 
 // ---------- Faktury a klienti (9. 10. 2026, faktury.js) ----------
 // Profil DODAVATELE na faktury: společný na instanci (jen správce) + vlastní na uživatele (/me) — NEPLÉST s /billing (odběratel KB, jen hosting).
@@ -2893,6 +2992,9 @@ kbRoute("GET", "/config", (e) => {
     if (pc && pc.vlastni && !modes.includes("transcribe")) modes = modes.concat(["transcribe"]);
     if (!pc) modes = modes.filter((m) => m !== "transcribe");
     if (modes.includes("chat_panel") && modes.includes("transcribe")) modes = modes.concat(["chat_voice"]);
+    // kreslení obrázků v asistentovi (29. 10. 2026): jen s KB_IMAGE_* a v tarifu brány; text v obrázku = FLUX 3 (KB_IMAGE_TEXT)
+    const O = require(`${__hooks}/obrazky.js`);
+    if (modes.includes("chat_panel") && O.dostupne($app)) modes = modes.concat(O.konfigurace($app).text ? ["chat_draw", "chat_draw_text"] : ["chat_draw"]);
   } catch (err) { /* bez chatu */ }
   return e.json(200, {
     skin: instanceSkin,
@@ -5612,6 +5714,31 @@ kbRoute("GET", "/v1/pages/{id}", (e) => {
   if (!rec) return e.json(404, { error: "page not found" });
   return e.json(200, { page: S.v1Dto($app, e, rec, true) });
 });
+// ---------- v1: obrázky (29. 10. 2026) — externí agent (MCP) nechá nakreslit obrázek, hned ho dostane ----------
+// {prompt, title, text?, format?} → zadání + kreslení v jednom požadavku (sekundy); stejná brzda a kredity jako karta
+kbRoute("POST", "/v1/images", (e) => {
+  const { apiKeyAuth, publicBaseUrlFromRequest } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const O = require(`${__hooks}/obrazky.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  if (!O.dostupne($app)) return e.json(404, { error: t(userLang(a.user), "err.imagesOff") });
+  const b = e.requestInfo().body || {};
+  const F = require(`${__hooks}/chat-obrazky.js`).FORMATY;
+  let rec;
+  try {
+    rec = O.zaloz($app, a.user.id, { prompt: String(b.prompt || ""), title: String(b.title || ""), text: String(b.text || ""), preset: F[String(b.format || "")] || "ctverec" }, {});
+  } catch (err) {
+    if (err && err.klic) return e.json(err.status || 400, { error: t(userLang(a.user), err.klic, err.params || {}) });
+    throw err;
+  }
+  const r = O.vytvorit($app, { auth: a.user }, { id: rec.id });
+  if (r.status !== 200) { try { $app.delete(rec); } catch (err) { /* nevadí */ } return e.json(r.status, r.body); }
+  const o = r.body.obrazek;
+  o.url = publicBaseUrlFromRequest($app, e, { prednostPozadavku: true }).replace(/\/+$/, "") + o.url;
+  return e.json(200, { image: o });
+}, $apis.bodyLimit(16 * 1024));
+
 // {title, html, team_visible?} → hotová stránka
 kbRoute("POST", "/v1/pages", (e) => {
   const { apiKeyAuth } = require(`${__hooks}/helpers.js`);

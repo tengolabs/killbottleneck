@@ -75,8 +75,8 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const tools = await rpc('tools/list', {});
     const names = (tools.result.tools || []).map((t) => t.name).sort();
-    expect(names.length === 33 && names.includes('create_events') && names.includes('create_map') && names.includes('create_page') && names.includes('create_rule') && names.includes('get_org_structure') && names.includes('list_people') && names.includes('get_portfolio'),
-      `tools/list → 33 nástrojů vč. create_events, create_page, list_people a get_portfolio (${names.join(', ')})`);
+    expect(names.length === 34 && names.includes('generate_image') && names.includes('create_events') && names.includes('create_map') && names.includes('create_page') && names.includes('create_rule') && names.includes('get_org_structure') && names.includes('list_people') && names.includes('get_portfolio'),
+      `tools/list → 34 nástrojů vč. generate_image, create_events, create_page, list_people a get_portfolio (${names.join(', ')})`);
     // Slovník 17. 8. 2026: úkol = uzel s řešitelem nebo termínem — task nástroje zanikly
     expect(!names.includes('add_task') && !names.includes('list_tasks') && !names.includes('update_task'),
       'task nástroje (add/list/update_task) NEEXISTUJÍ');

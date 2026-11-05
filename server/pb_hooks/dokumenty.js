@@ -64,6 +64,16 @@ function ocistiMeta(m) {
     if (v) out[k] = v;
   }
   if (m.logo === false) out.logo = false; // výchozí = s logem organizace; jen výslovné vypnutí se ukládá
+  // obrázky Kanceláře (3. 11. 2026): [{slot, id}] — slot "" = titulní / jediný obrázek, jinak nadpis snímku; vlastníka hlídá uloz
+  if (Array.isArray(m.images)) {
+    const imgs = [];
+    for (const x of m.images) {
+      if (imgs.length >= require(`${__hooks}/obrazky.js`).MAX_OBRAZKU_DOKUMENTU || !x || typeof x !== "object") continue;
+      const id = String(x.id || ""), slot = radek(x.slot, MAX_TITLE);
+      if (/^[a-z0-9]{15}$/.test(id) && !imgs.some((i) => i.slot === slot)) imgs.push({ slot: slot, id: id });
+    }
+    if (imgs.length) out.images = imgs;
+  }
   return JSON.stringify(out).length > MAX_META ? {} : out;
 }
 function jsonPole(rec, pole) {
@@ -100,6 +110,7 @@ function dto(rec, cely) {
     created: rec.getString("created"),
     updated: rec.getString("updated"),
   };
+  if (cely && out.meta.images) out.obrazky = require(`${__hooks}/obrazky.js`).obrazkyDokumentu($app, rec.getString("user"), out.meta.images);
   if (cely) out.text = text;
   else out.nahled = text.replace(/\s+/g, " ").trim().slice(0, NAHLED);
   return out;
@@ -202,7 +213,7 @@ function uloz(app, userId, data, opt) {
     rec.set("email_subject", radek(d.email_subject, MAX_SUBJECT));
     rec.set("map", ocisti(d.map, 40));
     rec.set("chat", ocisti(o.chat, 40));
-    rec.set("meta", ocistiMeta(d.meta));
+    rec.set("meta", metaVlastnika(app, userId, ocistiMeta(d.meta)));
     app.save(rec);
     return rec;
   }
@@ -213,8 +224,10 @@ function uloz(app, userId, data, opt) {
     email_to: d.email_to != null ? radek(d.email_to, MAX_TO) : pred.email_to,
     email_subject: d.email_subject != null ? radek(d.email_subject, MAX_SUBJECT) : pred.email_subject,
     // meta se mění CELÁ (panel i model posílají celý objekt), ne po klíčích — jinak by nešlo šablonu či odkaz zrušit
-    meta: d.meta != null ? ocistiMeta(d.meta) : pred.meta,
+    meta: d.meta != null ? metaVlastnika(app, userId, ocistiMeta(d.meta)) : pred.meta,
   };
+  // meta bez klíče images (update_document od modelu, starý klient) obrázky NEmaže — maže je jen výslovné pole z panelu
+  if (d.meta != null && !Array.isArray(d.meta.images) && pred.meta && pred.meta.images) nove.meta = { ...nove.meta, images: pred.meta.images };
   if (!nove.text.trim() && !nove.title.trim()) throw chybaS(400, "err.docEmpty");
   const zmena = Object.keys(nove).some((k) => (k === "meta" ? JSON.stringify(nove.meta) !== JSON.stringify(pred.meta) : nove[k] !== pred[k]));
   if (!zmena) return rec; // uložení beze změny nesmí přepsat předchozí verzi sama sebou
@@ -247,7 +260,43 @@ function vratit(app, userId, id) {
 function smazat(app, userId, id) {
   const rec = najdi(app, userId, id);
   if (!rec) throw chybaS(404, "err.docNotFound");
+  const pred = jsonPole(rec, "predchozi");
+  const ids = obrazkyIds(jsonPole(rec, "meta")).concat(obrazkyIds(pred && pred.meta));
   app.delete(rec);
+  if (ids.length) require(`${__hooks}/obrazky.js`).smazObrazky(app, userId, ids); // obrázky Kanceláře patří jen dokumentu
+}
+// Panel Dokumentů (3. 11. 2026): uživatel přidá nebo vymění obrázek prezentace / přání svým popisem (i česky).
+// Vrací { rec, obrazek } — obrázek je jen zadaný (stav „ceka“); nakreslí ho panel přes /chat/obrazek/vytvorit
+// (tam brzda, kredity a log jako u každého obrázku). Předchozí verze dokumentu si nechá i původní obrázek.
+function pridejObrazek(app, userId, id, slot, prompt) {
+  const O = require(`${__hooks}/obrazky.js`);
+  const rec = najdi(app, userId, id);
+  if (!rec) throw chybaS(404, "err.docNotFound");
+  if (!O.dostupne(app)) throw chybaS(404, "err.imagesOff");
+  const meta = jsonPole(rec, "meta") || {};
+  const kind = rec.getString("kind");
+  if ((kind !== "presentation" && kind !== "card") || O.BEZ_OBRAZKU.includes(meta.template)) throw chybaS(400, "err.docImageKind");
+  let s = "";
+  if (kind === "presentation" && slot) {
+    const { overOsnovu } = require(`${__hooks}/chat-kancelar.js`);
+    const os = overOsnovu(rec.getString("text"));
+    s = ((os.snimky || []).find((x) => norm(x.nadpis) === norm(slot)) || {}).nadpis || "";
+    if (!s) throw chybaS(400, "err.docImageSlot");
+  }
+  const imgs = (Array.isArray(meta.images) ? meta.images : []).filter((x) => x && x.slot !== s);
+  if (imgs.length >= O.MAX_OBRAZKU_DOKUMENTU) throw chybaS(400, "err.docImageMax", { max: O.MAX_OBRAZKU_DOKUMENTU });
+  const obr = O.zalozProDokument(app, userId, { prompt: prompt, title: s || rec.getString("title"), kind: kind, template: meta.template || "" }, { chat: rec.getString("chat") });
+  const nova = s ? imgs.concat([{ slot: s, id: obr.id }]) : [{ slot: "", id: obr.id }].concat(imgs);
+  return { rec: uloz(app, userId, { meta: { ...meta, images: nova } }, { id: id }), obrazek: obr };
+}
+function obrazkyIds(meta) { return meta && Array.isArray(meta.images) ? meta.images.map((x) => x && x.id).filter(Boolean) : []; }
+// meta.images jen s obrázky vlastníka (cizí id z panelu nebo od modelu vypadne)
+function metaVlastnika(app, userId, meta) {
+  if (!meta.images) return meta;
+  const imgs = require(`${__hooks}/obrazky.js`).vlastniObrazky(app, userId, meta.images);
+  const out = { ...meta };
+  if (imgs.length) out.images = imgs; else delete out.images;
+  return out;
 }
 
 // dokumenty vzniklé v novém rozhovoru dřív, než měl rozhovor id (chatRun ukládá až na konci)
@@ -303,6 +352,6 @@ function nastrojCteni(app, userId, ref) {
 
 module.exports = {
   MAX_TEXT, MAX_TITLE, MAX_DOKUMENTU, MAX_META, DRUHY, SKUPINY, SABLONY, ocistiMeta,
-  dto, sProjekty, najdi, seznam, podleOdkazu, uloz, vratit, smazat, doplnChat, vratitTah, snimek,
+  dto, sProjekty, najdi, seznam, podleOdkazu, uloz, vratit, smazat, pridejObrazek, doplnChat, vratitTah, snimek,
   rozdelPredmet, nazevZTextu, odpovedChyby, jeZastupny, norm, radek, nastrojSeznam, nastrojCteni,
 };

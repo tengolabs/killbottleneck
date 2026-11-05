@@ -23,7 +23,10 @@
     "osnova_other": "Page outline ({{count}} sections)",
     "kostra": "Look and skeleton of the page",
     "cela": "Whole page at once",
-    "osnovaBezi": "Page outline…"
+    "osnovaBezi": "Page outline…",
+    "obrazky_one": "Illustration (1)",
+    "obrazky_few": "Illustrations ({{count}})",
+    "obrazky_other": "Illustrations ({{count}})"
   },
   "code": "Code",
   "codeHint": "Show the HTML as it is written instead of the preview",

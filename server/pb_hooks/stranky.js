@@ -88,12 +88,14 @@ function dto(rec, cely, opt) {
   };
   if (vlastnik) out.share_token = token; // tajemství jen vlastníkovi (tým ho nikdy nedostane)
   out.lide = vlastnik ? lideIds(rec).length : 0; // kolika lidem je jmenovitě nasdílená
-  if (cely) out.html = html;
+  // obrázky bez adresy serveru (obrazky.cestyObrazku — i u stránek, které ji z doby psaní ještě nesou)
+  const cesty = (h) => require(`${__hooks}/obrazky.js`).cestyObrazku($app, h, "");
+  if (cely) out.html = cesty(html);
   // během psaní (a po chybě) i rozpracované HTML a kroky writeru — panel ukazuje, co se právě děje
   if (vlastnik && cely && out.stav !== "hotovo") {
     const pr = jsonPole(rec, "prubeh");
     out.prubeh = pr && typeof pr === "object" && Array.isArray(pr.kroky) ? pr : null;
-    out.rozepsano = rec.getString("rozepsano");
+    out.rozepsano = cesty(rec.getString("rozepsano"));
   }
   return out;
 }
@@ -467,6 +469,7 @@ const W = {
     `Section to write: id "${s.id}", heading "${s.heading}"`,
     s.icon ? `Icon for the heading: ${s.icon}` : "",
     s.visual ? `Planned visual: ${s.visual}` : "Planned visual: pick the best fit (cards, bars, gantt, timeline, donut, traffic light) — plain text only if nothing fits",
+    s.illustration ? ILUSTRACE.sekce(s) : "",
     `What goes in:\n${s.content || "(see facts)"}`,
     `All facts and content of the page (use what belongs to this section):\n${p.content || p.brief}`,
     stare ? "Current content of this section (rewrite it according to the instructions):\n```html\n" + stare + "\n```" : "",
@@ -514,6 +517,14 @@ const W = {
     "Apply the changes and return the WHOLE updated document in one ```html block.",
   ].join("\n\n"),
 };
+// Ilustrace (fáze 4 obrázků, 29. 10. 2026): JEN když instance kreslí (obrazky.dostupne) — jinak se prompty nemění
+// ani o bajt (cache promptu, staré sady). Výjimka z „no external images“: značka, kterou server nakreslí (obrazky.js).
+const ILUSTRACE = {
+  system: "\n- EXCEPTION to \"no external images\": the app can DRAW up to 3 illustrations for the page. Where an illustration helps (the opening/hero, a section about people, a place or a product), write <img data-kb-image=\"detailed English visual description, style and colours matching the page, no text\" data-format=\"header|landscape|square|portrait\" alt=\"short caption in the page language\"> — the app draws it and fills in the real address. Never use any other image URL and never put text, numbers or charts into an illustration (those stay in HTML/SVG). Keep existing <img src=…> tags of the page unchanged.",
+  osnova: "\nOptionally give at most 3 sections (usually the opening one) an \"illustration\": \"detailed English description of a picture that fits the section, no text\" — the app draws it. Leave it out where a picture would not help (tables, numbers). Write the description in ENGLISH and match it to the look in your \"style\" (light or dark background, colours, mood) — a real picture (scene, people, objects), never a chart, icon, SVG or text.",
+  sekce: (s) => `Illustration for this section (the app draws it): put exactly this tag where the picture fits best, usually right after the heading:\n<img data-kb-image="${String(s.illustration).replace(/["<>]/g, "'")}" data-format="header" alt="(short caption in the page language)">`,
+};
+
 // zadání od nástroje create_page: brief + fakta v jednom textu (oddělovač drží writer rozdělení)
 const ODDELOVAC = "\n\n---FAKTA---\n";
 function slozZadani(brief, content) {
@@ -552,6 +563,7 @@ const VISUALY = ["stat-cards", "bars", "gantt", "timeline", "donut", "traffic-li
 function sekceZOsnovy(o, sPrepisem) {
   if (!o || !Array.isArray(o.sections) || !o.sections.length) return null;
   const out = [], uz = {};
+  let ilustraci = 0; // ilustrace (fáze 4 obrázků): nejvýš 3 na stránku, dál se zahazují už tady
   o.sections.slice(0, MAX_SEKCI).forEach((s, i) => {
     if (!s || typeof s !== "object") return;
     let id = slug(s.id, i + 1);
@@ -562,6 +574,8 @@ function sekceZOsnovy(o, sPrepisem) {
     out.push({ id: id, heading: radek(s.heading || s.title || id, MAX_NADPIS), content: ocisti(s.content || "", MAX_OBSAH_SEKCE),
       visual: VISUALY.includes(visual) ? visual : "", icon: radek(s.icon || "", 8),
       action: ["keep", "rewrite", "new", "delete"].includes(akce) ? akce : "rewrite" });
+    const il = radek(s.illustration || "", 500);
+    if (il && ilustraci < 3) { out[out.length - 1].illustration = il; ilustraci++; }
   });
   return out.length ? out : null;
 }
@@ -675,6 +689,9 @@ function napsat(app, e, body) {
   const numPredictCela = cfg.vlastni ? Math.min(l.numPredict, VLASTNI_PAGE_CELA) : l.numPredict;
 
   const prepis = !!rec.getString("html");
+  const O = require(`${__hooks}/obrazky.js`);
+  const obr = O.dostupne(app); // ilustrace jen tam, kde instance kreslí
+  const sysW = W.system + (obr ? ILUSTRACE.system : "");
   const stats = { calls: 0, in: 0, out: 0, cached: 0, tools: ["page_writer"], skupiny: ["stranky"], modely: [], volani: [] };
   const t0 = Date.now();
   let chyba = null;
@@ -727,7 +744,7 @@ function napsat(app, e, body) {
     // celá stránka jedním voláním (záloha)
     const cela = () => {
       const k = krok("cela", "");
-      const html = vytahniHtml(zavolej(W.system, prepis ? W.prepis(p) : W.nova(p), numPredictCela, k));
+      const html = vytahniHtml(zavolej(sysW, prepis ? W.prepis(p) : W.nova(p), numPredictCela, k));
       if (!html) { k.s = "chyba"; throw chybaS(502, "err.pageNoHtml"); }
       hotovKrok(k);
       return html;
@@ -738,7 +755,7 @@ function napsat(app, e, body) {
       const dalsi = sekce.filter((x) => x.id !== s.id && x.action !== "delete").map((x) => x.heading);
       let frag = null;
       // model dostává kostru BEZ už napsaných částí (menší vstup, stejný prefix → cache)
-      for (let pokus = 0; pokus < 2 && !frag; pokus++) frag = vytahniFragment(zavolej(W.systemSekce, W.sekce(p, s, kostraZ(doc), dalsi, stare), nSekce, k));
+      for (let pokus = 0; pokus < 2 && !frag; pokus++) frag = vytahniFragment(zavolej(W.systemSekce + (obr ? ILUSTRACE.system : ""), W.sekce(p, s, kostraZ(doc), dalsi, stare), nSekce, k));
       if (!frag) { k.s = "chyba"; throw chybaS(502, "err.pageSectionFailed", { heading: s.heading }); }
       doc = vlozSekci(doc, s.id, frag);
       overVelikost(doc); // hned, ne až po poslední části (rozepsané zůstane v záznamu)
@@ -747,7 +764,7 @@ function napsat(app, e, body) {
     };
     if (!prepis) {
       const kO = krok("osnova", "");
-      const outO = zavolej(W.systemOsnova, W.osnova(p), nPlan, kO);
+      const outO = zavolej(W.systemOsnova + (obr ? ILUSTRACE.osnova : ""), W.osnova(p), nPlan, kO);
       const primo = vytahniHtml(outO);
       const osnova = primo ? null : parsujJson(outO);
       const sekce = osnova ? sekceZOsnovy(osnova, false) : null;
@@ -757,7 +774,7 @@ function napsat(app, e, body) {
         kO.info = sekce.length; p.style = radek(osnova.style || "", 200); hotovKrok(kO);
         const kK = krok("kostra", "");
         for (const s of sekce) krok("sekce", s.heading, s.id); // dopředu, ať panel ukáže, co přijde
-        const kostra = vytahniHtml(zavolej(W.systemKostra(W.system), W.kostra(p, sekce), nKostra, kK));
+        const kostra = vytahniHtml(zavolej(W.systemKostra(sysW), W.kostra(p, sekce), nKostra, kK));
         if (!kostra) { kK.s = "chyba"; kroky.splice(kroky.indexOf(kK) + 1); doc = cela(); }
         else {
           doc = doplnZnacky(kostra, sekce); hotovKrok(kK); uloz();
@@ -767,7 +784,7 @@ function napsat(app, e, body) {
     } else {
       p.zmeny = p.zadani;
       const kO = krok("osnova", "");
-      const outO = maZnacky(p.html) ? zavolej(W.systemOsnovaPrepis, W.osnovaPrepis(p), nPlan, kO) : "";
+      const outO = maZnacky(p.html) ? zavolej(W.systemOsnovaPrepis + (obr ? ILUSTRACE.osnova : ""), W.osnovaPrepis(p), nPlan, kO) : "";
       const primo = outO ? vytahniHtml(outO) : null;
       const osnova = outO && !primo ? parsujJson(outO) : null;
       const sekce = osnova ? sekceZOsnovy(osnova, true) : null;
@@ -783,7 +800,7 @@ function napsat(app, e, body) {
         const kK = kostruZnovu ? krok("kostra", "") : null;
         for (const s of prepsat) krok("sekce", s.heading, s.id);
         if (kostruZnovu) {
-          const kostra = vytahniHtml(zavolej(W.systemKostra(W.system), W.kostraPrepis(p, zive), nKostra, kK));
+          const kostra = vytahniHtml(zavolej(W.systemKostra(sysW), W.kostraPrepis(p, zive), nKostra, kK));
           if (!kostra) { kK.s = "chyba"; throw chybaS(502, "err.pageNoHtml"); }
           doc = doplnZnacky(kostra, zive);
           for (const s of zive) if (s.action === "keep") doc = vlozSekci(doc, s.id, obsahSekce(p.html, s.id));
@@ -795,6 +812,12 @@ function napsat(app, e, body) {
       }
     }
     if (!doc) throw chybaS(502, "err.pageNoHtml");
+    // ilustrace: značky <img data-kb-image> nakreslit a dosadit (bez kreslení na instanci se značky jen odstraní)
+    if (O.maZnackyIlustraci(doc)) {
+      const kI = krok("obrazky", ""); kI.s = "bezi"; kI.od = Date.now(); uloz();
+      const il = O.dosadIlustrace(app, e.auth, doc, { L: L, chat: rec.getString("chat"), brzda: () => { store.set(klic, Date.now()); return C.chatBrzda(e, L, { _obrazek: true }, null); } }); // zámek stránky obnovit před každou ilustrací (až 3 × 90 s)
+      doc = il.html; kI.info = il.pocet; kI.ms = Date.now() - kI.od; kI.s = "hotovo";
+    }
     ulozHtml(app, e.auth.id, rec.id, { html: doc });
   } catch (err) {
     chyba = err && err.klic ? t(L, err.klic, err.params || {}) : String(err && err.message ? err.message : err);
@@ -846,7 +869,8 @@ function v1Dto(app, e, rec, cely) {
     size_kb: Math.round(utf8Delka(rec.getString("html")) / 1024 * 10) / 10,
     created: rec.getString("created"), updated: rec.getString("updated"),
   };
-  if (cely) out.html = rec.getString("html");
+  // agent mimo instanci potřebuje plnou adresu obrázku
+  if (cely) out.html = require(`${__hooks}/obrazky.js`).cestyObrazku(app, rec.getString("html"), require(`${__hooks}/helpers.js`).publicBaseUrlFromRequest(app, e));
   return out;
 }
 function v1Chyba(e, user, err) {

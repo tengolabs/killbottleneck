@@ -23,7 +23,10 @@
     "osnova_other": "Osnova stránky ({{count}} částí)",
     "kostra": "Vzhled a kostra stránky",
     "cela": "Celá stránka najednou",
-    "osnovaBezi": "Osnova stránky…"
+    "osnovaBezi": "Osnova stránky…",
+    "obrazky_one": "Ilustrace (1)",
+    "obrazky_few": "Ilustrace ({{count}})",
+    "obrazky_other": "Ilustrace ({{count}})"
   },
   "code": "Kód",
   "codeHint": "Ukázat vznikající HTML místo náhledu",

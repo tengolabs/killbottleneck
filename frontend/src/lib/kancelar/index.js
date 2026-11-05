@@ -23,6 +23,15 @@ export function akcentSkinu(zaloha = '#2563eb') {
   } catch { return zaloha; }
 }
 
+// AI obrázky dokumentu (3. 11. 2026): DTO.obrazky [{slot, stav, url}] → { slot: bajty } jen hotové; chyba = bez obrázku
+async function aiObrazky(data, zakladna = '') {
+  const out = {};
+  await Promise.all((data.obrazky || []).filter((o) => o && o.stav === 'hotovo' && o.url).map(async (o) => {
+    const b = await obrazekBajty(String(zakladna || '').replace(/\/$/, '') + o.url);
+    if (b) out[o.slot || ''] = b;
+  }));
+  return out;
+}
 async function obrazekBajty(url) {
   if (!url) return null;
   try {
@@ -73,23 +82,27 @@ export async function prezentacePdf(data, opts = {}) {
   const { PDFLib, doc, fonty } = await novyDoc(data.title);
   const logo = await vlozObrazek(doc, opts.logo !== false ? await obrazekBajty(opts.logoUrl) : null);
   const os = parsujOsnovu(data.text); if (!os.titul) os.titul = data.title || ''; if (!os.podtitul && data.meta && data.meta.subtitle) os.podtitul = data.meta.subtitle;
-  sestavPrezentaciPdf({ doc, rgb: PDFLib.rgb, fonty, osnova: os, barva: opts.barva, logo, lang: opts.lang });
+  const obrazky = {};
+  for (const [slot, b] of Object.entries(await aiObrazky(data, opts.zakladna))) { const o = await vlozObrazek(doc, b); if (o) obrazky[slot] = o; }
+  sestavPrezentaciPdf({ doc, rgb: PDFLib.rgb, fonty, osnova: os, barva: opts.barva, logo, lang: opts.lang, obrazky, ops: PDFLib });
   return doc.save();
 }
 export async function prezentacePptx(data, opts = {}) {
   const [{ default: PptxGenJS }, { sestavPrezentaciPptx }] = await Promise.all([import('pptxgenjs'), import('./pptx.js')]);
   const os = parsujOsnovu(data.text); if (!os.titul) os.titul = data.title || ''; if (!os.podtitul && data.meta && data.meta.subtitle) os.podtitul = data.meta.subtitle;
   const logo = opts.logo !== false ? await obrazekBajty(opts.logoUrl) : null;
-  const pptx = sestavPrezentaciPptx(PptxGenJS, { osnova: os, barva: opts.barva, logoDataUrl: dataUrl(logo), lang: opts.lang, autor: opts.org && opts.org.name });
+  const obrazky = Object.fromEntries(Object.entries(await aiObrazky(data, opts.zakladna)).map(([slot, b]) => [slot, dataUrl(b)]));
+  const pptx = sestavPrezentaciPptx(PptxGenJS, { osnova: os, barva: opts.barva, logoDataUrl: dataUrl(logo), lang: opts.lang, autor: opts.org && opts.org.name, obrazky });
   return pptx.write({ outputType: 'blob' });
 }
 export async function pranickoPdf(data, opts = {}) {
   const { PDFLib, doc, fonty } = await novyDoc(data.title);
   const meta = { ...(data.meta || {}), color: opts.barva || (data.meta && data.meta.color), lang: opts.lang || (data.meta && data.meta.lang) };
   const [logo, fotka] = await Promise.all([vlozObrazek(doc, meta.logo !== false ? await obrazekBajty(opts.logoUrl) : null), vlozObrazek(doc, rozpoznejObrazek(opts.fotka))]);
+  const obrazek = fotka ? null : await vlozObrazek(doc, (await aiObrazky(data, opts.zakladna))[''] || null);
   let qr = null; let kresliQr = null;
   if (meta.link) { const Q = await import('@/lib/faktura/qr.js'); qr = await Q.qrMatice(meta.link); kresliQr = Q.kresliQr; }
-  sestavPranicko({ doc, rgb: PDFLib.rgb, fonty, data: { ...data, meta }, logo, fotka, qr, kresliQr });
+  sestavPranicko({ doc, rgb: PDFLib.rgb, fonty, data: { ...data, meta }, logo, fotka, qr, kresliQr, obrazek, ops: PDFLib });
   return doc.save();
 }
 export async function dokumentPdf(data, opts = {}) {

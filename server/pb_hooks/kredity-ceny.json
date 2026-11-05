@@ -25,5 +25,11 @@
     "usd_min": 0.006,
     "usd_kc": 20.8,
     "_": "přepis hlasovky „jako koupeno“ (Richard 5. 10. 2026): referenční nákupní cena OpenAI whisper-1 0,006 USD za minutu, účtuje se po sekundách z audio_ms; vlastní Whisper na našem hardwaru je skutečná rezerva"
+  },
+  "obrazek": {
+    "klein": 0.014,
+    "flux3": 0.03,
+    "usd_kc": 20.8,
+    "_": "obrázek asistenta „jako koupeno“ — referenční USD za kus podle modelu: klein = FLUX.2 [klein] 4B přes API třetích stran (~0,014 USD za 1 MP), flux3 = FLUX 3 Klein (odhad 0,03 USD). Pevnou cenu za kus v kreditech může provoz nastavit proměnnou KB_OBRAZEK_KREDITY."
   }
 }

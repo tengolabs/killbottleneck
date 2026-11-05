@@ -99,6 +99,8 @@ function karticka(k) {
  *   paticka    – pole řádků do patičky (prostý text)
  *   znacka     – název produktu v hlavičce (default killBottleneck)
  *   domov      – kam vede logo v hlavičce (adresa instance; default web)
+ *   obrazek    – { url, alt, width, height } volitelně: banner NAD nadpisem (denní sumář, 29. 10. 2026);
+ *                jen hostovaná absolutní adresa (Outlook ani Gmail data: URI neukážou), JPEG
  */
 function mailHtml(o) {
   const znacka = o.znacka || "killBottleneck";
@@ -146,6 +148,9 @@ function mailHtml(o) {
           ${hlavicka}
         </a>
       </td></tr>
+      ${o.obrazek && o.obrazek.url ? `<tr><td style="padding:0;line-height:0;">
+        <img src="${esc(o.obrazek.url)}" width="560" alt="${esc(o.obrazek.alt || "")}" style="display:block;width:100%;max-width:560px;height:auto;border:0;">
+      </td></tr>` : ""}
       <tr><td style="padding:28px;">
         <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:${BARVA_TEXT};">${esc(o.nadpis || "")}</h1>
         ${odstavce}

@@ -67,7 +67,9 @@
     "emailModeNoneDesc": "Nothing is e-mailed. Notifications stay in the app.",
     "navratTitle": "Come-back e-mails when I have not signed in for a while",
     "navratDesc": "After 3, 7, 14 and 30 days without signing in you get an overview of your open work and the smallest steps to get going again. Signing in resets the count.",
-    "emailModeOverridden": "Controlled by the e-mail mode above"
+    "emailModeOverridden": "Controlled by the e-mail mode above",
+    "sumarTitle": "Morning summary by e-mail",
+    "sumarDesc": "Every morning a short summary of your day — what is burning, what is due today and this week — with a picture of the day. Only on days when you have open work."
   },
   "native": {
     "newUnread_one": "{{count}} new notification",

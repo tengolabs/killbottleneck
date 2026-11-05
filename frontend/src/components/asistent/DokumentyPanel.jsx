@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Check, ChevronLeft, Copy, Download, ExternalLink, Eye, EyeOff, FileText, FolderKanban, Gift, ImagePlus, Loader2, Mail, Pencil, Phone, Plus, Presentation, ScrollText, Search, Trash2, Undo2, Users, X, NotebookPen, ClipboardList } from 'lucide-react';
+import { AlertTriangle, Brain, Check, ChevronLeft, Copy, Download, ExternalLink, Eye, EyeOff, FileText, FolderKanban, Gift, ImagePlus, Loader2, Mail, Maximize2, Pencil, Phone, Plus, Presentation, RefreshCw, ScrollText, Search, Trash2, Undo2, Users, X, NotebookPen, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,11 +11,14 @@ import PdfPohled from './PdfPohled';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useKbConfig } from '@/hooks/useKbConfig';
 import { SeznamStranek, DetailStranky, NovaStranka, NOVA } from './StrankyPohled';
-import { LayoutTemplate, Files } from 'lucide-react';
+import { LayoutTemplate, Files, Image as ImageIkona } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
-import { dokumenty as apiSeznam, dokument as apiDokument, dokumentUloz, dokumentVratit, dokumentSmazat } from '@/api/asistentApi';
+import { dokumenty as apiSeznam, dokument as apiDokument, dokumentUloz, dokumentVratit, dokumentSmazat, dokumentObrazek, obrazekVytvorit } from '@/api/asistentApi';
+import { pb } from '@/api/pb';
+import { useAiModes } from '@/hooks/useAiEnabled';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
 import PametPohled from './PametPohled';
+import SeznamObrazku from './SeznamObrazku';
 import { FakturySeznam, FakturaDetail, FAKTURA_PREFIX } from './FakturaPohled';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { zacniTah } from '@/lib/tahSirky';
@@ -174,8 +177,97 @@ function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ }) {
 // Kancelář: stažení souboru (PDF / Word / PowerPoint), u přání šablona, barva a fotka, náhled první strany.
 // Soubor vzniká v prohlížeči (lib/kancelar líně); fotka se drží jen v paměti panelu — nikam se neposílá.
 // Šablona a barva se ukládají do meta dokumentu hned (jedna routa jako úprava textu).
-function KancelarOvladani({ dok, onMeta, uklada }) {
+// AI obrázky prezentace / přání (3. 11. 2026): náhledy, Nakreslit znovu, Odebrat, nový obrázek vlastním popisem.
+// Zadaný obrázek (stav „ceka“) kreslí karta v chatu; panel ho nakreslí sám, až když na něj nikdo nesáhl 30 s (prohlížeč
+// zavřený hned po tahu) — dřív by se s kartou přetahoval o zámek (409). Do té doby čeká a ptá se. Diplom obrázky nemá.
+const ZAPOMENUTY_MS = 30_000;
+const zapomenuty = (o) => o.stav === 'ceka' && Date.now() - Date.parse(String(o.created || '').replace(' ', 'T')) > ZAPOMENUTY_MS;
+const nadpisySnimku = (text) => String(text || '').split('\n').map((r) => r.trim().match(/^#{2,3}\s+(.+)$/)).filter(Boolean).map((m) => m[1].trim());
+function ObrazkyKancelare({ dok, onDok, onNacti, uklada }) {
+  const { t } = useTranslation('asistent');
+  const ai = useAiModes();
+  const A = useAsistent();
+  const [kresli, setKresli] = useState({}); // id → true
+  const [popis, setPopis] = useState('');
+  const [slot, setSlot] = useState('');
+  const [chyba, setChyba] = useState('');
+  const obrazky = dok.obrazky || [];
+  const meta = dok.meta || PRAZDNA_META;
+  const jePrezentace = dok.kind === 'presentation';
+  const nakresli = useCallback(async (id, znovu) => {
+    setKresli((k) => ({ ...k, [id]: true })); setChyba('');
+    try { await obrazekVytvorit(id, znovu); } catch (e) { if (e.status !== 409) setChyba(e.message || t('dok.imgFailed')); } // 409 = kreslí karta v chatu
+    setKresli((k) => { const n = { ...k }; delete n[id]; return n; });
+    onNacti();
+  }, [onNacti, t]);
+  const cekaji = obrazky.filter(zapomenuty).map((o) => o.id).join(',');
+  const spustene = useRef(new Set());
+  useEffect(() => { for (const id of cekaji ? cekaji.split(',') : []) if (!spustene.current.has(id)) { spustene.current.add(id); nakresli(id, false); } }, [cekaji, nakresli]);
+  const pise = obrazky.some((o) => o.stav === 'pise' || (o.stav === 'ceka' && !zapomenuty(o) && !spustene.current.has(o.id))) && !Object.keys(kresli).length;
+  useEffect(() => { if (!pise) return undefined; const tm = setTimeout(onNacti, 3000); return () => clearTimeout(tm); }, [pise, onNacti, dok.obrazky]);
+  if (!['presentation', 'card'].includes(dok.kind) || meta.template === 'certificate' || (!ai.has('chat_draw') && !obrazky.length)) return null;
+  const odeber = async (id) => {
+    setChyba('');
+    try { const r = await dokumentUloz({ id: dok.id, meta: { ...meta, images: (meta.images || []).filter((x) => x.id !== id) } }); onDok(r.dokument); } catch (e) { setChyba(e.message || t('dok.errorSave')); }
+  };
+  const pridej = async () => {
+    if (!popis.trim()) return;
+    setChyba('');
+    try {
+      const r = await dokumentObrazek(dok.id, jePrezentace ? slot : '', popis.trim());
+      onDok(r.dokument); setPopis('');
+      spustene.current.add(r.obrazek.id);
+      nakresli(r.obrazek.id, false);
+    } catch (e) { setChyba(e.message || t('dok.imgFailed')); }
+  };
+  const nazevSlotu = (s) => (s ? s : jePrezentace ? t('dok.imgSlotTitle') : t('dok.imgSlotCard'));
+  const nadpisy = jePrezentace ? nadpisySnimku(dok.text) : [];
+  return (
+    <div className="space-y-1.5" data-testid="chat-dok-obrazky">
+      <p className="font-medium text-muted-foreground">{t('dok.imgTitle')}</p>
+      {obrazky.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {obrazky.map((o) => {
+            // „ceka“, který panel už zkusil a nekreslí = odmítnutý (síť, limit) → nepovedený s Nakreslit znovu, ne věčné točení
+            const bezi = kresli[o.id] || o.stav === 'pise' || (o.stav === 'ceka' && !spustene.current.has(o.id));
+            return (
+              <div key={o.id} className="w-28 space-y-1" data-testid="chat-dok-obrazek" data-stav={bezi ? 'pise' : o.stav} data-slot={o.slot || ''}>
+                {o.stav === 'hotovo' && o.url && !bezi
+                  ? <button type="button" className="block max-w-full cursor-zoom-in" title={t('obr.zvetsit')} onClick={() => { const h = obrazky.filter((x) => x.stav === 'hotovo' && x.url).map((x) => ({ ...x, title: nazevSlotu(x.slot) })); A.otevriObrazek({ polozky: h, index: h.findIndex((x) => x.id === o.id) }); }}>
+                    <img src={pb.baseURL.replace(/\/$/, '') + o.url} alt={nazevSlotu(o.slot)} width={o.width} height={o.height} className="h-20 w-auto max-w-full rounded border border-border bg-white" data-testid="chat-dok-obrazek-img" />
+                  </button>
+                  : <span className="flex h-20 w-full items-center justify-center gap-1 rounded border border-border bg-background text-muted-foreground">{bezi ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{t('dok.imgDrawing')}</> : <><AlertTriangle className="w-3.5 h-3.5" />{t('dok.imgFailed')}</>}</span>}
+                <p className="truncate text-[11px] text-muted-foreground" title={nazevSlotu(o.slot)}>{nazevSlotu(o.slot)}</p>
+                <div className="flex flex-col items-start gap-0.5 text-[11px]">
+                  {ai.has('chat_draw') && <button type="button" className="inline-flex items-center gap-0.5 whitespace-nowrap text-primary hover:underline disabled:opacity-50" disabled={bezi || uklada} onClick={() => nakresli(o.id, true)} data-testid="chat-dok-obrazek-znovu"><RefreshCw className="w-3 h-3" />{t('dok.imgRedraw')}</button>}
+                  <button type="button" className="text-muted-foreground hover:text-destructive hover:underline disabled:opacity-50" disabled={bezi || uklada} onClick={() => odeber(o.id)} data-testid="chat-dok-obrazek-odebrat">{t('dok.imgRemove')}</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {ai.has('chat_draw') && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {jePrezentace && nadpisy.length > 0 && (
+            <select value={slot} onChange={(e) => setSlot(e.target.value)} aria-label={t('dok.imgSlot')} className="h-7 max-w-[10rem] rounded-md border border-input bg-background px-1.5 text-xs" data-testid="chat-dok-obrazek-slot">
+              <option value="">{t('dok.imgSlotTitle')}</option>
+              {nadpisy.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
+          <Input value={popis} onChange={(e) => setPopis(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') pridej(); }} placeholder={t('dok.imgPrompt')} maxLength={1000} className="h-7 flex-1 min-w-[12rem] text-xs" data-testid="chat-dok-obrazek-popis" />
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={!popis.trim() || uklada} onClick={pridej} data-testid="chat-dok-obrazek-pridat"><ImagePlus className="w-3.5 h-3.5 mr-1" />{t('dok.imgAdd')}</Button>
+        </div>
+      )}
+      <p className="text-[11px] text-muted-foreground">{t('dok.imgHint')}</p>
+      {chyba && <p className="text-destructive" data-testid="chat-dok-obrazek-chyba">{chyba}</p>}
+    </div>
+  );
+}
+
+function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti }) {
   const { t, i18n } = useTranslation('asistent');
+  const A = useAsistent();
   const lang = i18n.language === 'en' ? 'en' : 'cs';
   const [formaty, setFormaty] = useState(null);
   const [beh, setBeh] = useState('');
@@ -185,7 +277,8 @@ function KancelarOvladani({ dok, onMeta, uklada }) {
   const meta = dok.meta || PRAZDNA_META;
   const jeKarta = dok.kind === 'card';
   useEffect(() => { let z = true; import('@/lib/kancelar').then((K) => { if (z) setFormaty(K.formaty(dok.kind)); }); return () => { z = false; }; }, [dok.kind]);
-  useEffect(() => { setNahled(''); }, [dok.updated, fotka]); // změna textu, barvy nebo fotky = starý náhled neplatí
+  const obrKlic = (dok.obrazky || []).map((o) => o.id + o.url).join(','); // nakreslený / vyměněný obrázek
+  useEffect(() => { setNahled(''); }, [dok.updated, fotka, obrKlic]); // změna textu, barvy, fotky nebo obrázku = starý náhled neplatí
   const stahni = async (format) => {
     if (beh) return;
     setBeh(format); setChyba('');
@@ -202,6 +295,19 @@ function KancelarOvladani({ dok, onMeta, uklada }) {
     try {
       const { nahledDokumentu } = await import('@/lib/kancelar/stahni');
       setNahled(await nahledDokumentu(dok, { lang, barva: jeKarta ? meta.color || '' : '', fotka: fotka ? fotka.bytes : null, sirka: 560 }));
+    } catch { setChyba(t('dok.previewError')); }
+    setBeh('');
+  };
+  // dokument velký vlevo místo mapy, jako obrázek (Richard 4. 11. večer: „pozvánka by se mohla také zobrazit vlevo“);
+  // všechny strany / snímky — šipkami listovat; ostrost podle šířky okna
+  const otevriVlevo = async () => {
+    if (beh) return;
+    setBeh('vlevo'); setChyba('');
+    try {
+      const { nahledyDokumentu } = await import('@/lib/kancelar/stahni');
+      const sirka = Math.min(2000, Math.max(800, Math.round(window.innerWidth * (window.devicePixelRatio || 1))));
+      const strany = await nahledyDokumentu(dok, { lang, barva: jeKarta ? meta.color || '' : '', fotka: fotka ? fotka.bytes : null, sirka });
+      A.otevriObrazek({ polozky: strany.map((s, i) => ({ id: `${dok.id}:${i + 1}`, title: dok.title || '', src: s.src, width: s.width, height: s.height })), index: 0 });
     } catch { setChyba(t('dok.previewError')); }
     setBeh('');
   };
@@ -236,6 +342,7 @@ function KancelarOvladani({ dok, onMeta, uklada }) {
         </div>
       )}
       {jeKarta && <p className="text-[11px] text-muted-foreground">{t('dok.photoHint')}</p>}
+      {onDok && <ObrazkyKancelare dok={dok} onDok={onDok} onNacti={onNacti} uklada={uklada} />}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-muted-foreground">{t('dok.downloadAs')}:</span>
         {(formaty || []).map((f) => (
@@ -243,11 +350,18 @@ function KancelarOvladani({ dok, onMeta, uklada }) {
             {beh === f ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1" />}{f === 'pptx' ? 'PowerPoint' : f === 'docx' ? 'Word' : 'PDF'}
           </Button>
         ))}
+        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={!!beh} onClick={otevriVlevo} title={t('dok.openLeftHint')} data-testid="chat-dok-vlevo">
+          {beh === 'vlevo' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Maximize2 className="w-3.5 h-3.5 mr-1" />}{t('dok.openLeft')}
+        </Button>
         <Button size="sm" variant="ghost" className="h-7 px-2" disabled={!!beh && beh !== 'nahled'} onClick={ukazNahled} data-testid="chat-dok-nahled">
           {beh === 'nahled' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : nahled ? <EyeOff className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}{nahled ? t('dok.previewHide') : t('dok.preview')}
         </Button>
       </div>
-      {nahled && <img src={nahled} alt={t('dok.previewAlt')} className="w-full rounded-md border border-border bg-white" data-testid="chat-dok-nahled-obrazek" />}
+      {nahled && (
+        <button type="button" onClick={otevriVlevo} title={t('dok.openLeftHint')} className="block w-full cursor-zoom-in" data-testid="chat-dok-nahled-zvetsit">
+          <img src={nahled} alt={t('dok.previewAlt')} className="w-full rounded-md border border-border bg-white" data-testid="chat-dok-nahled-obrazek" />
+        </button>
+      )}
       {chyba && <p className="text-destructive" data-testid="chat-dok-kancelar-chyba">{chyba}</p>}
     </div>
   );
@@ -390,7 +504,7 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
               </dl>
             )}
             {/* kancelář: stažení souboru, u přání šablona / barva / fotka, náhled — pro všechny druhy (PDF + Word) */}
-            <KancelarOvladani dok={dok} onMeta={ulozMeta} uklada={uklada} />
+            <KancelarOvladani dok={dok} onMeta={ulozMeta} uklada={uklada} onDok={setDok} onNacti={nacti} />
             {/* dvojklik do textu = upravit (jako v Claude) */}
             <div onDoubleClick={zacniUpravu} className="cursor-text">
               {dok.text ? <DokText text={dok.text} /> : <p className="text-sm text-muted-foreground italic">{t('dok.emptyText')}</p>}
@@ -454,14 +568,18 @@ export default function DokumentyPanel({ mobil }) {
   const novyDruh = novyDok ? (A.dokId.split(':')[1] || '') : '';
   const otevriNovy = useCallback((d) => A.setDokId(NOVY_DOK + (d ? ':' + d : '')), [A]);
   // záložky panelu Kancelář: Dokumenty | Stránky (když instance stránky má) | PDF — PDF sem přešlo z hlavičky chatu (Richard 1. 11. 2026: dvě ikonky „dokument“ a „složka“ mátly)
-  const ZALOZKY = [['dokumenty', FileText, 'str.tabDocs'], ...(strankyOn ? [['stranky', LayoutTemplate, 'str.tabPages']] : []), ['pdf', Files, 'dok.tabPdf']];
+  // Obrázky (4. 11. 2026, Richard: „zasloužilo by si to solo kategorii“) mezi Dokumenty a Stránkami — jen kde instance kreslí
+  const ai = useAiModes();
+  const obrazkyOn = ai.has('chat_draw');
+  const ZALOZKY = [['dokumenty', FileText, 'str.tabDocs'], ...(obrazkyOn ? [['obrazky', ImageIkona, 'obr.tab']] : []), ...(strankyOn ? [['stranky', LayoutTemplate, 'str.tabPages']] : []), ['pdf', Files, 'dok.tabPdf']];
   const zalozky = (
-    <div className="flex items-center gap-1" role="tablist" data-testid="chat-dok-zalozky">
+    // čtyři záložky se na telefonu (390 px) nevešly — PDF uřízlé (4. 11. 2026): na úzkém okně bez ikon, krajní nouze rolovat
+    <div className="flex min-w-0 items-center gap-1 overflow-x-auto" role="tablist" data-testid="chat-dok-zalozky">
       {ZALOZKY.map(([z, Ik, klic]) => (
         <button key={z} type="button" role="tab" aria-selected={zalozka === z} onClick={() => setZalozka(z)}
-          className={`text-sm font-semibold inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${zalozka === z ? 'bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
+          className={`shrink-0 text-sm font-semibold inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${zalozka === z ? 'bg-secondary' : 'text-muted-foreground hover:text-foreground'}`}
           data-testid="chat-dok-zalozka" data-zalozka={z}>
-          <Ik className={`w-4 h-4 ${zalozka === z ? 'text-primary' : ''}`} />{t(klic)}
+          <Ik className={`hidden sm:block w-4 h-4 ${zalozka === z ? 'text-primary' : ''}`} />{t(klic)}
         </button>
       ))}
     </div>
@@ -548,6 +666,8 @@ export default function DokumentyPanel({ mobil }) {
         ? <PametPohled />
         : novyDok
         ? <NovyDokument key={A.dokId} druh={novyDruh} mapId={mapaZAdresy} onOdeslat={posliZpravu} onZpet={() => A.setDokId('')} />
+        : !A.dokId && obrazkyOn && zalozka === 'obrazky'
+        ? <SeznamObrazku />
         : !A.dokId && zalozka === 'pdf'
         ? <PdfPohled onZpet={() => setZalozka('dokumenty')} onOpravit={A.funkcni ? (priloha) => A.spust('pdf_oprava', { priloha }) : undefined} loading={false} soubory={A.pdfSoubory} setSoubory={A.setPdfSoubory} />
         : novaStranka

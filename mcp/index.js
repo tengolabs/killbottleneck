@@ -45,7 +45,7 @@ const enc = encodeURIComponent; // id v cestě VŽDY encodovat (LLM může posla
 // server na neshodu vrátí 409 a nástroj se zotaví přenačtením mapy
 const lastUpdated = new Map();
 
-async function call(method, path, body) {
+async function call(method, path, body, timeoutMs) {
   // Nenakonfigurovaný server nástroje NABÍZÍ, ale při volání poctivě řekne, co chybí
   // (místo dřívějšího tichého pádu procesu při startu).
   if (CHYBI_KONFIG.length) {
@@ -57,7 +57,7 @@ async function call(method, path, body) {
       method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(timeoutMs || 30000), // obrázek: fronta FLUX 3 až ~1 min
     });
   } catch (e) {
     throw new Error(`killBottleneck instance unreachable at ${URL_BASE} (${e.message})`);
@@ -756,6 +756,12 @@ server.registerTool('get_page', {
   inputSchema: strict({ page_id: z.string() }),
 }, async ({ page_id }) => {
   try { const p = (await call('GET', `/api/kb/v1/pages/${enc(page_id)}`)).page; return text(popisStranky(p) + '\n\n```html\n' + p.html + '\n```'); } catch (e) { return errText(e.message); }
+});
+server.registerTool('generate_image', {
+  description: 'Draw a picture (illustration, banner, header image, poster) with the instance\'s image model and return a public link to the JPEG. Write `prompt` in English as a detailed visual description and add "no text". Only when readable words must be in the picture, put the exact short text into `text` (only if the instance allows pictures with text; letters may come out wrong). format: square 1024×1024 (default), banner 1200×400, header 1536×640, portrait 512×896, landscape 1792×1024. Costs AI credits like an assistant message.',
+  inputSchema: strict({ prompt: z.string(), title: z.string().describe('short caption'), text: z.string().optional(), format: z.enum(['square', 'banner', 'header', 'portrait', 'landscape']).optional() }),
+}, async ({ prompt, title, text: napis, format }) => {
+  try { const o = (await call('POST', '/api/kb/v1/images', { prompt, title, text: napis, format }, 100000)).image; return text(`Picture "${o.title}" drawn (${o.width}×${o.height}, model ${o.model === 'flux3' ? 'FLUX 3 Klein (with text)' : 'FLUX.2 klein'}): ${o.url}`); } catch (e) { return errText(e.message); }
 });
 server.registerTool('create_page', {
   description: 'Create a page from a COMPLETE single-file HTML document you wrote yourself (inline CSS/JS; external libraries only from https CDNs; no fetch to other servers; size limit per instance, typically 300 kB). The page appears in the user\'s Pages panel in the app and runs sandboxed (no access to the app\'s session). team_visible=true shows it to all members of the organization. Returns the id and the public link if one is on.',

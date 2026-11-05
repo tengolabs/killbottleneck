@@ -45,6 +45,7 @@ const Stranka = lazy(() => import('./pages/Stranka'));
 // Relax (14. 10. 2026): vrstva s akváriem / úlem — montuje se JEN když pauza běží (AsistentContext.relax),
 // jinak nulová zátěž; líný chunk, do lite rozpočtu nejde
 const RelaxVrstva = lazy(() => import('./components/relax/RelaxVrstva'));
+const ObrazekVrstva = lazy(() => import('./components/asistent/ObrazekVrstva'));
 
 const Spinner = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -98,6 +99,8 @@ const AsistentHost = ({ children }) => {
           <RelaxVrstva lite={lite} />
         </Suspense>
       )}
+      {/* prohlížeč obrázku (karta v chatu, Kancelář, záložka Obrázky) — líný chunk, jen když je obrázek otevřený */}
+      {!!user && !!A.prohlizec && <Suspense fallback={null}><ObrazekVrstva /></Suspense>}
     </>
   );
 };

@@ -11,6 +11,22 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.100-beta": {
+    cs: [
+      "Asistent umí kreslit: napište „nakresli ilustraci…“ nebo „udělej banner do e-mailu…“ a pod odpovědí se objeví obrázek ke stažení nebo k nakreslení znovu.",
+      "V Kanceláři přibyla záložka Obrázky: Nový obrázek bez rozhovoru (sedm stylů, výchozí Malba), prohlížeč a připíchnutí natrvalo; nepoužité obrázky se po 90 dnech samy uklidí.",
+      "Prezentace, přání, pozvánky i plakáty z Kanceláře dostanou obrázek samy a Stránky asistenta umí až tři ilustrace.",
+      "Denní sumář může chodit i e-mailem, s obrázkem dne v záhlaví — zapnete si ho v Notifikacích.",
+      "Na vlastním serveru připojíte svou službu obrázků přes OpenAI Images API (KB_IMAGE_PROVIDER=openai); bez nastavení se kreslení vůbec neukáže.",
+    ],
+    en: [
+      "The assistant can draw: write \"draw an illustration…\" or \"make an e-mail banner…\" and a picture appears under the reply, ready to download or redraw.",
+      "Office has a new Pictures tab: New image without a chat (seven styles, Painting by default), a viewer and pinning forever; unused pictures are cleaned up after 90 days.",
+      "Presentations, cards, invitations and posters from Office get a picture on their own, and assistant Pages can carry up to three illustrations.",
+      "The daily summary can also come by e-mail, with the picture of the day as its header — turn it on in Notifications.",
+      "On your own server, connect your picture service via the OpenAI Images API (KB_IMAGE_PROVIDER=openai); without it, drawing does not show up at all.",
+    ],
+  },
   "v0.99-beta": {
     cs: [
       "Kalendář „jen pro vybrané“ jde zase přidělit lidem — seznam členů ve Správě organizace byl od v0.83 vždy prázdný.",

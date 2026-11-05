@@ -74,3 +74,16 @@ export function kresliObrazek(page, obr, { x, y, w, h, zarovnani = 'left' }) {
   page.drawImage(obr.image, { x: xx, y: y + (h - dh) / 2, width: dw, height: dh });
   return { x: xx, y: y + (h - dh) / 2, w: dw, h: dh };
 }
+// obrázek přes celý obdélník (cover) — přebytek ořízne ořezová cesta; `ops` = PDFLib (pushGraphicsState, rectangle,
+// clip, endPath, popGraphicsState). AI obrázky Kanceláře (3. 11. 2026) mají poměr stran podle místa v šabloně,
+// ořez je jen pár procent. Bez `ops` (starší volající) vepsat (contain).
+export function kresliObrazekPres(page, obr, { x, y, w, h }, ops) {
+  if (!obr) return null;
+  if (!ops || !ops.pushGraphicsState) return kresliObrazek(page, obr, { x, y, w, h, zarovnani: 'center' });
+  const k = Math.max(w / obr.w, h / obr.h);
+  const dw = obr.w * k, dh = obr.h * k;
+  page.pushOperators(ops.pushGraphicsState(), ops.rectangle(x, y, w, h), ops.clip(), ops.endPath());
+  page.drawImage(obr.image, { x: x + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
+  page.pushOperators(ops.popGraphicsState());
+  return { x, y, w, h };
+}
