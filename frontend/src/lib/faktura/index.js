@@ -1,7 +1,7 @@
 // PDF faktury v PROHLÍŽEČI (9. 10. 2026): z DTO faktury (/chat/faktura/{id}) vyrobí pdf-lib dokument — server
 // soubor nikdy nedostane a nic se neukládá (Cloud Lite cizí soubory neukládá); PDF jde vyrobit kdykoli znovu 1:1,
 // protože faktura nese snímky dodavatele i odběratele. Knihovny (pdf-lib, fontkit, qrcode-generator) a fonty
-// Liberation Sans (OFL, public/fonts/pdf/) se načítají líně — statický import je zakázaný (lite-bundle.js).
+// KB Sans (podmnožina Liberation Sans, OFL, public/fonts/pdf/) se načítá líně — statický import je zakázaný (lite-bundle.js).
 import { getLib, nactiFont } from '@/lib/pdf';
 import { sestavFakturu, POPISKY, castka, datum } from './layout.js';
 import { qrMatice, kresliQr } from './qr.js';
@@ -24,7 +24,7 @@ async function logoBajty(url) {
 // data = DTO faktury; vrací Uint8Array (hotové PDF). Logo organizace je bonus: chyba načtení = bez loga.
 export async function fakturaPdf(data, { lang = 'cs', logoUrl = '' } = {}) {
   const { PDFLib, fontkit } = await getLib();
-  const [reg, bold, logo] = await Promise.all([nactiFont('LiberationSans-Regular'), nactiFont('LiberationSans-Bold'), logoBajty(logoUrl)]);
+  const [reg, bold, logo] = await Promise.all([nactiFont('KBSans-Regular'), nactiFont('KBSans-Bold'), logoBajty(logoUrl)]);
   const doc = await PDFLib.PDFDocument.create();
   doc.registerFontkit(fontkit);
   doc.setTitle(`${lang === 'en' ? 'Invoice' : 'Faktura'} ${data.cislo || ''}`);

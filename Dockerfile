@@ -30,6 +30,10 @@ ENV KB_VERSION=${KB_VERSION}
 COPY server/pb_migrations ./pb_migrations
 COPY server/pb_hooks ./pb_hooks
 COPY --from=frontend /build/dist ./pb_public
+# Licenční texty cestují s každou kopií (SUL + seznam třetích stran, nález L3c auditu 14. 10. 2026):
+# instance je servíruje na /LICENSE.txt a /THIRD-PARTY-LICENSES.txt, odkazuje na ně dialog „O aplikaci“.
+COPY LICENSE ./pb_public/LICENSE.txt
+COPY THIRD-PARTY-LICENSES.md ./pb_public/THIRD-PARTY-LICENSES.txt
 
 EXPOSE 8090
 VOLUME /app/pb_data

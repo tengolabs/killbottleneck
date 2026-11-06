@@ -1,7 +1,7 @@
 // Prezentace jako PDF (16:9, jeden snímek = strana) — čistá funkce nad injektovaným pdf-lib (node test i prohlížeč).
 // Vzhled: titulní strana s pruhem v barvě (akcent skinu nebo zvolená), obsahové strany s nadpisem, odrážkami
 // s puntíkem a patičkou (název · číslo); logo organizace vpravo nahoře. Poznámky řečníka do PDF NEJDOU
-// (jsou v PPTX) — PDF je k promítání a poslání. Písmo Liberation Sans (OFL) — jediné, co v PDF máme.
+// (jsou v PPTX) — PDF je k promítání a poslání. Písmo KB Sans (podmnožina Liberation Sans, OFL) — jediné, co v PDF máme.
 // AI obrázky (3. 11. 2026): `obrazky` = { '': titulní, '<nadpis snímku>': obsahový } → { image, w, h }; titulní vyplní
 // levý pruh místo kruhů, obsahový pravý panel (odrážky se zúží). `ops` = PDFLib kvůli ořezu (kresliObrazekPres).
 import { SNIMEK, hexRgb, hexRgbSvetle, tmava, kresliBlok, kresliObrazek, kresliObrazekPres, vyskaBloku } from './textPdf.js';

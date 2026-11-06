@@ -142,6 +142,7 @@ pak vidíte a rušíte v aplikaci pod „API klíče".
 | `update_page` | nahradí HTML a/nebo název stránky — posílá se CELÝ nový dokument, předchozí verze zůstává k obnovení |
 | `share_page` | sdílení stránky: `link_on`/`link_off`/`link_new` (veřejný odkaz), `team_on`/`team_off` (celá organizace), `user_on`/`user_off` (jeden člen přes `email`) |
 | `delete_page` | smaže stránku nenávratně |
+| `generate_image` | obrázek (ilustrace, banner, hlavička, plakát) obrazovým modelem instance — vrátí veřejný odkaz na JPEG; `prompt` anglicky bez textu, čitelný nápis jen přes `text`; formáty square/banner/header/portrait/landscape; stojí AI kredity jako zpráva asistentovi |
 
 **Úkol = uzel s řešitelem (`owner`) nebo termínem** — žádný samostatný úkolový
 záznam neexistuje. Novou práci zakládejte přes `add_nodes`, odbavujte přes

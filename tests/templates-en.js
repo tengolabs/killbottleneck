@@ -72,7 +72,7 @@ async function waitHealthy() {
     const byTitle = Object.fromEntries(tpls.map(t => [t.title, t]));
     const enText = t => JSON.stringify([t?.title_en, t?.description_en, t?.goal_en, t?.ai_nodes_en]);
     const CHECKS = [
-      ['Lean Canvas', 'How you make money and from what.', 'earn money from'],
+      ['Lean Canvas', 'What customers pay for and how.', 'How you make money and from what.'],
       ['Kanban tabule', 'work in columns (flow-based)', 'in flows (columns)'],
       ['Work-life balance', 'Track how much time you spend on work, leisure', 'free time and other activities'],
       ['Úspěšné studium', 'Active recall', '"Active review"'],

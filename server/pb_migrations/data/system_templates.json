@@ -851,7 +851,7 @@
   },
   {
     "title": "Business Model Canvas",
-    "description": "9 stavebních bloků byznys modelu na jedné mapě.",
+    "description": "9 stavebních bloků byznys modelu na jedné mapě. Rámec Business Model Canvas vytvořil Alexander Osterwalder (Strategyzer, CC BY-SA 3.0); texty bloků jsou vlastní.",
     "category": "strategie",
     "icon": "Layout",
     "goal": "Business Model Canvas",
@@ -919,7 +919,7 @@
       }
     ],
     "title_en": "Business Model Canvas",
-    "description_en": "The 9 building blocks of a business model on one map.",
+    "description_en": "The 9 building blocks of a business model on one map. The Business Model Canvas framework is by Alexander Osterwalder (Strategyzer, CC BY-SA 3.0); the block texts here are our own.",
     "goal_en": "Business Model Canvas",
     "ai_nodes_en": [
       {
@@ -2144,7 +2144,7 @@
   },
   {
     "title": "Lean Canvas",
-    "description": "9 bloků pro rychlé ověření startupu/produktu (Ash Maurya).",
+    "description": "9 bloků pro rychlé ověření nápadu na startup či produkt. Rámec Lean Canvas vytvořil Ash Maurya (odvozen z Business Model Canvas, CC BY-SA 3.0); texty bloků jsou vlastní.",
     "category": "strategie",
     "icon": "Lightbulb",
     "goal": "Lean Canvas",
@@ -2157,62 +2157,62 @@
         "title": "Lean Canvas (definuj startup/produkt)"
       },
       {
-        "description": "Top 1–3 problémy zákazníka, které řešíš.",
+        "description": "Jedno až tři největší trápení zákazníka, na která míříš.",
         "id": "lc1",
         "parentId": "root",
         "title": "Problém"
       },
       {
-        "description": "Cíloví zákazníci a early adopters.",
+        "description": "Pro koho to je a kdo to vyzkouší jako první.",
         "id": "lc2",
         "parentId": "root",
         "title": "Zákaznické segmenty"
       },
       {
-        "description": "Jasná zpráva, proč jsi jiný a proč za to stojí.",
+        "description": "Jednou větou: v čem jsi jiný a proč to má smysl koupit.",
         "id": "lc3",
         "parentId": "root",
         "title": "Unikátní hodnotová nabídka"
       },
       {
-        "description": "Top 3 funkce, které problém řeší.",
+        "description": "Nejvýš tři věci, které tvoje řešení pro každé trápení dělá.",
         "id": "lc4",
         "parentId": "root",
         "title": "Řešení"
       },
       {
-        "description": "Cesty, jak se dostaneš k zákazníkům.",
+        "description": "Kudy se o tobě zákazníci dozvědí a kudy nakoupí.",
         "id": "lc5",
         "parentId": "root",
         "title": "Kanály"
       },
       {
-        "description": "Jak a za co vyděláváš.",
+        "description": "Za co a jakým způsobem ti zákazníci platí.",
         "id": "lc6",
         "parentId": "root",
         "title": "Zdroje příjmů"
       },
       {
-        "description": "Hlavní náklady.",
+        "description": "Co tě bude stát rozjezd a provoz.",
         "id": "lc7",
         "parentId": "root",
         "title": "Struktura nákladů"
       },
       {
-        "description": "Čísla, podle kterých měříš úspěch.",
+        "description": "Několik čísel, na kterých poznáš, že to funguje.",
         "id": "lc8",
         "parentId": "root",
         "title": "Klíčové metriky"
       },
       {
-        "description": "Co nelze snadno zkopírovat ani koupit.",
+        "description": "Co máš jen ty a konkurence to nedožene penězi ani rychlostí.",
         "id": "lc9",
         "parentId": "root",
         "title": "Nespravedlivá výhoda"
       }
     ],
     "title_en": "Lean Canvas",
-    "description_en": "9 blocks for quickly validating a startup/product (Ash Maurya).",
+    "description_en": "9 blocks for quickly validating a startup or product idea. The Lean Canvas framework is by Ash Maurya (adapted from the Business Model Canvas, CC BY-SA 3.0); the block texts here are our own.",
     "goal_en": "Lean Canvas",
     "ai_nodes_en": [
       {
@@ -2222,55 +2222,55 @@
         "title": "Lean Canvas (define your startup/product)"
       },
       {
-        "description": "Top 1–3 customer problems you are solving.",
+        "description": "The one to three biggest pains of your customer that you are going after.",
         "id": "lc1",
         "parentId": "root",
         "title": "Problem"
       },
       {
-        "description": "Target customers and early adopters.",
+        "description": "Who it is for and who will try it first.",
         "id": "lc2",
         "parentId": "root",
         "title": "Customer Segments"
       },
       {
-        "description": "A clear message about why you're different and worth choosing.",
+        "description": "In one sentence: how you differ and why that is worth paying for.",
         "id": "lc3",
         "parentId": "root",
         "title": "Unique Value Proposition"
       },
       {
-        "description": "Top 3 features that solve the problem.",
+        "description": "At most three things your product does about each pain.",
         "id": "lc4",
         "parentId": "root",
         "title": "Solution"
       },
       {
-        "description": "Paths to reach your customers.",
+        "description": "Where customers hear about you and where they buy.",
         "id": "lc5",
         "parentId": "root",
         "title": "Channels"
       },
       {
-        "description": "How you make money and from what.",
+        "description": "What customers pay for and how.",
         "id": "lc6",
         "parentId": "root",
         "title": "Revenue Streams"
       },
       {
-        "description": "Main costs.",
+        "description": "What launching and running it will cost you.",
         "id": "lc7",
         "parentId": "root",
         "title": "Cost Structure"
       },
       {
-        "description": "Numbers you use to measure success.",
+        "description": "A few numbers that tell you it is working.",
         "id": "lc8",
         "parentId": "root",
         "title": "Key Metrics"
       },
       {
-        "description": "What cannot be easily copied or bought.",
+        "description": "What only you have and competitors cannot catch up with by money or speed.",
         "id": "lc9",
         "parentId": "root",
         "title": "Unfair Advantage"

@@ -119,7 +119,7 @@ export async function pocetStran({ PDFLib, bytes }) {
 
 // ---------- oprava textu (přelepka) ----------
 // Výběr řezu náhradního písma podle fontu v PDF: patkové (Times, Georgia,
-// Cambria, Garamond, Book…) → Liberation Serif, jinak Liberation Sans;
+// Cambria, Garamond, Book…) → KB Serif, jinak KB Sans (podmnožiny Liberation);
 // Bold/Italic z názvu fontu (pdf.js dává jen interní jméno g_d0_f1, ale
 // `fontFamily` ze styles a u některých PDF i skutečný název).
 export function vyberRez(fontName, fontFamily) {
@@ -127,7 +127,7 @@ export function vyberRez(fontName, fontFamily) {
   const serif = /serif(?!\s*sans)|times|georgia|cambria|garamond|book|palatino|minion|century|roman/.test(s) && !/sans/.test(s);
   const bold = /bold|black|heavy|semibold|demi/.test(s);
   const italic = /italic|oblique/.test(s);
-  return `Liberation${serif ? 'Serif' : 'Sans'}-${bold && italic ? 'BoldItalic' : bold ? 'Bold' : italic ? 'Italic' : 'Regular'}`;
+  return `KB${serif ? 'Serif' : 'Sans'}-${bold && italic ? 'BoldItalic' : bold ? 'Bold' : italic ? 'Italic' : 'Regular'}`;
 }
 
 // Barva textu a pozadí pod nalezeným textem: vyrenderovat stranu a vzorkovat —

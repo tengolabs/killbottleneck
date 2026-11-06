@@ -9,6 +9,34 @@ below before you jump several versions.
 
 ---
 
+## v0.101-beta — 2026-11-06
+
+**License housekeeping from the third code review — nothing copyleft, every notice in order**
+
+**Upgrade notes:** one data migration (`1793956000_canvas_texty_vlastni`) rewrites the block texts of the two system
+templates *Business Model Canvas* and *Lean Canvas* — only if they still carry the original seed wording; a template an
+admin edited is left alone (and logged), personal copies are untouched. Rebuild the image as usual.
+
+- **PDF fonts renamed.** The Latin subsets of Liberation Sans / Liberation Serif used for invoices, Office PDFs and
+  PDF text fixes are now called **KB Sans / KB Serif** (`frontend/public/fonts/pdf/KBSans-*.ttf`). The OFL reserves the
+  name "Liberation" for unmodified fonts; the files now ship the upstream OFL text instead of a Debian copyright file
+  that mentioned GPL-2+. Generated PDFs look exactly the same.
+- **Business Model Canvas and Lean Canvas** credit their authors (Osterwalder / Maurya, CC BY-SA 3.0) in the template
+  description; the Lean Canvas block descriptions are reworded in our own words instead of the original's.
+- **License texts travel with every copy:** the Docker image serves `/LICENSE.txt` and `/THIRD-PARTY-LICENSES.txt`,
+  and the *About* dialog links to both (also from the Android app, where the files live on the server). The About text no longer promises "no strings" — it says what the Sustainable
+  Use License allows (own use, commercial too; no hosted resale, no white-label).
+- **`THIRD-PARTY-LICENSES.md`** regenerated: dual-licensed packages are marked with the option we use and the GPL text
+  of jszip is no longer reproduced; Plus Jakarta Sans, the KB fonts and shadcn/ui are listed; the generator's allowlist
+  no longer lets "(GPL-3.0 AND MIT)" through (`scripts/licence-pravidla.mjs`, shared with the test). `NOTICE.md` is a
+  short, current notice instead of a stale package table.
+- **Website:** the Geist font ships its OFL text and is listed in `docs/THIRD-PARTY.md`.
+- **MCP package** `killbottleneck-mcp` 0.101.0 — the README lists `generate_image`, the version follows the app again.
+- Tests: `licence-soubory` (28 checks over the tree), `licence-instance` (instance serves the texts, templates seeded
+  with the new wording), `upgrade-canvas-texty` (existing instance gets the new texts, personal copies stay).
+
+---
+
 ## v0.100.1-beta — 2026-11-05
 
 **A weekly picture count instead of credits**

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Vygeneruje product/THIRD-PARTY-LICENSES.md — seznam všech produkčních
 // npm závislostí (frontend + mcp) s plným textem licence, plus ručně
-// udržované položky mimo npm (PocketBase, font Inter).
+// udržované položky mimo npm (PocketBase, fonty, shadcn/ui).
 //
 // Spuštění:  node product/scripts/gen-third-party-licenses.mjs
 // Vyžaduje nainstalované node_modules ve frontend/ i mcp/ (npm ci).
@@ -20,12 +20,12 @@ const OUT = join(ROOT, "THIRD-PARTY-LICENSES.md");
 // Vlastní balíčky — do seznamu třetích stran nepatří.
 const OWN = new Set(["killbottleneck", "killbottleneck-mcp"]);
 
-// Licence povolené v produktu (viz paměť: jen komerčně použitelné).
-// Cokoliv mimo seznam shodí generátor chybou → ruční posouzení.
-const ALLOWED = /^(MIT|ISC|0BSD|BSD-[23]-Clause|Apache-2\.0|Zlib|CC0-1\.0|Unlicense|BlueOak-1\.0\.0|Python-2\.0|\(.*\))(\s+AND\s+.*)?$/;
+// Pravidla povolených licencí: licence-pravidla.mjs (sdílené s testem).
+import { licencePovolena, zvolenaStrana, odhadnuta } from "./licence-pravidla.mjs";
 
 function checker(dir) {
-  const json = execSync("npx --yes license-checker --production --json", {
+  const json = // Verze přibitá: `npx --yes` bez verze by při každém běhu stáhl a spustil, co je zrovna na npm.
+  execSync("npx --yes license-checker@25.0.1 --production --json", {
     cwd: join(ROOT, dir),
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
@@ -43,18 +43,16 @@ for (const dir of ["frontend", "mcp"]) {
   }
 }
 
-const suspicious = [...packages.entries()].filter(([, i]) => {
-  const lic = String(i.licenses);
-  // Duální licence "(A OR B)" bereme jako OK jen když aspoň jedna strana je povolená.
-  if (lic.startsWith("(") && /\bOR\b/.test(lic)) {
-    return !lic.match(/MIT|ISC|BSD|Apache-2\.0|Zlib|CC0|Unlicense|WTFPL/);
-  }
-  return !ALLOWED.test(lic) && !/^MIT\*$/.test(lic);
-});
+const suspicious = [...packages.entries()].filter(([, i]) => !licencePovolena(i.licenses));
 if (suspicious.length) {
   console.error("⚠️ Balíčky s licencí mimo povolený seznam — posoudit ručně:");
   for (const [id, i] of suspicious) console.error(`   ${id}: ${i.licenses}`);
   process.exit(1);
+}
+const odhadnute = [...packages.entries()].filter(([, i]) => odhadnuta(i.licenses));
+if (odhadnute.length) {
+  console.warn("⚠️ Licence jen odhadnutá z README (package.json ji nedeklaruje) — ověřit ručně v repozitáři:");
+  for (const [id, i] of odhadnute) console.warn(`   ${id}: ${i.licenses} ${i.repository ?? ""}`);
 }
 
 const sorted = [...packages.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -79,15 +77,26 @@ node scripts/gen-third-party-licenses.mjs
 - License: MIT
 - Source: https://github.com/pocketbase/pocketbase
 
-### Inter font family (bundled in the documentation site build)
+### Inter font family (\`frontend/public/fonts/\`, self-hosted UI font)
 
 - License: SIL Open Font License 1.1
 - Source: https://github.com/rsms/inter
 
-### Liberation Sans / Liberation Serif (\`frontend/public/fonts/pdf/\`, subset to Latin — used only when the assistant corrects text in a PDF in the browser)
+### Plus Jakarta Sans (\`frontend/public/fonts/\`, self-hosted UI font)
 
-- License: SIL Open Font License 1.1 (copyright notice in \`frontend/public/fonts/pdf/LICENSE-Liberation.txt\`)
+- License: SIL Open Font License 1.1 (full text in \`frontend/public/fonts/LICENSE-OFL.txt\`)
+- Source: https://github.com/tokotype/PlusJakartaSans
+
+### KB Sans / KB Serif (\`frontend/public/fonts/pdf/\`, embedded into PDFs made in the browser — invoices, Office documents, PDF text fixes)
+
+- Latin subsets of Liberation Sans / Liberation Serif 2.1.5 (Red Hat, Inc.; digitized data Google Corporation), renamed because "Liberation" is a Reserved Font Name under the OFL
+- License: SIL Open Font License 1.1 (full text in \`frontend/public/fonts/pdf/LICENSE-OFL.txt\`)
 - Source: https://github.com/liberationfonts/liberation-fonts
+
+### UI primitives adapted from shadcn/ui (\`frontend/src/components/ui/\`)
+
+- License: MIT (copyright shadcn)
+- Source: https://github.com/shadcn-ui/ui — the toast hook is in turn inspired by react-hot-toast (MIT)
 
 ## npm packages (production dependencies of \`frontend/\` and \`mcp/\`)
 
@@ -104,7 +113,18 @@ md += `\n## License texts\n`;
 
 for (const [id, info] of sorted) {
   md += `\n---\n\n### ${id}\n\nLicense: ${info.licenses}\n\n`;
-  if (info.licenseFile && existsSync(info.licenseFile) && !/README/i.test(info.licenseFile)) {
+  const strana = zvolenaStrana(info.licenses);
+  const maText = info.licenseFile && existsSync(info.licenseFile) && !/README/i.test(info.licenseFile);
+  if (strana && maText) {
+    // Duál: text copyleftové strany (GPL/MPL…) se vynechá — od jejího nadpisu dál. Zbytek
+    // (volba, copyright, text zvolené strany) zůstává, MIT/BSD chtějí upozornění zachovat.
+    // Věta o vynechání se tiskne jen když se opravdu něco vystřihlo.
+    const cely = readFileSync(info.licenseFile, "utf8");
+    const cut = cely.search(/^\s*(GPL version 3\s*\n=+|GNU (AFFERO |LESSER )?GENERAL PUBLIC LICENSE|Mozilla Public License)/m);
+    const text = (cut >= 0 ? cely.slice(0, cut) : cely).trim();
+    md += `_Dual-licensed; killBottleneck uses this package under the **${strana}** license.${cut >= 0 ? " The text of the copyleft option is deliberately not reproduced here — see the repository above." : ""}_\n\n`;
+    if (text) md += "```\n" + text.replace(/```/g, "``\u200b`") + "\n```\n";
+  } else if (maText) {
     const text = readFileSync(info.licenseFile, "utf8").trim();
     md += "```\n" + text.replace(/```/g, "``​`") + "\n```\n";
   } else {
@@ -113,4 +133,4 @@ for (const [id, info] of sorted) {
 }
 
 writeFileSync(OUT, md);
-console.log(`✅ ${OUT}: ${sorted.length} npm balíčků + PocketBase + Inter + Liberation`);
+console.log(`✅ ${OUT}: ${sorted.length} npm balíčků + PocketBase + fonty + shadcn`);

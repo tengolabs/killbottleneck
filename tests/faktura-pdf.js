@@ -1,4 +1,4 @@
-// PDF faktury (9. 10. 2026) — rozvržení bez prohlížeče: skutečné PDF přes pdf-lib + fonty Liberation z public/,
+// PDF faktury (9. 10. 2026) — rozvržení bez prohlížeče: skutečné PDF přes pdf-lib + fonty KB Sans (podmnožina Liberation) z public/,
 // text přečtený pdf.js (číslo, jména, Neplátce DPH / DUZP, částky, strany), QR platba DEKÓDOVANÁ jsqr z nakreslené
 // matice (== SPAYD), logo chybí → nepadá, 50 položek = víc stran s číslováním. Bez dockeru:
 // node product/tests/faktura-pdf.js
@@ -31,7 +31,7 @@ async function vyrob(data, L, { qr = true, logo = null } = {}) {
   const qrcode = (await balik('qrcode-generator/qrcode.js')).default;
   const doc = await PDFLib.PDFDocument.create();
   doc.registerFontkit(fk);
-  const fonty = { regular: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'LiberationSans-Regular.ttf')), { subset: true }), bold: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'LiberationSans-Bold.ttf')), { subset: true }) };
+  const fonty = { regular: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'KBSans-Regular.ttf')), { subset: true }), bold: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'KBSans-Bold.ttf')), { subset: true }) };
   const qrText = data.spayd || data.epc || ''; // jako lib/faktura/index.js: SPAYD (CZK) nebo EPC (EUR)
   const matice = qr && qrText ? qrMaticeZ(qrcode, qrText, 'M') : null;
   sestavFakturu({ doc, rgb: PDFLib.rgb, fonty, data, L, logo, qr: matice, kresliQr });

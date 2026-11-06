@@ -1,5 +1,5 @@
 // Kancelář (14. 10. 2026) — soubory bez prohlížeče: tytéž čisté generátory jako v aplikaci (lib/kancelar/*) nad
-// injektovanými knihovnami (pdf-lib + fonty Liberation z public/, pptxgenjs, docx, qrcode-generator).
+// injektovanými knihovnami (pdf-lib + fonty KB Sans (podmnožina Liberation) z public/, pptxgenjs, docx, qrcode-generator).
 //  · parser osnovy (titul, podtitul, snímky, odrážky, poznámky; stropy 20 / 8),
 //  · PDF prezentace: strany 16:9, titul + každý snímek, text přečtený pdf.js s diakritikou, patička s čísly,
 //  · 4 šablony přání: rozměry (A5 šířka / A5 výška / A4 / A4 šířka), text, Kdy/Kde, QR DEKÓDOVANÝ jsqr == odkaz,
@@ -46,7 +46,7 @@ const JPG = new Uint8Array(Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4M
     const novyDoc = async () => {
       const doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fk);
       const f = async (n) => doc.embedFont(fs.readFileSync(path.join(FONTY, n + '.ttf')), { subset: true });
-      return { doc, fonty: { regular: await f('LiberationSans-Regular'), bold: await f('LiberationSans-Bold'), italic: await f('LiberationSans-Italic') } };
+      return { doc, fonty: { regular: await f('KBSans-Regular'), bold: await f('KBSans-Bold'), italic: await f('KBSans-Italic') } };
     };
     const obr = async (doc, bytes, png) => { const img = png ? await doc.embedPng(bytes) : await doc.embedJpg(bytes); return { image: img, w: img.width, h: img.height }; };
     const textPdf = async (bytes) => {

@@ -28,7 +28,7 @@ let libP = null;
 export const getLib = () => (libP ||= Promise.all([import('pdf-lib'), import('@pdf-lib/fontkit')]).then(([PDFLib, fk]) => ({ PDFLib, fontkit: fk.default })));
 
 const fontCache = new Map();
-// řezy náhradního písma leží v public/fonts/pdf/ (Liberation, OFL, osekané na latinku)
+// řezy náhradního písma leží v public/fonts/pdf/ (KB Sans/KB Serif = latinské podmnožiny Liberation, OFL — viz tam README.md)
 export async function nactiFont(rez) {
   if (!fontCache.has(rez)) {
     fontCache.set(rez, fetch(`${import.meta.env.BASE_URL || '/'}fonts/pdf/${rez}.ttf`).then(async (r) => {

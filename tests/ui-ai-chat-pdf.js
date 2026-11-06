@@ -27,7 +27,7 @@ const mockHandler = (req, res, body) => {
 
 const FE = path.join(__dirname, '../frontend');
 const balik = (p) => import(pathToFileURL(path.join(FE, 'node_modules', p)).href);
-const FONT = path.join(FE, 'public/fonts/pdf/LiberationSans-Regular.ttf');
+const FONT = path.join(FE, 'public/fonts/pdf/KBSans-Regular.ttf');
 
 H.beh(async () => {
   const PDFLib = await balik('pdf-lib/dist/pdf-lib.esm.js');

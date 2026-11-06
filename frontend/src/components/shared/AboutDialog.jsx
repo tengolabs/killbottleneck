@@ -5,9 +5,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Target, Youtube, MessagesSquare, Heart, ArrowUpCircle, BookOpen } from 'lucide-react';
+import { Target, Youtube, MessagesSquare, Heart, ArrowUpCircle, BookOpen, Scale } from 'lucide-react';
 import useVersionCheck from '@/hooks/useVersionCheck';
 import { isDesktopShell } from '@/lib/shell';
+import { serverOrigin } from '@/lib/serverUrl';
 
 // Decentní „O aplikaci" — jediné místo s podporou projektu a odkazy.
 // Odkazy drží konstanty níže, ať se dají měnit na jednom místě.
@@ -73,6 +74,29 @@ export default function AboutDialog({ open, onClose }) {
                 <span className="text-xs text-muted-foreground">{t('about.discordDesc')}</span>
               </span>
             </a>
+            {/* Licence jedou s každou kopií (Dockerfile → pb_public), ne z GitHubu: instance
+                bez internetu i white-label zákaz musí vidět totéž, co je v repu. Adresa od
+                serverOrigin(): v Android obalu je window.location.origin = https://localhost,
+                soubory má jen server. */}
+            {[
+              ['about-licence', `${serverOrigin()}/LICENSE.txt`, 'about.licenseTitle', 'about.licenseDesc'],
+              ['about-third-party', `${serverOrigin()}/THIRD-PARTY-LICENSES.txt`, 'about.licensesTitle', 'about.licensesDesc'],
+            ].map(([tid, href, titul, popis]) => (
+              <a
+                key={tid}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                data-testid={tid}
+                className="flex items-center gap-2.5 rounded-lg border p-2.5 hover:border-primary/50 hover:bg-primary/5 transition-all"
+              >
+                <Scale className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <span className="font-medium block">{t(titul)}</span>
+                  <span className="text-xs text-muted-foreground">{t(popis)}</span>
+                </span>
+              </a>
+            ))}
           </div>
           {/* Verze + hlídání novinek. Hostovaná instance sem nic nedostane
               (server v configu update_check vypne) — aktualizuje ji Richard. */}

@@ -1,5 +1,5 @@
 // Kancelář v PROHLÍŽEČI (14. 10. 2026): z DTO dokumentu (/chat/dokument/{id}) vyrobí soubor — PDF (pdf-lib + fonty
-// Liberation), PPTX (pptxgenjs) nebo Word (docx). Server žádný soubor nedrží a nic se neukládá; totéž PDF jde vyrobit
+// KB Sans = podmnožina Liberation), PPTX (pptxgenjs) nebo Word (docx). Server žádný soubor nedrží a nic se neukládá; totéž PDF jde vyrobit
 // kdykoli znovu z textu + meta. Knihovny se načítají LÍNĚ (statický import je zakázaný — lite-bundle.js), komponenty
 // importují i tento modul líně (import('@/lib/kancelar')). Čisté generátory (prezentacePdf, pranicko, dokumentPdf,
 // pptx, dokumentDocx) dostávají knihovny injektované → tytéž funkce jedou v node testech.
@@ -63,7 +63,7 @@ function dataUrl(o) {
   return `data:image/${o.png ? 'png' : 'jpeg'};base64,${btoa(s)}`;
 }
 async function fontySans() {
-  const [reg, bold, ital] = await Promise.all([nactiFont('LiberationSans-Regular'), nactiFont('LiberationSans-Bold'), nactiFont('LiberationSans-Italic')]);
+  const [reg, bold, ital] = await Promise.all([nactiFont('KBSans-Regular'), nactiFont('KBSans-Bold'), nactiFont('KBSans-Italic')]);
   return { reg, bold, ital };
 }
 async function novyDoc(titul) {

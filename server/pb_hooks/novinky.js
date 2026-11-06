@@ -11,6 +11,18 @@
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
   // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v0.101-beta": {
+    cs: [
+      "Licence třetích stran najdete přímo v aplikaci: dialog O aplikaci odkazuje na seznam, který jede s každou instancí.",
+      "Šablony Business Model Canvas a Lean Canvas uvádějí autory rámce a bloky popisují vlastními slovy.",
+      "Písma pro PDF (faktury, Kancelář) se jmenují KB Sans a KB Serif — na vzhledu dokumentů se nic nemění.",
+    ],
+    en: [
+      "Third-party licenses are available right in the app: the About dialog links to the list that ships with every instance.",
+      "The Business Model Canvas and Lean Canvas templates credit the framework authors and describe the blocks in our own words.",
+      "The PDF fonts (invoices, Office) are now called KB Sans and KB Serif — documents look exactly the same.",
+    ],
+  },
   "v0.100.1-beta": {
     cs: [
       "Obrázky od asistenta mohou mít vlastní týdenní počet a nečerpat AI kredity asistenta; když je počet vyčerpaný, aplikace řekne, že další obrázky půjdou od pondělí.",

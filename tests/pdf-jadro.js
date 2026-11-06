@@ -86,7 +86,7 @@ const item = (str, x, y, extra = {}) => ({ str, transform: [12, 0, 0, 12, x, y],
     const vyrob = async (radkyTextu) => {
       const doc = await PDFLib.PDFDocument.create();
       doc.registerFontkit(fontkit);
-      const f = await doc.embedFont(await nactiFont('LiberationSans-Regular'), { subset: true });
+      const f = await doc.embedFont(await nactiFont('KBSans-Regular'), { subset: true });
       const p = doc.addPage([595, 842]);
       let y = 760;
       for (const t of radkyTextu) { p.drawText(t, { x: 50, y, size: 12, font: f }); y -= 18; }
@@ -175,7 +175,7 @@ const item = (str, x, y, extra = {}) => ({ str, transform: [12, 0, 0, 12, x, y],
     // barvy: bílé písmo na tmavém pruhu — přelepka musí mít tmavé pozadí a světlý text (ne „nejtmavší pixel“)
     const { createCanvas } = await balik('@napi-rs/canvas/index.js');
     const docT = await PDFLib.PDFDocument.create(); docT.registerFontkit(fontkit);
-    const fT = await docT.embedFont(await nactiFont('LiberationSans-Bold'), { subset: true });
+    const fT = await docT.embedFont(await nactiFont('KBSans-Bold'), { subset: true });
     const pT = docT.addPage([595, 842]);
     pT.drawRectangle({ x: 40, y: 600, width: 515, height: 30, color: PDFLib.rgb(0.15, 0.2, 0.35) });
     pT.drawText('CELKEM K ÚHRADĚ', { x: 50, y: 610, size: 12, font: fT, color: PDFLib.rgb(1, 1, 1) });
@@ -211,7 +211,7 @@ const item = (str, x, y, extra = {}) => ({ str, transform: [12, 0, 0, 12, x, y],
     kod = '';
     try { await J.sloucit({ PDFLib, soubory: [pdf, zamcene] }); } catch (e) { kod = e.kod; }
     expect(kod === KOD.SIFROVANO, 'sloučení se zamčeným PDF = sifrovano');
-    expect(J.vyberRez('g_d0_f1', 'serif') === 'LiberationSerif-Regular' && J.vyberRez('ABCDEF+Calibri-Bold', 'sans-serif') === 'LiberationSans-Bold' && J.vyberRez('TimesNewRoman,BoldItalic', '') === 'LiberationSerif-BoldItalic', 'výběr řezu náhradního písma');
+    expect(J.vyberRez('g_d0_f1', 'serif') === 'KBSerif-Regular' && J.vyberRez('ABCDEF+Calibri-Bold', 'sans-serif') === 'KBSans-Bold' && J.vyberRez('TimesNewRoman,BoldItalic', '') === 'KBSerif-BoldItalic', 'výběr řezu náhradního písma');
   } catch (err) {
     fail++;
     console.log('  ❌ výjimka: ' + (err && err.stack ? err.stack : err));

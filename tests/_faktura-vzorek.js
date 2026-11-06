@@ -32,7 +32,7 @@ async function vyrob(data, L) {
   const qrcode = (await balik('qrcode-generator/qrcode.js')).default;
   const doc = await PDFLib.PDFDocument.create();
   doc.registerFontkit(fk);
-  const fonty = { regular: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'LiberationSans-Regular.ttf')), { subset: true }), bold: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'LiberationSans-Bold.ttf')), { subset: true }) };
+  const fonty = { regular: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'KBSans-Regular.ttf')), { subset: true }), bold: await doc.embedFont(fs.readFileSync(path.join(FONTY, 'KBSans-Bold.ttf')), { subset: true }) };
   const qrText = data.spayd || data.epc || '';
   const matice = qrText ? qrMaticeZ(qrcode, qrText, 'M') : null;
   sestavFakturu({ doc, rgb: PDFLib.rgb, fonty, data, L, logo: null, qr: matice, kresliQr });
