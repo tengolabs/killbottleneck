@@ -21,7 +21,7 @@
 > a tatáž aplikace, od v1.0.0 pod licencí **MIT**.
 > Chyby → [Issues](../../issues), nápady → Discussions.
 
-Grafické zobrazení projektů, firmy a procesů — mapy cílů, nad kterými pracují lidé i AI, **plně na vašem serveru: data neopouštějí firmu**. **Zdarma u sebe, s REST API a MCP serverem v ceně.** **Open source pod licencí MIT** — viz [Licence](#licence--mit).
+Grafické zobrazení projektů, firmy a procesů — mapy cílů, nad kterými pracují lidé i AI agenti, **plně na vašem serveru: data neopouštějí firmu**. **AI asistent** v postranním panelu s vámi plánuje den, třídí poznámky, navrhuje projekty, píše dokumenty a kreslí obrázky, vede týmovou poradu — s libovolným modelem, i lokálním. K tomu týmový kalendář, procesní mapy s rytmem, zjednodušené zobrazení na mobilu, **REST API a MCP server v ceně**. **Zdarma u sebe, open source pod licencí MIT** — viz [Licence](#licence--mit).
 
 ![Editor mapy cílů](assets/mapa-cs.jpg)
 
@@ -40,6 +40,7 @@ by mohlo opustit vaši síť, si zapínáte **vy**:
 <details>
 <summary><strong>Obsah</strong> — tohle README je úplná referenční příručka; stručná verze je na <a href="https://killbottleneck.cz/navod/rychly-start">webu</a>.</summary>
 
+- [Prohlídka v obrázcích](#prohlídka-v-obrázcích)
 - [Rychlý start](#rychlý-start)
 - [Co umí bez AI](#co-umí-bez-ai) · [Na mobilu](#na-mobilu)
 - [AI funkce (volitelné)](#ai-funkce-volitelné)
@@ -50,6 +51,19 @@ by mohlo opustit vaši síť, si zapínáte **vy**:
 - [Licence — MIT](#licence--mit)
 
 </details>
+
+## Prohlídka v obrázcích
+
+<table>
+<tr>
+<td width="50%"><img src="assets/asistent-cs.jpg" alt="Asistent vedle panelu Můj den"><br><sub><b>Asistent</b> bydlí vedle vašich map: ranní porada, večerní plánování, třídění poznámek do projektů — každá změna je karta, kterou potvrdíte.</sub></td>
+<td width="50%"><img src="assets/kalendar-cs.jpg" alt="Týmový kalendář"><br><sub><b>Kalendář</b>: termíny ze všech projektů, sdílené kalendáře firmy, zasedačky a nepřítomností, události s pozvánkami a připomínkami.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/proces-cs.jpg" alt="Procesní mapa s rytmem"><br><sub><b>Procesy</b>: tatáž mapa ve stylu Proces — kroky s rytmem (každý všední den, každý pátek, měsíčně), které se samy obnovují a ukazují, jestli je proces zdravý.</sub></td>
+<td width="50%"><img src="assets/kancelar-obrazky-cs.jpg" alt="Kancelář: dokumenty, obrázky, stránky a PDF od asistenta"><br><sub><b>Kancelář</b>: asistent napíše prezentaci, pozvánku, fakturu nebo e-mail ke stažení, nakreslí obrázek a postaví stránku ke sdílení — z dat ve vašich projektech.</sub></td>
+</tr>
+</table>
 
 ## Rychlý start
 
@@ -68,7 +82,10 @@ sami, nebo je admin pozve v Administraci (vytvoří se účet s dočasným hesle
 ## Co umí bez AI
 
 Plnohodnotný editor map (uzly, hrany, stavy, poznámky), více map na uživatele, komentáře
-k uzlům, sdílení map kolegům (čtení / úpravy), veřejné mapy, export do obrázku/PDF.
+k uzlům, sdílení map kolegům (čtení / úpravy), veřejné mapy, export do obrázku/PDF. **Týmový
+kalendář** (termíny, události, sdílené kalendáře, připomínky), styl mapy **Proces** s opakujícími
+se kroky, **mapa organizace** s rolemi, šablony, měření času, faktury a **zjednodušené
+zobrazení** na mobilu.
 
 ![Panel „Můj den"](assets/muj-den.jpg)
 

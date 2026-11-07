@@ -17,7 +17,7 @@ const BASE = path.join(__dirname, 'en-first-baseline.json');
 const CZ = /[ěščřžýáíéůúťďňĚŠČŘŽÝÁÍÉŮÚŤĎŇ]/;
 const LETTERS = /[A-Za-z]{3,}/;
 const EXT = ['.js', '.jsx', '.mjs', '.ts', '.py', '.sh', '.go', '.css', '.vue'];
-const SKIP = /(^|\/)(node_modules|dist|pb_data|\.vitepress\/(dist|cache|tmp-cz)|tests|docs|pb_migrations|i18n)(\/|$)|napoveda-index\.js$|package-lock/;
+const SKIP = /(^|\/)(node_modules|dist|pb_data|\.vitepress\/(dist|cache|tmp-cz)|tests|docs|pb_migrations|i18n|pb_public|pb_data)(\/|$)|napoveda-index\.js$|package-lock/;
 
 function soubory(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -21,7 +21,7 @@
 > version are one and the same app, released under the **MIT license** since v1.0.0.
 > Bugs → [Issues](../../issues), ideas → Discussions.
 
-A visual picture of your projects, your company and its processes — goal maps that people and AI agents work on together, **entirely on your own server: your data never leaves the company**. **Free to self-host, with REST API and MCP server included.** **Open source under the MIT license** — see [License](#license--mit).
+A visual picture of your projects, your company and its processes — goal maps that people and AI agents work on together, **entirely on your own server: your data never leaves the company**. An **AI assistant** in a side panel plans your day, sorts your notes, drafts projects, writes documents and pictures, and runs the team meeting — with any model you choose, including a local one. Plus a team calendar, process maps with a rhythm, a simplified view on the phone, **REST API and MCP server included**. **Free to self-host, open source under the MIT license** — see [License](#license--mit).
 
 ![The goal map editor](assets/mapa-en.jpg)
 
@@ -40,6 +40,7 @@ There is no telemetry, no analytics and no licence check.
 <details>
 <summary><strong>Contents</strong> — this README is the full reference; the short version is on <a href="https://killbottleneck.com/guide/quick-start">the website</a>.</summary>
 
+- [A tour in pictures](#a-tour-in-pictures)
 - [Quick start](#quick-start)
 - [What it does without AI](#what-it-does-without-ai) · [On a phone](#on-a-phone)
 - [AI features (optional)](#ai-features-optional)
@@ -53,6 +54,19 @@ There is no telemetry, no analytics and no licence check.
 - [License — MIT](#license--mit) · [Contact](#contact)
 
 </details>
+
+## A tour in pictures
+
+<table>
+<tr>
+<td width="50%"><img src="assets/asistent-en.jpg" alt="The assistant next to the My day panel"><br><sub><b>The assistant</b> lives next to your maps: morning briefing, evening planning, sorting notes into projects — every change is a card you confirm.</sub></td>
+<td width="50%"><img src="assets/kalendar-en.jpg" alt="The team calendar"><br><sub><b>Calendar</b>: deadlines from all projects, shared calendars for the company, the meeting room and time off, events with invitations and reminders.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/proces-en.jpg" alt="A process map with a rhythm"><br><sub><b>Processes</b>: the same map in the Process style — steps with a rhythm (every weekday, every Friday, monthly) that renew themselves and show whether the process is healthy.</sub></td>
+<td width="50%"><img src="assets/kancelar-obrazky-en.jpg" alt="Office: documents, pictures, pages and PDF from the assistant"><br><sub><b>Office</b>: the assistant writes presentations, invitations, invoices and e-mails to download, draws pictures and builds pages to share — from the data in your projects.</sub></td>
+</tr>
+</table>
 
 ## Quick start
 
@@ -72,7 +86,10 @@ account with a temporary password to hand over).
 ## What it does without AI
 
 A full goal map editor (nodes, edges, statuses, notes), multiple maps per user, comments on
-goals, sharing maps with colleagues (read / edit), public maps, export to image/PDF.
+goals, sharing maps with colleagues (read / edit), public maps, export to image/PDF. A **team
+calendar** (deadlines, events, shared calendars, reminders), the **Process** map style with
+recurring steps, an **organisation map** with roles, templates, time tracking, invoices, and
+a **simplified view** on the phone.
 
 ![The "My day" panel](assets/muj-den-en.jpg)
 
