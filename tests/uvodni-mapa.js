@@ -35,7 +35,7 @@ const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, con
 async function api(method, path, { token, body } = {}) {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   let json = null;
@@ -146,7 +146,7 @@ async function main() {
 
     console.log('== ČLEN dostane mapu taky: osobní rutinu, bez správy a zvaní ==');
     await api('POST', '/api/collections/users/records', {
-      body: { email: 'kolega@firma.cz', password: HESLO, passwordConfirm: HESLO, name: 'Kolega', role: 'user' },
+      body: { email: 'kolega@firma.cz', password: HESLO, passwordConfirm: HESLO, language: 'cs', name: 'Kolega', role: 'user' },
     });
     await new Promise((r) => setTimeout(r, 1500));
     const tok2 = await prihlas('kolega@firma.cz');
@@ -155,6 +155,11 @@ async function main() {
     const jeho = jehoVse.filter((m) => /Vítejte/i.test(m.title || ''));
     expect(jeho.length === 1, `úvodní mapu člen má (${jeho.length})`);
     expect(!/Zaveden/i.test(jeho[0]?.title || ''), `a jinak pojmenovanou („${jeho[0]?.title}")`);
+    // kořen (vrchol) sleduje titulek — do 5. 11. 2026 člen viděl titulek „Vítejte…"
+    // a kořen „Rozjet killBottleneck pro sebe" (analýza funkcí)
+    const jehoApex = ((jeho[0] || {}).nodes || []).find((n) => n.type === 'apexNode') || {};
+    const jehoKoren = (jehoApex.data || {}).apexText || (jehoApex.data || {}).title || '';
+    expect(jehoKoren === (jeho[0] || {}).title, `kořen mapy člena = titulek („${jehoKoren}")`);
     const jehoPol = polozky(jeho[0] || {});
     expect(jehoPol.length >= 8, `má vlastní položky (${jehoPol.length})`);
     const jehoNazvy = jehoPol.map((p) => p.title).join(' | ');

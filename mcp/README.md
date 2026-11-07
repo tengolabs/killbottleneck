@@ -1,45 +1,45 @@
-# killbottleneck-mcp — MCP server pro killBottleneck
+# killbottleneck-mcp — MCP server for killBottleneck
 
-Tenký [MCP](https://modelcontextprotocol.io) server (stdio): připojí AI asistenta
-(Claude Desktop, Claude Code, …) k vaší killBottleneck instanci přes zabezpečené
-`/api/kb/v1/*` REST API. Žádná další služba — běží lokálně u asistenta a mluví
-s instancí přes HTTP(S) s vaším API klíčem.
+**English** | [Česky](README.cs.md)
 
-> **Instance na HTTPS doméně?** Pak nepotřebujete ani tento lokální server —
-> každá instance vystavuje MCP rovnou na `https://VASE-DOMENA/mcp` (Streamable
-> HTTP, stejné nástroje, stejný API klíč). Viz „Vzdálené připojení" níže.
+A thin [MCP](https://modelcontextprotocol.io) server (stdio): it connects an AI assistant
+(Claude Desktop, Claude Code, …) to your killBottleneck instance through its authenticated
+`/api/kb/v1/*` REST API. No extra service — it runs locally next to the assistant and talks
+to the instance over HTTP(S) with your API key. Works identically for free self-hosted and
+hosted instances.
 
-*A thin stdio MCP server that connects AI assistants (Claude Desktop, Claude Code, …)
-to your killBottleneck instance via its authenticated `/api/kb/v1/*` REST API. Runs
-locally next to the assistant; works identically for free self-hosted and hosted instances.*
+> **Instance on an HTTPS domain?** Then you do not even need this local server — every
+> instance exposes MCP directly at `https://YOUR-DOMAIN/mcp` (Streamable HTTP, the same tools,
+> the same API key). See "Remote connection" below.
 
-## Nejrychleji: jeden řádek do agenta
+## Fastest: one line into your agent
 
-Aplikace po prvním přihlášení (a kdykoli v menu u jména → **Připojit AI agenta**) ukáže
-řádek `Nastav mi killBottleneck: stáhni si a postupuj podle tohoto návodu https://VASE-DOMENA/agent-setup.md`
-(v jazyce uživatele — agent pak odpovídá česky; anglická appka ukáže anglický řádek).
-Vložíte ho do Claude Code / Codexu / Cursoru, agent si návod z instance stáhne, zaregistruje
-vzdálený MCP (`/mcp`) a požádá vás o přihlášení v prohlížeči (OAuth) — žádný klíč se nikam
-neopisuje. Návod (anglicky) vystavuje každá instance sama na `/agent-setup.md`.
+After the first sign-in (and any time in the user menu → **Connect AI agent**) the app shows
+the line `Set up killBottleneck for me: download and follow this guide https://YOUR-DOMAIN/agent-setup.md`
+(in the user's language). Paste it into Claude Code / Codex / Cursor: the agent downloads the
+guide from the instance, registers the remote MCP (`/mcp`) and asks you to sign in in the
+browser (OAuth) — no key is ever copied anywhere. Every instance serves the guide (in English)
+at `/agent-setup.md`.
 
-## Instalace
+## Installation
 
-Nic — balíček je na npm (`killbottleneck-mcp`, verze sleduje verzi aplikace) a v MCP Registry
-(`com.killbottleneck/killbottleneck`); `npx -y killbottleneck-mcp` si ho stáhne sám. Z repozitáře
-(offline stroj, přibitá verze): `cd mcp && npm install` a `node /cesta/mcp/index.js`.
-Aplikace hotový příkaz `claude mcp add …` ukáže v dialogu **API klíče**.
+Nothing to install — the package is on npm (`killbottleneck-mcp`, its version follows the app)
+and in the MCP Registry (`com.killbottleneck/killbottleneck`); `npx -y killbottleneck-mcp`
+fetches it on its own. From the repository (offline machine, pinned version): `cd mcp && npm install`
+and `node /path/to/mcp/index.js`. The app shows a ready-made `claude mcp add …` command in the
+**API keys** dialog.
 
-## Konfigurace (env)
+## Configuration (env)
 
-| Proměnná | Význam |
+| Variable | Meaning |
 |---|---|
-| `KB_URL` | adresa instance, např. `https://firma.killbottleneck.com` nebo `http://192.168.1.10:8090` |
-| `KB_API_KEY` | API klíč `kb_user_…` — vydáte v aplikaci: uživatelské menu → **API klíče**. Pro zápis musí mít scope **Čtení i zápis**. |
+| `KB_URL` | address of the instance, e.g. `https://company.killbottleneck.com` or `http://192.168.1.10:8090` |
+| `KB_API_KEY` | API key `kb_user_…` — issued in the app: user menu → **API keys**. Writing needs the **Read and write** scope. |
 
-Klíč patří jen do env (ne do argumentů — ty jsou vidět v `ps`). Token se v aplikaci
-zobrazí jen jednou; klíč jde kdykoli rotovat nebo zrušit a lze mu nastavit expiraci.
+The key belongs in env only (not in arguments — those show up in `ps`). The app shows the
+token once; a key can be rotated or revoked at any time and can have an expiry.
 
-## Registrace u asistenta
+## Registering with the assistant
 
 **Claude Code:**
 ```bash
@@ -49,14 +49,14 @@ claude mcp add killbottleneck \
   -- npx -y killbottleneck-mcp
 ```
 
-**Docker** (bez Node.js na stroji):
+**Docker** (no Node.js on the machine):
 ```bash
-docker build -t killbottleneck-mcp ./mcp     # z kořene repozitáře
-docker run -i --rm -e KB_URL=https://firma.killbottleneck.com -e KB_API_KEY=kb_user_... killbottleneck-mcp
+docker build -t killbottleneck-mcp ./mcp     # from the repository root
+docker run -i --rm -e KB_URL=https://company.killbottleneck.com -e KB_API_KEY=kb_user_... killbottleneck-mcp
 ```
-`-i` je povinné — MCP mluví po standardním vstupu a výstupu.
+`-i` is required — MCP talks over standard input and output.
 
-**Claude Desktop** — do `claude_desktop_config.json`:
+**Claude Desktop** — in `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
@@ -72,25 +72,25 @@ docker run -i --rm -e KB_URL=https://firma.killbottleneck.com -e KB_API_KEY=kb_u
 }
 ```
 
-## Vzdálené připojení (bez lokálního serveru)
+## Remote connection (without the local server)
 
-Každá instance vystavuje MCP i přímo na **`/mcp`** (Streamable HTTP, stateless,
-stejných 34 nástrojů, stejné API klíče). Hodí se pro instanci na veřejné HTTPS
-doméně — asistent se připojí odkudkoli, bez instalace čehokoli lokálně.
+Every instance also exposes MCP directly at **`/mcp`** (Streamable HTTP, stateless, the same
+34 tools, the same API keys). Handy for an instance on a public HTTPS domain — the assistant
+connects from anywhere without installing anything locally.
 
 **Claude Code:**
 ```bash
-claude mcp add killbottleneck --transport http https://firma.killbottleneck.com/mcp \
+claude mcp add killbottleneck --transport http https://company.killbottleneck.com/mcp \
   --header "Authorization: Bearer kb_user_..."
 ```
 
-**Claude Desktop** (mluví se vzdálenými servery přes `mcp-remote`):
+**Claude Desktop** (talks to remote servers through `mcp-remote`):
 ```json
 {
   "mcpServers": {
     "killbottleneck": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://firma.killbottleneck.com/mcp",
+      "args": ["-y", "mcp-remote", "https://company.killbottleneck.com/mcp",
                "--header", "Authorization: Bearer ${KB_API_KEY}"],
       "env": { "KB_API_KEY": "kb_user_..." }
     }
@@ -98,82 +98,81 @@ claude mcp add killbottleneck --transport http https://firma.killbottleneck.com/
 }
 ```
 
-Poznámky: endpoint přijímá jen `POST` (žádné SSE streamování), autentizace je
-Bearer API klíčem — platí stejné scope, rate-limity i audit jako pro REST API.
-Konektory na claude.ai (web): přidejte custom konektor s adresou
-`https://firma.killbottleneck.com/mcp` — instance umí OAuth (registrace klienta,
-PKCE), claude.ai vás provede přihlášením a schválením přístupu; vydaný token
-pak vidíte a rušíte v aplikaci pod „API klíče".
+Notes: the endpoint accepts `POST` only (no SSE streaming); authentication is a Bearer API
+key — the same scopes, rate limits and audit as for the REST API. Connectors on claude.ai
+(web): add a custom connector with the address `https://company.killbottleneck.com/mcp` — the
+instance supports OAuth (client registration, PKCE), claude.ai walks you through signing in and
+approving access; the issued token is then visible and revocable in the app under "API keys".
 
-## Nástroje
+## Tools
 
-| Nástroj | Co dělá |
+| Tool | What it does |
 |---|---|
-| `list_maps` | seznam map (i archivovaných přes `archived=true`) |
-| `get_map` | mapa jako odsazený strom s id uzlů, stavy, termíny a lidmi |
-| `create_map` | nová mapa z osnovy (vrchol + vnořené uzly, layout automaticky) |
-| `add_nodes` | přidání podstromu pod uzel (⚠️ přepočítá layout celé mapy) |
-| `update_node` | název/stav/popis/termín/osoba/čekání-na-podstrom jednoho uzlu |
-| `delete_node` | smaže uzel VČETNĚ podstromu (vrchol nejde; celé mapy přes API nejdou) |
-| `create_rule` | nové automatizační pravidlo mapy (spouštěč, podmínky, akce) — jen editoři mapy |
-| `list_rules` | pravidla mapy (jen editoři) |
-| `update_rule` | úprava/zapnutí/vypnutí pravidla |
-| `delete_rule` | smazání pravidla |
-| `list_rule_runs` | log běhů pravidel mapy (co, kdy, s jakým výsledkem) |
-| `list_rule_templates` | šablony pravidel instance |
-| `save_rule_template` | uložení pravidla jako šablony |
-| `delete_rule_template` | smazání šablony (autor nebo admin) |
-| `get_org_structure` | organizační struktura: pozice a funkce s držiteli a zástupci (jen čtení) |
-| `list_people` | lidé instance (členové + viditelné externí kontakty) — platné hodnoty `owner`; neznámý e-mail server odmítne |
-| `create_events` | více událostí naráz (rozvrh přednášek, plán školení) — vše nebo nic, duplicitní (stejný název, den a čas) se přeskočí a nahlásí |
-| `create_event` | událost v kalendáři (schůzka, zubař) s časem, pozvanými členy a připomínkou — NENÍ úkol, do mapy nepatří; `calendar` ji dá do sdíleného kalendáře (firemní akce, rezervace místnosti s `end_time`, dovolená s `end_day`) |
-| `update_event` | úprava události (vlastní, ve sdíleném kalendáři jako správce/manažer, vlastní nepřítomnost) |
-| `delete_event` | smazání události; pozvaný se jí místo toho jen odhlásí |
-| `list_events` | události, které vlastník klíče vidí (vlastní, pozvané i všechny ze sdílených kalendářů) v rozsahu dní; `calendar` = jen jeden kalendář |
-| `list_calendars` | sdílené kalendáře instance: firemní (shared), místnosti a zdroje (resource), nepřítomnosti (absence) |
-| `create_calendar` | nový sdílený kalendář — jen správce/manažer; `visibility`/`members` = jen pro vybrané |
-| `delete_calendar` | smazání sdíleného kalendáře i s událostmi — jen správce/manažer, nejde vrátit |
-| `who_is_away` | kdo je kdy pryč (nepřítomnosti) v rozsahu dní, výchozí dnes…+14 |
-| `create_reminder` | časová připomínka k uzlu relativně k termínu (den před v HH:MM); termín nemění, jedna na uzel |
-| `get_portfolio` | pohled shora jako stránka Organizace: projekty s % hotovo, po termínu, nehýbe se, lidé, změny za 7 dní — nad týmovými a sdílenými mapami, které vlastník klíče vidí |
-| `list_pages` | stránky vlastníka klíče (jednosouborové HTML artefakty od asistenta/agenta): id, název, stav, velikost, veřejný odkaz, viditelnost pro tým |
-| `get_page` | jedna stránka: metadata + celé HTML (přečíst před `update_page`) |
-| `create_page` | nová stránka z KOMPLETNÍHO jednosouborového HTML (inline CSS/JS, knihovny jen z https CDN; limit velikosti instance, typicky 300 kB); `team_visible` ukáže všem členům |
-| `update_page` | nahradí HTML a/nebo název stránky — posílá se CELÝ nový dokument, předchozí verze zůstává k obnovení |
-| `share_page` | sdílení stránky: `link_on`/`link_off`/`link_new` (veřejný odkaz), `team_on`/`team_off` (celá organizace), `user_on`/`user_off` (jeden člen přes `email`) |
-| `delete_page` | smaže stránku nenávratně |
-| `generate_image` | obrázek (ilustrace, banner, hlavička, plakát) obrazovým modelem instance — vrátí veřejný odkaz na JPEG; `prompt` anglicky bez textu, čitelný nápis jen přes `text`; formáty square/banner/header/portrait/landscape; stojí AI kredity jako zpráva asistentovi |
+| `list_maps` | list of maps (archived ones too with `archived=true`) |
+| `get_map` | a map as an indented tree with node ids, statuses, deadlines and people |
+| `create_map` | a new map from an outline (apex + nested nodes, layout automatic) |
+| `add_nodes` | add a subtree under a node (⚠️ recomputes the layout of the whole map) |
+| `update_node` | title/status/description/deadline/person/wait-for-subtree of one node |
+| `delete_node` | deletes a node INCLUDING its subtree (not the apex; whole maps cannot be deleted through the API) |
+| `create_rule` | a new automation rule of a map (trigger, conditions, actions) — map editors only |
+| `list_rules` | the rules of a map (editors only) |
+| `update_rule` | edit / enable / disable a rule |
+| `delete_rule` | delete a rule |
+| `list_rule_runs` | run log of the map's rules (what, when, with which result) |
+| `list_rule_templates` | rule templates of the instance |
+| `save_rule_template` | save a rule as a template |
+| `delete_rule_template` | delete a template (author or admin) |
+| `get_org_structure` | organization structure: positions and roles with holders and deputies (read-only) |
+| `list_people` | people of the instance (members + visible external contacts) — the valid values of `owner`; an unknown e-mail is rejected by the server |
+| `create_events` | several events at once (lecture schedule, training plan) — all or nothing; duplicates (same title, day and time) are skipped and reported |
+| `create_event` | a calendar event (meeting, dentist) with a time, invited members and a reminder — NOT a task, it does not belong in a map; `calendar` puts it into a shared calendar (company events, a room booking with `end_time`, time off with `end_day`) |
+| `update_event` | edit an event (your own, in a shared calendar as admin/manager, your own absence) |
+| `delete_event` | delete an event; an invitee just leaves it instead |
+| `list_events` | events the key owner sees (own, invited and all from shared calendars) in a range of days; `calendar` = one calendar only |
+| `list_calendars` | shared calendars of the instance: company (shared), rooms and resources (resource), absences (absence) |
+| `create_calendar` | a new shared calendar — admin/manager only; `visibility`/`members` = selected people only |
+| `delete_calendar` | delete a shared calendar with its events — admin/manager only, irreversible |
+| `who_is_away` | who is away when (absences) in a range of days, default today…+14 |
+| `create_reminder` | a timed reminder on a node relative to its deadline (a day before at HH:MM); does not change the deadline, one per node |
+| `get_portfolio` | the view from above, like the Organization page: projects with % done, overdue, stalled, people, changes in 7 days — over the team and shared maps the key owner sees |
+| `list_pages` | pages of the key owner (single-file HTML artifacts from the assistant/agent): id, title, state, size, public link, team visibility |
+| `get_page` | one page: metadata + the whole HTML (read it before `update_page`) |
+| `create_page` | a new page from a COMPLETE single-file HTML (inline CSS/JS, libraries only from https CDNs; the instance's size limit, typically 300 kB); `team_visible` shows it to all members |
+| `update_page` | replaces the HTML and/or the title of a page — the WHOLE new document is sent, the previous version stays restorable |
+| `share_page` | page sharing: `link_on`/`link_off`/`link_new` (public link), `team_on`/`team_off` (whole organization), `user_on`/`user_off` (one member via `email`) |
+| `delete_page` | deletes a page irreversibly |
+| `generate_image` | a picture (illustration, banner, header, poster) by the instance's image model — returns a public JPEG link; `prompt` in English without text, a readable caption only via `text`; formats square/banner/header/portrait/landscape; costs AI credits like a message to the assistant |
 
-**Úkol = uzel s řešitelem (`owner`) nebo termínem** — žádný samostatný úkolový
-záznam neexistuje. Novou práci zakládejte přes `add_nodes`, odbavujte přes
-`update_node` → `status: done`. (Dřívější nástroje `list_tasks`/`add_task`/
-`update_task` byly ve v0.34 odstraněny; serverové rozhraní `/v1/tasks` vrací 410.)
+**A task = a node with an assignee (`owner`) or a deadline** — there is no separate task
+record. Create new work with `add_nodes`, finish it with `update_node` → `status: done`.
+(The former `list_tasks`/`add_task`/`update_task` tools were removed in v0.34; the server
+endpoint `/v1/tasks` returns 410.)
 
-## Chování a limity
+## Behaviour and limits
 
-- Klíč **jedná za svého majitele** (parita s aplikací): vidí vlastní, týmové i
-  sdílené mapy a zapisuje podle úrovně (`edit`/vlastní zapisuje vše; `work` i
-  `read` mění jen stav vlastních uzlů — jako odškrtnutí v aplikaci); `list_maps`/`get_map` úroveň
-  vrací jako `access`. Roli nečte — cizí soukromé i cizí veřejné mapy jsou 404.
-  Administraci, nastavení AI ani uživatele klíč neotevře nikdy.
-- Přiřazení řešitele přes API mu mapu automaticky nasdílí jako spolupracovníkovi
-  (stejně jako v aplikaci), aby práci viděl v Můj den — jen když vlastník klíče smí
-  sdílet (vlastník mapy / jmenovaný editor); odpověď nese `shared`. Pravidla a jejich
-  log vidí jen editoři mapy.
-- Výstupy nástrojů jsou anglicky (LLM jim rozumí vždy); chybové hlášky serveru
-  chodí v jazyce vlastníka klíče.
-- Rate-limit na klíč: 120 čtení + 30 zápisů za minutu; max 200 uzlů na volání;
-  tělo požadavku max 2 MB; max 20 klíčů na účet.
-- Obrana proti prompt injection: výstupy s uživatelským obsahem jsou uvozené
-  upozorněním, že jde o DATA, ne instrukce (názvy úkolů může psát i kolega).
-- Souběžné úpravy: server **vyžaduje** verzi mapy u každého zápisu (klient ji musí
-  nejdřív načíst) — tvrdá ochrana proti přepsání beze čtení. Tenhle MCP server to
-  řeší za vás: při zápisu do mapy, kterou ještě nečetl, si ji sám načte; když ji
-  mezitím změní někdo v editoru, dostane konflikt a vrátí aktuální strom, aby
-  asistent úpravu zopakoval nad čerstvou verzí.
-- Notifikace (přiřazení úkolu-uzlu, odblokování čekajícího uzlu) fungují stejně
-  jako z aplikace.
+- The key **acts for its owner** (parity with the app): it sees own, team and shared maps and
+  writes according to the access level (`edit`/own writes everything; `work` and `read` only
+  change the status of the owner's own nodes — like ticking a box in the app);
+  `list_maps`/`get_map` return the level as `access`. It never reads the role — other people's
+  private and public maps are 404. Administration, AI settings and users are never opened by a key.
+- Assigning an assignee through the API automatically shares the map with them as a
+  collaborator (as in the app), so they see the work in My day — only when the key owner may
+  share (map owner / named editor); the answer carries `shared`. Rules and their log are visible
+  to map editors only.
+- Tool outputs are English (LLMs always understand them); server error messages come in the
+  language of the key owner.
+- Rate limit per key: 120 reads + 30 writes a minute; max 200 nodes per call; request body
+  max 2 MB; max 20 keys per account.
+- Prompt-injection defence: outputs with user content are prefixed with a notice that they are
+  DATA, not instructions (task titles can be written by a colleague).
+- Concurrent edits: the server **requires** the map version with every write (the client must
+  read first) — a hard guard against overwriting without reading. This MCP server handles it
+  for you: when writing to a map it has not read yet, it reads it first; when someone changes it
+  in the editor in the meantime, it gets a conflict and returns the current tree so the
+  assistant can repeat the edit on the fresh version.
+- Notifications (task-node assignment, unblocking of a waiting node) work exactly as from the app.
 
-## Licence
+## License
 
-Součást killBottlenecku — viz `../LICENSE` (fair-code, Sustainable Use License).
+MIT — see [`LICENSE`](LICENSE). The killBottleneck name and logo are not part of the license
+([`../TRADEMARKS.md`](../TRADEMARKS.md)).

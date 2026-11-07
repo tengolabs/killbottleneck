@@ -28,7 +28,7 @@ const api = async (method, path, { token, bearer, body } = {}) => {
   // {} místo null, ať sada doběhne až ke konci a změří všechny kontroly
   return { status: res.status, json: json && typeof json === 'object' ? json : {} };
 };
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 const den = (posun) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + posun); return d.toISOString().slice(0, 10); };
 const notifs = async (token, type) => ((await api('GET', '/api/collections/notifications/records?perPage=200', { token })).json.items || []).filter((n) => n.type === type);

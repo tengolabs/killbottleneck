@@ -39,7 +39,7 @@ async function start(env, { volume = false } = {}) {
 async function ucet(email = EMAIL) {
   await fetch(`${BASE}/api/collections/users/records`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: HESLO, passwordConfirm: HESLO }),
+    body: JSON.stringify({ email, password: HESLO, passwordConfirm: HESLO, language: 'cs' }),
   });
 }
 

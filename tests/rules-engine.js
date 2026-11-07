@@ -405,7 +405,7 @@ H.beh(async () => {
     const off = await H.startInstance({ slug: 'rules-off', env: { KB_RULES_DISABLED: 1 } });
     const api2 = off.api;
     const ST2 = await off.superuser();
-    await api2('POST', '/api/collections/users/records', { body: { email: 'a@example.com', password: PW, passwordConfirm: PW } });
+    await api2('POST', '/api/collections/users/records', { body: { email: 'a@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
     const A2 = (await api2('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@example.com', password: PW } })).json.token;
     const map2 = (await api2('POST', '/api/collections/goalmaps/records', { token: A2, body: { title: 'Brzda', nodes: [node('root', { apexText: 'x', title: 'x', status: 'todo' }, 'apexNode'), node('Q', { title: 'q', status: 'todo' })], edges: [{ id: 'e', source: 'root', target: 'Q' }] } })).json;
     await api2('POST', '/api/collections/automation_rules/records', { token: ST2, body: { map: map2.id, enabled: true, name: 'nesmí běžet', trigger: { type: 'node_status_changed' }, actions: [{ type: 'set_owner', owner: 'a@example.com' }] } });

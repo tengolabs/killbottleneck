@@ -1,6 +1,7 @@
 # Third-party notices
 
-killBottleneck itself is distributed under the [Sustainable Use License](./LICENSE) (fair-code).
+killBottleneck itself is open source under the [MIT License](./LICENSE). The name "killBottleneck"
+and the logo are not part of that license — see [TRADEMARKS.md](./TRADEMARKS.md).
 Third-party components keep their own licenses, which continue to apply to them.
 
 **The complete, generated list** — every production npm package of `frontend/` and `mcp/`
@@ -34,7 +35,7 @@ killBottleneck must not send your users' IP addresses to a third-party font CDN)
 | What | From | License |
 | --- | --- | --- |
 | UI primitives in `frontend/src/components/ui/` | [shadcn/ui](https://github.com/shadcn-ui/ui) (toast hook inspired by react-hot-toast) | MIT |
-| `frontend/src/lib/skinValidator.js` (and its server copy) | our own code, released under CC0 so the skin editor can stay MIT | CC0 |
+| `frontend/src/lib/skinValidator.js` (and its server copy) | our own code, released under CC0 on 8 Aug 2026 so the skin editor can reuse it without conditions | CC0 |
 
 ## Templates
 

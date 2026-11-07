@@ -44,8 +44,8 @@ let mcp = null;
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_UVODNI_MAPA=0 -p 20504:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@x.cz', password: PW, passwordConfirm: PW } });
-    await api('POST', '/api/collections/users/records', { body: { email: 'b@x.cz', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@x.cz', password: PW, passwordConfirm: PW, language: 'cs' } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'b@x.cz', password: PW, passwordConfirm: PW, language: 'cs' } });
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@x.cz', password: PW } })).json.token;
     const B = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'b@x.cz', password: PW } })).json.token;
     const keyRW = (await api('POST', '/api/kb/api-keys', { token: A, body: { label: 'http-rw', scope: 'read_write' } })).json.token;
@@ -107,7 +107,7 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const stdioTools = (await stdioRpc('tools/list', {})).result.tools;
     const httpTools = (await mcpPost(keyRW, 'tools/list', {})).json.result.tools;
-    expect(httpTools.length === 34, `HTTP tools/list → 34 nástrojů (${httpTools.length})`);
+    expect(httpTools.length === 35, `HTTP tools/list → 35 nástrojů (${httpTools.length})`);
     const podle = (arr) => Object.fromEntries(arr.map((t) => [t.name, t]));
     const S = podle(stdioTools), H = podle(httpTools);
     expect(JSON.stringify(Object.keys(S).sort()) === JSON.stringify(Object.keys(H).sort()), 'stejná JMÉNA nástrojů');
@@ -216,6 +216,22 @@ let mcp = null;
     const gpStdio = await stdioRpc('tools/call', { name: 'get_portfolio', arguments: {} });
     const gpStdioText = (gpStdio.result.content || []).map((c) => c.text).join('\n');
     expect(/Portfolio as of/.test(toolText(gp)) && gpStdioText === toolText(gp), 'výstup get_portfolio je BYTE-SHODNÝ se stdio serverem');
+
+    // update_map (analýza funkcí 5. 11. 2026): přejmenování projektu přes agenta dřív
+    // změnilo jen text vrcholu a seznam projektů držel starý název
+    const um = await mcpPost(keyRW, 'tools/call', { name: 'update_map', arguments: { map_id: mapId, title: 'HTTP mapa přejmenovaná', description: 'popis z agenta' } });
+    expect(/Map updated: HTTP mapa přejmenovaná — popis z agenta/.test(toolText(um)), `update_map přejmenoval mapu (${toolText(um).slice(0, 80)})`);
+    const poUm = (await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token: A })).json;
+    expect(poUm.title === 'HTTP mapa přejmenovaná' && poUm.description === 'popis z agenta', `databáze drží nový název i popis (${poUm.title})`);
+    const umBad = await mcpPost(keyRW, 'tools/call', { name: 'update_map', arguments: { map_id: mapId, archived: true } });
+    expect(umBad.json.error || /archived/.test(toolText(umBad)), 'update_map odmítá neznámé pole (archived není jeho)');
+    const umRO = await mcpPost(keyRO, 'tools/call', { name: 'update_map', arguments: { map_id: mapId, title: 'x' } });
+    expect(/read|čten|403|denied|write/i.test(toolText(umRO)), `klíč jen pro čtení mapu nepřejmenuje (${toolText(umRO).slice(0, 60)})`);
+    // parita se stdio serverem: stejný nástroj, stejný text odpovědi
+    await stdioRpc('tools/call', { name: 'get_map', arguments: { map_id: mapId } }); // stdio si načte aktuální verzi (HTTP ji mezitím změnil)
+    const umStdio = await stdioRpc('tools/call', { name: 'update_map', arguments: { map_id: mapId, title: 'HTTP mapa přejmenovaná', description: 'popis z agenta' } });
+    const umStdioText = ((umStdio.result || {}).content || []).map((c) => c.text).join('\n');
+    expect(umStdioText === toolText(um), `výstup update_map je BYTE-SHODNÝ se stdio serverem (${umStdioText.slice(0, 60)})`);
 
     console.log('== události a připomínky (19. 9. 2026) ==');
     const zitra = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();

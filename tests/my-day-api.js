@@ -36,7 +36,7 @@ const mojePulnocVUtc = () => { const d = new Date(); d.setHours(0, 0, 0, 0); ret
 const myDayUrl = (today) => `/api/flowmap/my-day?today=${today}&since=${encodeURIComponent(mojePulnocVUtc())}`;
 
 const register = async (email) => {
-  await api('/api/collections/users/records', { body: { email, password: 'testheslo123', passwordConfirm: 'testheslo123' } });
+  await api('/api/collections/users/records', { body: { email, password: 'testheslo123', passwordConfirm: 'testheslo123', language: 'cs' } });
   const r = await api('/api/collections/users/auth-with-password', { body: { identity: email, password: 'testheslo123' } });
   return { token: r.json.token, id: r.json.record.id, email };
 };

@@ -29,7 +29,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, p, { token, body } = {}) => {
   const res = await fetch(BASE + p, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
@@ -63,7 +63,7 @@ const sekce = (prompt, nadpis) => {
       req.on('data', (c) => { telo += c; });
       req.on('end', () => {
         try { zachyceno.push(JSON.parse(telo)); } catch { zachyceno.push({ raw: telo }); }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Accept-Language': 'cs' });
         // odpověď musí vypadat jako od AI služby: { reply }
         res.end(JSON.stringify({ reply: 'Dnes to zvládneš. Drž se plánu. 💪' }));
       });
@@ -79,7 +79,7 @@ const sekce = (prompt, nadpis) => {
       + `${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW, language: 'cs' } });
     const AT = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@e2e.local', password: PW } })).json.token;
     // SLOVNÍK 17. 8. 2026: položky sází superuser (uživatelský create = 403)
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });

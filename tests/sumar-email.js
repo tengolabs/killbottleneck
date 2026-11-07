@@ -74,7 +74,7 @@ H.beh(async () => {
     expect(r.status === 200 && r.json.sumar_email === true, `${e} si sumář e-mailem zapne sám`);
   }
   // registrace se zapnutým sumářem rovnou v těle → server ho vypne (opt-in jen vlastník v Nastavení; checkup 5. 11.)
-  r = await inst.api('POST', '/api/collections/users/records', { body: { email: 'novy@example.com', password: 'Heslo12345!', passwordConfirm: 'Heslo12345!', name: 'Nový', sumar_email: true } });
+  r = await inst.api('POST', '/api/collections/users/records', { body: { email: 'novy@example.com', password: 'Heslo12345!', passwordConfirm: 'Heslo12345!', language: 'cs', name: 'Nový', sumar_email: true } });
   expect(r.status === 200 && r.json.sumar_email === false, `založení účtu se sumar_email=true → vypnuto (${r.status}, ${r.json.sumar_email})`);
   // podvrh: obyčejný obrázek uživatele s názvem banneru dne (dřív by ho ranní mail poslal všem jako banner instance)
   const den = today; // = fmtDateLocal serveru (Europe/Prague)

@@ -79,9 +79,9 @@ const api = async (method, path, { token, body } = {}) => {
     const uidOf = async (email) => ((await api('GET', `/api/collections/users/records?filter=${encodeURIComponent(`email='${email}'`)}`, { token: ST })).json.items || [])[0].id;
     // A = aktivní s prací; B = aktivní bez práce; C = má práci, ale NEpřihlášený
     // (filtr FLOWMAP_SUMMARY_ACTIVE_DAYS ho z ranní dávky vynechá)
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW } });
-    await api('POST', '/api/collections/users/records', { body: { email: 'b@e2e.local', password: PW, passwordConfirm: PW } });
-    await api('POST', '/api/collections/users/records', { body: { email: 'c@e2e.local', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW, language: 'cs' } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'b@e2e.local', password: PW, passwordConfirm: PW, language: 'cs' } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'c@e2e.local', password: PW, passwordConfirm: PW, language: 'cs' } });
     const authA = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@e2e.local', password: PW } })).json;
     const authB = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'b@e2e.local', password: PW } })).json;
     const authC = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'c@e2e.local', password: PW } })).json;

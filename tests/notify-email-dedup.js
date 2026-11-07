@@ -72,7 +72,7 @@ const proKoho = (adresa) => maily.filter((m) => new RegExp(adresa.replace('.', '
 
     console.log('== dva příjemci: zvoneček+e-mail a JEN e-mail ==');
     for (const em of ['a@example.com', 'zvonek@example.com', 'jenmail@example.com']) {
-      await api('POST', '/api/collections/users/records', { body: { email: em, password: PW, passwordConfirm: PW, name: em.split('@')[0] } });
+      await api('POST', '/api/collections/users/records', { body: { email: em, password: PW, passwordConfirm: PW, language: 'cs', name: em.split('@')[0] } });
     }
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@example.com', password: PW } })).json.token;
     const JEN = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'jenmail@example.com', password: PW } }));

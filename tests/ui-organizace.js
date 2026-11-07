@@ -29,7 +29,7 @@ const api = async (path, { token, bearer, body, method } = {}) => {
 
     // data přes API: admin + člen, týmová mapa s propadlým uzlem člena, adminova soukromá s propadlým uzlem
     const reg = async (email) => {
-      await api('/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+      await api('/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
       const r = await api('/api/collections/users/auth-with-password', { body: { identity: email, password: PW } });
       const klic = (await api('/api/kb/api-keys', { token: r.json.token, body: { label: 'seed', scope: 'read_write' } })).json.token;
       return { token: r.json.token, email, klic };

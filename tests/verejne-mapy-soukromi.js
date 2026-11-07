@@ -44,7 +44,7 @@ async function waitHealthy() {
     await waitHealthy();
 
     await api('POST', '/api/collections/users/records', {
-      body: { email: MAJITEL.email, password: MAJITEL.password, passwordConfirm: MAJITEL.password },
+      body: { email: MAJITEL.email, password: MAJITEL.password, passwordConfirm: MAJITEL.password, language: 'cs' },
     });
     const auth = await api('POST', '/api/collections/users/auth-with-password', {
       body: { identity: MAJITEL.email, password: MAJITEL.password },

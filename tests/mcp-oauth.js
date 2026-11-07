@@ -89,7 +89,7 @@ const catcher = http.createServer((req, res) => {
       'client-info vrací registrované redirect_uris (consent ukáže doménu)');
 
     console.log('== authorization code + PKCE (headless) ==');
-    await api('POST', '/api/collections/users/records', { body: { email: 'o@x.cz', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'o@x.cz', password: PW, passwordConfirm: PW, language: 'cs' } });
     const U = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'o@x.cz', password: PW } })).json.token;
     const verifier = crypto.randomBytes(32).toString('base64url');
     const ap = await api('POST', '/api/kb/oauth/approve', { token: U, body: {

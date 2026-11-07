@@ -45,7 +45,7 @@ async function start(env) {
 
 async function zaloz(email, role = 'member') {
   return api('POST', '/api/collections/users/records', {
-    body: { email, password: HESLO, passwordConfirm: HESLO, name: email.split('@')[0], role },
+    body: { email, password: HESLO, passwordConfirm: HESLO, language: 'cs', name: email.split('@')[0], role },
   });
 }
 

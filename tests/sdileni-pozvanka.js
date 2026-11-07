@@ -37,7 +37,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, p, { token, body } = {}) => {
   const res = await fetch(BASE + p, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
@@ -105,7 +105,7 @@ const zapniSmtp = (ST) => api('PATCH', '/api/settings', { token: ST, body: {
   smtp: { enabled: true, host: 'host.docker.internal', port: SMTP_PORT, tls: false },
 } });
 const ucet = async (email, extra = {}) => {
-  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, ...extra } });
+  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs', ...extra } });
   return (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json;
 };
 const mapa = async (token, title) => (await api('POST', '/api/collections/goalmaps/records', { token, body: {

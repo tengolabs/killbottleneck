@@ -149,8 +149,8 @@ onRecordCreateRequest((e) => {
   const mailLower = e.record.getString("email").trim().toLowerCase();
   if (mailLower && mailLower !== e.record.getString("email")) e.record.set("email", mailLower);
   if (isExternalOwner(e.record.getString("email"))) {
-    const { t, userLang } = require(`${__hooks}/i18n.js`);
-    throw new BadRequestError(t(userLang(null), "err.extEmailReserved"));
+    const { t, requestLang } = require(`${__hooks}/i18n.js`);
+    throw new BadRequestError(t(requestLang(e), "err.extEmailReserved"));
   }
   // sumář e-mailem je opt-in VLASTNÍKA (jako update): při založení účtu ho nikdo jiný než superuživatel nezapne (checkup 5. 11.)
   if (!e.hasSuperuserAuth()) e.record.set("sumar_email", false);
@@ -172,14 +172,14 @@ onRecordCreateRequest((e) => {
     // Registrace tu proto nejde vůbec — dokud box neprojde naším formulářem
     // (a nedostane kód), na self-hostu (bez KB_HOSTED) se nemění nic.
     if (env("HOSTED") === "1" && !setupCode) {
-      const { t, userLang } = require(`${__hooks}/i18n.js`);
-      throw new BadRequestError(t(userLang(null), "err.registrationClosed"));
+      const { t, requestLang } = require(`${__hooks}/i18n.js`);
+      throw new BadRequestError(t(requestLang(e), "err.registrationClosed"));
     }
     if (setupCode) {
       const given = String((e.requestInfo().body || {}).setup_code || "");
-      // registrace běží PŘED auth → jazyk uživatele není znám → default cs
-      const { t, userLang } = require(`${__hooks}/i18n.js`);
-      const L = userLang(null);
+      // registration runs BEFORE auth → no user language yet → the browser's Accept-Language decides
+      const { t, requestLang } = require(`${__hooks}/i18n.js`);
+      const L = requestLang(e);
       // Brzda na hádání klíče: doména hostované instance je veřejná (CT logy),
       // takže tenhle kód je jediné, co dělí internet od cizí organizace. Sám je
       // dost dlouhý na to, aby se neuhádl, ale bez brzdy by šlo zkoušet bez konce
@@ -504,25 +504,16 @@ onRecordAfterDeleteSuccess((e) => {
     try { e.app.logger().warn("users delete: úklid zastupování selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
 
-  // Smazaný člověk musí zmizet i ze SDÍLENÍ org mapy. Bez toho po něm zůstane
-  // e-mail v `shared_with_edit` i v `map_shares` — a jakmile se tatáž adresa
-  // znovu zaregistruje, přístup ke struktuře jí ožije (nález panelu 17. 8.).
+  // Smazaný člověk musí zmizet i ze SDÍLENÍ — org mapy i všech ostatních. Bez toho
+  // po něm zůstane e-mail v `shared_with_edit` i v `map_shares` — a jakmile se tatáž
+  // adresa znovu zaregistruje (nebo ji admin znovu pozve), přístup jí ožije (nález
+  // panelu 17. 8. pro org mapu; 7 Nov 2026 generalised to every map after the
+  // ownership transfer before account deletion made the stale rows systematic).
   try {
-    const { findOrgMapAnyState, jsonList, syncShares } = require(`${__hooks}/helpers.js`);
-    const em2 = e.record.getString("email");
-    const om2 = findOrgMapAnyState(e.app);
-    if (om2 && em2) {
-      const edit = jsonList(om2, "shared_with_edit");
-      const videt = jsonList(om2, "shared_with");
-      if (edit.includes(em2) || videt.includes(em2)) {
-        om2.set("shared_with_edit", edit.filter((x) => x !== em2));
-        om2.set("shared_with", videt.filter((x) => x !== em2));
-        e.app.save(om2);
-        syncShares(e.app, om2);
-      }
-    }
+    const { removeEmailFromAllShares } = require(`${__hooks}/helpers.js`);
+    removeEmailFromAllShares(e.app, e.record.getString("email"));
   } catch (err) {
-    try { e.app.logger().warn("users delete: úklid org sdílení selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
+    try { e.app.logger().warn("users delete: share cleanup failed", "error", String(err)); } catch (e2) { /* log is a bonus */ }
   }
   e.next();
 }, "users");
@@ -668,15 +659,29 @@ onRecordCreateRequest((e) => {
 
 // goalmaps: pole sdílení smí měnit jen vlastník (sdílený editor edituje jen obsah)
 onRecordUpdateRequest((e) => {
-  const { jsonVal, validateMapData, strukturaZhorsena, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, normalizeNodeShapes, logMapChanges, apexRemoved, deadlineChangeDenied, nodeDeleteDenied, stampAssignedBy, stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved, runAutomationRules, jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { jsonVal, validateMapData, strukturaZhorsena, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, normalizeNodeShapes, logMapChanges, apexRemoved, deadlineChangeDenied, nodeDeleteDenied, stampAssignedBy, stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved, runAutomationRules, jeAdmin, transferMapOwnership, transferTargetError, syncShares } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const orig = e.record.original();
   const isOwner = e.hasSuperuserAuth() || (e.auth && e.auth.id === orig.getString("owner"));
+  const archivedChangedByNonOwner = !isOwner && e.record.getBool("archived") !== orig.getBool("archived");
   if (!isOwner) {
     for (const f of ["shared_with", "shared_with_edit", "shared_with_work", "is_public", "team_access", "owner", "owner_email", "archived", "archived_at", "client"]) {
       e.record.set(f, orig.get(f));
     }
+  }
+  // An owner change via PATCH (owner or superuser) takes the same path as the
+  // /maps/{id}/transfer route: owner_email is derived, the new owner leaves the share
+  // lists, the previous one stays a co-admin. A bare PATCH of `owner` used to keep the
+  // old owner_email and a share row for the owner.
+  let ownerTransferred = false;
+  if (isOwner && e.record.getString("owner") !== orig.getString("owner")) {
+    let newOwner = null;
+    try { newOwner = e.app.findRecordById("users", e.record.getString("owner")); } catch (err) { newOwner = null; }
+    const bad = transferTargetError(e.app, orig, newOwner, L);
+    if (bad) throw new BadRequestError(bad);
+    transferMapOwnership(e.app, e.record, newOwner, { save: false, previousEmail: orig.getString("owner_email") });
+    ownerTransferred = true;
   }
   // pole série a číslo projektu spravuje výhradně server (create hook) — nejde přepsat ani vlastníkem
   for (const f of ["series", "series_number", "series_title", "series_year", "project_number"]) {
@@ -763,6 +768,11 @@ onRecordUpdateRequest((e) => {
   if (baseUpdated && baseUpdated !== orig.getString("updated")) {
     throw new ApiError(409, t(L, "err.mapConflict"));
   }
+  // Archiving/restoring is the owner's call. Until 5 Nov 2026 the field was silently
+  // reset for non-owners and the client got 200 (feature analysis: a co-admin
+  // "archived" and nothing happened) — refuse out loud so they know. After the 409
+  // check: a stale client gets "modified elsewhere", not a misleading "owner only".
+  if (archivedChangedByNonOwner) throw new BadRequestError(t(L, "err.archiveOwnerOnly"));
   // stav mapy PŘED uložením (kvůli detekci odblokování po e.next())
   const origNodes = jsonVal(orig, "nodes", []);
   const origEdges = jsonVal(orig, "edges", []);
@@ -788,6 +798,11 @@ onRecordUpdateRequest((e) => {
     try { e.app.logger().warn("goalmaps update: srovnání požadavků na automatizaci selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
   e.next();
+  if (ownerTransferred) {
+    try { syncShares(e.app, e.record); } catch (err) {
+      try { e.app.logger().warn("goalmaps update: share sync failed", "map", e.record.id, "error", String(err)); } catch (e2) { /* log is a bonus */ }
+    }
+  }
   // styl Projekt ↔ Proces: tvar opakovacích pravidel (obnova podkroků) sleduje styl — na serveru, ať platí pro
   // editor, asistenta, REST i budoucí v1/MCP stejně
   if (e.record.getString("kind") !== kindOld) {
@@ -3252,6 +3267,71 @@ kbRoute("POST", "/advisor", (e) => {
 // správa sdílení — věrná replika Base44 funkce shareMap (owner-only).
 // Každá mutující akce vrací `updated`, aby si editor posunul base_updated
 // a další autosave nespadl na falešný 409 (routa ukládá mimo request hook).
+// Transfer of project ownership (feature analysis 5 Nov 2026: the server only knew a
+// bare PATCH of `owner` with no button; deleting the account then cascaded to its
+// projects). Owner or administrator; the previous owner stays a co-admin (edit).
+// The org structure can only be taken over by an administrator.
+kbRoute("POST", "/maps/{id}/transfer", (e) => {
+  const { jeAdmin, transferMapOwnership, transferTargetError } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (!e.auth) return e.json(401, { error: t(L, "err.transferOwnerOnly") });
+  let map;
+  try { map = $app.findRecordById("goalmaps", e.request.pathValue("id")); } catch (err) { return e.json(404, { error: t(L, "err.mapNotFound") }); }
+  const isOwner = map.getString("owner") === e.auth.id;
+  if (!isOwner && !jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.transferOwnerOnly") });
+  const email = String((e.requestInfo().body || {}).email || "").trim();
+  let newOwner = null;
+  if (email) { try { newOwner = $app.findFirstRecordByData("users", "email", email); } catch (err) { newOwner = null; } }
+  const bad = transferTargetError($app, map, newOwner, L);
+  if (bad) return e.json(400, { error: bad });
+  transferMapOwnership($app, map, newOwner);
+  return e.json(200, { id: map.id, owner_email: newOwner.getString("email"), updated: map.getString("updated") });
+});
+
+// Projects an account owns — for user administration before deleting the account
+// (deletion cascades through the owner relation, so its projects would go with it).
+kbRoute("GET", "/users/{id}/maps", (e) => {
+  const { jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (!e.hasSuperuserAuth() && (!e.auth || !jeAdmin(e.auth))) return e.json(403, { error: t(L, "err.adminOnly") });
+  const uid = e.request.pathValue("id");
+  try { $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
+  const rows = $app.findRecordsByFilter("goalmaps", "owner = {:u}", "-updated", 5000, 0, { u: uid });
+  const maps = rows.map((m) => ({ id: m.id, title: m.getString("title"), archived: m.getBool("archived"), kind: m.getString("kind") }));
+  return e.json(200, { count: maps.length, maps: maps });
+});
+
+// Transfer all projects of an account to another member (default = the calling
+// administrator) — the step before deleting the account, so the previous owner is NOT
+// kept as a co-admin (a share row for a soon-deleted address would revive on
+// re-registration). Returns the count and the maps that could not be transferred
+// (the org structure when the target is not an admin) — the client must refuse to
+// delete the account while `skipped` is non-empty.
+kbRoute("POST", "/users/{id}/transfer-maps", (e) => {
+  const { jeAdmin, transferMapOwnership, transferTargetError } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (!e.hasSuperuserAuth() && (!e.auth || !jeAdmin(e.auth))) return e.json(403, { error: t(L, "err.adminOnly") });
+  const uid = e.request.pathValue("id");
+  try { $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
+  const email = String((e.requestInfo().body || {}).email || "").trim();
+  let newOwner = e.auth || null;
+  if (email) { try { newOwner = $app.findFirstRecordByData("users", "email", email); } catch (err) { newOwner = null; } }
+  if (!newOwner || newOwner.getString("kind") === "guest") return e.json(400, { error: t(L, "err.transferTargetNotMember") });
+  if (newOwner.id === uid) return e.json(400, { error: t(L, "err.transferSameOwner") });
+  const rows = $app.findRecordsByFilter("goalmaps", "owner = {:u}", "", 5000, 0, { u: uid });
+  let n = 0;
+  const skipped = [];
+  for (const m of rows) {
+    if (transferTargetError($app, m, newOwner, L)) { skipped.push({ id: m.id, title: m.getString("title"), kind: m.getString("kind") }); continue; }
+    transferMapOwnership($app, m, newOwner, { keepPrevious: false });
+    n += 1;
+  }
+  return e.json(200, { transferred: n, skipped: skipped, owner_email: newOwner.getString("email") });
+});
+
 kbRoute("POST", "/share", (e) => {
   const { jsonList, jsonVal, syncShares, notify, mapShareAdminAccess, jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
@@ -3804,8 +3884,8 @@ kbRoute("POST", "/deadline-requests", (e) => {
 // veřejné mapy — věrná replika Base44 funkce getPublicMap (bez přihlášení)
 kbRoute("POST", "/public-maps", (e) => {
   const { jsonVal, publicMapDto } = require(`${__hooks}/helpers.js`);
-  const { t, userLang } = require(`${__hooks}/i18n.js`);
-  const L = userLang(null); // veřejný endpoint bez přihlášení → default cs
+  const { t, requestLang } = require(`${__hooks}/i18n.js`);
+  const L = requestLang(e); // public endpoint without a sign-in → the browser's Accept-Language decides
 
   // jednoduchý rate-limit (endpoint je bez přihlášení): 30 požadavků/min/IP
   const ip = e.realIP();
@@ -5988,6 +6068,39 @@ kbRoute("POST", "/v1/maps", (e) => {
 
 // přidání podstromu: {parent_id?, items:[...], base_updated?} — bez parent_id se
 // věší na vrchol (apex). POZOR: přepočítá kanonický layout celé mapy.
+// Map title and description via v1 (MCP update_map). Until 5 Nov 2026 an agent could
+// only change the apex text (update_node) and the map list and the database kept the
+// old title. Full write only (owner / named edit / team edit); the org map stays
+// read-only through a key (the same gate v1SaveMapData applies — this route saves the
+// record directly, so it checks itself). base_updated is required like for other writes.
+kbRoute("POST", "/v1/maps/{id}", (e) => {
+  const { apiKeyAuth, v1WritableMap } = require(`${__hooks}/helpers.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
+  const a = apiKeyAuth($app, e, "read_write");
+  if (a.error) return e.json(a.status, { error: a.error });
+  const info = e.requestInfo().body || {};
+  if (JSON.stringify(info).length > 64 * 1024) return e.json(413, { error: t(a.lang, "err.bodyTooLarge") });
+  const H = require(`${__hooks}/helpers.js`);
+  const badBody = H.unknownFieldsError(info, H.V1_BODY_FIELDS.updateMap, a.lang);
+  if (badBody) return e.json(400, { error: badBody });
+  const w = v1WritableMap($app, e.request.pathValue("id"), a.user, "edit", a.lang);
+  if (w.error) return e.json(w.status, { error: w.error });
+  const map = w.map;
+  if (map.getString("kind") === "org") return e.json(403, { error: t(a.lang, "err.orgApiReadOnly") });
+  const baseUpdated = String(info.base_updated || "");
+  if (!baseUpdated) return e.json(400, { error: t(a.lang, "err.baseVersionRequired") });
+  if (baseUpdated !== map.getString("updated")) return e.json(409, { error: t(a.lang, "err.mapConflict") });
+  if (info.title === undefined && info.description === undefined) return e.json(400, { error: t(a.lang, "err.nothingToUpdate") });
+  if (info.title !== undefined) {
+    const title = String(info.title || "").trim().slice(0, 200);
+    if (!title) return e.json(400, { error: t(a.lang, "err.titleRequired") });
+    map.set("title", title);
+  }
+  if (info.description !== undefined) map.set("description", String(info.description || "").slice(0, 4000));
+  $app.save(map);
+  return e.json(200, { id: map.id, updated: map.getString("updated"), title: map.getString("title"), description: map.getString("description") });
+});
+
 kbRoute("POST", "/v1/maps/{id}/nodes", (e) => {
   const { apiKeyAuth, v1WritableMap, treeItemsToNodes, v1SaveMapData, notifyAssignedFromNodes, notifyAutomationRequests, stampAutomationRequesters, autoShareAssignees, mapToTree, jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);

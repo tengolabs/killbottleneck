@@ -402,6 +402,7 @@
     "automationWantedBadge": "chce automatizaci",
     "assignedNoDelete": "Cíl se zadaným úkolem nejde odstranit",
     "assignedNoDeleteHint": "Úkol s termínem smí z mapy odstranit jen zadavatel ({{email}}) nebo vlastník projektu.",
+    "assignedNoDeleteSkipped": "Cíle se zadáním od někoho jiného ({{skipped}} z {{total}} vybraných) v mapě zůstávají — smazat je smí jen zadavatel nebo vlastník projektu.",
     "workDetailTitle": "Zobrazit detail cíle",
     "workOwnOnly": "Tohle není váš úkol",
     "workOwnOnlyHint": "Jako spolupracovník měníte stav jen u cílů, kde jste zodpovědná osoba.",

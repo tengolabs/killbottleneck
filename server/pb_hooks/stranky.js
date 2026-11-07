@@ -638,7 +638,7 @@ function poRestartu(app) {
   for (const rec of rows) {
     try {
       const { t, userLang } = require(`${__hooks}/i18n.js`);
-      let L = "cs"; try { L = userLang(app.findRecordById("users", rec.getString("user"))); } catch (err) { L = "cs"; }
+      let L = userLang(null); try { L = userLang(app.findRecordById("users", rec.getString("user"))); } catch (err) { L = userLang(null); }
       nastavStav(app, rec, "chyba", t(L, "err.pageInterrupted"));
     } catch (err) { /* další záznam */ }
   }

@@ -9,17 +9,19 @@
   <a href="https://killbottleneck.com">Website</a> ·
   <a href="https://killbottleneck.com/guide/what-it-is">Documentation</a> ·
   <a href="./CHANGELOG.md">Changelog</a> ·
-  <a href="#license--fair-code">Licence</a>
+  <a href="#license--mit">License</a>
 </p>
 
-> 🧪 **Public beta.** killBottleneck is feature-complete and in beta — the cloud
-> and the self-hosted version alike; it is one and the same app. What we are
-> testing here is the **self-hosted** side: installation, reverse proxies, your
-> own SMTP, upgrades. Install it (Quick start below), try to break it, and
-> tell us what happened: bugs → [Issues](../../issues), ideas → Discussions.
-> v1.0 ships when the beta goes quiet.
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/tengolabs/killbottleneck?label=license" alt="License: MIT"></a>
+  <a href="https://github.com/tengolabs/killbottleneck/releases/latest"><img src="https://img.shields.io/github/v/release/tengolabs/killbottleneck?label=release" alt="Latest release"></a>
+</p>
 
-A visual picture of your projects, your company and its processes — goal maps that people and AI agents work on together, **entirely on your own server: your data never leaves the company**. **Free to self-host, with REST API and MCP server included.** Open in the spirit of open source, just without the right to resell it as a hosted service — see [License](#license--fair-code).
+> ✅ **v1.0 — stable, open source.** The beta is over. The cloud and the self-hosted
+> version are one and the same app, released under the **MIT license** since v1.0.0.
+> Bugs → [Issues](../../issues), ideas → Discussions.
+
+A visual picture of your projects, your company and its processes — goal maps that people and AI agents work on together, **entirely on your own server: your data never leaves the company**. **Free to self-host, with REST API and MCP server included.** **Open source under the MIT license** — see [License](#license--mit).
 
 ![The goal map editor](assets/mapa-en.jpg)
 
@@ -48,7 +50,7 @@ There is no telemetry, no analytics and no licence check.
 - [Data and backup](#data-and-backup) · [Team](#team) · [Registration and the registration key](#registration-and-the-registration-key)
 - [Sign in with Google](#sign-in-with-google-optional) · [Attachments](#attachments-on-goals-a-file-or-a-link) · [E-mail (SMTP)](#e-mail-smtp-optional)
 - [HTTPS (access from outside)](#https-access-from-outside) · [Updating](#updating)
-- [License — fair-code](#license--fair-code) · [Contact](#contact)
+- [License — MIT](#license--mit) · [Contact](#contact)
 
 </details>
 
@@ -651,45 +653,49 @@ anything. `FLOWMAP_*` variables in your `.env` keep working, there is no need to
 
 - A public link to a map shares only the map canvas — tasks and task comments are not visible
   through it.
-- Licence: **fair-code** — Sustainable Use License (see the License section below).
+- License: **MIT** (see the License section below).
 
-## License — fair-code
+## License — MIT
 
-killBottleneck isn't "open source" in the strict (OSI) sense — and we say so plainly. It's
-**fair-code**: the source is public, you can download it, run it, modify it and use it, and
-for the vast majority of people it delivers the same benefits as classic open source.
-The parts that *can* be classic **open source, are**: the
-[skin editor](https://tengolabs.github.io/killbottleneck-skins/) (MIT) and the whole
-[skin gallery](https://github.com/tengolabs/killbottleneck-skins) including its validator (CC0).
+killBottleneck is **open source** under the [MIT License](./LICENSE) — since v1.0.0 (November 2026).
+Download it, run it, modify it, redistribute it, build on it, privately or commercially; the
+only condition is keeping the copyright notice.
 
 **You get the whole of killBottleneck — every feature, including team collaboration and the AI
-features.** No stripped-down "free version", nothing locked behind a paywall. You can even
+features.** No stripped-down "free version", nothing locked behind a paywall. You can
 **power the AI yourself, for free** — with your own model (Ollama) on your machine, or your
-own API key. Our hosted cloud (AI included) is offered only as **a convenience for those who have
-nowhere to run killBottleneck** — it's convenience, not a condition.
+own API key.
 
-**What you may do with killBottleneck — free and with no catch:**
-- Run it yourself on your own computer or server — **your data stays with you**.
-- Use it in your company for your own work and your team — fully.
-- Plug in **your own AI** (a local model or your own API key), or use no AI at all.
-- Modify it however you need.
-- Offer services around killBottleneck (setup, consulting, customizations for a client).
+**What is public and what is not:**
+- This repository is the application itself: server, web client and the MCP server. The Docker
+  image is built from exactly this. The Windows app lives in its own repository
+  ([tengolabs/killbottleneck-desktop](https://github.com/tengolabs/killbottleneck-desktop), MIT too).
+- Not published: the sources of the documentation website (the site itself is at
+  [killbottleneck.com](https://killbottleneck.com)), the Android shell (the app ships through the
+  store) and the infrastructure of our **hosted service** (provisioning, billing, the customer
+  portal). The hosted service runs the very same image; you do not need any of this to run
+  killBottleneck yourself.
 
-**What we keep for ourselves — and what keeps killBottleneck alive:**
-- Hosting killBottleneck and charging people for access.
-- White-labeling it — releasing it under someone else's brand.
-- Reselling it as a paid service.
+**The name and the logo are not part of the license.** "killBottleneck" and its logo identify
+the original project and our hosted service. A fork needs its own name — "based on
+killBottleneck" is welcome. Details: [TRADEMARKS.md](./TRADEMARKS.md).
 
-That's our business — it's what lets us keep adding features, fixing bugs, and keeping
-killBottleneck alive. **We actively encourage you to build on killBottleneck** and use it however you need;
-just don't turn it into a competing hosted service. Full terms: [LICENSE](./LICENSE).
+**Older releases** (v0.x, the beta) were published under the Sustainable Use License and stay
+that way; the MIT license applies from v1.0.0 on.
+
 Third-party components keep their original licenses (MIT, Apache-2.0, BSD, …) — the full
 list with license texts is in [THIRD-PARTY-LICENSES.md](./THIRD-PARTY-LICENSES.md).
+The [skin editor](https://tengolabs.github.io/killbottleneck-skins/) and the
+[skin gallery](https://github.com/tengolabs/killbottleneck-skins) are MIT / CC0 as before.
 
-**Rights holder:** Tengo, s.r.o., ID No. 03339165, Dolní Valy 205, 262 72 Březnice, Czech Republic.
-Want to host killBottleneck as a service, ship it under your own brand, or resell it? The license doesn't allow that — but **a commercial license is available**, write to [licence@killbottleneck.com](mailto:licence@killbottleneck.com).
+**Why open source?** Reach. killBottleneck is meant to be used — in companies, by AI agents, in
+places we will never hear about. **Hosting by the authors is what funds development:** if you
+would rather not run a server, the [hosted plans](https://killbottleneck.com/pricing) keep the
+lights on here.
 
-*Česká verze této sekce je v [README.cs.md](./README.cs.md#licence--fair-code).*
+**Copyright holder:** Tengo s.r.o., ID No. 03339165, Dolní Valy 205, 262 72 Březnice, Czech Republic.
+
+*Česká verze této sekce je v [README.cs.md](./README.cs.md#licence--mit).*
 
 Built by **Richard Pobrislo** ([LinkedIn](https://www.linkedin.com/in/richard-pobrislo), [Ctrl+Alt+AI](https://www.youtube.com/@ctrlaltaicz)) — one person, which is why the support channels below are what they are.
 
@@ -702,7 +708,6 @@ The code is **written 100% by AI** — Claude Fable 5, Claude Opus 5 and Claude 
 | **GitHub Issues / Discussions** | bugs and ideas for improvements — in the open, so others can see them too |
 | **security@killbottleneck.com** | security issues (**not** in a public issue) — see [SECURITY.md](./SECURITY.md) |
 | **support@killbottleneck.com** | paid plans: the hosted instance |
-| **licence@killbottleneck.com** | commercial licensing — hosting as a service, white-label, reselling |
 | **info@killbottleneck.com** | everything else |
 
 We do not accept code from outside contributors (see [CONTRIBUTING.md](./CONTRIBUTING.md)) —
@@ -710,8 +715,9 @@ ideas and bug reports we do, and they are welcome.
 
 ## Supporting the project
 
-killBottleneck is **fair-code** — the whole product (every feature) is free to self-host and
-will stay that way. If it helps you:
+killBottleneck is **open source (MIT)** — the whole product (every feature) is free to self-host
+and will stay that way. If it helps you:
 
+- let us host it for you — the [hosted plans](https://killbottleneck.com/pricing) are what funds development,
 - follow our [YouTube channel](https://www.youtube.com/@ctrlaltaicz) with tutorials and AI news,
 - join us on [Discord](https://discord.gg/dkxMdVKwXw).

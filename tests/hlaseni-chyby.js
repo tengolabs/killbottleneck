@@ -42,7 +42,7 @@ const nastavSmtp = async () => {
   await sink.zapoj(inst, st);
 };
 const ucet = async (email) => {
-  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
   return (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 };
 

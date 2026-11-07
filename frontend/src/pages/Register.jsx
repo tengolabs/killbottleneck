@@ -11,6 +11,7 @@ import { UserPlus, Mail, Loader2, KeyRound } from "lucide-react";
 import { loadKbConfig } from "@/hooks/useKbConfig";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
+import { isNativeShell } from "@/lib/nativeShell";
 
 export default function Register() {
   const { t } = useTranslation("auth");
@@ -154,12 +155,16 @@ export default function Register() {
 
       {/* Na instanci s registračním klíčem jde Google registrace taky — kód se předá
           přes createData a server ho vynutí; tlačítko je aktivní až po vyplnění kódu. */}
-      <GoogleAuthButton
-        label={t("register.google")}
-        onError={setError}
-        setupCode={setupCode}
-        requireSetupCode={setupInfo.required}
-      />
+      {/* Google OAuth = browser redirect flow; it cannot work in the native shell, so it
+          is not offered (same as on sign-in — feature analysis 5 Nov 2026). */}
+      {!isNativeShell() && (
+        <GoogleAuthButton
+          label={t("register.google")}
+          onError={setError}
+          setupCode={setupCode}
+          requireSetupCode={setupInfo.required}
+        />
+      )}
     </AuthLayout>
   );
 }

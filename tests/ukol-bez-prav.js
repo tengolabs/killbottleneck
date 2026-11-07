@@ -41,7 +41,7 @@ async function api(method, path, { token, body } = {}) {
   let json = null; try { json = await res.json(); } catch (e) { /* prázdné tělo */ }
   return { status: res.status, json };
 }
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 const stavUzlu = async (token, mapId, nodeId) =>
   ((await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token })).json?.nodes || [])
@@ -209,9 +209,11 @@ const stavUzlu = async (token, mapId, nodeId) =>
         const n = [...document.querySelectorAll('.react-flow__node')].find((x) => (x.innerText || '').includes(tt));
         return [...(n?.querySelectorAll('button') || [])].filter((b) => b.querySelector('.lucide-timer')).length;
       };
-      return { muj: naKroku('Krok garanta'), cizi: naKroku('Cizí krok') };
+      return { muj: naKroku('Krok garanta'), cizi: naKroku('Cizí krok'), vrchol: naKroku('PROJEKT') };
     });
     expect(hodiny.muj === 1 && hodiny.cizi === 1, `hodiny zůstávají i u cizího kroku — rozhodnutí, ne vada (${JSON.stringify(hodiny)})`);
+    // vrchol: hodiny má čtenář taky (do 5. 11. 2026 se mu nekreslily — analýza funkcí)
+    expect(hodiny.vrchol === 1, `hodiny jsou i na vrcholu (${hodiny.vrchol})`);
 
     const trefa = await page.evaluate(() => {
       const n = [...document.querySelectorAll('.react-flow__node')].find((x) => (x.innerText || '').includes('Krok garanta'));

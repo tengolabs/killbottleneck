@@ -48,7 +48,7 @@ const otevriUzel = async (page, nazev) => page.evaluate((n) => {
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_PURPOSE_ASK=0 -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
-    await api('POST', '/api/collections/users/records', { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
     const auth = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'admin@example.com', password: PW } });
     const token = auth.json.token;
     const mapa = await api('POST', '/api/collections/goalmaps/records', {

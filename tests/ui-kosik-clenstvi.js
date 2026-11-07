@@ -43,7 +43,7 @@ async function start(env) {
   }
   await fetch(`${BASE}/api/collections/users/records`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL, password: HESLO, passwordConfirm: HESLO, setup_code: 'e2e-kod' }),
+    body: JSON.stringify({ email: EMAIL, password: HESLO, passwordConfirm: HESLO, language: 'cs', setup_code: 'e2e-kod' }),
   });
 }
 const linkyEnv = (linky) => `-e 'KB_PAYMENT_LINKS=${JSON.stringify(linky)}'`;

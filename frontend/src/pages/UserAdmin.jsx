@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '@/lib/clipboard';
 import { base44 } from '@/api/base44Client';
-import { getMembers, resetUserPassword, memberDeputy, savePurpose } from '@/api/kb';
+import { getMembers, resetUserPassword, memberDeputy, savePurpose, userMaps, transferUserMaps } from '@/api/kb';
 import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAuth } from '@/lib/AuthContext';
@@ -320,7 +320,32 @@ export default function UserAdmin() {
   };
 
   const handleDelete = async (userId) => {
-    if (!window.confirm(t('userAdmin.confirmDelete'))) return;
+    // Deleting the account would take its projects with it (the owner relation
+    // cascades) — offer to take them over first (feature analysis 5 Nov 2026).
+    // OK = take over, then delete; Cancel = second question whether to delete them too.
+    let owned;
+    try { owned = await userMaps(userId); } catch { owned = null; }
+    if (!owned) { window.alert(t('userAdmin.mapsListFailed')); return; } // never fall through to a blind delete
+    if ((owned.count || 0) > 0) {
+      const titles = (owned.maps || []).slice(0, 5).map((m) => m.title).join(', ') + (owned.count > 5 ? '…' : '');
+      if (window.confirm(t('userAdmin.confirmTransferMaps', { count: owned.count, titles }))) {
+        let result;
+        try {
+          result = await transferUserMaps(userId);
+        } catch (e) {
+          window.alert(e?.response?.error || e?.message || t('userAdmin.transferFailed'));
+          return;
+        }
+        if (!result || result.transferred !== owned.count) {
+          window.alert(t('userAdmin.transferIncomplete', { transferred: (result && result.transferred) || 0, count: owned.count }));
+          return;
+        }
+      } else if (!window.confirm(t('userAdmin.confirmDeleteWithMaps', { count: owned.count }))) {
+        return;
+      }
+    } else if (!window.confirm(t('userAdmin.confirmDelete'))) {
+      return;
+    }
     try {
       await base44.entities.User.delete(userId);
       setUsers((prev) => prev.filter((u) => u.id !== userId));

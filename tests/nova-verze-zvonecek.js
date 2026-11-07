@@ -21,7 +21,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, path, { token, body } = {}) => {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
@@ -52,7 +52,7 @@ const zvonecek = async (token) => {
     console.log('== účet vznikne na verzi v0.40 ==');
     spust('-e KB_VERSION=v0.40');
     ok(await pockej(), 'instance na v0.40 naběhla');
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@example.com', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
     let auth = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@example.com', password: PW } });
     const token = auth.json.token;
 
@@ -104,7 +104,7 @@ const zvonecek = async (token) => {
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 -e KB_VERSION=v0.37 -v ${NAME}-body:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     ok(await pockej(), 'čistá instance na v0.37 naběhla');
-    await api('POST', '/api/collections/users/records', { body: { email: 'b@example.com', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'b@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
     const auth2 = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'b@example.com', password: PW } });
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p ${PORT}:8090 -e KB_VERSION=v0.38-beta -v ${NAME}-body:/app/pb_data ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });

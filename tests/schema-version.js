@@ -22,7 +22,7 @@ const mock = http.createServer((req, res) => {
 const api = async (path, { token, body } = {}) => {
   const res = await fetch(BASE + path, {
     method: body ? 'POST' : 'GET',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch {}
@@ -38,7 +38,7 @@ const api = async (path, { token, body } = {}) => {
       -e FLOWMAP_AI_PROVIDER=custom -e FLOWMAP_AI_URL=http://host.docker.internal:${MOCK_PORT}/v1/advisor ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
 
-    await api('/api/collections/users/records', { body: { email: 'a@x.cz', password: 'testheslo123', passwordConfirm: 'testheslo123' } });
+    await api('/api/collections/users/records', { body: { email: 'a@x.cz', password: 'testheslo123', passwordConfirm: 'testheslo123', language: 'cs' } });
     const T = (await api('/api/collections/users/auth-with-password', { body: { identity: 'a@x.cz', password: 'testheslo123' } })).json.token;
 
     console.log('== schema_version kontrola ==');

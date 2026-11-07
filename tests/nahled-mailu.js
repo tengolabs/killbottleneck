@@ -138,7 +138,7 @@ const predmetZ = (raw) => {
     await api('POST', '/api/collections/users/request-password-reset', { body: { email: 'kolega@firma.cz' } });
     zachyceno.push({ soubor: 'obnova-hesla.html', popis: 'Obnovení hesla', raw: await mailPro('kolega@firma.cz') });
     // ověření adresy jde jen NEověřenému účtu → čerstvá samoregistrace
-    await api('POST', '/api/collections/users/records', { body: { email: 'novacek@firma.cz', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'novacek@firma.cz', password: PW, passwordConfirm: PW, language: 'cs' } });
     maily.length = 0;
     await api('POST', '/api/collections/users/request-verification', { body: { email: 'novacek@firma.cz' } });
     zachyceno.push({ soubor: 'overeni-adresy.html', popis: 'Ověření e-mailové adresy', raw: await mailPro('novacek@firma.cz') });

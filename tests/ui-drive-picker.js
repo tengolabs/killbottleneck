@@ -51,7 +51,7 @@ async function otevriDialog(browser, base, token, mapId) {
   return { page, googleRequests };
 }
 const pripravMapu = async (base) => {
-  await api(base, 'POST', '/api/collections/users/records', { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW } });
+  await api(base, 'POST', '/api/collections/users/records', { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
   const token = (await api(base, 'POST', '/api/collections/users/auth-with-password', { body: { identity: 'admin@example.com', password: PW } })).json.token;
   const mapa = await api(base, 'POST', '/api/collections/goalmaps/records', {
     token, body: { title: 'Projekt s přílohami', edges: [], nodes: [

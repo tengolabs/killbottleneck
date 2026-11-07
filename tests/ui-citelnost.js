@@ -49,7 +49,7 @@ const api = async (m, p, { token, body } = {}) => {
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_PURPOSE_ASK=0 -e TZ=Europe/Prague -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.cz', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.cz', password: PW, passwordConfirm: PW, language: 'cs' } });
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@e2e.cz', password: PW } })).json.token;
 
     // Mapa podle Richardova screenshotu „8D report": vrchol + 8 disciplín

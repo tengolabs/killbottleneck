@@ -35,7 +35,7 @@ const api = async (method, p, { token, body } = {}) => {
   return { status: res.status, json };
 };
 const reg = (email, role) => api('POST', '/api/collections/users/records', {
-  body: { email, password: PW, passwordConfirm: PW, ...(role ? { role } : {}) },
+  body: { email, password: PW, passwordConfirm: PW, language: 'cs', ...(role ? { role } : {}) },
 });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json?.token;
 const pseudo = (id) => `ext-${id}@kontakt.invalid`;
@@ -105,7 +105,7 @@ const pragueDate = (offset = 0) => {
 
     console.log('== pojistka: pseudo-adresa nezíská účet ==');
     const regPseudo = await api('POST', '/api/collections/users/records', {
-      body: { email: pseudo(ucetni.id), password: PW, passwordConfirm: PW } });
+      body: { email: pseudo(ucetni.id), password: PW, passwordConfirm: PW, language: 'cs' } });
     expect(regPseudo.status >= 400, `self-registrace na ext-adresu odmítnuta (${regPseudo.status})`);
     const invPseudo = await api('POST', '/api/kb/invite', { token: ADMIN, body: { email: pseudo(ucetni.id) } });
     expect(invPseudo.status === 400, `pozvánka na ext-adresu odmítnuta (${invPseudo.status})`);

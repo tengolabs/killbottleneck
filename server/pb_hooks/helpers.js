@@ -1463,6 +1463,7 @@ const V1_NODE_FIELDS = ["title", "status", "description", "deadline", "planned_o
 const V1_TREE_ITEM_FIELDS = V1_NODE_FIELDS.concat(["children"]);
 const V1_BODY_FIELDS = {
   createMap: ["title", "tree", "description", "apex_text", "kind"],
+  updateMap: ["title", "description", "base_updated"],
   addNodes: ["parent_id", "items", "base_updated"],
   updateNode: V1_NODE_FIELDS.concat(["base_updated"]),
   deleteNode: ["base_updated"],
@@ -2287,6 +2288,76 @@ function autoShareAssignees(app, map, actorUser, emails) {
   app.save(map);
   syncShares(app, map);
   return changed;
+}
+
+// Transfer of project ownership (feature analysis 5 Nov 2026: deleting an account
+// cascaded to its projects; the server only knew a bare PATCH of `owner` without the
+// derived changes). The new owner leaves the share lists (an owner has no share row);
+// the previous owner stays a co-admin (edit) so they do not lose their work — except
+// opts.keepPrevious=false (the step before deleting that account: a share row for a
+// soon-deleted e-mail would revive on re-registration, the 17 Aug 2026 org-map finding).
+// opts.previousEmail: the owner_email BEFORE the change — in the update hook the
+// record already carries the client's values (a client that sends owner + owner_email
+// together would otherwise look like "no change" and the previous owner would be lost).
+// opts.save=false: only sets the fields (the request hook saves; it calls syncShares).
+function transferMapOwnership(app, map, newOwner, opts) {
+  const o = opts || {};
+  const newEmail = newOwner.getString("email");
+  let prevEmail = o.previousEmail || map.getString("owner_email");
+  if (!prevEmail) { try { prevEmail = app.findRecordById("users", map.getString("owner")).getString("email"); } catch (err) { prevEmail = ""; } }
+  const without = (arr, email) => arr.filter((x) => x !== email);
+  let sharedWith = without(jsonList(map, "shared_with"), newEmail);
+  let sharedEdit = without(jsonList(map, "shared_with_edit"), newEmail);
+  let sharedWork = without(jsonList(map, "shared_with_work"), newEmail);
+  if (o.keepPrevious === false) {
+    sharedWith = without(sharedWith, prevEmail); sharedEdit = without(sharedEdit, prevEmail); sharedWork = without(sharedWork, prevEmail);
+  } else if (prevEmail && prevEmail !== newEmail) {
+    if (sharedWith.indexOf(prevEmail) < 0) sharedWith = sharedWith.concat([prevEmail]);
+    if (sharedEdit.indexOf(prevEmail) < 0) sharedEdit = sharedEdit.concat([prevEmail]);
+  }
+  map.set("owner", newOwner.id);
+  map.set("owner_email", newEmail);
+  map.set("shared_with", sharedWith);
+  map.set("shared_with_edit", sharedEdit);
+  map.set("shared_with_work", sharedWork);
+  if (o.save === false) return;
+  app.save(map);
+  syncShares(app, map);
+}
+
+// Why a transfer target is not acceptable — one place for the PATCH hook and both
+// routes. Returns a translated message, or "" when the target is fine.
+// `kind === "guest"`: the users field arrives with the guest-from-another-organization
+// branch (feat/host-organizace, migration 1792300000); until it is merged the check is
+// inert — it is here so a guest can never become a project owner once it lands.
+function transferTargetError(app, map, newOwner, lang) {
+  const i18n = require(`${__hooks}/i18n.js`);
+  if (!newOwner || newOwner.getString("kind") === "guest") return i18n.t(lang, "err.transferTargetNotMember");
+  if (newOwner.id === map.getString("owner")) return i18n.t(lang, "err.transferSameOwner");
+  if (map.getString("kind") === "org" && !jeAdmin(newOwner)) return i18n.t(lang, "err.orgAdminOnly");
+  return "";
+}
+
+// Remove an e-mail from the share lists of EVERY map it appears in (after an account
+// is deleted). Until 7 Nov 2026 only the org map was cleaned (17 Aug finding): a stale
+// `shared_with_edit` entry plus its map_shares row would give the next account with the
+// same address full write access to all those projects.
+function removeEmailFromAllShares(app, email) {
+  if (!email) return 0;
+  const rows = app.findRecordsByFilter("goalmaps",
+    "shared_with ~ {:e} || shared_with_edit ~ {:e} || shared_with_work ~ {:e}", "", 5000, 0, { e: email });
+  let n = 0;
+  for (const m of rows) {
+    const w = jsonList(m, "shared_with"), ed = jsonList(m, "shared_with_edit"), wk = jsonList(m, "shared_with_work");
+    if (!w.includes(email) && !ed.includes(email) && !wk.includes(email)) continue; // substring hit on another address
+    m.set("shared_with", w.filter((x) => x !== email));
+    m.set("shared_with_edit", ed.filter((x) => x !== email));
+    m.set("shared_with_work", wk.filter((x) => x !== email));
+    app.save(m);
+    syncShares(app, m);
+    n += 1;
+  }
+  return n;
 }
 
 // v1: společný zápis obsahu mapy — normalizace (parita cleanMap + sémantika) →
@@ -3752,8 +3823,8 @@ function autoStopStaleTimers(app) {
       r.set("note", (note ? note + " " : "") + "(auto-stop po 12 h)");
       app.save(r);
       // fallback názvu stopek v jazyce vlastníka (jinak notify složí text správně sám)
-      let ownerLang = "cs";
-      try { ownerLang = i18n.userLang(app.findFirstRecordByFilter("users", "email = {:e}", { e: r.getString("owner_email") })); } catch (e3) { /* default cs */ }
+      let ownerLang = i18n.userLang(null);
+      try { ownerLang = i18n.userLang(app.findFirstRecordByFilter("users", "email = {:e}", { e: r.getString("owner_email") })); } catch (e3) { /* fallback language */ }
       notify(app, {
         email: r.getString("owner_email"),
         actorEmail: "",
@@ -8175,7 +8246,7 @@ module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, transferMapOwnership, transferTargetError, removeEmailFromAllShares,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

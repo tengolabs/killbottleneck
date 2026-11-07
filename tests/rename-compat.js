@@ -65,10 +65,10 @@ async function start(inst, env) {
     console.log('== registrace: klíč platí na obou ==');
     for (const [jmeno, base] of [['stará instance', S], ['nová instance', N]]) {
       const spatne = await api(base, 'POST', '/api/collections/users/records',
-        { body: { email: 'x@example.com', password: PW, passwordConfirm: PW, setup_code: 'SPATNY' } });
+        { body: { email: 'x@example.com', password: PW, passwordConfirm: PW, language: 'cs', setup_code: 'SPATNY' } });
       expect(spatne.status >= 400, `${jmeno}: špatný klíč odmítnut`);
       const dobre = await api(base, 'POST', '/api/collections/users/records',
-        { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW, setup_code: KOD } });
+        { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW, language: 'cs', setup_code: KOD } });
       expect(dobre.status === 200 && dobre.json.role === 'admin', `${jmeno}: správný klíč pustí admina`);
     }
 

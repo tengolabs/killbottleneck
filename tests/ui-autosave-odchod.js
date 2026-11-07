@@ -31,7 +31,7 @@ const cizihoPuvodu = (m) => /fonts\.g|favicon|ERR_NETWORK_CHANGED/.test(m.text()
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_UVODNI_MAPA=0 -e KB_PURPOSE_ASK=0 -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
-    await api('POST', '/api/collections/users/records', { body: { email: EMAIL, password: PW, passwordConfirm: PW, name: 'Editor', role: 'admin' } });
+    await api('POST', '/api/collections/users/records', { body: { email: EMAIL, password: PW, passwordConfirm: PW, language: 'cs', name: 'Editor', role: 'admin' } });
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: EMAIL, password: PW } })).json.token;
     // schválně NEzarovnané pozice, ať Zarovnat něco změní
     const nodes = [

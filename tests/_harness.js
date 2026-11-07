@@ -118,7 +118,10 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
   Object.assign(inst, { volume: volume ? (volume === true ? name + '-data' : volume) : '',
     api: async (method, path, { token, bearer, body, form, headers } = {}) => {
       if (MUTACE === 'api' && String(method).toUpperCase() === 'GET') return { status: 200, json: {}, headers: new Headers() };
-      const hdr = Object.assign(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : { 'Content-Type': 'application/json' },
+      // Accept-Language: cs by default — the suites were written for a Czech client (a real browser always
+      // sends the header; since v1.0.0 the server answers anonymous requests in English without it).
+      // A suite that tests the English side passes its own headers: { 'Accept-Language': 'en' }.
+      const hdr = Object.assign({ 'Accept-Language': 'cs' }, form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : { 'Content-Type': 'application/json' },
         token ? { Authorization: token } : {}, bearer ? { Authorization: `Bearer ${bearer}` } : {}, headers || {});
       const res = await fetch(inst.base + path, { method, headers: hdr,
         ...(body !== undefined ? { body: form ? new URLSearchParams(body).toString() : JSON.stringify(body) } : {}) });
@@ -133,7 +136,10 @@ function startInstance({ slug, env = {}, addHostGateway = false, addHosts = {}, 
       if (r.status !== 200) throw new Error(`superuser login ${email} selhal: ${r.status}`);
       return r.json.token;
     },
-    register: (email, { pw = PW, ...extra } = {}) => inst.api('POST', '/api/collections/users/records', { body: { email, password: pw, passwordConfirm: pw, ...extra } }),
+    // language: cs by default — the web client always sends the account language on sign-up (lib/lang.js:
+    // Czech/Slovak browser → cs, otherwise en) and the suites expect Czech texts; since v1.0.0 an account
+    // WITHOUT a language is English. A suite that wants no language passes { language: '' }.
+    register: (email, { pw = PW, ...extra } = {}) => inst.api('POST', '/api/collections/users/records', { body: { email, password: pw, passwordConfirm: pw, language: 'cs', ...extra } }),
     login: async (email, pw = PW) => {
       const r = await inst.api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: pw } });
       if (r.status !== 200) throw new Error(`login ${email} selhal: ${r.status}`);

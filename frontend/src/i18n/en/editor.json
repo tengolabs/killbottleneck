@@ -402,6 +402,7 @@
     "automationWantedBadge": "automation wanted",
     "assignedNoDelete": "A goal with an assigned task cannot be removed",
     "assignedNoDeleteHint": "Only the assigner ({{email}}) or the project owner can remove a task with a due date from the map.",
+    "assignedNoDeleteSkipped": "Goals assigned by someone else ({{skipped}} of {{total}} selected) stay in the map — only the assigner or the project owner can remove them.",
     "workDetailTitle": "Show goal detail",
     "workOwnOnly": "This is not your task",
     "workOwnOnlyHint": "As a collaborator you can change status only on goals where you are the responsible person.",

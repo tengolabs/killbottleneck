@@ -539,7 +539,7 @@ H.beh(async () => {
   expect(!!kSd && kSd.popis === 'Share the project "Kitchen" with clen@example.com — collaborate' && kSd.detail === 'Jana Dvořáková', `EN karta sdílení (${kSd && kSd.popis})`);
 
   const instH = await H.startInstance({ slug: 'chat-nastaveni-hosted', addHostGateway: true, env: Object.assign({}, ENV, { KB_HOSTED: '1', KB_SETUP_CODE: 'e2e-kod' }) });
-  await instH.api('POST', '/api/collections/users/records', { body: { email: 'hadmin@example.com', password: H.PW, passwordConfirm: H.PW, setup_code: 'e2e-kod', name: 'Hana' } });
+  await instH.api('POST', '/api/collections/users/records', { body: { email: 'hadmin@example.com', password: H.PW, passwordConfirm: H.PW, language: 'cs', setup_code: 'e2e-kod', name: 'Hana' } });
   const HA = await instH.login('hadmin@example.com');
   fronta.push(nastroj('set_ai_settings', { model: 'x' }));
   r = await instH.api('POST', '/api/kb/chat', { token: HA, body: { message: 'Změň model AI', context: { route: '/admin/users' } } });

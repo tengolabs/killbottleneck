@@ -9,16 +9,19 @@
   <a href="https://killbottleneck.cz">Web</a> ·
   <a href="https://killbottleneck.cz/navod/co-to-je">Dokumentace</a> ·
   <a href="./CHANGELOG.md">Změny</a> ·
-  <a href="#licence--fair-code">Licence</a>
+  <a href="#licence--mit">Licence</a>
 </p>
 
-> 🧪 **Veřejná beta.** killBottleneck je funkčně kompletní a je v betě — cloudová
-> i self-host verze, je to jedna a tatáž aplikace. Tady testujeme hlavně
-> **self-host**: instalaci, provoz za reverse proxy, vlastní SMTP, aktualizace.
-> Nainstalujte si ho (Rychlý start níže), klidně ho zkuste rozbít a napište nám,
-> co se stalo: chyby → Issues, nápady → Discussions. v1.0 vyjde, až beta ztichne.
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/tengolabs/killbottleneck?label=licence" alt="Licence: MIT"></a>
+  <a href="https://github.com/tengolabs/killbottleneck/releases/latest"><img src="https://img.shields.io/github/v/release/tengolabs/killbottleneck?label=vyd%C3%A1n%C3%AD" alt="Poslední vydání"></a>
+</p>
 
-Grafické zobrazení projektů, firmy a procesů — mapy cílů, nad kterými pracují lidé i AI, **plně na vašem serveru: data neopouštějí firmu**. **Zdarma u sebe, s REST API a MCP serverem v ceně.** Otevřený kód v duchu open source, jen bez práva přeprodávat ho jako hostovanou službu — viz [Licence](#licence--fair-code).
+> ✅ **v1.0 — stabilní, open source.** Beta skončila. Cloudová i self-host verze je jedna
+> a tatáž aplikace, od v1.0.0 pod licencí **MIT**.
+> Chyby → [Issues](../../issues), nápady → Discussions.
+
+Grafické zobrazení projektů, firmy a procesů — mapy cílů, nad kterými pracují lidé i AI, **plně na vašem serveru: data neopouštějí firmu**. **Zdarma u sebe, s REST API a MCP serverem v ceně.** **Open source pod licencí MIT** — viz [Licence](#licence--mit).
 
 ![Editor mapy cílů](assets/mapa-cs.jpg)
 
@@ -44,7 +47,7 @@ by mohlo opustit vaši síť, si zapínáte **vy**:
 - [Kdo krok vykoná: člověk, nebo automatizace](#kdo-krok-vykoná-člověk-nebo-automatizace) — obsahuje **kontrakt webhooku** pro vlastní agenty
 - [Přenos projektu jinam (export/import JSON)](#přenos-projektu-jinam-export-a-import-json)
 - [Vzhled (skiny)](#vzhled-skiny) · [Notifikace](#notifikace)
-- [Licence — fair-code](#licence--fair-code)
+- [Licence — MIT](#licence--mit)
 
 </details>
 
@@ -629,45 +632,47 @@ Proměnné `FLOWMAP_*` ve vašem `.env` fungují dál, přepisovat je nemusíte.
 
 - Veřejný odkaz na mapu sdílí jen plátno mapy — úkoly a komentáře úkolů přes něj
   vidět nejsou.
-- Licence: **fair-code** — Sustainable Use License (viz sekci Licence níže).
+- Licence: **MIT** (viz sekci Licence níže).
 
-## Licence — fair-code
+## Licence — MIT
 
-killBottleneck není „open source" v přísném (OSI) smyslu — a říkáme to na rovinu. Je **fair-code**:
-kód je veřejný, můžeš si ho stáhnout, provozovat, upravit i používat, a pro drtivou většinu
-lidí přináší stejné výhody jako klasický open source. Části, které klasický
-**open source být mohou, jsou**: [editor skinů](https://tengolabs.github.io/killbottleneck-skins/)
-(MIT) a celá [galerie skinů](https://github.com/tengolabs/killbottleneck-skins) včetně
-validátoru (CC0).
+killBottleneck je **open source** pod licencí [MIT](./LICENSE) — od v1.0.0 (listopad 2026).
+Stáhni si ho, provozuj, uprav, šiř dál, stav na něm, soukromě i komerčně; jedinou podmínkou
+je zachovat copyright.
 
 **Dostáváš celý killBottleneck — všechny funkce, včetně týmové spolupráce i AI funkcí.** Žádná
-ořezaná „free verze", nic zamčené za paywallem. AI funkce si navíc můžeš **pohánět sám a
-zdarma** — vlastním modelem (Ollama) na svém počítači nebo vlastním API klíčem. Náš hostovaný
-cloud (AI v ceně) nabízíme jen jako **výpomoc pro ty, kdo killBottleneck nemají kde
-provozovat** — je to pohodlí, ne podmínka.
+ořezaná „free verze", nic zamčené za paywallem. AI funkce si můžeš **pohánět sám a zdarma** —
+vlastním modelem (Ollama) na svém počítači nebo vlastním API klíčem.
 
-**Co s killBottleneckem smíš — zdarma a bez háčků:**
-- Provozovat si ho sám na svém počítači či serveru — **data zůstávají u tebe**.
-- Používat ho ve firmě pro vlastní práci a svůj tým — se vším všudy.
-- Zapojit **vlastní AI** (lokální model nebo svůj API klíč), nebo AI vůbec nepoužívat.
-- Upravit si ho, jak potřebuješ.
-- Nabízet služby kolem killBottlenecku (nastavení, konzultace, úpravy pro klienta).
+**Co je veřejné a co ne:**
+- Tenhle repozitář je aplikace samotná: server, webový klient a MCP server. Přesně z něj se
+  staví Docker image. Aplikace pro Windows má vlastní repozitář
+  ([tengolabs/killbottleneck-desktop](https://github.com/tengolabs/killbottleneck-desktop), taky MIT).
+- Nezveřejňujeme: zdroje webu s dokumentací (web sám je na [killbottleneck.cz](https://killbottleneck.cz)),
+  obal pro Android (appka se vydává přes obchod) a infrastrukturu naší **hostované služby**
+  (zakládání instancí, platby, zákaznický portál). Hostovaná služba běží z téhož image; k provozu
+  killBottlenecku u sebe nic z toho nepotřebuješ.
 
-**Co si necháváme my — a díky čemu killBottleneck dál žije:**
-- Hostovat killBottleneck a prodávat lidem přístup.
-- White-label — vydávat ho pod cizí značkou.
-- Přeprodávat ho jako placenou službu.
+**Jméno a logo součástí licence nejsou.** „killBottleneck" a jeho logo označují původní projekt
+a naši hostovanou službu. Fork potřebuje vlastní jméno — „postaveno na killBottlenecku" je
+vítané. Podrobnosti: [TRADEMARKS.md](./TRADEMARKS.md).
 
-Tohle je náš byznys — právě díky němu můžeme dál přidávat funkce, opravovat chyby a držet
-killBottleneck naživu. **Aktivně tě zveme stavět na killBottlenecku** a používat ho, jak potřebuješ; jen
-z něj nedělej konkurenční hostovanou službu. Plné znění: [LICENSE](./LICENSE).
+**Starší vydání** (v0.x, beta) vyšla pod Sustainable Use License a tak zůstávají; MIT platí
+od v1.0.0 dál.
+
 Komponenty třetích stran zůstávají pod svými původními licencemi (MIT, Apache-2.0, BSD, …) —
 úplný seznam s texty licencí je v [THIRD-PARTY-LICENSES.md](./THIRD-PARTY-LICENSES.md).
+[Editor skinů](https://tengolabs.github.io/killbottleneck-skins/) a
+[galerie skinů](https://github.com/tengolabs/killbottleneck-skins) jsou MIT / CC0 jako dřív.
 
-**Držitel práv:** Tengo, s.r.o., IČO 03339165, Dolní Valy 205, 262 72 Březnice.
-Chceš killBottleneck hostovat jako službu, prodávat pod svou značkou nebo přeprodávat? To licence nedovoluje — ale **dá se koupit komerční licence**, napiš na [licence@killbottleneck.com](mailto:licence@killbottleneck.com).
+**Proč open source?** Dosah. killBottleneck má být používaný — ve firmách, AI agenty, na
+místech, o kterých se nikdy nedozvíme. **Hosting od autorů je to, z čeho se vývoj platí:**
+kdo nechce provozovat server, může si vzít [hostovaný tarif](https://killbottleneck.cz/ceny)
+a tím drží vývoj naživu.
 
-*The English wording of this section is in [README.md](./README.md#license--fair-code).*
+**Držitel práv:** Tengo s.r.o., IČO 03339165, Dolní Valy 205, 262 72 Březnice.
+
+*The English wording of this section is in [README.md](./README.md#license--mit).*
 
 Postavil **Richard Pobříslo** ([LinkedIn](https://www.linkedin.com/in/richard-pobrislo), [Ctrl+Alt+AI](https://www.youtube.com/@ctrlaltaicz)) — jeden člověk, proto ty kanály podpory níž vypadají, jak vypadají.
 
@@ -680,7 +685,6 @@ Kód je **ze 100 % napsaný AI** — modely Claude Fable 5, Claude Opus 5 a Clau
 | **GitHub Issues / Discussions** | chyby a nápady na vylepšení — veřejně, ať to vidí i ostatní |
 | **security@killbottleneck.com** | bezpečnostní chyby (**ne** do veřejného issue) — viz [SECURITY.md](./SECURITY.md) |
 | **support@killbottleneck.com** | placené tarify: hostovaná instance |
-| **licence@killbottleneck.com** | komerční licence — hostovat jako službu, white-label, přeprodej |
 | **info@killbottleneck.com** | všechno ostatní |
 
 Kód od externích přispěvatelů nepřijímáme (viz [CONTRIBUTING.md](./CONTRIBUTING.md)) —
@@ -688,7 +692,8 @@ nápady a hlášení chyb ale ano, a jsou vítané.
 
 ## Podpora projektu
 
-killBottleneck je **fair-code** — celý produkt (všechny funkce) je zdarma k self-hostu a zůstane. Pokud vám pomáhá:
+killBottleneck je **open source (MIT)** — celý produkt (všechny funkce) je zdarma k self-hostu a zůstane. Pokud vám pomáhá:
 
+- nechte ho hostovat u nás — [hostované tarify](https://killbottleneck.cz/ceny) jsou to, z čeho se vývoj platí,
 - sledujte náš [YouTube kanál](https://www.youtube.com/@ctrlaltaicz) s návody a AI novinkami,
 - přidejte se na [Discord](https://discord.gg/dkxMdVKwXw).

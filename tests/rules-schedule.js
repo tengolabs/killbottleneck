@@ -21,13 +21,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, path, { token, body } = {}) => {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
   return { status: res.status, json };
 };
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 const node = (id, data, type) => ({ id, type: type || 'goalNode', position: { x: 0, y: 100 }, data });
 

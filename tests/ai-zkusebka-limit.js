@@ -23,7 +23,7 @@ const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, con
 async function api(method, path, { token, body } = {}) {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   let json = null;
@@ -49,7 +49,7 @@ function branaVycerpana() {
         res.end('error code: 1015');
         return;
       }
-      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Accept-Language': 'cs' });
       const detail = {
         kvota: { error: KVOTA },
         'kvota-kod': { error: KVOTA, code: 'quota_exceeded' },
@@ -74,7 +74,7 @@ async function start(env) {
 
 async function ucet(email) {
   await api('POST', '/api/collections/users/records', {
-    body: { email, password: HESLO, passwordConfirm: HESLO, name: 'Zkoušející', role: 'admin' },
+    body: { email, password: HESLO, passwordConfirm: HESLO, language: 'cs', name: 'Zkoušející', role: 'admin' },
   });
   const r = await api('POST', '/api/collections/users/auth-with-password', {
     body: { identity: email, password: HESLO },
@@ -127,7 +127,7 @@ async function main() {
     // registrace i založení klíče jsou zápis (402) → účet a klíč zakládá superuser
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@example.com superheslo123`, { stdio: 'ignore' });
     const STz = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@example.com', password: 'superheslo123' } })).json.token;
-    let rz = await api('POST', '/api/collections/users/records', { token: STz, body: { email: 'sef@vyprselo.cz', password: HESLO, passwordConfirm: HESLO, name: 'Šéf', role: 'admin' } });
+    let rz = await api('POST', '/api/collections/users/records', { token: STz, body: { email: 'sef@vyprselo.cz', password: HESLO, passwordConfirm: HESLO, language: 'cs', name: 'Šéf', role: 'admin' } });
     expect(rz.status === 200, `superuser založí účet i po vypršení (${rz.status})`);
     const uzivId = rz.json.id;
     tok = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'sef@vyprselo.cz', password: HESLO } })).json?.token;
@@ -138,14 +138,14 @@ async function main() {
     expect(rz.status === 200, `klíč pro MCP založen superuserem (${rz.status})`);
     const seznam = await api('POST', '/api/kb/share', { token: tok, body: { action: 'list', mapId: 'neexistuje' } });
     expect(seznam.status === 404, `výpis sdílení je čtení: 404 (mapa není), ne 402 (${seznam.status})`);
-    const mcpList = await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${klicText}` },
+    const mcpList = await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', Authorization: `Bearer ${klicText}` },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) });
     const mcpJson = await mcpList.json().catch(() => null);
     expect(mcpList.status === 200 && mcpJson && mcpJson.result && Array.isArray(mcpJson.result.tools), `MCP tools/list po vypršení projde (${mcpList.status})`);
-    const mcpRead = await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${klicText}` },
+    const mcpRead = await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', Authorization: `Bearer ${klicText}` },
       body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'list_maps', arguments: {} } }) });
     expect(mcpRead.status === 200, `MCP čtecí nástroj list_maps projde (${mcpRead.status})`);
-    const mcpWrite = await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${klicText}` },
+    const mcpWrite = await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', Authorization: `Bearer ${klicText}` },
       body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'create_map', arguments: { title: 'x' } } }) });
     expect(mcpWrite.status === 402, `MCP zapisovací nástroj create_map je dál 402 (${mcpWrite.status})`);
     const zapis = await api('POST', '/api/collections/goalmaps/records', { token: tok, body: { title: 'x', nodes: [], edges: [] } });

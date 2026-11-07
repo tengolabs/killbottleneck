@@ -32,7 +32,7 @@ const api = async (method, p, { token, body } = {}) => {
   let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
   return { status: res.status, json };
 };
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 const freshMap = async (token, id) => (await api('GET', `/api/collections/goalmaps/records/${id}`, { token })).json;
 const findByTitle = (m, prefix) => (m.nodes || []).find((n) => String((n.data || {}).title || '').startsWith(prefix));

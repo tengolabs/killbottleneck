@@ -20,13 +20,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, path, { token, body } = {}) => {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
   return { status: res.status, json };
 };
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 
 (async () => {
@@ -131,7 +131,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     // ⚠️ Kontrolovat i TEXT hlášky: do 27. 9. 2026 tu 400 přicházelo z ReferenceError
     // (`jeAdmin` importovaný v bloku — S4-01) a test byl zelený ze špatného důvodu.
     // Plný scénář (admin založí účet → 200, člen nezíská roli) má sada admin-zaklada-ucet.js.
-    r = await api('POST', '/api/collections/users/records', { token: A, body: { email: 'novy@example.com', password: PW, passwordConfirm: PW, deputy: 'neexistuje@example.com' } });
+    r = await api('POST', '/api/collections/users/records', { token: A, body: { email: 'novy@example.com', password: PW, passwordConfirm: PW, language: 'cs', deputy: 'neexistuje@example.com' } });
     expect(r.status === 400 && /existující člen|existing member/.test((r.json && r.json.message) || ''), `pozvánka s neplatným zástupcem = 400 s hláškou o zástupci (${r.status} ${JSON.stringify(r.json && r.json.message)})`);
 
     console.log('== degradace admina odebere edit org mapy ==');

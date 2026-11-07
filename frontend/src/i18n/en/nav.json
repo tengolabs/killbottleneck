@@ -39,7 +39,7 @@
   },
   "about": {
     "title": "About killBottleneck",
-    "description": "killBottleneck is a fair-code tool for goal maps, projects and tasks. For an ordinary user or company it works like open source: download it, run it, modify it and use it for your own work, commercially too. You just may not resell it as a hosted service or release it under another brand.",
+    "description": "killBottleneck is an open source tool for goal maps, projects and tasks, released under the MIT license: download it, run it, modify it and use it for your own work, commercially too. Only the name and the logo stay with the authors.",
     "docsTitle": "Documentation",
     "docsDesc": "illustrated tutorials, features and setup",
     "youtubeTitle": "YouTube channel",
@@ -47,7 +47,7 @@
     "discordTitle": "Discord community",
     "discordDesc": "questions, ideas, deployment help",
     "licenseTitle": "Application license",
-    "licenseDesc": "Sustainable Use License — what you may and may not do",
+    "licenseDesc": "MIT License — the full text",
     "licensesTitle": "Third-party licenses",
     "licensesDesc": "the libraries and fonts used, with their licenses",
     "versionLine": "Version {{version}}",

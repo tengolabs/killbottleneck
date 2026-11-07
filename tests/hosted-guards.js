@@ -26,7 +26,7 @@ async function start(inst, env) {
 }
 
 const register = (base, email, extra = {}) =>
-  api(base, 'POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, ...extra } });
+  api(base, 'POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs', ...extra } });
 const login = async (base, email) => {
   const r = await api(base, 'POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } });
   if (r.status !== 200) throw new Error(`přihlášení selhalo: ${r.status}`);

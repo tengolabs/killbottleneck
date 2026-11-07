@@ -41,7 +41,7 @@ const api = async (m, p, b) => {
     // instanci ZABRAT prvním účtem — na panensky čisté od 11. 8. posílá login
     // first-run rovnou na registraci správce (claimed=false) a tenhle test
     // ověřuje chování BĚŽNÉ (zabrané) instance
-    await api('POST', '/api/collections/users/records', { email: 'admin@e2e.cz', password: 'testheslo123', passwordConfirm: 'testheslo123' });
+    await api('POST', '/api/collections/users/records', { email: 'admin@e2e.cz', password: 'testheslo123', passwordConfirm: 'testheslo123', language: 'cs' });
 
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
 

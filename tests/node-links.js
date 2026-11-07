@@ -56,7 +56,7 @@ async function nahraj(base, token, mapId, kb) {
 }
 
 async function pripravMapu(base) {
-  await api(base, 'POST', '/api/collections/users/records', { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW } });
+  await api(base, 'POST', '/api/collections/users/records', { body: { email: 'admin@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
   const auth = await api(base, 'POST', '/api/collections/users/auth-with-password', { body: { identity: 'admin@example.com', password: PW } });
   const token = auth.json.token;
   const mapa = await api(base, 'POST', '/api/collections/goalmaps/records', {

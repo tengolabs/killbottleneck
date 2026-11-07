@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { loadKbConfig } from '@/hooks/useKbConfig';
 
-// Hlídání nových verzí pro SELF-HOST.
+// New-version check for SELF-HOSTED instances.
 //
-// Ptá se PROHLÍŽEČ, ne server: instance o sobě nikam nic neodesílá, takže
-// nevzniká žádná telemetrie, kterou bychom museli obhajovat u fair-code
-// produktu. Cenou je, že se to dozvíme jen když je někdo přihlášený — což
-// self-hosterovi stačí, protože aktualizaci stejně dělá ručně.
+// The BROWSER asks, not the server: the instance never sends anything about
+// itself anywhere, so there is no telemetry to justify in an open source
+// product. The price is that we only learn about it while someone is signed
+// in — which is enough for a self-hoster, who updates by hand anyway.
 //
-// Vypnuto je to ve třech případech (server to rozhodne v /api/kb/config):
-//   1. hostovaná instance (KB_HOSTED=1) — aktualizujeme ji my, zákazníka by
-//      hláška jen mátla,
-//   2. self-hoster si to vypnul (KB_UPDATE_CHECK=0),
-//   3. vývojový build bez gitového tagu (verze "dev" nebo prázdná).
+// Disabled in three cases (the server decides in /api/kb/config):
+//   1. hosted instance (KB_HOSTED=1) — we update it, the notice would only
+//      confuse the customer,
+//   2. the self-hoster turned it off (KB_UPDATE_CHECK=0),
+//   3. a development build without a git tag (version "dev" or empty).
 
 const CACHE_KEY = 'kb-version-check';
 const CACHE_MS = 24 * 60 * 60 * 1000; // GitHub API má 60 dotazů/h na IP — stačí 1× denně
@@ -78,7 +78,7 @@ export default function useVersionCheck() {
         })
           .then((r) => (r.ok ? r.json() : null))
           .then((seznam) => {
-            // KB_UPDATE_PRERELEASE=1: kdo je na betě, chce vědět i o další betě.
+            // KB_UPDATE_PRERELEASE=1: also offer release candidates (-rc); default = stable releases only.
             const rel = Array.isArray(seznam)
               ? seznam.find((x) => x && !x.draft && (c.update_prerelease || !x.prerelease))
               : null;

@@ -31,7 +31,7 @@ const den = (posun) => new Date(Date.now() + posun * 86400000).toISOString().sli
 
     await fetch(`${BASE}/api/collections/users/records`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'hrany@e2e.cz', password: PW, passwordConfirm: PW }),
+      body: JSON.stringify({ email: 'hrany@e2e.cz', password: PW, passwordConfirm: PW, language: 'cs' }),
     });
     const auth = await (await fetch(`${BASE}/api/collections/users/auth-with-password`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

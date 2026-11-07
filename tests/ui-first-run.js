@@ -43,7 +43,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await fetch(`${BASE}/api/collections/users/records`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@example.com', password: PW, passwordConfirm: PW }),
+      body: JSON.stringify({ email: 'admin@example.com', password: PW, passwordConfirm: PW, language: 'cs' }),
     });
     await page.goto(`${BASE}/login`, { waitUntil: 'networkidle2' });
     await sleep(1500);
@@ -63,7 +63,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE2}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
     const reg2 = await fetch(`${BASE2}/api/collections/users/records`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'vetrelec@example.com', password: PW, passwordConfirm: PW }),
+      body: JSON.stringify({ email: 'vetrelec@example.com', password: PW, passwordConfirm: PW, language: 'cs' }),
     });
     ok(reg2.status >= 400, `self-registrace na hostovaném boxu bez kódu ODMÍTNUTA (${reg2.status})`);
     await page.goto(`${BASE2}/login`, { waitUntil: 'networkidle2' });
@@ -79,12 +79,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE3}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
     const regBez = await fetch(`${BASE3}/api/collections/users/records`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'a@example.com', password: PW, passwordConfirm: PW }),
+      body: JSON.stringify({ email: 'a@example.com', password: PW, passwordConfirm: PW, language: 'cs' }),
     });
     ok(regBez.status >= 400, `bez aktivačního kódu registrace neprojde (${regBez.status})`);
     const regS = await fetch(`${BASE3}/api/collections/users/records`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'a@example.com', password: PW, passwordConfirm: PW, setup_code: 'tajny-kod-123' }),
+      body: JSON.stringify({ email: 'a@example.com', password: PW, passwordConfirm: PW, language: 'cs', setup_code: 'tajny-kod-123' }),
     });
     ok(regS.status === 200, `s kódem projde (${regS.status})`);
     await page.goto(`${BASE3}/login`, { waitUntil: 'networkidle2' });

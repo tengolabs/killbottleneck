@@ -123,7 +123,7 @@ export default function Home() {
       toast({ title: t('editor:toasts.archived'), description: t('editor:toasts.archivedDesc') });
     } catch (e) {
       console.error(e);
-      toast({ title: t('toasts.archiveFailed'), variant: 'destructive' });
+      toast({ title: t('toasts.archiveFailed'), description: e?.message, variant: 'destructive' });
     }
   };
 

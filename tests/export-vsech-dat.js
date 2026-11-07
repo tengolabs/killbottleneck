@@ -22,7 +22,7 @@ const api = async (path, { token, bearer, body, method } = {}) => {
   return { status: res.status, json: json || {}, headers: res.headers };
 };
 const register = async (email) => {
-  const rec = (await api('/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } })).json;
+  const rec = (await api('/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } })).json;
   const r = await api('/api/collections/users/auth-with-password', { body: { identity: email, password: PW } });
   const klic = (await api('/api/kb/api-keys', { token: r.json.token, body: { label: 'seed', scope: 'read_write' } })).json.token;
   return { token: r.json.token, id: rec.id, email, klic };

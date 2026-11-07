@@ -107,6 +107,20 @@ const TOOLS = [
     },
   },
   {
+    name: "update_map",
+    description: "Rename a map or change its description (the project as a whole — not the apex node; the list of maps and the database show this title). Only `title` and `description`; archiving or the map style stay with people in the app. Requires full write access to the map.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        map_id: { type: "string" },
+        title: { type: "string", description: "New map/project title (1–200 characters)" },
+        description: { type: "string", description: "New map description; empty string clears" },
+      },
+      required: ["map_id"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "add_nodes",
     description: "Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). A node is a goal; a node with an assignee (owner) OR a deadline IS a task — that is the only kind of task in killBottleneck (there is no separate task record; new work = new node). NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.",
     inputSchema: {
@@ -587,6 +601,13 @@ const EXEC = {
     const r = vcall(auth, "POST", "/api/kb/v1/maps", { title: a.title, tree: a.outline, description: a.description, apex_text: a.apex_text, kind: a.kind });
     return text(`Map created.\n\n${renderMap({ id: r.id, title: a.title, updated: r.updated, kind: r.kind, tree: r.tree, notes: [] })}`);
   },
+  update_map: (auth, a) => mapWrite(auth, a.map_id, (base) => {
+    const body = { base_updated: base };
+    if (a.title !== undefined) body.title = a.title;
+    if (a.description !== undefined) body.description = a.description;
+    const r = vcall(auth, "POST", `/api/kb/v1/maps/${enc(a.map_id)}`, body);
+    return text(`Map updated: ${r.title}${r.description ? ` — ${r.description}` : ""}`);
+  }),
   add_nodes: (auth, a) => mapWrite(auth, a.map_id, (base) => {
     const r = vcall(auth, "POST", `/api/kb/v1/maps/${enc(a.map_id)}/nodes`, { parent_id: a.parent_id, items: a.items, base_updated: base });
     return text(`Added ${r.added_ids.length} node(s).\n\n${renderMap({ id: a.map_id, title: "", updated: r.updated, tree: r.tree, notes: [] })}`);

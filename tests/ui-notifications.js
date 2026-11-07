@@ -39,7 +39,7 @@ const api = async (method, p, { token, body } = {}) => {
 
     // admin (A) nasype příjemci (B) 35 notifikací — víc než se vejde do zvonečku (20)
     // i na jednu stránku (30), takže se otestuje i stránkování
-    const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+    const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
     await reg('admin@e2e.cz');
     await reg('prijemce@e2e.cz');
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'admin@e2e.cz', password: PW } })).json.token;

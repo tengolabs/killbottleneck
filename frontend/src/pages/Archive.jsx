@@ -72,7 +72,7 @@ export default function Archive() {
       toast({ title: t('editor:toasts.unarchived') });
     } catch (e) {
       console.error(e);
-      toast({ title: t('toasts.restoreFailed'), variant: 'destructive' });
+      toast({ title: t('toasts.restoreFailed'), description: e?.message, variant: 'destructive' });
     }
   };
 

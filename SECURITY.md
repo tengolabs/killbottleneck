@@ -1,15 +1,65 @@
-# Hlášení bezpečnostních chyb
+# Reporting security issues
 
-*(English below)*
+Thanks for reporting responsibly. People run killBottleneck on their own
+servers with their real work data in it, so we take this seriously.
+
+## Where to send it
+
+**Please do not open a public issue.** Send security reports to:
+
+**security@killbottleneck.com**
+
+or privately through GitHub: [Report a vulnerability](https://github.com/tengolabs/killbottleneck/security/advisories/new)
+(visible only to us).
+
+A public issue discloses the vulnerability before we can fix it, which puts
+every killBottleneck operator at risk.
+
+## What to include
+
+- what is broken and what an attacker gains,
+- how to reproduce it (steps, sample request, a video if easier),
+- the instance version (see the **About** dialog) and how it is deployed
+  (self-hosted / hosted by us),
+- whether you plan to disclose, and when.
+
+## What to expect
+
+- **Acknowledgement within 5 working days**, plus what happens next.
+- The rights holder is one person, not a security team — which is why this
+  isn't a 24-hour promise. We'd rather commit to something we can keep.
+- We'll agree on a disclosure date. Normally we fix, ship a release, and
+  publish the details afterwards.
+- We'll credit you in the release notes if you want us to.
+
+**We don't pay bug bounties** — the project has no budget for it. Saying so
+up front so nobody counts on it.
+
+## Out of scope
+
+- Feature ideas and ordinary bugs → GitHub Issues / Discussions.
+- Trouble with your hosted instance (can't log in, etc.) →
+  support@killbottleneck.com.
+- Automated scanner output with no demonstrated impact.
+
+---
+
+<details>
+<summary><b>Česky</b></summary>
+
+# Hlášení bezpečnostních chyb
 
 Děkujeme, že chcete chybu nahlásit odpovědně. Berem to vážně — killBottleneck si
 lidé pouštějí na vlastní servery a jsou v něm jejich pracovní data.
 
 ## Kam psát
 
-**licence@ ani veřejné issue prosím ne.** Bezpečnostní chybu pošlete na:
+**Veřejné issue prosím ne.** Bezpečnostní chybu pošlete na:
 
 **security@killbottleneck.com**
+
+nebo soukromě přes GitHub: [Report a vulnerability](https://github.com/tengolabs/killbottleneck/security/advisories/new)
+(uvidíme to jen my).
 
 Veřejné issue zveřejní zranitelnost dřív, než ji stihneme opravit — tím se
 ohrozí všichni, kdo killBottleneck provozují.
@@ -42,51 +92,5 @@ ohrozí všichni, kdo killBottleneck provozují.
 - Problémy s vaší hostovanou instancí (nefunguje přihlášení apod.) →
   support@killbottleneck.com.
 - Nálezy z automatických skenerů bez ukázky skutečného dopadu.
-
----
-
-<details>
-<summary><b>English</b></summary>
-
-# Reporting security issues
-
-Thanks for reporting responsibly. People run killBottleneck on their own
-servers with their real work data in it, so we take this seriously.
-
-## Where to send it
-
-**Please do not open a public issue.** Send security reports to:
-
-**security@killbottleneck.com**
-
-A public issue discloses the vulnerability before we can fix it, which puts
-every killBottleneck operator at risk.
-
-## What to include
-
-- what is broken and what an attacker gains,
-- how to reproduce it (steps, sample request, a video if easier),
-- the instance version (see the **About** dialog) and how it is deployed
-  (self-hosted / hosted by us),
-- whether you plan to disclose, and when.
-
-## What to expect
-
-- **Acknowledgement within 5 working days**, plus what happens next.
-- The rights holder is one person, not a security team — which is why this
-  isn't a 24-hour promise. We'd rather commit to something we can keep.
-- We'll agree on a disclosure date. Normally we fix, ship a release, and
-  publish the details afterwards.
-- We'll credit you in the release notes if you want us to.
-
-**We don't pay bug bounties** — the project has no budget for it. Saying so
-up front so nobody counts on it.
-
-## Out of scope
-
-- Feature ideas and ordinary bugs → GitHub Issues / Discussions.
-- Trouble with your hosted instance (can't log in, etc.) →
-  support@killbottleneck.com.
-- Automated scanner output with no demonstrated impact.
 
 </details>

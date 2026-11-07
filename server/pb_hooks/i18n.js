@@ -9,20 +9,41 @@
 
 const LANGS = ["cs", "en"];
 
-// Jazyk uživatele z users recordu; prázdné/neznámé = čeština (stávající účty).
+// The user's language from the users record; empty/unknown = English (v1.0.0, 8 Nov 2026).
+// Accounts that existed before v1.0.0 got language = "cs" from the migration
+// 1793977492_users_language_cs, so nothing changed for them.
 function userLang(user) {
   try {
     const l = user && user.getString ? user.getString("language") : "";
-    return LANGS.includes(l) ? l : "cs";
+    return LANGS.includes(l) ? l : "en";
   } catch (_) {
-    return "cs";
+    return "en";
+  }
+}
+
+// Language for endpoints without a signed-in user (registration closed, public map, setup code):
+// the browser's Accept-Language decides — Czech/Slovak → cs, anything else → en, the same rule
+// the web client uses on first visit (lib/lang.js). Before v1.0.0 these answers were always Czech.
+function requestLang(e) {
+  try {
+    // route handlers carry e.request; record hooks (onRecord*Request) carry e.requestEvent and
+    // e.requestInfo() whose header keys are normalized (accept_language)
+    let h = "";
+    const req = (e && e.request) || (e && e.requestEvent && e.requestEvent.request) || null;
+    if (req && req.header && typeof req.header.get === "function") h = req.header.get("Accept-Language") || "";
+    if (!h && e && typeof e.requestInfo === "function") { const ri = e.requestInfo(); h = (ri && ri.headers && ri.headers.accept_language) || ""; }
+    h = String(h).toLowerCase();
+    const first = h.split(",")[0].trim();
+    return /^(cs|sk)(-|;|$)/.test(first) ? "cs" : "en";
+  } catch (_) {
+    return "en";
   }
 }
 
 // {x} interpolace: t(lang, "notify.taskAssigned", { who: "...", title: "..." })
 function t(lang, key, params) {
   const entry = STRINGS[key];
-  let s = entry ? (entry[lang] || entry.cs) : key;
+  let s = entry ? (entry[lang] || entry.en) : key;
   if (params) {
     for (const k of Object.keys(params)) {
       s = s.split("{" + k + "}").join(String(params[k]));
@@ -34,7 +55,7 @@ function t(lang, key, params) {
 // Množné číslo: cs trojtvar (1 / 2–4 / 5+ a desetinná), en dvojtvar (1 / jinak).
 // plural(lang, 3, "goal") -> "cíle" | "goals"
 function plural(lang, n, key) {
-  const forms = PLURALS[key] && (PLURALS[key][lang] || PLURALS[key].cs);
+  const forms = PLURALS[key] && (PLURALS[key][lang] || PLURALS[key].en);
   if (!forms) return key;
   const abs = Math.abs(Number(n));
   if (lang === "en") return forms[abs === 1 ? 0 : 1];
@@ -665,6 +686,12 @@ const STRINGS = {
 
   // sdílení map (share routa) + veřejné mapy
   "err.mapNotFound": { cs: "Mapa nebyla nalezena.", en: "Map not found." },
+  // project archiving and ownership (feature analysis 5 Nov 2026: silent 200 for non-owners, cascade on account deletion)
+  "err.archiveOwnerOnly": { cs: "Archivovat nebo obnovit projekt smí jen jeho vlastník.", en: "Only the project owner can archive or restore it." },
+  "err.transferOwnerOnly": { cs: "Vlastnictví projektu smí předat jen jeho vlastník nebo administrátor.", en: "Only the project owner or an administrator can transfer ownership." },
+  "err.transferTargetNotMember": { cs: "Nový vlastník musí být člen instance s vlastním účtem.", en: "The new owner must be a member of this instance with an account." },
+  "err.transferSameOwner": { cs: "Tento účet už je vlastníkem projektu.", en: "This account already owns the project." },
+  "err.nothingToUpdate": { cs: "Není co změnit — pošlete title nebo description.", en: "Nothing to update — send title or description." },
   "err.badMapKind": { cs: "Neplatný styl mapy — povolené hodnoty jsou project (dokončit) a process (nepřetržitý běh).", en: "Invalid map kind — allowed values are project (to finish) and process (keeps running)." },
   "err.taskCreateDisabled": {
     cs: "Samostatné položky úkolů už nejde zakládat — úkol je cíl v mapě s řešitelem nebo termínem. Založte nový uzel.",
@@ -1638,5 +1665,5 @@ const STRINGS = {
 };
 
 // STRINGS/PLURALS exportované i kvůli paritnímu testu (product/tests/i18n-server-catalog.js);
-// goja extra exporty ignoruje, pb_hooks používá jen t/plural/userLang.
-module.exports = { t, plural, userLang, LANGS, STRINGS, PLURALS };
+// goja extra exporty ignoruje, pb_hooks používá jen t/plural/userLang/requestLang.
+module.exports = { t, plural, userLang, requestLang, LANGS, STRINGS, PLURALS };

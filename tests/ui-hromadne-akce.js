@@ -29,7 +29,7 @@ const api = async (method, path, { token, body } = {}) => {
   return { status: res.status, json };
 };
 const register = async (email) => {
-  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
   const r = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } });
   return { token: r.json.token, record: r.json.record, id: r.json.record.id, email };
 };
@@ -318,6 +318,49 @@ const register = async (email) => {
       ok(poZpet.a.owner === editor.email, 'Zpět vrátilo stav před poslední hromadnou změnou');
     } else {
       ok(false, 'tlačítko Zpět nebylo v liště k nalezení');
+    }
+
+    console.log('== F082: „Smazat výběr" přeskočí cizí zadání a přizná to ==');
+    // Do 5. 11. 2026 hromadné mazání nekontrolovalo zadavatele: server odmítl celý
+    // PATCH, aplikace mlčela, cíl zmizel z plátna a další práce se po obnovení
+    // stránky ztratila (analýza funkcí, snímky skeptik/E1/F082-*).
+    // čistý start: mapu znovu otevřít (po Zpět může být plátno v jiném stavu)
+    await page.goto(`${BASE}/map/${mapa.id}`, { waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length >= 4, { timeout: 45000 }).catch(() => {});
+    await sleep(1500);
+    let oblast2 = await page.evaluate(() => {
+      const cile = [...document.querySelectorAll('.react-flow__node')]
+        .filter((n) => /Prvni cil|Druhy cil|Cizi zadani/.test(n.innerText || ''));
+      if (cile.length !== 3) return { chyba: cile.map((n) => (n.innerText || '').split('\n')[0]) };
+      const r = cile.map((n) => n.getBoundingClientRect());
+      return { x1: Math.min(...r.map((b) => b.left)) - 25, y1: Math.min(...r.map((b) => b.top)) - 15,
+        x2: Math.max(...r.map((b) => b.right)) + 25, y2: Math.max(...r.map((b) => b.bottom)) + 15 };
+    });
+    ok(oblast2 && !oblast2.chyba, `tři cíle jsou zpět na plátně (${oblast2 && oblast2.chyba ? oblast2.chyba.join(' | ') : 'ok'})`);
+    if (oblast2 && oblast2.chyba) oblast2 = null;
+    if (oblast2) {
+      await page.keyboard.down('Shift');
+      await page.mouse.move(oblast2.x1, oblast2.y1); await page.mouse.down();
+      await page.mouse.move(oblast2.x2, oblast2.y2, { steps: 12 }); await page.mouse.up();
+      await page.keyboard.up('Shift');
+      await sleep(700);
+      ok(/Vybrán[oy]? 3/.test(await page.evaluate(() => document.body.innerText)), 'vybrány tři cíle včetně cizího zadání');
+      const smazat = await page.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find((x) => /Smazat výběr/.test(x.innerText || ''));
+        if (!b) return false; b.click(); return true;
+      });
+      ok(smazat, 'tlačítko Smazat výběr je v liště');
+      await sleep(800);
+      const toastText = await page.evaluate(() => document.body.innerText);
+      ok(/1 z 3/.test(toastText) && /zadání od někoho jiného|zadavatel/.test(toastText),
+        'aplikace nahlas přizná, že 1 ze 3 cílů zůstal (cizí zadání)');
+      await sleep(3700); // autosave (1,2 s debounce + zápis)
+      const poSmazani = await stav();
+      ok(!poSmazani.a && !poSmazani.b, 'vlastní cíle jsou smazané i na serveru (PATCH prošel)');
+      ok(!!poSmazani.c && poSmazani.c.deadline === '2026-09-01', 'cizí zadání zůstalo i s termínem');
+      // přeskočený cíl zůstává označený — lišta hlásí jeden vybraný, ne tři
+      const lista = await page.evaluate(() => (document.body.innerText.match(/Vybrán[oy]? \d+/) || ['—'])[0]);
+      ok(/Vybrán[oy]? 1$/.test(lista), `lišta po smazání hlásí jen přeskočený cíl (${lista})`);
     }
 
     ok(chyby.length === 0, `konzole bez chyb (${chyby.length}${chyby.length ? ': ' + chyby[0].slice(0, 140) : ''})`);

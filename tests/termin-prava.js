@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function api(method, path, { token, body } = {}) {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   let json = null;
@@ -33,7 +33,7 @@ async function api(method, path, { token, body } = {}) {
 
 async function registerAndLogin(u) {
   await api('POST', '/api/collections/users/records', {
-    body: { email: u.email, password: u.password, passwordConfirm: u.password },
+    body: { email: u.email, password: u.password, passwordConfirm: u.password, language: 'cs' },
   });
   const auth = await api('POST', '/api/collections/users/auth-with-password', {
     body: { identity: u.email, password: u.password },

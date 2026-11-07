@@ -111,7 +111,7 @@ const mock = http.createServer((req, res) => {
 const api = async (path, { token, body, method } = {}) => {
   const res = await fetch(BASE + path, {
     method: method || (body ? 'POST' : 'GET'),
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch {}
@@ -128,7 +128,7 @@ const api = async (path, { token, body, method } = {}) => {
       -e KB_AI_MODEL=kb-test-model -e KB_UVODNI_MAPA=0 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
 
-    await api('/api/collections/users/records', { body: { email: 'a@x.cz', password: 'testheslo123', passwordConfirm: 'testheslo123' } });
+    await api('/api/collections/users/records', { body: { email: 'a@x.cz', password: 'testheslo123', passwordConfirm: 'testheslo123', language: 'cs' } });
     const T = (await api('/api/collections/users/auth-with-password', { body: { identity: 'a@x.cz', password: 'testheslo123' } })).json.token;
 
     console.log('== zapnutá AI a nabídnuté funkce ==');
@@ -230,7 +230,7 @@ const api = async (path, { token, body, method } = {}) => {
     console.log('== detail cizí chyby vidí admin, řadový člen ne ==');
     // ⚠️ OpenAI vrací v 401 kus klíče. Admin detail potřebuje, běžný člen ho
     // vidět NESMÍ — jinak si ho z chybové hlášky přečte kdokoli z organizace.
-    await api('/api/collections/users/records', { body: { email: 'clen@x.cz', password: 'clenskeheslo123', passwordConfirm: 'clenskeheslo123' } });
+    await api('/api/collections/users/records', { body: { email: 'clen@x.cz', password: 'clenskeheslo123', passwordConfirm: 'clenskeheslo123', language: 'cs' } });
     const CT = (await api('/api/collections/users/auth-with-password', { body: { identity: 'clen@x.cz', password: 'clenskeheslo123' } })).json.token;
     rezim = 'nezmocnen';
     r = await api('/api/kb/advisor', { token: T, body: { mode: 'generate', goal: 'X', scope: 'stručná' } });
@@ -321,11 +321,11 @@ const api = async (path, { token, body, method } = {}) => {
         ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
       for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE2}/api/health`)).ok) break; } catch {} await sleep(1000); }
       const api2 = async (path, body, token) => {
-        const res = await fetch(BASE2 + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) }, body: JSON.stringify(body) });
+        const res = await fetch(BASE2 + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) }, body: JSON.stringify(body) });
         let json = null; try { json = await res.json(); } catch {}
         return { status: res.status, json };
       };
-      await api2('/api/collections/users/records', { email: 'a@x.cz', password: 'testheslo123', passwordConfirm: 'testheslo123' });
+      await api2('/api/collections/users/records', { email: 'a@x.cz', password: 'testheslo123', passwordConfirm: 'testheslo123', language: 'cs' });
       const T2 = (await api2('/api/collections/users/auth-with-password', { identity: 'a@x.cz', password: 'testheslo123' })).json.token;
       const stavy = [];
       for (let i = 0; i < 3; i++) {

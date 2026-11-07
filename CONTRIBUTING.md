@@ -1,61 +1,9 @@
-# Jak přispět / Contributing
-
-## 🇨🇿 Česky
-
-killBottleneck je **fair-code** projekt (source-available, licence [Sustainable Use License](./LICENSE)),
-ne klasický open source. Vážíme si zájmu komunity — a rádi bychom hned na začátku poctivě
-vysvětlili, **jak přispívání funguje**, ať nikoho nepřekvapí zavřené PR.
-
-**Vítáme (a moc pomáhá):**
-- 🐛 **Hlášení chyb** — co nefunguje, jak to reprodukovat, na jakém zařízení/prohlížeči.
-- 💡 **Nápady a přání** — co by appce chybělo, co by vám usnadnilo práci.
-- 🗺️ **Zpětná vazba k použitelnosti** — kde se ztrácíte, co je matoucí.
-
-Zakládejte prosím **Issues**. Čím konkrétnější, tím líp (kroky, screenshot, očekávané vs. skutečné).
-
-**Co (zatím) nepřijímáme:**
-- 🚫 **Externí code Pull Requesty.** Kód udržuje malý tým s jasnou laťkou a jedním
-  zodpovědným člověkem. Review a údržba cizího kódu je nad naše kapacity a je to vědomé
-  rozhodnutí, ne přehlédnutí. Prosíme, neposílejte PR s kódem — nebudou slučovány.
-
-**Našli jste chybu v dokumentaci?** Ta žije na
-[killbottleneck.com](https://killbottleneck.com/guide/what-it-is), ne v tomhle repu —
-založte prosím Issue s odkazem na stránku a my to opravíme. Překlepů si vážíme,
-píšeme v cizím jazyce.
-- Chcete si upravit killBottleneck pro sebe? **Forkněte si ho** — licence to pro vlastní/interní
-  použití dovoluje (viz [LICENSE](./LICENSE)). Jen z něj nedělejte hostovanou službu pro třetí.
-
-Díky téhle hranici můžeme dál pravidelně vydávat funkce a opravovat chyby, místo abychom
-utopili čas v review. Precedens: takhle to dělá třeba SQLite.
-
-*Původ kódu:* frontend vznikl portem z exportu Base44 (červenec 2026) a záměrně se od něj liší
-jen v auth (PocketBase místo OTP/Google), v adaptéru `base44Client.js` a v přepisu hlasu
-(`FromTextDialog` posílá audio jako base64); Base44 už není udržovaný protějšek.
-
-### Podle čeho posuzujeme nápady (anti-bloat pravidlo)
-
-Úkolníky neztloustnou naráz. Ztloustnou po jedné rozumné funkci — a nikdo z nich to
-neudělal schválně. Aby se to nestalo i nám, má killBottleneck napsané pravidlo, kterým nová
-funkce musí projít:
-
-1. **Nesmí přidat povinné pole ani nastavení**, které musí uživatel vyplnit, aby produkt
-   fungoval. Výchozí stav je použitelný bez konfigurace.
-2. **Nesmí přidat trvalou položku do hlavní navigace.** Hlavní navigace je uzavřený seznam;
-   rozšiřuje se jen rozhodnutím majitele produktu.
-3. **Druhá cesta k existující věci je vítaná** — pokud je *kontextová* (klik na to, co mám
-   před sebou / deep-link / vyhledávání / klávesová zkratka) a nic se u ní nenastavuje.
-   Dostupnost není bloat. Bloat je rozhodnutí, které po mně někdo chce.
-4. Musí mít odpověď na otázku: **ubírá to kliknutí v denním provozu?** Pokud ne, nepatří
-   do zjednodušeného (light) režimu.
-
-Neznamená to, že se nic nepřidává — znamená to, že se přidává na správné ose. Když nám
-pošlete nápad, který v tomhle sítu neprojde, řekneme to na rovinu i s důvodem.
+# Contributing / Jak přispět
 
 ## 🇬🇧 English
 
-killBottleneck is a **fair-code** project (source-available, [Sustainable Use License](./LICENSE)),
-not classic open source. We appreciate community interest — and want to be upfront about
-**how contributions work**, so closed PRs don't surprise anyone.
+killBottleneck is **open source** ([MIT License](./LICENSE)). We appreciate community interest —
+and want to be upfront about **how contributions work**, so closed PRs don't surprise anyone.
 
 **Welcome (and genuinely helpful):**
 - 🐛 **Bug reports** — what's broken, how to reproduce, which device/browser.
@@ -73,8 +21,8 @@ Please open **Issues**. The more specific (steps, screenshot, expected vs. actua
 [killbottleneck.com](https://killbottleneck.com/guide/what-it-is), not in this repository —
 please open an Issue with a link to the page and we will fix it. Typo reports are genuinely
 welcome; we do not write in our first language.
-- Want to customize killBottleneck for yourself? **Fork it** — the license permits your own/internal
-  use (see [LICENSE](./LICENSE)). Just don't turn it into a hosted service for third parties.
+- Want to customize killBottleneck for yourself? **Fork it — the MIT license lets you do anything**
+  (see [LICENSE](./LICENSE)). A fork just needs its own name and logo ([TRADEMARKS.md](./TRADEMARKS.md)).
 
 This boundary lets us keep shipping features and fixing bugs instead of drowning in reviews.
 Precedent: this is roughly how SQLite operates.
@@ -103,3 +51,54 @@ written rule every new feature has to pass:
 
 This doesn't mean nothing gets added — it means things get added along the right axis. If
 you send us an idea that doesn't pass this filter, we'll say so plainly, with the reason.
+
+## 🇨🇿 Česky
+
+killBottleneck je **open source** (licence [MIT](./LICENSE)). Vážíme si zájmu komunity — a rádi
+bychom hned na začátku poctivě vysvětlili, **jak přispívání funguje**, ať nikoho nepřekvapí
+zavřené PR.
+
+**Vítáme (a moc pomáhá):**
+- 🐛 **Hlášení chyb** — co nefunguje, jak to reprodukovat, na jakém zařízení/prohlížeči.
+- 💡 **Nápady a přání** — co by appce chybělo, co by vám usnadnilo práci.
+- 🗺️ **Zpětná vazba k použitelnosti** — kde se ztrácíte, co je matoucí.
+
+Zakládejte prosím **Issues**. Čím konkrétnější, tím líp (kroky, screenshot, očekávané vs. skutečné).
+
+**Co (zatím) nepřijímáme:**
+- 🚫 **Externí code Pull Requesty.** Kód udržuje malý tým s jasnou laťkou a jedním
+  zodpovědným člověkem. Review a údržba cizího kódu je nad naše kapacity a je to vědomé
+  rozhodnutí, ne přehlédnutí. Prosíme, neposílejte PR s kódem — nebudou slučovány.
+
+**Našli jste chybu v dokumentaci?** Ta žije na
+[killbottleneck.com](https://killbottleneck.com/guide/what-it-is), ne v tomhle repu —
+založte prosím Issue s odkazem na stránku a my to opravíme. Překlepů si vážíme,
+píšeme v cizím jazyce.
+- Chcete si upravit killBottleneck pro sebe? **Forkněte si ho — licence MIT dovoluje cokoliv**
+  (viz [LICENSE](./LICENSE)). Fork jen potřebuje vlastní jméno a logo ([TRADEMARKS.md](./TRADEMARKS.md)).
+
+Díky téhle hranici můžeme dál pravidelně vydávat funkce a opravovat chyby, místo abychom
+utopili čas v review. Precedens: takhle to dělá třeba SQLite.
+
+*Původ kódu:* frontend vznikl portem z exportu Base44 (červenec 2026) a záměrně se od něj liší
+jen v auth (PocketBase místo OTP/Google), v adaptéru `base44Client.js` a v přepisu hlasu
+(`FromTextDialog` posílá audio jako base64); Base44 už není udržovaný protějšek.
+
+### Podle čeho posuzujeme nápady (anti-bloat pravidlo)
+
+Úkolníky neztloustnou naráz. Ztloustnou po jedné rozumné funkci — a nikdo z nich to
+neudělal schválně. Aby se to nestalo i nám, má killBottleneck napsané pravidlo, kterým nová
+funkce musí projít:
+
+1. **Nesmí přidat povinné pole ani nastavení**, které musí uživatel vyplnit, aby produkt
+   fungoval. Výchozí stav je použitelný bez konfigurace.
+2. **Nesmí přidat trvalou položku do hlavní navigace.** Hlavní navigace je uzavřený seznam;
+   rozšiřuje se jen rozhodnutím majitele produktu.
+3. **Druhá cesta k existující věci je vítaná** — pokud je *kontextová* (klik na to, co mám
+   před sebou / deep-link / vyhledávání / klávesová zkratka) a nic se u ní nenastavuje.
+   Dostupnost není bloat. Bloat je rozhodnutí, které po mně někdo chce.
+4. Musí mít odpověď na otázku: **ubírá to kliknutí v denním provozu?** Pokud ne, nepatří
+   do zjednodušeného (light) režimu.
+
+Neznamená to, že se nic nepřidává — znamená to, že se přidává na správné ose. Když nám
+pošlete nápad, který v tomhle sítu neprojde, řekneme to na rovinu i s důvodem.

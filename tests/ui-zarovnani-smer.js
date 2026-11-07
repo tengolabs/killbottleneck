@@ -27,7 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     await fetch(`${BASE}/api/collections/users/records`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'r@test.cz', password: PW, passwordConfirm: PW }),
+      body: JSON.stringify({ email: 'r@test.cz', password: PW, passwordConfirm: PW, language: 'cs' }),
     });
     const auth = await (await fetch(`${BASE}/api/collections/users/auth-with-password`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

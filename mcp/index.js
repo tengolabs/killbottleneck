@@ -274,6 +274,22 @@ server.registerTool('create_map', {
   } catch (e) { return errText(e.message); }
 });
 
+server.registerTool('update_map', {
+  description: 'Rename a map or change its description (the project as a whole — not the apex node; the list of maps and the database show this title). Only `title` and `description`; archiving or the map style stay with people in the app. Requires full write access to the map.',
+  inputSchema: strict({
+    map_id: z.string(),
+    title: z.string().optional().describe('New map/project title (1–200 characters)'),
+    description: z.string().optional().describe('New map description; empty string clears'),
+  }),
+}, async ({ map_id, title, description }) => mapWrite(map_id, async (base) => {
+  const body = { base_updated: base };
+  if (title !== undefined) body.title = title;
+  if (description !== undefined) body.description = description;
+  const r = await call('POST', `/api/kb/v1/maps/${enc(map_id)}`, body);
+  lastUpdated.set(map_id, r.updated);
+  return text(`Map updated: ${r.title}${r.description ? ` — ${r.description}` : ''}`);
+}));
+
 server.registerTool('add_nodes', {
   description: 'Add a subtree of nodes to an existing map under parent_id (or under the apex when parent_id is omitted). A node is a goal; a node with an assignee (owner) OR a deadline IS a task — that is the only kind of task in killBottleneck (there is no separate task record; new work = new node). NOTE: this re-computes the layout of the whole map. Max 200 nodes per call. Returns the updated tree.',
   inputSchema: strict({

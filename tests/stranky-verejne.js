@@ -201,7 +201,7 @@ H.beh(async () => {
   // registrace i založení stránky jsou zápis (402) → účet a stránku zakládá superuser (obchází pravidla, jako ai-zkusebka-limit)
   const inst4 = await H.startInstance({ slug: 'stranky-trial', env: { KB_UVODNI_MAPA: 0, KB_TRIAL_UNTIL: '2020-01-01' } });
   const SU4 = await inst4.superuser();
-  r = await inst4.api('POST', '/api/collections/users/records', { token: SU4, body: { email: 'sef@vyprselo.cz', password: H.PW, passwordConfirm: H.PW, name: 'Šéf', role: 'admin' } });
+  r = await inst4.api('POST', '/api/collections/users/records', { token: SU4, body: { email: 'sef@vyprselo.cz', password: H.PW, passwordConfirm: H.PW, language: 'cs', name: 'Šéf', role: 'admin' } });
   expect(r.status === 200, `superuser založí účet i po vypršení (${r.status})`);
   const uziv4 = r.json.id;
   const A4 = await inst4.login('sef@vyprselo.cz');

@@ -170,8 +170,9 @@ function ApexGoalNode({ id, data, selected }) {
             <span className="block text-[10px] font-medium text-muted-foreground mt-0.5">{t('node.overallProgress')}</span>
           </p>
         )}
-        {!readOnly && (
+        {(!readOnly || !orgMap) && (
           <div className="relative z-10 flex items-center gap-1.5 mt-0.5">
+            {!readOnly && (<>
             <button
               onClick={(e) => { e.stopPropagation(); onAddChild(id); }}
               title={t(orgMap ? 'node.orgAddSub' : processMap ? 'process.addStepButton' : 'tasks:taskTable.addSubgoal')}
@@ -205,6 +206,10 @@ function ApexGoalNode({ id, data, selected }) {
             <button onClick={(e) => { e.stopPropagation(); onEditNode(id); }} title={t('common:actions.edit')} className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
               <Pencil className="w-3.5 h-3.5" />
             </button>
+            </>)}
+            {/* Timer also for readers / collaborators: the personal time log is on every
+                step (GoalNode, decision 20 Aug 2026) — it was missing on the apex
+                (feature analysis 5 Nov 2026). */}
             {!orgMap && (
             <button
               onClick={handleTimer}

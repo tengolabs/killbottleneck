@@ -31,7 +31,7 @@ async function api(method, path, { token, body } = {}) {
 }
 
 async function ucet(email, role) {
-  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+  await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
   const a = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } });
   return { token: a.json?.token, id: a.json?.record?.id };
 }

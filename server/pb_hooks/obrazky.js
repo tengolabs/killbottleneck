@@ -85,7 +85,7 @@ function poRestartu(app) {
     try {
       if (rec.getString("file")) { nastavStav(app, rec, "hotovo", ""); continue; }
       const { t, userLang } = require(`${__hooks}/i18n.js`);
-      let L = "cs"; try { L = userLang(app.findRecordById("users", rec.getString("user"))); } catch (err) { L = "cs"; }
+      let L = userLang(null); try { L = userLang(app.findRecordById("users", rec.getString("user"))); } catch (err) { L = userLang(null); }
       nastavStav(app, rec, "chyba", t(L, "err.imageInterrupted"));
     } catch (err) { /* další záznam */ }
   }

@@ -25,7 +25,7 @@ const api = async (method, path, { token, body } = {}) => {
 };
 
 const register = async (email) => {
-  await api('POST', '/api/collections/users/records', { body: { email, password: 'testheslo123', passwordConfirm: 'testheslo123' } });
+  await api('POST', '/api/collections/users/records', { body: { email, password: 'testheslo123', passwordConfirm: 'testheslo123', language: 'cs' } });
   const r = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: 'testheslo123' } });
   return { token: r.json.token, id: r.json.record.id, email };
 };

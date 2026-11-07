@@ -43,7 +43,7 @@ async function start() {
 }
 
 const zaloz = (email, role) => api('POST', '/api/collections/users/records', {
-  body: { email, password: HESLO, passwordConfirm: HESLO, name: email.split('@')[0], role },
+  body: { email, password: HESLO, passwordConfirm: HESLO, language: 'cs', name: email.split('@')[0], role },
 });
 const prihlas = async (email) => (await api('POST', '/api/collections/users/auth-with-password',
   { body: { identity: email, password: HESLO } })).json?.token;

@@ -10,7 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
-  // ⚠️ klíč = tag příštího vydání; pokud vyjde pod jiným číslem, přečíslovat
+  "v1.0.0": {
+    cs: [
+      "killBottleneck je open source pod licencí MIT: stáhnete, upravíte, provozujete i pro druhé — autorům zůstává jen jméno a logo.",
+      "Beta skončila. v1.0.0 je první stabilní vydání; aktualizace se od teď nabízí každému, kdo ji nemá vypnutou.",
+      "Záložní jazyk aplikace je angličtina (nepřihlášeným rozhoduje jazyk prohlížeče). Stávající účty bez nastaveného jazyka dostaly češtinu, takže se vám nic nemění.",
+      "Soubory pro vlastní server (docker-compose.yml, .env.example) jsou komentované anglicky; dokumentace zůstává česky i anglicky.",
+      "Šest oprav chování z analýzy funkcí: „Smazat výběr“ už nic neztratí, rychlý zápis v lite nabízí jen zapisovatelné projekty, archivovat smí jen vlastník, před smazáním účtu jde převzít jeho projekty a agent přes MCP umí přejmenovat projekt (update_map).",
+    ],
+    en: [
+      "killBottleneck is open source under the MIT license: download it, modify it, run it for others too — only the name and the logo stay with the authors.",
+      "The beta is over. v1.0.0 is the first stable release; from now on the update is offered to everyone who has not turned the check off.",
+      "The app's fallback language is English (for visitors the browser language decides). Existing accounts without a language set were given Czech, so nothing changes for you.",
+      "The self-hosting files (docker-compose.yml, .env.example) are commented in English; the documentation stays in both Czech and English.",
+      "Six behaviour fixes from the feature analysis: \"Delete selection\" no longer loses anything, quick add in lite offers only writable projects, only the owner can archive, projects can be taken over before an account is deleted, and an agent over MCP can rename a project (update_map).",
+    ],
+  },
   "v0.101-beta": {
     cs: [
       "Licence třetích stran najdete přímo v aplikaci: dialog O aplikaci odkazuje na seznam, který jede s každou instancí.",

@@ -1,7 +1,7 @@
 <!--
 ⚠️ Please read before you spend time on this.
 
-killBottleneck is fair-code, and we do NOT accept external pull requests. That is a
+killBottleneck is open source (MIT), but we do NOT accept external pull requests. That is a
 deliberate decision, not an oversight — the code is maintained by a small team with one
 person accountable for it, and reviewing outside contributions is beyond our capacity.
 A PR opened here will be closed, and we would rather tell you that now than after you have
@@ -14,8 +14,8 @@ What genuinely helps:
   • an Issue describing the bug, with steps to reproduce
   • an Issue describing the problem you are trying to solve
 
-Want the code your way? Fork it — the licence allows that for your own and internal use.
-Just don't turn it into a hosted service for third parties.
+Want the code your way? Fork it — the MIT license lets you do anything with the code.
+A fork just needs its own name and logo (see TRADEMARKS.md).
 -->
 
 **I have read CONTRIBUTING.md and understand that external pull requests are not merged.**

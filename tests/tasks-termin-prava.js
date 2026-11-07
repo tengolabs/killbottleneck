@@ -28,7 +28,7 @@ async function api(method, path, { token, bearer, body } = {}) {
   const res = await fetch(BASE + path, {
     method,
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json', 'Accept-Language': 'cs',
       ...(token ? { Authorization: token } : {}),
       ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
     },
@@ -37,7 +37,7 @@ async function api(method, path, { token, bearer, body } = {}) {
   let json = null; try { json = await res.json(); } catch (e) { /* prázdné tělo */ }
   return { status: res.status, json };
 }
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 
 (async () => {

@@ -58,7 +58,7 @@ const polozkyMenu = async (page) => {
     console.log('== self-host bez nastavené adresy: položka NENÍ ==');
     spust('');
     ok(await pockej(), 'instance bez KB_REPORT_TO naběhla');
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@example.com', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
     let auth = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@example.com', password: PW } });
     let page = await browser.newPage();
     await page.setViewport({ width: 1400, height: 900 });
@@ -86,7 +86,7 @@ const polozkyMenu = async (page) => {
       meta: { appName: 'killBottleneck', appURL: BASE, senderName: 'killBottleneck', senderAddress: 'noreply@killbottleneck.com' },
       smtp: { enabled: true, host: '127.0.0.1', port: 25, tls: false },
     } });
-    await api('POST', '/api/collections/users/records', { body: { email: 'b@example.com', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'b@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
     auth = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'b@example.com', password: PW } });
 
     page = await browser.newPage();

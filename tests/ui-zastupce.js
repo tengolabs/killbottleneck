@@ -34,9 +34,9 @@ const api = async (method, path, { token, body } = {}) => {
 
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert su@e2e.local supersu12345`, { stdio: 'ignore' });
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: 'su@e2e.local', password: 'supersu12345' } })).json.token;
-    await api('POST', '/api/collections/users/records', { body: { email: 'sef@example.com', password: PW, passwordConfirm: PW } }); // první = admin
-    await api('POST', '/api/collections/users/records', { body: { email: 'kolega@example.com', password: PW, passwordConfirm: PW } });
-    await api('POST', '/api/collections/users/records', { body: { email: 'zastupce@example.com', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'sef@example.com', password: PW, passwordConfirm: PW, language: 'cs' } }); // první = admin
+    await api('POST', '/api/collections/users/records', { body: { email: 'kolega@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'zastupce@example.com', password: PW, passwordConfirm: PW, language: 'cs' } });
     const SEF = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'sef@example.com', password: PW } })).json.token;
     const mapa = await api('POST', '/api/collections/goalmaps/records', {
       token: SEF, body: { title: 'Projekt se zástupci', edges: [{ id: 'e1', source: 'root', target: 'n1' }], nodes: [

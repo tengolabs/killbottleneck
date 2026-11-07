@@ -39,7 +39,7 @@
   },
   "about": {
     "title": "O aplikaci killBottleneck",
-    "description": "killBottleneck je fair-code nástroj pro mapy cílů, projekty a úkoly. Pro běžného uživatele i firmu funguje jako open source: stáhnete, spustíte, upravíte a používáte pro vlastní práci, i komerčně. Nesmí se jen přeprodávat jako hostovaná služba ani vydávat pod cizí značkou.",
+    "description": "killBottleneck je open source nástroj pro mapy cílů, projekty a úkoly pod licencí MIT: stáhnete, spustíte, upravíte a používáte pro vlastní práci, i komerčně. Autorům zůstává jen jméno a logo.",
     "docsTitle": "Dokumentace",
     "docsDesc": "návody s obrázky, funkce i nastavení",
     "youtubeTitle": "YouTube kanál",
@@ -47,7 +47,7 @@
     "discordTitle": "Komunita na Discordu",
     "discordDesc": "otázky, nápady, pomoc s nasazením",
     "licenseTitle": "Licence aplikace",
-    "licenseDesc": "Sustainable Use License — co smíte a co ne",
+    "licenseDesc": "Licence MIT — plné znění",
     "licensesTitle": "Licence třetích stran",
     "licensesDesc": "seznam použitých knihoven a písem s jejich licencemi",
     "versionLine": "Verze {{version}}",

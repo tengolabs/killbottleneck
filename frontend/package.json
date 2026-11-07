@@ -1,7 +1,7 @@
 {
   "name": "killbottleneck",
   "private": true,
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "version": "0.0.0",
   "type": "module",
   "scripts": {

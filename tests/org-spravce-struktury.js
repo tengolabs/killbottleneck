@@ -23,13 +23,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, path, { token, body } = {}) => {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   let json = null; try { json = await res.json(); } catch { /* prázdné tělo */ }
   return { status: res.status, json };
 };
-const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } });
+const reg = (email) => api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
 const login = async (email) => (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } })).json.token;
 
 (async () => {
@@ -200,7 +200,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     // i po odebrání práv.
     const klic = (await api('POST', '/api/flowmap/api-keys', { token: H, body: { label: 'test', scope: 'read_write' } })).json.token;
     const v1zapis = await fetch(`${BASE}/api/kb/v1/maps/${orgId}/nodes`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${klic}` },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', Authorization: `Bearer ${klic}` },
       body: JSON.stringify({ nodes: [{ title: 'Podvržená pozice' }] }),
     });
     expect(v1zapis.status >= 400, `zápis do struktury přes API klíč ODMÍTNUT (${v1zapis.status})`);
@@ -215,7 +215,7 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     // měřilo jen chybějící base_updated, ne bránu samotnou
     const verze = await (await fetch(`${BASE}/api/kb/v1/maps/${orgId}`, { headers: { Authorization: `Bearer ${klicA}` } })).json();
     const v1zapisA = await fetch(`${BASE}/api/kb/v1/maps/${orgId}/nodes`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${klicA}` },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', Authorization: `Bearer ${klicA}` },
       body: JSON.stringify({ items: [{ title: "Podvržená pozice adminovým klíčem" }], base_updated: (verze.map || verze).updated }),
     });
     let telo = null; try { telo = await v1zapisA.json(); } catch { /* prázdné */ }

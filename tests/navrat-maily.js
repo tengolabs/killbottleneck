@@ -290,7 +290,7 @@ H.beh(async () => {
   const inst4 = await H.startInstance({ slug: 'navrat-trial', addHostGateway: true, env: { TZ: 'Europe/Prague', KB_UVODNI_MAPA: 0, KB_TRIAL_UNTIL: '2020-01-01', KB_AI_PROVIDER: 'none' } });
   const ST4 = await inst4.superuser();
   await sink.zapoj(inst4, ST4, { appURL: inst4.base });
-  const reg4 = await inst4.api('POST', '/api/collections/users/records', { token: ST4, body: { email: 't@trial.cz', password: H.PW, passwordConfirm: H.PW, last_login: predDny(5) } });
+  const reg4 = await inst4.api('POST', '/api/collections/users/records', { token: ST4, body: { email: 't@trial.cz', password: H.PW, passwordConfirm: H.PW, language: 'cs', last_login: predDny(5) } });
   expect(reg4.status === 200 && reg4.json.last_login, `superuser založil účet s last_login (${reg4.status})`);
   const r4 = await inst4.api('POST', '/api/kb/run-navrat-maily', { token: ST4 });
   expect(r4.json.sent === 0, `po vypršení zkušebky nic (${r4.json.sent})`);

@@ -9,6 +9,57 @@ below before you jump several versions.
 
 ---
 
+## v1.0.0 — 2026-11-07
+
+**The first stable release — and killBottleneck is open source under the MIT license**
+
+**Upgrade notes:** one data migration fills in the language of existing accounts (`users.language = cs` wherever it
+was empty) so that nobody's e-mails or notifications change language. This is the first release the stable update
+channel has offered since v0.33-beta — if you jump from an older beta, read the *Upgrade notes* of the versions in
+between as usual (`git pull && docker compose up -d --build`, a backup first).
+
+- **License: MIT.** The whole product — server, web client, MCP server, desktop app — is released under the
+  [MIT License](./LICENSE). Download it, run it, modify it, host it for others, build on it. The beta releases (v0.x)
+  stay under the Sustainable Use License; the change applies from v1.0.0 on.
+- **The name and the logo stay with the authors** — see [TRADEMARKS.md](./TRADEMARKS.md). A fork needs its own name;
+  "based on killBottleneck" is welcome. The commercial-license offer (`licence@`) is gone from every text.
+- **End of the beta.** The website, the README and the app no longer say "public beta"; the `KB_UPDATE_PRERELEASE`
+  switch now means release candidates (`-rc`).
+- **English first.** `docker-compose.yml`, `.env.example` and the `Dockerfile` are commented in English only; new code,
+  comments and logs are written in English; `AGENTS.md` describes the repository for people and AI agents. A regression
+  test (`en-first`) keeps the amount of Czech in comments and logs from growing.
+- **Behaviour change — fallback language is English.** A user whose account has no language set now gets English
+  e-mails, notifications and assistant texts instead of Czech, and so do answers to visitors who are not signed in
+  (closed registration, public map links) unless their browser asks for Czech or Slovak. Existing accounts are not affected: the migration above
+  writes `cs` into every empty `language` field, which is exactly how the server treated them before. An account created
+  without a language (API, MCP) gets English server texts until its owner signs in through the web app, which then
+  stores the browser's language (Czech/Slovak → Czech, everything else → English) as before.
+- The *About* dialog describes the MIT license and links to its full text; `NOTICE.md` and the third-party list are
+  updated accordingly.
+
+**Fixes from the feature analysis of 5 Nov 2026** (behaviour defects verified live, no new decisions):
+
+- **"Delete selection" no longer loses data.** Bulk deletion skips goals whose task was assigned by someone else
+  (only the assigner or the project owner may remove them) and says so, exactly like the trash button and the
+  Delete key. Before, the server refused the whole save, the app stayed silent and later work was lost on reload.
+- **Lite quick add offers only projects you can write to** (owner, named "edit" share, team edit). A read-only
+  project ended with "The requested resource wasn't found".
+- **Archiving by a non-owner is refused out loud** (400 with a message) instead of a silent 200 with no effect.
+- **Transferring project ownership (API for now, no button yet):** `POST /api/kb/maps/{id}/transfer` (owner or administrator; the previous
+  owner stays a co-admin with edit rights) and, before deleting an account, *User administration* offers to take
+  over the user's projects (`GET /api/kb/users/{id}/maps`, `POST /api/kb/users/{id}/transfer-maps`) — deleting an
+  account used to delete its projects by cascade without warning. A bare `PATCH` of `owner` now derives
+  `owner_email` and the share lists the same way.
+- **MCP: new `update_map` tool** (title, description) — renaming a project through an agent used to change only the
+  apex text while the map list and the database kept the old title. 35 tools now; the HTTP `/mcp` catalog and the
+  stdio server stay 1:1.
+- **Welcome map of a member:** the root goal reads "Welcome to killBottleneck" like the title (it said "Get going on
+  your own").
+- Small: the timer is shown on the apex for readers too; the Google button is hidden on the sign-up page in the native
+  shell (as on sign-in).
+
+---
+
 ## v0.101-beta — 2026-11-06
 
 **License housekeeping from the third code review — nothing copyleft, every notice in order**

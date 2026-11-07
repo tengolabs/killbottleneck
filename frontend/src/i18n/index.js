@@ -32,11 +32,12 @@ export async function loadLanguage(lng) {
 // Init s JEDNÍM jazykem; main.jsx na výsledný promise čeká před renderem.
 export const i18nReady = (async () => {
   const lng = detectLang();
-  const pack = (await (PACKS[lng] || PACKS.cs)()).default;
+  const pack = (await (PACKS[lng] || PACKS.en)()).default;
   await i18n.use(initReactI18next).init({
     resources: { [lng]: pack },
     lng,
-    fallbackLng: 'cs',
+    fallbackLng: 'en', // v1.0.0: English is the declared fallback; the second catalog is not loaded, so
+    // a missing key still shows the key — parity of cs/en catalogs is enforced by tests/i18n-catalog.js
     // ⚠️ KOPIE, ne sdílená reference: react-i18next do options.ns za běhu
     // pushuje líné namespace (useTranslation('billing') apod.) — se sdíleným
     // polem by NAMESPACES rostlo a loadLanguage by pak vkládal undefined.

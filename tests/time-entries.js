@@ -32,8 +32,8 @@ const api = async (method, path, { token, body } = {}) => {
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
 
     // A = první registrovaný (admin), B = běžný user
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW } });
-    await api('POST', '/api/collections/users/records', { body: { email: 'b@e2e.local', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@e2e.local', password: PW, passwordConfirm: PW, language: 'cs' } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'b@e2e.local', password: PW, passwordConfirm: PW, language: 'cs' } });
     const authA = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@e2e.local', password: PW } })).json;
     const authB = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'b@e2e.local', password: PW } })).json;
     const AT = authA.token, BT = authB.token;

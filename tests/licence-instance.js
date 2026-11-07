@@ -1,5 +1,5 @@
 // Licenční texty jedou s každou kopií (vlna L, nález L3c): čerstvá instance z image servíruje
-// /LICENSE.txt (SUL) a /THIRD-PARTY-LICENSES.txt (generovaný seznam) jako text, ne SPA fallback;
+// /LICENSE.txt (MIT) a /THIRD-PARTY-LICENSES.txt (generovaný seznam) jako text, ne SPA fallback;
 // systémová šablona Lean Canvas se zakládá s vlastními texty a uvedením autora (L1).
 // Na image z v0.100 (před vlnou L) ČERVENÁ: oba soubory vrátí index.html aplikace.
 const H = require('./_harness');
@@ -9,7 +9,7 @@ H.beh(async () => {
   const inst = await H.startInstance({ slug: 'licence-inst', env: { KB_UVODNI_MAPA: 0, KB_PURPOSE_ASK: 0 } });
   console.log('== licence na instanci ==');
   for (const [cesta, vzor, co] of [
-    ['/LICENSE.txt', /Sustainable Use License/, 'SUL'],
+    ['/LICENSE.txt', /^MIT License\n\nCopyright \(c\) 2026 Tengo s\.r\.o\./, 'MIT'],
     ['/THIRD-PARTY-LICENSES.txt', /# Third-party licenses[\s\S]*### KB Sans \/ KB Serif[\s\S]*### jszip@/, 'seznam třetích stran'],
   ]) {
     const r = await fetch(inst.base + cesta);

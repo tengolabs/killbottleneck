@@ -81,7 +81,7 @@ async function start(env) {
 }
 
 const zaloz = (email) => api('POST', '/api/collections/users/records',
-  { body: { email, password: HESLO, passwordConfirm: HESLO, setup_code: 'e2e-kod' } });
+  { body: { email, password: HESLO, passwordConfirm: HESLO, language: 'cs', setup_code: 'e2e-kod' } });
 const prihlas = async (email) => (await api('POST', '/api/collections/users/auth-with-password',
   { body: { identity: email, password: HESLO } })).json?.token;
 

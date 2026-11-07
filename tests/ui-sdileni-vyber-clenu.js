@@ -47,7 +47,7 @@ const api = async (method, path, { token, body } = {}) => {
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
 
     for (const e of [SEF, KOLEGA, KOLEGYNE]) {
-      const r = await api('POST', '/api/collections/users/records', { body: { email: e, password: PW, passwordConfirm: PW } });
+      const r = await api('POST', '/api/collections/users/records', { body: { email: e, password: PW, passwordConfirm: PW, language: 'cs' } });
       ok(r.status === 200, `účet ${e} založen (${r.status})`);
     }
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: SEF, password: PW } })).json.token;

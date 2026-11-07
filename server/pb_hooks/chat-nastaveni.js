@@ -275,7 +275,7 @@ function hodnotaPredvolby(co, hodnota) {
 }
 // hodnota v DB (users): '' u zámku/režimu e-mailů = none/instant
 function ulozenaPredvolba(co, u) {
-  if (co === "language") return u.getString("language") || "cs";
+  if (co === "language") return u.getString("language") || "en";
   if (co === "align_lock") return u.getString("align_lock") || "none";
   if (co === "notify_email_mode") return u.getString("notify_email_mode") || "instant";
   if (co === "full_name") return u.getString("full_name");

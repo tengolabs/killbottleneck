@@ -40,10 +40,17 @@ export default function LiteQuickAdd({ onClose, onAdded }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const me = user?.email || '';
   useEffect(() => {
-    base44.entities.GoalMap.list('-updated_date', 200, { fields: 'id,title,archived' })
+    if (!me) return undefined; // auth still loading — the filter below needs my e-mail
+    base44.entities.GoalMap.list('-updated_date', 200, { fields: 'id,title,archived,owner_email,shared_with_edit,team_access' })
       .then((list) => {
-        const active = (list || []).filter((m) => !m.archived);
+        // Only projects I can WRITE to — a mirror of the goalmaps collection rule
+        // (owner, named "edit" share, team edit). A read-only project used to be
+        // offered too and the write ended with "The requested resource wasn't found"
+        // (feature analysis 5 Nov 2026).
+        const active = (list || []).filter((m) => !m.archived
+          && (m.created_by === me || (m.shared_with_edit || []).includes(me) || m.team_access === 'edit')); // created_by = owner_email (base44Client)
         setMaps(active);
         // výchozí je naposledy použitý projekt; když žádný není, zůstane
         // prázdno = zásobník, takže rychlý zápis nevyžaduje žádné rozhodnutí
@@ -51,7 +58,7 @@ export default function LiteQuickAdd({ onClose, onAdded }) {
         setMapId(active.some((m) => m.id === last) ? last : '');
       })
       .catch(() => setMaps([]));
-  }, []);
+  }, [me]);
 
   const save = async (e) => {
     e.preventDefault();

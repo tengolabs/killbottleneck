@@ -50,7 +50,7 @@ const pragueDow = () => { const d = new Date(new Date().toLocaleString('en-US', 
     // superuser (force routa) + běžný uživatel = vlastník šablony/projektu
     execSync(`docker exec ${NAME} /app/pocketbase superuser upsert ${SU.email} ${SU.pw}`, { stdio: 'ignore' });
     const ST = (await api('POST', '/api/collections/_superusers/auth-with-password', { body: { identity: SU.email, password: SU.pw } })).json.token;
-    await api('POST', '/api/collections/users/records', { body: { email: 'owner@e2e.local', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'owner@e2e.local', password: PW, passwordConfirm: PW, language: 'cs' } });
     const auth = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'owner@e2e.local', password: PW } })).json;
     const OT = auth.token, owner = auth.record.id;
 

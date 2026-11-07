@@ -13,7 +13,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -e KB_PURPOSE_ASK=0 -e TZ=Europe/Prague -p ${PORT}:8090 ${process.env.KB_TEST_IMAGE}`, { stdio: 'ignore' });
     for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /**/ } await sleep(1000); }
     await fetch(`${BASE}/api/collections/users/records`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'r@test.cz', password: PW, passwordConfirm: PW }) });
+      body: JSON.stringify({ email: 'r@test.cz', password: PW, passwordConfirm: PW, language: 'cs' }) });
     const auth = await (await fetch(`${BASE}/api/collections/users/auth-with-password`, { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'r@test.cz', password: PW }) })).json();
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });

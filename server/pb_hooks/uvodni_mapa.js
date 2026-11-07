@@ -227,7 +227,10 @@ function aiNodes(def, role, email, purpose) {
   // první dvě dnes, v pořadí oblastí (nastavení dřív než AI).
   const podleOblasti = [];
   for (const o of oblasti) for (const p of polozky) if (p.node === o.id) podleOblasti.push(p);
-  const goal = ucel === "solo" ? (def.goalSolo || def.goal) : ucel === "family" ? (def.goalFamily || def.goal) : def.goal;
+  // the root (apex) follows the title: a member gets "Welcome…", not "Get going on your
+  // own" (feature analysis 5 Nov 2026: a member's map title and root contradicted each other)
+  const goal = role !== "admin" ? def.titleClen
+    : ucel === "solo" ? (def.goalSolo || def.goal) : ucel === "family" ? (def.goalFamily || def.goal) : def.goal;
   // tour i na kořeni a oblastech — podle něj se pozná NEDOTČENÁ mapa (náhrada dotazníkem)
   const nodes = [{ id: "root", title: goal, parentId: null, description: "", tour: true }];
   for (const o of oblasti) {

@@ -1314,13 +1314,23 @@ function EditorContent({ mapId, personalMap = false }) {
     // výběr se čte ze stavu PŘED updaterem, ať toast a pushHistory neběží
     // uvnitř render fáze a prázdný výběr nezanechá prázdný krok v undo
     const apexSelected = nodes.some((n) => n.selected && isApexNodeShared(n));
-    const selectedIds = new Set(nodes.filter((n) => n.selected && !isApexNodeShared(n)).map((n) => n.id));
+    // A task assigned by someone else (deadline set by another person) is SKIPPED and
+    // reported — same as the trash button and the Delete key (canRemoveNodeShared).
+    // Otherwise the server (nodeDeleteDenied) refused the WHOLE map PATCH, the app did
+    // not report it, the goal vanished from the canvas and all further work was lost
+    // after a reload (F082, feature analysis 5 Nov 2026: "Delete selection" = silent data loss).
+    const selectedGoals = nodes.filter((n) => n.selected && !isApexNodeShared(n));
+    const foreign = selectedGoals.filter((n) => !canRemoveNodeShared(n));
+    const selectedIds = new Set(selectedGoals.filter((n) => canRemoveNodeShared(n)).map((n) => n.id));
     if (apexSelected) apexDeleteRefused();
+    if (foreign.length > 0) {
+      toast({ title: t('node.assignedNoDelete'), description: t('node.assignedNoDeleteSkipped', { skipped: foreign.length, total: selectedGoals.length }) });
+    }
     if (selectedIds.size === 0) return;
     pushHistory();
     setEdges((eds) => eds.filter((e) => !selectedIds.has(e.source) && !selectedIds.has(e.target)));
     setNodes((prev) => prev.filter((n) => !selectedIds.has(n.id)));
-  }, [nodes, setNodes, setEdges, pushHistory, apexDeleteRefused]);
+  }, [nodes, setNodes, setEdges, pushHistory, apexDeleteRefused, canRemoveNodeShared, toast, t]);
 
   const selectedNodeCount = nodes.filter((n) => n.selected).length;
 

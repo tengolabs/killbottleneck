@@ -15,7 +15,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const day = (offset) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + offset); return d.toLocaleDateString('en-CA'); };
 
 const api = async (path, { token, bearer, body, method } = {}) => {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', 'Accept-Language': 'cs' };
   if (token) headers.Authorization = token;
   if (bearer) headers.Authorization = `Bearer ${bearer}`;
   const res = await fetch(BASE + path, { method: method || (body ? 'POST' : 'GET'), headers, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -23,7 +23,7 @@ const api = async (path, { token, bearer, body, method } = {}) => {
   return { status: res.status, json: json || {} };
 };
 const register = async (email) => {
-  const rec = (await api('/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW } })).json;
+  const rec = (await api('/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } })).json;
   const r = await api('/api/collections/users/auth-with-password', { body: { identity: email, password: PW } });
   const klic = (await api('/api/kb/api-keys', { token: r.json.token, body: { label: 'rw', scope: 'read_write' } })).json.token;
   const ro = (await api('/api/kb/api-keys', { token: r.json.token, body: { label: 'ro', scope: 'read' } })).json.token;
@@ -289,7 +289,7 @@ const findNode = (tree, title) => {
     // Od v0.53 hook registrace ukládá e-mail lowercase → `Editor@E2E.CZ` koliduje s editor@e2e.cz
     // a unikát ho odmítne. (Do v0.52 tu sekce hlídala opak: dvojče jako samostatný účet bez práv;
     // celá třída problémů zmizela s migrací users_email_lowercase.)
-    r = await api('/api/collections/users/records', { body: { email: 'Editor@E2E.CZ', password: PW, passwordConfirm: PW } });
+    r = await api('/api/collections/users/records', { body: { email: 'Editor@E2E.CZ', password: PW, passwordConfirm: PW, language: 'cs' } });
     expect(r.status !== 200, `registrace dvojčete Editor@E2E.CZ neprojde (${r.status})`);
     // mixed-case zápis řešitele se vstřícně přeloží na JEDINÝ existující účet
     // (resolveOwner: přesná shoda → bez ohledu na velikost písmen, 1 kandidát = přijmout)

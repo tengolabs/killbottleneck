@@ -27,7 +27,7 @@ let mcp = null;
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
     execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p 20503:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
     for (let i = 0; i < 30; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch {} await sleep(1000); }
-    await api('POST', '/api/collections/users/records', { body: { email: 'a@x.cz', password: PW, passwordConfirm: PW } });
+    await api('POST', '/api/collections/users/records', { body: { email: 'a@x.cz', password: PW, passwordConfirm: PW, language: 'cs' } });
     const A = (await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'a@x.cz', password: PW } })).json.token;
     const key = (await api('POST', '/api/flowmap/api-keys', { token: A, body: { label: 'mcp-e2e', scope: 'read_write' } })).json.token;
 
@@ -75,8 +75,8 @@ let mcp = null;
     mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const tools = await rpc('tools/list', {});
     const names = (tools.result.tools || []).map((t) => t.name).sort();
-    expect(names.length === 34 && names.includes('generate_image') && names.includes('create_events') && names.includes('create_map') && names.includes('create_page') && names.includes('create_rule') && names.includes('get_org_structure') && names.includes('list_people') && names.includes('get_portfolio'),
-      `tools/list → 34 nástrojů vč. generate_image, create_events, create_page, list_people a get_portfolio (${names.join(', ')})`);
+    expect(names.length === 35 && names.includes('update_map') && names.includes('generate_image') && names.includes('create_events') && names.includes('create_map') && names.includes('create_page') && names.includes('create_rule') && names.includes('get_org_structure') && names.includes('list_people') && names.includes('get_portfolio'),
+      `tools/list → 35 nástrojů vč. update_map, generate_image, create_events, create_page, list_people a get_portfolio (${names.join(', ')})`);
     // Slovník 17. 8. 2026: úkol = uzel s řešitelem nebo termínem — task nástroje zanikly
     expect(!names.includes('add_task') && !names.includes('list_tasks') && !names.includes('update_task'),
       'task nástroje (add/list/update_task) NEEXISTUJÍ');
