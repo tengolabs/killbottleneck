@@ -9,6 +9,30 @@ below before you jump several versions.
 
 ---
 
+## v1.0.1 — 2026-11-08
+
+**The assistant on your own OpenAI key: reasoning models without extra settings, reminders and recurring events**
+
+**Upgrade notes:** no migration. If you added `KB_CHAT_OPENAI_EXTRA={"reasoning_effort":"none"}` to make the
+assistant work on OpenAI, you can keep it (it still takes precedence) or delete it.
+
+- **Reasoning models work with the assistant out of the box** (`openai` provider, e.g. `gpt-5.6-luna`). OpenAI
+  refuses a reasoning setting other than `none` together with tool calling, so every assistant turn ended with
+  *error 400*. The app now retries with `reasoning_effort: none` and then without the field, and remembers per model
+  what worked, so later turns go through on the first call.
+- **Drawing through OpenAI defaults to `gpt-image-1-mini`** instead of `gpt-image-1`, which many new API keys no longer
+  have (every picture failed at once). Set `KB_IMAGE_MODEL` to choose another model. The error message on a refused
+  request no longer shows doubled braces.
+- **Reminders without a project:** "Remind me tomorrow at 8 to call the bank" now becomes a calendar event with a
+  reminder, not an idea in the inbox.
+- **Recurring events:** "Every Monday at 9 we have a team meeting" becomes a series of events in the calendar (up to
+  30); when you don't say until when, the assistant usually asks first. A repeating *step* in a map keeps its own rhythm as
+  before.
+- **New guide: [Your own OpenAI key](https://killbottleneck.com/tutorials/openai)** — the assistant and drawing on a
+  self-hosted server with one OpenAI key, which models to pick, what we measured and what to do when something fails.
+
+---
+
 ## v1.0.0 — 2026-11-07
 
 **The first stable release — and killBottleneck is open source under the MIT license**

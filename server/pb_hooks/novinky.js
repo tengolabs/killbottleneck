@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.0.1": {
+    cs: [
+      "„Připomeň mi zítra v 8 zavolat do banky“ asistent zapíše jako událost v kalendáři s připomínkou, i když nepatří k žádnému projektu.",
+      "Opakovanou událost („každé pondělí v 9 porada“) asistent rozepíše do kalendáře na jednotlivé dny; když neřeknete, do kdy, obvykle se zeptá.",
+      "Na vlastním serveru s klíčem OpenAI asistent funguje i s uvažujícími modely (třeba gpt-5.6-luna) bez nastavování navíc a kreslení má výchozí model gpt-image-1-mini. Návod je v dokumentaci pod Vlastní klíč OpenAI.",
+    ],
+    en: [
+      "\"Remind me tomorrow at 8 to call the bank\" becomes a calendar event with a reminder, even when it belongs to no project.",
+      "A recurring event (\"every Monday at 9 a meeting\") is written into the calendar day by day; when you don't say until when, the assistant usually asks.",
+      "On your own server with an OpenAI key the assistant works with reasoning models too (e.g. gpt-5.6-luna) without extra settings, and drawing defaults to gpt-image-1-mini. The guide is in the docs under Your own OpenAI key.",
+    ],
+  },
   "v1.0.0": {
     cs: [
       "killBottleneck je open source pod licencí MIT: stáhnete, upravíte, provozujete i pro druhé — autorům zůstává jen jméno a logo.",

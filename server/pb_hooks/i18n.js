@@ -1175,7 +1175,7 @@ const STRINGS = {
   "err.imageDrawing": { cs: "Obrázek se právě kreslí — chvíli počkejte.", en: "The picture is being drawn — please wait a moment." },
   "err.imageBusy": { cs: "Obrázky jsou teď vytížené. Zkuste to za chvíli.", en: "Pictures are busy right now. Please try again in a moment." },
   "err.imageOpenaiFormat": { cs: "Služba obrázků vrátila jiný formát než JPEG. Nastavte model, který umí output_format jpeg (např. gpt-image-1).", en: "The picture service returned a format other than JPEG. Use a model that supports output_format jpeg (e.g. gpt-image-1)." },
-  "err.imageOpenaiRefused": { cs: "Služba obrázků požadavek odmítla ({{msg}}).", en: "The picture service refused the request ({{msg}})." },
+  "err.imageOpenaiRefused": { cs: "Služba obrázků požadavek odmítla ({msg}).", en: "The picture service refused the request ({msg})." },
   "err.imageUnavailable": { cs: "Obrázky teď nejdou (služba je nedostupná). Zkuste to později.", en: "Pictures are not available right now (the service is down). Please try again later." },
   "err.imageTextOff": { cs: "Obrázky s textem jsou na této instanci vypnuté.", en: "Pictures with text are disabled on this instance." },
   "err.imagePromptMissing": { cs: "Chybí popis obrázku.", en: "The picture description is missing." },

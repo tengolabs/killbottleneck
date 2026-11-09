@@ -201,13 +201,27 @@ function posliOpenAI(cfg, base, bohate, hole, limit, timeout) {
     if (extra) Object.assign(t, extra);
     return t;
   };
-  // model/brána effort nezná → jednou bez něj (effort z prostředí nastavil správce vědomě, ten se nechá)
+  // Effort rejected (400 mentioning reasoning) → try "none" first, then without the parameter. OpenAI
+  // /chat/completions on gpt-5.4+ (Luna, mini) rejects function tools together with any effort except "none",
+  // and without the parameter it applies its default effort, so that is a 400 too — the assistant with tools
+  // did not work at all (verified 2026-11-06). A gateway that does not know effort at all still passes on the
+  // second try as before. What worked is remembered per instance, separately for calls with and without tools
+  // (the Advisor without tools keeps "low"). Effort set in `extra` is the admin's choice and is never changed.
+  const effortKey = "llm:effort:" + base + "|" + model + "|" + (hole && hole.tools ? "tools" : "");
   const zkus = (t) => {
-    let r = posli(t);
-    if (r.statusCode === 400 && t.reasoning_effort !== undefined && !effortZExtra && /reasoning/i.test(errDetail(r))) {
-      const bez = Object.assign({}, t);
-      delete bez.reasoning_effort;
-      r = posli(bez);
+    if (t.reasoning_effort === undefined || effortZExtra) return posli(t);
+    const learned = store.get(effortKey);
+    const variant = (e) => {
+      const v = Object.assign({}, t);
+      if (e === "omit") delete v.reasoning_effort; else v.reasoning_effort = e;
+      return v;
+    };
+    let r = posli(learned ? variant(learned) : t);
+    if (learned) return r;
+    for (const e of (t.reasoning_effort === "none" ? ["omit"] : ["none", "omit"])) {
+      if (r.statusCode !== 400 || !/reasoning/i.test(errDetail(r))) break;
+      r = posli(variant(e));
+      if (r.statusCode >= 200 && r.statusCode < 300) store.set(effortKey, e);
     }
     return r;
   };

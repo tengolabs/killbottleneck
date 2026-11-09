@@ -27,6 +27,9 @@ const POVOLENE = new Set(['model', 'messages', 'stream', 'temperature', 'top_p',
 const uvazujici = (m) => /gpt-5|luna/i.test(String(m || ''));
 // gpt-5.6-luna = pravděpodobné id Luny; luna-mock = uvažující model, jehož jméno to neprozradí; gpt-5-prisny effort nezná
 const EFFORT = { 'gpt-5-mini': ['minimal', 'low', 'medium', 'high'], 'gpt-5.6-luna': ['none', 'low', 'medium', 'high'], 'luna-mock': ['none', 'low', 'medium', 'high'] };
+// Real OpenAI (verified 2026-11-06 with gpt-5.6-luna and gpt-5.4-mini): function tools + any effort except "none"
+// → 400 on /chat/completions; a missing effort means the model's default effort, so it is rejected as well.
+const NASTROJE_JEN_NONE = new Set(['gpt-5.6-luna']);
 const PREMYSLENI = { none: 0, minimal: 50, low: 400, medium: 1800, high: 5000 };
 const CEKAJICI = (ids) => `An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'. The following tool_call_ids did not have response messages: ${ids.join(', ')}`;
 
@@ -38,6 +41,7 @@ function over(b) {
     if ('max_tokens' in b) return "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.";
     if ('temperature' in b && b.temperature !== 1) return `Unsupported value: 'temperature' does not support ${b.temperature} with this model. Only the default (1) value is supported.`;
     if ('reasoning_effort' in b && !(EFFORT[b.model] || []).includes(b.reasoning_effort)) return `Unsupported value: 'reasoning_effort' does not support '${b.reasoning_effort}' with this model.`;
+    if (NASTROJE_JEN_NONE.has(b.model) && Array.isArray(b.tools) && b.reasoning_effort !== 'none') return `Function tools with reasoning_effort are not supported for ${b.model} in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.`;
   } else if ('reasoning_effort' in b) return 'Unrecognized request argument supplied: reasoning_effort';
   let cekaji = [];
   for (const m of b.messages || []) {
@@ -265,7 +269,7 @@ H.beh(async () => {
 
   console.log('== T7: uvažující modely — holé tělo napoprvé, rezerva a effort ==');
   fronta.length = 0; // selhání předchozího kroku nesmí posunout odpovědi dalším (mutace M4 ukázala řetězení)
-  for (const model of ['gpt-5-mini', 'gpt-5.6-luna']) {
+  for (const model of ['gpt-5-mini']) {
     await nastav(model);
     predV = volani.length; const pred7 = odmitnuto.length;
     fronta.push({ content: 'Ahoj z ' + model });
@@ -274,6 +278,24 @@ H.beh(async () => {
     expect(r.status === 200 && v7.length === 1 && odmitnuto.length === pred7, `T7 ${model}: jedno volání, žádné 400 (${r.status}, volání ${v7.length}; ${odmitnuto.slice(pred7).join(' | ').slice(0, 120)})`);
     expect(v7[0] && !('max_tokens' in v7[0]) && !('temperature' in v7[0]) && v7[0].max_completion_tokens === 1500 + 4000 && v7[0].reasoning_effort === 'low', `T7 ${model}: max_completion_tokens s rezervou 4000, effort low (${JSON.stringify(v7[0] && { mct: v7[0].max_completion_tokens, re: v7[0].reasoning_effort })})`);
   }
+  // Luna like real OpenAI: tools + effort "low" → 400 → retry with "none" (not without the parameter — that is
+  // rejected too); the instance remembers it → the next turn goes with "none" in one call
+  await nastav('gpt-5.6-luna');
+  predV = volani.length;
+  fronta.push({ content: 'Ahoj z Luny' }, { content: 'Luna znovu' });
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Ahoj' } });
+  const v7l = volani.slice(predV);
+  expect(r.status === 200 && v7l.length === 2 && v7l[0].reasoning_effort === 'low' && v7l[1].reasoning_effort === 'none' && Array.isArray(v7l[1].tools) && /Ahoj z Luny/.test(posledniA(r.json.chat).content || ''), `T7 Luna: nástroje + effort odmítnuté → druhý pokus s „none“ (${r.status}, efforty ${v7l.map((v) => v.reasoning_effort).join(',')})`);
+  predV = volani.length;
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'Ještě jednou' } });
+  const v7l2 = volani.slice(predV);
+  expect(r.status === 200 && v7l2.length === 1 && v7l2[0].reasoning_effort === 'none', `T7 Luna: instance si „none“ pamatuje → další tah jedním voláním (${r.status}, volání ${v7l2.length}, ${v7l2.map((v) => v.reasoning_effort).join(',')})`);
+  // Advisor on Luna has no tools → keeps "low" in one call (the learned "none" applies to calls with tools only)
+  predV = volani.length;
+  fronta.push({ content: '{"questions":["Pro koho?","Kdy?","Za kolik?"]}' });
+  r = await inst.api('POST', '/api/kb/advisor', { token: A, body: { mode: 'questions', goal: 'Otevřít kavárnu' } });
+  const v7la = volani.slice(predV);
+  expect(r.status === 200 && v7la.length === 1 && !('tools' in v7la[0]) && v7la[0].reasoning_effort === 'low', `T7 Luna: Poradce bez nástrojů jedním voláním s „low“ (${r.status}, volání ${v7la.length}, ${v7la.map((v) => v.reasoning_effort).join(',')})`);
   // uvažující model, jehož jméno to neprozradí: první tah 400 na max_tokens → rovnou s rezervou (ne „spotřeboval
   // limit na přemýšlení“), instance si ho zapamatuje → druhý tah jedním voláním
   await nastav('luna-mock');
@@ -286,13 +308,13 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'Ještě jednou' } });
   const v7n = volani.slice(predV);
   expect(r.status === 200 && v7n.length === 1 && !('max_tokens' in v7n[0]) && v7n[0].reasoning_effort === 'low', `T7 neznámé jméno: instance si model pamatuje → druhý tah jedním voláním (${r.status}, volání ${v7n.length})`);
-  // model, který effort nezná → jednou bez něj (a pak odpověď, žádná chyba pro uživatele)
+  // model, který effort nezná → „none“ taky odmítne → pak bez něj (a odpověď, žádná chyba pro uživatele)
   await nastav('gpt-5-prisny');
   predV = volani.length;
   fronta.push({ content: 'Ahoj bez effortu' });
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Ahoj' } });
   const v7b = volani.slice(predV);
-  expect(r.status === 200 && v7b.length === 2 && v7b[0].reasoning_effort === 'low' && !('reasoning_effort' in v7b[1]) && /bez effortu/.test(r.json.chat.messages.at(-1).content || ''), `T7: effort odmítnutý → druhý pokus bez něj (${r.status}, volání ${v7b.length})`);
+  expect(r.status === 200 && v7b.length === 3 && v7b[0].reasoning_effort === 'low' && v7b[1].reasoning_effort === 'none' && !('reasoning_effort' in v7b[2]) && /bez effortu/.test(r.json.chat.messages.at(-1).content || ''), `T7: effort odmítnutý i jako „none“ → třetí pokus bez něj (${r.status}, volání ${v7b.length})`);
   // starý Poradce (chatOpenAI) na uvažujícím modelu: taky bez dvojího volání
   await nastav('gpt-5-mini');
   predV = volani.length;
@@ -346,7 +368,7 @@ H.beh(async () => {
   expect((await inst.api('POST', '/api/kb/ai-test', { token: C, body: { mode: 'vision' } })).status === 403, 'test obrázku smí jen správce');
 
   console.log('== souhrn: přísný mock neodmítl nic mimo řízený případ effortu ==');
-  const necekane = odmitnuto.filter((x) => !/reasoning_effort' does not support 'low'/.test(x) && !/Unsupported parameter: 'max_tokens'/.test(x));
+  const necekane = odmitnuto.filter((x) => !/reasoning_effort' does not support '(low|none)'/.test(x) && !/^Function tools with reasoning_effort are not supported for gpt-5\.6-luna/.test(x) && !/Unsupported parameter: 'max_tokens'/.test(x));
   expect(odmitnuto.filter((x) => /Unsupported parameter: 'max_tokens'/.test(x)).length === 1, 'jediné odmítnuté max_tokens = první tah modelu s neznámým jménem');
   expect(necekane.length === 0, `žádné neočekávané 400 (${necekane.length}: ${necekane.join(' | ').slice(0, 300)})`);
   expect(mock.pozadavky.filter((q) => q.url.startsWith('/v1/chat')).every((q) => q.headers.authorization === 'Bearer sk-test-mock-klic'), 'klíč z Administrace jde v Authorization');

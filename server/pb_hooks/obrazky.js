@@ -9,7 +9,7 @@
 // (self-host, Lite beze změny).
 // Vlastní služba (self-host, 5. 11. 2026): KB_IMAGE_PROVIDER=openai = standardní OpenAI Images API
 // (POST {KB_IMAGE_URL}/images/generations, výchozí https://api.openai.com/v1), klíč KB_IMAGE_TOKEN, model KB_IMAGE_MODEL
-// (výchozí gpt-image-1). Obrázek se chce jako JPEG (output_format) — jiný formát pole souboru nepřijme.
+// (výchozí gpt-image-1-mini). Obrázek se chce jako JPEG (output_format) — jiný formát pole souboru nepřijme.
 // ⚠️ PocketBase JSVM: require() uvnitř funkcí.
 
 const PRESETY = { ctverec: [1024, 1024], banner: [1200, 400], hlavicka: [1536, 640], vysoky: [512, 896], siroky: [1792, 1024] };
@@ -28,7 +28,7 @@ function konfigurace(app) {
     const klic = env("IMAGE_TOKEN") || "";
     if (!klic) return null; // bez klíče se OpenAI nedá volat → funkce skrytá
     return { openai: true, url: String(env("IMAGE_URL") || "https://api.openai.com/v1").replace(/\/+$/, ""), token: klic,
-      model: env("IMAGE_MODEL") || "gpt-image-1", text: env("IMAGE_TEXT") === "1" };
+      model: env("IMAGE_MODEL") || "gpt-image-1-mini", text: env("IMAGE_TEXT") === "1" };
   }
   let url = env("IMAGE_URL") || "", token = env("IMAGE_TOKEN") || "";
   let c = null;

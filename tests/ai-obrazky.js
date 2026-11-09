@@ -626,7 +626,7 @@ H.beh(async () => {
     if (/ODMITNI/.test(b.prompt || '')) { res.statusCode = 400; res.end('{"error":{"message":"Your request was rejected","type":"invalid_request_error","code":"moderation_blocked"}}'); return; }
     res.end(JSON.stringify({ created: 1, data: [{ b64_json: /PNG/.test(b.prompt || '') ? PNG_B64 : JPEG_B64 }] }));
   });
-  const oa = await H.startInstance({ slug: 'ai-obrazky-openai', addHostGateway: true, env: Object.assign({}, ZAKLAD, { KB_IMAGE_PROVIDER: 'openai', KB_IMAGE_URL: openai.base + '/v1', KB_IMAGE_TOKEN: 'sk-test-oa', KB_IMAGE_MODEL: 'gpt-image-1' }) });
+  const oa = await H.startInstance({ slug: 'ai-obrazky-openai', addHostGateway: true, env: Object.assign({}, ZAKLAD, { KB_IMAGE_PROVIDER: 'openai', KB_IMAGE_URL: openai.base + '/v1', KB_IMAGE_TOKEN: 'sk-test-oa' }) });
   await oa.register('admin@example.com', { name: 'Petr' });
   const A4 = await oa.login('admin@example.com');
   cfg = (await oa.api('GET', '/api/kb/config')).json;
@@ -637,13 +637,13 @@ H.beh(async () => {
   r = await oa.api('POST', '/api/kb/chat/obrazek/vytvorit', { token: A4, body: { id: k4.image_id } });
   const q = oaPozadavky[oaPozadavky.length - 1] || { body: {} };
   expect(r.status === 200 && r.json.obrazek.stav === 'hotovo' && !!r.json.obrazek.url, `OpenAI: obrázek nakreslen a uložen (${r.status} ${r.json.obrazek && r.json.obrazek.stav})`);
-  expect(q.url === '/v1/images/generations' && q.auth === 'Bearer sk-test-oa' && q.body.model === 'gpt-image-1' && q.body.n === 1 && q.body.output_format === 'jpeg' && q.body.size === '1536x1024' && /cozy carpentry workshop/.test(q.body.prompt),
+  expect(q.url === '/v1/images/generations' && q.auth === 'Bearer sk-test-oa' && q.body.model === 'gpt-image-1-mini' && q.body.n === 1 && q.body.output_format === 'jpeg' && q.body.size === '1536x1024' && /cozy carpentry workshop/.test(q.body.prompt),
     `OpenAI: /images/generations, Bearer klíč, model, JPEG, na šířku 1536×1024 (${JSON.stringify({ u: q.url, m: q.body.model, f: q.body.output_format, s: q.body.size })})`);
   expect(!('mode' in q.body) && !('seed' in q.body) && !q.auth.includes('img_tok'), 'OpenAI: jen standardní pole (žádné mode/seed naší brány)');
   const f4 = await fetch(oa.base + r.json.obrazek.url);
   expect(f4.status === 200 && /image\/jpeg/.test(f4.headers.get('content-type') || ''), `OpenAI: uložený soubor jde načíst jako JPEG (${f4.status})`);
   const log4 = ((await oa.api('GET', '/api/collections/ai_chat_log/records?perPage=50', { token: await oa.superuser() })).json.items || []).filter((l) => l.tools === 'image_draw');
-  expect(log4.length === 1 && log4[0].model === 'gpt-image-1#obrazek' && log4[0].zdroj === 'vlastni', `OpenAI: řádek logu nese model služby a zdroj „vlastni“, ne náš FLUX (${log4[0] && log4[0].model} / ${log4[0] && log4[0].zdroj})`);
+  expect(log4.length === 1 && log4[0].model === 'gpt-image-1-mini#obrazek' && log4[0].zdroj === 'vlastni', `OpenAI: řádek logu nese model služby a zdroj „vlastni“, ne náš FLUX (${log4[0] && log4[0].model} / ${log4[0] && log4[0].zdroj})`);
   // čtverec a na výšku
   fronta.push(nastroj('generate_image', { prompt: 'a tall poster, no text', title: 'Plakát', format: 'portrait' }), text('Kreslím.'));
   r = await oa.api('POST', '/api/kb/chat', { token: A4, body: { message: 'Nakresli plakát' } });
