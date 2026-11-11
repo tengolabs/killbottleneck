@@ -4,6 +4,7 @@ import { Search, X, Filter, Zap, BarChart3, CheckSquare } from 'lucide-react';
 import BufferPanel from '@/components/goal-map/BufferPanel';
 import TimeLogPanel from '@/components/time/TimeLogPanel';
 import ReportRailButton from '@/components/shared/ReportRailButton';
+import { useAsistent } from '@/lib/AsistentContext';
 
 // Levá lišta plátna shora: lupa (top-4), zásobník (top-16), časovač (top-28),
 // filtr Moje úkoly (top-40), pravidla (top-52), dashboard (top-64), úkoly
@@ -19,6 +20,8 @@ export default function LeftRail({
 }) {
   const { t } = useTranslation('editor');
   const navigate = useNavigate();
+  // the assistant's tab takes the top slot (11 Nov 2026) → every rail item one slot lower (margin on top of its top-*)
+  const posun = useAsistent().railOffset || 0;
   return (
     <>
         {bufferEnabled && !dashboardOpen && (
@@ -48,7 +51,7 @@ export default function LeftRail({
           return (
             <>
               {searchOpen ? (
-                <div style={{ left: railLeft }} className={`absolute top-4 z-30 flex items-center gap-1 rounded-r-lg border ${railCls} bg-card pl-1 pr-1 py-1.5 shadow-md`}>
+                <div style={{ left: railLeft, marginTop: posun }} className={`absolute top-4 z-30 flex items-center gap-1 rounded-r-lg border ${railCls} bg-card pl-1 pr-1 py-1.5 shadow-md`}>
                   {/* lupa je přepínač: druhý klik pole zavře (dotaz zůstává platný
                       a zavřená lupa ho ukazuje podbarvením); křížek maže a zavírá */}
                   <button
@@ -77,7 +80,7 @@ export default function LeftRail({
               ) : (
                 <button
                   onClick={() => setSearchOpen(true)}
-                  style={{ left: railLeft }}
+                  style={{ left: railLeft, marginTop: posun }}
                   title={t('toolbar.searchPlaceholder')}
                   className={`absolute top-4 z-30 flex items-center rounded-r-lg border ${railCls} bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all`}
                 >
@@ -87,7 +90,7 @@ export default function LeftRail({
               {user && (
                 <button
                   onClick={() => setMyTasksOnly((v) => !v)}
-                  style={{ left: railLeft }}
+                  style={{ left: railLeft, marginTop: posun }}
                   title={t('toolbar.myTasksTitle')}
                   className={`absolute top-40 z-30 flex items-center rounded-r-lg border ${railCls} px-2 py-2.5 shadow-md transition-all ${myTasksOnly ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-secondary'}`}
                 >
@@ -100,7 +103,7 @@ export default function LeftRail({
               {canEdit && user && activeMapId && !isPublicView && !isTemplatePreview && (
                 <button
                   onClick={() => { setRulesDefaults({}); setRulesOpen(true); }}
-                  style={{ left: railLeft }}
+                  style={{ left: railLeft, marginTop: posun }}
                   title={`${t('toolbar.rules')}${mapRules.length > 0 ? ` (${mapRules.length})` : ''}`}
                   data-testid="toolbar-rules"
                   className={`absolute top-52 z-30 flex items-center rounded-r-lg border ${railCls} bg-card px-2 py-2.5 shadow-md text-muted-foreground hover:bg-secondary transition-all`}
@@ -122,7 +125,7 @@ export default function LeftRail({
             schované, takže lišta sedí u kraje. */}
         <button
           onClick={() => setDashboardOpen((v) => !v)}
-          style={{ left: dashboardOpen ? 0 : railLeft }}
+          style={{ left: dashboardOpen ? 0 : railLeft, marginTop: posun }}
           title={t('toolbar.dashboardTitle')}
           className={`absolute top-64 z-30 flex items-center rounded-r-lg border px-2 py-2.5 shadow-md transition-all ${dashboardOpen ? 'bg-primary text-primary-foreground border-l-0' : `bg-card text-muted-foreground hover:bg-secondary ${(bufferOpen || timeLogOpen) ? '' : 'border-l-0'}`}`}
         >
@@ -136,7 +139,7 @@ export default function LeftRail({
         {user && activeMapId && !isPublicView && !dashboardOpen && (
           <button
             onClick={() => navigate(`/tasks?map=${activeMapId}`)}
-            style={{ left: railLeft }}
+            style={{ left: railLeft, marginTop: posun }}
             title={`${t('toolbar.railTasksTitle')}${mapTaskCount > 0 ? ` (${mapTaskCount})` : ''}`}
             aria-label={t('toolbar.railTasksTitle')}
             data-testid="rail-ukoly-projektu"

@@ -1500,13 +1500,16 @@ cronAdd("auto_templates", "0 * * * *", () => {
   }
 });
 
-// Denní AI sumáře úkolů: cron běží HODINOVĚ (offset 15 min za auto_templates,
-// ať ranní projekty ze šablon už existují); helpers.runDailySummaries vygeneruje
-// sumář uživatelům s otevřenou prací od cílové hodiny (FLOWMAP_SUMMARY_HOUR,
-// default 6, lokální TZ) — guard = existence dnešního záznamu (catch-up zdarma).
-cronAdd("daily_summaries", "15 * * * *", () => {
+// Daily AI task summaries: helpers.runDailySummaries writes a summary for users with open
+// work from the target hour (FLOWMAP_SUMMARY_HOUR, default 6, local TZ) — the guard is
+// today's record (catch-up for free). 9 Nov 2026: the cron ticks every minute, but the batch
+// runs only from <hour>:<instance minute 1–30>, then every 5 min in that hour and once an
+// hour later (before, all instances ran at :15 at once) — see helpers.summaryMinute /
+// summaryCronDue. Minute ≥ 1 = after auto_templates (:00).
+cronAdd("daily_summaries", "* * * * *", () => {
   try {
-    const { runDailySummaries } = require(`${__hooks}/helpers.js`);
+    const { runDailySummaries, summaryCronDue, summaryHour, summaryMinute } = require(`${__hooks}/helpers.js`);
+    if (!summaryCronDue(new Date(), summaryHour(), summaryMinute($app))) return;
     const n = runDailySummaries($app);
     if (n > 0) $app.logger().info("daily_summaries: vygenerováno sumářů", "count", n);
   } catch (err) {

@@ -188,3 +188,9 @@
    a text se nesmí vybírat — lib/tahSirky.js nasazuje třídu na body (15. 10. 2026) */
 body.kb-tah { user-select: none; cursor: col-resize; }
 body.kb-tah iframe { pointer-events: none; }
+body.kb-tah.kb-presun { cursor: grabbing; }
+/* assistant column edge: accent line on the inner edge + a glow onto the page (mirrored when docked left) */
+.kb-chat-hrana { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; pointer-events: none; background: hsl(var(--primary) / 0.55); transition: background-color 150ms; }
+.kb-chat-hrana::after { content: ''; position: absolute; top: 0; bottom: 0; right: 100%; width: 18px; background: linear-gradient(to left, hsl(var(--primary) / 0.22), transparent); }
+.kb-chat-hrana-vlevo { left: auto; right: 0; }
+.kb-chat-hrana-vlevo::after { right: auto; left: 100%; background: linear-gradient(to right, hsl(var(--primary) / 0.22), transparent); }

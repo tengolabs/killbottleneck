@@ -1,6 +1,5 @@
 {
   "title": "Assistant",
-  "tab": "Assistant",
   "toggle": "AI assistant",
   "close": "Minimise (the conversation stays)",
   "resize": "Resize",
@@ -17,10 +16,25 @@
     "zapis": "the change"
   },
   "newChat": "New conversation",
-  "newChatShort": "New",
   "history": "Previous conversations",
   "historyEmpty": "No conversations yet.",
   "delete": "Delete conversation",
+  "conversations": "Conversations",
+  "backToChat": "Back to the conversation",
+  "searchChats": "Search conversations…",
+  "searchNothing": "Nothing found.",
+  "group": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "week": "This week",
+    "older": "Older"
+  },
+  "deleteConfirm": "Delete this conversation?",
+  "cancel": "Cancel",
+  "moveLeft": "Move to the left",
+  "moveRight": "Move to the right",
+  "moveHint": "You can also grab the header and drag it to the other edge",
+  "moveDrop": "Drop to dock the assistant here",
   "memoryTitle": "What the assistant remembers about you",
   "memoryHint": "The assistant stores your preferences and context here (markdown). Edit or clear the text — next time it gets exactly this.",
   "memoryEmpty": "Nothing yet. Tell it for example: \"Remember that I write short e-mails.\"",
@@ -181,7 +195,6 @@
   "poradaOfferHint": "I will go through what is where, suggest where to start, and ask a few click questions.",
   "poradaYes": "Yes, let us go",
   "poradaNo": "Not today",
-  "poradaTab": "Morning briefing is waiting",
   "modePorada": "Morning briefing",
   "modeNocni": "Evening planning",
   "nocniOffer": "Evening planning",
@@ -199,7 +212,6 @@
   "relaxOffer5": "5 minutes",
   "relaxOffer15": "15 minutes",
   "relaxOfferNe": "Not now",
-  "relaxTab": "Break?",
   "relaxBezi": "Relax running · {{cas}} left",
   "relaxKonec": "End",
   "relaxHotovo": "The break is over. Back to it?",
@@ -466,7 +478,9 @@
     "imgHint": "The picture is drawn by AI without text — the headline and text stay in the template. Your own photo takes its place.",
     "imgSlot": "Where",
     "openLeft": "Open on the left",
-    "openLeftHint": "Open the document large on the left next to the chat (⛶ full screen)"
+    "openLeftHint": "Open the document large on the left next to the chat (⛶ full screen)",
+    "openRight": "Open on the right",
+    "openRightHint": "Open the document large on the right next to the chat (⛶ full screen)"
   },
   "rizika": {
     "titulek": "Risks in “{{title}}”",

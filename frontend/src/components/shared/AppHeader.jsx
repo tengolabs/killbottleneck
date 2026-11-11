@@ -63,7 +63,7 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
   // panel asistenta (AsistentHost) si bere záporným okrajem zpět, panel začíná POD lištou (useSpodekHlavicky).
   // `bg-card` na obalu je nutné: proužek je průsvitný a při rolování by jím prosvítal obsah.
   return (
-    <div ref={obal} className="sticky top-0 z-30 bg-card transition-[margin]" style={asistent.odsun ? { marginRight: -asistent.odsun } : undefined} data-app-header-obal>
+    <div ref={obal} className="sticky top-0 z-30 bg-card transition-[margin]" style={asistent.odsun ? (asistent.side === 'left' ? { marginLeft: -asistent.odsun } : { marginRight: -asistent.odsun }) : undefined} data-app-header-obal>
     {/* Pruh o zkušební době patří NAD hlavičku, ať ho vidí každá stránka
         s AppHeaderem — jinak by se musel opakovat na pěti místech. */}
     <TrialBanner />

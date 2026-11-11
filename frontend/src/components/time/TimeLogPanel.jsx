@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
+import { useAsistent } from '@/lib/AsistentContext';
 import { base44 } from '@/api/base44Client';
 import { useTimer, formatElapsed, formatTimeRange } from '@/lib/TimerContext';
 import { formatMinutes } from '@/components/time/TimeSummary';
@@ -29,6 +30,10 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
   const { running, elapsed, start, stop } = useTimer();
   const pos = fixed ? 'fixed' : 'absolute';
   const spodek = useSpodekHlavicky(fixed); // fixed ouško: pod skutečnou hlavičkou (viz hook)
+  const asistent = useAsistent();
+  const { setLeftPanelWidth } = asistent;
+  useEffect(() => { if (!open) return undefined; setLeftPanelWidth('timelog', 320); return () => setLeftPanelWidth('timelog', 0); }, [open, setLeftPanelWidth]); // sm:w-80
+  const levo = fixed ? asistent.leftInset || 0 : 0; // assistant docked on the left (10 Nov 2026)
   const [entries, setEntries] = useState([]);
   const [maps, setMaps] = useState([]);
   const [note, setNote] = useState('');
@@ -112,8 +117,8 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
     return (
       <button
         onClick={onToggle}
-        style={{ left: leftOffset, ...(fixed ? { top: spodek + 56 } : {}) }}
-        className={`${pos} ${fixed ? '' : 'top-28'} z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2 text-xs font-medium text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset ? '' : 'border-l-0'}`}
+        style={{ left: leftOffset + levo, marginTop: asistent.railOffset || 0, ...(fixed ? { top: spodek + 56 } : {}) }}
+        className={`${pos} ${fixed ? '' : 'top-28'} z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2 text-xs font-medium text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset || levo ? '' : 'border-l-0'}`}
         title={t('timeLog.openTitle')}
       >
         <Timer className={`w-4 h-4 ${running ? 'text-red-500 animate-spin' : ''}`} />
@@ -123,7 +128,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
   }
 
   return (
-    <div data-testid="timelog-panel" style={fixed ? { top: spodek } : undefined} className={`${pos} left-0 ${fixed ? '' : 'top-0'} bottom-0 z-20 w-full sm:w-80 bg-card border-r shadow-xl flex flex-col`}>
+    <div data-testid="timelog-panel" style={fixed ? { top: spodek, left: levo } : undefined} className={`${pos} left-0 ${fixed ? '' : 'top-0'} bottom-0 z-20 w-full sm:w-80 bg-card border-r shadow-xl flex flex-col`}>
       <div className="h-12 px-3 flex items-center gap-2 border-b shrink-0">
         {/* klik na ikonku/název zavírá stejně jako křížek — jedním klikem tam i zpět */}
         <button onClick={onToggle} title={t('timeLog.closeTitle')} className="flex items-center gap-2 hover:opacity-70 transition-opacity">

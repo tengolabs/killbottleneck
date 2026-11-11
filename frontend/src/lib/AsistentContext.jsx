@@ -10,6 +10,10 @@ import { useAuth } from '@/lib/AuthContext';
 // (veze se i do /lite, hlídá tests/lite-bundle.js) nenarostl. Rozhovor sám je na serveru.
 const KEY_OPEN = 'kb-chat-open';
 const KEY_WIDTH = 'kb-chat-width';
+// Panel side (10 Nov 2026, Richard: "move the assistant to the left too"): 'right' (default) | 'left'.
+// On the left the other windows mirror — Office (documents), relax "beside" and the image viewer sit to its right.
+const KEY_SIDE = 'kb-chat-side';
+const readSide = () => (nactiKlic(KEY_SIDE) === 'left' ? 'left' : 'right');
 export const MIN_W = 320;
 export const MAX_W = 640;
 // Dokumenty asistenta (30. 9. 2026): panel VLEVO od chatu, přes mapu (stránku neodsouvá).
@@ -25,6 +29,7 @@ export const PAMET = 'pamet';
 // stránka asistenta otevřená v panelu Dokumentů (dokId = 'stranka:<id>', 14. 10. 2026)
 export const STRANKA = 'stranka:';
 export const NOVY_DOK = 'novy';  // dokId 'novy' nebo 'novy:<druh>' = formulář Nový dokument (Kancelář, 1. 11. 2026)
+const RAIL_SLOT = 48; // one left-rail slot (3rem): the rails step by 48 px
 
 // Relax (Richard 14. 10. 2026): hlídaná pauza s akváriem / úlem a odpočtem — přes celou obrazovku (jde zamknout
 // PINem a odejít od PC) nebo „vedle“ (vlevo místo mapy, vpravo chat). Scény jsou statické soubory v iframe
@@ -63,6 +68,22 @@ const ctiSirkuDok = () => {
 export function AsistentProvider({ children }) {
   const [open, setOpenState] = useState(() => nactiKlic(KEY_OPEN) === '1');
   const [width, setWidthState] = useState(ctiSirku);
+  const [side, setSideState] = useState(readSide);
+  // the assistant's tab owns the TOP slot of the left rail whenever it is shown on desktop (Richard 11 Nov 2026: "the
+  // assistant must be first and at the same height on both sides") → rails (search, inbox, timer…) start one slot lower
+  const [leftTabShown, setLeftTabShown] = useState(false);
+  const railOffset = leftTabShown ? RAIL_SLOT : 0;
+  // open left-edge panels (inbox 288 px, timer 320 px) — the robot moves right with them like the other rail tabs
+  const [leftPanels, setLeftPanels] = useState({});
+  const leftPanelWidth = Object.values(leftPanels).reduce((a, b) => a + b, 0);
+  const setLeftPanelWidth = useCallback((k, w) => setLeftPanels((p) => ((p[k] || 0) === w ? p : { ...p, [k]: w })), []);
+  const setSide = useCallback((v) => {
+    setSideState((prev) => {
+      const next = (typeof v === 'function' ? v(prev) : v) === 'left' ? 'left' : 'right';
+      ulozKlic(KEY_SIDE, next);
+      return next;
+    });
+  }, []);
   const [dostupny, setDostupny] = useState(false); // panel se kreslí (i při výpadku AI / bez AI — historie, Dokumenty, relax)
   // AI asistentovi právě odpovídá (19. 10. 2026) — na tomhle visí tlačítka, která asistenta odjinud SPOUŠTĚJÍ
   // (Roztřídit s AI, Můj den, kalendář); `dostupny` drží jen rozložení stránky
@@ -72,6 +93,8 @@ export function AsistentProvider({ children }) {
   // začíná pod ní (useSpodekHlavicky). Na telefonu (< 640 px) panel překryje celou šířku, obsah se neodsouvá.
   const siroke = useMedia('(min-width: 640px)'); // = Tailwind `sm:`
   const odsun = dostupny && open && siroke ? width : 0;
+  // the same offset split by side, so callers don't repeat the condition (page padding, headers, left rails on Home/Tasks)
+  const leftInset = side === 'left' ? odsun : 0;
   // Zjednodušené zobrazení (4. 10. 2026): VLASTNÍ, NEperzistentní stav otevření. `kb-chat-open`
   // patří plné aplikaci — kdo tam nechal panel otevřený, nesmí na telefonu v lite dostat chat
   // přes celou obrazovku místo seznamu (a chunk panelu by jel hned při startu, lite-bundle.js).
@@ -90,6 +113,16 @@ export function AsistentProvider({ children }) {
   const [dokOpen, setDokOpenState] = useState(() => nactiKlic(KEY_DOK_OPEN) === '1');
   const [dokWidth, setDokWidthState] = useState(ctiSirkuDok);
   const [dokId, setDokId] = useState('');      // otevřený dokument ('' = seznam)
+  // one-shot request: also open the large viewer for this document (chat card "Open beside", Richard 11 Nov 2026)
+  const [docPreview, setDocPreview] = useState('');
+  // the request must not linger: dropped once the documents panel closes or shows another document, and after 20 s
+  // (the detail failed to load) — otherwise the viewer would pop up later on an unrelated opening
+  useEffect(() => {
+    if (!docPreview) return undefined;
+    if (!dokOpen || dokId !== docPreview) { setDocPreview(''); return undefined; }
+    const timer = setTimeout(() => setDocPreview(''), 20000);
+    return () => clearTimeout(timer);
+  }, [docPreview, dokOpen, dokId]);
   // asistent dokument založil/změnil → panel znovu načte; `ids` = KTERÉ dokumenty (detail jiného
   // dokumentu nesmí hlásit „asistent ho mezitím upravil“ — checkup 1. 10.)
   const [dokZmena, setDokZmena] = useState({ verze: 0, ids: [] });
@@ -114,7 +147,7 @@ export function AsistentProvider({ children }) {
     setDokWidthState(n);
     ulozKlic(KEY_DOK_WIDTH, String(n));
   }, []);
-  const otevriDokument = useCallback((id) => opatrne(() => { setDokId(id || ''); setDokOpen(true); }), [opatrne, setDokOpen]);
+  const otevriDokument = useCallback((id, opt) => opatrne(() => { setDokId(id || ''); setDocPreview(opt && opt.preview && id ? id : ''); setDokOpen(true); }), [opatrne, setDokOpen]);
   const obnovDokumenty = useCallback((ids) => setDokZmena((z) => ({ verze: z.verze + 1, ids: ids || [] })), []);
   const setOpen = useCallback((v) => {
     setOpenState((prev) => {
@@ -188,18 +221,18 @@ export function AsistentProvider({ children }) {
   const zavriObrazek = useCallback(() => setProhlizec(null), []);
 
   const value = useMemo(() => ({
-    open, setOpen, width, setWidth, odsun, dostupny, setDostupny, funkcni, setFunkcni, uzel, setUzel, liteOpen, setLiteOpen,
-    dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
+    open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, setLeftTabShown, leftPanelWidth, setLeftPanelWidth, dostupny, setDostupny, funkcni, setFunkcni, uzel, setUzel, liteOpen, setLiteOpen,
+    dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, docPreview, setDocPreview, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
     zadost, spust, vyridZadost, pdfSoubory, setPdfSoubory,
     relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax,
     prohlizec, otevriObrazek, zavriObrazek, setProhlizec,
-  }), [open, setOpen, width, setWidth, odsun, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, prohlizec, otevriObrazek, zavriObrazek]);
+  }), [open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, leftPanelWidth, setLeftPanelWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, docPreview, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, prohlizec, otevriObrazek, zavriObrazek]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, odsun: 0, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {}, prohlizec: null, otevriObrazek: () => {}, zavriObrazek: () => {}, setProhlizec: () => {} };
+const PRAZDNO = { open: false, width: 0, odsun: 0, leftInset: 0, side: 'right', setSide: () => {}, railOffset: 0, setLeftTabShown: () => {}, leftPanelWidth: 0, setLeftPanelWidth: () => {}, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, docPreview: '', setDocPreview: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {}, prohlizec: null, otevriObrazek: () => {}, zavriObrazek: () => {}, setProhlizec: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }

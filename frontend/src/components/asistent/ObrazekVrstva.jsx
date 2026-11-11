@@ -109,7 +109,7 @@ export default function ObrazekVrstva() {
   const kresli = !!kresliId && kresliId === o.id;
   const sirokyPruh = (vedle ? okno - chatW - dokW : okno) >= 760; // užší prohlížeč: jen ikona, ať zbyde místo na název
   const veStrance = !!(o.pouziti && o.pouziti.some((x) => x.druh === 'stranka'));
-  const styl = vedle ? { top: spodek, left: 0, bottom: 0, right: chatW + dokW } : undefined;
+  const styl = vedle ? (A.side === 'left' ? { top: spodek, right: 0, bottom: 0, left: chatW + dokW } : { top: spodek, left: 0, bottom: 0, right: chatW + dokW }) : undefined; // mirrored with the assistant on the left
 
   return (
     <div className={`${vedle ? 'fixed z-[41]' : 'fixed inset-0 z-[60]'} flex flex-col bg-[#0b0f14] text-white`} style={styl}

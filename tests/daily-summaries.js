@@ -1,6 +1,7 @@
 // Denní AI sumáře (daily_summaries) — cron/force generace, refresh routa, RLS.
 // Čerstvý kontejner na :20494. Ověřuje:
 //  - summaryHour() čte FLOWMAP_SUMMARY_HOUR s defaultem 6 a rozsahem 0–23 (unit);
+//  - summaryMinute/summaryCronDue: minuta instance 1–30 z adresy, dávka od <hodina>:<minuta> (unit);
 //  - provider none: force routa generuje 0, refresh vrací 503;
 //  - provider ollama (reálný model na E2E_OLLAMA_URL): force vygeneruje sumář JEN
 //    uživateli s otevřenou prací, druhý běh 0 (idempotence, guard = dnešní záznam);
@@ -39,6 +40,28 @@ const api = async (method, path, { token, body } = {}) => {
     expect(helpers.summaryHour() === want, `summaryHour("${val}") = ${want} (dostal ${helpers.summaryHour()})`);
   }
   delete process.env.FLOWMAP_SUMMARY_HOUR;
+
+  // --- UNIT: minuta sumářů instance + kdy cron spouští dávku (9. 11. 2026: všechny instance
+  // v :15 naráz → 3 sumáře ze 7 spadly; teď od 6:00 s vlastní minutou instance 1–30) ---
+  console.log('== unit: summaryMinute / summaryCronDue ==');
+  const appUrl = (u) => ({ settings: () => ({ meta: { appURL: u } }) });
+  const adresy = Array.from({ length: 40 }, (_, i) => `https://firma${i}.killbottleneck.com`);
+  const minuty = adresy.map((u) => helpers.summaryMinute(appUrl(u)));
+  expect(minuty.every((m) => m >= 1 && m <= 30), `minuta instance je v 1–30 (${minuty.join(',')})`);
+  expect(new Set(minuty).size >= 15, `40 instancí se rozprostře do ≥ 15 různých minut (${new Set(minuty).size})`);
+  expect(helpers.summaryMinute(appUrl(adresy[3])) === minuty[3], 'stejná adresa = pokaždé stejná minuta');
+  expect(helpers.summaryMinute(appUrl('')) === 1, 'bez adresy = :01');
+  process.env.FLOWMAP_SUMMARY_MINUTE = '45';
+  expect(helpers.summaryMinute(appUrl(adresy[0])) === 45, 'FLOWMAP_SUMMARY_MINUTE přebije výpočet');
+  process.env.FLOWMAP_SUMMARY_MINUTE = '60';
+  expect(helpers.summaryMinute(appUrl(adresy[0])) === minuty[0], 'neplatná minuta (60) se ignoruje');
+  delete process.env.FLOWMAP_SUMMARY_MINUTE;
+  const v = (h, m) => new Date(2026, 10, 9, h, m, 0);
+  const due = (h, m) => helpers.summaryCronDue(v(h, m), 6, 7);
+  expect(!due(5, 7) && !due(6, 0) && !due(6, 6), 'před 6:07 nic (ani 6:00 u instance s minutou 7)');
+  expect(due(6, 7) && due(6, 12) && due(6, 57), 'v 6:07, pak po 5 min (rychlý druhý pokus)');
+  expect(!due(6, 8) && !due(6, 15), 'mezi tím ne — dřívější pevné :15 už neplatí');
+  expect(due(7, 7) && due(13, 7) && !due(7, 12) && !due(7, 15), 'později jednou za hodinu v minutě instance');
 
   // --- UNIT: summaryAiConfig (env override vs fallback na aiConfig) ---
   console.log('== unit: summaryAiConfig ==');

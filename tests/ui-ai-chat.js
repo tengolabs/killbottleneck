@@ -63,10 +63,11 @@ H.beh(async () => {
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-tab"]'), 'zavřený panel = ouško na pravém okraji');
   {
-    // ouško 40 px pod spodní hranou lišty (dřív pevných 96 px od okraje — s proužkem „Zkušební verze“ leželo přes panáčka; 27. 10. 2026)
+    // ouško POD spodní hranou lišty (dřív pevných 96 px od okraje — s proužkem „Zkušební verze“ leželo přes panáčka; 27. 10. 2026);
+    // od 11. 11. 2026 8 px pod lištou = horní místo levé lišty, na obou stranách stejně (Richard: „asistent první a ve stejné výšce“)
     const spodekListy = await page.evaluate(() => Math.round(document.querySelector('[data-app-header]').getBoundingClientRect().bottom));
     const ousko = await (await page.$('[data-testid="chat-tab"]')).boundingBox();
-    expect(Math.round(ousko.y) === spodekListy + 40, `ouško 40 px pod lištou (lišta do ${spodekListy}, ouško od ${Math.round(ousko.y)})`);
+    expect(Math.round(ousko.y) === spodekListy + 8, `ouško 8 px pod lištou (lišta do ${spodekListy}, ouško od ${Math.round(ousko.y)})`);
   }
   await (await page.$('[data-testid="chat-tab"]')).click();
   expect(await cekej('[data-testid="chat-panel"]'), 'kliknutí na ouško otevře panel');
@@ -78,9 +79,7 @@ H.beh(async () => {
 
   console.log('== nabídka ranní porady při prvním otevření, „Dnes ne" drží ==');
   expect(await cekej('[data-testid="chat-porada-nabidka"]'), 'první otevření dne → nabídka ranní porady');
-  expect(!!(await page.$('[data-testid="chat-nocni-nabidka"]')), 'pod ní je i rámeček Noční plánování (Richard 30. 9. 2026: solo rámeček)');
-  const poradiRamecku = await page.evaluate(() => { const a = document.querySelector('[data-testid="chat-porada-nabidka"]'), b = document.querySelector('[data-testid="chat-nocni-nabidka"]'); return a && b ? (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? 'pod' : 'nad') : 'chybí'; });
-  expect(poradiRamecku === 'pod', `rámeček Noční plánování je pod ranní nabídkou (${poradiRamecku})`);
+  expect(!(await page.$('[data-testid="chat-nocni-nabidka"]')), 'rámeček Noční plánování je schovaný (Richard 11. 11. 2026: „schovej“)');
   await page.click('[data-testid="chat-porada-ne"]');
   await sleep(300);
   expect((await page.$('[data-testid="chat-porada-nabidka"]')) === null, 'Dnes ne → nabídka zmizela');
@@ -527,27 +526,18 @@ H.beh(async () => {
   const vP = volani[volani.length - 1];
   expect(/RANNÍ PORADA/.test(systemZ(vP)) && vP.messages.some((m) => m.role === 'user' && /ranní poradu/.test(m.content)), 'server dostal režim porada a složil úvodní zprávu');
 
-  console.log('== Noční plánování = vlastní rámeček pod nabídkou ranní porady (Richard 30. 9. 2026: „ne 3. tlačítko, solo rámeček“) ==');
+  console.log('== Noční plánování: rámeček schovaný (Richard 11. 11. 2026), režim zůstává (pravidla, historie s ☾) ==');
   await page.click('[data-testid="chat-novy"]');
-  expect(await cekej('[data-testid="chat-nocni-nabidka"]'), 'rámeček Noční plánování v prázdném rozhovoru (i když ranní nabídka už není)');
-  expect((await page.$('[data-testid="chat-chip-nocni"]')) === null, 'noční plánování není čip, jen rámeček');
-  const predNocni = volani.length;
-  await page.click('[data-testid="chat-nocni-start"]');
-  expect(await cekej('[data-testid="chat-otazky"]', 5000), 'noční plánování: úvodní otázka je tu hned');
-  expect(await cekejText('z celého dne zůstaly v hlavě', 3000) && await cekejText('Máte něco z dneška?', 1000), 'noční plánování: výzva k nápadům z celého dne, s otázkou');
-  expect(await cekejText('Noční plánování'), 'titulek rozhovoru = Noční plánování');
-  expect(volani.length === predNocni, `úvod nočního plánování bez volání modelu (${volani.length - predNocni})`);
-  fronta.push(text('NOCNI-UI-MOCK.'));
-  await page.evaluate(() => [...document.querySelectorAll('[data-testid="chat-otazka-volba"]')].find((b) => /Nic nemám/.test(b.innerText)).click());
-  await page.click('[data-testid="chat-otazky-odeslat"]');
-  expect(await cekejText('NOCNI-UI-MOCK'), 'noční plánování odpovědělo');
-  expect((await page.$('[data-testid="chat-nocni-nabidka"]')) === null, 'v běžícím rozhovoru rámeček není');
-  expect(await page.evaluate(() => Object.entries(localStorage).some(([k, v]) => k.startsWith('kb-chat-porada-ne:') && v === new Date().toLocaleDateString('en-CA'))), 'spuštění nočního plánování uklidí ranní nabídku pro dnešek (Richard 30. 9. 2026)');
-  const vN = volani[volani.length - 1];
-  expect(/NOČNÍ PLÁNOVÁNÍ/.test(systemZ(vN)) && vN.messages.some((m) => m.role === 'user' && /noční plánování/.test(m.content)), 'server dostal režim nocni a složil úvodní zprávu');
+  expect(await cekej('[data-testid="chat-ai-blok"]'), 'prázdný rozhovor je vykreslený (AI blok)');
+  expect((await page.$('[data-testid="chat-nocni-nabidka"]')) === null && (await page.$('[data-testid="chat-chip-nocni"]')) === null, 'v prázdném rozhovoru není rámeček ani čip Nočního plánování');
+  const rN = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'nocni', message: '', context: { route: '/' } } });
+  expect(rN.status === 200 && rN.json.chat.mode === 'nocni', `režim nocni dál funguje (server, ${rN.status})`);
+  await page.reload({ waitUntil: 'networkidle2' }); // the list is loaded on start — a chat made over the API shows after a reload
+  await cekej('[data-testid="chat-historie"]');
   await page.click('[data-testid="chat-historie"]');
   expect(await cekejTextDokumentu('☾ Noční plánování'), 'v historii má noční plánování ikonu měsíce');
   await page.keyboard.press('Escape');
+  expect(await cekej('[data-testid="chat-panel"][data-pohled="chat"] [data-testid="chat-input"]'), 'Esc vrátí seznam rozhovorů zpět do rozhovoru');
 
   console.log('== přepnutí rozhovoru z historie: stav karty otázek nepřeteče do jiného rozhovoru ==');
   // nejdřív rozhovor se DVĚMA otázkami, potom nový s JEDNOU (čerstvě vykreslený) a z něj historií zpět do prvního —
@@ -569,7 +559,7 @@ H.beh(async () => {
   await page.keyboard.type('rozepsano-v-jednom');
   await page.click('[data-testid="chat-historie"]');
   await cekejTextDokumentu('Dvojotazka pro test prepnuti');
-  const polozkyHistoriePrep = await page.$$('[role="menuitem"]');
+  const polozkyHistoriePrep = await page.$$('[data-testid="chat-rozhovory-polozka"]');
   let kliknutoPrep = false;
   for (const el of polozkyHistoriePrep) { if (/Dvojotazka pro test prepnuti/.test(await el.evaluate((n) => n.innerText))) { await el.click(); kliknutoPrep = true; break; } }
   expect(kliknutoPrep && await cekejText('DVE-B: Pro koho?') && !(await textPanelu()).includes('JEDNA: Kam s tím?'), 'historie přepnula do rozhovoru se dvěma otázkami');
@@ -749,8 +739,9 @@ H.beh(async () => {
   // hlavička panelu je pod ukotvenou horní lištou (27. 10. 2026) → toasty o její výšku níž
   const toastTop = await page.evaluate(() => ({ ocek: `${Math.round(document.querySelector('[data-app-header]').getBoundingClientRect().bottom) + 48}px`, prom: document.documentElement.style.getPropertyValue('--kb-toast-top'), css: getComputedStyle(document.querySelector('[data-testid="toast-viewport"]')).top }));
   expect(toastTop.prom === toastTop.ocek && toastTop.css === toastTop.ocek, `toasty na telefonu leží pod hlavičkou otevřeného panelu (lišta + 48 px = ${toastTop.ocek}, je ${toastTop.prom}/${toastTop.css}), ne přes její tlačítka`);
-  await page.click('[data-testid="chat-robot-zavrit"]');
-  expect(await cekej('[data-testid="chat-bar"]'), 'klepnutí na robota v hlavičce chat zmenší do lišty (i s toastem na obrazovce)');
+  // (robot vlevo nahoře nahradil 10. 11. 2026 ☰ Rozhovory podle schváleného náhledu — minimalizuje šipka vpravo)
+  await page.click('[data-testid="chat-zavrit"]');
+  expect(await cekej('[data-testid="chat-bar"]'), 'klepnutí na šipku v hlavičce chat zmenší do lišty (i s toastem na obrazovce)');
   await page.click('[data-testid="chat-bar-rozbalit"]');
   expect(await cekej('[data-testid="chat-panel"]'), 'a lišta ho zase rozbalí');
   await page.click('[data-testid="chat-input"]');

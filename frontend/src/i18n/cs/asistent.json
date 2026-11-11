@@ -1,6 +1,5 @@
 {
   "title": "Asistent",
-  "tab": "Asistent",
   "toggle": "AI asistent",
   "close": "Minimalizovat (rozhovor zůstane)",
   "resize": "Změnit šířku",
@@ -17,10 +16,25 @@
     "zapis": "zápis"
   },
   "newChat": "Nový rozhovor",
-  "newChatShort": "Nový",
   "history": "Předchozí rozhovory",
   "historyEmpty": "Zatím žádné rozhovory.",
   "delete": "Smazat rozhovor",
+  "conversations": "Rozhovory",
+  "backToChat": "Zpět k rozhovoru",
+  "searchChats": "Hledat v rozhovorech…",
+  "searchNothing": "Nic nenalezeno.",
+  "group": {
+    "today": "Dnes",
+    "yesterday": "Včera",
+    "week": "Tento týden",
+    "older": "Starší"
+  },
+  "deleteConfirm": "Smazat rozhovor?",
+  "cancel": "Zrušit",
+  "moveLeft": "Přesunout doleva",
+  "moveRight": "Přesunout doprava",
+  "moveHint": "Hlavičku jde chytit a přetáhnout k druhému okraji",
+  "moveDrop": "Pustit = asistent sem",
   "memoryTitle": "Co si o vás asistent pamatuje",
   "memoryHint": "Asistent si sem ukládá vaše preference a souvislosti (markdown). Můžete text upravit nebo smazat — příště ho dostane takhle.",
   "memoryEmpty": "Zatím nic. Řekněte mu například: „Pamatuj si, že píšu stručné e-maily.“",
@@ -181,7 +195,6 @@
   "poradaOfferHint": "Projdu, co kde je, doporučím, čím začít, a pár klikacích otázek.",
   "poradaYes": "Ano, jdeme na to",
   "poradaNo": "Dnes ne",
-  "poradaTab": "Ranní porada čeká",
   "modePorada": "Ranní porada",
   "modeNocni": "Noční plánování",
   "nocniOffer": "Noční plánování",
@@ -199,7 +212,6 @@
   "relaxOffer5": "5 minut",
   "relaxOffer15": "15 minut",
   "relaxOfferNe": "Teď ne",
-  "relaxTab": "Pauza?",
   "relaxBezi": "Relax běží · zbývá {{cas}}",
   "relaxKonec": "Ukončit",
   "relaxHotovo": "Pauza skončila. Jdeme na to?",
@@ -466,7 +478,9 @@
     "imgHint": "Obrázek kreslí AI bez textu — nadpis a text zůstávají v šabloně. Vlastní fotka má přednost.",
     "imgSlot": "Kam",
     "openLeft": "Otevřít vlevo",
-    "openLeftHint": "Otevřít dokument velký vlevo vedle chatu (⛶ přes celou obrazovku)"
+    "openLeftHint": "Otevřít dokument velký vlevo vedle chatu (⛶ přes celou obrazovku)",
+    "openRight": "Otevřít vpravo",
+    "openRightHint": "Otevřít dokument velký vpravo vedle chatu (⛶ přes celou obrazovku)"
   },
   "rizika": {
     "titulek": "Rizika v projektu „{{title}}“",

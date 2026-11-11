@@ -171,7 +171,7 @@ export default function RelaxVrstva({ lite = false }) {
   const ztlumeno = !!r.hotovo;
   // vedle: celá levá část POD horní lištou (Richard 27. 10. 2026: „ať pořád máš notifikace a víš, kde jsi“ — ruší
   // 15. 10. „na vodu je pruh aplikace, to ne“); i telefonní „nad“ začíná pod lištou. Celá obrazovka (zámek s PINem) lištu zakrývá dál.
-  const styl = nad ? (nadListou ? { top: spodek, left: 0, right: 0, bottom: vyskaListy } : { top: spodek, left: 0, right: 0, height: NAD_PODIL }) : vedle ? { top: spodek, right: A.width, left: 0, bottom: 0 } : undefined;
+  const styl = nad ? (nadListou ? { top: spodek, left: 0, right: 0, bottom: vyskaListy } : { top: spodek, left: 0, right: 0, height: NAD_PODIL }) : vedle ? (A.side === 'left' ? { top: spodek, left: A.width, right: 0, bottom: 0 } : { top: spodek, right: A.width, left: 0, bottom: 0 }) : undefined; // assistant on the left → scene to its right
   const tridy = vedle ? 'fixed z-40' : 'fixed inset-0 z-[60]';
   // na úzkém okně (telefon) má scéna vlastní hlavičku přes celou šířku → lišta je pruh NAD scénou, ne přes ni
   const lista = pruh

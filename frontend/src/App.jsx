@@ -83,12 +83,13 @@ const AsistentHost = ({ children }) => {
   const zobrazit = !!user && !lite && !strankaOkno;
   const liteOtevren = lite && !!user && A.liteOpen;
   const odsun = zobrazit ? A.odsun : 0; // šířku a práh 640 px počítá kontext (čtou ho i horní lišty)
+  const naLevo = A.side === 'left'; // panel on the left (10 Nov 2026) → content shifts right instead of left
   // odchod z lite (odkaz z karty do mapy, karta „celá aplikace") → příště v lite nenaskočí panel sám
   const { setLiteOpen } = A;
   useEffect(() => { if (!lite && A.liteOpen && setLiteOpen) setLiteOpen(false); }, [lite, A.liteOpen, setLiteOpen]);
   return (
     <>
-      <div style={odsun ? { paddingRight: odsun } : undefined} className="transition-[padding]">{children}</div>
+      <div style={odsun ? (naLevo ? { paddingLeft: odsun } : { paddingRight: odsun }) : undefined} className="transition-[padding]">{children}</div>
       {zobrazit && <Suspense fallback={null}><AsistentPanel /></Suspense>}
       {liteOtevren && <Suspense fallback={null}><AsistentPanel lite /></Suspense>}
       {/* zamčený relax po F5: tmavý závoj z hlavního balíku zakryje mapu, než dojede chunk vrstvy */}

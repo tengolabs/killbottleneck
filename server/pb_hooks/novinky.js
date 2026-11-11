@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.1.0": {
+    cs: [
+      "Asistenta jde přesunout doleva: tlačítko ⇄ v hlavičce, nebo hlavičku chyťte a přetáhněte k druhému okraji. Kancelář, akvárko i velký náhled se pak otevírají napravo od něj.",
+      "Rozhovory najdete přímo v panelu pod ☰ — po dnech, s hledáním a velkým tlačítkem Nový rozhovor.",
+      "Zavřený asistent je jen malý robot nahoře v levé liště; při práci se točí a tečkou dá vědět, když dopíše odpověď nebo na vás čeká otázka.",
+      "„Otevřít vedle“ u prezentace nebo přání v chatu otevře rovnou i velký náhled.",
+    ],
+    en: [
+      "You can move the assistant to the left: the ⇄ button in the header, or grab the header and drag it to the other edge. Office, the aquarium and the large preview then open to its right.",
+      "Your conversations are right in the panel under ☰ — by day, with search and a big New conversation button.",
+      "The closed assistant is just a small robot at the top of the left rail; it spins while working and shows a dot when a reply is done or a question is waiting for you.",
+      "\"Open beside\" on a presentation or card in the chat opens the large preview right away.",
+    ],
+  },
   "v1.0.1": {
     cs: [
       "„Připomeň mi zítra v 8 zavolat do banky“ asistent zapíše jako událost v kalendáři s připomínkou, i když nepatří k žádnému projektu.",

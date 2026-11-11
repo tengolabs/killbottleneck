@@ -174,6 +174,8 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
   // „Roztřídit s AI“ (1. 10. 2026): asistent roztřídí zásobník (balíček trideni, varianta zásobník) —
   // jen kde asistent běží a je co třídit (aspoň 2 nápady)
   const asistent = useAsistent();
+  const { setLeftPanelWidth } = asistent;
+  useEffect(() => { if (!open) return undefined; setLeftPanelWidth('buffer', 288); return () => setLeftPanelWidth('buffer', 0); }, [open, setLeftPanelWidth]); // sm:w-72
   const [newTitle, setNewTitle] = useState('');
   const [adding, setAdding] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -182,6 +184,8 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
   const pos = fixed ? 'fixed' : 'absolute';
   // fixed ouško: pod skutečnou hlavičkou (na telefonu dvouřádkovou), ne pevných 64 px
   const spodek = useSpodekHlavicky(fixed);
+  // fixed (Home/Tasks): an assistant docked on the LEFT takes the edge → start next to it (10 Nov 2026)
+  const levo = fixed ? asistent.leftInset || 0 : 0;
 
   const handleAdd = async () => {
     const title = newTitle.trim();
@@ -201,8 +205,8 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
         onClick={toggle}
         data-testid="buffer-toggle"
         title={t('tasks:taskTable.bufferSection')}
-        style={{ left: leftOffset, ...(fixed ? { top: spodek + 8 } : {}) }}
-        className={`${pos} ${fixed ? '' : 'top-16'} z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all ${leftOffset ? '' : 'border-l-0'}`}
+        style={{ left: leftOffset + levo, marginTop: asistent.railOffset || 0, ...(fixed ? { top: spodek + 8 } : {}) }}
+        className={`${pos} ${fixed ? '' : 'top-16'} z-30 flex items-center gap-1.5 rounded-r-lg border bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all ${leftOffset || levo ? '' : 'border-l-0'}`}
       >
         <Inbox className="w-4 h-4 text-primary" />
         {items.length > 0 && (
@@ -215,7 +219,7 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
   }
 
   return (
-    <div data-testid="buffer-panel" style={fixed ? { top: spodek } : undefined} className={`${pos} left-0 ${fixed ? '' : 'top-0'} bottom-0 w-full sm:w-72 bg-card border-r shadow-xl flex flex-col z-20`}>
+    <div data-testid="buffer-panel" style={fixed ? { top: spodek, left: levo } : undefined} className={`${pos} left-0 ${fixed ? '' : 'top-0'} bottom-0 w-full sm:w-72 bg-card border-r shadow-xl flex flex-col z-20`}>
       <div className="h-12 border-b flex items-center justify-between px-4 shrink-0">
         {/* klik na ikonku/název zavírá stejně jako křížek — jedním klikem tam i zpět */}
         <button onClick={toggle} title={t('buffer.closeTitle')} className="flex items-center gap-2 hover:opacity-70 transition-opacity">

@@ -19,7 +19,7 @@ services:
         # "dev" and the update check is not offered — exactly what we want for
         # work in progress. (Dev repo only: staging deploys go through
         # nasadit-staging.sh, which stamps the number — don't run compose by hand.)
-        KB_VERSION: ${KB_VERSION:-v1.0.1}
+        KB_VERSION: ${KB_VERSION:-v1.1.0}
     # Container name. Override with KB_NAME when running two instances side by
     # side on one host (a hard-coded name made the second stack collide).
     container_name: ${KB_NAME:-killbottleneck}
@@ -134,6 +134,8 @@ services:
       # summaries — when KB_SUMMARY_PROVIDER is set, summaries bypass the general
       # AI config (a smaller/faster model suits short formatted text).
       KB_SUMMARY_HOUR: ${KB_SUMMARY_HOUR:-${FLOWMAP_SUMMARY_HOUR:-6}}
+      # minute of that hour (0–59); empty = a fixed minute 1–30 derived from KB_PUBLIC_URL
+      KB_SUMMARY_MINUTE: ${KB_SUMMARY_MINUTE:-${FLOWMAP_SUMMARY_MINUTE:-}}
       # Morning generation only for accounts signed in within the last N days
       # (0 = everyone); others get theirs when they open the app.
       KB_SUMMARY_ACTIVE_DAYS: ${KB_SUMMARY_ACTIVE_DAYS:-${FLOWMAP_SUMMARY_ACTIVE_DAYS:-14}}

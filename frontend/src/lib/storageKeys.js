@@ -67,7 +67,8 @@ export function smazKliceAsistenta() {
       // Stav a šířka panelu a volba modelu jsou předvolby prohlížeče, ne data účtu — ty
       // zůstávají; klíče s `:` jsou vázané na id účtu (porada, aktivita), mezi účty
       // uniknout nemůžou a smazat je by znamenalo nabídnout poradu podruhé (panel 28. 9.).
-      if (k && k.startsWith('kb-chat-') && !k.includes(':') && k !== 'kb-chat-open' && k !== 'kb-chat-width' && k !== 'kb-chat-model') smazat.push(k);
+      // The panel side (kb-chat-side, left/right) is such a browser preference too.
+      if (k && k.startsWith('kb-chat-') && !k.includes(':') && k !== 'kb-chat-open' && k !== 'kb-chat-width' && k !== 'kb-chat-model' && k !== 'kb-chat-side') smazat.push(k);
       // relax (/checkup 15. 10.): stav pauzy s otiskem PINu, hlídač aktivity a ranní razítko patří k účtu → po odhlášení pryč
       // (otisk 4 číslic jde offline projít za milisekundy a lidé PIN recyklují); předvolby scény/rozložení (bez `:`) zůstávají
       if (k && (k.startsWith('kb-relax:') || k.startsWith('kb-relax-aktivita:') || k.startsWith('kb-relax-rano:'))) smazat.push(k);

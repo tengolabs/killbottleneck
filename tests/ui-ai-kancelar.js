@@ -104,6 +104,34 @@ H.beh(async () => {
   expect(!(await page.$('[data-testid="chat-dok-obrazky"]')), 'bez služby obrázků (KB_IMAGE_*) panel sekci Obrázky nenabízí');
   expect(await cekej('[data-testid="chat-dok-kancelar"]') && !!(await page.$('[data-testid="chat-dok-soubor-pptx"]')) && !!(await page.$('[data-testid="chat-dok-soubor-pdf"]')) && !!(await page.$('[data-testid="chat-dok-soubor-docx"]')), 'panel: Stáhnout jako PowerPoint / PDF / Word');
 
+  console.log('== karta „Otevřít vedle“ otevře detail I velký náhled; popisek podle strany asistenta (Richard 11. 11.) ==');
+  const box = async (sel) => { const el = await page.$(sel); return el ? el.boundingBox() : null; };
+  const zmizi = async (sel, ms = 5000) => page.waitForSelector(sel, { hidden: true, timeout: ms }).then(() => true).catch(() => false);
+  await sleep(3000); // rendering the slides takes ~1 s — a negative check needs the full time it would take
+  expect(!(await page.$('[data-testid="obrazek-vrstva"]')), 'samo otevřený detail po tahu velký náhled NEotvírá (beze změny)');
+  const popisek = () => page.$eval('[data-testid="chat-dok-vlevo"]', (b) => ({ s: b.dataset.strana, t: b.textContent.trim() }));
+  let pp = await popisek();
+  expect(pp.s === 'left' && pp.t === 'Otevřít vlevo', `asistent vpravo → „Otevřít vlevo“ (${JSON.stringify(pp)})`);
+  await page.click('[data-testid="chat-soubor-otevrit"]');
+  expect(await cekej('[data-testid="obrazek-vrstva"]', 20000), 'karta „Otevřít vedle“ → velký náhled prezentace');
+  let vNah = await box('[data-testid="obrazek-vrstva"]'), vDok = await box('[data-testid="chat-dokumenty"]');
+  expect(!!(await page.$('[data-testid="chat-dok-detail"][data-kind="presentation"]')) && vNah.x <= 1 && vNah.x + vNah.width <= vDok.x + 1, `náhled vlevo od Kanceláře, detail zůstal (${Math.round(vNah.x + vNah.width)} ≤ ${Math.round(vDok.x)})`);
+  expect(/^1\/4$/.test(await page.$eval('[data-testid="obrazek-vrstva-poradi"]', (el) => el.textContent.replace(/\s/g, '')).catch(() => '')), 'náhled má všechny 4 snímky');
+  await page.click('[data-testid="obrazek-vrstva-zavrit"]');
+  expect(await zmizi('[data-testid="obrazek-vrstva"]'), 'náhled zavřen');
+  await page.click('[data-testid="chat-strana"]');
+  expect(await cekej('[data-testid="chat-panel"][data-side="left"]'), 'asistent přesunut doleva');
+  pp = await popisek();
+  expect(pp.s === 'right' && pp.t === 'Otevřít vpravo', `asistent vlevo → „Otevřít vpravo“ (${JSON.stringify(pp)})`);
+  await page.click('[data-testid="chat-soubor-otevrit"]');
+  expect(await cekej('[data-testid="obrazek-vrstva"]', 20000), 'vlevo: karta otevře velký náhled');
+  vNah = await box('[data-testid="obrazek-vrstva"]'); vDok = await box('[data-testid="chat-dokumenty"]');
+  expect(vNah.x >= vDok.x + vDok.width - 1 && Math.abs(vNah.x + vNah.width - 1400) <= 2, `náhled VPRAVO od Kanceláře (${Math.round(vNah.x)} ≥ ${Math.round(vDok.x + vDok.width)})`);
+  await page.click('[data-testid="obrazek-vrstva-zavrit"]');
+  await zmizi('[data-testid="obrazek-vrstva"]');
+  await page.click('[data-testid="chat-strana"]');
+  expect(await cekej('[data-testid="chat-panel"][data-side="right"]'), 'asistent zpět vpravo');
+
   console.log('== skutečná stažení z karty a z panelu ==');
   const predStazenim = volani.length;
   vyprazdni();

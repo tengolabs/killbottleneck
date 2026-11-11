@@ -114,12 +114,13 @@ H.beh(async () => {
   // otevřený rozhovor z minula je vidět (obnovil se po reloadu)
   const vPanelu = await page.$eval('[data-testid="chat-panel"]', (e) => e.innerText);
   expect(vPanelu.includes('HISTORIE-MOCK'), 'starý rozhovor je vidět i při výpadku');
-  // historie v nabídce
+  // seznam rozhovorů v panelu (10. 11. 2026, místo rozbalovací nabídky)
   await page.click('[data-testid="chat-historie"]');
   await sleep(400);
-  const polozky = await page.evaluate(() => [...document.querySelectorAll('[role="menuitem"]')].map((x) => x.innerText));
+  const polozky = await page.evaluate(() => [...document.querySelectorAll('[data-testid="chat-rozhovory-polozka"]')].map((x) => x.innerText));
   expect(polozky.length >= 1, `historie rozhovorů se načetla (${polozky.length})`);
   await page.keyboard.press('Escape');
+  expect(await cekej('[data-testid="chat-input"]'), 'Esc vrátí seznam zpět do rozhovoru');
   for (const [sel, co] of [['[data-testid="chat-chipy"]', 'čipy'], ['[data-testid="chat-nocni-nabidka"]', 'noční plánování'], ['[data-testid="chat-hlas"]', 'hlasovka'], ['[data-testid="chat-obrazek"]', 'sponka'], ['[data-testid="chat-porada-nabidka"]', 'nabídka porady']]) {
     expect((await page.$(sel)) === null, `při výpadku není ${co}`);
   }
@@ -217,6 +218,11 @@ H.beh(async () => {
   expect(!!(await p2.$('[data-testid="chat-stav-pripojit"]')) && !!(await p2.$('[data-testid="chat-stav-relax"]')) && !(await p2.$('[data-testid="chat-stav-zkusit"]')), 'správce: Připojit AI + Relax');
   const kp2 = await kontrastPruhu(p2);
   expect(kp2 >= 4.5, `pozvánka čitelná (nejhorší kontrast ${kp2.toFixed(1)} : 1)`);
+  // checkup 11 Nov 2026: without AI the left rails don't move down → no robot in the left rail's top slot (it covered
+  // the inbox toggle / map search); the rail starts where it always did
+  expect((await p2.$('[data-testid="chat-tab-levy"]')) === null, 'bez AI: otevřený panel vpravo nekreslí robota do levé lišty');
+  const bufBezAi = await p2.$eval('[data-testid="buffer-toggle"]', (e) => parseFloat(getComputedStyle(e).marginTop) || 0).catch(() => null);
+  expect(bufBezAi === 0, `bez AI: levá lišta se neposouvá dolů (margin-top ${bufBezAi})`);
   expect((await p2.$('[data-testid="chat-chipy"]')) === null && (await p2.$('[data-testid="chat-obrazek"]')) === null, 'bez čipů a sponky');
   await p2.click('[data-testid="chat-dokumenty-btn"]');
   expect(await cekej2('[data-testid="chat-dok-filtr"]', 5000), 'Dokumenty jdou otevřít (seznam se načetl)');

@@ -4,6 +4,7 @@ import { Bug } from 'lucide-react';
 import { useReportConfig } from '@/hooks/useReportConfig';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useAuth } from '@/lib/AuthContext';
+import { useAsistent } from '@/lib/AsistentContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import ReportDialog from './ReportDialog';
 
@@ -27,6 +28,8 @@ export default function ReportRailButton({ top = 'top-40', leftOffset = 0, fixed
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const spodek = useSpodekHlavicky(fixed); // fixed ouško: pod skutečnou hlavičkou (viz hook); `top` platí jen pro absolute
+  const asistent = useAsistent();
+  const levo = fixed ? asistent.leftInset || 0 : 0; // assistant docked on the left (10 Nov 2026)
 
   if (!enabled) return null;
 
@@ -35,10 +38,10 @@ export default function ReportRailButton({ top = 'top-40', leftOffset = 0, fixed
     <>
       <button
         onClick={() => setOpen(true)}
-        style={{ left: leftOffset, ...(fixed ? { top: spodek + 104 } : {}) }}
+        style={{ left: leftOffset + levo, marginTop: asistent.railOffset || 0, ...(fixed ? { top: spodek + 104 } : {}) }}
         title={nsReady ? t('report.titulek') : undefined}
         data-rail-report
-        className={`${pos} ${fixed ? '' : top} z-30 flex items-center rounded-r-lg border bg-card px-2 py-2.5 text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset ? '' : 'border-l-0'}`}
+        className={`${pos} ${fixed ? '' : top} z-30 flex items-center rounded-r-lg border bg-card px-2 py-2.5 text-muted-foreground hover:text-primary shadow-md transition-all ${leftOffset || levo ? '' : 'border-l-0'}`}
       >
         <Bug className="w-4 h-4" />
       </button>

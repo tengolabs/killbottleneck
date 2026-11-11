@@ -809,7 +809,7 @@ function KartaSoubor({ karta, onOtevriDokument }) {
           </button>
         )) : <span className="text-muted-foreground" data-testid="chat-soubor-neulozeno">{t('soubor.notSaved')}</span>}
         {karta.doc_id && onOtevriDokument && (
-          <button type="button" onClick={() => onOtevriDokument(karta.doc_id)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline ml-auto" data-testid="chat-soubor-otevrit">
+          <button type="button" onClick={() => onOtevriDokument(karta.doc_id, { preview: !kresli })} className="inline-flex items-center gap-1 font-medium text-primary hover:underline ml-auto" data-testid="chat-soubor-otevrit">
             <PanelLeftOpen className="w-3.5 h-3.5" />{t('dok.openBeside')}
           </button>
         )}

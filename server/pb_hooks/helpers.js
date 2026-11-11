@@ -6221,6 +6221,34 @@ function summaryHour() {
   return (h >= 0 && h <= 23) ? h : 6;
 }
 
+// This instance's summary minute. 9 Nov 2026 (Richard: "start the summaries at 6"): the cron
+// ran in every hosted instance in the SAME minute (:15) → at 6:15 seven requests hit one
+// model at once, three failed and the summary came an hour late. Now the summary hour starts
+// at :00 and every instance has its own fixed minute 1–30 derived from its address, so the
+// requests spread out. Earliest :01 — at :00 auto_templates creates the morning projects from
+// templates and the summary should know about them. FLOWMAP_SUMMARY_MINUTE (0–59) overrides it; no address = 1.
+function summaryMinute(app) {
+  const m = parseInt(env("SUMMARY_MINUTE"), 10);
+  if (m >= 0 && m <= 59) return m;
+  let klic = "";
+  try { klic = publicBaseUrl(app); } catch (err) { /* bez adresy → :01 */ }
+  if (!klic) return 1;
+  let h = 0;
+  for (let i = 0; i < klic.length; i++) h = (h * 31 + klic.charCodeAt(i)) >>> 0;
+  return 1 + (h % 30);
+}
+
+// Should the summary cron (runs every minute) start a batch now? In the summary hour from the
+// instance's minute every 5 min — a second try for those the AI did not answer comes right away,
+// not an hour later. In later hours once an hour in the instance's minute (catch-up, e.g. after
+// a restart). Repeating is cheap: the guard is today's record in daily_summaries.
+function summaryCronDue(now, hour, minute) {
+  const h = now.getHours(), m = now.getMinutes();
+  if (h < hour) return false;
+  if (h === hour) return m >= minute && (m - minute) % 5 === 0;
+  return m === minute;
+}
+
 // AI konfigurace pro sumáře: env FLOWMAP_SUMMARY_PROVIDER/URL/MODEL/TOKEN má
 // přednost před obecným aiConfig — sumář je krátký formátovaný text, na který
 // se hodí jiný (menší/rychlejší) model než na generování map, aniž by se
@@ -8245,7 +8273,7 @@ module.exports = { ASSIST_MODES,
   zrusApiKlice,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour, summaryMinute, summaryCronDue,
   buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, transferMapOwnership, transferTargetError, removeEmailFromAllShares,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,

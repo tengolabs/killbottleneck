@@ -9,6 +9,30 @@ below before you jump several versions.
 
 ---
 
+## v1.1.0 — 2026-11-11
+
+**The assistant on the left or on the right, and your conversations right inside the panel**
+
+**Upgrade notes:** no migration, nothing to configure. The assistant stays on the right until you move it.
+
+- **Move the assistant to the left:** the ⇄ button in the panel header, or grab the header and drag it to the other edge
+  of the screen. On the left, Office, the aquarium "beside" and the large image viewer open to its right, and the left
+  rails (search, idea buffer, timer) make room for it. The browser remembers the side; on a phone the panel always fills
+  the screen.
+- **Conversations inside the panel:** ☰ shows your recent conversations grouped Today / Yesterday / This week / Older,
+  with search (accents don't matter), a big New conversation button and the open one marked. Deleting asks for a
+  confirmation first. ✎ in the header starts a new conversation.
+- **A smaller closed tab:** the closed assistant is a robot icon at the top of the left rail (and at the right edge while
+  the assistant sits on the right). It spins while the assistant works and shows a dot when a reply finished, a
+  question waits or the morning briefing is ready.
+- **"Open beside"** on a presentation or card in the chat opens the large preview as well; the documents button reads
+  "Open on the left" or "Open on the right" depending on where the assistant is.
+- **Evening planning** no longer has its own box in an empty conversation; start it from a rule with *Offer the
+  assistant → Evening planning*.
+- Daily summaries start at `KB_SUMMARY_HOUR` (default 6:00) in a fixed minute per instance instead of all at :15.
+
+---
+
 ## v1.0.1 — 2026-11-08
 
 **The assistant on your own OpenAI key: reasoning models without extra settings, reminders and recurring events**

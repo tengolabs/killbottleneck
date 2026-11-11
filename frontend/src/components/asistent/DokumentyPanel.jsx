@@ -265,7 +265,7 @@ function ObrazkyKancelare({ dok, onDok, onNacti, uklada }) {
   );
 }
 
-function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti }) {
+function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti, mobil }) {
   const { t, i18n } = useTranslation('asistent');
   const A = useAsistent();
   const lang = i18n.language === 'en' ? 'en' : 'cs';
@@ -311,6 +311,21 @@ function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti }) {
     } catch { setChyba(t('dok.previewError')); }
     setBeh('');
   };
+  // chat card "Open beside" asked for the large viewer too (Richard 11 Nov 2026) — once, as soon as formats are known;
+  // on a phone the documents panel already fills the screen, so only the detail opens
+  const bigViewRef = useRef(otevriVlevo);
+  bigViewRef.current = otevriVlevo;
+  const { docPreview, setDocPreview } = A;
+  useEffect(() => {
+    // waits while another render is running (otevriVlevo would return early and the request would be lost)
+    if (!docPreview || docPreview !== dok.id || !formaty || beh) return;
+    setDocPreview('');
+    if (!mobil) bigViewRef.current();
+  }, [docPreview, dok.id, formaty, beh, mobil, setDocPreview]);
+  // the viewer opens on the side away from the assistant — the label follows (assistant on the left → "on the right")
+  const viewerRight = !mobil && A.side === 'left';
+  const velkyText = viewerRight ? t('dok.openRight') : t('dok.openLeft');
+  const velkyHint = viewerRight ? t('dok.openRightHint') : t('dok.openLeftHint');
   const vyberFotku = async (e) => {
     const f = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -350,15 +365,15 @@ function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti }) {
             {beh === f ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1" />}{f === 'pptx' ? 'PowerPoint' : f === 'docx' ? 'Word' : 'PDF'}
           </Button>
         ))}
-        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={!!beh} onClick={otevriVlevo} title={t('dok.openLeftHint')} data-testid="chat-dok-vlevo">
-          {beh === 'vlevo' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Maximize2 className="w-3.5 h-3.5 mr-1" />}{t('dok.openLeft')}
+        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={!!beh} onClick={otevriVlevo} title={velkyHint} data-testid="chat-dok-vlevo" data-strana={viewerRight ? 'right' : 'left'}>
+          {beh === 'vlevo' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Maximize2 className="w-3.5 h-3.5 mr-1" />}{velkyText}
         </Button>
         <Button size="sm" variant="ghost" className="h-7 px-2" disabled={!!beh && beh !== 'nahled'} onClick={ukazNahled} data-testid="chat-dok-nahled">
           {beh === 'nahled' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : nahled ? <EyeOff className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}{nahled ? t('dok.previewHide') : t('dok.preview')}
         </Button>
       </div>
       {nahled && (
-        <button type="button" onClick={otevriVlevo} title={t('dok.openLeftHint')} className="block w-full cursor-zoom-in" data-testid="chat-dok-nahled-zvetsit">
+        <button type="button" onClick={otevriVlevo} title={velkyHint} className="block w-full cursor-zoom-in" data-testid="chat-dok-nahled-zvetsit">
           <img src={nahled} alt={t('dok.previewAlt')} className="w-full rounded-md border border-border bg-white" data-testid="chat-dok-nahled-obrazek" />
         </button>
       )}
@@ -367,7 +382,7 @@ function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti }) {
   );
 }
 
-function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
+function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt, mobil }) {
   const { t, i18n } = useTranslation('asistent');
   const [dok, setDok] = useState(null);
   const [chyba, setChyba] = useState('');
@@ -504,7 +519,7 @@ function Detail({ id, verze, zmenene, onZpet, onSmazano, hlidac, onProjekt }) {
               </dl>
             )}
             {/* kancelář: stažení souboru, u přání šablona / barva / fotka, náhled — pro všechny druhy (PDF + Word) */}
-            <KancelarOvladani dok={dok} onMeta={ulozMeta} uklada={uklada} onDok={setDok} onNacti={nacti} />
+            <KancelarOvladani dok={dok} onMeta={ulozMeta} uklada={uklada} onDok={setDok} onNacti={nacti} mobil={mobil} />
             {/* dvojklik do textu = upravit (jako v Claude) */}
             <div onDoubleClick={zacniUpravu} className="cursor-text">
               {dok.text ? <DokText text={dok.text} /> : <p className="text-sm text-muted-foreground italic">{t('dok.emptyText')}</p>}
@@ -623,7 +638,8 @@ export default function DokumentyPanel({ mobil }) {
 
   // tažení za levou hranu = šířka (stejně jako panel chatu)
   // tažení šířky: pointer capture + úklid i nad iframe relaxu (lib/tahSirky.js, 15. 10. 2026)
-  const naTah = useCallback((e) => zacniTah(e, { sirka: A.dokWidth, nastav: A.setDokWidth }), [A]);
+  const vlevo = A.side === 'left'; // assistant on the left → Office sits to its RIGHT, resize handle on the right edge
+  const naTah = useCallback((e) => zacniTah(e, { sirka: A.dokWidth, nastav: A.setDokWidth, smer: A.side === 'left' ? -1 : 1 }), [A]);
   // na úzkém okně se vejde, co zbude vedle chatu (48 px mapy vlevo nechat vidět)
   const sirka = sirkaDokumentu(okno, A.width, A.dokWidth);
 
@@ -632,14 +648,17 @@ export default function DokumentyPanel({ mobil }) {
       // z-[45]: NAD relaxem „vedle“ (z-40, kreslí se později a Dokumenty dřív zakryl — klik-test 19. 10.), pod relaxem přes celou
       // obrazovku (z-[60]) a pod dialogy (z-50)
       // i na telefonu POD lištou (rozhodnutí Richarda 27. 10. 2026 „i na telefonu panel pod lištou“ platí i pro Dokumenty)
-      className={mobil ? 'fixed left-0 right-0 bottom-0 z-50 flex flex-col bg-card' : 'fixed bottom-0 z-[45] flex flex-col bg-card border-l border-t shadow-2xl'}
-      style={mobil ? { top: spodek } : { top: spodek, right: A.width, width: sirka, maxWidth: DOK_MAX_W }}
+      className={mobil ? 'fixed left-0 right-0 bottom-0 z-50 flex flex-col bg-card' : 'fixed bottom-0 z-[45] flex flex-col bg-card border-t shadow-2xl'}
+      style={mobil ? { top: spodek } : { top: spodek, [vlevo ? 'left' : 'right']: A.width, width: sirka, maxWidth: DOK_MAX_W }}
+      data-side={vlevo ? 'left' : 'right'}
       data-testid="chat-dokumenty"
       aria-label={t('dok.kancelarTitle')}
     >
       {!mobil && (
-        <div onPointerDown={naTah} title={t('resize')} data-testid="chat-dok-resize" className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30" />
+        <div onPointerDown={naTah} title={t('resize')} data-testid="chat-dok-resize" className={`peer absolute ${vlevo ? 'right-0' : 'left-0'} top-0 bottom-0 z-10 w-1.5 cursor-col-resize hover:bg-primary/30`} />
       )}
+      {/* same accent edge + glow as the assistant column (Richard 11 Nov 2026: "add it to the next column too") */}
+      {!mobil && <div aria-hidden="true" data-testid="chat-dok-hrana" className={`kb-chat-hrana ${vlevo ? 'kb-chat-hrana-vlevo' : ''} peer-hover:bg-primary`} />}
       <div className="h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           {mobil ? (
@@ -679,7 +698,7 @@ export default function DokumentyPanel({ mobil }) {
         : A.dokId && A.dokId.startsWith(FAKTURA_PREFIX)
         ? <FakturaDetail key={A.dokId} id={A.dokId.slice(FAKTURA_PREFIX.length)} onZpet={() => { setSkupina('faktury'); A.setDokId(''); }} />
         : A.dokId
-        ? <Detail key={A.dokId} id={A.dokId} verze={A.dokVerze} zmenene={A.dokZmenene} hlidac={hlidac} onProjekt={naProjekt} onZpet={() => A.setDokId('')} onSmazano={() => { A.setDokId(''); A.obnovDokumenty(); }} />
+        ? <Detail key={A.dokId} id={A.dokId} mobil={mobil} verze={A.dokVerze} zmenene={A.dokZmenene} hlidac={hlidac} onProjekt={naProjekt} onZpet={() => A.setDokId('')} onSmazano={() => { A.setDokId(''); A.obnovDokumenty(); }} />
         : <Seznam verze={A.dokVerze} onOtevri={(id) => A.setDokId(id)} onNova={otevriNovy} skupina={skupina} setSkupina={setSkupina} q={q} setQ={setQ} />}
     </aside>
   );

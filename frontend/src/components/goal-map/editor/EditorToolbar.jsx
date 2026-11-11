@@ -414,7 +414,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
     </span>
   ) : null;
   return (
-      <header ref={obalListy} data-app-header style={odsunPanelu ? { marginRight: -odsunPanelu } : undefined} className="transition-[margin] sticky top-0 min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-30 shrink-0">
+      <header ref={obalListy} data-app-header style={odsunPanelu ? (asistent.side === 'left' ? { marginLeft: -odsunPanelu } : { marginRight: -odsunPanelu }) : undefined} className="transition-[margin] sticky top-0 min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-30 shrink-0">
         <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
           {/* Značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
               U názvu projektu být nesmí — dvě loga vedle sebe by si konkurovala,

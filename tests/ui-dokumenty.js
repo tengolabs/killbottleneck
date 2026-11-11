@@ -234,9 +234,10 @@ H.beh(async () => {
   await page.click('[data-testid="chat-dok-hledat"]'); await page.keyboard.press('Escape');
   expect(!!(await page.$('[data-testid="chat-dokumenty"]')), 'Esc v políčku panel nezavře');
   await page.click('[data-testid="chat-historie"]');
-  expect(await cekej('[role="menu"]'), 'menu historie otevřené');
+  expect(await cekej('[data-testid="chat-rozhovory"]'), 'seznam rozhovorů otevřený');
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
   await page.keyboard.press('Escape');
-  expect(await zmizi('[role="menu"]') && !!(await page.$('[data-testid="chat-dokumenty"]')), 'Esc zavře jen menu historie, dokumenty zůstanou (Esc patří horní vrstvě)');
+  expect(await zmizi('[data-testid="chat-rozhovory"]') && !!(await page.$('[data-testid="chat-dokumenty"]')), 'Esc zavře jen seznam rozhovorů, dokumenty zůstanou (Esc patří horní vrstvě)');
   await page.click('[data-testid="chat-dokumenty"] h2, [data-testid="chat-dok-seznam"]');
   await page.evaluate(() => document.activeElement && document.activeElement.blur());
   await page.keyboard.press('Escape');

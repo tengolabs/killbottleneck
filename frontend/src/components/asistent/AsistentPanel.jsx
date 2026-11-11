@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Bot, Briefcase, ChevronDown, ChevronUp, FileText, Fish, History, ImagePlus, Loader2, PanelRightClose, Plus, RefreshCw, Send, Sparkles, Sunrise, Moon, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, Bot, ChevronDown, ChevronUp, FileText, Files, Fish, ImagePlus, List, Loader2, PanelLeftClose, PanelRightClose, RefreshCw, Send, Sparkles, SquarePen, Sunrise, Moon, X } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA, KEY_RELAX_AKTIVITA, KEY_START_RELAX } from '@/lib/storageKeys';
 import { useRelaxOdpocet, formatOdpocet } from '@/components/relax/useRelaxOdpocet';
 import { NAD_PODIL } from '@/components/relax/RelaxVrstva';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/lib/AuthContext';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useAsistent, MIN_W, MAX_W, sirkaDokumentu, RELAX_SABLONY } from '@/lib/AsistentContext';
@@ -25,6 +22,7 @@ import { useHlasovka, HlasovkaTlacitko, HlasovkaPruh } from './Hlasovka';
 import AsistentZprava from './AsistentZprava';
 import AiBlok from './AiBlok';
 import DokumentyPanel from './DokumentyPanel';
+import ConversationList from './ConversationList';
 import { STRANKA, NOVY_DOK } from '@/lib/AsistentContext';
 import { strankaNapsat } from '@/api/asistentApi';
 import { useAsistentChat } from './useAsistentChat';
@@ -32,7 +30,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { savedMode } from '@/lib/liteMode';
 import { nactiStupen } from '@/lib/citelnost';
 import { pb } from '@/api/pb';
-import { zacniTah } from '@/lib/tahSirky';
+import { zacniTah, startMove } from '@/lib/tahSirky';
 
 // AI chat na boku (13. 9. 2026): vpravo, přes celou výšku, minimalizovatelný na
 // ouško. Rozhovor drží AsistentContext (nad Routerem); tahle komponenta jen
@@ -48,6 +46,8 @@ const sKlientem = (kontext) => ({ ...kontext, klient: { theme: effectiveTheme(),
 // značka režimu v historii rozhovorů
 const IKONA_REZIMU = { porada: '☀ ', nocni: '☾ ', rozbor: '⚒ ', trideni: '☰ ', novy_projekt: '✦ ', po_schuzce: '✎ ', revize: '↻ ', priprava: '☷ ', tymova_porada: '⚑ ', kancelar: '▤ ' };
 const MAX_TEXT = 8000; // strop zprávy na serveru (chat.js)
+// Night-planning frame in an empty conversation (Richard 29.–30. 9. 2026) — hidden since 11 Nov 2026 at his request
+const NIGHT_PLANNING_IN_PANEL = false;
 const CHYBA_TEXTU = { textDlouhy: 'textTooLong', textPrazdny: 'textEmpty', textChyba: 'textError', zvukVelky: 'voiceTooBig' };
 
 // ---- Relax (Richard 14. 10. 2026) ----
@@ -205,7 +205,7 @@ export default function AsistentPanel({ lite = false }) {
   const A = useMemo(() => ({ ...panel, ...rozhovor }), [panel, rozhovor]);
   const location = useLocation();
   const [text, setText] = useState('');
-  const [pohled, setPohled] = useState('chat'); // chat | pdf (paměť je od 1. 10. 2026 v Dokumentech)
+  const [pohled, setPohled] = useState('chat'); // chat | rozhovory (conversation list, 10 Nov 2026); paměť je od 1. 10. 2026 v Dokumentech
   // Vložený obrázek (Ctrl+V, přetažení, sponka) — 16. 9. 2026. Zmenšuje se hned při
   // vložení; server ho přepíše a originál zahodí, ve vlákně zůstane náhled a přepis.
   const [obrazek, setObrazek] = useState(null);   // { base64, nahled, nahledMime, url }
@@ -317,6 +317,10 @@ export default function AsistentPanel({ lite = false }) {
   const mobil = lite || uzkeOkno;
   // panel začíná pod ukotvenou horní lištou (Richard 27. 10. 2026) — i na telefonu v plné aplikaci; lite lištu nemá → 0
   const spodek = useSpodekHlavicky(!lite);
+  // Side (10 Nov 2026): on a phone / in lite the panel covers the full width, so the side only applies on a wide window
+  const vlevo = !mobil && panel.side === 'left';
+  // header drag → drop target shown while dragging ('left' | 'right' | null)
+  const [moveTarget, setMoveTarget] = useState(null);
 
   // Nabídka ranní porady (Richard 13. 9. 2026: „ráno otevřu a zeptá se mě"):
   // ukáže se při prvním otevření aplikace v daném dni nebo po víc než 8 h
@@ -375,6 +379,22 @@ export default function AsistentPanel({ lite = false }) {
   }, [location.pathname, panel.uzel]);
 
   const zpravy = (A.chat && A.chat.messages) || [];
+  // closed panel: a dot when the assistant finished a turn while it was closed (e.g. a presentation being made — Richard
+  // 11 Nov 2026: "a dot when it wants to say something or finishes … and I closed it while it was working")
+  const [unread, setUnread] = useState(false);
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (A.loading) { wasRunning.current = true; return; }
+    if (wasRunning.current) { wasRunning.current = false; if (!A.open) setUnread(true); }
+  }, [A.loading, A.open]);
+  useEffect(() => { if (A.open) setUnread(false); }, [A.open]);
+  const posledniTah = zpravy.slice(zpravy.map((m) => m.role).lastIndexOf('user') + 1);
+  const cekaKarta = posledniTah.some((m) => (m.karty || []).some((k) => k.type === 'otazky' || (k.type === 'akce' && k.stav === 'ceka')));
+  // desktop: the robot sits in the left rail's top slot ALWAYS (also with the assistant on the right — Richard 11 Nov 2026,
+  // approved option "robot stays on the left"); the rails move one slot down for it
+  const robotLeft = !!ready && !!dostupny && !mobil && stav !== 'nepripojeno';
+  const { setLeftTabShown } = panel;
+  useEffect(() => { setLeftTabShown(robotLeft); return () => setLeftTabShown(false); }, [robotLeft, setLeftTabShown]);
   // Posun: při odeslání dolů (vlastní zpráva + „přemýšlím"), po odpovědi na
   // ZAČÁTEK odpovědi — dlouhá odpověď jinak skočí na konec a člověk musí jet
   // nahoru, aby viděl, jak začíná (Richard 13. 9., z telefonu).
@@ -502,10 +522,11 @@ export default function AsistentPanel({ lite = false }) {
   useEffect(() => {
     const el = document.documentElement;
     // otevřené dokumenty leží vlevo od chatu → toasty ještě o jejich šířku dál (orientačně; na úzkém okně je panel užší)
-    if (panel.open && !mobil) el.style.setProperty('--kb-toast-right', `${panel.width + (panel.dokOpen ? sirkaDokumentu(window.innerWidth, panel.width, panel.dokWidth) : 0)}px`); else el.style.removeProperty('--kb-toast-right');
+    // assistant on the left: toasts stay bottom-right where nothing covers them
+    if (panel.open && !mobil && !vlevo) el.style.setProperty('--kb-toast-right', `${panel.width + (panel.dokOpen ? sirkaDokumentu(window.innerWidth, panel.width, panel.dokWidth) : 0)}px`); else el.style.removeProperty('--kb-toast-right');
     if (panel.open && mobil) el.style.setProperty('--kb-toast-top', `${spodek + 48}px`); else el.style.removeProperty('--kb-toast-top');
     return () => { el.style.removeProperty('--kb-toast-right'); el.style.removeProperty('--kb-toast-top'); };
-  }, [panel.open, panel.width, panel.dokOpen, panel.dokWidth, mobil, spodek]);
+  }, [panel.open, panel.width, panel.dokOpen, panel.dokWidth, mobil, spodek, vlevo]);
   // Dokumenty (30. 9. 2026): když asistent v tahu dokument založí (draft_text) nebo přepíše
   // (update_document), panel dokumentů se na počítači sám otevře s ním — jako artefakt v Claude.
   // Jen po DOKONČENÉM tahu (loading true → false), ne při načtení starého rozhovoru z historie, a jen na
@@ -552,7 +573,18 @@ export default function AsistentPanel({ lite = false }) {
 
   // tažení za levou hranu = šířka (bez knihovny; primitiv resizable v ui/ není)
   // tažení šířky: pointer capture + úklid i nad iframe relaxu (lib/tahSirky.js, 15. 10. 2026)
-  const naTah = useCallback((e) => zacniTah(e, { sirka: A.width, nastav: A.setWidth }), [A]);
+  const naTah = useCallback((e) => zacniTah(e, { sirka: A.width, nastav: A.setWidth, smer: vlevo ? -1 : 1 }), [A, vlevo]);
+  // dragging the header to the other edge (buttons inside the header keep their clicks)
+  const { setSide } = panel;
+  const naPresun = useCallback((e) => {
+    if (mobil || (e.target && e.target.closest && e.target.closest('button, a, input, textarea, [role="button"]'))) return;
+    startMove(e, { onTarget: setMoveTarget, onDrop: (s) => { if (s) setSide(s); } });
+  }, [mobil, setSide]);
+  const prepniStranu = useCallback(() => setSide((s) => (s === 'left' ? 'right' : 'left')), [setSide]);
+  // conversations list: open / new / back (the list replaces messages + input; Esc is handled by the list)
+  const zpetDoChatu = useCallback(() => setPohled('chat'), []);
+  const novyRozhovor = useCallback(() => { setPohled('chat'); A.novy(); }, [A]);
+  const otevriRozhovor = useCallback((id) => { setPohled('chat'); A.otevriChat(id); }, [A]);
 
   // balíček spuštěný odjinud (Nový projekt → „Navrhnout s AI“, zásobník → „Roztřídit s AI“): vyřídit, až je
   // panel volný — během odpovědi by zacniRezim žádost tiše zahodil
@@ -584,19 +616,47 @@ export default function AsistentPanel({ lite = false }) {
   const naNastaveniAi = () => { if (panel.relax && !panel.relax.zamek) panel.ukonciRelax(); navigate('/admin/users?oddil=ai'); if (mobil) zavriChat(); };
   const placeholderStav = stav === 'vypadek' ? t('stav.placeholderVypadek') : stav === 'nepripojeno' ? t('stav.placeholderNepripojeno') : '';
 
+  // Closed-panel tab = robot + dot, no words (Richard 11 Nov 2026: "Morning briefing waiting" lay over the left rail).
+  // Same height on both sides: the left rail's top slot (rails start one slot lower) and the same top on the right.
+  // The left robot is always there on desktop; on the right only while the assistant is docked right (approved mock-up).
+  // Spinner while it works; dot = a question/action waiting, news finished while closed, morning briefing, pause.
+  const tecka = cekaKarta ? 'karta' : unread ? 'novinka' : nabidnoutPoradu ? 'porada' : relaxNabidka ? 'relax' : ''; // one dot; the testid names the most pressing reason
+  const popis = A.loading ? (textPrubehu(A.prubeh, t) || t('thinking')) : tecka === 'porada' ? t('poradaOffer') : tecka === 'relax' ? t('relaxOffer') : t('toggle');
+  const ousko = (strana, hlavni) => {
+    const zavreno = !A.open;
+    return (
+      <button
+        key={strana}
+        type="button"
+        onClick={() => (hlavni ? A.setOpen(true) : A.setOpen((v) => !v))}
+        title={zavreno ? popis : t('toggle')}
+        aria-label={t('toggle')}
+        data-testid={hlavni ? 'chat-tab' : 'chat-tab-levy'}
+        data-tecka={zavreno ? tecka : ''}
+        data-pracuje={zavreno && A.loading ? '1' : '0'}
+        style={strana === 'left' ? { top: spodek + 8, left: panel.leftPanelWidth || 0 } : { top: spodek + 8 }}
+        data-side={strana}
+        className={`fixed ${strana === 'left' ? `rounded-r-lg ${panel.leftPanelWidth ? '' : 'border-l-0'}` : 'right-0 rounded-l-lg border-r-0'} z-30 flex items-center gap-1.5 border bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all`}
+      >
+        {zavreno && A.loading ? <Loader2 className="w-4 h-4 text-primary animate-spin" data-testid={hlavni ? 'chat-tab-pracuje' : undefined} /> : <Bot className="w-4 h-4 text-primary" />}
+        {zavreno && tecka && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" data-testid={hlavni ? `chat-tab-${tecka}` : undefined} />}
+        {zavreno && stav === 'vypadek' && <span className="w-2 h-2 rounded-full bg-amber-500" data-testid={hlavni ? 'chat-tab-vypadek' : undefined} />}
+      </button>
+    );
+  };
+
   if (!A.open && mobil) {
     // telefon: minimalizovaný chat = lišta dole (poslední věta asistenta + políčko),
     // mapa je vidět. Z lišty jde psát i odeslat bez otevření (Richard 13. 9.: „zmenšit,
     // co je nade mnou, mít rozhled a pořád psát"); odpověď se ukáže v liště, karty
     // (otázky, akce k potvrzení) se hlásí tečkou — klepnutí na řádek panel otevře.
     const posledniA = [...zpravy].reverse().find((m) => m.role === 'assistant' && m.content);
-    const posledniTah = zpravy.slice(zpravy.map((m) => m.role).lastIndexOf('user') + 1);
-    const cekaKarta = posledniTah.some((m) => (m.karty || []).some((k) => k.type === 'otazky' || (k.type === 'akce' && k.stav === 'ceka')));
     return (
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-card shadow-lg" data-testid="chat-bar">
         <button type="button" onClick={() => A.setOpen(true)} className="w-full px-3 pt-1.5 text-left text-xs text-muted-foreground inline-flex items-center gap-1.5" data-testid="chat-bar-otevrit">
           {A.loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" /> : <Bot className="w-3.5 h-3.5 text-primary shrink-0" />}
           <span className="truncate" data-testid="chat-bar-text">{A.loading ? (textPrubehu(A.prubeh, t) || t('thinking')) : stav === 'vypadek' ? t(ai.hosted ? 'stav.vypadekTitle' : 'stav.vlastniVypadekTitle') : nabidnoutPoradu ? t('poradaOffer') : (posledniA ? posledniA.content.replace(/\s+/g, ' ').slice(0, 120) : t('emptyTitle'))}</span>
+          {/* no "news" dot here: the bar itself shows the finished reply */}
           {(nabidnoutPoradu || cekaKarta) && <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" data-testid={cekaKarta ? 'chat-bar-karta' : 'chat-tab-porada'} />}
           {stav === 'vypadek' && <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" data-testid="chat-bar-vypadek" />}
         </button>
@@ -619,27 +679,7 @@ export default function AsistentPanel({ lite = false }) {
     );
   }
 
-  if (!A.open) {
-    return (
-      <button
-        type="button"
-        onClick={() => A.setOpen(true)}
-        title={nabidnoutPoradu ? t('poradaOffer') : relaxNabidka ? t('relaxOffer') : t('toggle')}
-        aria-label={t('toggle')}
-        data-testid="chat-tab"
-        // 40 px pod spodní hranou lišty (dřív pevných 96 px od okraje — s proužkem „Zkušební verze“ na telefonu
-        // ouško leželo přes panáčka; nález panelu 27. 10. 2026)
-        style={{ top: spodek + 40 }}
-        className="fixed right-0 z-30 flex items-center gap-1.5 rounded-l-lg border border-r-0 bg-card px-2 py-2.5 shadow-md hover:bg-secondary transition-all"
-      >
-        <Bot className="w-4 h-4 text-primary" />
-        <span className="hidden sm:inline text-xs font-medium">{nabidnoutPoradu ? t('poradaTab') : relaxNabidka ? t('relaxTab') : t('tab')}</span>
-        {nabidnoutPoradu && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" data-testid="chat-tab-porada" />}
-        {!nabidnoutPoradu && relaxNabidka && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" data-testid="chat-tab-relax" />}
-        {stav === 'vypadek' && <span className="w-2 h-2 rounded-full bg-amber-500" data-testid="chat-tab-vypadek" />}
-      </button>
-    );
-  }
+  if (!A.open) return <>{ousko('left', vlevo)}{!vlevo && ousko('right', true)}</>;
 
   // poslední VIDITELNÁ zpráva (zprávy nástrojů se nekreslí): když model skončí textem
   // a zároveň suggest_next, leží za odpovědí ještě výsledek nástroje a čipy by byly zašedlé
@@ -677,13 +717,20 @@ export default function AsistentPanel({ lite = false }) {
     if (Date.now() - (ctiAktivitu(klicRelax).posledniRelax || 0) >= HLIDAC_ZNOVU_MS) relaxNavrh = t('relaxChip');
   }
 
+  // minimise button at the OUTER screen edge on both sides (Richard 11 Nov 2026: "as close to the screen edge as on the other
+  // side — then I click one spot to keep opening and closing"); the closed tab sits at the same spot. Not a close: the chat stays.
+  const zavrit = <Button variant="ghost" size="icon" className={`h-8 w-8 ${vlevo ? '-ml-1 shrink-0' : ''}`} title={t('close')} aria-label={t('close')} onClick={zavriChat} data-testid="chat-zavrit">{mobil ? <ChevronDown className="w-4 h-4" /> : vlevo ? <PanelLeftClose className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}</Button>;
   return (
     <>
+    {/* no AI connected: the rails don't move down (railOffset 0), so the robot must not sit over them */}
+    {!vlevo && robotLeft && ousko('left', false)}
     {panel.dokOpen && <DokumentyPanel mobil={mobil} />}
     <aside
-      className={`fixed right-0 bottom-0 z-40 flex flex-col bg-card border-l shadow-xl w-full ${mobil ? '' : 'sm:w-auto'}`}
+      className={`fixed ${vlevo ? 'left-0' : 'right-0'} ${mobil ? (vlevo ? 'border-r' : 'border-l') : ''} bottom-0 z-40 flex flex-col bg-card shadow-xl w-full ${mobil ? '' : 'sm:w-auto'}`}
       style={mobil ? { top: relaxNad ? `calc(${spodek}px + ${NAD_PODIL})` : spodek } : { top: spodek, width: A.width, minWidth: MIN_W, maxWidth: MAX_W }}
       data-testid="chat-panel"
+      data-side={vlevo ? 'left' : 'right'}
+      data-pohled={pohled}
       aria-label={t('title')}
     >
       {!mobil && (
@@ -691,50 +738,43 @@ export default function AsistentPanel({ lite = false }) {
           onPointerDown={naTah}
           title={t('resize')}
           data-testid="chat-resize"
-          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30"
+          className={`peer absolute ${vlevo ? 'right-0' : 'left-0'} top-0 bottom-0 z-10 w-1.5 cursor-col-resize hover:bg-primary/30`}
         />
       )}
-      <div className="h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0">
+      {/* Column edge (Richard 11 Nov 2026: "make the assistant column's divider stand out, maybe with an effect"):
+          a 2 px accent line + a soft accent glow spilling onto the page; brighter while the resize handle is hovered */}
+      {!mobil && <div aria-hidden="true" data-testid="chat-hrana" className={`kb-chat-hrana ${vlevo ? 'kb-chat-hrana-vlevo' : ''} peer-hover:bg-primary`} />}
+      {/* Header (10 Nov 2026, approved mock-up): ☰ Conversations · title · ✎ New · 📄 Office · 🐟 (11 Nov: Office in the middle, aquarium right) | ⇄ side · ⇥ minimise.
+          On a wide window the empty part of the header is a drag handle — drop it on the other edge to move the panel. */}
+      <div
+        className={`h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0 ${mobil ? '' : 'cursor-grab active:cursor-grabbing select-none touch-none'}`}
+        onPointerDown={mobil ? undefined : naPresun}
+        title={mobil ? undefined : t('moveHint')}
+        data-testid="chat-hlavicka"
+      >
         <div className="flex items-center gap-2 min-w-0">
-          {/* robot vlevo = taky minimalizace (Richard 29. 9. 2026: „zmenšit i při kliknutí vlevo nahoře na ikonku robota") */}
-          <button type="button" className="shrink-0 rounded p-1 -m-1 hover:bg-muted" title={t('close')} aria-label={t('close')} onClick={zavriChat} data-testid="chat-robot-zavrit"><Bot className="w-4 h-4 text-primary" /></button>
-          <span className="text-sm font-semibold truncate">{(A.chat && A.chat.title) || t('title')}</span>
-          {/* Nový rozhovor hned u názvu a s popiskem — mezi samotnými ikonami vpravo se hledal (Richard 17. 9. 2026) */}
-          <Button variant="outline" size="sm" className="h-8 px-2 gap-1 shrink-0" title={t('newChat')} onClick={() => { setPohled('chat'); A.novy(); }} data-testid="chat-novy"><Plus className="w-4 h-4" />{t('newChatShort')}</Button>
+          {vlevo && <>{zavrit}<span className="h-5 w-px bg-border shrink-0" aria-hidden="true" /></>}
+          <Button variant={pohled === 'rozhovory' ? 'default' : 'ghost'} size="icon" className={`h-8 w-8 shrink-0 ${vlevo ? '' : '-ml-1'}`} title={t('conversations')} aria-label={t('conversations')} aria-pressed={pohled === 'rozhovory'} onClick={() => setPohled((p) => (p === 'rozhovory' ? 'chat' : 'rozhovory'))} data-testid="chat-historie"><List className="w-4 h-4" /></Button>
+          <span className="text-sm font-semibold truncate" data-testid="chat-nazev">{pohled === 'rozhovory' ? t('conversations') : (A.chat && A.chat.title) || t('title')}</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" title={t('history')} data-testid="chat-historie"><History className="w-4 h-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>{t('history')}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {A.seznam.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('historyEmpty')}</div>}
-              {A.seznam.map((c) => (
-                <DropdownMenuItem key={c.id} onSelect={() => { setPohled('chat'); A.otevriChat(c.id); }} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{IKONA_REZIMU[c.mode] || ''}{c.title || t('newChat')}</span>
-                  <button type="button" className="text-muted-foreground hover:text-destructive" title={t('delete')} onClick={(e) => { e.stopPropagation(); e.preventDefault(); A.smaz(c.id); }}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {/* Dokumenty (30. 9. 2026): poznámky, e-maily a sumáře od asistenta — panel vlevo od chatu */}
+          <Button variant="ghost" size="icon" className="h-8 w-8" title={t('newChat')} aria-label={t('newChat')} onClick={novyRozhovor} data-testid="chat-novy"><SquarePen className="w-4 h-4" /></Button>
+          {/* Dokumenty (30. 9. 2026): poznámky, e-maily a sumáře od asistenta — panel vedle chatu */}
+          {/* Kancelář (1. 11. 2026; od 11. 11. uprostřed, akvárko vpravo — Richard): jedna ikonka = panel se záložkami Dokumenty | Stránky | PDF (dřív zvlášť „složka“ a „dokument“ pro PDF — mátlo) */}
+          <Button variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('dok.kancelarTitle')} aria-label={t('dok.kancelarTitle')} aria-pressed={panel.dokOpen} onClick={() => (panel.dokOpen ? panel.opatrne(() => panel.setDokOpen(false)) : panel.setDokOpen(true))} data-testid="chat-dokumenty-btn"><Files className="w-4 h-4" /></Button>
           {/* relax (Richard 15. 10. 2026): stálý přepínač mapa ⇄ rybičky v hlavičce — bez odpočtu, vedle chatu (na telefonu celá) */}
           <Button variant={panel.relax ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('relaxToggle')} aria-label={t('relaxToggle')} aria-pressed={!!panel.relax} onClick={() => (panel.relax ? panel.ukonciRelax() : spustRelax({ minut: 0, rozlozeni: 'vedle' }))} data-testid="chat-relax-toggle"><Fish className="w-4 h-4" /></Button>
-          {/* Kancelář (1. 11. 2026): jedna ikonka = panel se záložkami Dokumenty | Stránky | PDF (dřív zvlášť „složka“ a „dokument“ pro PDF — mátlo) */}
-          <Button variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('dok.kancelarTitle')} aria-label={t('dok.kancelarTitle')} aria-pressed={panel.dokOpen} onClick={() => (panel.dokOpen ? panel.opatrne(() => panel.setDokOpen(false)) : panel.setDokOpen(true))} data-testid="chat-dokumenty-btn"><Briefcase className="w-4 h-4" /></Button>
           <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
-          {/* minimalizace, ne zavření — rozhovor zůstává (křížek sváděl k „zavírám úplně", Richard 13. 9.) */}
-          <Button variant="ghost" size="icon" className="h-8 w-8" title={t('close')} aria-label={t('close')} onClick={zavriChat} data-testid="chat-zavrit">{mobil ? <ChevronDown className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}</Button>
+          {!mobil && <Button variant="ghost" size="icon" className="h-8 w-8" title={`${t(vlevo ? 'moveRight' : 'moveLeft')} — ${t('moveHint')}`} aria-label={t(vlevo ? 'moveRight' : 'moveLeft')} onClick={prepniStranu} data-testid="chat-strana"><ArrowLeftRight className="w-4 h-4" /></Button>}
+          {!vlevo && zavrit}
         </div>
       </div>
 
       {!funkcni && <StavAsistenta stav={stav} hosted={!!ai.hosted} spravce={spravce} blik={blik} t={t} onZkusit={() => refreshAiModes()} onRelax={() => spustRelax({ minut: 0 })} onNastaveni={naNastaveniAi} />}
 
-      {(
+      {pohled === 'rozhovory' ? (
+        <ConversationList items={A.seznam} activeId={A.chat && A.chat.id} modeIcons={IKONA_REZIMU} t={t} onOpen={otevriRozhovor} onNew={novyRozhovor} onDelete={A.smaz} onBack={zpetDoChatu} />
+      ) : (
         <>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2" data-testid="chat-zpravy">
             {/* Výpadek: historie rovnou v panelu (schválený náhled 19. 10.) — bez AI je to hlavní, co tu jde dělat;
@@ -747,6 +787,7 @@ export default function AsistentPanel({ lite = false }) {
                     {IKONA_REZIMU[c.mode] || ''}{c.title || t('newChat')}
                   </button>
                 ))}
+                {A.seznam.length > 5 && <button type="button" onClick={() => setPohled('rozhovory')} className="block w-full px-3 py-1.5 text-left text-xs text-primary hover:underline" data-testid="chat-stav-historie-vse">{t('conversations')} ({A.seznam.length})</button>}
               </div>
             )}
             {relaxNabidka && !panel.relax && (
@@ -773,7 +814,8 @@ export default function AsistentPanel({ lite = false }) {
             {/* Noční plánování (Richard 29.–30. 9. 2026): vlastní rámeček pod nabídkou ranní porady, v prázdném
                 rozhovoru VŽDY — žádná logika dne, nabídka ani notifikace, nic k odmítání; spouští ho jen uživatel.
                 Spuštění uklidí ranní nabídku pro dnešek (Richard 30. 9.: „už by mi neměla svítit“) */}
-            {zpravy.length === 0 && funkcni && !A.loading && (
+            {/* hidden 11 Nov 2026 (Richard: "Night planning — hide it"); the mode stays (rules, history) — NIGHT_PLANNING_IN_PANEL brings the frame back */}
+            {NIGHT_PLANNING_IN_PANEL && zpravy.length === 0 && funkcni && !A.loading && (
               <div className="rounded-lg border border-primary/50 bg-background/70 p-3 text-sm" data-testid="chat-nocni-nabidka">
                 <p className="inline-flex items-center gap-1.5 font-medium"><Moon className="w-4 h-4 text-primary" />{t('nocniOffer')}</p>
                 <p className="text-xs text-muted-foreground mt-1">{t('nocniOfferHint')}</p>
@@ -905,6 +947,16 @@ export default function AsistentPanel({ lite = false }) {
         </>
       )}
     </aside>
+    {/* drop target while dragging the header: a translucent strip on the side the panel will dock to */}
+    {moveTarget && moveTarget !== (vlevo ? 'left' : 'right') && (
+      <div
+        className={`fixed bottom-0 z-[55] pointer-events-none border-2 border-dashed border-primary bg-primary/15 flex items-center justify-center text-sm font-medium text-primary ${moveTarget === 'left' ? 'left-0' : 'right-0'}`}
+        style={{ top: spodek, width: A.width }}
+        data-testid="chat-strana-cil" data-cil={moveTarget}
+      >
+        {t('moveDrop')}
+      </div>
+    )}
     </>
   );
 }

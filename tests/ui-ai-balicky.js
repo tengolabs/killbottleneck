@@ -65,11 +65,7 @@ H.beh(async () => {
   console.log('== počítač: AI blok pod Nočním plánováním (mřížka, bez sbalení) ==');
   expect(await otevriPanel(), 'panel asistenta je otevřený');
   expect(await cekej('[data-testid="chat-ai-blok"]'), 'v prázdném rozhovoru je AI blok');
-  const poloha = await page.evaluate(() => {
-    const n = document.querySelector('[data-testid="chat-nocni-nabidka"]'); const b = document.querySelector('[data-testid="chat-ai-blok"]');
-    return n && b ? { nocni: n.getBoundingClientRect().bottom, blok: b.getBoundingClientRect().top } : null;
-  });
-  expect(!!poloha && poloha.blok >= poloha.nocni, `AI blok je POD rámečkem Nočního plánování (${JSON.stringify(poloha)})`);
+  expect(!(await page.$('[data-testid="chat-nocni-nabidka"]')), 'rámeček Noční plánování schovaný (11. 11. 2026) — AI blok je hned pod nabídkami');
   const tlacitka = await page.$$eval('[data-testid^="chat-blok-"]', (els) => els.map((e) => e.getAttribute('data-testid')));
   expect(tlacitka.join(',') === 'chat-blok-trideni,chat-blok-novy-projekt,chat-blok-po-schuzce,chat-blok-revize,chat-blok-priprava,chat-blok-kancelar,chat-blok-tym,chat-blok-stranka', `tlačítka pomocníků — správce vidí i Týmovou poradu (${tlacitka.join(',')})`);
   expect(!(await page.$('[data-testid="chat-ai-blok-rozbalit"]')), 'na počítači se blok nesbaluje');
