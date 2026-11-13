@@ -6,11 +6,16 @@ import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Loader2, CreditCard, Landmark, Check, ExternalLink, Mail, ChevronDown, ChevronRight } from 'lucide-react';
 import { useLazyNs } from '@/i18n/lazyNs';
-import { TARIFY } from '@/lib/kosikTarify';
+import { TARIFY, perMonth } from '@/lib/kosikTarify';
 
-// Košík členství (jen admin, jen hostovaná instance). Tarify a ceny viz
-// lib/kosikTarify.js.
-// SAMOOBSLUHA jen pro ZKUŠEBKU a jen na Cloud Lite (rozhodnutí Richarda 14. 10.
+// Membership cart (admin only, hosted instance only). Plans and prices: lib/kosikTarify.js.
+// Since 12 Nov 2026 the offer mirrors the public price list (Unlimited AI ×3 + KB Cloud Start,
+// dedicated-server plans hidden) and a longer period is shown as its price per month with the
+// charged total below. A TRIAL instance can pay by card for any plan that stays on the shared
+// server (`selfService`: Lite and Unlimited AI) — the provider then only lifts the trial limits
+// and sets the plan's AI quota. Older notes below (Czech) still apply to everything else.
+// Košík členství (jen admin, jen hostovaná instance).
+// SAMOOBSLUHA jen pro ZKUŠEBKU a jen na Cloud Start (rozhodnutí Richarda 14. 10.
 // 2026): tahle cesta je jediná, kterou provozovatel po zaplacení povýší bez
 // člověka (instanci se jen zruší konec zkušebky). Přechod na vlastní server
 // (Pro / AI Agent = stěhování dat) a změna tarifu u instance, která už platí
@@ -23,6 +28,8 @@ import { TARIFY } from '@/lib/kosikTarify';
 // a vyžaduje vyplněné fakturační údaje.
 const SUPPORT = 'support@killbottleneck.com';
 const OBDOBI = ['month', 'quarter', 'year'];
+const NABIDKA = TARIFY.filter((x) => !x.hidden);
+const kc = (n) => Number(n).toLocaleString('cs-CZ').replace(/\u00a0|\u202f/g, ' ');
 
 export default function MembershipSection({ billingComplete }) {
   const nsReady = useLazyNs('billing');
@@ -44,10 +51,10 @@ export default function MembershipSection({ billingComplete }) {
 
   if (user?.role !== 'admin' || !config?.hosted || !nsReady) return null;
 
-  const vybrany = TARIFY.find((x) => x.tier === tier);
+  const vybrany = NABIDKA.find((x) => x.tier === tier) || NABIDKA[0];
   // zkušebka = instance s koncem zkušební doby (i prošlé); bez něj už platí
   const zkusebka = !!config.trial_until;
-  const samoobsluha = zkusebka && tier === 'cloud-lite';
+  const samoobsluha = zkusebka && !!vybrany.selfService;
   const cena = vybrany.prices[period];
   const prevodem = samoobsluha && vybrany.transferYear && period === 'year';
   const links = config.payment_links || {};
@@ -107,21 +114,31 @@ export default function MembershipSection({ billingComplete }) {
       </button>
 
       {tarifyVidet && (<>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3" role="radiogroup" aria-label={t('membership.planLabel')}>
-        {TARIFY.map((x) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3" role="radiogroup" aria-label={t('membership.planLabel')}>
+        {NABIDKA.map((x) => {
+          // a plan without the chosen period (quarter is Lite only) shows its yearly price
+          const o = x.prices[period] ? period : 'year';
+          return (
           <button key={x.tier} type="button" role="radio" aria-checked={tier === x.tier}
             onClick={() => {
               setTier(x.tier);
               if (!x.prices[period]) setPeriod('year'); // čtvrtletí má jen Lite
               setOrderDone(null); setError('');
             }}
-            className={`rounded-lg border p-3 text-left transition-colors ${
+            className={`flex flex-col justify-start rounded-lg border p-3 text-left transition-colors ${
               tier === x.tier ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/50'}`}
             data-testid={`plan-${x.tier}`}>
             <div className="font-medium text-sm">{t(`membership.plan.${x.tier}`)}</div>
-            <div className="text-lg font-bold mt-1">
-              {x.prices[period] ?? x.prices.year} Kč
-              <span className="text-xs font-normal text-muted-foreground"> / {t(`membership.period.${x.prices[period] ? period : 'year'}`)}</span>
+            {/* struck-through monthly price on its own line (kept empty for monthly so the cards align) */}
+            <div className="mt-1 min-h-5 text-sm text-muted-foreground" data-testid={`was-${x.tier}`}>
+              {o !== 'month' && <s>{kc(x.prices.month)} Kč</s>}
+            </div>
+            <div className="text-lg font-bold whitespace-nowrap" data-testid={`price-${x.tier}`}>
+              {kc(perMonth(x.prices[o], o))} Kč
+              <span className="text-xs font-normal text-muted-foreground"> {t('membership.perMonth')}</span>
+            </div>
+            <div className="min-h-4 text-xs text-muted-foreground" data-testid={`total-${x.tier}`}>
+              {o !== 'month' && t(`membership.total.${o}`, { amount: kc(x.prices[o]) })}
             </div>
             <ul className="mt-2 space-y-1">
               {funkce(x.tier).map((f) => (
@@ -131,7 +148,8 @@ export default function MembershipSection({ billingComplete }) {
               ))}
             </ul>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       <a href={t('membership.pricingUrl')} target="_blank" rel="noopener noreferrer" data-testid="compare-plans"
@@ -178,7 +196,7 @@ export default function MembershipSection({ billingComplete }) {
               {t('membership.orderByTransfer')}
             </Button>
           )}
-          {!samoobsluha && (
+          {(!samoobsluha || (!cardUrl && !vybrany.transferYear)) && (
             <Button asChild variant={zkusebka ? 'default' : 'outline'}>
               <a href={mailto} data-testid="write-us"><Mail className="h-4 w-4 mr-2" />{t('membership.writeUs')}</a>
             </Button>
@@ -190,8 +208,9 @@ export default function MembershipSection({ billingComplete }) {
             {!samoobsluha
               ? t(zkusebka ? 'membership.ownServerByMail' : 'membership.changeByMail')
               : !cardLink
-                ? t(prevodem ? 'membership.cardUnavailable' : 'membership.cardUnavailableNoTransfer')
-                : [t('membership.payerEmail'), !prevodem && t('membership.transferYearlyOnly')].filter(Boolean).join(' ')}
+                ? t(prevodem ? 'membership.cardUnavailable'
+                  : vybrany.transferYear ? 'membership.cardUnavailableNoTransfer' : 'membership.cardUnavailableWrite')
+                : [t('membership.payerEmail'), vybrany.transferYear && !prevodem && t('membership.transferYearlyOnly')].filter(Boolean).join(' ')}
           </span>
         </div>
       )}

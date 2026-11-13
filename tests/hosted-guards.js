@@ -1,6 +1,6 @@
 // Ochrany HOSTOVANÉ instance (FLOWMAP_HOSTED=1) + měkký výpadek AI.
 //
-// Proč zvlášť: na sdíleném boxu Cloud Lite běží vedle sebe kontejnery cizích
+// Proč zvlášť: na sdíleném boxu Cloud Start běží vedle sebe kontejnery cizích
 // zákazníků a metadata služba poskytovatele. Admin instance = ZÁKAZNÍK, ne
 // správce železa, takže mu server nesmí dovolit poslat požadavek na privátní
 // adresu (test připojení k AI = jinak pohodlný skener vnitřní sítě).

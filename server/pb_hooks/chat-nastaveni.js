@@ -539,7 +539,7 @@ function overNastaveni(app, auth, name, a) {
     case "order_membership": {
       if (!H.jeAdmin(auth)) return "Error: only an administrator orders the membership.";
       if (!hosted) return "Error: membership orders exist only on hosted instances. Tell the user plainly.";
-      if (String(a.tier || "cloud-lite") !== "cloud-lite" || String(a.period || "year") !== "year") return "Error: by bank transfer only the yearly Cloud Lite plan can be ordered (tier \"cloud-lite\", period \"year\"); other plans are paid by card in Organization settings → Membership.";
+      if (String(a.tier || "cloud-lite") !== "cloud-lite" || String(a.period || "year") !== "year") return "Error: by bank transfer only the yearly Cloud Start plan can be ordered (tier \"cloud-lite\", period \"year\"); other plans are paid by card in Organization settings → Membership.";
       if (!H.billingKompletni((H.billingNacti(app) || {}))) return "Error: billing details are incomplete (company, street, city, zip are required) — fill them in first with set_billing (the user confirms), then order.";
       return null;
     }
@@ -794,7 +794,7 @@ function provedNastaveni(app, auth, L, name, a, ktx) {
     case "order_membership": {
       const r = http("POST", "/api/kb/order-transfer", { tier: "cloud-lite", period: "year" });
       if (r.status !== 200) return { text: chybaHttp(r) };
-      return { text: "The yearly Cloud Lite membership was ordered by bank transfer; the invoice with payment details arrives by e-mail at the billing address. Nothing is paid yet — the membership is activated after the payment." };
+      return { text: "The yearly Cloud Start membership was ordered by bank transfer; the invoice with payment details arrives by e-mail at the billing address. Nothing is paid yet — the membership is activated after the payment." };
     }
     default: return { text: `Error: unknown settings tool ${name}.` };
   }
@@ -923,7 +923,7 @@ function popisNastaveni(app, auth, L, name, a) {
       const pz = poziceDle(app, a.position);
       return cs ? `Odebrat pozici ${q(pz ? pz.title : a.position)} z organizační struktury` : `Remove the position ${q(pz ? pz.title : a.position)} from the org structure`;
     }
-    case "order_membership": return cs ? "Objednat roční členství Cloud Lite převodem — vznikne závazná objednávka, faktura přijde e-mailem" : "Order the yearly Cloud Lite membership by bank transfer — a binding order is created, the invoice arrives by e-mail";
+    case "order_membership": return cs ? "Objednat roční členství Cloud Start převodem — vznikne závazná objednávka, faktura přijde e-mailem" : "Order the yearly Cloud Start membership by bank transfer — a binding order is created, the invoice arrives by e-mail";
     default: return name;
   }
 }

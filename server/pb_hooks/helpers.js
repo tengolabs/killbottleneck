@@ -191,7 +191,7 @@ function pracovatSeNesmi() {
 
 // Strop počtu uživatelů instance (KB_MAX_USERS; 0/prázdné = bez omezení).
 //
-// Zavedeno 6. 8. 2026 s registračním trychtýřem: zkušebka i tarif Cloud Lite
+// Zavedeno 6. 8. 2026 s registračním trychtýřem: zkušebka i tarif Cloud Start
 // mají 2 křesla, Privát je nemá omezená vůbec („platíte za server, ne za lidi").
 // Do té doby produkt strop NEZNAL, takže by ho zkušebka neměla.
 //
@@ -218,7 +218,7 @@ function userCount(app) {
 }
 
 // PŘES stropem, ne jen na něm. Vzniká jediným způsobem: zkušebka počet lidí
-// neomezuje, ale placený Cloud Lite je pro dva — kdo si ve zkušebce nasadí pět
+// neomezuje, ale placený Cloud Start je pro dva — kdo si ve zkušebce nasadí pět
 // lidí a koupí Lite, má rázem o tři účty víc, než za kolik platí. Nechat je tam
 // běžet by znamenalo, že si tarif pro dva koupí kdokoli pro celou firmu.
 // Účty ale NEMAŽEME my: zákazník musí sám rozhodnout, kdo zůstane.

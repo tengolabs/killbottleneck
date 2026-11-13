@@ -1,17 +1,21 @@
 // UI: košík členství v Nastavení organizace (/admin/users) na hostované instanci.
 // Do 14. 10. 2026 nabízel srpnové tarify (Privát 249/490 Kč, Lite 290 Kč/rok) a kartu
 // nikde. Od té doby (rozhodnutí Richarda 14. 10.): samoobsluha kartou/převodem JEN
-// zkušebka → Cloud Lite; Pro / AI Agent (stěhování na vlastní server) a změna tarifu
+// zkušebka → Cloud Start; Pro / AI Agent (stěhování na vlastní server) a změna tarifu
 // u instance, která už platí, přes „Napsat nám" — jinak by si platící zákazník koupil
 // druhé předplatné a přechod na vlastní server by po platbě neproběhl.
 // Hlídá se, že to správce opravdu VIDÍ a že tlačítka vedou tam, kam mají:
-//  · tři současné tarify, žádný Privát; pod každým, co obsahuje; odkaz na ceník webu
+// Od 12. 11. 2026 košík zrcadlí veřejný ceník: Neomezená AI (1 / do 5 / do 12 lidí) + KB Cloud
+// Lite, Pro a AI Agent schované; delší období se ukazuje jako cena ZA MĚSÍC s celkovou částkou
+// menším písmem pod ní; zkušebka zaplatí kartou i Neomezenou AI (zůstává na sdíleném serveru).
+//  · nabídka jako web (4 karty, žádný Pro/Agent/Privát); pod každou, co obsahuje; odkaz na ceník
+//  · ročně: přeškrtnutá měsíční cena, přepočet na měsíc, pod tím „… Kč ročně“; čtvrtletí stejně
 //  · zkušebka + Lite: karta → link <tarif>-<období> s client_reference_id a předvyplněným
 //    e-mailem; ročně i převodem
-//  · zkušebka + Pro/Agent: ŽÁDNÁ karta ani převod, „Napsat nám" s předmětem tarifu
-//  · zvolené čtvrtletí + přepnutí na Pro → období spadne na rok (žádná cena „undefined")
+//  · zkušebka + Neomezená AI: karta → link tarifu, převod NE, žádné „Napsat nám“
+//  · zvolené čtvrtletí + přepnutí na Neomezenou AI → období spadne na rok (žádná cena „undefined“)
 //  · instance, která už platí: žádná karta ani převod u žádného tarifu
-//  · bez linků: převod ano, věty si neodporují
+//  · bez linků: Lite převod ano, Neomezená AI „Napsat nám“; věty si neodporují
 // SNIMKY=<složka> uloží snímky (galerie ke klik-testu).
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -25,7 +29,8 @@ const HESLO = 'TestHeslo.2026';
 const EMAIL = 'spravce@kosik-e2e.cz';
 // vymyšlené linky (skutečné drží provozní část repa; jejich shodu s webem hlídá jiný test)
 const LINKY = Object.fromEntries(['cloud-lite-month', 'cloud-lite-quarter', 'cloud-lite-year',
-  'cloud-pro-month', 'cloud-pro-year', 'cloud-ai-agent-month', 'cloud-ai-agent-year']
+  'cloud-pro-month', 'cloud-pro-year', 'cloud-ai-agent-month', 'cloud-ai-agent-year',
+  ...[1, 5, 12].flatMap((n) => [`ai-unlimited-${n}-month`, `ai-unlimited-${n}-year`])]
   .map((k) => [k, `https://buy.stripe.com/test_${k.replace(/-/g, '_')}`]));
 const SNIMKY = process.env.SNIMKY || '';
 const den = (posun) => new Date(Date.now() + posun * 86400000).toISOString().slice(0, 10);
@@ -78,6 +83,12 @@ const klik = async (page, testid) => {
 const sekce = (page) => page.$eval('[data-testid="membership-section"]', (el) => el.innerText);
 const href = (page, testid) => page.$eval(`[data-testid="${testid}"]`, (a) => a.href).catch(() => null);
 const je = async (page, testid) => (await page.$(`[data-testid="${testid}"]`)) !== null;
+// cena na kartě tarifu: { velka: 'přeškrtnutá? + přepočet za měsíc', celkem: 'malý řádek pod ní' }
+const cena = async (page, tarif) => ({
+  velka: (await page.$eval(`[data-testid="price-${tarif}"]`, (el) => el.innerText)).replace(/\s+/g, ' ').trim(),
+  skrt: await page.$eval(`[data-testid="was-${tarif}"]`, (el) => (el.querySelector('s') || {}).innerText || ''),
+  celkem: (await page.$eval(`[data-testid="total-${tarif}"]`, (el) => el.innerText)).replace(/\s+/g, ' ').trim(),
+});
 
 (async () => {
   let browser;
@@ -88,10 +99,23 @@ const je = async (page, testid) => (await page.$(`[data-testid="${testid}"]`)) !
     await start(`-e KB_TRIAL_UNTIL=${den(20)} ${linkyEnv(LINKY)}`);
     let { page, ctx } = await kosik(browser);
     let t = await sekce(page);
-    expect(/KB Cloud Lite/.test(t) && /KB Cloud Pro/.test(t) && /KB Cloud AI Agent/.test(t), 'tři současné tarify');
+    expect(/KB Cloud Start/.test(t) && /Neomezená AI · 1 člověk/.test(t) && /Neomezená AI · tým do 5 lidí/.test(t)
+      && /Neomezená AI · firma do 12 lidí/.test(t), 'nabídka jako web: Neomezená AI ×3 + KB Cloud Start');
+    expect(!(await je(page, 'plan-cloud-pro')) && !(await je(page, 'plan-cloud-ai-agent')) && !/KB Cloud Pro|AI Agent/.test(t),
+      'Pro a AI Agent schované (jako na webu)');
     expect(!/Privát|(^|[^0-9])(249|290|490) Kč/.test(t), 'žádný Privát ani srpnové ceny (249 / 290 / 490 Kč)');
-    expect(/990 Kč/.test(t) && /4490 Kč/.test(t) && /8900 Kč/.test(t), 'roční ceny 990 / 4490 / 8900 Kč');
-    expect(/Lidí neomezeně/.test(t) && /Přílohy k úkolům do 5 GB/.test(t) && /Agent Hermes plní úkoly/.test(t),
+    let c = await cena(page, 'cloud-lite');
+    expect(c.velka === '83 Kč za měsíc' && c.skrt === '99 Kč' && c.celkem === '990 Kč ročně',
+      `Lite ročně: přeškrtnuto 99, 83 Kč za měsíc, pod tím 990 Kč ročně („${c.velka}“ / „${c.celkem}“)`);
+    c = await cena(page, 'ai-unlimited-1');
+    expect(c.velka === '324 Kč za měsíc' && c.skrt === '389 Kč' && c.celkem === '3 890 Kč ročně',
+      `Neomezená AI 1 ročně: 324 Kč za měsíc, 3 890 Kč ročně („${c.velka}“ / „${c.celkem}“)`);
+    c = await cena(page, 'ai-unlimited-5');
+    const c12 = await cena(page, 'ai-unlimited-12');
+    expect(c.velka === '908 Kč za měsíc' && c.skrt === '1 089 Kč' && c.celkem === '10 890 Kč ročně'
+      && c12.velka === '1 741 Kč za měsíc' && c12.skrt === '2 089 Kč' && c12.celkem === '20 890 Kč ročně',
+    `Neomezená AI 5 a 12 ročně: 908 / 1 741 Kč za měsíc („${c.velka}“, „${c12.velka}“)`);
+    expect(/Lidí neomezeně/.test(t) && /Až 5 lidí píše asistentovi bez kvóty/.test(t) && /KB Cloud Start se všemi funkcemi v ceně/.test(t),
       'pod tarify je vypsané, co obsahují');
     const web = await page.$eval('[data-testid="compare-plans"]', (a) => ({ href: a.href, target: a.target })).catch(() => null);
     expect(web && web.href === 'https://killbottleneck.cz/ceny' && web.target === '_blank',
@@ -107,34 +131,41 @@ const je = async (page, testid) => (await page.$(`[data-testid="${testid}"]`)) !
 
     console.log('== zkušebka: Lite čtvrtletně ==');
     await klik(page, 'period-quarter');
-    t = await sekce(page);
-    expect(/279 Kč/.test(t), 'čtvrtletí 279 Kč');
+    c = await cena(page, 'cloud-lite');
+    expect(c.velka === '93 Kč za měsíc' && c.skrt === '99 Kč' && c.celkem === '279 Kč čtvrtletně',
+      `čtvrtletí: 93 Kč za měsíc, pod tím 279 Kč čtvrtletně („${c.velka}“ / „${c.celkem}“)`);
+    c = await cena(page, 'ai-unlimited-1');
+    expect(c.velka === '324 Kč za měsíc' && c.celkem === '3 890 Kč ročně', 'Neomezená AI čtvrtletí nemá → ukazuje roční cenu');
     expect(!(await je(page, 'order-transfer')), 'čtvrtletí převodem NE');
     h = await href(page, 'pay-card');
     expect(h && h.startsWith(LINKY['cloud-lite-quarter']), 'karta → link Lite čtvrtletně');
 
-    console.log('== zkušebka: přepnutí na Pro ze čtvrtletí ==');
-    await klik(page, 'plan-cloud-pro');
+    console.log('== zkušebka: přepnutí na Neomezenou AI ze čtvrtletí ==');
+    await klik(page, 'plan-ai-unlimited-5');
     t = await sekce(page);
-    expect(!(await je(page, 'period-quarter')), 'Pro nemá čtvrtletí');
+    expect(!(await je(page, 'period-quarter')), 'Neomezená AI nemá čtvrtletí');
     expect(await page.$eval('[data-testid="period-year"]', (el) => el.getAttribute('aria-checked')) === 'true',
       'období spadlo na rok');
     expect(!/undefined|NaN/.test(t), 'žádná rozbitá cena');
-    expect(!(await je(page, 'pay-card')) && !(await je(page, 'order-transfer')),
-      'Pro: ŽÁDNÁ karta ani převod (stěhování na vlastní server se domlouvá)');
-    h = await href(page, 'write-us');
-    expect(h && h.startsWith('mailto:support@killbottleneck.com') && decodeURIComponent(h).includes('KB Cloud Pro'),
-      '„Napsat nám“ → e-mail na support s tarifem v předmětu');
-    expect(/Přechod na vlastní server s vámi domluvíme e-mailem/.test(t), 'a vysvětlí proč');
-    await snimek(page, '2-zkusebka-pro');
+    h = await href(page, 'pay-card');
+    expect(h && h.startsWith(LINKY['ai-unlimited-5-year'] + '?') && /client_reference_id=/.test(h)
+      && h.includes(`prefilled_email=${encodeURIComponent(EMAIL)}`),
+    'Neomezená AI ze zkušebky: karta → link tarifu ročně s client_reference_id a e-mailem');
+    expect(!(await je(page, 'order-transfer')) && !(await je(page, 'write-us')), 'převod ani „Napsat nám“ se nenabízí (jde to samo kartou)');
+    const pozn = await page.$eval('[data-testid="membership-note"]', (el) => el.innerText);
+    expect(/e-mail, se kterým jste instanci zakládali/.test(pozn) && !/převodem/.test(pozn),
+      'řekne, jakým e-mailem platit, a nemluví o převodu');
+    await snimek(page, '2-zkusebka-neomezena-ai');
 
-    console.log('== zkušebka: AI Agent měsíčně ==');
-    await klik(page, 'plan-cloud-ai-agent');
+    console.log('== zkušebka: Neomezená AI pro 12 měsíčně ==');
+    await klik(page, 'plan-ai-unlimited-12');
     await klik(page, 'period-month');
-    t = await sekce(page);
-    expect(/890 Kč/.test(t) && /449 Kč/.test(t) && /99 Kč/.test(t), 'měsíční ceny 99 / 449 / 890 Kč');
-    expect(!(await je(page, 'pay-card')), 'AI Agent: žádná karta');
-    expect(decodeURIComponent((await href(page, 'write-us')) || '').includes('KB Cloud AI Agent'), '„Napsat nám“ s AI Agentem');
+    c = await cena(page, 'ai-unlimited-12');
+    const cl = await cena(page, 'cloud-lite');
+    expect(c.velka === '2 089 Kč za měsíc' && c.skrt === '' && c.celkem === '' && cl.velka === '99 Kč za měsíc' && cl.celkem === '',
+      `měsíčně: plná měsíční cena bez přeškrtnutí a bez řádku pod ní („${c.velka}“, „${cl.velka}“)`);
+    h = await href(page, 'pay-card');
+    expect(h && h.startsWith(LINKY['ai-unlimited-12-month'] + '?'), 'karta → link Neomezené AI 12 měsíčně');
 
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
     await page.setViewport({ width: 390, height: 844 });
@@ -151,12 +182,16 @@ const je = async (page, testid) => (await page.$(`[data-testid="${testid}"]`)) !
     expect(!(await je(page, 'plan-cloud-lite')), 'aktivní členství: karty tarifů jsou sbalené');
     await klik(page, 'tarify-toggle');
     expect(await je(page, 'plan-cloud-lite'), '„Porovnat a změnit tarif“ karty rozbalí');
-    for (const tarif of ['cloud-lite', 'cloud-pro', 'cloud-ai-agent']) {
+    for (const tarif of ['ai-unlimited-1', 'ai-unlimited-5', 'ai-unlimited-12', 'cloud-lite']) {
       await klik(page, `plan-${tarif}`);
       expect(!(await je(page, 'pay-card')) && !(await je(page, 'order-transfer')) && await je(page, 'write-us'),
         `${tarif}: žádný druhý nákup, jen „Napsat nám“`);
     }
     expect(/ať neplatíte dvakrát/.test(await sekce(page)), 'vysvětlí proč (žádné druhé předplatné)');
+    await klik(page, 'plan-ai-unlimited-1');
+    h = await href(page, 'write-us');
+    expect(h && h.startsWith('mailto:support@killbottleneck.com') && decodeURIComponent(h).includes('Neomezená AI · 1 člověk'),
+      '„Napsat nám“ → e-mail na support s tarifem v předmětu');
     await snimek(page, '3-aktivni-clenstvi');
     await ctx.close();
 
@@ -170,6 +205,11 @@ const je = async (page, testid) => (await page.$(`[data-testid="${testid}"]`)) !
     t = await sekce(page);
     expect(/zvolte roční platbu převodem/.test(t) && !/zatím prosím převodem \(roční\)/.test(t),
       'měsíčně: rada bez rozporu (převod jen ročně)');
+    await klik(page, 'plan-ai-unlimited-1');
+    t = await sekce(page);
+    expect(!(await je(page, 'pay-card')) && !(await je(page, 'order-transfer')) && await je(page, 'write-us')
+      && /napište nám prosím/.test(t) && !/převodem/.test(await page.$eval('[data-testid="membership-note"]', (el) => el.innerText)),
+    'Neomezená AI bez linku: „Napsat nám“, o převodu ani slovo');
     await ctx.close();
   } catch (err) {
     fail++;

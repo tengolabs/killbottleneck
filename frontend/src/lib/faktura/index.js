@@ -1,5 +1,5 @@
 // PDF faktury v PROHLÍŽEČI (9. 10. 2026): z DTO faktury (/chat/faktura/{id}) vyrobí pdf-lib dokument — server
-// soubor nikdy nedostane a nic se neukládá (Cloud Lite cizí soubory neukládá); PDF jde vyrobit kdykoli znovu 1:1,
+// soubor nikdy nedostane a nic se neukládá (Cloud Start cizí soubory neukládá); PDF jde vyrobit kdykoli znovu 1:1,
 // protože faktura nese snímky dodavatele i odběratele. Knihovny (pdf-lib, fontkit, qrcode-generator) a fonty
 // KB Sans (podmnožina Liberation Sans, OFL, public/fonts/pdf/) se načítá líně — statický import je zakázaný (lite-bundle.js).
 import { getLib, nactiFont } from '@/lib/pdf';

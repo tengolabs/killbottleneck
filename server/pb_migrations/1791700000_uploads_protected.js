@@ -7,7 +7,7 @@
 // takže ji stačí zpřísnit: čtení jen vlastník, soubor chráněný (file-token + view),
 // a zápis zamknout (checkup 2. 11. 2026): createRule null = jen superuser — jinak by
 // kdokoli přihlášený plnil disk 25MB soubory do kolekce, kterou aplikace nepoužívá
-// (Cloud Lite nahrávání nemá, tohle by ho obešlo).
+// (Cloud Start nahrávání nemá, tohle by ho obešlo).
 migrate((app) => {
   const c = app.findCollectionByNameOrId("uploads");
   c.viewRule = "owner = @request.auth.id";

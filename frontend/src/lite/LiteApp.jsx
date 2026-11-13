@@ -152,7 +152,7 @@ export default function LiteApp() {
           (Richard 6.–7. 8. 2026: „v lite není logo vůbec a to je taky škoda"; světlá a tmavá
           verze, kolečko s hadem má natvrdo tmavé pozadí). Vpravo cesta do celé aplikace —
           dole za seznamem ji na telefonu nikdo nenašel a nápis „plná verze" si jeden uživatel
-          vyložil jako nákup placené verze (ceník má tarif „Cloud Lite"), proto „Celá aplikace".
+          vyložil jako nákup placené verze (ceník má tarif „Cloud Start"), proto „Celá aplikace".
           Prosté <button>, ne shadcn — Radix by rozbil lite-bundle.js. */}
       <header className="max-w-xl mx-auto px-4 pt-4 pb-1 flex items-center gap-2" data-testid="lite-hlavicka">
         <button

@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.1.1": {
+    cs: [
+      "Při zakládání nového projektu se asistent zeptá, jestli budete řešitelem kroků, rovnou v první kartě otázek — o jedno klikání méně.",
+      "Když odpovíte „já“, asistent vás jako řešitele zapíše správně a už se znovu neptá.",
+      "Návod Telefon v nápovědě popisuje, že v telefonu máte celou aplikaci i zjednodušené zobrazení.",
+    ],
+    en: [
+      "When you start a new project, the assistant asks whether you'll own the steps right in the first question card — one click less.",
+      "When you answer \"me\", the assistant records you as the owner correctly and doesn't ask again.",
+      "The Phone guide in the help now says you get the full app on a phone as well as the simplified view.",
+    ],
+  },
   "v1.1.0": {
     cs: [
       "Asistenta jde přesunout doleva: tlačítko ⇄ v hlavičce, nebo hlavičku chyťte a přetáhněte k druhému okraji. Kancelář, akvárko i velký náhled se pak otevírají napravo od něj.",

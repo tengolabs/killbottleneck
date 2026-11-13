@@ -1,4 +1,4 @@
-// Přechod ze zkušebky (bez stropu lidí) na Cloud Lite (dva) — účtů je víc,
+// Přechod ze zkušebky (bez stropu lidí) na Cloud Start (dva) — účtů je víc,
 // než na kolik tarif je.
 //
 // Richardův nález 6. 8. 2026: „nemůžu přece mít v lite 5 lidí, když je pro 2.
@@ -80,7 +80,7 @@ async function main() {
       token: tok, body: { title: 'Práce ze zkušebky', nodes: [], edges: [] } });
     expect(zapis.status === 200, 'a normálně se pracuje');
 
-    console.log('== zaplatí Cloud Lite (pro dva) — zámek, dokud účty neprobere ==');
+    console.log('== zaplatí Cloud Start (pro dva) — zámek, dokud účty neprobere ==');
     await start(`-e KB_MAX_USERS=2`);   // povýšeno: strop 2, zkušebka pryč
     const tok2 = await prihlas('sef@firma.cz');
     expect(!!tok2, 'přihlášení funguje dál (nikoho jsme nevyhodili)');

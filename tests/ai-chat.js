@@ -699,6 +699,23 @@ H.beh(async () => {
     rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: cid8, message: '1) Ano, řeším je já — přidej do mapy Dodávka sad' } });
     const kAdd = rr.json.chat.messages.flatMap((m) => m.karty || []).filter((x) => x.type === 'akce' && x.stav === 'ceka').pop();
     expect(!!kAdd && /Přidat do projektu „Dodávka sad“ uzly: Další hovor · přiřazeno: admin@example\.com/.test(kAdd.popis), `karta add_nodes ukáže řešitele (${kAdd && kAdd.popis})`);
+    // 12. 11. 2026 (measurement): a write the server REJECTED wrote nothing → the assignee answer stays valid
+    // (before: tree rejected for its format, corrected tree then failed "not asked" → the model asked a second time)
+    const cid9 = await zeptejResitele();
+    fronta.push(nastroj('create_project', { title: 'Sklad Brno', goal: 'Sklad', outline: 'Najít prostor' }),
+      nastroj('create_project', { title: 'Sklad Brno', goal: 'Sklad', outline: [{ title: 'Najít prostor', deadline: den(3), owner: 'me' }] }));
+    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: cid9, message: '1) Ano, řeším je já — založ projekt' } });
+    const tool9 = rr.json.chat.messages.filter((m) => m.role === 'tool').map((m) => String(m.content || ''));
+    const k9 = rr.json.chat.messages.flatMap((m) => m.karty || []).filter((x) => x.type === 'akce' && x.stav === 'ceka').pop();
+    expect(tool9.some((t) => /expected array/.test(t)) && !tool9.some((t) => /has not been asked/.test(t)) && !!k9 && /Sklad Brno/.test(k9.popis), `odmítnutý pokus nezneplatní odpověď na řešitele → opravený strom rovnou na kartu (${tool9.map((t) => t.slice(0, 40)).join(' | ')})`);
+    // update_node takes owner "me" like new steps do (before: "Unknown owner \"me\"")
+    fronta.push(nastroj('update_node', { map_id: 'Dodávka sad', node_id: 'Bez řešitele', owner: 'me' }));
+    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: cid8, message: 'Krok Bez řešitele v Dodávka sad řeším taky já' } });
+    expect(!rr.json.chat.messages.some((m) => m.role === 'tool' && /Unknown owner/.test(m.content || '')), 'update_node owner „me“ projde kontrolou');
+    p = await potvrdPosledni(rr.json.chat.id, 'Hotovo.');
+    const sady2 = (await inst.api('GET', `/api/collections/goalmaps/records?filter=(title='Dodávka sad')`, { token: A })).json.items[0];
+    const bez2 = ((sady2 && sady2.nodes.find((n) => (n.data || {}).title === 'Bez řešitele')) || {}).data || {};
+    expect(bez2.owner === 'admin@example.com', `update_node owner „me“ = e-mail uživatele (${bez2.owner})`);
     expect(/do textu pro uživatele ho nikdy nepiš/.test(systemZ(posledniVolani())), 'systémová instrukce: „me“ nepsat do textu');
     expect(md.status === 200 && JSON.stringify(md.json).includes('Dodat 105 sad'), `krok s řešitelem je v Můj den (${md.status})`);
   }
@@ -799,6 +816,17 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat/potvrdit', { token: A, body: { chat_id: chatN.id, action_ids: kartyN.map((k) => k.id), ok: true } });
   expect(r.status === 200 && /den je uzavřený/.test(r.json.chat.messages[r.json.chat.messages.length - 1].content), `Provést vše → obě provedeny, model dopoví (${r.status})`);
   expect((await inst.api('GET', '/api/kb/chat/seznam', { token: A })).json.chats.length >= 1 && (await inst.api('GET', '/api/collections/goalmaps/records?filter=' + encodeURIComponent('title="Oslava"'), { token: A })).json.totalItems === 1, 'projekt Oslava skutečně založen');
+  // 12. 11. 2026 (Richard: A): card keeps at most 3 questions, but the assignee question passes on top — trimmed
+  // away it came back as a separate round (measured: 12/12 first cards had it, all cut, 20/24 asked again)
+  const q5 = (resitel) => ['Termín?', 'Rozpočet?', 'Prostory?', 'Personál?'].map((t) => ({ text: t, options: ['A', 'B'] })).concat(resitel ? [{ text: 'Chcete být řešitelem kroků s termínem? Pak je uvidíte v Můj den.', options: ['Ano, řeším je já', 'Ne, nechat bez řešitele'] }] : []);
+  fronta.push(nastroj('ask_user', { questions: q5(true) }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Kavárna u nádraží', context: { route: '/' } } });
+  let qk = ((r.json.chat.messages.at(-1).karty || []).find((k) => k.type === 'otazky') || {}).questions || [];
+  expect(qk.length === 4 && /řešitelem kroků/.test(qk[3].text) && qk[2].text === 'Prostory?', `3 otázky + řešitel navíc projde (${qk.map((q) => q.text).join(' | ')})`);
+  fronta.push(nastroj('ask_user', { questions: q5(false) }));
+  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Kavárna u nádraží 2', context: { route: '/' } } });
+  qk = ((r.json.chat.messages.at(-1).karty || []).find((k) => k.type === 'otazky') || {}).questions || [];
+  expect(qk.length === 3, `bez otázky na řešitele zůstává strop 3 (${qk.length})`);
   // Richard 30. 9. (zápisnice s termínem): řešitel se ptá v TÉŽE otázce jako doporučení → po Ano rovnou karta, žádná druhá otázka
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { mode: 'nocni', message: '', context: { route: '/' } } });
   const chatT = r.json.chat;

@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Vystavené faktury (asistent, 9. 10. 2026). Faktura je NEMĚNNÁ: nese snímek dodavatele (`supplier`) i odběratele
 // (`customer`) z okamžiku vystavení — pozdější změna adresy klienta ji nemění a PDF jde kdykoli vygenerovat
-// znovu 1:1 (PDF se NIKDY neukládá, jen data — Cloud Lite cizí soubory neukládá). Oprava = nová faktura.
+// znovu 1:1 (PDF se NIKDY neukládá, jen data — Cloud Start cizí soubory neukládá). Oprava = nová faktura.
 // Částky (`subtotal`, `vat`, `total`) počítá VÝHRADNĚ server z položek — model žádné částky nepočítá.
 // Číselná řada: jedna na instanci a rok (`year`, `number`), BEZ DĚR — unikátní index je jediná pravda,
 // číslo přiděluje faktury.js v transakci (MAX+1 + opakování při kolizi), NE čítač jako project_number.

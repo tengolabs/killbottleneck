@@ -18,11 +18,29 @@
     "hintTrial": "Your trial runs until {{date}}. Choose a plan and payment method — your data and address stay unchanged.",
     "planLabel": "Plan",
     "plan": {
-      "cloud-lite": "KB Cloud Lite",
+      "ai-unlimited-1": "Unlimited AI · 1 person",
+      "ai-unlimited-5": "Unlimited AI · team of up to 5",
+      "ai-unlimited-12": "Unlimited AI · company of up to 12",
+      "cloud-lite": "KB Cloud Start",
       "cloud-pro": "KB Cloud Pro",
       "cloud-ai-agent": "KB Cloud AI Agent"
     },
     "features": {
+      "ai-unlimited-1": [
+        "KB Cloud Start with every feature included",
+        "1 person uses the assistant without a quota",
+        "Everyone else keeps 50 turns a week"
+      ],
+      "ai-unlimited-5": [
+        "KB Cloud Start with every feature included",
+        "Up to 5 people use the assistant without a quota",
+        "Everyone else keeps 50 turns a week"
+      ],
+      "ai-unlimited-12": [
+        "KB Cloud Start with every feature included",
+        "Up to 12 people use the assistant without a quota",
+        "Everyone else keeps 50 turns a week"
+      ],
       "cloud-lite": [
         "Shared server in Germany, HTTPS",
         "Unlimited people",
@@ -47,24 +65,25 @@
     "compareLink": "Compare plans on the website",
     "pricingUrl": "https://killbottleneck.com/pricing",
     "periodLabel": "Billing period",
-    "period": {
-      "year": "year",
-      "quarter": "3 months",
-      "month": "month"
-    },
     "periodPick": {
       "month": "Monthly",
       "quarter": "Quarterly",
       "year": "Yearly"
     },
+    "perMonth": "per month",
+    "total": {
+      "year": "{{amount}} CZK billed yearly",
+      "quarter": "{{amount}} CZK billed quarterly"
+    },
     "yearFree": "A year = 10 monthly payments, 2 months free.",
     "payByCard": "Pay by card",
     "cardUnavailable": "Card payment is coming soon — please use bank transfer (yearly) or contact support@killbottleneck.com.",
     "cardUnavailableNoTransfer": "Card payment is coming soon — choose yearly payment by bank transfer or contact support@killbottleneck.com.",
+    "cardUnavailableWrite": "Card payment is coming soon — please write to us at support@killbottleneck.com.",
     "payerEmail": "When paying by card, use the e-mail you created the instance with — we activate your membership based on it.",
     "writeUs": "Write to us",
     "mailSubject": "Plan change: {{plan}} ({{period}}) — instance {{slug}}",
-    "ownServerByMail": "We'll arrange the move to your own server with you by e-mail — we set up the server and move your data. In the app, card payment is currently available for KB Cloud Lite.",
+    "ownServerByMail": "We'll arrange the move to your own server with you by e-mail — we set up the server and move your data. In the app, card payment is available for KB Cloud Start and Unlimited AI.",
     "changeByMail": "We'll arrange a change of plan or billing period with you by e-mail so you don't pay twice — we adjust your existing subscription instead of adding a second one.",
     "orderByTransfer": "Order via bank transfer (invoice)",
     "transferYearlyOnly": "Bank transfer is only available for the yearly plan.",

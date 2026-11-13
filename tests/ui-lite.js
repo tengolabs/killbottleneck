@@ -369,7 +369,7 @@ const clickText = async (page, text, sel = 'button, a') => {
 
     console.log('== odchod do celé aplikace a zpět (nikoho neuvěznit) ==');
     // 4. 10. 2026: „Přepnout na plnou verzi" → „Otevřít celou aplikaci". Jeden uživatel si
-    // myslel, že tím KUPUJE plnou verzi (ceník má tarif „Cloud Lite"). Slovo „verze" tu nesmí být.
+    // myslel, že tím KUPUJE plnou verzi (ceník má tarif „Cloud Start"). Slovo „verze" tu nesmí být.
     const dolni = await page.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.innerText.trim()).filter((x) => /verz/i.test(x)));
     expect(dolni.length === 0, `žádné tlačítko neříká „verze" (${dolni.join(' | ') || 'žádné'})`);
     expect(await clickText(page, 'Otevřít celou aplikaci'), 'klik na Otevřít celou aplikaci (dole za seznamem)');

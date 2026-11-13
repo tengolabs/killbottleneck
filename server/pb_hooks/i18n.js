@@ -771,7 +771,7 @@ const STRINGS = {
   },
   // Zkušebka: AI je jediné, co je v ní omezené. Hláška to musí říct nahlas,
   // ať si zákazník nemyslí, že takhle skoupý je produkt sám.
-  // Přechod ze zkušebky (bez stropu lidí) na Cloud Lite (dva) — účtů je víc, než
+  // Přechod ze zkušebky (bez stropu lidí) na Cloud Start (dva) — účtů je víc, než
   // na kolik tarif je. Zámek drží, dokud si zákazník účty neprobere.
   "err.stehujeme": {
     cs: "Přesouváme vaši instanci na váš vlastní server. Chvíli nejde nic ukládat — "
@@ -1657,7 +1657,7 @@ const STRINGS = {
     en: "The subscription has ended. Your data is safe and can be exported; to keep editing, renew the subscription — killbottleneck.com/pricing.",
   },
 
-  // strop uživatelů (zkušebka a tarif Cloud Lite mají 2 křesla)
+  // strop uživatelů (zkušebka a tarif Cloud Start mají 2 křesla)
   "err.userLimitReached": {
     cs: "Tenhle killBottleneck má obsazená všechna místa. Uvolněte místo smazáním účtu, nebo přejděte na tarif bez omezení počtu lidí — killbottleneck.cz/ceny.",
     en: "This killBottleneck has all its seats taken. Free one up by removing an account, or move to a plan without a seat limit — killbottleneck.com/pricing.",

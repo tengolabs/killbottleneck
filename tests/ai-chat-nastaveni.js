@@ -547,7 +547,7 @@ H.beh(async () => {
   expect(!jmenaNastroju(volani[volani.length - 2]).includes('set_ai_settings') && jmenaNastroju(volani[volani.length - 2]).includes('set_billing') && jmenaNastroju(volani[volani.length - 2]).includes('order_membership'), 'hosted: nabídka bez set_ai_settings, s fakturací a objednávkou');
   expect(toolZ(posledniVolani()).some((m) => /not available in this conversation/.test(m.content)), 'volání set_ai_settings na hosted → nedostupné');
   fronta.push(nastroj('order_membership', {}));
-  r = await instH.api('POST', '/api/kb/chat', { token: HA, body: { chat_id: chatH.id, message: 'Objednej roční Cloud Lite' } });
+  r = await instH.api('POST', '/api/kb/chat', { token: HA, body: { chat_id: chatH.id, message: 'Objednej roční Cloud Start' } });
   expect(toolZ(posledniVolani()).some((m) => /billing details are incomplete/.test(m.content)), 'objednávka bez fakturačních údajů → chyba s radou');
   fronta.push(nastroj('set_billing', { company: 'Tengo s.r.o.', street: 'Dlouhá 1', city: 'Praha', zip: '11000', email: 'spatny-mail' }));
   r = await instH.api('POST', '/api/kb/chat', { token: HA, body: { chat_id: chatH.id, message: 'Fakturační údaje…' } });
@@ -569,7 +569,7 @@ H.beh(async () => {
   bill = (await instH.api('GET', '/api/kb/billing', { token: HA })).json;
   expect(bill.billing.ico === '03339165' && bill.billing.company === 'Tengo s.r.o.', 'částečná změna fakturace sloučila s uloženým');
   fronta.push(nastroj('order_membership', {}));
-  r = await instH.api('POST', '/api/kb/chat', { token: HA, body: { chat_id: chatH.id, message: 'Objednej roční Cloud Lite' } });
+  r = await instH.api('POST', '/api/kb/chat', { token: HA, body: { chat_id: chatH.id, message: 'Objednej roční Cloud Start' } });
   chatH = r.json.chat;
   const kOrd = posledniKarta(chatH, 'akce');
   expect(!!kOrd && /závazná objednávka/.test(kOrd.popis) && /Tengo s\.r\.o\., Dlouhá 1, 11000 Praha/.test(kOrd.detail), `karta objednávky se silným textem a údaji (${kOrd && kOrd.popis} | ${kOrd && kOrd.detail})`);

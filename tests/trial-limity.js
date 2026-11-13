@@ -1,4 +1,4 @@
-// Strop počtu uživatelů instance (KB_MAX_USERS) — zkušebka a Cloud Lite mají 2 křesla.
+// Strop počtu uživatelů instance (KB_MAX_USERS) — zkušebka a Cloud Start mají 2 křesla.
 //
 // Zavedeno 6. 8. 2026 s registračním trychtýřem. Produkt do té doby žádný strop
 // NEZNAL, takže by zkušebka byla neomezená a slib „2 lidé" na webu by nebyl pravda.

@@ -1192,7 +1192,7 @@ onRecordCreateRequest((e) => {
   } else {
     // NAHRANÝ SOUBOR — v hostované verzi vypnutý. Cizí soubory jsou pro
     // provozovatele nejdražší část hostingu (místo, každá záloha, DPA,
-    // odpovědnost za obsah), takže Cloud Lite jede jen na odkazy. Self-host má
+    // odpovědnost za obsah), takže Cloud Start jede jen na odkazy. Self-host má
     // vlastní disk a vlastní starost → beze změny.
     //   KB_FILES_MB:  0 = nahrávání vypnuté | číslo = strop CELÉ instance v MB
     //                 | prázdné = bez omezení (výchozí, self-host)
@@ -2834,7 +2834,7 @@ routerUse((e) => {
     return e.json(402, { error: t(userLang(e.auth), "err.predplatneSkoncilo"), code: "subscription_ended" });
   }
   // Účtů je víc, než na kolik je tarif. Stane se přechodem ze zkušebky (ta počet
-  // lidí neomezuje) na Cloud Lite (dva). Zápis se zamkne, dokud si zákazník
+  // lidí neomezuje) na Cloud Start (dva). Zápis se zamkne, dokud si zákazník
   // účty neprobere — mazat je za něj nebudeme. Odebírání účtů proto musí projít,
   // jinak by se z toho nedalo dostat.
   // čtecí POSTy (MCP výpisy, výpis sdílení) projdou i při překročeném počtu účtů — záměrně, ne pořadím
@@ -3045,7 +3045,7 @@ kbRoute("GET", "/config", (e) => {
     // než mu pozvánku odmítne server
     max_users: (() => { const { userLimit } = require(`${__hooks}/helpers.js`); return userLimit() || null; })(),
     // Počet účtů posíláme VŽDY, i když strop není. Zkušebka počet lidí
-    // neomezuje, ale Cloud Lite je pro dva — zákazník musí vidět DOPŘEDU, kolik
+    // neomezuje, ale Cloud Start je pro dva — zákazník musí vidět DOPŘEDU, kolik
     // účtů bude muset odebrat, ne to zjistit až po zaplacení. (Richard 6. 8. 2026.)
     user_count: totalUsers[0].c,
     // účel instance (team/family/solo); "" = první admin ještě neodpověděl → dialog

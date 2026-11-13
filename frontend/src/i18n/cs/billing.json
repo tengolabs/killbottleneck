@@ -18,11 +18,29 @@
     "hintTrial": "Zkušební verze běží do {{date}}. Vyberte tarif a způsob platby — data i adresa zůstanou beze změny.",
     "planLabel": "Tarif",
     "plan": {
-      "cloud-lite": "KB Cloud Lite",
+      "ai-unlimited-1": "Neomezená AI · 1 člověk",
+      "ai-unlimited-5": "Neomezená AI · tým do 5 lidí",
+      "ai-unlimited-12": "Neomezená AI · firma do 12 lidí",
+      "cloud-lite": "KB Cloud Start",
       "cloud-pro": "KB Cloud Pro",
       "cloud-ai-agent": "KB Cloud AI Agent"
     },
     "features": {
+      "ai-unlimited-1": [
+        "KB Cloud Start se všemi funkcemi v ceně",
+        "1 člověk píše asistentovi bez kvóty",
+        "Ostatní lidé dál 50 tahů týdně"
+      ],
+      "ai-unlimited-5": [
+        "KB Cloud Start se všemi funkcemi v ceně",
+        "Až 5 lidí píše asistentovi bez kvóty",
+        "Ostatní lidé dál 50 tahů týdně"
+      ],
+      "ai-unlimited-12": [
+        "KB Cloud Start se všemi funkcemi v ceně",
+        "Až 12 lidí píše asistentovi bez kvóty",
+        "Ostatní lidé dál 50 tahů týdně"
+      ],
       "cloud-lite": [
         "Sdílený server v Německu, HTTPS",
         "Lidí neomezeně",
@@ -47,24 +65,25 @@
     "compareLink": "Porovnat tarify na webu",
     "pricingUrl": "https://killbottleneck.cz/ceny",
     "periodLabel": "Období platby",
-    "period": {
-      "year": "rok",
-      "quarter": "3 měsíce",
-      "month": "měsíc"
-    },
     "periodPick": {
       "month": "Měsíčně",
       "quarter": "Čtvrtletně",
       "year": "Ročně"
     },
+    "perMonth": "za měsíc",
+    "total": {
+      "year": "{{amount}} Kč ročně",
+      "quarter": "{{amount}} Kč čtvrtletně"
+    },
     "yearFree": "Rok = 10 měsíčních plateb, 2 měsíce zdarma.",
     "payByCard": "Zaplatit kartou",
     "cardUnavailable": "Platba kartou se připravuje — zatím prosím převodem (roční) nebo napište na support@killbottleneck.com.",
     "cardUnavailableNoTransfer": "Platba kartou se připravuje — zvolte roční platbu převodem nebo napište na support@killbottleneck.com.",
+    "cardUnavailableWrite": "Platba kartou se připravuje — napište nám prosím na support@killbottleneck.com.",
     "payerEmail": "Při platbě kartou použijte e-mail, se kterým jste instanci zakládali — podle něj vám členství aktivujeme.",
     "writeUs": "Napsat nám",
     "mailSubject": "Změna tarifu: {{plan}} ({{period}}) — instance {{slug}}",
-    "ownServerByMail": "Přechod na vlastní server s vámi domluvíme e-mailem — připravíme server a data přestěhujeme. Kartou jde v aplikaci zatím zaplatit KB Cloud Lite.",
+    "ownServerByMail": "Přechod na vlastní server s vámi domluvíme e-mailem — připravíme server a data přestěhujeme. Kartou jde v aplikaci zaplatit KB Cloud Start a Neomezená AI.",
     "changeByMail": "Změnu tarifu nebo období s vámi domluvíme e-mailem, ať neplatíte dvakrát — stávající předplatné upravíme, ne že přibude druhé.",
     "orderByTransfer": "Objednat převodem (faktura)",
     "transferYearlyOnly": "Platba převodem je jen u ročního členství.",

@@ -189,6 +189,12 @@ function chatAiConfig(app, modelOverride) {
     cfg.think = false; cfg.numCtx = 0; cfg.extra = vl.extra || null; cfg.tier = "heavy"; cfg.timeout = VLASTNI_TIMEOUT_S;
     return cfg;
   }
+  // stable prompt start (12. 11. 2026): map list frozen per conversation, changes as notes (mapyStav) — for hybrid
+  // models with checkpoint-only cache (Strata). KB_CHAT_STALY_ZACATEK=1 main model, KB_CHAT2_STALY_ZACATEK=1 second model.
+  cfg.stalyZacatek = String(env("CHAT_STALY_ZACATEK") || "") === "1";
+  // stable tool list (12. 11. 2026): tool groups opened mid-conversation arrive as a message at the END (note on the user
+  // message / open_tools result) instead of rewriting the tool list at the start. KB_CHAT_STALE_NASTROJE / KB_CHAT2_STALE_NASTROJE.
+  cfg.staleNastroje = String(env("CHAT_STALE_NASTROJE") || "") === "1";
   const strategie = String(env("CHAT_HYBRID") || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
   const lp = String(env("CHAT_LIGHT_PROVIDER") || "").toLowerCase();
   if (strategie.length && ["ollama", "openai"].includes(lp)) {
@@ -212,6 +218,7 @@ function chatAiConfig(app, modelOverride) {
       koncepty: String(env("CHAT_ROZJEZD_KONCEPTY") || "prvni").toLowerCase() !== "druhy", // výchozí: koncepty textů píše první model
       druhy: { provider: p2, url: env("CHAT2_URL") || "", model: env("CHAT2_MODEL") || "", token: env("CHAT2_TOKEN") || "", think: parseThink(env("CHAT2_THINK")),
         numCtx: Number(env("CHAT2_NUM_CTX") || 0) || 0, extra: extraJson(env("CHAT2_OPENAI_EXTRA")) || null, tier: "heavy", druhy: true,
+        stalyZacatek: String(env("CHAT2_STALY_ZACATEK") || "") === "1", staleNastroje: String(env("CHAT2_STALE_NASTROJE") || "") === "1",
         nastroje: ["all", "historie", "skupiny"].indexOf(String(env("CHAT2_TOOLS") || "all").toLowerCase()) >= 0 ? String(env("CHAT2_TOOLS") || "all").toLowerCase() : "all" } };
     // KB_CHAT2_TOOLS: all = všechny nástroje (stabilní prompt ~24k tok.) · historie = skupiny podle klíčových slov jen ze STARŠÍCH zpráv
     // (nová zpráva prompt nemění → cache drží, prompt ~12k; chybějící skupinu si model otevře open_tools / pojistkou) · skupiny = jako první model
@@ -626,6 +633,14 @@ const P = {
     pamet: "Co si o uživateli pamatuješ (z minula):\n{text}",
     mapy: "Mapy, do kterých uživatel vidí (číslo projektu · název · přístup; archivované tu nejsou — najdeš je search_projects):\n{radky}",
     mapyZadne: "Uživatel zatím nemá žádnou mapu.",
+    // stable prompt start: changes of the map list since the conversation started (mapyStav)
+    mapyZmena: "[Seznam map se od začátku rozhovoru změnil (platí tento stav, ne seznam v úvodu):\n{plus}\n{minus}]",
+    mapyZmenaPlus: "Nové nebo změněné:\n{radky}",
+    mapyZmenaMinus: "Už v seznamu nejsou (smazané, archivované nebo bez přístupu):\n{radky}",
+    mapyAktualni: "[Seznam map se od začátku rozhovoru změnil, aktuální stav (platí místo seznamu v úvodu):\n{radky}]",
+    skupinyNota: "[Systém: otevřena skupina nástrojů {skupiny}. Tyto nástroje máš od teď k dispozici — nejsou v úvodním seznamu, ale volej je stejně jako ostatní:\n{nastroje}\nPokyny k nim:\n{pokyny}]",
+    skupinyNotaZnovu: "Nástroj {nastroj} je ve skupině, kterou jsi ještě neměl — teď ji máš (popis výš). Zavolej {nastroj} znovu se správnými parametry.",
+    skupinyNotaSamostatne: "Error: not executed — open_tools has to be called alone. Call this tool again now.",
     kdeMapa: "v mapě „{title}“",
     kdeMujDen: "na stránce Můj den / Úkoly",
     kdeLite: "ve zjednodušeném zobrazení pro telefon (seznam Co mám dnes dělat; bez mapy — odkaz „Ukázat v mapě“ otevře celou aplikaci)",
@@ -762,8 +777,8 @@ const P = {
       novy_projekt: [
         "REŽIM NOVÝ PROJEKT S AI: pomůžeš uživateli navrhnout a založit nový projekt (mapu). Tenhle postup má PŘEDNOST před obecným pravidlem „rovnou zavolej create_project“ i před obecným pravidlem pro přepis obrázku. Postup:",
         "0) Aplikace na začátku ukázala formulář (cíl projektu + podrobnost plánu). Když uživatel cíl nevyplnil ani nevložil podklady: jednou větou ho vyzvi, ať napíše cíl projektu, nebo vloží podklady ({podklady}), a zavolej ask_user s JEDNOU otázkou „Jaký je cíl projektu?“ a 3 krátkými příklady cílů (uživatel může napsat i vlastní). Nic jiného v tom tahu.",
-        "1) Jakmile znáš cíl (z formuláře, ze zprávy nebo z podkladů), polož přes ask_user PŘESNĚ 3 doplňující otázky, které plán nejvíc zpřesní (termín, rozsah, pro koho to je, rozpočet, co už je hotové), každou se 3 krátkými návrhy odpovědí (nejvýš 5 slov). Z podkladů se ptej jen na to, co chybí. Nic nezakládej. Na podrobnost plánu (Stručná / Detailní / Hloubková) se sám neptej: když ji uživatel zvolil ve formuláři, drž se jí; jinak ji aplikace k tvým otázkám přidá sama.",
-        "2) Po odpovědích navrhni CELÝ strom a zavolej create_project (title; goal = jedna věta, co je cíl; outline) PŘESNĚ podle zvolené podrobnosti: Stručná = 5–7 hlavních kroků bez podkroků · Detailní = PŘESNĚ 3 oblasti, každá 2–3 kroky, nic hlubšího · Hloubková = 3 oblasti → 2–3 kroky → 1–2 podkroky, žádná 4. úroveň, celkem 18–25 uzlů (počítají se oblasti, kroky i podkroky; plných 3 × 3 × 2 je 30 a neprojde — většině kroků dej jen JEDEN podkrok). Kroky řaď chronologicky, názvy nejvýš 8 slov a konkrétní (ne „Plánování“). Termín (deadline) jen když ho uživatel řekl. Uživatel dostane kartu s celým stromem.",
+        "1) Jakmile znáš cíl (z formuláře, ze zprávy nebo z podkladů), polož přes ask_user PŘESNĚ 3 doplňující otázky, které plán nejvíc zpřesní (termín, rozsah, pro koho to je, rozpočet, co už je hotové), každou se 3 krátkými návrhy odpovědí (nejvýš 5 slov). Z podkladů se ptej jen na to, co chybí. Když plán může mít termíny (uživatel zmínil termín nebo datum, nebo se na termín ptáš), přidej do TÉHOŽ volání ask_user ještě otázku „Chcete být řešitelem kroků s termínem? Pak je uvidíte v Můj den.“ s volbami „Ano, řeším je já“ a „Ne, nechat bez řešitele“ — na řešitele se pak už neptej znovu. Nic nezakládej. Na podrobnost plánu (Stručná / Detailní / Hloubková) se sám neptej: když ji uživatel zvolil ve formuláři, drž se jí; jinak ji aplikace k tvým otázkám přidá sama.",
+        "2) Po odpovědích: dostanou-li kroky termín a ještě nevíš, kdo je řeší, zavolej NEJDŘÍV samotnou otázku na řešitele (viz zásady) a strom zatím nenavrhuj — ani v přemýšlení; navrhneš ho až po odpovědi. Pak navrhni CELÝ strom a zavolej create_project (title; goal = jedna věta, co je cíl; outline) PŘESNĚ podle zvolené podrobnosti: Stručná = 5–7 hlavních kroků bez podkroků · Detailní = PŘESNĚ 3 oblasti, každá 2–3 kroky, nic hlubšího · Hloubková = 3 oblasti → 2–3 kroky → 1–2 podkroky, žádná 4. úroveň, celkem 18–25 uzlů (počítají se oblasti, kroky i podkroky; plných 3 × 3 × 2 je 30 a neprojde — většině kroků dej jen JEDEN podkrok). Kroky řaď chronologicky, názvy nejvýš 8 slov a konkrétní (ne „Plánování“). Termín (deadline) jen když ho uživatel řekl. Uživatel dostane kartu s celým stromem.",
         "3) Po „Ne“ na kartě se zeptej přes ask_user „Co změnit?“ s volbami „Jiný rozsah“, „Upravit kroky – napíšu co“ a „Zahodit“.",
         "4) Po založení nabídni přes suggest_next první krok (naplánovat na zítřek, rozebrat první oblast, připravit podklady).",
         "Otázky VŽDY přes ask_user, nikdy v textu.",
@@ -875,6 +890,14 @@ const P = {
     pamet: "What you remember about the user (from before):\n{text}",
     mapy: "Maps the user can see (project number · title · access; archived ones are not listed — search_projects finds them):\n{radky}",
     mapyZadne: "The user has no map yet.",
+    // stable prompt start: changes of the map list since the conversation started (mapyStav)
+    mapyZmena: "[The map list changed since the conversation started (this is the current state, not the list in the introduction):\n{plus}\n{minus}]",
+    mapyZmenaPlus: "New or changed:\n{radky}",
+    mapyZmenaMinus: "No longer listed (deleted, archived or no access):\n{radky}",
+    mapyAktualni: "[The map list changed since the conversation started, current state (replaces the list in the introduction):\n{radky}]",
+    skupinyNota: "[System: tool group {skupiny} is now open. You can use these tools from now on — they are not in the initial list, but call them like any other tool:\n{nastroje}\nInstructions for them:\n{pokyny}]",
+    skupinyNotaZnovu: "The tool {nastroj} is in a group you did not have yet — you have it now (described above). Call {nastroj} again with the right parameters.",
+    skupinyNotaSamostatne: "Error: not executed — open_tools has to be called alone. Call this tool again now.",
     kdeMapa: "in the map \"{title}\"",
     kdeMujDen: "on the My day / Tasks page",
     kdeLite: "in the simplified phone view (the What I need to do today list; no map canvas — the \"Show in map\" link opens the full app)",
@@ -1004,8 +1027,8 @@ const P = {
       novy_projekt: [
         "NEW PROJECT WITH AI MODE: you help the user design and create a new project (map). This procedure takes precedence over the general rule \"call create_project right away\" and over the general rule for image transcripts. Procedure:",
         "0) The app showed a form at the start (project goal + level of detail). When the user left the goal empty and added no material: in one sentence ask them to write the project goal, or add material ({podklady}), and call ask_user with ONE question \"What is the project goal?\" and 3 short example goals (the user can also write their own). Nothing else in that turn.",
-        "1) As soon as you know the goal (from the form, the message or the material), ask via ask_user EXACTLY 3 follow-up questions that sharpen the plan most (deadline, scope, who it is for, budget, what is done already), each with 3 short suggested answers (at most 5 words). From material ask only what is missing. Create nothing. Do not ask about the level of detail (Brief / Detailed / In-depth) yourself: when the user chose it in the form, stick to it; otherwise the app adds it to your questions.",
-        "2) After the answers propose the WHOLE tree and call create_project (title; goal = one sentence on the aim; outline) EXACTLY per the chosen detail: Brief = 5–7 main steps without sub-steps · Detailed = EXACTLY 3 areas, each 2–3 steps, nothing deeper · In-depth = 3 areas → 2–3 steps → 1–2 sub-steps, no 4th level, 18–25 nodes in total (areas, steps and sub-steps all count; a full 3 × 3 × 2 is 30 and will be rejected — give most steps just ONE sub-step). Order steps chronologically, titles at most 8 words and concrete (not \"Planning\"). A deadline only when the user said one. The user gets a card with the whole tree.",
+        "1) As soon as you know the goal (from the form, the message or the material), ask via ask_user EXACTLY 3 follow-up questions that sharpen the plan most (deadline, scope, who it is for, budget, what is done already), each with 3 short suggested answers (at most 5 words). From material ask only what is missing. When the plan may get deadlines (the user mentioned a deadline or date, or you ask about one), add to the SAME ask_user call the question \"Do you want to be the assignee of the steps with a deadline? Then you will see them in My day.\" with the options \"Yes, I handle them\" and \"No, leave them unassigned\" — then do not ask about the assignee again. Create nothing. Do not ask about the level of detail (Brief / Detailed / In-depth) yourself: when the user chose it in the form, stick to it; otherwise the app adds it to your questions.",
+        "2) After the answers: if the steps will get deadlines and you do not know yet who owns them, FIRST call just the owner question (see the rules) and do not design the tree yet — not even in your reasoning; design it after the answer. Then propose the WHOLE tree and call create_project (title; goal = one sentence on the aim; outline) EXACTLY per the chosen detail: Brief = 5–7 main steps without sub-steps · Detailed = EXACTLY 3 areas, each 2–3 steps, nothing deeper · In-depth = 3 areas → 2–3 steps → 1–2 sub-steps, no 4th level, 18–25 nodes in total (areas, steps and sub-steps all count; a full 3 × 3 × 2 is 30 and will be rejected — give most steps just ONE sub-step). Order steps chronologically, titles at most 8 words and concrete (not \"Planning\"). A deadline only when the user said one. The user gets a card with the whole tree.",
         "3) After \"No\" on the card ask via ask_user \"What to change?\" with the options \"Different detail\", \"Edit the steps – I will write what\" and \"Discard\".",
         "4) After creation offer via suggest_next the first step (plan it for tomorrow, break down the first area, prepare materials).",
         "Questions ALWAYS via ask_user, never in text.",
@@ -1102,10 +1125,13 @@ function chybaResitele(items, msgs, email) {
   if (!bez.length) {
     // otázka musí být novější než poslední zápis kroků (aktuální volání = poslední zpráva, tu nepočítat)
     let otazka = -1, zapis = -1;
+    // a write the server rejected ("Error: …" result) wrote nothing — it must not make the answer look stale
+    // (measured 12. 11. 2026: a tree rejected for its format, then the corrected one failed "not asked" → asked twice)
+    const odmitnute = new Set(msgs.filter((m) => m && m.role === "tool" && /^Error/.test(String(m.content || ""))).map((m) => m.toolCallId));
     for (let k = 0; k < msgs.length - 1; k++) {
       for (const tc of (msgs[k] && msgs[k].toolCalls) || []) {
         if (tc.name === "ask_user" && /řešitel|assignee/i.test(JSON.stringify(tc.args || {}))) otazka = k;
-        if (["create_project", "create_project_from_ideas", "add_nodes"].includes(tc.name)) zapis = k;
+        if (["create_project", "create_project_from_ideas", "add_nodes"].includes(tc.name) && !odmitnute.has(tc.id)) zapis = k;
       }
     }
     if (otazka > zapis) return null;
@@ -1230,7 +1256,7 @@ const NASTROJE_ZAKLAD = [
     parameters: { type: "object", properties: { position: { type: "string", description: "exact title of the position (from get_org_structure)" }, holder: { type: "string" }, deputy: { type: "string" }, position_kind: { type: "string", enum: ["position", "function"] }, title: { type: "string" } }, required: ["position"], additionalProperties: false } },
   { name: "remove_org_position", skupina: "nastaveni", jenRole: "struktura", kind: "write", description: "Remove a position from the org structure (by exact title). The user confirms first.",
     parameters: { type: "object", properties: { position: { type: "string" } }, required: ["position"], additionalProperties: false } },
-  { name: "order_membership", skupina: "nastaveni", jenRole: "admin", jenKdy: "hosted", kind: "write", description: "Order the yearly Cloud Lite membership by bank transfer (hosted instances; billing details must be complete — set_billing first). Creates a binding order; the invoice arrives by e-mail. Other plans are paid by card in Organization settings → Membership. The user confirms first.",
+  { name: "order_membership", skupina: "nastaveni", jenRole: "admin", jenKdy: "hosted", kind: "write", description: "Order the yearly Cloud Start membership by bank transfer (hosted instances; billing details must be complete — set_billing first). Creates a binding order; the invoice arrives by e-mail. Other plans are paid by card in Organization settings → Membership. The user confirms first.",
     parameters: { type: "object", properties: { tier: { type: "string", enum: ["cloud-lite"] }, period: { type: "string", enum: ["year"] } }, required: [], additionalProperties: false } },
   { name: "get_map_sharing", skupina: "nastaveni", kind: "read", description: "Who can see a project (map): the people it is shared with and their permission (read / work / edit), the team access and the public link. Only the project's owner or a co-manager can read it. map_id = the exact title, the project number like \"#12\", or the id from list_maps.",
     parameters: { type: "object", properties: { map_id: { type: "string" } }, required: ["map_id"], additionalProperties: false } },
@@ -1307,7 +1333,9 @@ const SKUPINY_KLICE = {
   // kreslení (29. 10. 2026): obrázek / ilustrace / banner / plakát / přání — FLUX na GPU serveru (obrazky.js)
   kresleni: /nakresl|namaluj|kresli|obrazek|obrazk|ilustrac|banner|pohlednic|tapet|\bdraw|drawing|picture|illustrat|\bimage|wallpaper/i,
   faktury: /faktur|invoic|vyfakturuj|fakturac|odberatel|\bklient|customer|\bclient|vizitk|business card|\bico\b|\bdic\b|splatnost|due date|adresar|address book|zaplacen|unpaid|nezaplacen|dodavatel\w* (udaj|profil)|supplier (details|profile)|\beurech\b|dolarech|\bmena faktur|invoice currency/i,
-  nastaveni: /nastav|preferenc|upozorn|notifik|notif|jazyk|cestin|anglict|language|english|czech|motiv|\btmav|\bsvetl|theme|\bdark|\blight|zjednodus|\blite\b|plnou verz|cel\w* aplikac|full app|citelnost|velikost pism|readab|font size|zarovn|zamek|\balign|(cele|zobrazovan\w*|moje|me|mi) jmeno|prejmenuj (me|mi|firmu|organizaci|spolecnost)|\bucet|profil|account|pozv|invite|\brole|spravce|manazer|administr|zastup|deputy|member|\bclen|nazev firm|organizac|\bucel|purpose|kredit|kvot|quota|ai agent|agenta|agenty|agentu|webhook|fakturac|billing|objedn\w* (clenstv|cloud)|order (the )?(membership|cloud)|vychozi vzhled|default skin|settings?|struktur|pozic\w* (v |ve |do )?(org|struktu)|org chart|position (in|of) the org|hesl|password|api kli|api key|simplif|full version|my account|display name|full name|notification|invit|credit|sdil|shar(e|ing)|pristup (k|do|na) (projekt|map)|access to (the )?(project|map)|tymov\w* pristup|team access|(cel\w+|vsem|vsichni v) (tym|firm|lid)|whole team|all members|everyone (in|on) the team|ke cteni|k upravam|read[- ]only|view only|spoluprac|collaborat|spolusprav|co-?manag|pridej (?!krok|ukol|napad|cil|podkrok|bod|polozk|poznamk)\S+ do (projektu|mapy|tymu)|add (?!a |the |step|task|node|idea|item)\S+ to (the )?(\S+ )?(project|map|team)|kdo vidi|who (can )?sees?|precten|read all|mark .{0,20}read|nahlas|hlasen|report (a |the )?(bug|problem|issue)|\bbug\b|verejn\w* odkaz|public link|zverejn/i,
+  // plan names (12 Nov 2026): the plan was renamed KB Cloud Lite → KB Cloud Start; until then "Objednej roční Cloud Lite" opened
+  // this group only by accident through `\blite\b` (the phone view). Membership words now open it on their own.
+  nastaveni: /nastav|preferenc|upozorn|notifik|notif|jazyk|cestin|anglict|language|english|czech|motiv|\btmav|\bsvetl|theme|\bdark|\blight|zjednodus|\blite\b|plnou verz|cel\w* aplikac|full app|citelnost|velikost pism|readab|font size|zarovn|zamek|\balign|(cele|zobrazovan\w*|moje|me|mi) jmeno|prejmenuj (me|mi|firmu|organizaci|spolecnost)|\bucet|profil|account|pozv|invite|\brole|spravce|manazer|administr|zastup|deputy|member|\bclen|nazev firm|organizac|\bucel|purpose|kredit|kvot|quota|ai agent|agenta|agenty|agentu|webhook|fakturac|billing|objedn\w* (clenstv|cloud)|order (the )?(membership|cloud)|cloud (start|lite)|clenstv|predplatn|\btarif|membership|subscription|vychozi vzhled|default skin|settings?|struktur|pozic\w* (v |ve |do )?(org|struktu)|org chart|position (in|of) the org|hesl|password|api kli|api key|simplif|full version|my account|display name|full name|notification|invit|credit|sdil|shar(e|ing)|pristup (k|do|na) (projekt|map)|access to (the )?(project|map)|tymov\w* pristup|team access|(cel\w+|vsem|vsichni v) (tym|firm|lid)|whole team|all members|everyone (in|on) the team|ke cteni|k upravam|read[- ]only|view only|spoluprac|collaborat|spolusprav|co-?manag|pridej (?!krok|ukol|napad|cil|podkrok|bod|polozk|poznamk)\S+ do (projektu|mapy|tymu)|add (?!a |the |step|task|node|idea|item)\S+ to (the )?(\S+ )?(project|map|team)|kdo vidi|who (can )?sees?|precten|read all|mark .{0,20}read|nahlas|hlasen|report (a |the )?(bug|problem|issue)|\bbug\b|verejn\w* odkaz|public link|zverejn/i,
   // nápověda (4. 10. 2026): otázky na OVLÁDÁNÍ aplikace („jak se…“, „kde najdu…“, „návod“). Schválně úzce — obecné
   // „kde je“ už otevírá `hledani`, holé „nastav“ otevírá 24 schémat `nastaveni`, „jak se daří / jak to vypadá“ je stav
   // projektu, ne ovládání (negativní lookahead); model navíc zná jméno `help`
@@ -1449,7 +1477,7 @@ function kdeJe(app, auth, ctx, L, mapa) {
 }
 
 // ctx: { route, map_id } z klienta; rec: rozhovor (mode/target, dřívější návrhy)
-function systemZprava(app, auth, ctx, L, rec, skupiny) {
+function systemZprava(app, auth, ctx, L, rec, skupiny, opts) {
   const T = P[L];
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   const jmeno = auth.getString("name") || auth.getString("full_name") || auth.email();
@@ -1504,26 +1532,112 @@ function systemZprava(app, auth, ctx, L, rec, skupiny) {
   }
   const pamet = pametText(app, auth.id, "");
   if (pamet) casti.push(dosad(T.pamet, { text: ocisti(pamet, MAX_PAMET) }));
-  let mapy = [];
-  try { mapy = mapyUzivatele(app, auth, false); } catch (err) { mapy = []; }
-  if (mapy.length) {
-    // číslo projektu je neměnné → prefix systému mezi tahy drží (cache); archivované mapy tu NEJSOU (search_projects)
-    // Řazení podle ČÍSLA (nejnovější projekt první), ne podle poslední změny: `-updated` z dotazu by po každém
-    // potvrzeném zápisu (i kolegy) přeskupilo řádky → systémová zpráva jiná → cache prefixu celé historie pryč
-    // (měření 4. 10. 2026: pobrislova 77 % cache, pád po každém zápisu).
-    const { prefixProjectNumber } = require(`${__hooks}/helpers.js`);
-    const serazene = mapy.slice().sort((a, b) => (b.number - a.number) || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0) || (a.id < b.id ? -1 : 1));
-    const radky = serazene.slice(0, 60).map((m) => `- ${prefixProjectNumber(m.number)}${m.title} · ${m.access}`).join("\n");
-    casti.push(dosad(T.mapy, { radky: radky }));
-  } else {
-    casti.push(T.mapyZadne);
-  }
+  // Stable start (opts.staly): the list as the model got it at the start of the history window — creating a
+  // project mid-conversation used to rewrite this part of the system message, and a hybrid model (Strata) then
+  // re-read the WHOLE prompt (12. 11. 2026: 7–14 s per call, measured in cache-mereni). Changes since then reach
+  // the model as a note in the user message that first saw them (mapyStav / mapy_sez).
+  const snap = opts && opts.staly ? mapyStav(opts.msgs || jsonVal(rec, "messages", []), L).zaklad : null;
+  const radky = snap || radkyMap(app, auth);
+  casti.push(radky.length ? dosad(T.mapy, { radky: radky.join("\n") }) : T.mapyZadne);
   // NIC proměnlivého tady: systémová zpráva je jedna zpráva na začátku promptu, takže i změna
   // na jejím konci (nový návrh, počet otevřených uzlů, kde uživatel je) zahodí cache CELÉ
   // historie. Kde uživatel je + vybraný uzel jdou jako hranatá závorka u zprávy uživatele
   // (kontextTahu, uložené u zprávy → historie se zpětně nemění); „už nabídnuté kroky“ vidí
   // model ve svých dřívějších voláních suggest_next; počty otevřených a nápadů má z nástrojů.
   return sFragmenty(casti);
+}
+
+// Map list lines for the system message: "- #12 Title · access", newest project first, at most 60.
+// Sorted by project NUMBER, not by last change: `-updated` would reshuffle the lines after every confirmed
+// write (even a colleague's) → different system message → prefix cache of the whole history gone
+// (measured 4. 10. 2026: pobrislova 77 % cache, drop after every write). Archived maps are not listed (search_projects).
+function radkyMap(app, auth) {
+  let mapy = [];
+  try { mapy = mapyUzivatele(app, auth, false); } catch (err) { mapy = []; }
+  const { prefixProjectNumber } = require(`${__hooks}/helpers.js`);
+  const serazene = mapy.slice().sort((a, b) => (b.number - a.number) || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0) || (a.id < b.id ? -1 : 1));
+  return serazene.slice(0, 60).map((m) => `- ${prefixProjectNumber(m.number)}${m.title} · ${m.access}`);
+}
+
+const stejneRadky = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
+
+// Stable start: store the current map list on a new user message when it differs from the last stored one
+// (the first message of a conversation always gets it). Only the lines are stored — the note is derived from
+// them at render time, so the history the model gets never changes after the fact.
+function pridejMapySeznam(app, auth, msgs, zprava) {
+  const radky = radkyMap(app, auth);
+  let posledni = null;
+  for (const m of msgs || []) if (m.role === "user" && Array.isArray(m.mapy_sez)) posledni = m.mapy_sez;
+  if (!stejneRadky(posledni, radky)) zprava.mapy_sez = radky;
+}
+
+// { zaklad, pozn }: zaklad = map list valid at the start of the history window (goes into the system message;
+// null = nothing stored yet → live list), pozn = { index within the window: note } for later user messages that
+// carry a changed list. Older conversations (before stable start) get their first snapshot inside the window.
+function mapyStav(msgs, L) {
+  const start = oknoStart(msgs || []);
+  let zaklad = null;
+  for (let i = 0; i <= start && i < msgs.length; i++) if (msgs[i].role === "user" && Array.isArray(msgs[i].mapy_sez)) zaklad = msgs[i].mapy_sez;
+  let ucinne = zaklad;
+  const pozn = {};
+  for (let i = start + 1; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m.role !== "user" || !Array.isArray(m.mapy_sez)) continue;
+    if (ucinne === null) { zaklad = ucinne = m.mapy_sez; continue; }
+    const t = mapyZmenaText(ucinne, m.mapy_sez, L);
+    if (t) pozn[i - start] = t;
+    ucinne = m.mapy_sez;
+  }
+  return { zaklad: zaklad, pozn: pozn };
+}
+const mapyPoznamkyOkna = (msgs, L) => mapyStav(msgs, L).pozn;
+
+// Note for the model: which map lines appeared/changed and which are gone. Many changes → the whole new list.
+function mapyZmenaText(pred, po, L) {
+  const T = P[L];
+  const stare = new Set(pred); const nove = new Set(po);
+  const plus = po.filter((r) => !stare.has(r)); const minus = pred.filter((r) => !nove.has(r));
+  if (!plus.length && !minus.length) return "";
+  if (plus.length + minus.length > 20) return dosad(T.mapyAktualni, { radky: po.length ? po.join("\n") : T.mapyZadne });
+  return dosad(T.mapyZmena, { plus: plus.length ? dosad(T.mapyZmenaPlus, { radky: plus.join("\n") }) : "", minus: minus.length ? dosad(T.mapyZmenaMinus, { radky: minus.join("\n") }) : "" }).replace(/\n{2,}/g, "\n").replace(/\n\]$/, "]");
+}
+
+// Stable tool list: { zaklad: Set of groups in the tool list (as at the start of the history window, plus groups
+// opened before the window), nove: { index within the window: [groups first delivered with that user message] },
+// dorucene: Set of all groups the model has by the end of msgs }. User messages store the wanted groups (`skup`),
+// open_tools / safety-net results store what they opened (`skupiny_otevrene`). null zaklad = nothing stored yet.
+function skupinyStav(msgs) {
+  const start = oknoStart(msgs || []);
+  let zaklad = null; const predOknem = [];
+  for (let i = 0; i < msgs.length && i <= start; i++) {
+    const m = msgs[i];
+    if (m.role === "user" && Array.isArray(m.skup)) zaklad = m.skup;
+    if (i < start && m.role === "tool" && Array.isArray(m.skupiny_otevrene)) predOknem.push.apply(predOknem, m.skupiny_otevrene);
+  }
+  let dorucene = zaklad ? new Set(zaklad.concat(predOknem)) : null;
+  const zakladSet = () => (dorucene ? new Set(zaklad.concat(predOknem)) : null);
+  const nove = {};
+  for (let i = start + 1; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m.role === "tool" && Array.isArray(m.skupiny_otevrene)) { if (dorucene) for (const g of m.skupiny_otevrene) dorucene.add(g); continue; }
+    if (m.role !== "user" || !Array.isArray(m.skup)) continue;
+    if (dorucene === null) { zaklad = m.skup; dorucene = new Set(zaklad.concat(predOknem)); continue; }
+    const n = m.skup.filter((g) => !dorucene.has(g));
+    if (n.length) { nove[i - start] = n; for (const g of n) dorucene.add(g); }
+  }
+  return { zaklad: zakladSet(), nove: nove, dorucene: dorucene };
+}
+const poradiSkupin = (arr) => arr.slice().sort((a, b) => SKUPINY_OTEVIRATELNE.indexOf(a) - SKUPINY_OTEVIRATELNE.indexOf(b));
+
+// Note delivering tool groups at the end of the prompt: the group instructions (systemSkupiny) + the tool schemas as JSON
+// (same fields the API tool list carries). Measured 12. 11. 2026: Strata calls a tool described only in a message.
+function skupinyNotaText(app, auth, L, mode, skupiny) {
+  const T = P[L];
+  const sk = poradiSkupin(skupiny);
+  const set = new Set(sk);
+  const defs = proModel(set, auth, app).filter((n) => NASTROJ[n.name] && set.has(NASTROJ[n.name].skupina) && nastrojVRezimu(n.name, mode));
+  const pokyny = sk.filter((g) => T.systemSkupiny && T.systemSkupiny[g]).map((g) => T.systemSkupiny[g]);
+  return dosad(T.skupinyNota, { skupiny: sk.join(", "), nastroje: defs.map((n) => JSON.stringify({ name: n.name, description: n.description, parameters: n.parameters })).join("\n"), pokyny: pokyny.length ? pokyny.join("\n") : "—" });
 }
 
 // hranatá závorka s kontextem k JEDNÉ zprávě uživatele (uloží se k ní; historie se nemění)
@@ -2857,13 +2971,14 @@ function novyChat(app, auth, L) {
 // PDF zpráva = doprovod (≤2000) + značka + hlavičky stran (≤60×20) + text (≤40000) — strop podle částí
 const stropZpravy = (m) => (m.pdf && !m.pdf.orez ? MAX_ZN_PDF + 2000 + 200 + MAX_STRAN_PDF * 20 : MAX_ZN_USER);
 // starsi=true: zpráva z dřívějšího tahu bez PDF se zkrátí na MAX_ZN_USER_STARE (PDF má vyšší strop a zůstává celé)
-const sKontextem = (m, starsi) => {
+// pozn = stable-start note (map list changed) — after the context bracket, before the text, never shortened
+const sKontextem = (m, starsi, pozn) => {
   const strop = stropZpravy(m);
   const obsah = String(m.content == null ? "" : m.content);
   const max = starsi && strop <= MAX_ZN_USER && obsah.length > MIN_ZN_USER_OREZ ? Math.min(strop, MAX_ZN_USER_STARE) : strop;
   const text = ocisti(m.content, max);
   const orez = starsi && text.length < String(m.content == null ? "" : m.content).trim().length ? "\n…[earlier message shortened]" : "";
-  return (m.kontext ? String(m.kontext) + "\n" : "") + text + orez;
+  return (m.kontext ? String(m.kontext) + "\n" : "") + (pozn ? pozn + "\n" : "") + text + orez;
 };
 
 // Volání z poslední zprávy asistenta, která ještě nemají výsledek: krok zpět přes výsledky nástrojů
@@ -2894,9 +3009,10 @@ function zkratArgumenty(args) {
   };
   return zkrat(args);
 }
-function zpravyProModel(msgs, L, mode) {
-  const T = P[L];
-  const plnaHistorie = REZIMY_PLNA_HISTORIE.has(String(mode || ""));
+// Index of the first message the model gets (history window). Shared by zpravyProModel and the stable-start
+// map list (mapySnapshot): both must agree on where the window starts, otherwise the system message and the
+// history would describe different moments of the conversation.
+function oknoStart(msgs) {
   // okno = posledních MAX_TAHU tahů uživatele (dřív 24 zpráv ≈ 5 tahů — koncept
   // e-mailu z minulého tahu tak vypadl z paměti modelu, 13. 9. 2026)
   const userIdx = msgs.map((m, i) => (m.role === "user" ? i : -1)).filter((i) => i >= 0);
@@ -2906,11 +3022,33 @@ function zpravyProModel(msgs, L, mode) {
     const dalsi = userIdx.find((i) => msgs.length - i <= MAX_HIST);
     start = dalsi === undefined ? msgs.length - MAX_HIST : dalsi;
   }
-  let okno = msgs.slice(start);
-  if (okno.length && okno[0].role !== "user") {
-    const prvniUser = okno.findIndex((m) => m.role === "user");
-    if (prvniUser > 0) okno = okno.slice(prvniUser);
+  if (start < msgs.length && msgs[start].role !== "user") {
+    const prvniUser = msgs.slice(start).findIndex((m) => m.role === "user");
+    if (prvniUser > 0) start += prvniUser;
   }
+  return start;
+}
+
+// Notes per user message (index within the window) for the stable start: map list changes (opts.staly) and tool groups
+// first delivered with that message (opts.notaSkupin = groups → text). null = nothing to add.
+function poznamkyOkna(msgs, L, opts) {
+  if (!opts || (!opts.staly && !opts.notaSkupin)) return null;
+  const out = {};
+  if (opts.staly) Object.assign(out, mapyPoznamkyOkna(msgs, L));
+  if (opts.notaSkupin) {
+    const nove = skupinyStav(msgs).nove;
+    for (const k of Object.keys(nove)) out[k] = (out[k] ? out[k] + "\n" : "") + opts.notaSkupin(nove[k]);
+  }
+  return out;
+}
+// opts.staly (stable prompt start, KB_CHAT_STALY_ZACATEK / KB_CHAT2_STALY_ZACATEK): the map list lives in the
+// system message as it was at the start of the window; later changes are a note in the user message that first
+// saw them (mapy_sez stored on that message). The prompt then only grows at its end — see mapySnapshot.
+function zpravyProModel(msgs, L, mode, opts) {
+  const T = P[L];
+  const plnaHistorie = REZIMY_PLNA_HISTORIE.has(String(mode || ""));
+  const okno = msgs.slice(oknoStart(msgs));
+  const mapyPoznamky = poznamkyOkna(msgs, L, opts);
   const out = [];
   const posledniTah = okno.map((m) => m.role).lastIndexOf("user");
   // stáří zprávy v tazích = kolik zpráv uživatele je za ní (0 = aktuální tah)
@@ -2926,12 +3064,14 @@ function zpravyProModel(msgs, L, mode) {
         for (const c of cekaNa) {
           // stejný strop jako u běžné zprávy: PDF poslané jako odpověď na otázku (formulář Nového projektu k němu
           // sám zve) se dřív uřízlo na 8000 znaků
-          const txt = c.name === "ask_user" ? dosad(T.odpovedi, { text: ocisti(m.content, stropZpravy(m)) }) : T.zamitnuto;
+          const pozn = mapyPoznamky && mapyPoznamky[i] && c.name === "ask_user" ? "\n" + mapyPoznamky[i] : "";
+          const txt = c.name === "ask_user" ? dosad(T.odpovedi, { text: ocisti(m.content, stropZpravy(m)) }) + pozn : T.zamitnuto;
           out.push({ role: "tool", name: c.name, toolCallId: c.id, content: txt });
         }
-        if (cekaNa.some((c) => c.name !== "ask_user")) out.push({ role: "user", content: sKontextem(m, kratit(i)) });
+        const jenOdpoved = cekaNa.some((c) => c.name === "ask_user");
+        if (cekaNa.some((c) => c.name !== "ask_user")) out.push({ role: "user", content: sKontextem(m, kratit(i), jenOdpoved ? "" : mapyPoznamky && mapyPoznamky[i]) });
       } else {
-        out.push({ role: "user", content: sKontextem(m, kratit(i)) });
+        out.push({ role: "user", content: sKontextem(m, kratit(i), mapyPoznamky && mapyPoznamky[i]) });
       }
     } else if (m.role === "assistant") {
       // otázka z dřívější odpovědi zůstala bez odpovědi a model mezitím pokračoval (po potvrzení karet):
@@ -2946,6 +3086,8 @@ function zpravyProModel(msgs, L, mode) {
       // výsledek bez svého volání (osiřelý) nebo podruhé tentýž → modelu nepatří (OpenAI by ho odmítl)
       if (!nezodpovezena(out).some((c) => c.id === m.toolCallId)) continue;
       const stary = i < posledniTah;
+      // delivered tool group (stable tool list): the schemas must stay whole in every later turn
+      if (Array.isArray(m.skupiny_otevrene)) { out.push({ role: "tool", name: m.name, toolCallId: m.toolCallId, content: String(m.content || "") }); continue; }
       out.push({ role: "tool", name: m.name, toolCallId: m.toolCallId, content: ocisti(m.content, stary ? limitEnv("CHAT_MAX_TOOL_STARE", MAX_TOOL_STARE, 200, MAX_TOOL) : MAX_TOOL) });
     }
   }
@@ -3040,8 +3182,17 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
   const pending = [];
   const skupiny = skupinyNastroju(msgs, ctx, rec, cfg, !!(cfg.druhy && cfg.nastroje === "historie"));
   stats.skupiny = Array.from(skupiny);
-  let sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) };
-  const vseOtevreno = () => SKUPINY_OTEVIRATELNE.every((g) => skupiny.has(g));
+  const so = { staly: !!cfg.stalyZacatek, msgs: msgs }; // stable start: system + history from the same messages
+  if (so.staly) stats.staly = 1;
+  // stable tool list: the API tool list = groups at the start of the window (zakladSk); everything opened later is a
+  // message at the end (dorucene = what the model has). Without it the two are the same set (skupiny).
+  const sn = !!cfg.staleNastroje;
+  const stSk = sn ? skupinyStav(msgs) : null;
+  const zakladSk = sn ? (stSk.zaklad || new Set(skupiny)) : skupiny;
+  const dorucene = sn ? (stSk.dorucene || new Set(skupiny)) : skupiny;
+  if (sn) { so.notaSkupin = (g) => skupinyNotaText(app, auth, L, rec.getString("mode"), g); stats.skupiny = Array.from(dorucene); }
+  let sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, zakladSk, so) };
+  const vseOtevreno = () => SKUPINY_OTEVIRATELNE.every((g) => dorucene.has(g));
   const start = msgs.length; // hybrid: při předání hlavnímu modelu se tah lehkého zahodí
   if (!stats.dok) stats.dok = [];
   // dokumenty tahu (draft_text/update_document) + session token uživatele a kontext klienta pro nástroje nastavení
@@ -3057,32 +3208,55 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
   const poznamky = [];
   for (kolo = 0; kolo < MAX_KOL + 1; kolo++) {
     const posledni = kolo >= MAX_KOL;
-    const zpravy = [sys].concat(zpravyProModel(msgs, L, rec.getString("mode")), poznamky);
+    const zpravy = [sys].concat(zpravyProModel(msgs, L, rec.getString("mode"), so), poznamky);
     if (posledni) zpravy.push({ role: "user", content: P[L].dokonci });
     const rezimRec = rec.getString("mode");
     // open_tools nabízet jen dokud je co otevírat (GPT s KB_CHAT_TOOLS=auto má všechno hned)
-    const nabidka = posledni ? [] : proModel(skupiny, auth, app).filter((n) => nastrojVRezimu(n.name, rezimRec) && (n.name !== "open_tools" || !vseOtevreno()));
+    const nabidka = posledni ? [] : proModel(zakladSk, auth, app).filter((n) => nastrojVRezimu(n.name, rezimRec) && (n.name !== "open_tools" || !vseOtevreno()));
     prubeh("model");
     const r = zavolejModel(cfg, zpravy, nabidka, L, stats);
     // open_tools: model si řekl o skupinu → přidat (nástroje + fragment promptu) a zavolat znovu; volání se do historie nepíše
     const otevrit = posledni ? [] : r.toolCalls.filter((c) => c.name === "open_tools");
+    // stable tool list: open_tools and the safety net (a known tool from a group the model does not have) become a stored
+    // tool call + result carrying the group's schemas — the prompt only grows at its end
+    const chybiS = sn && !posledni ? r.toolCalls.filter((c) => NASTROJ[c.name] && NASTROJ[c.name].skupina && !dorucene.has(NASTROJ[c.name].skupina) && nastrojDostupny(c.name, rezimRec, auth, app)) : [];
+    if (sn && (otevrit.length || chybiS.length)) {
+      // nevykonano: these calls only got schemas back — the "already read in this turn" check must not count them
+      msgs.push({ role: "assistant", content: bezMarkdownu(String(r.content || "")), ts: new Date().toISOString(), karty: [], tier: cfg.tier || "heavy", toolCalls: r.toolCalls, nevykonano: true });
+      for (const c of r.toolCalls) {
+        const g = c.name === "open_tools" ? String((c.args || {}).group || "").toLowerCase() : (chybiS.indexOf(c) >= 0 ? NASTROJ[c.name].skupina : "");
+        if (!g) { msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: P[L].skupinyNotaSamostatne }); continue; }
+        if (SKUPINY_OTEVIRATELNE.indexOf(g) < 0) { msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: "Error: unknown group " + g + "." }); continue; }
+        const znovu = c.name !== "open_tools" ? "\n" + dosad(P[L].skupinyNotaZnovu, { nastroj: c.name }) : "";
+        if (dorucene.has(g)) {
+          const jmena = proModel(new Set([g]), auth, app).filter((n) => NASTROJ[n.name] && NASTROJ[n.name].skupina === g).map((n) => n.name);
+          msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: (c.name === "open_tools" ? dosad(P[L].skupinaOtevrena, { skupina: g, nastroje: jmena.join(", ") || "—" }) : "") + znovu });
+          continue;
+        }
+        dorucene.add(g);
+        msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: skupinyNotaText(app, auth, L, rezimRec, [g]) + znovu, skupiny_otevrene: [g] });
+      }
+      stats.skupiny = Array.from(dorucene);
+      if (otevrit.length) stats.otevreno = (stats.otevreno || 0) + 1; else stats.rozsireni = (stats.rozsireni || 0) + 1;
+      continue;
+    }
     if (otevrit.length) {
       const pred = skupiny.size;
       for (const c of otevrit) { const g = String((c.args || {}).group || "").toLowerCase(); if (SKUPINY_OTEVIRATELNE.indexOf(g) >= 0) skupiny.add(g); }
       r.toolCalls = r.toolCalls.filter((c) => c.name !== "open_tools");
       if (skupiny.size > pred) {
         stats.skupiny = Array.from(skupiny); stats.otevreno = (stats.otevreno || 0) + 1;
-        sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) };
+        sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny, so) };
         continue;
       }
       if (!r.toolCalls.length && !String(r.content || "").trim()) { pridejPoznamkuOtevrena(poznamky, otevrit, skupiny, nabidka, L, stats); continue; } // už otevřená nebo neznámá skupina a nic dalšího → znovu, ale s poznámkou
     }
     // pojistka: model chce známý nástroj, který jsme mu nenabídli → přidat skupinu a zkusit znovu
-    const chybi = posledni ? [] : r.toolCalls.filter((c) => NASTROJ[c.name] && NASTROJ[c.name].skupina && !nabidka.some((n) => n.name === c.name) && nastrojDostupny(c.name, rezimRec, auth, app));
+    const chybi = posledni || sn ? [] : r.toolCalls.filter((c) => NASTROJ[c.name] && NASTROJ[c.name].skupina && !nabidka.some((n) => n.name === c.name) && nastrojDostupny(c.name, rezimRec, auth, app));
     if (chybi.length) {
       for (const c of chybi) skupiny.add(NASTROJ[c.name].skupina);
       stats.skupiny = Array.from(skupiny); stats.rozsireni = (stats.rozsireni || 0) + 1;
-      sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) };
+      sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny, so) };
       continue;
     }
     const sv = suggestVTextu(r.content);
@@ -3102,7 +3276,7 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
     // místo nového čtení krátká zpráva, že výsledek je výš (Richard 16. 9. 2026: get_map „Dílna“ 2×)
     // jen v tomto běhu smyčky (od `start`, bez právě přidané zprávy): po potvrzení karty (chatPotvrdit
     // nepřidává zprávu uživatele) se data změnila a model je MUSÍ smět přečíst znovu
-    const precteno = new Set(msgs.slice(start, msgs.length - 1).filter((m) => m.role === "assistant").flatMap((m) => m.toolCalls || [])
+    const precteno = new Set(msgs.slice(start, msgs.length - 1).filter((m) => m.role === "assistant" && !m.nevykonano).flatMap((m) => m.toolCalls || [])
       .filter((c) => NASTROJ[c.name] && NASTROJ[c.name].kind === "read")
       .map((c) => c.name + JSON.stringify(c.args || {})));
     // tah s přepisem obrázku: text z obrázku může obsahovat vložené pokyny → trvalou paměť a zásobník
@@ -3146,7 +3320,11 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
         // „Založit nový projekt“ k otázce po přepisu — ne v režimu Nový projekt s AI (tam se ptá na plán, projekt už vzniká)
         // ani v týmové poradě (create_project tam není povolený → slepá volba), přípravě, revizi a rozboru
         const bezVolbyProjektu = !["", "porada", "nocni", "trideni", "po_schuzce"].includes(rezimRec || "");
-        let qs = (c.args.questions || []).slice(0, 3).map((q, qi) => { const o = (q.options || []).slice(0, 4).map((x) => ocisti(x, 120)).filter(Boolean); return { text: ocisti(q.text, 300), options: bezVolbyProjektu ? o : sNovymProjektem(msgs, L, o, start, qi) }; }).filter((q) => q.text);
+        // At most 3 questions — plus the assignee question on top (new project asks it in the same card as the
+        // 3 follow-up questions; trimmed away it would come back as a separate round)
+        const qsVse = Array.isArray(c.args.questions) ? c.args.questions : [];
+        const qsVyber = qsVse.slice(0, 3).concat(qsVse.slice(3).filter((q) => /řešitel|assignee/i.test(String((q && q.text) || ""))).slice(0, 1));
+        let qs = qsVyber.map((q, qi) => { const o = (q.options || []).slice(0, 4).map((x) => ocisti(x, 120)).filter(Boolean); return { text: ocisti(q.text, 300), options: bezVolbyProjektu ? o : sNovymProjektem(msgs, L, o, start, qi) }; }).filter((q) => q.text);
         // Nový projekt s AI: k otázkám modelu přidá server otázku na podrobnost plánu (Stručná / Detailní /
         // Hloubková, jako měl Poradce) — dokud ji uživatel nezvolil (viz rozsahPridat), když model položil aspoň 2 otázky
         if (rec.getString("mode") === "novy_projekt" && qs.length >= 2 && rozsahPridat(rec, msgs, L) && !qs.some((q) => jeOtazkaRozsahu(q, L))) qs = qs.concat([{ text: P[L].rozsahOtazka.text, options: P[L].rozsahOtazka.options.slice() }]);
@@ -3179,6 +3357,12 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
           ownerJa(c.args.outline || c.args.items, auth.email());
           // ikonky automaticky (Richard 15. 10. 2026): model je dává sám, chybějící doplní server podle názvu — PŘED kartou, ať je karta ukáže
           doplnIkony(c.args.outline || c.args.items);
+        }
+        // update_node takes the same owner words as new steps ("me" = the user, "none" = clear) — the prompt tells
+        // the model to answer the assignee question with "me", and it uses it here too
+        if (c.name === "update_node" && c.args && typeof c.args.owner === "string") {
+          if (/^(me|já|ja|@me)$/i.test(c.args.owner.trim())) c.args.owner = auth.email();
+          else if (/^(none|nikdo|-)$/i.test(c.args.owner.trim())) c.args.owner = "";
         }
         if (cfg.tier === "light" && cfg.predani) { msgs.length = start; stats.predano = (stats.predano || 0) + 1; return "predat"; }
         // pevný první krok skládá APLIKACE (Richard 1. 10. 2026): první faktura bez údajů dodavatele → formulář
@@ -3453,20 +3637,31 @@ function chatPredehrat(app, auth, body, cfg, L) {
   const ctx = jeVedouciRezim(rezimRec) ? { route: "-" } : ((body && body.context) || {});
   const druhy = Object.assign({}, cfg.rozjezd.druhy, { sessionAuth: cfg.sessionAuth || "" });
   const skupiny = skupinyNastroju(msgs, ctx, rec, druhy, false); // historie = všechny dosavadní zprávy (příští tah tu novou vynechá → stejné skupiny)
-  const sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, skupiny) };
-  const vseOtevreno = SKUPINY_OTEVIRATELNE.every((g) => skupiny.has(g));
-  const nabidka = proModel(skupiny, auth, app).filter((n) => nastrojVRezimu(n.name, rezimRec) && (n.name !== "open_tools" || !vseOtevreno));
+  const soP = { staly: !!druhy.stalyZacatek }; // filled with `dalsi` below, once it exists
+  let zakladP = skupiny; let doruceneP = skupiny; // stable tool list: computed from `dalsi` below
+  const vseOtevreno = () => SKUPINY_OTEVIRATELNE.every((g) => doruceneP.has(g));
+  const nabidkaZ = () => proModel(zakladP, auth, app).filter((n) => nastrojVRezimu(n.name, rezimRec) && (n.name !== "open_tools" || !vseOtevreno()));
   // Historie PŘESNĚ jako v příštím tahu: za poslední odpověď přidat prázdnou zprávu uživatele (jen s kontextem) — ořez starých
   // výsledků nástrojů a okno historie se počítají podle stáří v tazích, bez ní by se prompt lišil už od minulého tahu a cache
   // propadla (měření 10. 10. 2026: první lokální tah měl 0 tokenů z cache i po předehřátí).
-  const dalsi = msgs.concat([{ role: "user", content: "", ts: new Date().toISOString(), kontext: kontextTahu(app, auth, ctx, L) }]);
+  const dalsiZprava = { role: "user", content: "", ts: new Date().toISOString(), kontext: kontextTahu(app, auth, ctx, L) };
+  if (druhy.stalyZacatek) pridejMapySeznam(app, auth, msgs, dalsiZprava); // the next real message will carry the same list
+  if (druhy.staleNastroje) dalsiZprava.skup = poradiSkupin(Array.from(skupinyNastroju(msgs.concat([dalsiZprava]), ctx, rec, druhy, false)));
+  const dalsi = msgs.concat([dalsiZprava]);
   // sloty: když jsou všechny obsazené ostrou prací, předehřátí vynechat (zařadilo by se za ně a zdrželo ostré tahy)
   if (cfg.rozjezd.slots && !volnySlot(cfg.rozjezd.slots)) return { stav: "plno" };
   const store = $app.store(); const klic = "rozjezd:predehrivani";
   store.set(klic, Number(store.get(klic) || 0) + 1);
   let r;
   try {
-    r = llmPredehrej(druhy, [sys].concat(zpravyProModel(dalsi, L, rezimRec)), nabidka, { lang: L, think: druhy.think === undefined ? false : druhy.think, temperature: 0.3 });
+    soP.msgs = dalsi;
+    if (druhy.staleNastroje) {
+      const st = skupinyStav(dalsi);
+      zakladP = st.zaklad || skupiny; doruceneP = st.dorucene || skupiny;
+      soP.notaSkupin = (g) => skupinyNotaText(app, auth, L, rezimRec, g);
+    }
+    const sys = { role: "system", content: systemZprava(app, auth, ctx, L, rec, zakladP, soP) };
+    r = llmPredehrej(druhy, [sys].concat(zpravyProModel(dalsi, L, rezimRec, soP)), nabidkaZ(), { lang: L, think: druhy.think === undefined ? false : druhy.think, temperature: 0.3 });
     // stín: druhý model odpoví na POSLEDNÍ zprávu uživatele vlastní smyčkou nad historií BEZ odpovědi prvního modelu —
     // čtecí nástroje se vykonají, zápisy ne (nic se neuloží, žádná karta) → porovnání s prvním modelem na živém rozhovoru
     if (cfg.rozjezd.stin && body && body.stin !== false) {
@@ -3655,6 +3850,9 @@ function chatRun(app, auth, body, cfg, L, oprava) {
   // klik na „pošlu…“ ve výzvě od aplikace (jen čistý text, ne příloha) → odpoví aplikace, ne model
   const cekaci = !mode && !imgB64 && !pdf && !hlasB64 ? cekaciOdpoved(msgs, text) : null;
   const zprava = { role: "user", content: text, ts: new Date().toISOString(), kontext: kontextTahu(app, auth, ctx, L) };
+  if (cfg.stalyZacatek || (cfg.rozjezd && cfg.rozjezd.druhy.stalyZacatek)) pridejMapySeznam(app, auth, msgs, zprava); // stable start
+  const cfgSk = cfg.staleNastroje ? cfg : (cfg.rozjezd && cfg.rozjezd.druhy.staleNastroje ? cfg.rozjezd.druhy : null);
+  if (cfgSk) zprava.skup = poradiSkupin(Array.from(skupinyNastroju(msgs.concat([zprava]), ctx, rec, cfgSk, false))); // stable tool list
   if (nahled) zprava.obrazek = nahled;
   if (pdf) zprava.pdf = { name: pdf.name, pages: pdf.pages };
   if (hlasB64) zprava.hlas = { s: stats.hlas ? stats.hlas.s : 0 };

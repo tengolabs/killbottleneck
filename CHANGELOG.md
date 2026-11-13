@@ -9,6 +9,25 @@ below before you jump several versions.
 
 ---
 
+## v1.1.1 — 2026-11-13
+
+**The owner question comes with the first questions about a new project**
+
+**Upgrade notes:** no migration. Two new optional settings, `KB_CHAT_STALY_ZACATEK` and `KB_CHAT_STALE_NASTROJE`
+(see the environment reference); without them nothing changes.
+
+- **New project:** the assistant asks whether you'll own the steps in the same card as its first questions instead of
+  in a separate card later — one click less.
+- **Owner fixes:** answering "me" as the owner of a step works, and a change the server rejected no longer makes the
+  assistant ask about the owner a second time.
+- **For administrators:** `KB_CHAT_STALY_ZACATEK=1` keeps the list of maps at the start of the assistant's prompt the
+  same for a whole conversation and `KB_CHAT_STALE_NASTROJE=1` does the same for the tool list; later changes are passed
+  inside the conversation. Useful for model servers that cache only the beginning of a prompt. Off by default.
+- The Phone guide no longer claims the map is for large screens only — a phone has the full app as well as the
+  simplified view.
+
+---
+
 ## v1.1.0 — 2026-11-11
 
 **The assistant on the left or on the right, and your conversations right inside the panel**
