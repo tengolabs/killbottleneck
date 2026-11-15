@@ -92,6 +92,10 @@ function pozviDoOrganizace(app, o) {
     if (projekt) app.store().set("pozvanka_projekt:" + email, projekt);
     try {
       $mails.sendRecordPasswordReset(app, rec);
+      // Pending shares of this address are NOT activated here (security review 11 Nov
+      // 2026): the inviter can reset the new account's password and sign in as the
+      // invited person. They wait for the share invitation's own token or for a
+      // confirmation by whoever manages the project.
       return { ok: true, email: email, role: role, invited_via_email: true };
     } catch (err) {
       // e-mail selhal — spadneme na ruční předání, účet už existuje

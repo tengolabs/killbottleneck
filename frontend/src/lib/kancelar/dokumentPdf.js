@@ -1,7 +1,7 @@
 // Každý dokument z Dokumentů jako PDF na „hlavičkovém papíře“ (14. 10. 2026): A4, hlavička = název organizace + logo
 // + linka v barvě, u e-mailu Komu / Předmět, tělo = markdown-lite (nadpisy #, odrážky -, odstavce), stránkování.
 // Prezentace tudy jde jako osnova (nadpisy snímků + odrážky) — PDF snímků dělá prezentacePdf.js.
-import { A4, hexRgb, kresliBlok, kresliObrazek, zalom } from './textPdf.js';
+import { A4, hexRgb, kresliBlok, kresliObrazek, zalom, drawableData } from './textPdf.js';
 import { parsujBloky } from './osnova.js';
 
 const [W, H] = A4;
@@ -9,7 +9,8 @@ const OKRAJ = 56;
 const SPODEK = 60;
 export const POPISKY = { cs: { komu: 'Komu', predmet: 'Předmět', strana: 'Strana' }, en: { komu: 'To', predmet: 'Subject', strana: 'Page' } };
 
-export function sestavDokumentPdf({ doc, rgb, fonty, data, org = {}, logo = null, barva = '#2563eb', lang = 'cs' }) {
+export function sestavDokumentPdf({ doc, rgb, fonty, data: rawData, org: rawOrg = {}, logo = null, barva = '#2563eb', lang = 'cs' }) {
+  const data = drawableData(rawData, fonty.regular); const org = drawableData(rawOrg, fonty.regular); // F2-06
   const T = POPISKY[lang === 'en' ? 'en' : 'cs'];
   const akcent = hexRgb(barva, rgb);
   const text = rgb(0.13, 0.13, 0.15);
@@ -20,7 +21,8 @@ export function sestavDokumentPdf({ doc, rgb, fonty, data, org = {}, logo = null
   const hlavicka = () => {
     page = doc.addPage([W, H]); strany.push(page);
     let hy = H - 40;
-    if (org.name) page.drawText(String(org.name), { x: OKRAJ, y: hy - 12, size: 11, font: fonty.bold, color: text });
+    // a long organization name wraps (two lines at most) and stays clear of the logo (F2-08); a short one is drawn as before
+    if (org.name) kresliBlok(page, { text: String(org.name), font: fonty.bold, size: 11, x: OKRAJ, y: hy - 1, sirka: sirka - (logo ? 122 : 0), barva: text, max: 2 });
     if (logo) kresliObrazek(page, logo, { x: W - OKRAJ - 110, y: hy - 30, w: 110, h: 32, zarovnani: 'right' });
     page.drawLine({ start: { x: OKRAJ, y: hy - 40 }, end: { x: W - OKRAJ, y: hy - 40 }, thickness: 1.2, color: akcent });
     y = hy - 64;

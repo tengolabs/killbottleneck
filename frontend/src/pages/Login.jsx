@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import i18next from "i18next";
 import PasswordInput from "@/components/shared/PasswordInput";
 import { base44 } from "@/api/base44Client";
 import { loadKbConfig } from "@/hooks/useKbConfig";
@@ -14,7 +15,16 @@ import { isNativeShell } from "@/lib/nativeShell";
 import { isDesktopShell } from "@/lib/shell";
 import { getServerUrl, clearServerUrl } from "@/lib/serverUrl";
 import { safeNext } from "@/lib/safeNext";
-import { useAuth } from "@/lib/AuthContext";
+import { useAuth, SESSION_ENDED_KEY } from "@/lib/AuthContext";
+import { rememberShareInvite, claimShareInvite, stripInviteFromAddress } from "@/lib/shareInvite";
+
+// Read once per page load and removed right away, so a reload does not repeat it; kept in the
+// module because the form remounts (language switch) before the person has read it.
+let sessionEnded = false;
+try {
+  sessionEnded = !!sessionStorage.getItem(SESSION_ENDED_KEY);
+  sessionStorage.removeItem(SESSION_ENDED_KEY);
+} catch { /* no storage → no note */ }
 
 export default function Login() {
   const { t } = useTranslation("auth");
@@ -22,7 +32,9 @@ export default function Login() {
   const { isAuthenticated } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  // The sign-in ended under an open tab (password reset by the administrator, expired
+  // token): say why the person is looking at this form again.
+  const [error, setError] = useState(() => (sessionEnded ? i18next.t("errors:auth.sessionEnded") : ""));
   const [loading, setLoading] = useState(false);
   // Obnova hesla e-mailem má smysl JEN když instance umí odesílat poštu. Self-host
   // bez SMTP jinak nabízel „Zapomněli jste heslo?", server odpověděl 204 (v pořádku)
@@ -59,12 +71,29 @@ export default function Login() {
     if (isAuthenticated && isDesktopShell()) navigate(safeNext(new URLSearchParams(window.location.search).get("next")), { replace: true });
   }, [isAuthenticated, navigate]);
 
+  // ?invite= — one-time token from a share invitation (the invited person already has an
+  // account and signs in instead of signing up); confirmed right after sign-in
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("invite");
+    if (!token) return;
+    rememberShareInvite(token);
+    stripInviteFromAddress(); // the token must not stay in the address bar / browser history
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    sessionEnded = false;
     setError("");
     setLoading(true);
     try {
       await base44.auth.loginViaEmailPassword(email, password);
+      try {
+        await claimShareInvite();
+      } catch (err) {
+        // signed in, only the invitation was refused — say so and stay here
+        setError(err?.response?.error || err?.message || t("register.inviteFailed"));
+        return;
+      }
       // ?next= — návrat tam, odkud přihlášení přišlo (OAuth consent apod.).
       // Musí zůstat na NAŠEM originu: startsWith("/") nestačí, prohlížeč
       // normalizuje `\` na `/`, takže `/\evil.com` by se stalo `//evil.com`

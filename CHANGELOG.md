@@ -9,6 +9,59 @@ below before you jump several versions.
 
 ---
 
+## v1.2.0 — 2026-11-15
+
+**A reliability release: work is not lost silently, lists show everything, and sharing and member removal behave predictably**
+
+**Upgrade notes:** migrations run by themselves. Two things to know:
+(1) A project shared with an address that has no account yet is now confirmed only through the link in the
+invitation e-mail. Shares that were waiting for such an address before the upgrade have to be **sent again** from
+the share dialog (without SMTP, copy the link there); sharing the project again with an address that already has
+an account confirms it right away. (2) Signing in after an outage: a lost connection or a server restart no longer
+signs people out. (3) **API and MCP clients:** a write that carries a stale `base_updated` of a project is now
+answered with **409** — load the project again and repeat the write.
+
+- **Editor:** a save that failed is shown in a banner with the reason and is retried; closing the tab sends what
+  was waiting. **Undo** takes back one step (add, delete, move) instead of the whole map and refuses when the step
+  collides with a later change. The step dialog keeps what you are typing when a colleague changes the same step.
+- **Working together:** two people (or a person and a rule) writing into one project at the same moment no longer
+  overwrite each other; the assistant answers one request per conversation at a time and gives your text back when
+  a request fails.
+- **Lists show everything:** Home, Tasks, the archive, the personal map, the timer and the pickers in the assistant
+  read all projects, not only the most recent ones. A failed load says so and offers **Try again** instead of
+  showing an empty or shortened list. Column headers in the task table sort; the third click returns the order from
+  the map.
+- **Sharing and people:** an administrator sees and takes over only projects they could already see (other people's
+  private projects are reported as a count); the last administrator cannot be demoted or deleted; deleting a member
+  removes only their private things — shared projects are handed over and attachments, tracked time and team
+  templates stay. The delete dialog lists what goes and what stays. Public links of the deleted member's assistant
+  pages stop working (a page shared only by such a link goes with the account). An administrator can reset one
+  account's password at most three times in ten minutes.
+- **Rules and templates:** an assignee the instance does not know (no account, a typo) leaves the step unassigned
+  and is reported, instead of a step that looks assigned to nobody. A rule that creates sub-steps shares the project
+  with their assignees when its author may share. Imported projects name the importing person as the one who
+  assigned the work.
+- **Time tracking:** the end of a finished entry is written once — a timer left running in another tab cannot
+  count the same time twice. An entry closed by the 12-hour auto-stop can have its end moved earlier through the
+  API.
+- **Calendar and e-mail:** two bookings of one resource sent at the same moment cannot both pass; a reminder never
+  lands after the start on the night the clocks change; no reminders for archived calendars or rejected absences;
+  the daily summary is not mailed twice and the e-mail digest retries a failed send (at most three times a day).
+- **Voice messages:** the length that credits are charged for is measured by the server from the recording, not
+  taken from the client.
+- **PDF:** characters the font lacks are rewritten instead of drawn as blanks, long names wrap, the EUR payment QR
+  code is UTF-8.
+- **Texts:** counts are declined correctly in Czech and English ("1 task", "4 goals"); raw English server sentences
+  no longer reach the screen.
+- **Upgrades:** a Canvas system template whose text the administrator edited keeps the edit. A collection rule emptied
+  by hand no longer stops the upgrade.
+- **Security:** several fixes in sharing, member removal, credit accounting and administrator rights. Updating is
+  recommended.
+- **For contributors:** suites that cannot run on a machine report themselves as skipped instead of passed; new
+  suites cover concurrent writes, paging and failed loads.
+
+---
+
 ## v1.1.1 — 2026-11-13
 
 **The owner question comes with the first questions about a new project**

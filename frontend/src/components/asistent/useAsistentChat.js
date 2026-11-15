@@ -125,6 +125,8 @@ const prevedChybu = (e) => {
   // teď, ne až po pravidelném doptání (19. 10. 2026). Zdravá AI = nic se nezmění, jen jeden levný dotaz.
   if (e && (e.isTimeout || !e.status || e.status >= 500)) refreshAiModes();
   if (e && e.isTimeout) return 'timeout';
+  // no answer at all (connection down, server unreachable) — not "the assistant did not respond"
+  if (e && !e.status) return 'offline';
   // vyčerpaná týdenní kvóta kreditů organizace: server říká komu a kolik → ukázat jeho text
   if (e && e.status === 429 && e.response && e.response.code === 'ai_kvota' && e.response.error) return e.response.error;
   // 'rate' = hodinový strop (ai_rate). Jiné 429 mají vlastní text ze serveru — měsíční limit přepisu u brány,
@@ -139,6 +141,8 @@ export function useAsistentChat({ open, klient }) {
   const aplikovane = useRef(new Set()); // klíče karet, které se v prohlížeči už projevily (viz projevKarty)
   const [chatId, setChatIdState] = useState(() => nactiKlic(KEY_CHAT) || '');
   const [chat, setChat] = useState(null);      // DTO ze serveru {id,title,messages,pending,model}
+  const chatNow = useRef(null);
+  chatNow.current = chat;
   const [seznam, setSeznam] = useState([]);
   const [loading, setLoading] = useState(false);
   // Průběh tahu (5. 10. 2026): server během tahu píše do ai_chat_prubeh (jeden záznam na uživatele), co právě dělá;
@@ -175,15 +179,23 @@ export function useAsistentChat({ open, klient }) {
   }, []);
   // ponechChybu: znovunačtení rozhovoru PO chybě (zpráva neodešla, karta se nepotvrdila) nesmí smazat hlášku, která
   // právě říká proč — dřív ji smazalo hned, takže v rozběhnutém rozhovoru zpráva jen beze slova zmizela
+  // Returns the loaded conversation, or null when it could not be loaded.
   const otevriChat = useCallback(async (id, ponechChybu) => {
     if (!ponechChybu) setError(null);
-    if (!id) { setChat(null); setChatId(''); return; }
+    if (!id) { setChat(null); setChatId(''); return null; }
     try {
       const r = await chatDetail(id);
-      if (!zivy.current) return;
+      if (!zivy.current) return null;
       setChat(r.chat); setChatId(r.chat.id);
-    } catch {
-      setChat(null); setChatId(''); // smazaný / cizí rozhovor → začít čistě
+      return r.chat;
+    } catch (e) {
+      // Only a conversation the server says is deleted / not mine starts clean. A request that
+      // failed (connection down, 5xx) says nothing about the conversation: it stays in the panel
+      // with its id — the panel used to "forget" it (and `kb-chat-id`) after a short outage and
+      // the next message went to a new conversation without history (code analysis 4, F2-01).
+      if (e && (e.status === 404 || e.status === 403)) { setChat(null); setChatId(''); }
+      else if (!ponechChybu && zivy.current) setError(prevedChybu(e));
+      return null;
     }
   }, [setChatId]);
 
@@ -229,6 +241,11 @@ export function useAsistentChat({ open, klient }) {
   const send = useCallback(async (text, context, patchUser, obrazek, pdf, hlas) => {
     const t = String(text || '').trim();
     if ((!t && !obrazek && !pdf && !hlas) || loading) return { ok: false, vratit: false };
+    // how many of the person's messages the conversation holds now — after a failed request
+    // this tells whether the server has stored the new one after all
+    const userCount = (c) => ((c && c.messages) || []).filter((m) => m.role === 'user' && !m.docasna).length;
+    const predOdeslanim = userCount(chatNow.current);
+    const baselineKnown = !!chatNow.current || !chatId; // the conversation was loaded (or is a new one)
     setError(null);
     setLoading(true);
     // optimisticky ukázat zprávu hned; server ji uloží i při chybě modelu
@@ -266,14 +283,46 @@ export function useAsistentChat({ open, klient }) {
       // v ní řeč, brána odmítla, ale i výpadek sítě, chyba proxy (413/502/504) nebo vypršení času. Jen když server
       // řekne `ulozeno` (přepis je v rozhovoru, selhal až model), nahrávka potřeba není — poslala by se podruhé.
       // Obrázek / PDF: jako dosud jen při odmítnutí vstupu (jinak mohly být zpracované).
+      // chat_busy (409): the conversation is still answering another request (second tab, retry) — the server took
+      // nothing, so the text and the attachment go back to the input and the server's sentence is shown.
       const ulozeno = !!(e && e.response && e.response.ulozeno);
-      const nezpracovano = hlas ? !ulozeno : !!(e && !e.isTimeout && (e.status === 400 || e.status === 429 || e.status === 422 || kod === 'ai_vision' || String(kod || '').startsWith('ai_hlas')));
-      if (!zivy.current) return { ok: false, vratit: nezpracovano };
-      setError(prevedChybu(e));
-      if (chatId) otevriChat(chatId, true);
-      else if ((obrazek || pdf || hlas) && nezpracovano) setChat((c) => (c && !c.id ? null : c)); // nový rozhovor se nezaložil → pryč s dočasnou bublinou
-      else if (obrazek || pdf || hlas) nactiSeznam(); // mohl vzniknout na serveru — ať je v historii
-      return { ok: false, vratit: nezpracovano };
+      // A refusal (any 4xx: 400, 402 subscription, 403, 409 busy, 413, 422, 429 cap / quota) comes BEFORE the message
+      // is stored — unless the server says `ulozeno` — so the text goes back to the input (F2-02; until then only
+      // attachments were returned and a plain text message vanished from the field and the screen).
+      const odmitnuto = !!(e && !e.isTimeout && !ulozeno && ((e.status >= 400 && e.status < 500 && e.status !== 408) || kod === 'chat_busy' || kod === 'ai_vision' || String(kod || '').startsWith('ai_hlas')));
+      // No answer at all (connection down — F2-01): whether the server got the message is unknown until the
+      // conversation can be read again; see below.
+      const bezOdpovedi = !!(e && !e.status && !e.isTimeout);
+      let nezpracovano = hlas ? !ulozeno : odmitnuto;
+      if (!zivy.current) return { ok: false, vratit: nezpracovano || bezOdpovedi };
+      const chyba = prevedChybu(e);
+      setError(chyba);
+      if (chatId) {
+        const nacteny = await otevriChat(chatId, true);
+        if (!zivy.current) return { ok: false, vratit: nezpracovano || bezOdpovedi };
+        // connection lost: still down → the request most likely never left, the text goes back; back up again →
+        // the server's copy decides (the message is there = it was stored, do not offer it a second time)
+        // Without a loaded copy to count against (the panel opened during the outage) the count says
+        // nothing: the message is stored only if the last one of the person's messages is this text.
+        if (bezOdpovedi) {
+          if (!nacteny) nezpracovano = true;
+          else if (baselineKnown) nezpracovano = userCount(nacteny) <= predOdeslanim;
+          else {
+            const mine = (nacteny.messages || []).filter((m) => m.role === 'user');
+            const last = mine[mine.length - 1];
+            nezpracovano = !(t && last && String(last.content || '').trim() === t);
+          }
+        }
+        // the conversation could not be re-read: keep it as it was, only without the bubble of a message that is
+        // back in the input
+        if (!nacteny && nezpracovano) setChat((c) => (c ? { ...c, messages: (c.messages || []).filter((m) => !m.docasna) } : c));
+      } else {
+        if (bezOdpovedi) nezpracovano = true;
+        if (nezpracovano) setChat((c) => (c && !c.id ? null : c)); // nový rozhovor se nezaložil → pryč s dočasnou bublinou
+        else if (obrazek || pdf || hlas) nactiSeznam(); // mohl vzniknout na serveru — ať je v historii
+      }
+      if (bezOdpovedi && nezpracovano && zivy.current) setError('offlineSend');
+      return { ok: false, vratit: nezpracovano, zaneprazdneno: kod === 'chat_busy' };
     } finally {
       if (zivy.current) setLoading(false);
     }

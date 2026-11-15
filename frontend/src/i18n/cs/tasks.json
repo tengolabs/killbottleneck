@@ -30,6 +30,8 @@
     "vsechnyProjektyTitle": "Zrušit zúžení na projekt — ukázat úkoly všech projektů",
     "nodeFallback": "uzel",
     "newTask": "Nový úkol",
+    "loadFailed": "Úkoly se nepodařilo načíst.",
+    "loadRetry": "Zkusit znovu",
     "stropZobrazeno": "Zobrazeno {{shown}} z {{total}} úkolů",
     "nacistVse": "Načíst vše",
     "emptyTitle": "Zatím nemáte žádné úkoly",

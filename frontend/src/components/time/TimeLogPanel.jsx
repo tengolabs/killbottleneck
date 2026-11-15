@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useAsistent } from '@/lib/AsistentContext';
 import { base44 } from '@/api/base44Client';
+import { listAllPages } from '@/lib/listAll';
 import { useTimer, formatElapsed, formatTimeRange } from '@/lib/TimerContext';
 import { formatMinutes } from '@/components/time/TimeSummary';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
     base44.entities.TimeEntry.list('-started', 20)
       .then((list) => setEntries((list || []).filter((e) => e.ended)))
       .catch(() => {});
-    base44.entities.GoalMap.list('-updated_date', 200, { fields: 'id,title,archived' })
+    listAllPages(base44.entities.GoalMap, '-updated_date,id', 200, { rawFilter: 'archived != true', fields: 'id,title,archived' })
       .then((list) => setMaps((list || []).filter((m) => !m.archived)))
       .catch(() => {});
   };
@@ -79,6 +80,8 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
     try {
       const rec = await stop({ note: note.trim() });
       setNote('');
+      // closed elsewhere in the meantime (another tab, the phone): TimerContext said so; no "recorded" toast
+      if (rec?.alreadyEnded) return;
       const unassigned = rec && !rec.map_id && !rec.task_id && !rec.node_id;
       toast({
         title: t('timeLog.timeRecorded'),

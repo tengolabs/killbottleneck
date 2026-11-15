@@ -192,7 +192,11 @@ function adresatSdileni(app, ref) {
 function pravoSdileni(map, email) {
   const H = require(`${__hooks}/helpers.js`);
   const ma = (pole) => H.jsonList(map, pole).some((x) => String(x).toLowerCase() === email);
-  if (!ma("shared_with")) return "";
+  if (!ma("shared_with")) {
+    // a pending share (an address without an account — it waits for the invitation link) has its own row
+    const ceka = H.shareInviteRow($app, map.id, email);
+    return ceka ? ceka.getString("permission") : "";
+  }
   return ma("shared_with_edit") ? "edit" : (ma("shared_with_work") ? "work" : "read");
 }
 function pravoNazev(p, L) {
@@ -215,6 +219,10 @@ function ctiSdileni(app, auth, a) {
     // účet bez jména (čerstvě pozvaný) ≠ bez účtu — model jinak tvrdí „zatím nemá účet“ (ostrý běh 4. 10.)
     return `• ${em}${u ? (u.full_name || u.name ? ` (${u.full_name || u.name})` : "") : " (no account yet)"} — ${pravoSdileni(m, em)}`;
   });
+  // pending shares: invited addresses that have no access yet (they get it by coming through the invitation link)
+  for (const r of H.pendingShareRows(app, m.id)) {
+    lide.push(`• ${r.getString("email")} (invited, NO ACCESS YET — gets it by signing up or signing in through the invitation link) — ${r.getString("permission")}`);
+  }
   const out = [
     `Sharing of "${m.getString("title")}" (owner ${vlastnikEmail(app, m) || "?"}):`,
     `team access (every member of the instance): ${m.getString("team_access") || "none"}`,
@@ -574,8 +582,8 @@ function provedNastaveni(app, auth, L, name, a, ktx) {
       let navic = "";
       if (j.member && j.member.registered === false) {
         navic = j.invite === "sent"
-          ? ` ${email} has no account yet — an invitation e-mail was sent; they will see the project after registering with this address.`
-          : ` ${email} has no account on this instance yet — they will see the project once they register with this address${j.registration_open === false ? (j.admin_asked ? " (registration is closed: the administrators were asked in the app to invite them)" : " (registration is closed: an administrator invites them first — invite_member, the user confirms)") : ""}.`;
+          ? ` ${email} has no account yet — an invitation e-mail was sent; they will see the project after signing up through the link in that e-mail (signing up with the address without the link gives no access).`
+          : ` ${email} has no account on this instance yet and NO invitation e-mail went out — they get access only through a one-time invitation link, which the user copies in the project's Share dialog (the "send again" button next to the address)${j.registration_open === false ? (j.admin_asked ? " (registration is closed: the administrators were asked in the app to invite them)" : " (registration is closed: an administrator invites them first — invite_member, the user confirms)") : ""}.`;
       }
       return { text: `Project "${m.getString("title")}" shared with ${email}: ${soucasne ? `${soucasne} → ${perm}` : perm}.${navic}` };
     }
@@ -937,7 +945,7 @@ function detailNastaveni(app, auth, L, name, a) {
     const u = clen(app, email);
     const z = [];
     if (u && (u.full_name || u.name)) z.push(u.full_name || u.name);
-    if (!u) z.push(cs ? "bez účtu — projekt uvidí po registraci s touto adresou" : "no account — sees the project after registering with this address");
+    if (!u) z.push(cs ? "bez účtu — projekt uvidí, až přijde přes odkaz z pozvánky" : "no account — sees the project after coming through the invitation link");
     const s = pravoSdileni(m, email);
     if (s && name === "share_map") z.push((cs ? "dosud: " : "so far: ") + pravoNazev(s, L));
     return z.join(" · ");

@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Inbox, Trash2, ExternalLink, LayoutGrid, CalendarClock, Bot, Paperclip, ListTodo, Users, History } from 'lucide-react';
 import { useNodeEditState } from './useNodeEditState';
+import BackgroundChanges from './sections/BackgroundChanges';
 import BasicsSection from './sections/BasicsSection';
 import OrgSection from './sections/OrgSection';
 import AssignmentSection from './sections/AssignmentSection';
@@ -98,6 +99,7 @@ export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAc
             ))}
           </nav>
           <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
+            {Object.keys(s.bgChanges).length > 0 && <div className="mb-4"><BackgroundChanges s={s} /></div>}
             <div className="max-w-2xl space-y-4">
               {active === 'org' && <OrgSection s={s} members={members} />}
               {active === 'basics' && <BasicsSection s={s} withColor={!s.isApex} />}

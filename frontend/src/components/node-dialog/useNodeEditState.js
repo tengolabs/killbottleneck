@@ -12,6 +12,30 @@ import { linkKind } from './linkKind';
 // tenhle balík jako prop `s`. Vzniklo extrakcí z NodeEditDialog.jsx (14. 8.
 // 2026, přestavba na kategorie) BEZE ZMĚNY chování; komentáře u jednotlivých
 // pravidel zůstaly u polí, kterých se týkají.
+// The form values of the node dialog as they follow from a node (one place for the first load
+// and for comparing with a change that arrives while the dialog is open).
+export function nodeFormValues(node) {
+  const d = node?.data || {};
+  return {
+    title: d.title || '',
+    description: d.description || '',
+    status: d.status || 'todo',
+    color: d.color || '',
+    apexText: d.apexText || '',
+    deadline: d.deadline || '',
+    owner: d.owner || '',
+    waitForChildren: !!d.waitForChildren,
+    icon: d.icon || '',
+    executorKind: d.executorKind === 'human' || !d.executorKind ? 'human' : 'automation',
+    executorName: d.executorName || '',
+    automationWanted: !!d.automationWanted,
+    automationNote: d.automationNote || '',
+    positionKind: d.positionKind === 'function' ? 'function' : 'position',
+    holder: d.holder || '',
+    deputy: d.deputy || '',
+  };
+}
+
 export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
   const { t } = useTranslation('editor');
   const { toast } = useToast();
@@ -116,28 +140,59 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
       .catch(() => setLastRun(null));
   }, [node?.id, mapId]);
 
+  // The form is filled from the node when the dialog OPENS (another node id). While it stays
+  // open the node can change underneath — a colleague ticks it, a rule moves the deadline, the
+  // person's own switch elsewhere in the dialog (code analysis 4, F1-04). The effect used to
+  // depend on the node object and rewrote ALL fields, typed text included. Now, field by field:
+  //   · a field the person has not touched follows the background change silently;
+  //   · a field the person is editing keeps what they typed and the new value is offered
+  //     (bgChanges → the notice in the dialog: take the new value / keep mine).
+  const form = {
+    title, description, status, color, apexText, deadline, owner, waitForChildren, icon,
+    executorKind, executorName, automationWanted, automationNote, positionKind, holder, deputy,
+  };
+  const formNow = useRef(form);
+  formNow.current = form;
+  const setters = {
+    title: setTitle, description: setDescription, status: setStatus, color: setColor, apexText: setApexText,
+    deadline: setDeadline, owner: setOwner, waitForChildren: setWaitForChildren, icon: setIcon,
+    executorKind: setExecutorKind, executorName: setExecutorName, automationWanted: setAutomationWanted,
+    automationNote: setAutomationNote, positionKind: setPositionKind, holder: setHolder, deputy: setDeputy,
+  };
+  const loaded = useRef({ id: null, values: null }); // what the form was last filled from
+  const [bgChanges, setBgChanges] = useState({});    // field → value that arrived in the background
   useEffect(() => {
-    if (node) {
-      const apex = node.data?.nodeType === 'apex' || node.type === 'apexNode';
-      setTitle(node.data?.title || '');
-      setDescription(node.data?.description || '');
-      setStatus(node.data?.status || 'todo');
-      setColor(node.data?.color || '');
-      setIsApex(apex);
-      setApexText(node.data?.apexText || '');
-      setDeadline(node.data?.deadline || '');
-      setOwner(node.data?.owner || '');
-      setWaitForChildren(!!node.data?.waitForChildren);
-      setIcon(node.data?.icon || '');
-      setExecutorKind(node.data?.executorKind === 'human' || !node.data?.executorKind ? 'human' : 'automation');
-      setExecutorName(node.data?.executorName || '');
-      setAutomationWanted(!!node.data?.automationWanted);
-      setAutomationNote(node.data?.automationNote || '');
-      setPositionKind(node.data?.positionKind === 'function' ? 'function' : 'position');
-      setHolder(node.data?.holder || '');
-      setDeputy(node.data?.deputy || '');
+    if (!node) { loaded.current = { id: null, values: null }; return; } // closed → the next opening loads afresh
+    const incoming = nodeFormValues(node);
+    setIsApex(node.data?.nodeType === 'apex' || node.type === 'apexNode');
+    if (loaded.current.id !== node.id) {
+      for (const k of Object.keys(incoming)) setters[k](incoming[k]);
+      loaded.current = { id: node.id, values: incoming };
+      setBgChanges({});
+      return;
     }
+    const base = loaded.current.values;
+    const mine = formNow.current;
+    const offered = {};
+    const settled = [];
+    for (const k of Object.keys(incoming)) {
+      if (incoming[k] === base[k]) continue;
+      if (mine[k] === base[k]) { setters[k](incoming[k]); settled.push(k); }
+      else if (mine[k] === incoming[k]) settled.push(k);
+      else offered[k] = incoming[k];
+    }
+    loaded.current = { id: node.id, values: incoming };
+    if (settled.length || Object.keys(offered).length) {
+      setBgChanges((prev) => {
+        const next = { ...prev, ...offered };
+        for (const k of settled) delete next[k];
+        return next;
+      });
+    }
+    // setters are state setters (stable); the form is read through the ref
   }, [node]);
+  const dropBgChange = (k) => setBgChanges((prev) => { const next = { ...prev }; delete next[k]; return next; });
+  const takeBgChange = (k) => { if (k in bgChanges) setters[k](bgChanges[k]); dropBgChange(k); };
 
   const changeExecutorKind = (kind) => {
     setExecutorKind(kind);
@@ -306,5 +361,6 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
     linkUrl, setLinkUrl, linkName, setLinkName, savingLink, setSavingLink,
     uploadsEnabled, pickerCfg, lastRun, loadFiles,
     handleUpload, handleDownload, handleRemoveFile, handleAddLink, handleSave,
+    bgChanges, takeBgChange, keepMine: dropBgChange,
   };
 }

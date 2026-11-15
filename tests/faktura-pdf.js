@@ -152,8 +152,13 @@ async function dekoduj(matice) {
     const tgb = (await textPdf((await vyrob(GBn, 'en')).bytes)).join('\n');
     expect(/Not VAT registered/.test(tgb) && /£1,950\.00/.test(tgb) && /Sort code 12-34-56, account 12345678/.test(tgb) && !/QR payment/.test(tgb), 'GB neplátce: Not VAT registered, £, sort code, bez QR');
     const CZeur = Object.assign({}, DATA, { currency: 'EUR' }); CZeur.spayd = F.spayd(CZeur); CZeur.epc = F.epcQr(CZeur);
-    const tcz = (await textPdf((await vyrob(CZeur, 'cs')).bytes)).join('\n');
-    expect(!CZeur.spayd && !!CZeur.epc && /1\s?600,00\s?€/.test(tcz) && /Variabilní symbol/.test(tcz) && /QR platba/.test(tcz), 'český dodavatel v EUR: 1 600,00 €, VS zůstává, EPC QR');
+    const cz = await vyrob(CZeur, 'cs');
+    const tcz = (await textPdf(cz.bytes)).join('\n');
+    expect(!CZeur.spayd && !!CZeur.epc && /1\s?600,00\s?€/.test(tcz) && /Variabilní symbol/.test(tcz) && /QR platba/.test(tcz), 'český dodavatel v EUR: 1 600,00 €, VS zůstává, nadpis QR platba');
+    // T1-04 (code analysis 4): the one input where the EPC code used to be damaged — a supplier's name with
+    // diacritics in EUR — is decoded too, not only checked for "a string exists" (F2-04)
+    const dekCz = await dekoduj(cz.matice);
+    expect(!!cz.matice && dekCz === CZeur.epc && /Jan Novák – konzultace/.test(dekCz || ''), `český dodavatel v EUR: QR dekódované jsqr == EPC včetně jména s diakritikou (${JSON.stringify(dekCz || '').slice(0, 60)}…)`);
     expect(castka(1600, 'en', 'USD') === '$1,600.00' && castka(1600, 'cs', 'EUR') === '1\u00a0600,00\u00a0€' && castka(1600, 'en', 'PLN') === '1,600.00 PLN', 'castka se symboly');
     expect(datum('2026-10-23', 'en', 'US') === '10/23/2026' && datum('2026-10-23', 'en', 'DE') === '23/10/2026' && datum('2026-10-23', 'cs', 'US') === '23. 10. 2026', 'datum: US pořadí jen v en');
     const { souctyPoMenach } = await mod('src/lib/faktura/zeme.js');

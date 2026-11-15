@@ -65,6 +65,7 @@ export const getMembers = () => kbSend('/api/kb/members', { method: 'GET' }).the
 export const resetUserPassword = (email) => kbSend('/api/kb/reset-user-password', { body: { email } });
 export const memberDeputy = (id, deputy) => kbSend('/api/kb/member-deputy', { body: { id, deputy } });
 // projects an account owns (before deleting the account — deletion cascades) and their transfer
+export const userMapCounts = () => kbSend('/api/kb/users/map-counts', { method: 'GET' }).then((r) => (r && r.counts) || {});
 export const userMaps = (id) => kbSend(`/api/kb/users/${encodeURIComponent(id)}/maps`, { method: 'GET' });
 export const transferUserMaps = (id, email) => kbSend(`/api/kb/users/${encodeURIComponent(id)}/transfer-maps`, { body: email ? { email } : {} });
 export const transferMap = (mapId, email) => kbSend(`/api/kb/maps/${encodeURIComponent(mapId)}/transfer`, { body: { email } });

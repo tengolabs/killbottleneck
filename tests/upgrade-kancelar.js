@@ -26,7 +26,7 @@ const OSNOVA = '# Kuchyň Novákovi\n## Cíl\n- Linka do 30. 11.\n## Kde jsme\n-
 
 H.beh(async () => {
   if (!STARY) {
-    expect(true, 'upgrade test PŘESKOČEN — KB_STARY_IMAGE není; spouštět cíleně: KB_STARY_IMAGE=<obraz minulého vydání>');
+    H.preskoceno('KB_STARY_IMAGE není; spouštět cíleně: KB_STARY_IMAGE=<obraz minulého vydání>');
     return;
   }
   const mock = await H.httpMock(mockHandler);

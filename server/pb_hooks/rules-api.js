@@ -62,7 +62,13 @@ function saveRule(app, map, rec, info, ctx) {
     app.save(rec);
     return { status: 200, body: { rule: ruleDto(rec) } };
   }
-  const v = validateRuleInput(app, map, info, { strict: !!ctx.strict });
+  // assignees of sub-steps are checked as the SAVING person sees people; one who is unknown
+  // now but already was in the stored rule (the member left) is emptied, not refused (S2-03)
+  let userId = "";
+  try { userId = app.findFirstRecordByFilter("users", "email = {:e}", { e: ctx.userEmail }).id; } catch (err) { /* falls back to the project owner */ }
+  let prevActions = null;
+  if (rec) { try { prevActions = JSON.parse(rec.getString("actions") || "[]"); } catch (err) { prevActions = null; } }
+  const v = validateRuleInput(app, map, info, { strict: !!ctx.strict, userId: userId, prevActions: prevActions });
   if (v.error) return { status: 400, body: { error: t(lang, "err.ruleInvalid", { reason: v.error }) } };
   if (!rec) {
     // strukturální limit à la Asana (50/mapa) je v pořádku; měsíční metr NIKDY

@@ -183,7 +183,8 @@
     "posoudit": "Review with the assistant",
     "rozhodnutiPozn": "Decision note (the requester sees it)",
     "schvaleno": "Time off \"{{title}}\" approved",
-    "zamitnuto": "Time off \"{{title}}\" declined"
+    "zamitnuto": "Time off \"{{title}}\" declined",
+    "byvalyClen": "former member"
   },
   "pripominka": {
     "chipTitle": "You have a reminder set here",
@@ -203,7 +204,10 @@
       "2": "2 days before the deadline",
       "7": "a week before the deadline"
     },
-    "offsetJine": "{{n}} days before the deadline"
+    "offsetJine_one": "{{count}} day before the deadline",
+    "offsetJine_few": "{{count}} days before the deadline",
+    "offsetJine_many": "{{count}} days before the deadline",
+    "offsetJine_other": "{{count}} days before the deadline"
   },
   "novyKal": {
     "titulek": "New shared calendar",
@@ -234,7 +238,10 @@
     "archivovan": "Calendar \"{{name}}\" archived",
     "obnoven": "Calendar \"{{name}}\" restored",
     "smazat": "Delete",
-    "smazatPotvrdit": "Really delete with {{count}} event(s)",
+    "smazatPotvrdit_one": "Really delete with {{count}} event",
+    "smazatPotvrdit_few": "Really delete with {{count}} events",
+    "smazatPotvrdit_many": "Really delete with {{count}} events",
+    "smazatPotvrdit_other": "Really delete with {{count}} events",
     "smazan": "Calendar \"{{name}}\" deleted with its events"
   }
 }

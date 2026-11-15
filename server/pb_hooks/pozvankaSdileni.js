@@ -74,10 +74,15 @@ function posliPozvankuKeSdileni(app, o) {
   // `day` má max 32 znaků: "ps:" + id mapy (15) + ":" + 13 znaků otisku adresy.
   const vlastnikId = mapa.getString("owner") || odesilatel.id;
   const zavoraKlic = ("ps:" + mapa.id + ":" + $security.md5(komu).slice(0, 13)).slice(0, 32);
+  // o.znovu = an explicit "send again" by the person managing the sharing (the previous
+  // token no longer works, so the earlier e-mail is useless) — skips this once-only bar;
+  // the daily caps below still hold.
+  let zavoraExistuje = false;
   try {
     app.findFirstRecordByFilter("mail_budget", "user = {:u} && day = {:d}", { u: vlastnikId, d: zavoraKlic });
-    return "already_sent";
+    zavoraExistuje = true;
   } catch (err) { /* ještě nešla */ }
+  if (zavoraExistuje && !o.znovu) return "already_sent";
 
   const dnes = new Date().toISOString().slice(0, 10);
   const dnesKlic = "psday:" + dnes;
@@ -118,7 +123,10 @@ function posliPozvankuKeSdileni(app, o) {
     org: nazevOrganizace(app, info), // organizace v hlavičce (Richard 24. 10. 2026)
   };
   if (otevrena && info.base) {
-    podklad.tlacitko = { text: t(lang, "sharemail.button"), url: info.base + "/register?email=" + encodeURIComponent(komu) };
+    // The link carries the one-time token: the share is granted only to whoever comes
+    // through it (finding S4-02) — signing up with the same address elsewhere gives nothing.
+    podklad.tlacitko = { text: t(lang, "sharemail.button"), url: info.base + "/register?email=" + encodeURIComponent(komu)
+      + (o.token ? "&invite=" + encodeURIComponent(o.token) : "") };
     podklad.tlacitkoNahrada = t(lang, "mail.linkFallback");
   }
   podklad.karta = {
@@ -150,9 +158,11 @@ function posliPozvankuKeSdileni(app, o) {
   // Účetnictví AŽ PO odeslání: závora zapsaná před neúspěšným odesláním by
   // pozvánku zablokovala navždy (tatáž past jako S2-02 v notify()).
   try {
-    const zavora = new Record(budget);
-    zavora.set("user", vlastnikId); zavora.set("day", zavoraKlic); zavora.set("sent", 1);
-    app.save(zavora);
+    if (!zavoraExistuje) {
+      const zavora = new Record(budget);
+      zavora.set("user", vlastnikId); zavora.set("day", zavoraKlic); zavora.set("sent", 1);
+      app.save(zavora);
+    }
   } catch (err) {
     try { app.logger().warn("share: závora pozvánky se neuložila", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }

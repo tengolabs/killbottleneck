@@ -19,10 +19,12 @@
 //
 // Seznam projektů se stahuje AŽ TADY a jen `id,title` — lite režim si nesmí
 // natáhnout celé mapy s JSON bloby uzlů.
+import { serverReason } from '@/lib/serverReason';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { listAllPages } from '@/lib/listAll';
 import { useAuth } from '@/lib/AuthContext';
 import { todayKey } from '@/lib/taskActions';
 import { addNodeToMap } from '@/lib/mapNodes';
@@ -43,7 +45,7 @@ export default function LiteQuickAdd({ onClose, onAdded }) {
   const me = user?.email || '';
   useEffect(() => {
     if (!me) return undefined; // auth still loading — the filter below needs my e-mail
-    base44.entities.GoalMap.list('-updated_date', 200, { fields: 'id,title,archived,owner_email,shared_with_edit,team_access' })
+    listAllPages(base44.entities.GoalMap, '-updated_date,id', 200, { rawFilter: 'archived != true', fields: 'id,title,archived,owner_email,shared_with_edit,team_access' })
       .then((list) => {
         // Only projects I can WRITE to — a mirror of the goalmaps collection rule
         // (owner, named "edit" share, team edit). A read-only project used to be
@@ -88,7 +90,7 @@ export default function LiteQuickAdd({ onClose, onAdded }) {
       }
       onAdded();
     } catch (err) {
-      setError(err?.message || t('add.failed'));
+      setError(serverReason(err) || t('add.failed'));
       setSaving(false);
     }
   };

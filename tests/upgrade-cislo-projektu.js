@@ -16,7 +16,7 @@ const mapa = (title) => ({ title, nodes: [{ id: 'r', type: 'apexNode', position:
 H.beh(async () => {
   if (!STARY) {
     // harness odmítá sadu bez jediné kontroly (vždy-zelená past) → přeskočení se zapíše nahlas
-    expect(true, 'upgrade test PŘESKOČEN — KB_STARY_IMAGE není; spouštět cíleně: KB_STARY_IMAGE=<obraz minulého vydání>');
+    H.preskoceno('KB_STARY_IMAGE není; spouštět cíleně: KB_STARY_IMAGE=<obraz minulého vydání>');
     return;
   }
   const env = { KB_UVODNI_MAPA: 0 };

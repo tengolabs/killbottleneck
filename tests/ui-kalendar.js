@@ -367,7 +367,10 @@ H.beh(async () => {
   await sleep(600);
   expect(!!(await page.waitForSelector(`${chipSel('Ochutnávka pro sousedy')} [data-testid="gcal-chip-zvonek"]`, { timeout: 8000 }).catch(() => null)), 'chip uzlu s připomínkou má zvoneček');
   // Můj den: dnešní událost jako řádek s časem nad seznamem (server sections.events)
-  const mujDen = (await inst.api('GET', '/api/kb/my-day', { token: V })).json;
+  // `today` is passed as the app passes it (api/myDay.js): without it the server takes ITS day (UTC in the
+  // container), which between 00:00 and 01:00 (02:00 in summer) local time is still yesterday — the event
+  // created "today" in the browser was then missing here and the suite ended 150/1 (a test trap, not an app bug)
+  const mujDen = (await inst.api('GET', `/api/kb/my-day?today=${den(0)}`, { token: V })).json;
   expect((mujDen?.sections?.events || []).some((e) => e.title === 'Zubař' && e.time === '14:00' && e.mine && e.participants === 1), `Můj den API nese dnešní událost s časem (${JSON.stringify((mujDen?.sections || {}).events)})`);
   // na Úkolech je panel výchozí sbalený (Richard 11. 8.) → Projekty (rozbalený)
   await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
@@ -506,12 +509,17 @@ H.beh(async () => {
   const pohovor = (await udalosti()).find((e) => e.title === 'Pohovor');
   expect(!!pohovor && pohovor.time === '11:00' && pohovor.end_time === '12:00', `API: Pohovor 11:00–12:00 bez kolize (${JSON.stringify(pohovor)})`);
   // správce upraví cizí firemní akci v detailu (can_edit)
+  // the dialog of the saved "Pohovor" must be gone first: a click that came before it closed
+  // found no new dialog and the check below read a missing field as "read-only" (flaky, 14 Nov 2026)
+  await page.waitForSelector('[data-testid="kal-dialog-udalost"]', { hidden: true, timeout: 8000 }).catch(() => {});
   // v neděli je dnešek vpravo dole a čip zakryjí oznámení „Událost … založena“ z kroků výše → klik myší trefil oznámení
   // a dialog se neotevřel (regrese v0.89 v neděli 25. 10. 2026; čekat na zmizení nejde — buňka se mezitím přeskládá)
   // → klik přímo na prvek
   await page.$eval(chipSel('18:00 Večírek'), (el) => el.click());
   await page.waitForSelector('[data-testid="kal-dialog-udalost"]', { timeout: 8000 }).catch(() => {});
-  expect(!(await page.$eval('[data-testid="udalost-nazev"]', (el) => el.readOnly).catch(() => true)), 'správce může cizí firemní akci upravit (pole nejsou jen ke čtení)');
+  const nazevPole = await page.$eval('[data-testid="udalost-nazev"]', (el) => ({ ro: el.readOnly, v: el.value })).catch(() => null);
+  expect(!!nazevPole && nazevPole.v === 'Večírek', `detail cizí firemní akce se otevřel (${JSON.stringify(nazevPole)})`);
+  expect(!!nazevPole && !nazevPole.ro, 'správce může cizí firemní akci upravit (pole nejsou jen ke čtení)');
   await page.keyboard.press('Escape');
   await sleep(400);
 

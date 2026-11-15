@@ -39,7 +39,10 @@
     "noLimit": "bez stropu",
     "groupAdmin": "Správci",
     "groupOthers": "Ostatní členové",
-    "groupPeople": "{{n}} lidí",
+    "groupPeople_one": "{{count}} člověk",
+    "groupPeople_few": "{{count}} lidé",
+    "groupPeople_many": "{{count}} člověka",
+    "groupPeople_other": "{{count}} lidí",
     "used": "{{pouzito}} z {{kvota}} tahů",
     "usedNoLimit": "{{pouzito}} tahů",
     "person": "Člověk",
@@ -153,7 +156,10 @@
     "visMembers": "jen vybraní",
     "membersCount": "vybraní členové: {{count}} (upravit)",
     "delete": "Smazat i s událostmi (nejde vrátit)",
-    "deleteConfirm": "opravdu smazat ({{count}} událostí)"
+    "deleteConfirm_one": "opravdu smazat ({{count}} událost)",
+    "deleteConfirm_few": "opravdu smazat ({{count}} události)",
+    "deleteConfirm_many": "opravdu smazat ({{count}} události)",
+    "deleteConfirm_other": "opravdu smazat ({{count}} událostí)"
   },
   "vlastniAi": {
     "heading": "Vlastní model nebo API klíč",

@@ -4,12 +4,13 @@
 // (jsou v PPTX) — PDF je k promítání a poslání. Písmo KB Sans (podmnožina Liberation Sans, OFL) — jediné, co v PDF máme.
 // AI obrázky (3. 11. 2026): `obrazky` = { '': titulní, '<nadpis snímku>': obsahový } → { image, w, h }; titulní vyplní
 // levý pruh místo kruhů, obsahový pravý panel (odrážky se zúží). `ops` = PDFLib kvůli ořezu (kresliObrazekPres).
-import { SNIMEK, hexRgb, hexRgbSvetle, tmava, kresliBlok, kresliObrazek, kresliObrazekPres, vyskaBloku } from './textPdf.js';
+import { SNIMEK, hexRgb, hexRgbSvetle, tmava, kresliBlok, kresliObrazek, kresliObrazekPres, vyskaBloku, drawableData } from './textPdf.js';
 
 const [W, H] = SNIMEK;
 const OKRAJ = 56;
 
-export function sestavPrezentaciPdf({ doc, rgb, fonty, osnova, barva = '#2563eb', logo = null, lang = 'cs', obrazky = {}, ops = null }) {
+export function sestavPrezentaciPdf({ doc, rgb, fonty, osnova: rawOsnova, barva = '#2563eb', logo = null, lang = 'cs', obrazky = {}, ops = null }) {
+  const osnova = drawableData(rawOsnova, fonty.regular); // F2-06
   const akcent = hexRgb(barva, rgb);
   const svetla = hexRgbSvetle(barva, rgb, 0.9);
   const bilaNaAkcentu = tmava(barva);
@@ -37,14 +38,16 @@ export function sestavPrezentaciPdf({ doc, rgb, fonty, osnova, barva = '#2563eb'
   }
   osnova.snimky.forEach((s, i) => {
     const p = doc.addPage([W, H]);
-    const obr = obrazky[s.nadpis] || null;
+    // pictures are keyed by the RAW slide heading (index.js, pptx.js) — the cleaned one would miss "📌 Steps"
+    const obr = obrazky[((rawOsnova.snimky || [])[i] || {}).nadpis] || obrazky[s.nadpis] || null;
     const panel = obr ? Math.round(W * 0.36) : 0; // pravý panel s obrázkem; logo a text se posunou vlevo
     if (obr) kresliObrazekPres(p, obr, { x: W - panel, y: 0, w: panel, h: H - 10 }, ops);
     p.drawRectangle({ x: 0, y: H - 10, width: W, height: 10, color: akcent });
     if (logo) kresliObrazek(p, logo, { x: W - panel - OKRAJ - 120, y: H - 24 - 44, w: 120, h: 40, zarovnani: 'right' });
     const sirka = W - panel - 2 * OKRAJ - (logo ? 140 : 0);
     let y = H - 44;
-    y = kresliBlok(p, { text: s.nadpis, font: fonty.bold, size: 30, x: OKRAJ, y, sirka, barva: text, radkovani: 1.15, max: 2 });
+    // a heading made of emoji only is empty after cleaning — the slide number stands in for it
+    y = kresliBlok(p, { text: s.nadpis || String(i + 1), font: fonty.bold, size: 30, x: OKRAJ, y, sirka, barva: text, radkovani: 1.15, max: 2 });
     p.drawLine({ start: { x: OKRAJ, y: y - 6 }, end: { x: OKRAJ + 72, y: y - 6 }, thickness: 3, color: akcent });
     y -= 30;
     // velikost odrážek podle množství textu, ať se vejdou (24 → 14)

@@ -461,8 +461,9 @@ export default function AsistentPanel({ lite = false }) {
     if (A.loading || pdfCte) return;
     if (zPolicka) { setText(''); setObrazek(null); setPdf(null); }
     const vysl = await A.send(v, sKlientem(kontext), patchUser, obr || undefined, prilohaPdf || undefined);
-    if (!obr && !prilohaPdf) return;
-    // server zprávu nezpracoval (přepis selhal, vadný obrázek, brzda) → příloha i text zpátky do políčka
+    // The server did not take the message — refused it (hourly cap, quota, subscription, busy conversation,
+    // invalid input, failed transcription) or could not be reached: the text and the attachment go back to
+    // the input and the panel says why. One path for a plain text and for attachments (F2-01, F2-02).
     if (vysl && vysl.vratit) {
       if (obr) setObrazek((p) => { if (p) { URL.revokeObjectURL(obr.url); return p; } return obr; });
       if (prilohaPdf) setPdf((p) => p || prilohaPdf);
@@ -601,7 +602,13 @@ export default function AsistentPanel({ lite = false }) {
     setPohled('chat');
     // 'zprava' = hotová zpráva složená formulářem (Stránky → šablona, 15. 10. 2026): do běžícího rozhovoru;
     // na telefonu by panel Dokumentů chat zakryl → zavřít
-    if (zadost.mode === 'zprava') { if (mobil) panel.setDokOpen(false); A.send(String((zadost.target || {}).text || ''), sKlientem(kontext), patchUser); return; }
+    if (zadost.mode === 'zprava') {
+      if (mobil) panel.setDokOpen(false);
+      // refused / not delivered → the composed message is offered in the input instead of vanishing with its form
+      const slozena = String((zadost.target || {}).text || '');
+      A.send(slozena, sKlientem(kontext), patchUser).then((v) => { if (v && v.vratit) setText((p) => p || slozena); });
+      return;
+    }
     // 'pdf_oprava' = „Opravit s asistentem“ ze záložky PDF v Kanceláři (1. 11. 2026): soubor jako příloha nad políčkem
     if (zadost.mode === 'pdf_oprava') { if (mobil) panel.setDokOpen(false); naOpravit((zadost.target || {}).priloha); return; }
     A.zacniRezim(zadost.mode, zadost.target, sKlientem(kontext), patchUser);
@@ -707,7 +714,7 @@ export default function AsistentPanel({ lite = false }) {
     });
     return odkaz && zaKartou ? odkaz : null;
   };
-  const chyba = A.error ? (A.error === 'rate' ? t('errorRate') : A.error === 'timeout' ? t('errorTimeout') : A.error === 'lost' ? t('errorLost') : A.error === 'generic' ? t('errorGeneric') : A.error) : null;
+  const chyba = A.error ? (A.error === 'rate' ? t('errorRate') : A.error === 'timeout' ? t('errorTimeout') : A.error === 'lost' ? t('errorLost') : A.error === 'generic' ? t('errorGeneric') : A.error === 'offline' ? t('errorOffline') : A.error === 'offlineSend' ? t('errorOfflineSend') : A.error) : null;
   const chips = t('chips', { returnObjects: true });
   // telefon na výšku + relax „vedle“ = scéna NAD chatem (RelaxVrstva), panel začíná pod ní
   const relaxNad = mobil && !!panel.relax && panel.relax.rozlozeni === 'vedle' && !panel.relax.zamek; // i lite (panel přes celou šířku)

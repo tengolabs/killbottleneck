@@ -39,7 +39,10 @@
     "noLimit": "no limit",
     "groupAdmin": "Administrators",
     "groupOthers": "Other members",
-    "groupPeople": "{{n}} people",
+    "groupPeople_one": "{{count}} person",
+    "groupPeople_few": "{{count}} people",
+    "groupPeople_many": "{{count}} people",
+    "groupPeople_other": "{{count}} people",
     "used": "{{pouzito}} of {{kvota}} turns",
     "usedNoLimit": "{{pouzito}} turns",
     "person": "Person",
@@ -153,7 +156,10 @@
     "visMembers": "selected only",
     "membersCount": "selected members: {{count}} (edit)",
     "delete": "Delete with its events (cannot be undone)",
-    "deleteConfirm": "really delete ({{count}} events)"
+    "deleteConfirm_one": "really delete ({{count}} event)",
+    "deleteConfirm_few": "really delete ({{count}} events)",
+    "deleteConfirm_many": "really delete ({{count}} events)",
+    "deleteConfirm_other": "really delete ({{count}} events)"
   },
   "vlastniAi": {
     "heading": "Own model or API key",

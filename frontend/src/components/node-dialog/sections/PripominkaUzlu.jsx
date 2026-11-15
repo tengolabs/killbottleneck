@@ -67,7 +67,7 @@ export default function PripominkaUzlu({ mapId, nodeId, deadline }) {
 
   if (!nsReady || !nacteno) return null;
   const casOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
-  const offsetText = (o) => (OFFSETY.includes(String(o)) ? t(`pripominka.offset.${o}`) : t('pripominka.offsetJine', { n: o }));
+  const offsetText = (o) => (OFFSETY.includes(String(o)) ? t(`pripominka.offset.${o}`) : t('pripominka.offsetJine', { count: Number(o) }));
   return (
     <div className="space-y-1.5 rounded-lg border p-2" data-testid="uzel-pripominka">
       {rec && !otevreno ? (

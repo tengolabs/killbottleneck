@@ -45,7 +45,9 @@ export function useBufferInsert({
           pos = { x: 250, y: 150 };
         }
       }
-      pushHistory();
+      // the step remembers the idea: Undo puts it back into the buffer (it used to vanish from
+      // both the map and the buffer — code analysis 4, F1-08)
+      pushHistory({ bufferItem: item });
       setNodes((prev) => [
         ...prev,
         {

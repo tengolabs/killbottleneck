@@ -7,22 +7,10 @@
 //     mazaný vlastník spolusprávcem NEzůstává a po smazání účtu jeho e-mail zmizí ze sdílení
 //     VŠECH map (jinak by znovuregistrace téže adresy přístup oživila — nález 17. 8. u org mapy);
 //   • PATCH pole owner vlastníkem jde stejnou cestou (owner_email dopočítán);
-const { execSync } = require('child_process');
-const PORT = 20533;
-const BASE = `http://127.0.0.1:${PORT}`;
-const NAME = 'flowmap-e2e-vlastnictvi';
-const PW = 'testheslo123';
-let pass = 0, fail = 0;
-const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const api = async (method, path, { token, body } = {}) => {
-  const res = await fetch(BASE + path, {
-    method, headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let json = null; try { json = await res.json(); } catch { /* prázdná odpověď */ }
-  return { status: res.status, json };
-};
+// On the shared harness since code analysis 4 (T1-09): the port is assigned by Docker, no own `docker run`.
+const H = require('./_harness');
+const { expect, sleep, PW } = H;
+let api; // = inst.api, set once the instance runs
 const errOf = (r) => String((r.json || {}).error || (r.json || {}).message || '');
 const register = async (email) => {
   await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
@@ -37,11 +25,11 @@ const mapaTelo = (title, nodes) => ({
 });
 const mapu = async (id, who) => (await api('GET', `/api/collections/goalmaps/records/${id}`, { token: who.token }));
 
-(async () => {
-  try {
-    execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d -e KB_RATE_LIMITS=0 --name ${NAME} -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
-    for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
+H.beh(async () => {
+  {
+    // the intro projects stay on (KB_UVODNI_MAPA default): the takeover block counts them as the private ones
+    const inst = await H.startInstance({ slug: 'vlastnictvi' });
+    api = inst.api;
 
     const admin = await register('admin@vl.cz');     // první účet = admin
     const clen1 = await register('clen1@vl.cz');
@@ -100,20 +88,30 @@ const mapu = async (id, who) => (await api('GET', `/api/collections/goalmaps/rec
     const m2 = (await api('POST', '/api/collections/goalmaps/records', { token: admin.token,
       body: Object.assign(mapaTelo('Projekt B', [uzel('x', 'Krok')]), { owner: admin.id, owner_email: admin.email }) })).json;
     await api('POST', '/api/kb/share', { token: admin.token, body: { action: 'share', mapId: m2.id, email: clen3.email, permission: 'work' } });
-    const pocetPred = (await api('GET', `/api/kb/users/${clen3.id}/maps`, { token: admin.token })).json.count;
+    // Decision 11 Nov 2026 (code analysis 4, S4-01/S3-02): the administrator takes over ONLY the projects
+    // they already have access to. clen3 also owns the private intro projects — those are not transferred
+    // (and not listed by title); they go away with the account. Until 11 Nov this block expected
+    // `transferred === count` (everything, private included) and the deleted owner removed from the shares
+    // right at the transfer; now the previous owner stays a co-admin until the account is really deleted.
+    const pred = (await api('GET', `/api/kb/users/${clen3.id}/maps`, { token: admin.token })).json;
+    const pocetPred = pred.count;
+    expect(pred.maps.length === 1 && pred.maps[0].id === m.id && pred.private_count === pocetPred - 1 && pocetPred >= 2,
+      `admin vidí názvem jen sdílený projekt, soukromé úvodní jen počtem (${pred.maps.length} + ${pred.private_count} soukromých z ${pocetPred})`);
     r = await api('POST', `/api/kb/users/${clen3.id}/transfer-maps`, { token: admin.token, body: {} });
-    expect(r.status === 200 && r.json.transferred === pocetPred && Array.isArray(r.json.skipped) && r.json.skipped.length === 0 && r.json.owner_email === admin.email,
-      `admin převzal projekty clen3 (${r.status} ${JSON.stringify(r.json)})`);
+    expect(r.status === 200 && r.json.transferred === 1 && r.json.private_count === pocetPred - 1 && Array.isArray(r.json.skipped) && r.json.skipped.length === 0 && r.json.owner_email === admin.email,
+      `admin převzal jen projekt, ke kterému má přístup; soukromé nechal být (${r.status} ${JSON.stringify(r.json)})`);
     mm = (await mapu(m.id, admin)).json;
     expect(mm.owner === admin.id && mm.owner_email === admin.email, 'mapa je adminova');
-    expect(!(mm.shared_with_edit || []).includes(clen3.email) && !(mm.shared_with || []).includes(clen3.email),
-      'mazaný vlastník NEzůstal spolusprávcem (krok před smazáním účtu)');
+    expect((mm.shared_with_edit || []).includes(clen3.email),
+      'dokud účet žije, původní vlastník zůstává spolusprávcem (živý účet nesmí o projekt potichu přijít)');
     r = await api('GET', `/api/kb/users/${clen3.id}/maps`, { token: admin.token });
-    expect(r.status === 200 && r.json.count === 0, `clen3 už nic nevlastní (${r.json && r.json.count})`);
+    expect(r.status === 200 && r.json.count === pocetPred - 1 && r.json.maps.length === 0, `clen3 zbyly jen soukromé projekty (${r.json && r.json.count})`);
     r = await api('DELETE', `/api/collections/users/records/${clen3.id}`, { token: admin.token });
     expect(r.status === 204, `účet clen3 smazán (${r.status})`);
     r = await mapu(m.id, admin);
     expect(r.status === 200, `a projekt přežil (${r.status})`);
+    expect(!(r.json.shared_with_edit || []).includes(clen3.email) && !(r.json.shared_with || []).includes(clen3.email),
+      'po smazání účtu už mazaný vlastník spolusprávcem není');
     const m2po = (await mapu(m2.id, admin)).json;
     expect(!(m2po.shared_with || []).includes(clen3.email) && !(m2po.shared_with_work || []).includes(clen3.email),
       'po smazání účtu zmizel jeho e-mail ze sdílení i cizí mapy');
@@ -141,11 +139,5 @@ const mapu = async (id, who) => (await api('GET', `/api/collections/goalmaps/rec
     expect(mm.owner === clen1.id && (mm.shared_with_edit || []).includes(clen2.email), `i tak zůstal předchozí vlastník spolusprávcem (${(mm.shared_with_edit || []).join(',')})`);
     r = await api('PATCH', `/api/collections/goalmaps/records/${m.id}`, { token: clen1.token, body: { owner: 'neexistuje123' } });
     expect(r.status === 400, `owner na neexistující účet → 400 (${r.status})`);
-  } catch (err) {
-    fail++; console.log('  ❌ výjimka:', err.message);
-  } finally {
-    execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
   }
-  console.log(`\n${pass} ✅ / ${fail} ❌`);
-  process.exit(fail ? 1 : 0);
-})();
+}, { nazev: 'MAPA-VLASTNICTVI' });

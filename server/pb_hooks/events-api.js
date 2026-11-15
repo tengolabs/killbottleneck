@@ -536,6 +536,8 @@ function eventDto(app, rec, u, emaily, kal) {
     place: rec.getString("place"),
     series: rec.getString("series"),
     owner_email: ownerEmail,
+    // the author's account was deleted (the event stays — decision 11 Nov 2026); the client shows "former member"
+    owner_former: !ownerEmail,
     participants: parts,
     remind: rec.getBool("remind"),
     remind_before_min: Number(rec.get("remind_before_min")) || 0,
@@ -633,16 +635,19 @@ function saveEvent(app, user, rec, info, ctx) {
   for (const k of ["day", "time", "end_day", "end_time"]) {
     if (d[k] !== undefined || (rec ? rec.getString(k) : "") !== cr.data[k]) d[k] = cr.data[k];
   }
-  if (cal && cal.getString("kind") === "resource") {
-    const kolize = najdiKolizi(app, cal.id, cr.data, rec ? rec.id : "");
-    if (kolize) {
-      const kr = rozsahUdalosti(kolize.rec);
-      return { status: 409, body: {
-        error: t(lang, "err.eventCollision", { name: cal.getString("name"), title: kolize.rec.getString("title"), from: kr.od.slice(11), to: kr.do.slice(11) }),
-        collision: eventDto(app, kolize.rec, user),
-        next_free: kolize.next_free,
-      } };
-    }
+  const resource = !!cal && cal.getString("kind") === "resource";
+  const selfId = rec ? rec.id : "";
+  const collisionAnswer = (kolize) => {
+    const kr = rozsahUdalosti(kolize.rec);
+    return { status: 409, body: {
+      error: t(lang, "err.eventCollision", { name: cal.getString("name"), title: kolize.rec.getString("title"), from: kr.od.slice(11), to: kr.do.slice(11) }),
+      collision: eventDto(app, kolize.rec, user),
+      next_free: kolize.next_free,
+    } };
+  };
+  if (resource) {
+    const kolize = najdiKolizi(app, cal.id, cr.data, selfId);
+    if (kolize) return collisionAnswer(kolize);
   }
   const before = rec ? (rec.get("participants") || []).slice() : [];
   const creating = !rec;
@@ -701,7 +706,20 @@ function saveEvent(app, user, rec, info, ctx) {
       : rec.getString("day") + " " + String(H.deadlineHour()).padStart(2, "0") + ":00";
     if (fireAt <= H.nowLocalMinute()) rec.set("reminded_at", H.nowLocalMinute());
   }
-  app.save(rec);
+  if (resource) {
+    // The check above and this save are two steps: two bookings of the same slot sent at
+    // the same moment both passed the check and both were saved (finding S5-01). Write
+    // transactions run one at a time, so the check is repeated inside the one that saves;
+    // inside a batch `app` already is that transaction and this only joins it.
+    let late = null;
+    app.runInTransaction((tx) => {
+      late = najdiKolizi(tx, cal.id, cr.data, selfId);
+      if (!late) tx.save(rec);
+    });
+    if (late) return collisionAnswer(late);
+  } else {
+    app.save(rec);
+  }
 
   // nová (nebo znovu otevřená) nepřítomnost ke schválení → správcům a manažerům, kteří
   // kalendář VIDÍ (skrytý kalendář nesmí prosáknout textem notifikace); žadatel = aktér, notify ho vynechá

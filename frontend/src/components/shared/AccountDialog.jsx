@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { downloadAllMyData, uploadAllMyData } from '@/lib/exportAll';
 import { pb } from '@/api/pb';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth, markLeavingOnPurpose } from '@/lib/AuthContext';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -87,6 +87,7 @@ export default function AccountDialog({ open, onClose, sekce }) {
     }
     setSaving(true);
     try {
+      markLeavingOnPurpose(); // the change invalidates this token; our own sign-out follows
       await pb.collection('users').update(user.id, {
         oldPassword, password: newPassword, passwordConfirm: newPassword2,
       });
@@ -96,6 +97,7 @@ export default function AccountDialog({ open, onClose, sekce }) {
       toast({ title: t('account.passwordChanged') });
       setTimeout(() => logout(), 1200);
     } catch (e) {
+      markLeavingOnPurpose(false);
       toast({ title: t('account.passwordFailed'), description: e?.message, variant: 'destructive' });
     } finally {
       setSaving(false);

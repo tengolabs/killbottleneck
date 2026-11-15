@@ -183,7 +183,8 @@
     "posoudit": "Posoudit s asistentem",
     "rozhodnutiPozn": "Poznámka k rozhodnutí (uvidí žadatel)",
     "schvaleno": "Nepřítomnost „{{title}}“ schválena",
-    "zamitnuto": "Nepřítomnost „{{title}}“ zamítnuta"
+    "zamitnuto": "Nepřítomnost „{{title}}“ zamítnuta",
+    "byvalyClen": "bývalý člen"
   },
   "pripominka": {
     "chipTitle": "Máte tu nastavenou připomínku",
@@ -203,7 +204,10 @@
       "2": "2 dny před termínem",
       "7": "týden před termínem"
     },
-    "offsetJine": "{{n}} dní před termínem"
+    "offsetJine_one": "{{count}} den před termínem",
+    "offsetJine_few": "{{count}} dny před termínem",
+    "offsetJine_many": "{{count}} dne před termínem",
+    "offsetJine_other": "{{count}} dní před termínem"
   },
   "novyKal": {
     "titulek": "Nový sdílený kalendář",
@@ -234,7 +238,10 @@
     "archivovan": "Kalendář „{{name}}“ archivován",
     "obnoven": "Kalendář „{{name}}“ obnoven",
     "smazat": "Smazat",
-    "smazatPotvrdit": "Opravdu smazat i {{count}} událostí",
+    "smazatPotvrdit_one": "Opravdu smazat i {{count}} událost",
+    "smazatPotvrdit_few": "Opravdu smazat i {{count}} události",
+    "smazatPotvrdit_many": "Opravdu smazat i {{count}} události",
+    "smazatPotvrdit_other": "Opravdu smazat i {{count}} událostí",
     "smazan": "Kalendář „{{name}}“ smazán i s událostmi"
   }
 }

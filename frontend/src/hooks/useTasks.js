@@ -13,6 +13,15 @@ const STRANKA = 500;
 export function useTasks(user, { mapId } = {}) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  // `loading` = the FIRST load only (the page shows a spinner instead of the view); later
+  // refreshes run in the background as `refreshing` — a spinner on every row action unmounted
+  // the table / timeline / calendar: expanded branches, scroll position, the chosen scale and
+  // month were lost and the page jumped to the top (code analysis 4, F3-04).
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const loadedRef = useRef(false);
+  const scopeRef = useRef('');
+  const userId = user?.id || '';
   const [total, setTotal] = useState(0);
   const [castecne, setCastecne] = useState(false);
   // „Načíst vše" drží i přes další refresh() (deep-linky a řádkové akce
@@ -36,8 +45,13 @@ export function useTasks(user, { mapId } = {}) {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
+    if (!userId) return;
+    // another account or another map = a first load again: nothing of the previous one may stay
+    const scope = `${userId}|${mapId || ''}`;
+    if (scopeRef.current !== scope) { scopeRef.current = scope; loadedRef.current = false; setItems([]); }
+    const first = !loadedRef.current;
+    if (first) setLoading(true);
+    setRefreshing(true);
     try {
       if (mapId) {
         const list = await base44.entities.Task.filter({ map_id: mapId }, '-created_date', 1000);
@@ -50,12 +64,18 @@ export function useTasks(user, { mapId } = {}) {
         setTotal(totalItems);
         setCastecne(totalItems > list.length);
       }
+      loadedRef.current = true;
+      setError(false);
     } catch {
-      // seznam není kritický — při chybě zůstane prázdný
+      // the list keeps what it had; the page shows the failure (F3-05)
+      setError(true);
     } finally {
-      setLoading(false);
+      if (first) setLoading(false);
+      setRefreshing(false);
     }
-  }, [user, mapId, nactiStranky]);
+    // the user's ID, not the object: patchUser (focus star, closing a dialog) makes a new `user`
+    // object and every such change used to reload the whole page
+  }, [userId, mapId, nactiStranky]);
 
   // klik na „Načíst vše" v pruhu — dotáhne zbylé stránky a pruh zmizí
   const nacistVse = useCallback(async () => {
@@ -98,5 +118,5 @@ export function useTasks(user, { mapId } = {}) {
     return m;
   }, [items]);
 
-  return { items, loading, total, castecne, nacistVse, update, remove, refresh, byParent };
+  return { items, loading, refreshing, error, total, castecne, nacistVse, update, remove, refresh, byParent };
 }

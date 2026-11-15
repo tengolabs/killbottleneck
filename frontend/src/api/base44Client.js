@@ -1,3 +1,4 @@
+import { serverReason } from '@/lib/serverReason';
 import i18next from 'i18next';
 
 // Adapter se stejným rozhraním jako @base44/sdk klient, ale nad lokálním
@@ -249,11 +250,13 @@ const entityApi = (name) => {
     // Stránkovaný výpis — na rozdíl od list()/filter() vrací i totalItems/totalPages,
     // takže jde postavit stránkování bez tahání celé kolekce. rawFilter je hotový
     // PB filtr (např. 'read = false'), query je objekt jako u filter().
-    async listPage(sort, page = 1, perPage = 30, { query, rawFilter } = {}) {
+    // `fields` = PB field names, as in list() (a cheap listing without the JSON blobs).
+    async listPage(sort, page = 1, perPage = 30, { query, rawFilter, fields } = {}) {
       const filter = rawFilter || (query ? buildFilter(name, query) : undefined);
       const res = await pb.collection(col).getList(page, perPage, {
         sort: mapSort(sort),
         ...(filter ? { filter } : {}),
+        ...(fields ? { fields } : {}),
       });
       return {
         items: res.items.map((r) => toDto(name, r)),
@@ -274,8 +277,10 @@ const entityApi = (name) => {
       const r = await pb.collection(col).create(toPayload(name, data));
       return toDto(name, r);
     },
-    async update(id, data) {
-      const r = await pb.collection(col).update(id, toPayload(name, data));
+    // `options` = fetch options for this one request (the map editor sends its last save with
+    // `keepalive` when the page is being closed)
+    async update(id, data, options) {
+      const r = await pb.collection(col).update(id, toPayload(name, data), options);
       return toDto(name, r);
     },
     async delete(id) {
@@ -285,11 +290,16 @@ const entityApi = (name) => {
   };
 };
 
-const authError = (err, fallback) => {
-  const e = new Error(err?.response?.message || err?.message || fallback);
+// PocketBase's own English sentences never go to the screen (finding F4-07): the person
+// reads OUR translated text, or the sentence our own hook wrote (wrong registration key,
+// closed registration, account limit) — see lib/serverReason.js.
+const authError = (err, fallback, message) => {
+  const e = new Error(message || fallback);
   e.status = err?.status;
   return e;
 };
+// no answer from the server at all (offline, server down) — the SDK reports status 0
+const authFallback = (err, key) => i18next.t(err?.status ? key : 'errors:auth.serverUnreachable');
 
 // Offline data v service workeru NEJSOU vázaná na účet. Na sdíleném telefonu
 // by po přepnutí uživatele ukázala „Můj den" toho předchozího — proto se maže
@@ -349,13 +359,20 @@ export const base44 = {
         throw authError(err, i18next.t('errors:auth.refreshFailed'));
       }
     },
+    // The signed-in account as the browser remembers it (no request). Used when the server
+    // cannot be reached at start: the person stays signed in with what we know (finding F5-02).
+    rememberedUser() {
+      // (a stored token without the account record is not a remembered person)
+      return pb.authStore.isValid && pb.authStore.record?.id ? toDto('User', pb.authStore.record) : null;
+    },
     async loginViaEmailPassword(email, password) {
       try {
         const res = await pb.collection('users').authWithPassword(String(email || '').trim().toLowerCase(), password);
         await clearOfflineData();
         return toDto('User', res.record);
       } catch (err) {
-        throw authError(err, i18next.t('errors:auth.invalidCredentials'));
+        // 400 = wrong e-mail or password; anything else is not the person's typo
+        throw authError(err, authFallback(err, err?.status === 400 ? 'errors:auth.invalidCredentials' : 'errors:auth.loginFailed'), serverReason(err));
       }
     },
     // Přihlášení přes Google (jen když instance má nakonfigurovaný OAuth client).
@@ -382,8 +399,7 @@ export const base44 = {
         return toDto('User', res.record);
       } catch (err) {
         // serverová hláška (např. „chybí aktivační kód") je užitečnější než generická
-        const msg = err?.response?.data?.setup_code?.message || err?.response?.message;
-        throw authError({ ...err, message: msg }, i18next.t('errors:auth.googleFailed'));
+        throw authError(err, i18next.t('errors:auth.googleFailed'), serverReason(err));
       }
     },
     async register({ email, password, setupCode }) {
@@ -402,8 +418,13 @@ export const base44 = {
         await clearOfflineData();
       } catch (err) {
         const data = err?.response?.data || {};
-        const msg = data.email?.message || data.password?.message || err?.response?.message;
-        throw authError({ ...err, message: msg }, 'Registrace selhala');
+        // PocketBase's own validation is English and, to a visitor who is not signed in, does
+        // not even name the field ("Failed to create record.") — so a refused create with no
+        // sentence of ours gets one translated text that names the likely causes.
+        const key = data.email?.code === 'validation_not_unique' ? 'errors:auth.emailTaken'
+          : data.password?.code ? 'errors:auth.passwordRefused'
+            : err?.status === 400 ? 'errors:auth.registerRefused' : 'errors:auth.registerFailed';
+        throw authError(err, authFallback(err, key), serverReason(err));
       }
     },
     async resetPasswordRequest(email) {
@@ -594,6 +615,13 @@ export const base44 = {
     },
     forget() { orgCache = null; },
     async save({ id, name, logoFile, removeLogo }) {
+      // The caller may not know the record yet: the purpose questionnaire (or the purpose
+      // select in administration) creates it on the server. Creating blindly made a SECOND
+      // record and the name was lost on the next load (finding F4-03) — look first.
+      if (!id) {
+        const res = await pb.collection('org_settings').getList(1, 1);
+        id = res.items[0]?.id;
+      }
       const form = new FormData();
       form.append('name', name || '');
       if (logoFile) form.append('logo', logoFile);
@@ -602,7 +630,8 @@ export const base44 = {
         ? await pb.collection('org_settings').update(id, form)
         : await pb.collection('org_settings').create(form);
       orgCache = null;   // po přejmenování/výměně loga musí ostatní místa číst znovu
-      return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '' };
+      // same shape as get() — a caller that replaces its state with the result must not lose `purpose` (finding F4-03)
+      return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '', purpose: r.purpose || '' };
     },
   },
 

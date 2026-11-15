@@ -200,7 +200,7 @@ function EditorContent({ mapId, personalMap = false }) {
   const templateSeedsRef = useRef(null); // {idMap, rules} z náhledu šablony — pravidla se založí až s mapou
   // Zpět — hooks/useMapHistory.js (F1-07)
   const {
-    canUndo, pushHistory, handleUndo,
+    canUndo, pushHistory, handleUndo, undoEnv, noteForeign,
   } = useMapHistory({ nodesNow, edgesNow, setNodes, setEdges });
   const buffer = useBufferNodes(user);
   const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
@@ -248,9 +248,11 @@ function EditorContent({ mapId, personalMap = false }) {
   // Dialog VRCHOLU ukazuje barvu PROJEKTU (vrchol JE projekt) — i když byla
   // nastavená paletou v tabulce úkolů a data.color vrcholu je prázdné.
   // Uložení jde zpátky přes handleSaveNode, který ji do projektu propíše.
-  const editNode = editNodeRaw && editNodeRaw.type === 'apexNode' && !editNodeRaw.data?.color && color
+  // Memoised: a NEW object on every render of the editor made the dialog reload its form each
+  // time the toolbar repainted (saved → idle) and wiped what was being typed (F1-04).
+  const editNode = useMemo(() => (editNodeRaw && editNodeRaw.type === 'apexNode' && !editNodeRaw.data?.color && color
     ? { ...editNodeRaw, data: { ...editNodeRaw.data, color } }
-    : editNodeRaw;
+    : editNodeRaw), [editNodeRaw, color]);
   // zodpovědné osoby: sdílení mapy + všichni členové týmu (BEZ externích kontaktů —
   // jejich pseudo-e-maily do našeptávačů sdílení/e-mailů nepatří)
   const ownerOptions = useMemo(
@@ -665,12 +667,12 @@ function EditorContent({ mapId, personalMap = false }) {
   // výš volá zapamatujServer a v cleanupu čte saveTimer/pendingSave (flush
   // při odchodu) — obojí hook vrací.
   const {
-    conflict, remoteChanged, saveStatus, baseUpdated, zapamatujServer, zrcadliStavDoZakladny,
+    conflict, remoteChanged, saveStatus, saveError, retrySave, baseUpdated, zapamatujServer, zrcadliStavDoZakladny,
     saveTimer, pendingSave, nasadNaPlatno, handleKeepMine,
   } = useMapAutosave({
     mapId, activeMapId, setActiveMapId, isDraft, canEdit, isPublicView, isTemplatePreview,
     nodes, edges, title, color, setNodes, setEdges, setTitle, setColor,
-    nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t,
+    nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t, noteForeign,
   });
 
   // Rozložení mapy (efekt směru, layoutAllForView, Zarovnat + zámek stylu,
@@ -1143,6 +1145,22 @@ function EditorContent({ mapId, personalMap = false }) {
     pushHistory, buffer, canRemoveNodeShared, assignedDeleteRefused, handleDeleteNode, setEditNodeId, toast, t,
   });
 
+  // What Undo needs and what only exists down here (hooks/useMapHistory.js): the guard of the
+  // trash button, the way back into the buffer for an undone idea, and the words for a step
+  // that can no longer be taken back.
+  undoEnv.current = {
+    canRemove: canRemoveNodeShared,
+    restoreBufferItem: (item) => buffer.add({
+      title: item.title, description: item.description || '', color: item.color || '', deadline: item.deadline || '',
+    }),
+    onRefused: (r) => toast({
+      title: t('toasts.undoRefused'),
+      description: `${t(`toasts.undoReason.${r.reason}`, { title: r.title || t('toasts.undoNode') })} ${t('toasts.undoNothingChanged')}`,
+      duration: 12000,
+    }),
+    onRestoreFailed: () => toast({ title: t('tasks:tasksPage.stashFailed'), description: t('common:misc.tryAgainPlease'), variant: 'destructive' }),
+  };
+
   // Odpojení uzlu od rodiče (ikonka na uzlu) — smaže příchozí hrany
   const handleDetachNode = useCallback(
     (nodeId) => {
@@ -1507,6 +1525,8 @@ function EditorContent({ mapId, personalMap = false }) {
         savingTemplate={savingTemplate}
         handleSaveTemplate={handleSaveTemplate}
         remoteChanged={remoteChanged}
+        saveError={saveError}
+        retrySave={retrySave}
       />
       <EditorToolbar
         nav={{ navigate, org }}
@@ -1807,8 +1827,16 @@ function EditorContent({ mapId, personalMap = false }) {
 
 export default function GoalMapEditor({ personalMap = false }) {
   const { id } = useParams();
+  // One editor instance = ONE map (code analysis 4, F1-01/F1-06). The route keeps this component
+  // mounted when the address goes from one map straight to another (user menu → organisation
+  // structure, a notification from the bell, the browser's Back between two maps), so without the
+  // key the undo history, the "changed elsewhere" banner, the conflict dialog and an open node
+  // dialog of map A stayed alive over map B — one click on Undo then wrote A's content into B.
+  // The unmount flushes a pending save of A with A's own closure (cleanup of the load effect).
+  // A new map keeps its instance: after the first save the address is replaced without the
+  // router (history.replaceState), so `id` stays "new" until the person leaves.
   return (
-    <ReactFlowProvider>
+    <ReactFlowProvider key={id || ''}>
       <EditorContent mapId={id} personalMap={personalMap} />
     </ReactFlowProvider>
   );

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { listAllPages } from '@/lib/listAll';
 import { useAuth } from '@/lib/AuthContext';
 import { useTimer, formatElapsed } from '@/lib/TimerContext';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,7 @@ export default function TimerWidget() {
     setNote(running.note || '');
     setMapId(running.map_id || '');
     setClientId(running.client_id || '');
-    base44.entities.GoalMap.list('-updated_date', 200, { fields: 'id,title,archived,client' })
+    listAllPages(base44.entities.GoalMap, '-updated_date,id', 200, { rawFilter: 'archived != true', fields: 'id,title,archived,client' })
       .then((list) => setMaps((list || []).filter((m) => !m.archived)))
       .catch(() => {});
     base44.entities.Client.list('name').then(setClients).catch(() => {});
@@ -90,6 +91,8 @@ export default function TimerWidget() {
     try {
       const rec = await stop(patch());
       setOpen(false);
+      // closed elsewhere in the meantime (another tab, the phone): TimerContext said so; no "recorded" toast
+      if (rec?.alreadyEnded) return;
       // nepřiřazené měření s poznámkou server uložil i jako nápad do zásobníku
       const toInbox = rec && !rec.map_id && !rec.task_id && !rec.node_id && rec.note;
       toast({

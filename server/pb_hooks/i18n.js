@@ -196,8 +196,8 @@ const STRINGS = {
     en: "{actor} shared the project “{project}” with you in killBottleneck — a map of goals, steps and who is working on what.",
   },
   "sharemail.howOpen": {
-    cs: "Abyste projekt viděli, zaregistrujte se touto e-mailovou adresou: {email}. Přístup se k ní naváže sám, hned po přihlášení ho najdete mezi projekty.",
-    en: "To see the project, sign up with this e-mail address: {email}. Access is tied to it and the project shows up among your projects right after you sign in.",
+    cs: "Abyste projekt viděli, zaregistrujte se tlačítkem z tohoto e-mailu, adresou {email}. Odkaz je jen pro vás a platí 30 dní — přístup dostane jen ten, kdo přijde přes něj. Účet už máte? Otevřete odkaz a přihlaste se.",
+    en: "To see the project, sign up with the button in this e-mail, using the address {email}. The link is yours only and is valid for 30 days — access goes only to whoever comes through it. Already have an account? Open the link and sign in.",
   },
   "sharemail.howClosed": {
     cs: "Na této instanci si účet nezaložíte sami — zakládá ho správce organizace. Odpovězte na tento e-mail a {actorEmail} vám pozvánku zařídí. Jakmile budete mít účet s adresou {email}, projekt uvidíte.",
@@ -434,6 +434,15 @@ const STRINGS = {
     en: "{actor} shared the project \"{project}\" with you",
   },
   // žádost správci: člen sdílel projekt s adresou bez účtu na zavřené instanci
+  "notify.mapTransferred": {
+    cs: "{actor} převedl váš projekt „{project}\" na nového vlastníka ({owner}). Zůstáváte spolusprávcem.",
+    en: "{actor} transferred your project \"{project}\" to a new owner ({owner}). You stay a co-admin.",
+  },
+  // deleting a member hands their shared projects over (decision 11 Nov 2026)
+  "notify.mapHandedOver": {
+    cs: "Účet {member} byl smazán. Projekt „{project}\" přešel na vás — jste jeho novým vlastníkem.",
+    en: "The account {member} was deleted. The project \"{project}\" passed to you — you are its new owner.",
+  },
   "notify.inviteRequest": {
     cs: "{actor} sdílí projekt „{project}\" s {email} — ten zatím nemá účet. Pozvěte ho do organizace.",
     en: "{actor} shared the project \"{project}\" with {email}, who has no account yet. Invite them to the organization.",
@@ -602,6 +611,7 @@ const STRINGS = {
   // normalizeTimeEntry (helpers.js) — důvody za prefix err.invalidTimeEntry
   "err.invalidStartEndDate": { cs: "neplatné datum začátku/konce", en: "invalid start/end date" },
   "err.endAfterStart": { cs: "konec záznamu musí být po začátku", en: "entry end must be after its start" },
+  "err.timeEntryAlreadyEnded": { cs: "Tohle měření už bylo ukončeno jinde — jeho konec se nemění.", en: "This time entry has already been stopped elsewhere — its end stays as it is." },
   "err.timeMapNotFound": { cs: "mapa nenalezena", en: "map not found" },
   "err.mapNotAvailable": { cs: "mapa není dostupná", en: "map not available" },
 
@@ -731,7 +741,14 @@ const STRINGS = {
   },
   "err.emailRequired": { cs: "E-mail je povinný.", en: "E-mail is required." },
   "err.emailInvalid": { cs: "Zadejte platný e-mail.", en: "Enter a valid e-mail address." },
+  "err.lastAdminDemote": { cs: "Poslední administrátor nemůže o roli přijít. Nejdřív udělte roli administrátora někomu dalšímu — instance nesmí zůstat bez správce.", en: "This is the only administrator. Make somebody else an administrator first — the instance must not be left without one." },
+  "err.lastAdminDelete": { cs: "Účet posledního administrátora nejde smazat. Nejdřív udělte roli administrátora někomu dalšímu.", en: "The last administrator's account cannot be deleted. Make somebody else an administrator first." },
+  "err.shareInviteInvalid": { cs: "Odkaz z pozvánky neplatí — vypršel, už byl použit, nebo patří jiné adrese. Požádejte toho, kdo s vámi projekt sdílí, o novou pozvánku.", en: "The invitation link is not valid — it expired, was already used, or belongs to another address. Ask the person sharing the project to send a new invitation." },
   "err.userNotFound": { cs: "Takový uživatel na instanci není.", en: "No such user on this instance." },
+  "err.resetPasswordTooOften": {
+    cs: "Heslo tohoto účtu už bylo za posledních 10 minut obnoveno třikrát. Zkuste to prosím později.",
+    en: "This account's password has already been reset three times in the last 10 minutes. Please try again later.",
+  },
   "err.resetPasswordNotSelf": {
     cs: "Vlastní heslo si takhle obnovit nelze — v hostované verzi si nechte poslat e-mail, na vlastním serveru vede cesta přes konzoli PocketBase.",
     en: "You cannot reset your own password this way — in the hosted version request an e-mail; on your own server use the PocketBase console.",
@@ -1016,6 +1033,7 @@ const STRINGS = {
     cs: "Tohle není nahrávka, kterou umíme přepsat (WebM, Ogg/Opus, M4A, MP3 nebo WAV).",
     en: "This is not a recording we can transcribe (WebM, Ogg/Opus, M4A, MP3 or WAV).",
   },
+  "err.chatBusy": { cs: "Rozhovor právě odpovídá — počkejte na odpověď a pak to zkuste znovu.", en: "This conversation is still answering — wait for the reply, then try again." },
   "err.chatSaveFailed": { cs: "Rozhovor se nepodařilo uložit — zprávu prosím pošlete znovu.", en: "The conversation could not be saved — please send your message again." },
   "err.chatVoiceFailed": {
     cs: "Hlasovku se teď nepodařilo přepsat — nahrávka zůstala v panelu, zkuste ji poslat znovu za chvíli.",

@@ -12,6 +12,8 @@ import { loadKbConfig } from "@/hooks/useKbConfig";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
 import { isNativeShell } from "@/lib/nativeShell";
+import { useAuth } from "@/lib/AuthContext";
+import { rememberShareInvite, pendingShareInvite, claimShareInvite, stripInviteFromAddress } from "@/lib/shareInvite";
 
 export default function Register() {
   const { t } = useTranslation("auth");
@@ -25,6 +27,23 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [setupCode, setSetupCode] = useState("");
   const [setupInfo, setSetupInfo] = useState({ required: false, claimed: true });
+  // ?invite= — one-time token from a share invitation. The shared project is granted only
+  // to whoever comes through this link (the server checks the token after sign-in).
+  const { isAuthenticated } = useAuth();
+  const [inviteFailed, setInviteFailed] = useState("");
+  const goNext = () => { window.location.href = safeNext(new URLSearchParams(window.location.search).get("next")); };
+  useEffect(() => {
+    const token = searchParams.get("invite");
+    if (!token) return;
+    rememberShareInvite(token);
+    stripInviteFromAddress(); // the token must not stay in the address bar / browser history
+  }, [searchParams]);
+  // already signed in (the invited person has an account, or came back from Google):
+  // confirm the invitation right away
+  useEffect(() => {
+    if (!isAuthenticated || !pendingShareInvite()) return;
+    claimShareInvite().then(goNext).catch((err) => setInviteFailed(err?.response?.error || err?.message || t("register.inviteFailed")));
+  }, [isAuthenticated, t]);
 
   // hostovaná instance chce registrační klíč (viz /api/kb/config)
   useEffect(() => {
@@ -48,6 +67,13 @@ export default function Register() {
     try {
       // lokální verze: registrace rovnou přihlásí (bez e-mailového ověření)
       await base44.auth.register({ email, password, setupCode });
+      try {
+        await claimShareInvite();
+      } catch (err) {
+        // the account exists and is signed in, only the invitation was refused — say so
+        setInviteFailed(err?.response?.error || err?.message || t("register.inviteFailed"));
+        return;
+      }
       // ?next= (Login sem posílá nezaložený box i s query): první uživatel, který přišel
       // z OAuth consentu agenta, se musí vrátit na /oauth/authorize, ne na titulku —
       // jinak callback agenta propadne. Stejná ochrana originu jako v Login.jsx.
@@ -67,7 +93,7 @@ export default function Register() {
       footer={
         <>
           {t("register.haveAccount")}{" "}
-          <Link to="/login" className="text-primary font-medium hover:underline">
+          <Link to={"/login" + window.location.search} className="text-primary font-medium hover:underline">
             {t("register.signIn")}
           </Link>
         </>
@@ -76,6 +102,12 @@ export default function Register() {
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}
+        </div>
+      )}
+      {inviteFailed && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm space-y-2" data-testid="invite-failed">
+          <p>{inviteFailed}</p>
+          <Button type="button" variant="outline" size="sm" onClick={goNext}>{t("register.inviteContinue")}</Button>
         </div>
       )}
 

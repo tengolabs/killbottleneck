@@ -17,7 +17,7 @@ const predmet = (mail) => (mail.match(/^Subject:(.*)$/m) || ['', ''])[1].trim();
 
 H.beh(async () => {
   if (!STARY) {
-    expect(true, 'upgrade test SKIPPED — KB_STARY_IMAGE not set; run on purpose: KB_STARY_IMAGE=<image of the previous release>');
+    H.preskoceno('KB_STARY_IMAGE not set; run on purpose: KB_STARY_IMAGE=<image of the previous release>');
     return;
   }
   const env = { KB_UVODNI_MAPA: 0, KB_PURPOSE_ASK: 0 };

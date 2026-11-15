@@ -54,7 +54,12 @@ export default function MembershipSection({ billingComplete }) {
   const vybrany = NABIDKA.find((x) => x.tier === tier) || NABIDKA[0];
   // zkušebka = instance s koncem zkušební doby (i prošlé); bez něj už platí
   const zkusebka = !!config.trial_until;
-  const samoobsluha = zkusebka && !!vybrany.selfService;
+  // Subscription ended (config.subscription_ended): the instance is locked and has to be PAID for again,
+  // so the cart offers payment exactly as for a trial. Only instances on the shared box get
+  // this lock, and a new payment with the instance's slug unlocks it (the same path as paying a trial).
+  const skoncilo = !!config.subscription_ended;
+  const kNakupu = zkusebka || skoncilo;
+  const samoobsluha = kNakupu && !!vybrany.selfService;
   const cena = vybrany.prices[period];
   const prevodem = samoobsluha && vybrany.transferYear && period === 'year';
   const links = config.payment_links || {};
@@ -73,7 +78,7 @@ export default function MembershipSection({ billingComplete }) {
   const mailto = `mailto:${SUPPORT}?subject=${encodeURIComponent(t('membership.mailSubject', {
     plan: t(`membership.plan.${tier}`), period: t(`membership.periodPick.${period}`), slug,
   }))}`;
-  const tarifyVidet = tarifyOtevrit ?? zkusebka;
+  const tarifyVidet = tarifyOtevrit ?? kNakupu;
   const funkce = (x) => {
     const f = t(`membership.features.${x}`, { returnObjects: true });
     return Array.isArray(f) ? f : []; // chybějící klíč vrací řetězec — nespadnout s celou stránkou
@@ -101,10 +106,12 @@ export default function MembershipSection({ billingComplete }) {
         <ShoppingCart className="h-4 w-4 text-primary" />
         <h2 className="font-heading text-sm font-semibold">{t('membership.heading')}</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-4">
-        {zkusebka
-          ? t('membership.hintTrial', { date: config.trial_until })
-          : t('membership.hintActive')}
+      <p className="text-sm text-muted-foreground mb-4" data-testid="membership-hint">
+        {skoncilo
+          ? t('membership.hintEnded')
+          : zkusebka
+            ? t('membership.hintTrial', { date: config.trial_until })
+            : t('membership.hintActive')}
       </p>
 
       <button type="button" onClick={() => setTarifyOtevrit(!tarifyVidet)} aria-expanded={tarifyVidet}
@@ -197,7 +204,7 @@ export default function MembershipSection({ billingComplete }) {
             </Button>
           )}
           {(!samoobsluha || (!cardUrl && !vybrany.transferYear)) && (
-            <Button asChild variant={zkusebka ? 'default' : 'outline'}>
+            <Button asChild variant={kNakupu ? 'default' : 'outline'}>
               <a href={mailto} data-testid="write-us"><Mail className="h-4 w-4 mr-2" />{t('membership.writeUs')}</a>
             </Button>
           )}
@@ -206,7 +213,7 @@ export default function MembershipSection({ billingComplete }) {
           )}
           <span className="text-sm text-muted-foreground basis-full" data-testid="membership-note">
             {!samoobsluha
-              ? t(zkusebka ? 'membership.ownServerByMail' : 'membership.changeByMail')
+              ? t(kNakupu ? 'membership.ownServerByMail' : 'membership.changeByMail')
               : !cardLink
                 ? t(prevodem ? 'membership.cardUnavailable'
                   : vybrany.transferYear ? 'membership.cardUnavailableNoTransfer' : 'membership.cardUnavailableWrite')

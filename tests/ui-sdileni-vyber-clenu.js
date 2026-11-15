@@ -135,7 +135,11 @@ const api = async (method, path, { token, body } = {}) => {
     await page.type('[role="dialog"] input[type="email"]', CIZI);
     await pozvat();
     r = await api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A });
-    ok((r.json?.shared_with || []).includes(CIZI), `volný e-mail nasdílen (${JSON.stringify(r.json?.shared_with)})`);
+    // Code analysis 4, S4-02 (11 Nov 2026): an address without an account is a PENDING share — it is listed in the
+    // dialog ("no account yet"), but no longer written into the project record (until then: shared_with included it).
+    ok(!(r.json?.shared_with || []).includes(CIZI), `volný e-mail bez účtu není v záznamu projektu — čeká na pozvánku (${JSON.stringify(r.json?.shared_with)})`);
+    const cekajici = await page.evaluate(() => [...document.querySelectorAll('[role="dialog"] [data-testid="share-no-account"]')].map((p) => p.parentElement.innerText.replace(/\s+/g, ' ')));
+    ok(cekajici.length === 1 && cekajici[0].includes(CIZI), `v dialogu je jako čekající „zatím bez účtu" (${cekajici.join(' | ')})`);
     s = await seznamSdileni();
     ok(s.includes(CIZI), `cizí adresa je v seznamu (${s.join(', ')})`);
     m = await moznosti();

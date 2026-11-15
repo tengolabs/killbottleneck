@@ -41,14 +41,14 @@ H.beh(async () => {
 
   const { browser } = await H.browser();
   // Každá stránka ve vlastním kontextu (čisté úložiště); `ram` = podvržená aplikace, `token` = přihlášení.
-  async function stranka({ ram = false, token = null } = {}) {
+  async function stranka({ ram = false, token = null, record = {} } = {}) {
     const kontext = await browser.createBrowserContext();
     const page = await kontext.newPage();
     await page.setViewport({ width: 1500, height: 950 });
     const pozadavky = [];
     page.on('request', (r) => pozadavky.push(r.url()));
     if (ram) await page.evaluateOnNewDocument(falesnyRam);
-    if (token) await page.evaluateOnNewDocument((t) => { if (!localStorage.getItem('pocketbase_auth')) localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: {} })); }, token);
+    if (token) await page.evaluateOnNewDocument((t, rec) => { if (!localStorage.getItem('pocketbase_auth')) localStorage.setItem('pocketbase_auth', JSON.stringify({ token: t, record: rec })); }, token, record);
     return { page, pozadavky, zavri: () => kontext.close() };
   }
   const textStranky = (page) => page.evaluate(() => document.body.innerText);
@@ -200,7 +200,11 @@ H.beh(async () => {
 
   console.log('== výpadek serveru při startu stránky už neodhlásí (502), neplatné přihlášení ano (401) ==');
   for (const [kod, odhlasit, ram] of [[502, false, true], [401, true, false]]) {
-    const s = await stranka({ token: anna, ram });
+    // A real signed-in browser keeps the account record next to the token: with it the person stays IN the app
+    // during an outage (finding F5-02). The check used to store a token alone, which no sign-in ever leaves behind,
+    // and so guarded the redirect to the sign-in form (Richard's decision 14 Nov 2026: rewrite).
+    const zaznamAnny = (await inst.api('POST', '/api/collections/users/auth-refresh', { token: anna })).json.record;
+    const s = await stranka({ token: anna, ram, record: odhlasit ? {} : zaznamAnny });
     await s.page.setRequestInterception(true);
     s.page.on('request', (r) => {
       if (r.url().includes('/api/collections/users/auth-refresh')) r.respond({ status: kod, contentType: 'application/json', body: JSON.stringify({ status: kod, message: 'x', data: {} }) });
@@ -212,8 +216,9 @@ H.beh(async () => {
     if (odhlasit) expect(!ulozeno, `odpověď ${kod} na obnovu přihlášení → odhlášen`);
     else expect(!!ulozeno && JSON.parse(ulozeno).token, `odpověď ${kod} na obnovu přihlášení → přihlášení ZŮSTÁVÁ`);
     if (!odhlasit) {
-      // v aplikaci: výpadek poslal na /login; server se vrátil → obnovení NESMÍ chtít heslo znovu
-      expect(new URL(s.page.url()).pathname === '/login', `při výpadku chráněná stránka poslala na přihlášení (${new URL(s.page.url()).pathname})`);
+      // in the app: an outage does NOT send to /login (the person stays in the app with what the browser
+      // remembers); the server is back → a reload must NOT ask for the password again
+      expect(new URL(s.page.url()).pathname !== '/login' && !(await s.page.$('#password')), `při výpadku zůstává člověk v aplikaci, ne na formuláři s heslem (${new URL(s.page.url()).pathname})`);
       s.page.removeAllListeners('request');
       await s.page.setRequestInterception(false);
       await s.page.reload({ waitUntil: 'networkidle2' });

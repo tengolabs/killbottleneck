@@ -1,7 +1,12 @@
 {
   "misc": {
     "untitled": "Untitled",
-    "goalsMeta": "{{count}} goals",
+    "loadFailed": "Not all projects could be loaded.",
+    "loadRetry": "Try again",
+    "goalsMeta_one": "{{count}} goal",
+    "goalsMeta_few": "{{count}} goals",
+    "goalsMeta_many": "{{count}} goals",
+    "goalsMeta_other": "{{count}} goals",
     "accessEdit": "edit",
     "accessRead": "read"
   },

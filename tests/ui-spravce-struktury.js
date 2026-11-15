@@ -123,7 +123,9 @@ const login = async (email) => (await api('POST', '/api/collections/users/auth-w
     const klice = await page.evaluate(() => document.querySelectorAll('[data-testid^="reset-"]').length);
     ok(klice > 0, `obnovu hesla nabízí (${klice}× — u admina a u sebe ne, to je záměr)`);
     await page.keyboard.press('Escape'); await sleep(300);
-    ok(/Pozvat/i.test(txt), 'pozvat uživatele může');
+    // T1-07: this only sees the control; that the invitation is really sent and the list of people stays
+    // is measured by ui-chyby4-sprava2.js (block B, F4-02)
+    ok(/Pozvat/i.test(txt), 'ovládání „Pozvat“ správce struktury vidí');
 
     console.log('== admin má pořád všechno ==');
     const pageA = await browser.newPage();

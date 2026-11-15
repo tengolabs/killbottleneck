@@ -117,9 +117,11 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
         // povýšení existujícího člena (server vrací `upgraded`) mění ŘÁDEK,
         // nepřidává nový — jinak byl e-mail v seznamu dvakrát, se dvěma
         // úrovněmi a duplicitním React key (nález panelu 20. 8. 2026)
-        setMembers(prev => (res.upgraded
+        // …and confirming a pending share for an account that now exists replaces its
+        // row too (the address is already listed as pending)
+        setMembers(prev => ((res.upgraded || prev.some((m) => m.email === res.member.email))
           ? prev.map((m) => (m.email === res.member.email
-            ? { ...m, permission: res.member.permission, registered: res.member.registered }
+            ? { ...m, permission: res.member.permission, registered: res.member.registered, pending: !!res.member.pending }
             : m))
           : [...prev, res.member]));
         // `org_invited`: sdílení na potvrzení založilo účet — člen už JE
@@ -132,6 +134,8 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
             adminAsked: !!res.admin_asked,
             registrationOpen: !!res.registration_open,
             canInviteToOrg: !!res.can_invite_to_org,
+            // one-time invitation link, present only when the e-mail did not go out
+            invitePath: res.invite_path || '',
           });
         }
         setEmail('');
@@ -175,6 +179,44 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
       }
     } catch {
       setError(t('shareDialog.permissionFailed'));
+    }
+  });
+
+  // Pending share: send the invitation again. The server issues a new one-time link
+  // (the previous one stops working); when no e-mail can go out, the link comes back
+  // and the person managing the sharing hands it over.
+  const handleReinvite = (m) => f.run(async () => {
+    try {
+      setPozvanka(null);
+      setLinkCopied(false);
+      const res = await shareMap({ action: 'reinvite', mapId, memberEmail: m.email });
+      if (res?.error) { setError(res.error); return; }
+      setPozvanka({
+        email: m.email,
+        invite: res.invite,
+        resent: true,
+        registered: !!m.registered,
+        adminAsked: !!res.admin_asked,
+        registrationOpen: !!res.registration_open,
+        canInviteToOrg: !!res.can_invite_to_org,
+        invitePath: res.invite_path || '',
+      });
+      setMembers(prev => prev.map((x) => (x.email === m.email ? { ...x, invite_valid: true } : x)));
+    } catch (e) {
+      setError(e.response?.error || e.response?.message || t('shareDialog.addFailed'));
+    }
+  });
+
+  // Pending share of an address that HAS an account by now (the person signed up
+  // without the invitation link): whoever manages the sharing confirms it for that account.
+  const handleConfirmAccount = (m) => f.run(async () => {
+    try {
+      const res = await shareMap({ action: 'share', mapId, email: m.email, permission: m.permission });
+      if (res?.error) { setError(res.error); return; }
+      bump(res);
+      setMembers(prev => prev.map((x) => (x.email === m.email ? { ...x, ...res.member, pending: false } : x)));
+    } catch (e) {
+      setError(e.response?.error || e.response?.message || t('shareDialog.addFailed'));
     }
   });
 
@@ -229,7 +271,8 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
   };
   const handleCopyRegisterLink = async () => {
     if (!pozvanka) return;
-    const url = `${serverOrigin()}/register?email=${encodeURIComponent(pozvanka.email)}`;
+    // the link carries the one-time token — without it signing up gives no access
+    const url = `${serverOrigin()}${pozvanka.invitePath || `/register?email=${encodeURIComponent(pozvanka.email)}`}`;
     if (await copyToClipboard(url)) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
@@ -371,7 +414,9 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                   ? <MailCheck className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
                   : <MailWarning className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />}
                 <div className="space-y-1">
-                  <p>{t(`shareDialog.invite.${pozvanka.invite}`, { email: pozvanka.email })}</p>
+                  <p>{pozvanka.resent
+                    ? t(pozvanka.invite === 'sent' ? 'shareDialog.reinvite.sent' : 'shareDialog.reinvite.link', { email: pozvanka.email })
+                    : t(`shareDialog.invite.${pozvanka.invite}`, { email: pozvanka.email })}</p>
                   {!pozvanka.registrationOpen && !['org_invited', 'org_invited_password'].includes(pozvanka.invite) && (
                     <p className="text-muted-foreground">
                       {pozvanka.canInviteToOrg
@@ -400,11 +445,17 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                   {t('shareDialog.inviteToOrg')}
                 </Button>
               )}
-              {pozvanka.registrationOpen && !['sent', 'already_sent'].includes(pozvanka.invite) && (
-                <Button size="sm" variant="outline" className="w-full" onClick={handleCopyRegisterLink}>
-                  {linkCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                  {linkCopied ? t('tasks:inviteDialog.copied') : t('shareDialog.copyRegisterLink')}
-                </Button>
+              {pozvanka.invitePath && (pozvanka.registrationOpen || pozvanka.registered) && (
+                <div className="space-y-1.5" data-testid="share-invite-link">
+                  <code className="block rounded border bg-background px-2 py-1 text-xs break-all" data-testid="share-invite-link-url">
+                    {`${serverOrigin()}${pozvanka.invitePath}`}
+                  </code>
+                  <Button size="sm" variant="outline" className="w-full" onClick={handleCopyRegisterLink} data-testid="share-invite-link-copy">
+                    {linkCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    {linkCopied ? t('tasks:inviteDialog.copied') : t('shareDialog.copyRegisterLink')}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">{t('shareDialog.inviteLinkNote')}</p>
+                </div>
               )}
             </div>
           )}
@@ -448,6 +499,15 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                             {t('shareDialog.noAccountBadge')}
                           </p>
                         )}
+                        {m.pending && m.registered !== false && (
+                          <p
+                            className="text-xs text-amber-600 dark:text-amber-500 truncate"
+                            data-testid="share-pending-account"
+                            title={t('shareDialog.pendingAccountBadgeTitle')}
+                          >
+                            {t('shareDialog.pendingAccountBadge')}
+                          </p>
+                        )}
                         {m.permission === 'read' && m.has_work && (
                           <p
                             className="text-xs text-amber-600 dark:text-amber-500 truncate"
@@ -460,6 +520,34 @@ export default function ShareDialog({ open, mapId, isOwner, onClose, onMapBumped
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      {m.pending && m.registered !== false && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleConfirmAccount(m)}
+                          disabled={f.busy}
+                          className="h-8 px-2 text-xs"
+                          title={t('shareDialog.confirmAccountTitle')}
+                          data-testid="share-confirm-account"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          {t('shareDialog.confirmAccount')}
+                        </Button>
+                      )}
+                      {m.pending && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleReinvite(m)}
+                          disabled={f.busy}
+                          className="shrink-0 h-8 w-8 text-muted-foreground"
+                          title={t('shareDialog.reinviteTitle')}
+                          aria-label={t('shareDialog.reinviteTitle')}
+                          data-testid="share-reinvite"
+                        >
+                          <MailCheck className="w-4 h-4" />
+                        </Button>
+                      )}
                       <div className="flex items-center rounded-md border overflow-hidden">
                         <button
                           onClick={() => handlePermissionChange(m.email, 'read')}

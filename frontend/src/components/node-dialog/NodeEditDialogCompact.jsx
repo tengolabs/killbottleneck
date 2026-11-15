@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Inbox, Trash2, ExternalLink } from 'lucide-react';
 import { useNodeEditState } from './useNodeEditState';
+import BackgroundChanges from './sections/BackgroundChanges';
 import BasicsSection from './sections/BasicsSection';
 import AssignmentSection from './sections/AssignmentSection';
 import ExecutorSection from './sections/ExecutorSection';
@@ -39,6 +40,7 @@ export default function NodeEditDialogCompact({ node, mapId, onSave, onClose, ma
           <DialogTitle>{t('nodeDialog.title')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2 flex-1 min-h-0 overflow-y-auto pr-1">
+          <BackgroundChanges s={s} />
           <BasicsSection s={s} withColor={false} />
           <AssignmentSection s={s} mapAccess={mapAccess} members={members} onShareAdd={onShareAdd} onContactsChanged={onContactsChanged} />
           {!s.isApex && (

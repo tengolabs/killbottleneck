@@ -45,6 +45,7 @@ import { intlLocale } from '@/lib/locale';
 import { rhythmLabel } from '@/lib/rhythm';
 import { useToast } from '@/components/ui/use-toast';
 import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
+import { useTodayKey } from '@/hooks/useTodayKey';
 
 const PER_SECTION = 5;
 
@@ -125,12 +126,18 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
   // bucketování) je v pb_hooks/helpers.js:buildMyDay — tady se jen kreslí.
   const [day, setDay] = useState(null);
   const [dayError, setDayError] = useState(false);
+  // Reloaded when the DAY changes while the page stays open (the header showed the new date over
+  // yesterday's sections and counts — code analysis 4, F3-06) and when the account changes; the
+  // e-mail, not the identity of the `user` object (patchUser makes a new one on every focus
+  // star — F3-04).
+  const dayKey = useTodayKey();
+  const userEmail = user?.email || '';
   const reloadDay = useCallback(() => {
-    if (!user?.email) return;
+    if (!userEmail) return;
     fetchMyDay()
       .then((d) => { setDay(d); setDayError(false); })
       .catch(() => setDayError(true));
-  }, [user]);
+  }, [userEmail, dayKey]);
   useEffect(() => { reloadDay(); }, [reloadDay]);
 
   // Nápady ze zásobníku vrací server taky, ale otevírací dialog potřebuje CELÝ

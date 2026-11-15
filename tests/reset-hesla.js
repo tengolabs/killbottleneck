@@ -104,6 +104,15 @@ async function ucet(email, role) {
     .filter((n) => n.type === 'password_reset');
   expect(notif2.length === 2, `po pokusu o vypnutí poplach přišel ZASE (${notif2.length})`);
 
+  // Brake (code analysis 4, wave 4): the 3rd reset of one account inside 10 minutes still goes through, the 4th
+  // gets 429 and leaves the password as it was; another account is not affected.
+  const r3 = await api('POST', '/api/kb/reset-user-password', { token: admin.token, body: { email: 'clen@firma.cz' } });
+  expect(r3.status === 200 && !!r3.json.temp_password, `třetí obnova téhož účtu ještě projde (${r3.status})`);
+  const r4 = await api('POST', '/api/kb/reset-user-password', { token: admin.token, body: { email: 'clen@firma.cz' } });
+  expect(r4.status === 429 && /třikrát/.test((r4.json || {}).error || ''), `čtvrtá do 10 minut → 429 s vysvětlením (${r4.status} „${(r4.json || {}).error}")`);
+  const stale = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'clen@firma.cz', password: r3.json.temp_password } });
+  expect(stale.status === 200, `odmítnutá obnova heslo nezměnila — poslední vydané heslo platí (${stale.status})`);
+
   execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
   console.log(`\n${fail ? '🔴' : '🟢'} RESET HESLA PASS ${pass} / FAIL ${fail}`);
   process.exit(fail ? 1 : 0);

@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { toast } from '@/components/ui/use-toast';
 import { intlLocale, parsePbDate } from '@/lib/locale';
 
 // Globální stopky (měření času práce). Běžící záznam žije v DB (time_entries,
@@ -18,17 +19,34 @@ export function TimerProvider({ children }) {
   const [running, setRunning] = useState(null); // TimeEntry DTO s ended = ''
   const [elapsed, setElapsed] = useState(0); // sekundy
 
+  const gen = useRef(0);
   const refresh = useCallback(() => {
     if (!user) {
       setRunning(null);
-      return;
+      return Promise.resolve();
     }
-    base44.entities.TimeEntry.filter({ ended: '' }, '-started', 1)
-      .then((list) => setRunning(list?.[0] || null))
+    // a re-read started before a Start/Stop/assign of this tab must not overwrite its result
+    const g = ++gen.current;
+    return base44.entities.TimeEntry.filter({ ended: '' }, '-started', 1)
+      .then((list) => { if (g === gen.current) setRunning(list?.[0] || null); })
       .catch(() => {});
   }, [user]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // The timer may have been closed elsewhere (a new one started in another tab or on the
+  // phone, the 12 h auto-stop) — coming back to this tab re-reads it, so the tab does not
+  // keep ticking on an entry that has ended (finding F6-04).
+  useEffect(() => {
+    if (!user) return undefined;
+    const onReturn = () => { if (document.visibilityState === 'visible') refresh(); };
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
+    };
+  }, [user, refresh]);
 
   useEffect(() => {
     if (!running) {
@@ -53,6 +71,7 @@ export function TimerProvider({ children }) {
       client_id: target.client_id || '',
       label: (target.label || '').slice(0, 200),
     });
+    gen.current++;
     setRunning(rec);
     return rec;
   }, []);
@@ -61,6 +80,7 @@ export function TimerProvider({ children }) {
   const assign = useCallback(async (patch = {}) => {
     if (!running) return null;
     const rec = await base44.entities.TimeEntry.update(running.id, patch);
+    gen.current++;
     setRunning(rec);
     return rec;
   }, [running]);
@@ -68,13 +88,34 @@ export function TimerProvider({ children }) {
   // stop(patch) — patch může nést i finální přiřazení (map_id/client_id/note/label)
   const stop = useCallback(async (patch = {}) => {
     if (!running) return null;
-    const rec = await base44.entities.TimeEntry.update(running.id, {
-      ...patch,
-      ended: new Date().toISOString(),
-    });
-    setRunning(null);
-    return rec;
-  }, [running]);
+    try {
+      const rec = await base44.entities.TimeEntry.update(running.id, {
+        ...patch,
+        ended: new Date().toISOString(),
+      });
+      gen.current++;
+      setRunning(null);
+      return rec;
+    } catch (err) {
+      // 409 = the entry was already closed elsewhere and the server keeps its end (F6-04);
+      // 404 = it was deleted. Either way this tab was showing a timer that no longer runs:
+      // nothing is written, the tab shows what really runs now, and the caller gets the
+      // entry as the server recorded it, marked `alreadyEnded` (no "time recorded" toast).
+      if (err?.status !== 409 && err?.status !== 404) throw err;
+      // what the person filled in at Stop (note, project, client) is still theirs to keep:
+      // the server lets a finished entry take it, only the end stays
+      const keep = Object.fromEntries(Object.entries(patch).filter(([k, v]) => k !== 'ended' && v !== '' && v != null));
+      let rec = null;
+      if (err.status === 409) {
+        if (Object.keys(keep).length) rec = await base44.entities.TimeEntry.update(running.id, keep).catch(() => null);
+        if (!rec) rec = await base44.entities.TimeEntry.get(running.id).catch(() => null);
+      }
+      await refresh();
+      // said here, once, for every Stop button (header, panel, node, task row)
+      if (err.status === 409 && err?.response?.message) toast({ title: err.response.message });
+      return { ...(rec || {}), alreadyEnded: true };
+    }
+  }, [running, refresh]);
 
   return (
     <TimerContext.Provider value={{ running, elapsed, start, assign, stop, refresh }}>

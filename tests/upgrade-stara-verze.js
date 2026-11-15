@@ -14,7 +14,7 @@ const STARY = process.env.KB_STARY_IMAGE || '';
 
 H.beh(async () => {
   if (!STARY) {
-    expect(true, 'upgrade test SKIPPED — KB_STARY_IMAGE not set; run on purpose: KB_STARY_IMAGE=kb-v033 (built from v0.33-beta)');
+    H.preskoceno('KB_STARY_IMAGE not set; run on purpose: KB_STARY_IMAGE=kb-v033 (built from v0.33-beta)');
     return;
   }
   const env = { KB_UVODNI_MAPA: 0, KB_PURPOSE_ASK: 0 };

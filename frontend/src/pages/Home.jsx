@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
@@ -22,6 +22,8 @@ import { useSidePanels } from '@/hooks/useSidePanels';
 import SkinPattern from '@/components/shared/SkinPattern';
 import { PAGE_CONTAINER } from '@/lib/layout';
 import { useMembersWithContacts } from '@/lib/externalContacts';
+import { chipTasksUrl } from '@/lib/myDayChips';
+import { listAllPages } from '@/lib/listAll';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -62,14 +64,37 @@ export default function Home() {
     base44.org.get().then(setOrg).catch(() => {});
   }, [isAuthenticated]);
 
+  // Only LIVE maps are read, filtered on the server, and ALL of them page by page (code analysis
+  // 4, F5-06). Before: the 50 most recently changed maps including archived ones, filtered in
+  // the browser — the 51st project was silently missing and after a clean-up the archived maps
+  // took the whole window, so live projects vanished from the page. The first page is shown at
+  // once, the rest is appended in the background. The archive link gets its real count.
+  const [archivedCount, setArchivedCount] = useState(null); // null = not known yet
+  // the list may be incomplete (a later page failed) — the page says so with "Try again"
+  const [mapsError, setMapsError] = useState(false);
+  const loadedRef = useRef(false);
+  const loadGen = useRef(0); // only the load started last may write (an older answer must not overwrite a newer one)
   const loadMaps = async () => {
+    const gen = ++loadGen.current;
+    const mine = () => gen === loadGen.current;
     try {
-      const data = await base44.entities.GoalMap.list('-updated_date', 50);
-      setMaps(data);
+      base44.entities.GoalMap.count({ rawFilter: 'archived = true' })
+        .then((n) => { if (mine()) setArchivedCount(n); })
+        .catch(() => { if (mine()) setArchivedCount((c) => (c === null ? 0 : c)); });
+      const all = await listAllPages(base44.entities.GoalMap, '-updated_date,id', 50, {
+        rawFilter: 'archived != true',
+        // a later reload (row action in My day) must not shrink the shown list to the first page
+        onPage: (soFar) => { if (mine() && !loadedRef.current) { setMaps(soFar); setLoading(false); } },
+      });
+      if (!mine()) return;
+      loadedRef.current = true;
+      setMaps(all);
+      setMapsError(false);
     } catch (e) {
       console.error(e);
+      if (mine()) setMapsError(true);
     } finally {
-      setLoading(false);
+      if (mine()) setLoading(false);
     }
   };
 
@@ -96,7 +121,6 @@ export default function Home() {
   // Org struktura (kind='org') taky ne: není to projekt (Richard 15. 8.) —
   // vstup má pod panáčkem a ve Správě organizace.
   const activeMaps = maps.filter((m) => !m.archived && m.kind !== 'org');
-  const archivedCount = maps.filter((m) => m.archived).length;
   const myAll = activeMaps.filter((m) => m.created_by_id === user?.id);
   // projekty, kde mám roli: sdílené se mnou, nebo mám přiřazený cíl/úkol
   const participatingAll = activeMaps.filter((m) => m.created_by_id !== user?.id && isParticipating(m));
@@ -120,6 +144,7 @@ export default function Home() {
     try {
       await base44.entities.GoalMap.update(mapId, { archived: true });
       setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, archived: true } : m)));
+      setArchivedCount((c) => c + 1);
       toast({ title: t('editor:toasts.archived'), description: t('editor:toasts.archivedDesc') });
     } catch (e) {
       console.error(e);
@@ -192,20 +217,17 @@ export default function Home() {
                 onOpenNode={(item) => navigate(`/map/${item.mapId}?node=${item.id}`)}
                 // řádková akce mohla sáhnout na úkol i na uzel mapy → načíst obojí
                 onChanged={() => { refreshTasks(); loadMaps(); }}
-                onChipClick={(kind) => navigate(
-                  kind === 'delegated'
-                    ? '/tasks?owner=delegated'
-                    : kind === 'delegatedOverdue'
-                      ? '/tasks?owner=delegated&deadline=overdue'
-                    : kind === 'done'
-                      ? '/tasks?assignee=me&status=done'   // kam zmizela odbavená práce
-                      : ['overdue', 'today', 'week'].includes(kind)
-                        ? `/tasks?assignee=me&deadline=${kind}`
-                        : '/tasks?assignee=me'
-                )}
+                // chip → filters is written once (lib/myDayChips.js), Tasks uses the same function
+                onChipClick={(kind) => navigate(chipTasksUrl(kind))}
               />
             )}
-            {maps.length === 0 ? (
+            {mapsError && (
+              <div role="alert" data-testid="home-load-error" className="mb-4 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                <span className="flex-1">{t('misc.loadFailed')}</span>
+                <Button variant="ghost" size="sm" className="h-7" data-testid="home-load-retry" onClick={() => loadMaps()}>{t('misc.loadRetry')}</Button>
+              </div>
+            )}
+            {maps.length === 0 && archivedCount === 0 && !mapsError ? (
               <div className="text-center py-20">
             <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4">
               <MapIcon className="w-8 h-8 text-muted-foreground" />

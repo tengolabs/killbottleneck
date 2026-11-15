@@ -502,7 +502,11 @@ H.beh(async () => {
   fronta.push(text('x'), text('x'));
   const dvoji = await Promise.all([potvrd(A, chat.id, k.id, true), potvrd(A, chat.id, k.id, true)]);
   const stavy = dvoji.map((x) => x.status).sort();
-  expect(stavy.join(',') === '200,404', `dvojí potvrzení téže karty: jedno 200, druhé 404 (${stavy.join(',')})`);
+  // the second request is refused: 409 while the first one still runs (one conversation = one turn at a time,
+  // code analysis 4, S1-02), or 404 when it arrives after it — the card is no longer waiting
+  expect(stavy.join(',') === '200,409' || stavy.join(',') === '200,404', `dvojí potvrzení téže karty: jedno 200, druhé odmítnuto 409/404 (${stavy.join(',')})`);
+  const potreti = await potvrd(A, chat.id, k.id, true);
+  expect(potreti.status === 404, `po doběhnutí je karta vyřízená — další klik 404 (${potreti.status})`);
   chat = ((dvoji.find((x) => x.status === 200) || {}).json || {}).chat;
   expect(!!chat && kartaPodleId(chat, k.id).stav === 'hotovo' && (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).status === 404, 'projekt smazán (jednou)');
   expect(fronta.length === 1, `model dopověděl jen jednou — druhý požadavek skončil před vykonáním (ve frontě zbylo ${fronta.length})`);

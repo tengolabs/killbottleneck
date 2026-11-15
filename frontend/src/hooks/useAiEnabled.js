@@ -55,6 +55,15 @@ function load(fresh = false) {
       : { ...EMPTY }));
 }
 
+// The browser reports the connection back → ask right away instead of waiting for the 2-minute
+// re-check: after a short outage the assistant must accept the message that is waiting in the
+// input (code analysis 4, F2-01). Only while the AI is marked as down; a healthy state is not polled.
+if (typeof window !== 'undefined') {
+  // `healthy === false` alone: an instance with only the assistant's own model (ai_provider "none")
+  // is not `configured`, yet it is marked as down the same way when the config request fails
+  window.addEventListener('online', () => { if (cached && cached.healthy === false) load(true); });
+}
+
 // ruční obnova (po uložení nastavení AI v administraci) — překreslí všechna
 // AI tlačítka bez reloadu stránky
 export function refreshAiModes() {

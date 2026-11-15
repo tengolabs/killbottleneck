@@ -1,7 +1,12 @@
 {
   "misc": {
     "untitled": "Bez názvu",
-    "goalsMeta": "{{count}} cílů",
+    "loadFailed": "Projekty se nepodařilo načíst všechny.",
+    "loadRetry": "Zkusit znovu",
+    "goalsMeta_one": "{{count}} cíl",
+    "goalsMeta_few": "{{count}} cíle",
+    "goalsMeta_many": "{{count}} cíle",
+    "goalsMeta_other": "{{count}} cílů",
     "accessEdit": "úpravy",
     "accessRead": "čtení"
   },

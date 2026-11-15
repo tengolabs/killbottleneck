@@ -24,7 +24,7 @@ function Skupina({ t, nazev, s, celkem, testid }) {
   return (
     <div className="rounded-lg border bg-background p-3" data-testid={testid}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-medium">{nazev} <span className="text-xs text-muted-foreground font-normal">({t('groupPeople', { n: s.lidi })})</span></span>
+        <span className="text-sm font-medium">{nazev} <span className="text-xs text-muted-foreground font-normal">({t('groupPeople', { count: s.lidi })})</span></span>
         <span className="text-xs text-muted-foreground" data-testid={`${testid}-n`}>{maStrop ? t('used', { pouzito: fmtN(s.kredity), kvota: fmtN(s.kvota) }) : t('usedNoLimit', { pouzito: fmtN(s.kredity) })}</span>
       </div>
       {maStrop && (

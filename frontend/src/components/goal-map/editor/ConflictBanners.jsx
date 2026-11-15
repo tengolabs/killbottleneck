@@ -9,7 +9,7 @@ import { Loader2, Archive, ArchiveRestore } from 'lucide-react';
 export default function ConflictBanners({
   conflict, exporting, handleExportJson, saveStatus, handleKeepMine,
   isPublicView, navigate, archived, isMapOwner, handleToggleArchive,
-  isTemplatePreview, savingTemplate, handleSaveTemplate, remoteChanged,
+  isTemplatePreview, savingTemplate, handleSaveTemplate, remoteChanged, saveError, retrySave,
 }) {
   const { t } = useTranslation('editor');
   return (
@@ -61,6 +61,27 @@ export default function ConflictBanners({
             {savingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
             {t('banner.useTemplate')}
           </Button>
+        </div>
+      )}
+      {/* The last change is NOT in the database (F1-03): stays until a save gets through. */}
+      {saveError && !conflict && (
+        <div
+          role="alert"
+          data-testid="save-error"
+          data-kind={saveError.kind}
+          className="min-h-9 py-1 bg-red-50 border-b border-red-200 dark:bg-red-950/40 dark:border-red-900 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 text-sm shrink-0"
+        >
+          <span className="text-red-800 dark:text-red-300 font-medium">
+            {t(`saveState.unsaved.${saveError.manual ? 'manual' : saveError.kind}`, { reason: saveError.message || t(`saveState.reason.${saveError.kind}`) })}
+          </span>
+          <Button size="sm" variant="outline" className="h-6 text-xs" data-testid="save-retry" disabled={saveStatus === 'saving'} onClick={retrySave}>
+            {t('saveState.retry')}
+          </Button>
+          {saveError.kind === 'rejected' && (
+            <Button size="sm" variant="ghost" className="h-6 text-xs" disabled={exporting} onClick={() => handleExportJson(true)}>
+              {t('conflict.download')}
+            </Button>
+          )}
         </div>
       )}
       {remoteChanged && !conflict && (

@@ -32,6 +32,11 @@ const COND_OPS = ['eq', 'ne', 'empty', 'not_empty', 'before', 'after'];
 const OPS_FOR = (field) => (field === 'parent' ? ['eq', 'ne'] : COND_OPS);
 const STATUSES = ['todo', 'in_progress', 'done'];
 
+// What the form SHOWS must be what gets saved: the frequency select displays "daily" for a
+// fresh schedule trigger, so the state carries it too — the server refuses a schedule
+// without `freq` (finding F6-01).
+const withTriggerDefaults = (trigger) => (trigger.type === 'schedule' && !trigger.freq ? { ...trigger, freq: 'daily' } : trigger);
+
 const selectCls = 'h-9 w-full rounded-md border border-input bg-background px-2 text-sm';
 
 // Šablonka pod-uzlů z API/MCP může nést i owner/deadline/status/... nebo
@@ -95,14 +100,14 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
       const tpl = defaults.template;
       setName(tpl.name || '');
       setNodeId(defaults.node_id || '');
-      setTrigger(tpl.trigger || { type: 'node_status_changed' });
+      setTrigger(withTriggerDefaults(tpl.trigger || { type: 'node_status_changed' }));
       setConds(tpl.conditions || []);
       setActions((tpl.actions || []).map(withOutline));
     } else {
       setName('');
       setNodeId(defaults.node_id || '');
       // trigger_type: propojka z kategorie Chování přednastaví „po odblokování"
-      setTrigger({ type: defaults.trigger_type || 'node_status_changed' });
+      setTrigger(withTriggerDefaults({ type: defaults.trigger_type || 'node_status_changed' }));
       setConds([]);
       setActions([{ type: 'notify', to: 'map_owner', message: '' }]);
     }
@@ -184,7 +189,7 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
 
       <div className="space-y-2 rounded-lg border p-3">
         <Label className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> {t('rules.whenLabel')}</Label>
-        <select className={selectCls} value={trigType} onChange={(e) => setTrigger({ type: e.target.value })} data-testid="rule-trigger">
+        <select className={selectCls} value={trigType} onChange={(e) => setTrigger(withTriggerDefaults({ type: e.target.value }))} data-testid="rule-trigger">
           {TRIGGERS.map((tr) => <option key={tr} value={tr}>{t(`rules.triggers.${tr}`)}</option>)}
         </select>
         {trigType === 'node_status_changed' && (

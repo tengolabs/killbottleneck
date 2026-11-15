@@ -400,6 +400,105 @@ function orezNahledy(msgs) {
     if (dalsiUser < 0) break;
     msgs.splice(0, dalsiUser);
   }
+  // Only the CURRENT turn is left and it still does not fit (code analysis 4, S1-03 / S1-01:
+  // one turn with 16 big reads, or a confirmation whose follow-up re-reads big projects).
+  // The save must never fail on size — a failed save loses the user's message, or leaves a
+  // performed action "waiting" forever. Tool results of the current turn are shortened
+  // from the oldest one to what the model gets from them next turn anyway (MAX_TOOL_STARE);
+  // the newest ones stay whole as long as they fit.
+  if (bajtu(JSON.stringify(msgs)) > STROP_MSGS) {
+    const stareMax = limitEnv("CHAT_MAX_TOOL_STARE", MAX_TOOL_STARE, 200, MAX_TOOL);
+    for (let i = 0; i < msgs.length && bajtu(JSON.stringify(msgs)) > STROP_MSGS; i++) {
+      if (msgs[i].role === "tool" && String(msgs[i].content || "").length > stareMax) msgs[i].content = ocisti(msgs[i].content, stareMax);
+    }
+  }
+  // Last resort (a turn of huge texts without tool results): halve the longest text until
+  // it fits. Bounded — every pass halves one text, texts under 200 characters are left.
+  for (let pass = 0; pass < 200 && bajtu(JSON.stringify(msgs)) > STROP_MSGS; pass++) {
+    let j = -1, max = 200;
+    for (let i = 0; i < msgs.length; i++) { const n = String(msgs[i].content || "").length; if (n > max) { max = n; j = i; } }
+    if (j < 0) break;
+    msgs[j].content = String(msgs[j].content).slice(0, Math.floor(max / 2));
+    if (msgs[j].pdf) msgs[j].pdf = Object.assign({}, msgs[j].pdf, { orez: true });
+  }
+}
+
+// ---------- one conversation = one turn at a time (code analysis 4, S1-02) ----------
+// A turn loads the conversation, works for seconds to minutes and saves the WHOLE
+// `messages` at the end. Two overlapping requests on one conversation (two tabs, a retry
+// after a timeout, a message sent while a card is being confirmed) both answered 200 and
+// the one that saved first lost its whole turn — or an action from a confirmed card was
+// performed while the conversation kept it as rejected. The SIMPLER correct variant was
+// chosen: the second request is refused with 409 `chat_busy` (nothing is queued — a queued
+// turn would wait minutes behind a proxy that cuts the request after ~100 s); the client
+// keeps what the user typed. The lock lives in the app store (one process), is taken
+// atomically, released in `finally`, and expires on its own after ZAMEK_CHATU_MS should a
+// release ever be missed; a restart clears it.
+const ZAMEK_CHATU_MS = 30 * 60 * 1000;
+function chatBezi(app, chatId) {
+  if (!chatId) return false;
+  const v = String(app.store().get("chat:bezi:" + chatId) || "");
+  const od = Number(v.split(":")[0]) || 0;
+  return !!od && Date.now() - od < ZAMEK_CHATU_MS;
+}
+function chybaBezi(L) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const e = new Error(t(L, "err.chatBusy")); e.status = 409; e.code = "chat_busy";
+  return e;
+}
+// Runs `fn` holding the lock of an EXISTING conversation of this user (a new conversation
+// has no id anybody else could send). `fn` must load the conversation itself — inside.
+function sZamkemChatu(app, auth, chatId, L, fn) {
+  const rec = chatId ? nactiChat(app, auth, chatId) : null;
+  if (!rec) return fn(); // new conversation, or not found / not mine → fn answers 404 as before
+  const klic = "chat:bezi:" + rec.id;
+  const moje = Date.now() + ":" + $security.randomString(8);
+  let obsazeno = false;
+  app.store().setFunc(klic, (stary) => {
+    const od = Number(String(stary || "").split(":")[0]) || 0;
+    if (od && Date.now() - od < ZAMEK_CHATU_MS) { obsazeno = true; return stary; }
+    return moje;
+  });
+  if (obsazeno) throw chybaBezi(L);
+  try { return fn(); }
+  finally { if (app.store().get(klic) === moje) app.store().remove(klic); } // never release somebody else's lock; removed, so the store does not grow
+}
+
+// ONE way to save a conversation (S1-01, S1-03): trim to the size cap, then save. Used by
+// every path that writes `messages` — a plain app.save in chatPotvrdit / chatVratit used
+// to fail on the cap after the action had already been performed.
+function ulozRozhovor(app, rec) {
+  const { jsonVal } = require(`${__hooks}/helpers.js`);
+  const po = jsonVal(rec, "messages", []); // jsonVal returns a copy → put the trimmed one back
+  orezNahledy(po);
+  rec.set("messages", po);
+  app.save(rec);
+}
+
+// Images ordered in this turn whose card never reached the saved conversation (the turn
+// failed after generate_image, or the save failed): nobody can draw or see them and the
+// cleanup would only take them after 90 days (3rd-round finding S1-02, scenario D).
+// Removed only when still waiting, not referenced by the saved conversation and not used
+// by a document or a page (unknown use = keep).
+function uklidObrazkuTahu(app, stats, rec, ulozeno) {
+  const nove = ((stats && stats.dok) || []).filter((z) => z.novy && z.obrazek);
+  if (!nove.length) return;
+  const O = require(`${__hooks}/obrazky.js`);
+  // the last save failed → what counts is the conversation as it IS stored (chatPotvrdit saves
+  // once before the model follows up; that version may already refer to the image)
+  let vRozhovoru = "";
+  if (ulozeno) vRozhovoru = rec.getString("messages");
+  else if (rec.id) { try { vRozhovoru = app.findRecordById("ai_chats", rec.id).getString("messages"); } catch (err) { vRozhovoru = ""; } }
+  for (const z of nove) {
+    try {
+      if (vRozhovoru.indexOf(z.id) >= 0) continue;
+      const img = app.findRecordById("ai_images", z.id);
+      if (img.getString("stav") !== "ceka") continue;
+      const kde = O.pouziti(app, img);
+      if (!kde || kde.length) continue;
+      app.delete(img);
+    } catch (err) { /* already gone */ }
+  }
 }
 function zkratPdf(m) {
   const c = String(m.content || "");
@@ -1442,6 +1541,14 @@ function ulozPamet(app, userId, text, mapId) {
     rec.set("map", m);
   }
   rec.set("text", ocisti(text, MAX_PAMET));
+  // Emptied PROJECT notes are deleted, not kept as an empty row: pametProjektu listed the empty row
+  // again, so the card came back blank with "Delete" disabled and could never be removed (found by
+  // ui-chyby4-mezery, 13 Nov 2026). The returned record still answers getString("text") === "".
+  // The memory about the person (map "") keeps its single row.
+  if (m && !rec.getString("text")) {
+    if (rec.id) { try { app.delete(rec); } catch (err) { app.save(rec); } }
+    return rec;
+  }
   app.save(rec);
   return rec;
 }
@@ -3358,6 +3465,13 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
           // ikonky automaticky (Richard 15. 10. 2026): model je dává sám, chybějící doplní server podle názvu — PŘED kartou, ať je karta ukáže
           doplnIkony(c.args.outline || c.args.items);
         }
+        // the same for the sub-step checklists of rule actions (the schema offers "me" / "none"
+        // there too; the server knows no "me" — code analysis 4, S2-03)
+        if (["create_rule", "update_rule", "save_rule_template"].includes(c.name)) {
+          for (const akce of (Array.isArray(c.args.actions) ? c.args.actions : [])) {
+            if (akce && akce.type === "create_subnodes") ownerJa(akce.items, auth.email());
+          }
+        }
         // update_node takes the same owner words as new steps ("me" = the user, "none" = clear) — the prompt tells
         // the model to answer the assignee question with "me", and it uses it here too
         if (c.name === "update_node" && c.args && typeof c.args.owner === "string") {
@@ -3690,7 +3804,7 @@ function zapisLog(app, auth, rec, cfg, stats, ms, chyba) {
     l.set("user", auth.id); l.set("chat", rec.id); l.set("provider", cfg.provider || ""); l.set("model", modely.slice(0, 120));
     l.set("tokens_in", stats.in); l.set("tokens_out", stats.out); l.set("tokens_cached", stats.cached || 0); l.set("ms", ms); l.set("calls", stats.calls);
     l.set("tools", stats.tools.join(",").slice(0, 500)); l.set("override", !!cfg.modelOverride);
-    if (stats.hlas) l.set("audio_ms", Math.round((stats.hlas.s || 0) * 1000)); // podklad pro případnou cenu za minutu (zatím se nestrhává)
+    if (stats.hlas) l.set("audio_ms", Math.round((stats.hlas.s || 0) * 1000)); // length measured by the server (prepis.js audioSeconds) — the basis of the transcript credits (kredity.js)
     if (stats.hlas && stats.hlas.ms) l.set("prepis_ms", Math.round(stats.hlas.ms)); // doba přepisu Whisperem (GPU čas, 4. 10. 2026)
     // otevřené skupiny nástrojů (každá = tisíce tokenů schémat v každém volání) — podklad pro zúžení klíčových slov
     l.set("skupiny", (stats.skupiny || []).join(",").slice(0, 300));
@@ -3706,8 +3820,9 @@ function zapisLog(app, auth, rec, cfg, stats, ms, chyba) {
   }
 }
 
-// délka hlasovky hlášená klientem (jen do bubliny a do logu): konečné číslo 0–3600 s, cokoli jiného 0 —
-// nesmyslná hodnota by se nevešla do ai_chat_log.audio_ms a shodila zápis řádku (a s ním započtení tahu)
+// Length of a voice message as reported by the client — a HINT for the bubble only (the recorder knows
+// it to the second, an uploaded file sends 0 = "no time shown"). Never the basis of the price: credits
+// and ai_chat_log.audio_ms use the length measured by the server (prepis.js audioSeconds).
 function delkaHlasovky(v) { const n = Number(v); return Number.isFinite(n) ? Math.min(3600, Math.max(0, Math.round(n))) : 0; }
 
 // POST /chat — zpráva uživatele. Čekající akce z minula se tím ZAMÍTAJÍ
@@ -3715,6 +3830,11 @@ function delkaHlasovky(v) { const n = Number(v); return Number.isFinite(n) ? Mat
 // `oprava` (jen z chatOprav) = { obsah, idx, puvodni, titulek }: tah naváže na historii PŘED opravovanou zprávou a
 // všechno uloží jedním zápisem na konci — dokud model běží, je v databázi původní stav (pád procesu nic neztratí)
 function chatRun(app, auth, body, cfg, L, oprava) {
+  const id = !jeRezim(body && body.mode) && body && body.chat_id ? String(body.chat_id) : ""; // a guide always starts a new conversation
+  return sZamkemChatu(app, auth, id, L, () => chatTah(app, auth, body, cfg, L, oprava));
+}
+// the turn itself — the caller holds the lock of the conversation (chatRun, chatOprav)
+function chatTah(app, auth, body, cfg, L, oprava) {
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   let text = ocisti(body && body.message, 8000); // 8000: vložený .txt/.md (Nový projekt s AI, třídění), 1. 10. 2026
@@ -3782,8 +3902,11 @@ function chatRun(app, auth, body, cfg, L, oprava) {
   const pdf = !mode && body && body.pdf_text ? zkontrolujPdf(body, L) : null;
   // hlasovka (1. 10. 2026): ověřit HNED (druh podle obsahu), přepsat až po založení statistik
   const hlasB64 = !mode && body && body.audio_base64 ? String(body.audio_base64) : "";
-  const { zkontrolujHlas, prepisHlasovky } = require(`${__hooks}/prepis.js`);
+  const { zkontrolujHlas, prepisHlasovky, audioSeconds } = require(`${__hooks}/prepis.js`);
   const hlasExt = hlasB64 ? zkontrolujHlas(app, body, L) : "";
+  // The length that sets the price of the transcript (and goes to the log) is measured by the server
+  // from the uploaded bytes; `audio_s` from the client only labels the bubble (it used to set the price, S8-03).
+  const hlasS = hlasB64 ? audioSeconds(hlasB64, hlasExt) : 0;
   // oprava přepisu (chatOprav): celý obsah zprávy i se značkou (a textem PDF), poskládaný a zkrácený už v chatOprav
   if (oprava) text = String(oprava.obsah || "");
   if (!text && !imgB64 && !pdf && !hlasB64) { const e = new Error(t(L, "err.chatNoMessage")); e.status = 400; throw e; }
@@ -3819,7 +3942,7 @@ function chatRun(app, auth, body, cfg, L, oprava) {
       // nahrávka končí tady (jako originál obrázku): jde jen přepisovači a nikam se neukládá
       const t1 = Date.now();
       let prepis;
-      try { prepis = prepisHlasovky(app, L, hlasB64, hlasExt); } finally { stats.hlas = { ms: Date.now() - t1, s: delkaHlasovky(body.audio_s) }; }
+      try { prepis = prepisHlasovky(app, L, hlasB64, hlasExt); } finally { stats.hlas = { ms: Date.now() - t1, s: hlasS }; }
       body.audio_base64 = "";
       const doprovod = ocisti(text, 2000);
       const celyPrepis = (doprovod ? doprovod + "\n\n" : "") + P[L].hlas.znacka + "\n" + prepis;
@@ -3855,7 +3978,7 @@ function chatRun(app, auth, body, cfg, L, oprava) {
   if (cfgSk) zprava.skup = poradiSkupin(Array.from(skupinyNastroju(msgs.concat([zprava]), ctx, rec, cfgSk, false))); // stable tool list
   if (nahled) zprava.obrazek = nahled;
   if (pdf) zprava.pdf = { name: pdf.name, pages: pdf.pages };
-  if (hlasB64) zprava.hlas = { s: stats.hlas ? stats.hlas.s : 0 };
+  if (hlasB64) zprava.hlas = { s: delkaHlasovky(body.audio_s) };
   if (oprava) {
     // opravená zpráva si nese náhled / hlasovku / PDF původní zprávy a je označená
     for (const k of ["obrazek", "hlas", "pdf"]) if (oprava.puvodni && oprava.puvodni[k]) zprava[k] = oprava.puvodni[k];
@@ -3883,20 +4006,18 @@ function chatRun(app, auth, body, cfg, L, oprava) {
     vyjimka = e2;
     throw e2;
   } finally {
-    const po = jsonVal(rec, "messages", []); // jsonVal vrací kopii → ořezanou uložit zpět
-    orezNahledy(po);
-    rec.set("messages", po);
     // i při chybě modelu zůstane zpráva uživatele uložená. Když selže samo uložení (strop pole, DB), nesmí
     // výjimka z finally přebít původní výsledek: tah se zaloguje (podklad kvóty — model už byl zavolán)
     // a klient se dozví, že zpráva uložená NENÍ (hlasovku/fotku nabídne k opakování). Do 4. 11. 2026 tu
     // save bez try shodil i zapisLog a odpověď lhala `ulozeno: true` (S1-01).
-    try { app.save(rec); } catch (err) {
+    try { ulozRozhovor(app, rec); } catch (err) {
       chybaUlozeni = String(err && err.message ? err.message : err);
       chyba = chyba || chybaUlozeni;
       if (vyjimka) vyjimka.ulozeno = false;
       try { app.logger().warn("chat: uložení rozhovoru selhalo", "chat", rec.id, "error", chybaUlozeni); } catch (e3) { /* log je bonus */ }
     }
     prubehZapis(app, auth, rec, null); // tah skončil (i chybou) → panel přestane ukazovat průběh
+    uklidObrazkuTahu(app, stats, rec, !chybaUlozeni);
     // nový rozhovor dostal id až uložením → doplnit ho dokumentům z tohoto tahu
     if (stats.dok && stats.dok.length) {
       const D = require(`${__hooks}/dokumenty.js`); const S = require(`${__hooks}/stranky.js`);
@@ -3918,6 +4039,10 @@ function chatRun(app, auth, body, cfg, L, oprava) {
 // chatRun — platí pro něj všechny stráže, limity i log). Zápisy do map jdou jen přes potvrzení, takže zahození
 // návrhů nic nepoškodí; když už z tahu něco vzniklo, vrací 409 a oprava patří do další zprávy.
 function chatOprav(app, auth, body, cfg, L) {
+  // the correction reads the conversation and then runs a turn — both under one lock
+  return sZamkemChatu(app, auth, body && body.chat_id ? String(body.chat_id) : "", L, () => chatOpravTah(app, auth, body, cfg, L));
+}
+function chatOpravTah(app, auth, body, cfg, L) {
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const chyba = (klic, status) => { const e = new Error(t(L, klic)); e.status = status; return e; };
@@ -3948,7 +4073,7 @@ function chatOprav(app, auth, body, cfg, L) {
   }
   // Nic se neukládá předem: chatRun naváže na historii před opravovanou zprávou a uloží všechno jedním zápisem.
   // Když skončí dřív (strop, chyba vstupu), zůstane v databázi původní zpráva i odpověď.
-  return chatRun(app, auth, { chat_id: rec.id, message: "", context: body && body.context }, cfg, L, { obsah: obsah, idx: o.idx, puvodni: puvodni, titulek: titulek });
+  return chatTah(app, auth, { chat_id: rec.id, message: "", context: body && body.context }, cfg, L, { obsah: obsah, idx: o.idx, puvodni: puvodni, titulek: titulek });
 }
 
 // Výsledek akce vykonané prohlížečem (oprava PDF): {provedeno:[{page,find,replace,zmenseno}],
@@ -3982,6 +4107,9 @@ function pdfPosledni(msgs) {
 // (Router key = jazyk), takže stav držený jen v prohlížeči by se ztratil a vrácená karta by se po dalším potvrzení
 // znovu projevila (panel 4. 10. 2026). Samotné hodnoty vrací prohlížeč (users PATCH / localStorage) jako dřív.
 function chatVratit(app, auth, body, L) {
+  return sZamkemChatu(app, auth, body && body.chat_id ? String(body.chat_id) : "", L, () => chatVratitTah(app, auth, body, L));
+}
+function chatVratitTah(app, auth, body, L) {
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const rec = nactiChat(app, auth, body && body.chat_id);
@@ -3995,7 +4123,7 @@ function chatVratit(app, auth, body, L) {
   }
   if (!nalezeno) { const e = new Error(t(L, "err.chatActionNotFound")); e.status = 404; throw e; }
   rec.set("messages", msgs);
-  app.save(rec);
+  ulozRozhovor(app, rec);
   return chatDto(rec);
 }
 
@@ -4041,6 +4169,9 @@ function textPozvanky(p, L, nabidka) {
   return `Do kalendáře ${n === 1 ? "přidána" : n >= 2 && n <= 4 ? "přidány" : "přidáno"} ${n} ${slovo}${k ? ` (${k} ${k === 1 ? "už tam byla" : k <= 4 ? "už tam byly" : "už tam bylo"})` : ""}.${nabidka ? " Mám k tomu založit i projekt s přípravou (přihláška, platba, vybavení…)?" : ""}`;
 }
 function chatPotvrdit(app, auth, body, cfg, L) {
+  return sZamkemChatu(app, auth, body && body.chat_id ? String(body.chat_id) : "", L, () => chatPotvrditTah(app, auth, body, cfg, L));
+}
+function chatPotvrditTah(app, auth, body, cfg, L) {
   const { jsonVal } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   const rec = nactiChat(app, auth, body && body.chat_id);
@@ -4100,7 +4231,15 @@ function chatPotvrdit(app, auth, body, cfg, L) {
   }
   rec.set("pending", pend);
   rec.set("messages", msgs);
+  // The performed (or rejected) action goes into the saved conversation NOW, before the
+  // model is asked to follow up (S1-01): whatever happens next — the model fails, its
+  // answer cannot be saved — the card never stays "waiting" for an action already done.
   let chyba = "";
+  let chybaUlozeni = "";
+  try { ulozRozhovor(app, rec); } catch (err) {
+    chybaUlozeni = String(err && err.message ? err.message : err);
+    try { app.logger().error("chat: saving the confirmed action failed", "chat", rec.id, "error", chybaUlozeni); } catch (e3) { /* log is a bonus */ }
+  }
   try {
     // všechny vybrané karty hotové + jednoduchá akce + volný rozhovor → dopoví aplikace, model se nevolá (0 tokenů)
     const vsechnyHotove = vybrane.every((a) => msgs.some((m) => (m.karty || []).some((k) => k.type === "akce" && k.id === a.id && k.stav === "hotovo")));
@@ -4140,10 +4279,18 @@ function chatPotvrdit(app, auth, body, cfg, L) {
   } catch (err) {
     chyba = String(err && err.message ? err.message : err); throw err;
   } finally {
-    app.save(rec);
+    // a failed save must not replace the result of the turn nor skip the log (the model was already called)
+    chybaUlozeni = "";
+    try { ulozRozhovor(app, rec); } catch (err) {
+      chybaUlozeni = String(err && err.message ? err.message : err);
+      chyba = chyba || chybaUlozeni;
+      try { app.logger().warn("chat: uložení rozhovoru selhalo", "chat", rec.id, "error", chybaUlozeni); } catch (e3) { /* log je bonus */ }
+    }
     prubehZapis(app, auth, rec, null); // potvrzení dokončeno → panel přestane ukazovat průběh
+    uklidObrazkuTahu(app, stats, rec, !chybaUlozeni);
     zapisLog(app, auth, rec, cfg, stats, Date.now() - t0, chyba);
   }
+  if (chybaUlozeni) { const e = new Error(t(L, "err.chatSaveFailed")); e.status = 500; e.code = "ulozeni_selhalo"; throw e; }
   const dto = chatDto(rec);
   // dočasné heslo pozvánky: ke kartě jen v TÉTO odpovědi (uživatel ho opíše/zkopíruje), uložené zprávy ho nenesou
   if (Object.keys(jednorazove).length) for (const m of dto.messages || []) for (const k of (m.karty || [])) if (k.type === "akce" && jednorazove[k.id]) k.jednorazove = jednorazove[k.id];
@@ -4298,4 +4445,4 @@ function chatChyba(e, err, L, cfg) {
 }
 
 
-module.exports = { REZIM, jeRezim, ROZSAH, chybaRozsahu, otestujObrazek, zkontrolujObrazek, zkontrolujPdf, visionAiConfig, orezNahledy, zpravyProModel, pametProjektu, mapaId, chatCfg, chatBrzda, chatChyba, chatAiConfig, chatRun, chatOprav, opravaPrepisu, chatPotvrdit, chatPredehrat, chatVratit, chatDto, nactiChat, seznamChatu, pametText, ulozPamet, NASTROJE, MAX_PAMET, P, prubehZapis, zapisLog };
+module.exports = { REZIM, jeRezim, ROZSAH, chybaRozsahu, otestujObrazek, zkontrolujObrazek, zkontrolujPdf, visionAiConfig, orezNahledy, zpravyProModel, pametProjektu, mapaId, chatCfg, chatBrzda, chatChyba, chatAiConfig, chatRun, chatOprav, opravaPrepisu, chatPotvrdit, chatPredehrat, chatVratit, chatDto, nactiChat, chatBezi, chybaBezi, ulozRozhovor, seznamChatu, pametText, ulozPamet, NASTROJE, MAX_PAMET, P, prubehZapis, zapisLog };

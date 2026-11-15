@@ -55,7 +55,7 @@ H.beh(async () => {
   r = await api('PATCH', `/api/collections/users/records/${uid}`, { token: SUP, body: { email: 'VLASTNIK@example.com' } });
   expect(r.status === 400, `změna na adresu existujícího účtu (jinou velikostí) skončí chybou unikátu (${r.status})`);
 
-  if (!STARY) { console.log('== upgrade test přeskočen (KB_STARY_IMAGE není) =='); return; }
+  if (!STARY) { H.preskoceno('upgrade část (migrace users_email_lowercase) — KB_STARY_IMAGE není; spouštět cíleně: KB_STARY_IMAGE=<obraz před opravou, např. kb-v033>'); return; }
   console.log('== migrace: data z image bez opravy → nový image ==');
   // ⚠️ harness stop() maže volume → upgrade test používá vlastní pojmenovaný volume a kontejner ruší přímo
   const { execSync } = require('child_process');

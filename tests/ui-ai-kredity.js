@@ -45,7 +45,8 @@ H.beh(async () => {
   const janaKr = await page.evaluate(() => document.querySelector('[data-testid="ai-kredity-clovek"] [data-testid="ai-kredity-clovek-kredity"]')?.innerText);
   expect(/0[,.]05/.test(janaKr), `Jana 3 zprávy ≈ 0,05 tahu — 1 tah = průměrný skutečný tah z kredity-ceny.json, mock je levný (${janaKr})`);
   expect(/bez stropu|no limit/i.test(await txt('[data-testid="ai-kredity-rozdeleni"]')), 'výchozí = bez stropu');
-  expect(/1 lidí|1 people/.test(await txt('[data-testid="ai-kredity-admin"]')) && /1 lidí|1 people/.test(await txt('[data-testid="ai-kredity-ostatni"]')), 'skupiny správci 1 · ostatní 1');
+  // declined since finding F6-03 of code analysis 4 (the text used to be "1 lidí" / "1 people")
+  expect(/\(1 člověk\)|\(1 person\)/.test(await txt('[data-testid="ai-kredity-admin"]')) && /\(1 člověk\)|\(1 person\)/.test(await txt('[data-testid="ai-kredity-ostatni"]')), 'skupiny správci 1 · ostatní 1');
 
   console.log('== nastavení kvóty klávesnicí, uložení přežije reload ==');
   await page.click('[data-testid="ai-kredity-kvota"]', { clickCount: 3 });

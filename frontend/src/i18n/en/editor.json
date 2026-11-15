@@ -88,7 +88,20 @@
   },
   "saveState": {
     "saving": "Saving...",
-    "saved": "Saved"
+    "saved": "Saved",
+    "notSaved": "Not saved",
+    "retry": "Try again",
+    "unsaved": {
+      "offline": "Your last changes are not saved — the server can't be reached. Retrying automatically; keep this map open for now.",
+      "server": "Your last changes are not saved — the server did not answer properly ({{reason}}). Retrying automatically; keep this map open for now.",
+      "manual": "The map could not be created — the server did not answer properly ({{reason}}). Use the button to try again; keep this map open for now.",
+      "rejected": "Changes are not saved — the server refused them: {{reason}} Undo your last edit or download a backup; until then nothing else in this map is saved either."
+    },
+    "reason": {
+      "offline": "no connection",
+      "server": "server error",
+      "rejected": "the change can't be saved."
+    }
   },
   "share": {
     "sharedWith_one": "Shared with {{count}} user",
@@ -120,6 +133,16 @@
     "createApex": "Create main goal"
   },
   "toasts": {
+    "undoRefused": "This step can no longer be undone",
+    "undoNode": "the node",
+    "undoNothingChanged": "Nothing in the map was changed.",
+    "undoReason": {
+      "changed": "“{{title}}” has changed since then (by you or a colleague) and undoing would overwrite that change.",
+      "gone": "“{{title}}” is no longer in the map.",
+      "linked": "“{{title}}” has got its own sub-goals or connections since then.",
+      "protected": "“{{title}}” is a task assigned by someone else and you can't remove it from the map.",
+      "structure": "The restored connection to “{{title}}” would break the map tree (the step has another parent now, or a loop would appear)."
+    },
     "mapNotSaved": "The map isn't saved yet",
     "mapNotSavedDesc": "Save the map first (add some content).",
     "mapSaved": "Map saved",
@@ -127,6 +150,7 @@
     "mapFromTemplateDesc": "Created from the clean template — anything you tried in the preview is not carried over.",
     "error": "Error",
     "saveMapFailed": "The map could not be saved.",
+    "leaveUnsaved": "The last changes to the map “{{title}}” could not be saved",
     "archived": "Project archived",
     "archivedDesc": "You'll find it on the Archive page.",
     "unarchived": "Project restored from archive",
@@ -138,7 +162,10 @@
     "nodeImproved": "Node improved",
     "nodeImprovedDesc": "The AI updated the node's text.",
     "subgoalsAdded": "Subgoals added",
-    "subgoalsAddedDesc": "{{count}} new goals were added.",
+    "subgoalsAddedDesc_one": "{{count}} new goal was added.",
+    "subgoalsAddedDesc_few": "{{count}} new goals were added.",
+    "subgoalsAddedDesc_many": "{{count}} new goals were added.",
+    "subgoalsAddedDesc_other": "{{count}} new goals were added.",
     "aiConnectionError": "Could not reach the AI advisor.",
     "aiError": "AI error",
     "aiTimeout": "We are sorry — we are working on a fix. Please try again later.",
@@ -156,6 +183,29 @@
     "alignUnlockedDesc": "Maps are no longer realigned on their own."
   },
   "nodeDialog": {
+    "bgChange": {
+      "title": "This step has been changed elsewhere meanwhile. What you typed is kept — decide for these fields:",
+      "take": "Take the new value",
+      "keep": "Keep mine",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "status": "Status",
+        "color": "Color",
+        "apexText": "Main goal text",
+        "deadline": "Deadline",
+        "owner": "Responsible person",
+        "waitForChildren": "Waiting for sub-goals",
+        "icon": "Icon",
+        "executorKind": "Who carries out the step",
+        "executorName": "Automation",
+        "automationWanted": "Automation request",
+        "automationNote": "Automation note",
+        "positionKind": "Position / function",
+        "holder": "Holder",
+        "deputy": "Deputy"
+      }
+    },
     "title": "Edit goal",
     "descriptionLabel": "Description",
     "categoriesNav": "Node settings categories",
@@ -352,13 +402,13 @@
     "teamFailed": "Couldn't change organization sharing.",
     "publicFailed": "Couldn't change the public link.",
     "noAccountBadge": "no account yet",
-    "noAccountBadgeTitle": "They will see the map once they sign up with this address.",
+    "noAccountBadgeTitle": "They will see the project once they come through the invitation link (signing up with the same address without the link gives no access).",
     "invite": {
       "sent": "{{email}} has no account yet — we sent an invitation explaining how to open the project.",
       "already_sent": "{{email}} has no account yet. An invitation to this project was already sent earlier and is not sent again.",
-      "no_smtp": "{{email}} has no account yet and no invitation was sent — this instance has no mail server set up. Let them know another way.",
-      "limit": "{{email}} has no account yet and no invitation was sent — today's invitation limit is used up. Let them know another way.",
-      "failed": "{{email}} has no account yet and the invitation could not be sent. Let them know another way.",
+      "no_smtp": "{{email}} has no account yet and no invitation was sent — this instance has no mail server set up. Hand over the link below.",
+      "limit": "{{email}} has no account yet and no invitation was sent — today's invitation limit is used up. Hand over the link below.",
+      "failed": "{{email}} has no account yet and the invitation could not be sent. Hand over the link below.",
       "org_invited": "{{email}} had no account yet — we created one and sent an invitation with a link to set a password. They will see the project right after signing in.",
       "org_invited_password": "{{email}} had no account yet — we created one. This instance has no mail server, so hand over the sign-in details:"
     },
@@ -373,7 +423,17 @@
       "cancel": "Cancel"
     },
     "inviteToOrg": "Invite to organization",
-    "copyRegisterLink": "Copy sign-up link"
+    "copyRegisterLink": "Copy sign-up link",
+    "inviteLinkNote": "The link works once and is valid for 30 days. Only whoever signs up or signs in through it gets access to the project — signing up with this address alone is not enough.",
+    "reinvite": {
+      "sent": "A new invitation for {{email}} was sent. The earlier link no longer works.",
+      "link": "The invitation for {{email}} was not sent by e-mail. Hand over the link below — the earlier link no longer works."
+    },
+    "reinviteTitle": "Send the invitation again (new link)",
+    "pendingAccountBadge": "has an account, invitation not confirmed",
+    "pendingAccountBadgeTitle": "They signed up without the invitation link, so they do not see the project yet. Send the invitation again, or confirm the share for this account.",
+    "confirmAccount": "Share",
+    "confirmAccountTitle": "Confirm the share for the account with this address"
   },
   "node": {
     "projectBadge": "Project",

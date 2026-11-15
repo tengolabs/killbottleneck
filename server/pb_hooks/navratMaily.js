@@ -218,6 +218,10 @@ function posliNavratMail(app, user, o) {
     // RFC 8058: poštovní klienti ukážou „Odhlásit" u hlavičky mailu; One-Click = POST na tutéž adresu
     headers: { "List-Unsubscribe": "<" + o.odhlasitUrl + ">", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
   });
+  // The model call above can take seconds to minutes. The caller re-checks the account
+  // right before the send (finding S7-01): whoever signed in or switched e-mails off in
+  // the meantime must not get the mail.
+  if (o.predOdeslanim && o.predOdeslanim() === false) return { ai: ai, preskoceno: true };
   app.newMailClient().send(message);
   return { ai: ai };
 }
@@ -267,13 +271,24 @@ function runNavratMaily(app, opts) {
   let sent = 0;
   let chybAiZaSebou = 0;
   const FAIL_STREAK_STOP = 3; // po třech selháních modelu zbytek dávky rovnou bez AI
-  for (const u of kandidati) {
+  // Is the account still due for this stage? Read FRESH from the database — the candidate
+  // list is as old as the whole batch (finding S7-01).
+  const stavNavratu = (rec) => {
+    const lastLogin = rec.getString("last_login");
+    let st = H.jsonVal(rec, "navrat", null);
+    if (!st || typeof st !== "object" || Array.isArray(st)) st = {};
+    if (st.cyklus !== lastLogin) st = { cyklus: lastLogin, krok: 0, odhlasit: st.odhlasit || "", odhlaseno: st.odhlaseno === true };
+    return { lastLogin: lastLogin, st: st };
+  };
+  for (const kandidat of kandidati) {
     if (cfg.maxDenne >= 0 && sentToday >= cfg.maxDenne) break;
     try {
-      const lastLogin = u.getString("last_login");
-      let st = H.jsonVal(u, "navrat", null);
-      if (!st || typeof st !== "object" || Array.isArray(st)) st = {};
-      if (st.cyklus !== lastLogin) st = { cyklus: lastLogin, krok: 0, odhlasit: st.odhlasit || "", odhlaseno: st.odhlaseno === true };
+      // The record loaded at the start of the batch is stale by now: decide on a fresh one.
+      let u = null;
+      try { u = app.findRecordById("users", kandidat.id); } catch (err) { continue; } // deleted meanwhile
+      if (u.getString("notify_email_mode") === "none") continue;
+      const { lastLogin, st } = stavNavratu(u);
+      if (!lastLogin || lastLogin >= hranice) continue; // signed in since the batch started
       if (st.odhlaseno === true) continue;
       const dnu = dnyBezPrihlaseni(lastLogin, now);
       let cil = 0;
@@ -283,33 +298,50 @@ function runNavratMaily(app, opts) {
       // odhlašovací token: v DB jen otisk (vzor api_keys / oauth_codes), čistý text
       // jen v odkazu tohoto mailu; každý mail dostane nový, starší odkazy tím přestanou platit
       const plain = $security.randomString(40);
-      st.odhlasit = $security.sha256(plain);
       const odhlasitUrl = info.base + "/api/kb/navrat/odhlasit?u=" + encodeURIComponent(u.id) + "&t=" + encodeURIComponent(plain);
       const vysledek = posliNavratMail(app, u, {
         krok: cil, dnu: dnu, dny: cfg.dny, odhlasitUrl: odhlasitUrl,
         aiPovoleno: chybAiZaSebou < FAIL_STREAK_STOP,
         naChybuAi: () => { chybAiZaSebou++; },
+        // right before the send: the model may have taken minutes — the user could have
+        // signed in, unsubscribed or switched e-mails off in the meantime
+        predOdeslanim: () => {
+          let ted = null;
+          try { ted = app.findRecordById("users", u.id); } catch (err) { return false; }
+          if (ted.getString("notify_email_mode") === "none") return false;
+          if (ted.getString("last_login") !== lastLogin) return false;
+          const n = H.jsonVal(ted, "navrat", null);
+          return !(n && typeof n === "object" && n.odhlaseno === true);
+        },
       });
       if (vysledek.ai) chybAiZaSebou = 0;
+      if (vysledek.preskoceno) continue;
       // účetnictví AŽ PO odeslání (vzor pozvankaSdileni): stupeň zapsaný před
-      // neúspěšným odesláním by mail ztratil navždy
-      st.krok = cil;
-      st.odeslano = now.toISOString();
-      u.set("navrat", st);
-      app.save(u);
+      // neúspěšným odesláním by mail ztratil navždy.
+      // Only the `navrat` column is written, with one UPDATE: saving the whole record
+      // would put back every column as it was when the record was loaded — including
+      // the password hash and the token key (finding S7-01). `odhlaseno` is taken from
+      // the row as it is NOW, so an unsubscribe made in the last moment survives.
+      let odhlasenoTed = st.odhlaseno === true;
+      try {
+        const n = H.jsonVal(app.findRecordById("users", u.id), "navrat", null);
+        if (n && typeof n === "object" && !Array.isArray(n)) odhlasenoTed = n.odhlaseno === true;
+      } catch (err) { /* deleted meanwhile — the UPDATE below changes nothing */ }
+      const novy = { cyklus: lastLogin, krok: cil, odhlasit: $security.sha256(plain), odhlaseno: odhlasenoTed, odeslano: now.toISOString() };
+      app.db().newQuery("UPDATE users SET navrat = {:n} WHERE id = {:id}").bind({ n: JSON.stringify(novy), id: u.id }).execute();
       sent++;
       sentToday++;
       try {
         if (!radekDne) {
           radekDne = new Record(app.findCollectionByNameOrId("mail_budget"));
-          radekDne.set("user", u.id);
+          radekDne.set("user", kandidat.id);
           radekDne.set("day", "navrat:" + today);
         }
         radekDne.set("sent", sentToday);
         app.save(radekDne);
       } catch (err) { /* počítadlo je pojistka, mail už odešel */ }
     } catch (err) {
-      try { app.logger().warn("navrat_maily: uživatel selhal", "user", u.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+      try { app.logger().warn("navrat_maily: uživatel selhal", "user", kandidat.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
     }
   }
   // ruční/testovací spuštění NESMÍ umlčet ten plánovaný (stejná past jako u runEmailDigests)

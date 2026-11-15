@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.2.0": {
+    cs: [
+      "Práce se neztrácí potichu: když se uložení mapy nepovede, uvidíte to i s důvodem a aplikace to zkusí znovu. „Vrátit zpět“ bere zpět jeden krok, ne celou mapu.",
+      "Domů, Úkoly, archiv i výběry projektů ukazují všechny projekty, ne jen ty naposledy změněné. Když se seznam nenačte, aplikace to řekne a nabídne „Zkusit znovu“.",
+      "Smazání člena odstraní jen jeho soukromé věci: sdílené projekty se předají dál a přílohy, odpracovaný čas a týmové šablony zůstávají. Dialog předem vypíše, co zmizí a co zůstane.",
+      "Sdílení pro adresu, která ještě nemá účet, se potvrzuje odkazem z pozvánky. Pozvánky, které čekaly už před aktualizací, prosím pošlete z dialogu Sdílet znovu.",
+      "Výpadek připojení nebo restart serveru vás už neodhlásí.",
+    ],
+    en: [
+      "Work is not lost silently: when saving a map fails, you see it with the reason and the app tries again. Undo takes back one step, not the whole map.",
+      "Home, Tasks, the archive and the project pickers show all projects, not only the most recently changed ones. When a list fails to load, the app says so and offers \"Try again\".",
+      "Deleting a member removes only their private things: shared projects are handed over, and attachments, tracked time and team templates stay. The dialog lists in advance what goes and what stays.",
+      "A share for an address that has no account yet is confirmed through the link in the invitation. Please re-send invitations that were already waiting before the update from the Share dialog.",
+      "A lost connection or a server restart no longer signs you out.",
+    ],
+  },
   "v1.1.1": {
     cs: [
       "Při zakládání nového projektu se asistent zeptá, jestli budete řešitelem kroků, rovnou v první kartě otázek — o jedno klikání méně.",

@@ -54,13 +54,16 @@ export const listExternalContacts = async () => {
 // zobrazuje řešitel. reload() volat po změně adresáře (onContactsChanged).
 export function useMembersWithContacts(user) {
   const [members, setMembers] = useState([]);
+  const userId = user?.id || '';
   const reload = useCallback(() => {
-    if (!user) return;
+    if (!userId) return;
     Promise.all([
       getMembers().catch(() => []),
       listExternalContacts(),
     ]).then(([team, contacts]) => setMembers([...team, ...contactsToMemberRows(contacts)]));
-  }, [user]);
+    // the ID, not the identity of the `user` object (patchUser makes a new one — F3-04); the name
+    // is there so that a rename in the account dialog shows in the member list
+  }, [userId, user?.full_name, user?.name]);
   useEffect(() => { reload(); }, [reload]);
   return [members, reload];
 }

@@ -513,16 +513,20 @@ H.beh(async () => {
   fronta.push(nastroj('share_map', { map_id: 'Kuchyň Dvořákovi', member: 'host@example.com', permission: 'read' }));
   r = await chatuj(A, { chat_id: chatSd.id, message: 'Nasdílej Kuchyň host@example.com ke čtení' });
   chatSd = r.json.chat; kSd = posledniKarta(chatSd, 'akce');
-  expect(!!kSd && kSd.detail === 'bez účtu — projekt uvidí po registraci s touto adresou', `adresát bez účtu: karta to řekne (${kSd && kSd.detail})`);
+  // Code analysis 4, S4-02 (11 Nov 2026): a share with an address without an account is PENDING — it is granted only
+  // to whoever comes through the invitation link, not to whoever registers the address. Until then these three checks
+  // expected the address right in the project's shared_with and, after a plain registration, an ordinary member row.
+  expect(!!kSd && kSd.detail === 'bez účtu — projekt uvidí, až přijde přes odkaz z pozvánky', `adresát bez účtu: karta to řekne (${kSd && kSd.detail})`);
   fronta.push(text('x'));
   r = await potvrd(A, chatSd.id, kSd.id, true); chatSd = r.json.chat;
   sd = await sdileni();
-  expect(kartaPodleId(chatSd, kSd.id).stav === 'hotovo' && /no account/.test(kartaPodleId(chatSd, kSd.id).vysledek || '') && sd.s.includes('host@example.com'), `sdílení na e-mail bez účtu (jako dialog) (${(kartaPodleId(chatSd, kSd.id).vysledek || '').slice(0, 120)})`);
+  expect(kartaPodleId(chatSd, kSd.id).stav === 'hotovo' && /no account/.test(kartaPodleId(chatSd, kSd.id).vysledek || '') && /invitation link/.test(kartaPodleId(chatSd, kSd.id).vysledek || '') && !sd.s.includes('host@example.com'),
+    `sdílení na e-mail bez účtu (jako dialog): čeká na odkaz z pozvánky, v záznamu projektu adresa není (${(kartaPodleId(chatSd, kSd.id).vysledek || '').slice(0, 120)})`);
   await inst.register('host@example.com', {});
   fronta.push(nastroj('get_map_sharing', { map_id: 'Kuchyň Dvořákovi' }), text('x'));
   r = await chatuj(A, { chat_id: chatSd.id, message: 'Kdo vidí Kuchyň?' });
   const vid2 = (toolZ(posledniVolani()).slice(-1)[0] || {}).content || ''; // jen výpis get_map_sharing (starší výsledek share_map „no account“ je ve stejném rozhovoru)
-  expect(/• host@example.com — read/.test(vid2) && !/host@example.com[^\n]*no account/.test(vid2), `účet bez jména (čerstvě registrovaný) se nehlásí jako „bez účtu“ (${(vid2.match(/• host[^\n]*/) || [''])[0]})`);
+  expect(/• host@example.com \(invited, NO ACCESS YET[^\n]*— read/.test(vid2) && !/host@example.com[^\n]*no account/.test(vid2), `registrace bez odkazu: výpis ho vede jako pozvaného bez přístupu, ne jako „bez účtu“ ani jako člena (${(vid2.match(/• host[^\n]*/) || [''])[0]})`);
   fronta.push(nastroj('share_map', { map_id: 'Kuchyň Dvořákovi', member: 'admin@example.com', permission: 'read' }), text('x'));
   r = await chatuj(A, { chat_id: chatSd.id, message: 'Nasdílej mi Kuchyň' });
   expect(toolZ(posledniVolani()).some((m) => /share a project with themselves/.test(m.content)), 'sám sobě → chyba');

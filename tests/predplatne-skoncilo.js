@@ -73,13 +73,13 @@ const prihlas = async (email) => (await api('POST', '/api/collections/users/auth
     console.log('== předplatné SKONČILO: jen pro čtení, data zůstanou ==');
     await start('-e KB_PREDPLATNE_SKONCILO=1');
     const tok = await prihlas('majitel@e2e.cz');
-    expect(!!tok, 'PŘIHLÁŠENÍ funguje i po konci předplatného (cesta k datům)');
+    expect(!!tok, 'PŘIHLÁŠENÍ funguje i po konci předplatného');
     const cfg = await api('GET', '/api/kb/config');
     expect(cfg.json?.subscription_ended === true, 'config hlásí konec předplatného (frontend ukáže pruh)');
     expect(cfg.json?.trial_expired === false && !cfg.json?.trial_until, 'a NEtvrdí, že jde o zkušebku');
     const cti = await api('GET', '/api/collections/goalmaps/records', { token: tok });
     expect(cti.status === 200 && cti.json?.items?.some((m) => m.title === 'Práce za předplatného'),
-      'ČTENÍ jde dál a DATA JSOU TAM — export není zablokovaný');
+      'ČTENÍ map jde dál a DATA JSOU TAM (přílohy a ostatní výjimky zámku měří zamek-vyjimky.js)');
     const zapis = await api('POST', '/api/collections/goalmaps/records', {
       token: tok, body: { title: 'Po konci', nodes: [], edges: [] } });
     expect(zapis.status === 402, `ZÁPIS odmítnut s 402 (${zapis.status})`);

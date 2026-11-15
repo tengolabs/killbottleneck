@@ -335,7 +335,7 @@ function zapisLog(app, auth, rec, ms, chyba, gen, opt) {
 // Týdenní strop obrázků instance (KB_OBRAZKY_TYDEN; prázdné / 0 = bez stropu; Richard 5. 11. 2026: obrázky „solo“ —
 // vlastní počet, ne kredity). Počítají se POVEDENÁ kreslení uživatelů (řádky image_draw, i Nakreslit znovu a ilustrace
 // Stránek) od pondělí 00:00 UTC — stejný týden jako kvóta kreditů (kredity.js zacatekTydne); banner sumáře (image_banner)
-// patří instanci a do stropu se nepočítá. Rozkreslené (ještě bez řádku) se nepočítají → souběh může strop přetáhnout o pár kusů.
+// patří instanci a do stropu se nepočítá. Pictures being drawn right now have no row yet — reserveWeek counts them.
 function stropTydne() {
   const { env } = require(`${__hooks}/helpers.js`);
   const n = parseInt(env("OBRAZKY_TYDEN"), 10);
@@ -355,6 +355,33 @@ function tydenBrzda(app, L) {
   if (nakreslenoTydne(app) < strop) return null;
   const { t } = require(`${__hooks}/i18n.js`);
   return { status: 429, body: { error: t(L, "err.imageWeekLimit", { limit: strop }), code: "image_week" } };
+}
+// A place under the weekly cap for ONE drawing, taken before the gateway is called and given
+// back when the drawing ended (its log row is written by then). tydenBrzda alone counts only
+// finished rows, so N drawings sent at once all passed it and the cap of 2 drew 6 (finding
+// S8-04). The store holds the drawings in progress ("<start ms>:<random>" joined by commas);
+// the finished ones are counted inside the same setFunc, so the check and the reservation
+// are one step. An entry nobody gave back (cannot happen with `finally`; a restart clears
+// the store) stops counting after ZAMEK_MS. Returns { refused } (429) or { release }.
+const WEEK_KEY = "img:week:drawing";
+function reserveWeek(app, L) {
+  const strop = stropTydne();
+  if (!strop) return { release: () => {} };
+  const store = app.store();
+  const mine = Date.now() + ":" + $security.randomString(8);
+  const live = (v) => String(v || "").split(",").filter((x) => x && Date.now() - (Number(x.split(":")[0]) || 0) < ZAMEK_MS);
+  let full = false;
+  store.setFunc(WEEK_KEY, (cur) => {
+    const drawing = live(cur);
+    if (nakreslenoTydne(app) + drawing.length >= strop) full = true;
+    else drawing.push(mine);
+    return drawing.join(",");
+  });
+  if (full) {
+    const { t } = require(`${__hooks}/i18n.js`);
+    return { refused: { status: 429, body: { error: t(L, "err.imageWeekLimit", { limit: strop }), code: "image_week" } } };
+  }
+  return { release: () => { store.setFunc(WEEK_KEY, (cur) => live(cur).filter((x) => x !== mine).join(",")); } };
 }
 // obrázek bez kreditů (KB_OBRAZEK_KREDITY=0): kreslení ani popis Nového obrázku pak nečerpají kvótu kreditů a ta je ani nezastaví
 function zdarma() {
@@ -403,11 +430,16 @@ function vytvorit(app, e, body) {
     return Date.now();
   });
   if (obsazeno) return { status: 409, body: { error: t(L, "err.imageDrawing") } };
+  let week = null;
   try {
+    // weekly cap first, as chatBrzda has it — and held until the drawing ended (S8-04)
+    week = reserveWeek(app, L);
+    if (week.refused) return odmitni(week.refused);
     const brzda = C.chatBrzda(e, L, { _obrazek: true }, null);
     if (brzda) return odmitni(brzda);
     return nakresli(app, e.auth, rec, cfg, L, znovu);
   } finally {
+    if (week && week.release) week.release();
     store.set(klic, 0);
   }
 }
@@ -492,7 +524,11 @@ function dosadIlustrace(app, auth, html, o) {
     const popis = atribut(tag, "data-kb-image").trim();
     // brzda za KAŽDÝ obrázek (kvóta kreditů vždy — i s vlastním modelem stránky kreslí naše služba obrázků; checkup 5. 11.);
     // odmítnutí = značka zmizí jako při výpadku, stránka se dopíše
-    const odmitnuto = cfg && popis && i < MAX_ILUSTRACI && o && o.brzda ? !!o.brzda() : false;
+    // a place under the weekly cap for this illustration, held until it is drawn (S8-04)
+    // (given back in `finally`: a throw from the brake or from the drawing must not hold the place for ZAMEK_MS)
+    const week = cfg && popis && i < MAX_ILUSTRACI && o && o.brzda ? reserveWeek(app, o.L) : null;
+    try {
+    const odmitnuto = week ? !!(week.refused || o.brzda()) : false;
     if (odmitnuto) chyb++;
     if (cfg && popis && i < MAX_ILUSTRACI && !odmitnuto) {
       let rec = null;
@@ -508,6 +544,7 @@ function dosadIlustrace(app, auth, html, o) {
         } else chyb++;
       } catch (err) { chyb++; try { $app.logger().warn("obrazky: ilustrace stránky selhala", "error", String(err).slice(0, 200)); } catch (e2) { /* log je bonus */ } }
     }
+    } finally { if (week && week.release) week.release(); }
     out = out.replace(tag, () => nahrada); // funkce: $' / $& v alt nebo style od modelu by se jinak rozvinuly
   }
   return { html: out, pocet: pocet, chyb: chyb };

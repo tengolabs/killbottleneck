@@ -12,6 +12,7 @@
 // viz product/tests/scale-limits.js; za komprimující proxy zhruba třetina).
 // Hlídá to product/tests/lite-bundle.js; když sáhnete po hotové komponentě
 // z components/ui/, ověřte si, co za sebou táhne.
+import { serverReason } from '@/lib/serverReason';
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -101,7 +102,7 @@ export default function LiteApp() {
   // stavu a vypadalo by to, že akce prostě „nezabrala" — přesně ten tichý
   // neúspěch, kvůli kterému lidi nástroji přestanou věřit.
   const failedAction = useCallback((err) => {
-    toast({ title: t('error.actionFailed'), description: err?.message, variant: 'destructive' });
+    toast({ title: t('error.actionFailed'), description: serverReason(err) || undefined, variant: 'destructive' });
     reload();
   }, [toast, reload, t]);
 

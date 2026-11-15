@@ -2,24 +2,10 @@
 // Analýza funkcí 5. 11. 2026: „Lite nabídne novému členovi cizí projekt k zápisu"
 // — seznam bral všechny projekty bez ohledu na práva a zápis do projektu jen ke
 // čtení skončil anglickou hláškou „The requested resource wasn't found".
-const puppeteer = require('puppeteer-core');
-const { execSync } = require('child_process');
-const PORT = 20534;
-const BASE = `http://127.0.0.1:${PORT}`;
-const NAME = 'flowmap-e2e-ui-lite-prava';
-const PW = 'testheslo123';
-const PHONE = { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
-let pass = 0, fail = 0;
-const expect = (c, m) => (c ? (pass++, console.log(`  ✅ ${m}`)) : (fail++, console.log(`  ❌ ${m}`)));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const api = async (method, path, { token, body } = {}) => {
-  const res = await fetch(BASE + path, {
-    method, headers: { 'Content-Type': 'application/json', 'Accept-Language': 'cs', ...(token ? { Authorization: token } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let json = null; try { json = await res.json(); } catch { /* prázdná odpověď */ }
-  return { status: res.status, json };
-};
+// On the shared harness since code analysis 4 (T1-09): the port is assigned by Docker, no own `docker run`.
+const H = require('./_harness');
+const { expect, sleep, PW } = H;
+let api, BASE; // = inst.api / inst.base, set once the instance runs
 const register = async (email) => {
   await api('POST', '/api/collections/users/records', { body: { email, password: PW, passwordConfirm: PW, language: 'cs' } });
   const r = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password: PW } });
@@ -31,12 +17,10 @@ const mapa = async (who, title) => (await api('POST', '/api/collections/goalmaps
   edges: [],
 } })).json;
 
-(async () => {
-  let browser;
-  try {
-    execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
-    execSync(`docker run -d -e KB_RATE_LIMITS=0 -e KB_PURPOSE_ASK=0 --name ${NAME} -p 127.0.0.1:${PORT}:8090 ${process.env.KB_TEST_IMAGE || 'product-flowmap'}`, { stdio: 'ignore' });
-    for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* startuje */ } await sleep(1000); }
+H.beh(async () => {
+  {
+    const inst = await H.startInstance({ slug: 'ui-lite-prava' });
+    api = inst.api; BASE = inst.base;
 
     const sef = await register('sef@lite.cz');
     const clen = await register('clen@lite.cz');
@@ -60,9 +44,8 @@ const mapa = async (who, title) => (await api('POST', '/api/collections/goalmaps
     r = await api('PATCH', `/api/collections/goalmaps/records/${jenCteni.id}`, { token: clen.token, body: { description: 'x', base_updated: jc.updated } });
     expect(r.status === 404 || r.status === 403, `zápis do mapy jen ke čtení server odmítá (${r.status})`);
 
-    browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
-    const page = await browser.newPage();
-    await page.setViewport(PHONE);
+    // console: false — as before the move, only uncaught page errors count (not console.error)
+    const { page } = await H.browser({ mobil: true, konzole: false });
     const chyby = [];
     page.on('pageerror', (e) => chyby.push(String(e)));
     await page.evaluateOnNewDocument((t, rec) => {
@@ -93,12 +76,5 @@ const mapa = async (who, title) => (await api('POST', '/api/collections/goalmaps
     const up = (await api('GET', `/api/collections/goalmaps/records/${upravovat.id}`, { token: sef.token })).json;
     expect((up.nodes || []).some((n) => (n.data || {}).title === 'LITE-ZAPIS-DO-SDILENE'), 'zápis do sdíleného projektu s právem Upravovat se uložil');
     expect(chyby.length === 0, `stránka bez výjimek (${chyby.length})`);
-  } catch (err) {
-    fail++; console.log('  ❌ výjimka:', err.message);
-  } finally {
-    if (browser) await browser.close().catch(() => {});
-    execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
   }
-  console.log(`\n${pass} ✅ / ${fail} ❌`);
-  process.exit(fail ? 1 : 0);
-})();
+}, { nazev: 'UI-LITE-PRAVA-PROJEKTU' });

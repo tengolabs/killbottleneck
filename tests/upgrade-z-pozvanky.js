@@ -18,7 +18,7 @@ const den = (posun) => {
 
 H.beh(async () => {
   if (!STARY) {
-    expect(true, 'upgrade test PŘESKOČEN — KB_STARY_IMAGE není; spouštět cíleně: KB_STARY_IMAGE=<obraz minulého vydání>');
+    H.preskoceno('KB_STARY_IMAGE není; spouštět cíleně: KB_STARY_IMAGE=<obraz minulého vydání>');
     return;
   }
   const env = { KB_UVODNI_MAPA: 0, KB_PURPOSE_ASK: 0, TZ: 'Europe/Prague' };

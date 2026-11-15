@@ -3,6 +3,13 @@
     "notLoggedIn": "Not signed in",
     "refreshFailed": "Sign-in verification failed",
     "invalidCredentials": "Invalid email or password",
-    "googleFailed": "Google sign-in failed"
+    "googleFailed": "Google sign-in failed",
+    "serverUnreachable": "The server is not responding. Check your connection and try again.",
+    "loginFailed": "Sign-in failed. Please try again.",
+    "emailTaken": "An account with this email already exists. Sign in, or reset your password.",
+    "passwordRefused": "This password cannot be used. Choose another one, at least 8 characters.",
+    "registerRefused": "The account could not be created. An account with this email may already exist — try signing in or resetting your password.",
+    "registerFailed": "Registration failed. Please try again.",
+    "sessionEnded": "Your sign-in is no longer valid. Please sign in again."
   }
 }

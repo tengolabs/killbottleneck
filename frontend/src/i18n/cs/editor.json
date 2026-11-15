@@ -88,7 +88,20 @@
   },
   "saveState": {
     "saving": "Ukládání...",
-    "saved": "Uloženo"
+    "saved": "Uloženo",
+    "notSaved": "Neuloženo",
+    "retry": "Zkusit znovu",
+    "unsaved": {
+      "offline": "Poslední změny nejsou uložené — nejde spojení se serverem. Zkouším to znovu sám; mapu zatím nezavírejte.",
+      "server": "Poslední změny nejsou uložené — server neodpověděl správně ({{reason}}). Zkouším to znovu sám; mapu zatím nezavírejte.",
+      "manual": "Mapu se nepodařilo založit — server neodpověděl správně ({{reason}}). Zkuste to znovu tlačítkem; mapu zatím nezavírejte.",
+      "rejected": "Změny nejsou uložené — server je odmítl: {{reason}} Vraťte poslední úpravu (Zpět) nebo si stáhněte zálohu; do té doby se neuloží ani další práce v mapě."
+    },
+    "reason": {
+      "offline": "bez spojení",
+      "server": "chyba serveru",
+      "rejected": "změnu nelze uložit."
+    }
   },
   "share": {
     "sharedWith_one": "Sdíleno s {{count}} uživatelem",
@@ -120,6 +133,16 @@
     "createApex": "Vytvořit hlavní cíl"
   },
   "toasts": {
+    "undoRefused": "Tenhle krok už nejde vrátit",
+    "undoNode": "uzel",
+    "undoNothingChanged": "V mapě se nic nezměnilo.",
+    "undoReason": {
+      "changed": "„{{title}}“ se od té doby změnil (u vás nebo u kolegy) a vrácení by tu změnu přepsalo.",
+      "gone": "„{{title}}“ už v mapě není.",
+      "linked": "„{{title}}“ má mezitím vlastní podcíle nebo spojení.",
+      "protected": "„{{title}}“ je úkol zadaný někým jiným a z mapy ho odebrat nemůžete.",
+      "structure": "Vrácené spojení ke kroku „{{title}}“ by porušilo strom mapy (krok má mezitím jiného rodiče nebo by vznikl kruh)."
+    },
     "mapNotSaved": "Mapa ještě není uložená",
     "mapNotSavedDesc": "Nejdřív mapu uložte (přidejte obsah).",
     "mapSaved": "Mapa uložena",
@@ -127,6 +150,7 @@
     "mapFromTemplateDesc": "Vznikl z čisté šablony — co jste zkoušeli v náhledu, se nepřenáší.",
     "error": "Chyba",
     "saveMapFailed": "Mapu se nepodařilo uložit.",
+    "leaveUnsaved": "Poslední změny v mapě „{{title}}“ se nepodařilo uložit",
     "archived": "Projekt archivován",
     "archivedDesc": "Najdete ho na stránce Archiv.",
     "unarchived": "Projekt obnoven z archivu",
@@ -138,7 +162,10 @@
     "nodeImproved": "Uzel vylepšen",
     "nodeImprovedDesc": "AI aktualizovala text uzlu.",
     "subgoalsAdded": "Podcíle přidány",
-    "subgoalsAddedDesc": "{{count}} nových cílů bylo přidáno.",
+    "subgoalsAddedDesc_one": "Byl přidán {{count}} nový cíl.",
+    "subgoalsAddedDesc_few": "Byly přidány {{count}} nové cíle.",
+    "subgoalsAddedDesc_many": "Bylo přidáno {{count}} nového cíle.",
+    "subgoalsAddedDesc_other": "Bylo přidáno {{count}} nových cílů.",
     "aiConnectionError": "Chyba spojení s AI poradcem.",
     "aiError": "Chyba AI",
     "aiTimeout": "Omlouváme se, pracujeme na nápravě. Zkuste to prosím později.",
@@ -156,6 +183,29 @@
     "alignUnlockedDesc": "Mapy se už samy nepřerovnávají."
   },
   "nodeDialog": {
+    "bgChange": {
+      "title": "Tenhle krok se mezitím změnil jinde. Co máte rozepsané, zůstalo — u těchto polí rozhodněte:",
+      "take": "Převzít novou hodnotu",
+      "keep": "Nechat moje",
+      "fields": {
+        "title": "Název",
+        "description": "Popis",
+        "status": "Stav",
+        "color": "Barva",
+        "apexText": "Text hlavního cíle",
+        "deadline": "Termín",
+        "owner": "Zodpovědná osoba",
+        "waitForChildren": "Čekání na podcíle",
+        "icon": "Ikona",
+        "executorKind": "Kdo krok vykonává",
+        "executorName": "Automatizace",
+        "automationWanted": "Žádost o automatizaci",
+        "automationNote": "Poznámka k automatizaci",
+        "positionKind": "Pozice / funkce",
+        "holder": "Držitel",
+        "deputy": "Zástupce"
+      }
+    },
     "title": "Upravit cíl",
     "descriptionLabel": "Popis",
     "categoriesNav": "Kategorie nastavení uzlu",
@@ -352,13 +402,13 @@
     "teamFailed": "Nepodařilo se změnit sdílení s organizací.",
     "publicFailed": "Nepodařilo se změnit veřejný odkaz.",
     "noAccountBadge": "zatím bez účtu",
-    "noAccountBadgeTitle": "Mapu uvidí, až se zaregistruje s touto adresou.",
+    "noAccountBadgeTitle": "Projekt uvidí, až přijde přes odkaz z pozvánky (registrace stejnou adresou bez odkazu přístup nedá).",
     "invite": {
       "sent": "{{email}} zatím nemá účet — poslali jsme pozvánku s návodem, jak projekt otevřít.",
       "already_sent": "{{email}} zatím nemá účet. Pozvánka k tomuto projektu už odešla dřív, znovu se neposílá.",
-      "no_smtp": "{{email}} zatím nemá účet a pozvánka neodešla — instance nemá nastavenou mailovou bránu. Dejte mu vědět jinak.",
-      "limit": "{{email}} zatím nemá účet a pozvánka neodešla — dnešní limit pozvánek je vyčerpaný. Dejte mu vědět jinak.",
-      "failed": "{{email}} zatím nemá účet a pozvánku se nepodařilo odeslat. Dejte mu vědět jinak.",
+      "no_smtp": "{{email}} zatím nemá účet a pozvánka neodešla — instance nemá nastavenou mailovou bránu. Předejte mu odkaz níže.",
+      "limit": "{{email}} zatím nemá účet a pozvánka neodešla — dnešní limit pozvánek je vyčerpaný. Předejte mu odkaz níže.",
+      "failed": "{{email}} zatím nemá účet a pozvánku se nepodařilo odeslat. Předejte mu odkaz níže.",
       "org_invited": "{{email}} zatím neměl účet — založili jsme mu ho a poslali pozvánku s odkazem na nastavení hesla. Projekt uvidí hned po přihlášení.",
       "org_invited_password": "{{email}} zatím neměl účet — založili jsme mu ho. Instance nemá mailovou bránu, předejte mu přihlašovací údaje:"
     },
@@ -373,7 +423,17 @@
       "cancel": "Zrušit"
     },
     "inviteToOrg": "Pozvat do organizace",
-    "copyRegisterLink": "Kopírovat odkaz na registraci"
+    "copyRegisterLink": "Kopírovat odkaz na registraci",
+    "inviteLinkNote": "Odkaz je jednorázový a platí 30 dní. Přístup k projektu dostane jen ten, kdo se přes něj zaregistruje nebo přihlásí — samotná registrace touto adresou nestačí.",
+    "reinvite": {
+      "sent": "Nová pozvánka pro {{email}} odešla. Dřívější odkaz přestal platit.",
+      "link": "Pozvánka pro {{email}} e-mailem neodešla. Předejte mu odkaz níže — dřívější odkaz přestal platit."
+    },
+    "reinviteTitle": "Poslat pozvánku znovu (nový odkaz)",
+    "pendingAccountBadge": "účet má, pozvánku nepotvrdil",
+    "pendingAccountBadgeTitle": "Zaregistroval se bez odkazu z pozvánky, takže projekt zatím nevidí. Pošlete mu pozvánku znovu, nebo sdílení tomuto účtu potvrďte.",
+    "confirmAccount": "Sdílet",
+    "confirmAccountTitle": "Potvrdit sdílení pro účet s touto adresou"
   },
   "node": {
     "projectBadge": "Projekt",

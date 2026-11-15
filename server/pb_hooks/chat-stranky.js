@@ -82,7 +82,7 @@ function vykonej(app, auth, L, name, args, ktx) {
       if (!rec.getString("html")) return { text: `Error: the page "${rec.getString("title")}" has no content yet (status ${rec.getString("stav")}); the user can retry it in the Pages panel.` };
       const pred = { zadani: rec.getString("zadani"), title: rec.getString("title"), stav: rec.getString("stav"), chyba: rec.getString("chyba") };
       const nove = St.zadejPrepis(app, auth.id, rec.id, { zadani: pokyny, title: a.title != null ? String(a.title) : null });
-      if (ktx && ktx.dok) ktx.dok.push({ id: rec.id, novy: false, stranka: true, pred: pred });
+      if (ktx && ktx.dok) ktx.dok.push({ id: rec.id, novy: false, stranka: true, pred: pred, po: { title: nove.getString("title") } }); // po = what this turn set (vratitTah)
       return { text: `The page "${nove.getString("title")}" is queued for rewriting; the app rewrites it now (minutes) and keeps the previous version. Reply with ONE short sentence.`,
         karta: { type: "stranka", page_id: nove.id, title: nove.getString("title"), stav: "ceka", akce: "prepis" } };
     }

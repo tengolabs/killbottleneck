@@ -14,6 +14,8 @@ import { hledaciText } from '@/hooks/useTaskFilters';
 export function useTaskTrees({
   items, byParent, maps, user, buffer, matchesFilters, bufferVisible,
   mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, t,
+  // key of today — the deadline filter depends on the day, so the memos must follow it (F3-06)
+  todayKey,
 }) {
   // archivované projekty v úkolech nefigurují (žijí na /archive) — filtruje se
   // mapa i úkoly na ni navěšené. Stejně jako Home ukazujeme jen projekty, kde
@@ -37,7 +39,7 @@ export function useTaskTrees({
   // úkol nejvyšší úrovně projde, když odpovídá sám, nebo některý jeho podúkol
   const topLevel = useMemo(
     () => items.filter((task) => !task.parent_id && !archivedMapIds.has(task.map_id) && (matchesFilters(task) || (byParent[task.id] || []).some(matchesFilters))),
-    [items, byParent, archivedMapIds, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search]
+    [items, byParent, archivedMapIds, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, todayKey]
   );
 
   // Celý strom uzlů každé mapy (mapa = projekt, uzly = jeho cíle) — odvozeno
@@ -106,7 +108,7 @@ export function useTaskTrees({
       if (pruned.length > 0) res[mapId] = pruned;
     }
     return res;
-  }, [rawTrees, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search]);
+  }, [rawTrees, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, todayKey]);
 
   // kanban zůstává jen o rozpracovanosti — z uzlů ukazuje dál jen ty s termínem
   const boardNodeItems = useMemo(() => {
@@ -137,7 +139,7 @@ export function useTaskTrees({
       deadlineChangeWanted: n.deadlineChangeWanted, deadlineChangeRequestedBy: n.deadlineChangeRequestedBy, raw: n,
     }));
     return out;
-  }, [topLevel, byParent, boardNodeItems, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, user]);
+  }, [topLevel, byParent, boardNodeItems, mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, user, todayKey]);
 
   const bufferItems = useMemo(() => {
     if (!bufferVisible) return [];
@@ -150,7 +152,7 @@ export function useTaskTrees({
       }
       return true;
     });
-  }, [buffer.items, bufferVisible, deadlineFilter, search]);
+  }, [buffer.items, bufferVisible, deadlineFilter, search, todayKey]);
 
   return { activeMaps, archivedMapIds, topLevel, nodeTrees, boardNodeItems, calendarItems, bufferItems };
 }

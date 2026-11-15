@@ -122,8 +122,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     };
     expect(poradi('FMEA — kanban', 'Snížit počet reklamací'),
       'hlavní cíl je POD názvem projektu, ne nad ním');
-    expect(poradi('Snížit počet reklamací', ' cílů'),
-      'hlavní cíl stojí nad řádkem s počtem cílů');
+    // the count line is declined since finding F6-03 of code analysis 4 ("1 cíl", "2 cíle", "5 cílů")
+    const pocetCilu = (kartaFmea.match(/\d+ cíl(e|ů)?(?![a-zá-ž])/) || [''])[0];
+    expect(!!pocetCilu && poradi('Snížit počet reklamací', pocetCilu),
+      `hlavní cíl stojí nad řádkem s počtem cílů („${pocetCilu}")`);
     // shoda názvů = řádek se neopakuje (dvakrát totéž pod sebou je šum)
     const kartaStejna = await textKarty('PROJEKT-KARTA');
     expect((kartaStejna.match(/PROJEKT-KARTA/g) || []).length === 1,

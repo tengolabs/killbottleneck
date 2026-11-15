@@ -45,6 +45,14 @@ const expect = (c, m) => {
 };
 const ok = expect;
 const pocty = () => ({ pass, fail });
+// A suite (or a part of it) that cannot run here — no image of the old release, … — says so
+// instead of counting an always-true check (code analysis 4, T1-01: five upgrade suites printed
+// PASS 1 / FAIL 0 in every full regression without running). finish() then exits with 77
+// (the automake "skipped" code) unless something failed, and tests/run-all.sh lists the suite
+// under "NEBĚŽELO" instead of counting it as green.
+const KOD_PRESKOCENO = 77;
+const preskocene = [];
+const preskoceno = (duvod) => { preskocene.push(String(duvod || 'bez udání důvodu')); console.log(`  ⏭️  PŘESKOČENO: ${preskocene[preskocene.length - 1]}`); };
 // await + catch → ❌ (nahrazuje ruční `catch { fail++ }` bloky)
 const zkusit = async (fn, m) => { try { await fn(); return true; } catch (e) { fail++; console.log(`  ❌ ${m}: ${String(e && e.message || e).slice(0, 160)}`); return false; } };
 
@@ -251,6 +259,11 @@ async function finish({ nazev = 'SADA' } = {}) {
   if (dokonceno) return; dokonceno = true;
   for (const f of uklid.splice(0)) { try { await f(); } catch { /* úklid je best-effort */ } }
   for (const i of instance.splice(0)) { try { i.stop(); } catch { /* už neběží */ } }
+  if (preskocene.length && !fail) {
+    console.log(`\n⏭️  ${nazev} ${pass ? 'ZČÁSTI PŘESKOČENA' : 'PŘESKOČENA'} — PASS ${pass} / FAIL 0 — ${preskocene.join('; ')}`);
+    process.exitCode = KOD_PRESKOCENO;
+    return;
+  }
   if (pass + fail === 0) { console.log('  ❌ sada neodbavila žádnou kontrolu (zelená na prázdné stránce)'); fail++; process.exitCode = 2; }
   console.log(`\n${fail ? '🔴' : '🟢'} ${nazev} PASS ${pass} / FAIL ${fail}`);
   process.exitCode = process.exitCode === 2 ? 2 : (fail ? 1 : 0);
@@ -287,4 +300,4 @@ async function vyberZListy(page, co, polozka) {
   return true;
 }
 
-module.exports = { PW, SU, sleep, expect, ok, pocty, zkusit, waitFor, waitHealthy, startInstance, apiPathFirst, apiBaseFirst, smtpSink, httpMock, browser, cizihoPuvodu, finish, beh, MUTACE, vyberZListy };
+module.exports = { PW, SU, sleep, expect, ok, pocty, preskoceno, KOD_PRESKOCENO, zkusit, waitFor, waitHealthy, startInstance, apiPathFirst, apiBaseFirst, smtpSink, httpMock, browser, cizihoPuvodu, finish, beh, MUTACE, vyberZListy };

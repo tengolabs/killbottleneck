@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot, RotateCw, Target } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Check, AlertTriangle, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot, RotateCw, Target } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
 import { stavAsistenta } from '@/hooks/useAiEnabled';
 import { useMedia } from '@/lib/useMedia';
@@ -402,15 +402,16 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   // přepínače směru — nezabírá místo, takže se při uložení nic nepohne (dřív
   // text uprostřed řady odsouval přepínač směru o ~65 px). Text zůstává pro
   // čtečky (a pro sady, které na „Ukládání" čekají). Na telefonu se neukazuje.
-  const stavUkladaniIkona = !sirokaLista && (saveStatus === 'saving' || saveStatus === 'saved') ? (
+  const stavUkladaniText = saveStatus === 'saving' ? t('saveState.saving') : saveStatus === 'error' ? t('saveState.notSaved') : t('saveState.saved');
+  const stavUkladaniIkona = !sirokaLista && (saveStatus === 'saving' || saveStatus === 'saved' || saveStatus === 'error') ? (
     <span
-      className={`hidden sm:flex absolute right-full top-1/2 -translate-y-1/2 mr-1.5 items-center ${saveStatus === 'saving' ? 'text-muted-foreground' : 'text-green-600'}`}
-      title={saveStatus === 'saving' ? t('saveState.saving') : t('saveState.saved')}
+      className={`hidden sm:flex absolute right-full top-1/2 -translate-y-1/2 mr-1.5 items-center ${saveStatus === 'saving' ? 'text-muted-foreground' : saveStatus === 'error' ? 'text-red-600' : 'text-green-600'}`}
+      title={stavUkladaniText}
       data-testid="save-status"
       data-stav={saveStatus}
     >
-      {saveStatus === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-      <span className="sr-only">{saveStatus === 'saving' ? t('saveState.saving') : t('saveState.saved')}</span>
+      {saveStatus === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saveStatus === 'error' ? <AlertTriangle className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+      <span className="sr-only">{stavUkladaniText}</span>
     </span>
   ) : null;
   return (
@@ -519,6 +520,11 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               {saveStatus === 'saved' && (
                 <span className="flex items-center gap-1.5 text-green-600">
                   <Check className="w-3 h-3" /> {t('saveState.saved')}
+                </span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="flex items-center gap-1.5 text-red-600">
+                  <AlertTriangle className="w-3 h-3" /> {t('saveState.notSaved')}
                 </span>
               )}
             </span>

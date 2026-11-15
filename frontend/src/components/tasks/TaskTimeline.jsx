@@ -22,7 +22,8 @@ import {
 import { statusConfig } from '@/lib/statusMeta';
 import { intlLocale, fmtDate } from '@/lib/locale';
 import { getInitials, getDeadlineStatus, formatDeadline } from '@/lib/nodeMeta';
-import { isoTyden, klicTydne } from '@/lib/kalendar';
+import { isoTyden, klicTydne, parsujDen } from '@/lib/kalendar';
+import { useTodayKey } from '@/hooks/useTodayKey';
 
 // Pomocné funkce pro lokální manipulaci s daty bez posunu časových pásem
 const parseDateLocal = (str) => {
@@ -87,11 +88,11 @@ export default function TaskTimeline({
   // Stav pro horní interaktivní scroller pruh
   const [scrollProgress, setScrollProgress] = useState({ left: 0, visibleWidth: 0 });
 
-  const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
+  // "Today" follows the calendar while the page stays open — it used to be computed once on the
+  // first render, so after midnight the line, the highlighted column and the default starts of
+  // the bars were a day off until a reload (code analysis 4, F3-06).
+  const dayKey = useTodayKey();
+  const today = useMemo(() => parsujDen(dayKey), [dayKey]);
 
   const todayKey = fmtDateKey(today);
 

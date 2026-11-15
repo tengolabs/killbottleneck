@@ -97,7 +97,7 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-soubor"][data-druh="presentation"]', 15000), 'karta soubor (prezentace) v chatu');
   const tlacitka = await page.$$eval('[data-testid="chat-soubor"] button', (els) => els.map((e) => e.getAttribute('data-testid')));
   expect(tlacitka.includes('chat-soubor-pptx') && tlacitka.includes('chat-soubor-pdf') && !tlacitka.includes('chat-soubor-docx') && tlacitka.includes('chat-soubor-otevrit'), `karta: Stáhnout PowerPoint + PDF + Otevřít vedle (${tlacitka.join(',')})`);
-  expect(/3 snímků/.test(await page.$eval('[data-testid="chat-soubor"]', (el) => el.innerText)), 'karta ukazuje počet snímků');
+  expect(/3 snímky/.test(await page.$eval('[data-testid="chat-soubor"]', (el) => el.innerText)), 'karta ukazuje počet snímků');
   expect(await cekej('[data-testid="chat-dok-detail"][data-kind="presentation"]', 15000), 'panel Dokumentů se sám otevřel na prezentaci');
   const docId = await page.$eval('[data-testid="chat-dok-detail"]', (el) => el.getAttribute('data-id'));
   expect(await cekejTextDok('Stav pro klienta') && await cekejTextDok('Podtitul'), 'detail ukazuje podtitul z meta');

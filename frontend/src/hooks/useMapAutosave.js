@@ -6,6 +6,7 @@ import { isApexNode as isApexNodeShared } from '@/lib/mapNodes';
 import { cleanMapData as cleanMap } from '@/lib/cleanMap';
 import { trojcestnyMerge, stableJson } from '@/lib/mergeMap';
 import { createProjectRecord } from '@/lib/createProject';
+import { isDesktopShell } from '@/lib/shell';
 
 // Ukládání mapy (F1-07, krok 13, doména AUTOSAVE): stav konfliktu a pruhu
 // cizí změny, ZÁKLADNA tříčestného merge (serverNodes/Edges/Title/Color,
@@ -22,10 +23,33 @@ import { createProjectRecord } from '@/lib/createProject';
 // (13 zapisovatelů ve 4 doménách), `nodesNow/edgesNow` (čtou je dřívější
 // hooky) a `mapRulesNow` (plní useMapRules níž) jsou refy editoru a přicházejí
 // jako vstup; hook je jen plní/čte.
+// What went wrong with a save, for the "not saved" banner. No status = the request never got an
+// answer (connection down, server unreachable).
+export function saveFailure(e) {
+  const status = Number(e?.status) || 0;
+  const message = status ? String(e?.response?.message || e?.message || '') : '';
+  if (!status) return { kind: 'offline', status, message: '' };
+  if (status >= 500 || status === 408 || status === 429) return { kind: 'server', status, message };
+  return { kind: 'rejected', status, message };
+}
+// A request sent with `keepalive` is finished by the browser even after the page is gone, but all
+// such requests of a page may carry 64 KiB of body together — a bigger one is refused outright.
+// Maps under the limit go with keepalive; a bigger map goes as an ordinary request (it leaves at
+// once, on `visibilitychange`/`pagehide`, and usually reaches the server, but the browser may cut
+// it) and relies on the `beforeunload` warning, during which the save gets through.
+const KEEPALIVE_LIMIT = 60000;
+const sendOptions = (opts, payload) => {
+  if (!opts || !opts.keepalive) return undefined;
+  try { return new Blob([JSON.stringify(payload)]).size <= KEEPALIVE_LIMIT ? { keepalive: true } : undefined; } catch { return undefined; }
+};
+
+// Pause before the next automatic attempt: 3 s, 6 s, 12 s, 24 s, then every 30 s.
+const retryDelay = (n) => Math.min(30000, 3000 * 2 ** Math.min(n, 4));
+
 export function useMapAutosave({
   mapId, activeMapId, setActiveMapId, isDraft, canEdit, isPublicView, isTemplatePreview,
   nodes, edges, title, color, setNodes, setEdges, setTitle, setColor,
-  nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t,
+  nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t, noteForeign,
 }) {
   const [conflict, setConflict] = useState(false); // B3: mapa změněna z jiného místa
   // Hlídání na pozadí zjistilo cizí změnu DŘÍV, než uživatel začal psát.
@@ -46,6 +70,47 @@ export function useMapAutosave({
   // pak se porovnání nikdy netrefí a chová se to jako dřív.
   const ulozenyOtisk = useRef(null);
   const [saveStatus, setSaveStatus] = useState('idle');
+  // A failed save stays VISIBLE (code analysis 4, F1-03): until the canvas is in the database
+  // the editor shows "not saved" with the reason. kind: 'offline' (no connection), 'server'
+  // (5xx / overload) — both retried automatically; 'rejected' (the server refused the content,
+  // 4xx) — not retried on its own, the person has to change something.
+  const [saveError, setSaveError] = useState(null);
+  const saveErrorNow = useRef(null);
+  const retryCount = useRef(0);
+  // A retry never calls an old closure of the save (its title / colour may be stale by then): it
+  // bumps this counter, the autosave effect runs again and schedules a fresh save.
+  const [retryTick, setRetryTick] = useState(0);
+  const latestSave = useRef(null); // the save the effect scheduled last — only that one may re-register itself
+  const scheduleRetry = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => setRetryTick((n) => n + 1), Math.max(0, retryDelay(retryCount.current++) - 1200));
+  };
+  const unmounted = useRef(false);
+  useEffect(() => { unmounted.current = false; return () => { unmounted.current = true; }; }, []);
+  const failSave = (e, extra) => {
+    const err = { ...saveFailure(e), ...(extra || {}) };
+    saveErrorNow.current = err;
+    setSaveError(err);
+    setSaveStatus('error');
+    return err;
+  };
+  const clearSaveError = () => {
+    retryCount.current = 0;
+    if (!saveErrorNow.current) return;
+    saveErrorNow.current = null;
+    setSaveError(null);
+  };
+  // Leaving the map while the last change could not be stored: the editor (and its banner) is
+  // gone by the time the answer arrives, so the global toast is the only place left to say it.
+  const reportLostOnLeave = (e) => {
+    const err = saveFailure(e);
+    toast({
+      title: t('toasts.leaveUnsaved', { title: hlavickaNow.current.title || t('defaults.newMapTitle') }),
+      description: err.message || t(`saveState.reason.${err.kind}`),
+      variant: 'destructive',
+      duration: 30000,
+    });
+  };
   const pendingSave = useRef(null); // rozpracované uložení k odeslání při odchodu z mapy (F1-04)
   const mapIdNow = useRef(mapId); // mapa, kterou editor PRÁVĚ má — odpověď opožděného flush-PATCHe se pozná
   mapIdNow.current = mapId;
@@ -96,6 +161,7 @@ export function useMapAutosave({
   // základ base_updated pro navazující flush i po přepnutí na jinou mapu.
   const inFlightPromise = useRef(null);
   const saveTimer = useRef(null);
+  const draftWaiting = useRef(false); // a new map is scheduled to be created (not sent yet)
 
   // Aplikace pro Windows (lib/desktopApp.js): před zavřením okna, přepnutím organizace
   // a obnovením stránky rám požádá o okamžité uložení — autosave jinak čeká 1,2 s a úprava
@@ -117,6 +183,70 @@ export function useMapAutosave({
     };
     window.addEventListener('kb-desktop-flush', ulozHned);
     return () => window.removeEventListener('kb-desktop-flush', ulozHned);
+  }, []);
+
+  // A failed save is sent again by the "Try again" button of the banner and when the browser
+  // reports the connection back (`online`) — through the autosave effect (see retryTick).
+  const retrySave = useCallback(() => {
+    if (!saveErrorNow.current || saveInFlight.current) return;
+    setSaveStatus('saving'); // the save itself starts after the autosave pause — show it at once
+    setRetryTick((n) => n + 1);
+  }, []);
+  useEffect(() => {
+    window.addEventListener('online', retrySave);
+    return () => window.removeEventListener('online', retrySave);
+  }, [retrySave]);
+
+  // Closing the tab, reloading or typing another address right after an edit (F1-09): the
+  // autosave waits 1.2 s and its timer dies with the page. The waiting save is therefore sent the
+  // moment the page is being hidden (`visibilitychange` → hidden comes first and is the only
+  // event phones reliably fire, `pagehide` covers the rest) — with `keepalive`, so the browser
+  // finishes it after the page is gone (see KEEPALIVE_LIMIT for bigger maps).
+  // `beforeunload`: the browser asks before leaving only where that flush cannot be relied on (see
+  // onBeforeUnload); the save is started right there, so it is usually done by the time the person
+  // answers. Not in the Windows app — its frame asks for the flush itself (`kb-desktop-flush`
+  // above) and a cancelled `beforeunload` would silently block closing the window there.
+  useEffect(() => {
+    const flushNow = () => {
+      const fn = pendingSave.current;
+      if (!fn) return;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      pendingSave.current = null;
+      fn(true, { keepalive: true });
+    };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flushNow(); };
+    // A scheduled save is not yet unsaved work: the timer also starts after changes that leave the
+    // content as stored (a node measured, a selection) — the fingerprint decides, as in the save.
+    // → { dirty, big }: big = the map does not fit a keepalive request (see KEEPALIVE_LIMIT)
+    const unsavedState = () => {
+      try {
+        const { cleanNodes, cleanEdges } = cleanMapData();
+        const { title: tt, color: cc } = hlavickaNow.current;
+        const now = stableJson({ title: tt, color: cc, nodes: cleanNodes, edges: cleanEdges });
+        return { dirty: now !== ulozenyOtisk.current, big: new Blob([now]).size > KEEPALIVE_LIMIT };
+      } catch { return { dirty: true, big: true }; }
+    };
+    const onBeforeUnload = (e) => {
+      // The browser asks only where the silent flush is not enough (Richard, 12 Nov 2026): the
+      // save failed, a new map is not created yet (creating cannot be hurried through keepalive),
+      // an ordinary request is on its way (it dies with the page) or the map is too big for
+      // keepalive. A small map with a save merely waiting leaves without a question — the flush
+      // below sends it and the browser finishes it.
+      const st = (pendingSave.current || saveInFlight.current) ? unsavedState() : { dirty: false, big: false };
+      const unsaved = !!saveErrorNow.current || draftWaiting.current || (st.dirty && (saveInFlight.current || st.big));
+      flushNow();
+      if (!unsaved || isDesktopShell()) return;
+      e.preventDefault();
+      e.returnValue = ''; // older browsers show the question only with returnValue set
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flushNow);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flushNow);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
   }, []);
 
   // latest-ref vzor: přiřazení při KAŽDÉM renderu, ať refy nikdy nezaostávají
@@ -141,7 +271,8 @@ export function useMapAutosave({
       if (!hasContent) return;
       setSaveStatus('saving');
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(async () => {
+      const zaloz = async () => {
+        draftWaiting.current = false;
         // F1-01: create už letí → druhé kolo by založilo DRUHÝ projekt. Stačí
         // neodesílat: doběhnutí create posune activeMapId, efekt běží znovu
         // a rozdíl dopsaný během letu odešle běžný PATCH níž (rozhodne otisk).
@@ -159,17 +290,28 @@ export function useMapAutosave({
           // odeslalo, co uživatel dopsal BĚHEM letícího create; prázdné kolo
           // zahodí porovnání otisku (po F1-03 je ulozenyOtisk kanonický).
           window.history.replaceState(null, '', `/map/${newMap.id}`);
+          clearSaveError();
           setSaveStatus('saved');
           setTimeout(() => setSaveStatus('idle'), 2000);
         } catch (e) {
           console.error(e);
-          setSaveStatus('idle');
+          if (unmounted.current) { reportLostOnLeave(e); return; }
+          // the map does not exist yet → say so and (connection / server trouble) try again
+          // Creating is not idempotent: after a server error the map may exist already and a retry
+          // would make a second one. Only a request with no answer at all (connection down) is
+          // sent again on its own; otherwise the banner offers the button (`manual`).
+          const err = failSave(e, saveFailure(e).kind === 'server' ? { manual: true } : null);
+          if (err.kind === 'offline' && latestSave.current === zaloz) scheduleRetry();
         } finally {
           saveInFlight.current = false;
           dolet(null); // create nenese base_updated pro navazující PATCH
         }
-      }, 1200);
+      };
+      latestSave.current = zaloz;
+      draftWaiting.current = true;
+      saveTimer.current = setTimeout(zaloz, 1200);
       return () => {
+        draftWaiting.current = false;
         if (saveTimer.current) clearTimeout(saveTimer.current);
       };
     }
@@ -180,7 +322,32 @@ export function useMapAutosave({
     // „Ukládání…" a zhasla — a tooltip i návod přitom slibují, že se do mapy
     // nic nezapisuje. Uživatel viděl opak toho, co mu říkáme (panel 13. 8.).
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    const odesli = async (flush = false) => {
+    const odesli = async (flush = false, opts = null) => {
+      // B3: somebody else changed the map meanwhile (409) — one handling for the regular save and
+      // for the flush that waited for a save in flight (that path used to show "not saved" instead).
+      const onConflict = async () => {
+        // Automatizace doběhla a označila uzel za hotový → mapa se posunula pod
+        // rukama. Tvrdý dotaz „načíst znovu?" by tady znamenal ztrátu rozepsané
+        // změny, a to zrovna ve scénáři, kvůli kterému se automatizace zavádějí.
+        // Když se cizí zásah s mojí prací nepotkal, slijeme ho tiše.
+        if (await slitCiziZmenu()) {
+          // Rozepsanou práci odešle autosave, který slití samo vyvolá. Když
+          // ale nezůstalo nic k odeslání, nikdo už lištu nepřepne a zůstala by
+          // svítit na „Ukládání…".
+          if (skipNextSave.current) {
+            // nothing left to send (e.g. the earlier request was stored and only its answer got
+            // lost) → the "not saved" banner must go with it, no retry is scheduled any more
+            clearSaveError();
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus('idle'), 2000);
+          }
+          return;
+        }
+        clearSaveError(); // the conflict dialog takes over
+        setConflict(true);
+        setSaveStatus('idle');
+        return;
+      };
       // F1-01: vlastní PATCH ještě letí — druhé kolo se STARÝM base_updated by
       // skončilo 409 a dialogem konfliktu kvůli MÉMU uložení. Přeplánovat na
       // chvíli po doběhnutí; odešle se AKTUÁLNÍ stav (cleanMapData čte refy)
@@ -211,13 +378,14 @@ export function useMapAutosave({
         try {
           setSaveStatus('saving');
           saveInFlight.current = true;
-          const updated = await base44.entities.GoalMap.update(activeMapId, {
+          const telo = {
             ...snimek,
             // Po přechodu na jinou mapu už baseUpdated patří TÉ NOVÉ (load-efekt
             // volá zapamatujServer) — správný základ nese odpověď právě
             // doběhlého PATCHe. Když nedoběhl úspěšně, zbývá baseUpdated.
             base_updated: dobehlo || baseUpdated.current,
-          });
+          };
+          const updated = await base44.entities.GoalMap.update(activeMapId, telo, sendOptions(opts, telo));
           if (mapIdNow.current !== mapId) return; // pozdní odpověď po přepnutí mapy — základnu nové mapy nepřepisovat
           zapamatujServer({
             updated_date: updated.updated_date,
@@ -225,6 +393,7 @@ export function useMapAutosave({
             nodes: updated.nodes || snimek.nodes, edges: updated.edges || snimek.edges,
           });
           ulozenyOtisk.current = otisk;
+          clearSaveError();
           setSaveStatus('saved');
           setTimeout(() => setSaveStatus('idle'), 2000);
         } catch (e) {
@@ -232,7 +401,17 @@ export function useMapAutosave({
           // smysl (plátno patří jiné mapě / nikomu). Jen ohlásit — dřív se tahle
           // úprava ztrácela VŽDY a potichu.
           console.error('flush při odchodu selhal', e?.status, e?.message);
-          if (mapIdNow.current === mapId) setSaveStatus('idle');
+          if (unmounted.current) reportLostOnLeave(e);
+          else if (mapIdNow.current === mapId && e?.status === 409) await onConflict();
+          else if (mapIdNow.current === mapId) {
+            // the editor is still open (flush asked for by the Windows app / a new process step):
+            // same visible state and retry as a failed autosave
+            const err = failSave(e);
+            if (latestSave.current === odesli) {
+              pendingSave.current = odesli;
+              if (err.kind !== 'rejected') scheduleRetry();
+            }
+          }
         } finally {
           saveInFlight.current = false;
         }
@@ -252,17 +431,23 @@ export function useMapAutosave({
         // Porovnává se kanonický tvar (`stableJson` srovnává pořadí klíčů
         // i prázdné hodnoty), takže se zahodí JEN opravdu prázdný zápis.
         const otisk = stableJson({ title, color, nodes: cleanNodes, edges: cleanEdges });
-        if (otisk === ulozenyOtisk.current) return;   // nic se nemění → ani indikátor
+        if (otisk === ulozenyOtisk.current) {   // nic se nemění → ani indikátor
+          // …unless a failed save is still shown: the canvas is back at what the database
+          // holds (the person undid the refused change), so there is nothing unsaved any more
+          if (saveErrorNow.current) { clearSaveError(); setSaveStatus('idle'); }
+          return;
+        }
         setSaveStatus('saving');
         saveInFlight.current = true;
         inFlightPromise.current = new Promise((res) => { dolet = res; });
-        const updated = await base44.entities.GoalMap.update(activeMapId, {
+        const telo = {
           title,
           color,
           nodes: cleanNodes,
           edges: cleanEdges,
           base_updated: baseUpdated.current, // B3: verze, ze které vycházíme
-        });
+        };
+        const updated = await base44.entities.GoalMap.update(activeMapId, telo, sendOptions(opts, telo));
         // razítko pro navazující flush — MUSÍ se vzít před guardem níž, právě
         // kvůli přechodu na jinou mapu (flush pak nemá jiný správný základ)
         doletBase = updated.updated_date || null;
@@ -279,6 +464,7 @@ export function useMapAutosave({
         // o vlásek lišila od naší, porovnání „nic se nemění" by se nikdy
         // netrefilo a autosave by se točil dokola
         ulozenyOtisk.current = otisk;
+        clearSaveError();
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
         // AUTOMATIZAČNÍ PRAVIDLA běží UVNITŘ PATCHe, ale AŽ PO uložení — jejich
@@ -288,6 +474,7 @@ export function useMapAutosave({
         // „změnil jsem na Probíhá a nic se nerozjelo" — set_owner přitom
         // na serveru proběhl, jen zůstal neviditelný.) Levná kontrola verze
         // se dělá JEN když má mapa zapnutá pravidla.
+        if (unmounted.current) return; // saved on the way out — nobody is left to show the rules' follow-up to
         if ((mapRulesNow.current || []).some((rl) => rl && rl.enabled)) {
           const ver = await base44.entities.GoalMap.get(activeMapId, { fields: 'updated' });
           if (ver?.updated_date && ver.updated_date !== updated.updated_date) {
@@ -306,40 +493,36 @@ export function useMapAutosave({
           }
         }
       } catch (e) {
+        // the editor of this map is gone (left for another page / another map): nothing to merge
+        // or retry over, but the person must learn that the last change did not get through
+        if (unmounted.current) { console.error(e); reportLostOnLeave(e); return; }
         if (mapIdNow.current !== mapId) { console.error(e); return; } // odpověď staré mapy po přechodu — nic nad novou neřešit
         // B3: cizí klient mezitím mapu změnil → nabídnout přenačtení místo přepsání
-        if (e?.status === 409) {
-          // Automatizace doběhla a označila uzel za hotový → mapa se posunula pod
-          // rukama. Tvrdý dotaz „načíst znovu?" by tady znamenal ztrátu rozepsané
-          // změny, a to zrovna ve scénáři, kvůli kterému se automatizace zavádějí.
-          // Když se cizí zásah s mojí prací nepotkal, slijeme ho tiše.
-          if (await slitCiziZmenu()) {
-            // Rozepsanou práci odešle autosave, který slití samo vyvolá. Když
-            // ale nezůstalo nic k odeslání, nikdo už lištu nepřepne a zůstala by
-            // svítit na „Ukládání…".
-            if (skipNextSave.current) {
-              setSaveStatus('saved');
-              setTimeout(() => setSaveStatus('idle'), 2000);
-            }
-            return;
-          }
-          setConflict(true);
-          setSaveStatus('idle');
-          return;
-        }
+        if (e?.status === 409) { await onConflict(); return; }
         console.error(e);
-        setSaveStatus('idle');
+        // F1-03: say it and keep it visible. The canvas still differs from the database, so the
+        // unsent state stays registered for the flush on leaving (pendingSave) and — when the
+        // cause can pass on its own (connection, server error) — is sent again after a pause
+        // and as soon as the browser reports the connection back.
+        // (Only the save scheduled last registers itself: when the person edited during the
+        // failed request, a newer save is already waiting and will carry everything.)
+        const err = failSave(e);
+        if (latestSave.current === odesli) {
+          pendingSave.current = odesli;
+          if (err.kind !== 'rejected') scheduleRetry();
+        }
       } finally {
         saveInFlight.current = false;
         if (dolet) dolet(doletBase); // čekající flush smí vyrazit (s razítkem úspěšného zápisu)
       }
     };
     pendingSave.current = odesli;
+    latestSave.current = odesli;
     saveTimer.current = setTimeout(() => { pendingSave.current = null; odesli(); }, 1200);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [nodes, edges, title, color, isDraft, activeMapId, canEdit, isPublicView, isTemplatePreview]);
+  }, [nodes, edges, title, color, isDraft, activeMapId, canEdit, isPublicView, isTemplatePreview, retryTick]);
 
   // Nasazení sloučeného stavu na plátno.
   // ⚠️ SLÉVAT, ne vyměnit vše: velkoplošná výměna objektů brala uzlům interní
@@ -497,6 +680,8 @@ export function useMapAutosave({
       if (r.title !== pred.title) setTitle(r.title);
       if (r.color !== pred.color) setColor(r.color);
       nasadNaPlatno(r.nodes, r.edges);
+      // Undo must not take back a step over what somebody else changed meanwhile (F1-02)
+      if (noteForeign && r.prevzateUzly && r.prevzateUzly.length) noteForeign(r.prevzateUzly);
       // Mám-li nad rámec serveru vlastní rozepsanou práci, autosave ji MUSÍ
       // odeslat; jinak by převzetí spustilo jen prázdné kolo ukládání.
       // (Efekty běží až po tomhle bloku, takže pořadí sedí.)
@@ -545,6 +730,7 @@ export function useMapAutosave({
       });
       doletBase = updated.updated_date || null;
       zapamatujServer({ updated_date: updated.updated_date, title, color, nodes: cleanNodes, edges: cleanEdges });
+      clearSaveError();
       setConflict(false);
       setRemoteChanged(false);
       setSaveStatus('saved');
@@ -594,7 +780,9 @@ export function useMapAutosave({
   }, [activeMapId, isDraft, isPublicView, isTemplatePreview, canEdit, conflict, remoteChanged, slitCiziZmenu]);
 
   return {
-    conflict, remoteChanged, saveStatus, baseUpdated, zapamatujServer, zrcadliStavDoZakladny,
+    conflict, remoteChanged, saveError, retrySave,
+    // a failed save outlives the 2 s "saved" timer of an earlier one — the indicator follows the error
+    saveStatus: saveError ? (saveStatus === 'saving' ? 'saving' : 'error') : (saveStatus === 'error' ? 'idle' : saveStatus), baseUpdated, zapamatujServer, zrcadliStavDoZakladny,
     saveTimer, pendingSave, nasadNaPlatno, handleKeepMine,
   };
 }

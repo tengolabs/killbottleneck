@@ -26,6 +26,70 @@ export function tmava(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.6;
 }
 
+// ---- characters the embedded font cannot draw (code analysis 4, F2-06) ----
+// KB Sans is a Latin subset on purpose. pdf-lib writes a character outside it as an empty
+// glyph and reports nothing, so "A → B" came out as "A   B" and a name in Cyrillic as blank
+// space. Before drawing: common symbols are rewritten with what the font has, emoji and
+// invisible marks are left out (with the one space after them), anything else becomes "?"
+// — a visible sign that something is missing. Text inside the font is returned unchanged.
+const SUBSTITUTES = {
+  '→': '->', '←': '<-', '↔': '<->', '⇒': '=>', '⇐': '<=', '⇔': '<=>', '➜': '->', '➔': '->', '➡': '->', '⬅': '<-',
+  '≥': '>=', '≤': '<=', '≠': '!=', '≈': '~', '∞': 'inf', '√': 'sqrt',
+  '✓': '[x]', '✔': '[x]', '✅': '[x]', '☑': '[x]', '☐': '[ ]', '❌': '×', '✗': '×', '✘': '×', '❎': '×',
+  '★': '*', '☆': '*', '⭐': '*', '■': '•', '□': '•', '▪': '•', '▫': '•', '●': '•', '○': '•', '◦': '•', '►': '>', '▶': '>', '◄': '<', '◀': '<',
+  '⚠': '(!)', 'ℹ': '(i)', '№': 'No.', '\t': ' ', '\u2011': '-', '\u2010': '-', '\u2212': '-',
+  '\u2009': ' ', '\u200a': ' ', '\u2002': ' ', '\u2003': ' ', '\u2007': ' ', '\u202f': ' ', '\u00a0': ' ',
+};
+// left out without a trace: emoji with their modifiers (and the one space that followed them), zero-width marks, CR
+const PICTOGRAPH = /\p{Extended_Pictographic}/u;
+const isEmoji = (ch, cp) => PICTOGRAPH.test(ch) || (cp >= 0x1f1e6 && cp <= 0x1f1ff) || (cp >= 0x1f3fb && cp <= 0x1f3ff); // + flag letters, skin tones
+// zero-width and direction marks, variation selectors, keycap, BOM, CR, emoji tag letters
+const INVISIBLE_POINTS = new Set([0x200b, 0x200c, 0x200d, 0x200e, 0x200f, 0x2060, 0xfe0e, 0xfe0f, 0x20e3, 0xfeff, 0x0d]);
+const isInvisible = (cp) => INVISIBLE_POINTS.has(cp) || (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069) || (cp >= 0xe0020 && cp <= 0xe007f);
+const charSets = new WeakMap();
+function charSetOf(font) {
+  let set = charSets.get(font);
+  if (!set) { set = new Set(font.getCharacterSet()); charSets.set(font, set); }
+  return set;
+}
+export function drawableText(text, font) {
+  const src = String(text == null ? '' : text);
+  if (/^[\x20-\x7e\n]*$/.test(src) || !font || !font.getCharacterSet) return src;
+  const set = charSetOf(font);
+  const lines = [];
+  for (const line of src.normalize('NFC').split('\n')) {
+    let out = ''; let emoji = false;
+    for (const ch of line) {
+      const cp = ch.codePointAt(0);
+      if (isInvisible(cp)) continue;
+      if (set.has(cp)) out += ch;
+      else if (SUBSTITUTES[ch] !== undefined) out += SUBSTITUTES[ch];
+      else if (isEmoji(ch, cp)) emoji = true;
+      else out += '?';
+    }
+    if (emoji) {
+      // the spaces that stood around the emoji go with it: "A 🎯 B" → "A B", "Done 🎉" → "Done";
+      // the indentation of the line stays
+      const indent = /^ */.exec(line)[0];
+      out = indent + out.replace(/^ +/, '').replace(/ {2,}/g, ' ').replace(/ +$/, '');
+      // a line that was nothing but emoji (also behind a list or heading mark: "# 🎯") is left
+      // out, so that no empty heading or bullet is drawn
+      if (src.includes('\n') && /^\s*([#>*•-]+)?\s*$/.test(out)) continue;
+    }
+    lines.push(out);
+  }
+  return lines.join('\n');
+}
+// the same for every string inside plain data (invoice DTO, document, outline); other values pass through
+export function drawableData(value, font) {
+  if (typeof value === 'string') return drawableText(value, font);
+  if (Array.isArray(value)) return value.map((v) => drawableData(v, font));
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, drawableData(v, font)]));
+  }
+  return value;
+}
+
 export function zalom(text, font, size, sirka) {
   const out = [];
   for (const odst of String(text || '').split('\n')) {

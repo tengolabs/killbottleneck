@@ -142,7 +142,9 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
     return next;
   });
 
-  const sortBy = (key) => setSort((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }));
+  // ascending → descending → back to the order of the map (the third click on the same header)
+  const sortBy = (key) => setSort((s) => (s.key !== key ? { key, dir: 'asc' }
+    : s.dir === 'asc' ? { key, dir: 'desc' } : { key: 'created_date', dir: 'desc' }));
 
   // cache popisků pro řazení (plní se líně, resetuje se změnou members)
   const labelCacheMap = useMemo(() => new Map(), [members]);
@@ -160,8 +162,8 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
       case 'status': return dir * ((STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0));
       // řadí se podle zobrazeného JMÉNA (externí kontakt by se jinak řadil podle
       // pseudo-e-mailu); labely předpočítané — find v komparátoru byl O(n·log n·m)
-      case 'assignee': return dir * (labelCache(a.assignee_email) || '￿').localeCompare(labelCache(b.assignee_email) || '￿');
-      case 'deadline': return dir * ((a.deadline || '9999') < (b.deadline || '9999') ? -1 : a.deadline === b.deadline ? 0 : 1);
+      case 'assignee': return dir * compareLocale(labelCache(a.assignee_email) || '￿', labelCache(b.assignee_email) || '￿');
+      case 'deadline': return dir * (a.deadline || '9999').localeCompare(b.deadline || '9999');
       default: return dir * ((a.created_date || '') < (b.created_date || '') ? -1 : 1);
     }
   };
@@ -177,13 +179,20 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
       if (!b) return -1;
       return compareLocale(mapById[a]?.title || '', mapById[b]?.title || '');
     });
+    // Node rows ARE the table since "a node is a task" — the clickable headers sorted only the
+    // residual `tasks` records, so a click turned the arrow and nothing else (code analysis 4,
+    // F3-03). Siblings are sorted on every level of the outline (a child stays under its
+    // parent); until a header is clicked the order of the map is kept. Copies only — the trees
+    // belong to the hook.
+    const sortNodes = (list) => (sort.key === 'created_date' ? list
+      : [...list].sort(cmp).map((n) => ({ ...n, children: sortNodes(n.children || []) })));
     return keys.map((k) => ({
       mapId: k,
       map: mapById[k],
-      tasks: groups[k].tasks.sort(cmp),
-      nodeRoots: groups[k].nodeRoots,
+      tasks: [...groups[k].tasks].sort(cmp),
+      nodeRoots: sortNodes(groups[k].nodeRoots),
     }));
-  }, [tasks, nodeTrees, mapById, sort]);
+  }, [tasks, nodeTrees, mapById, sort, members]);
 
   // Handlery a sdílená data pro řádky (F3-07) — dřív 18 props prodrátovaných
   // přes NodeItemRow/TaskRow/BufferRow. Obal onCycle (cycleStatus) je tentýž,
@@ -312,7 +321,7 @@ export default function TaskTable({ tasks, byParent, maps, members = [], nodeTre
                     nodeLabel={nodeLabel(task)}
                     canDelete={task.created_by === meEmail || mapById[task.map_id]?.created_by === meEmail}
                   />
-                  {expanded.has(task.id) && (byParent[task.id] || []).sort(cmp).map((s) => (
+                  {expanded.has(task.id) && [...(byParent[task.id] || [])].sort(cmp).map((s) => (
                     <TaskRow
                       key={s.id}
                       task={s}

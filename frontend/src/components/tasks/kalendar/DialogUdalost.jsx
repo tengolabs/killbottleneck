@@ -219,7 +219,7 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
             <Ikona className="w-4 h-4 text-primary" /> {udalost?.id ? (mine ? t('udalost.titulekUprava') : t('udalost.titulekDetail')) : t('udalost.titulekNova')}
           </DialogTitle>
           <DialogDescription>
-            {mine ? (kal ? t('udalost.popisSdilena', { name: kal.name }) : t('udalost.popis')) : (kal ? t('udalost.popisSdilenaCteni', { who: udalost?.owner_email || '', name: kal.name }) : t('udalost.popisPozvany', { who: udalost?.owner_email || '' }))}
+            {mine ? (kal ? t('udalost.popisSdilena', { name: kal.name }) : t('udalost.popis')) : (kal ? t('udalost.popisSdilenaCteni', { who: udalost?.owner_email || (udalost?.owner_former ? t('udalost.byvalyClen') : ''), name: kal.name }) : t('udalost.popisPozvany', { who: udalost?.owner_email || (udalost?.owner_former ? t('udalost.byvalyClen') : '') }))}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

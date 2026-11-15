@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { base44 } from '@/api/base44Client';
+import { listAllPages } from '@/lib/listAll';
 
 // druh → pole formuláře (pořadí = pořadí na obrazovce). `n` = povinné; chips = volby z i18n `volby.<pole>`
 const POLE = {
@@ -48,7 +49,8 @@ export default function NovyDokument({ druh, mapId, onOdeslat, onZpet }) {
   const [mapa, setMapa] = useState(mapaZAdresy);
   useEffect(() => {
     let zivy = true;
-    base44.entities.GoalMap.list('-updated_date', 50)
+    // every live project, titles only (the list used to be the 50 most recently changed maps, archived included)
+    listAllPages(base44.entities.GoalMap, '-updated_date,id', 200, { rawFilter: 'archived != true', fields: 'id,title,archived,kind' })
       .then((rows) => { if (!zivy) return; const m = (rows || []).filter((x) => !x.archived && x.kind !== 'org'); setMapy(m); }) // mimo /map/:id nic nepředvybírat — u pozvánky by „Vycházej z projektu…“ šlo do zprávy omylem (/checkup 2. 11. 2026)
       .catch(() => { if (zivy) setMapy([]); });
     return () => { zivy = false; };

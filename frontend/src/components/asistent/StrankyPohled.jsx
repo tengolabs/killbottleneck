@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { pb } from '@/api/pb';
 import { base44 } from '@/api/base44Client';
+import { listAllPages } from '@/lib/listAll';
 import { getMembers } from '@/api/kb';
 import { useAuth } from '@/lib/AuthContext';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -181,7 +182,7 @@ export function SeznamStranek({ verze, onOtevri, onNova, skupina, setSkupina, q,
               <span className="text-[11px] text-muted-foreground shrink-0">{datum(s.updated, i18n.language)}</span>
             </div>
             <p className="text-xs text-muted-foreground truncate mt-0.5 pl-6">
-              {s.mine ? t(`state.${s.stav}`) : t('by', { name: s.owner_name || '—' })}{s.stav === 'hotovo' && s.size_kb ? ` · ${t('size', { kb: s.size_kb })}` : ''}
+              {s.mine ? t(`state.${s.stav}`) : t('by', { name: s.owner_former ? t('formerMember') : (s.owner_name || '—') })}{s.stav === 'hotovo' && s.size_kb ? ` · ${t('size', { kb: s.size_kb })}` : ''}
             </p>
           </button>
         ))}
@@ -308,7 +309,7 @@ export function DetailStranky({ id, verze, zmenene, onZpet, onSmazano }) {
       <div className="px-3 pt-2 pb-1.5 space-y-1 shrink-0">
         <h2 className="text-sm font-semibold break-words leading-tight" data-testid="chat-str-titulek">{str.title}</h2>
         <p className="text-[11px] text-muted-foreground">
-          {str.mine ? t(`state.${str.stav}`) : t('by', { name: str.owner_name || '—' })} · {datum(str.updated, i18n.language)}{str.stav === 'hotovo' && str.size_kb ? ` · ${t('size', { kb: str.size_kb })}` : ''}
+          {str.mine ? t(`state.${str.stav}`) : t('by', { name: str.owner_former ? t('formerMember') : (str.owner_name || '—') })} · {datum(str.updated, i18n.language)}{str.stav === 'hotovo' && str.size_kb ? ` · ${t('size', { kb: str.size_kb })}` : ''}
         </p>
         {pise && (
           <div className="rounded-md border border-primary/50 bg-primary/5 px-2.5 py-1.5 text-xs space-y-1.5" data-testid="chat-str-pise">
@@ -395,7 +396,8 @@ export function NovaStranka({ sablona, mapId, onOdeslat, onZpet }) {
   const [doplneni, setDoplneni] = useState('');
   useEffect(() => {
     let zivy = true;
-    base44.entities.GoalMap.list('-updated_date', 50)
+    // every live project, titles only (the list used to be the 50 most recently changed maps, archived included)
+    listAllPages(base44.entities.GoalMap, '-updated_date,id', 200, { rawFilter: 'archived != true', fields: 'id,title,archived,kind' })
       .then((rows) => { if (!zivy) return; const m = (rows || []).filter((x) => !x.archived && x.kind !== 'org'); setMapy(m); setMapa((p) => p || (m[0] && m[0].id) || ''); })
       .catch(() => { if (zivy) setMapy([]); });
     return () => { zivy = false; };

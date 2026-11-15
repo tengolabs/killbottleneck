@@ -11,6 +11,10 @@ export async function qrMatice(text, { oprava = 'M' } = {}) {
 }
 // varianta s injektovanou knihovnou (node test bez bundleru)
 export function qrMaticeZ(qrcode, text, oprava = 'M') {
+  // Bytes are UTF-8: the library's default is `charCode & 0xff`, which mangled every letter
+  // outside Latin-1 (EPC payment code: the supplier's name, while its header says UTF-8;
+  // code analysis 4, F2-04). ASCII gives the same bytes as before.
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
   const qr = qrcode(0, oprava); // 0 = typ (velikost) automaticky podle délky
   qr.addData(String(text || ''), 'Byte');
   qr.make();

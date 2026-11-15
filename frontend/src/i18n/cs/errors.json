@@ -3,6 +3,13 @@
     "notLoggedIn": "Nepřihlášen",
     "refreshFailed": "Ověření přihlášení selhalo",
     "invalidCredentials": "Neplatný email nebo heslo",
-    "googleFailed": "Přihlášení přes Google se nezdařilo"
+    "googleFailed": "Přihlášení přes Google se nezdařilo",
+    "serverUnreachable": "Server neodpovídá. Zkontrolujte připojení a zkuste to znovu.",
+    "loginFailed": "Přihlášení se nezdařilo. Zkuste to znovu.",
+    "emailTaken": "Účet s tímto e-mailem už existuje. Přihlaste se, nebo si nechte obnovit heslo.",
+    "passwordRefused": "Toto heslo nejde použít. Zvolte jiné, alespoň 8 znaků.",
+    "registerRefused": "Účet se nepodařilo vytvořit. Účet s tímto e-mailem možná už existuje — zkuste se přihlásit nebo si obnovit heslo.",
+    "registerFailed": "Registrace selhala. Zkuste to znovu.",
+    "sessionEnded": "Přihlášení přestalo platit. Přihlaste se prosím znovu."
   }
 }

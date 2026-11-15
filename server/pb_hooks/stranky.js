@@ -119,22 +119,20 @@ function lideDto(app, rec) {
 }
 // Jmenovité sdílení: pridat / odebrat člena (id nebo e-mail účtu na této instanci; sebe ne)
 function sdilejS(app, userId, id, akce, clen) {
-  const rec = najdi(app, userId, id);
-  if (!rec) throw chybaS(404, "err.pageNotFound");
-  const ref = String(clen || "").trim();
-  let u = null;
-  if (ref) {
-    try { u = ref.indexOf("@") >= 0 ? app.findAuthRecordByEmail("users", ref.toLowerCase()) : app.findRecordById("users", ref); } catch (err) { u = null; }
-  }
-  if (!u) throw chybaS(400, "err.pageUserNotFound");
-  if (u.id === userId) throw chybaS(400, "err.pageShareSelf");
-  const ids = lideIds(rec).filter((x) => x !== u.id);
-  const a = String(akce || "");
-  if (a === "pridat") ids.push(u.id);
-  else if (a !== "odebrat") throw chybaS(400, "err.pageBadAction");
-  rec.set("shared_with", ids);
-  app.save(rec);
-  return rec;
+  return zmen(app, userId, id, (rec, tx) => {
+    const ref = String(clen || "").trim();
+    let u = null;
+    if (ref) {
+      try { u = ref.indexOf("@") >= 0 ? tx.findAuthRecordByEmail("users", ref.toLowerCase()) : tx.findRecordById("users", ref); } catch (err) { u = null; }
+    }
+    if (!u) throw chybaS(400, "err.pageUserNotFound");
+    if (u.id === userId) throw chybaS(400, "err.pageShareSelf");
+    const ids = lideIds(rec).filter((x) => x !== u.id);
+    const a = String(akce || "");
+    if (a === "pridat") ids.push(u.id);
+    else if (a !== "odebrat") throw chybaS(400, "err.pageBadAction");
+    rec.set("shared_with", ids);
+  });
 }
 // jméno autora u týmových stránek (jen `name`, ne e-mail)
 function sAutory(app, dtos) {
@@ -142,9 +140,11 @@ function sAutory(app, dtos) {
   for (const d of dtos) {
     if (d.mine) continue;
     if (!(d.owner in jmena)) {
-      try { jmena[d.owner] = String(app.findRecordById("users", d.owner).getString("name") || "").trim(); } catch (err) { jmena[d.owner] = ""; }
+      // null = the author's account was deleted (a shared page stays — decision 11 Nov 2026)
+      try { jmena[d.owner] = String(app.findRecordById("users", d.owner).getString("name") || "").trim(); } catch (err) { jmena[d.owner] = null; }
     }
-    d.owner_name = jmena[d.owner];
+    d.owner_name = jmena[d.owner] || "";
+    if (jmena[d.owner] === null) d.owner_former = true; // the client shows "former member"
   }
   for (const d of dtos) delete d.owner;
   return dtos;
@@ -157,6 +157,29 @@ function najdiZaznam(app, id) {
 function najdi(app, userId, id) {
   const rec = najdiZaznam(app, id);
   return rec && rec.getString("user") === userId ? rec : null;
+}
+// ONE atomic "read the current record → change → save" (code analysis 4, finding S6-01).
+// A save writes the WHOLE record, so whoever keeps a record object across other people's
+// writes puts their old values back: the page writer (minutes of work) used to revive a
+// cancelled public link, the old title and the team visibility; a share toggle could in
+// turn overwrite the writer's result. Every writer of ai_pages goes through here: the
+// record is re-read inside a write transaction (writes are serialized) and `fn(rec, tx)`
+// sets only its own fields. A missing / foreign page → 404; an error thrown by `fn`
+// (chybaS) passes through unchanged and nothing is saved.
+function zmen(app, userId, id, fn) {
+  let out = null, chyba = null;
+  try {
+    app.runInTransaction((tx) => {
+      const rec = najdi(tx, userId, id);
+      if (!rec) { chyba = chybaS(404, "err.pageNotFound"); throw new Error("page not found"); }
+      try { fn(rec, tx); } catch (err) { chyba = err; throw err; }
+      tx.save(rec);
+      out = rec;
+    });
+  } catch (err) {
+    throw chyba || err;
+  }
+  return out;
 }
 // vlastník vidí vše; člen týmu / jmenovitě nasdílený jen stránky, které už mají HTML — i během přepisu (stav ceka/pise/chyba
 // se starým html) platí poslední hotová verze, jako mapa při úpravě (/checkup 25. 10. 2026: odkaz dřív na minuty zhasl)
@@ -237,74 +260,60 @@ function zaloz(app, userId, data, opt) {
 // Asistent chce stránku přepsat: pokyny do `zadani`, stav „ceka“ (HTML zůstává jako náhled,
 // writer dostane současné HTML + pokyny a vrátí celý nový dokument)
 function zadejPrepis(app, userId, id, data) {
-  const rec = najdi(app, userId, id);
-  if (!rec) throw chybaS(404, "err.pageNotFound");
-  const d = data || {};
-  const zadani = ocisti(d.zadani, MAX_ZADANI);
-  if (!zadani.trim()) throw chybaS(400, "err.pageNoBrief");
-  if (d.title != null && radek(d.title, MAX_TITLE)) rec.set("title", radek(d.title, MAX_TITLE));
-  rec.set("zadani", zadani);
-  rec.set("stav", "ceka");
-  rec.set("chyba", "");
-  rec.set("prubeh", null);
-  rec.set("rozepsano", "");
-  app.save(rec);
-  return rec;
+  return zmen(app, userId, id, (rec) => {
+    const d = data || {};
+    const zadani = ocisti(d.zadani, MAX_ZADANI);
+    if (!zadani.trim()) throw chybaS(400, "err.pageNoBrief");
+    if (d.title != null && radek(d.title, MAX_TITLE)) rec.set("title", radek(d.title, MAX_TITLE));
+    rec.set("zadani", zadani);
+    rec.set("stav", "ceka");
+    rec.set("chyba", "");
+    rec.set("prubeh", null);
+    rec.set("rozepsano", "");
+  });
 }
 // Nové HTML (writer, v1 API). Předchozí verze se schová („Vrátit“); opt.predchozi="zachovat" =
 // druhý zápis v témž tahu nepřepíše verzi ze začátku tahu (vzor dokumenty.js)
 function ulozHtml(app, userId, id, data, opt) {
   const o = opt || {};
   const d = data || {};
-  const rec = najdi(app, userId, id);
-  if (!rec) throw chybaS(404, "err.pageNotFound");
-  const html = ocisti(d.html, MAX_HTML_POLE + 1);
-  if (!html.trim()) throw chybaS(400, "err.pageNoHtml");
-  overVelikost(html);
-  const stare = rec.getString("html");
-  if (stare && stare !== html && o.predchozi !== "zachovat") {
-    rec.set("predchozi_html", stare);
-    rec.set("predchozi_title", rec.getString("title"));
-  }
-  if (d.title != null && radek(d.title, MAX_TITLE)) rec.set("title", radek(d.title, MAX_TITLE));
-  rec.set("html", html);
-  rec.set("stav", "hotovo");
-  rec.set("chyba", "");
-  rec.set("rozepsano", "");
-  app.save(rec);
-  return rec;
-}
-function nastavStav(app, rec, stav, chyba) {
-  rec.set("stav", STAVY.includes(stav) ? stav : "chyba");
-  rec.set("chyba", radek(chyba || "", 300));
-  app.save(rec);
-  return rec;
+  return zmen(app, userId, id, (rec) => {
+    const html = ocisti(d.html, MAX_HTML_POLE + 1);
+    if (!html.trim()) throw chybaS(400, "err.pageNoHtml");
+    overVelikost(html);
+    const stare = rec.getString("html");
+    if (stare && stare !== html && o.predchozi !== "zachovat") {
+      rec.set("predchozi_html", stare);
+      rec.set("predchozi_title", rec.getString("title"));
+    }
+    if (d.title != null && radek(d.title, MAX_TITLE)) rec.set("title", radek(d.title, MAX_TITLE));
+    rec.set("html", html);
+    rec.set("stav", "hotovo");
+    rec.set("chyba", "");
+    rec.set("rozepsano", "");
+  });
 }
 function prejmenuj(app, userId, id, title) {
-  const rec = najdi(app, userId, id);
-  if (!rec) throw chybaS(404, "err.pageNotFound");
-  const t = radek(title, MAX_TITLE);
-  if (!t) throw chybaS(400, "err.pageNoTitle");
-  rec.set("title", t);
-  app.save(rec);
-  return rec;
+  return zmen(app, userId, id, (rec) => {
+    const t = radek(title, MAX_TITLE);
+    if (!t) throw chybaS(400, "err.pageNoTitle");
+    rec.set("title", t);
+  });
 }
 // „Vrátit předchozí verzi“: prohodí aktuální a předchozí → druhé kliknutí vrátí zpět
 function vratit(app, userId, id) {
-  const rec = najdi(app, userId, id);
-  if (!rec) throw chybaS(404, "err.pageNotFound");
-  if (rec.getString("stav") === "pise" || rec.getString("stav") === "ceka") throw chybaS(409, "err.pageWriting"); // writer by vrácenou verzi hned přepsal
-  const pred = rec.getString("predchozi_html");
-  if (!pred) throw chybaS(400, "err.pageNoPrevious");
-  const ted = rec.getString("html"), tedTitle = rec.getString("title");
-  rec.set("html", pred);
-  rec.set("title", rec.getString("predchozi_title") || tedTitle);
-  rec.set("predchozi_html", ted);
-  rec.set("predchozi_title", tedTitle);
-  rec.set("stav", "hotovo");
-  rec.set("chyba", "");
-  app.save(rec);
-  return rec;
+  return zmen(app, userId, id, (rec) => {
+    if (rec.getString("stav") === "pise" || rec.getString("stav") === "ceka") throw chybaS(409, "err.pageWriting"); // writer by vrácenou verzi hned přepsal
+    const pred = rec.getString("predchozi_html");
+    if (!pred) throw chybaS(400, "err.pageNoPrevious");
+    const ted = rec.getString("html"), tedTitle = rec.getString("title");
+    rec.set("html", pred);
+    rec.set("title", rec.getString("predchozi_title") || tedTitle);
+    rec.set("predchozi_html", ted);
+    rec.set("predchozi_title", tedTitle);
+    rec.set("stav", "hotovo");
+    rec.set("chyba", "");
+  });
 }
 function smazat(app, userId, id) {
   const rec = najdi(app, userId, id);
@@ -313,22 +322,16 @@ function smazat(app, userId, id) {
 }
 // Sdílení odkazem: zapnout (nový token, když ještě není) / vypnout / obnovit (nový token, starý hned neplatí)
 function sdileni(app, userId, id, akce) {
-  const rec = najdi(app, userId, id);
-  if (!rec) throw chybaS(404, "err.pageNotFound");
-  const a = String(akce || "");
-  if (a === "vypnout") rec.set("share_token", "");
-  else if (a === "zapnout" || a === "obnovit") {
-    if (a === "obnovit" || !rec.getString("share_token")) rec.set("share_token", $security.randomStringWithAlphabet(TOKEN_DELKA, TOKEN_ABECEDA));
-  } else throw chybaS(400, "err.pageBadAction");
-  app.save(rec);
-  return rec;
+  return zmen(app, userId, id, (rec) => {
+    const a = String(akce || "");
+    if (a === "vypnout") rec.set("share_token", "");
+    else if (a === "zapnout" || a === "obnovit") {
+      if (a === "obnovit" || !rec.getString("share_token")) rec.set("share_token", $security.randomStringWithAlphabet(TOKEN_DELKA, TOKEN_ABECEDA));
+    } else throw chybaS(400, "err.pageBadAction");
+  });
 }
 function nastavTym(app, userId, id, viditelna) {
-  const rec = najdi(app, userId, id);
-  if (!rec) throw chybaS(404, "err.pageNotFound");
-  rec.set("team_visible", !!viditelna);
-  app.save(rec);
-  return rec;
+  return zmen(app, userId, id, (rec) => { rec.set("team_visible", !!viditelna); });
 }
 // veřejná routa: jen hotové stránky, token přesného tvaru (cokoli jiného = 404 bez dotazu do DB)
 function podleTokenu(app, token) {
@@ -350,7 +353,7 @@ function doplnChat(app, ids, chatId) {
   for (const id of ids || []) {
     try {
       const rec = app.findRecordById("ai_pages", id);
-      if (!rec.getString("chat")) { rec.set("chat", chatId); app.save(rec); }
+      if (!rec.getString("chat")) zmen(app, rec.getString("user"), rec.id, (r) => { if (!r.getString("chat")) r.set("chat", chatId); });
     } catch (err) { /* smazaná mezitím */ }
   }
 }
@@ -360,8 +363,13 @@ function vratitTah(app, zmeny) {
     try {
       const rec = app.findRecordById("ai_pages", z.id);
       if (z.novy) { app.delete(rec); continue; }
-      rec.set("zadani", z.pred.zadani); rec.set("title", z.pred.title); rec.set("stav", z.pred.stav); rec.set("chyba", z.pred.chyba);
-      app.save(rec);
+      // on the CURRENT record, only the fields the discarded turn wrote: a link cancelled or a
+      // page renamed by the person during the turn stays (the title goes back only when it
+      // still is the one the turn set)
+      zmen(app, rec.getString("user"), rec.id, (r) => {
+        r.set("zadani", z.pred.zadani); r.set("stav", z.pred.stav); r.set("chyba", z.pred.chyba);
+        if (z.po && r.getString("title") === z.po.title) r.set("title", z.pred.title);
+      });
     } catch (err) { /* nic k vrácení */ }
   }
 }
@@ -639,7 +647,7 @@ function poRestartu(app) {
     try {
       const { t, userLang } = require(`${__hooks}/i18n.js`);
       let L = userLang(null); try { L = userLang(app.findRecordById("users", rec.getString("user"))); } catch (err) { L = userLang(null); }
-      nastavStav(app, rec, "chyba", t(L, "err.pageInterrupted"));
+      zmen(app, rec.getString("user"), rec.id, (r) => { r.set("stav", "chyba"); r.set("chyba", radek(t(L, "err.pageInterrupted"), 300)); });
     } catch (err) { /* další záznam */ }
   }
   return rows.length;
@@ -700,12 +708,16 @@ function napsat(app, e, body) {
   let doc = "";
   // krok = {k: osnova|kostra|sekce|cela, t: nadpis části, s: ceka|bezi|hotovo|chyba, ms}
   const krok = (k, nazev, id) => { const x = { k: k, t: nazev || "", s: "ceka" }; if (id) x.id = id; kroky.push(x); return x; };
-  const uloz = () => {
-    rec.set("prubeh", { kroky: kroky, od: t0 });
-    rec.set("rozepsano", doc);
-    app.save(rec);
-    store.set(klic, Date.now());
-  };
+  // Progress is written into the CURRENT record and only into the writer's own fields
+  // (finding S6-01): `rec` was loaded at the start and the person may have cancelled the
+  // public link, renamed the page or changed who sees it since. A page deleted meanwhile
+  // throws 404 and ends the writing.
+  const zapis = (stav, chybaTxt) => zmen(app, e.auth.id, rec.id, (r) => {
+    r.set("prubeh", { kroky: kroky, od: t0 });
+    r.set("rozepsano", doc);
+    if (stav) { r.set("stav", STAVY.includes(stav) ? stav : "chyba"); r.set("chyba", radek(chybaTxt || "", 300)); }
+  });
+  const uloz = () => { zapis(); store.set(klic, Date.now()); };
   const zavolej = (system, user, nVolani, krokRec) => {
     const s = {};
     if (Date.now() - t0 > MAX_CELKEM_MS) throw chybaS(504, "err.pageBudget", { min: Math.round(MAX_CELKEM_MS / 60000) });
@@ -727,7 +739,12 @@ function napsat(app, e, body) {
   };
   const hotovKrok = (k) => { k.s = "hotovo"; };
   const nPlan = Math.min(numPredict, 2000), nKostra = Math.min(numPredictCela, 6000), nSekce = Math.min(numPredict, 4000);
-  nastavStav(app, rec, "pise", "");
+  try { zmen(app, e.auth.id, rec.id, (r) => { r.set("stav", "pise"); r.set("chyba", ""); }); }
+  catch (err) {
+    uvolni();
+    if (err && err.klic === "err.pageNotFound") return { status: 404, body: { error: t(L, "err.pageNotFound") } }; // deleted since it was loaded
+    throw err;
+  }
   // do ai_chat_prubeh (ukazatel průběhu TAHU) writer nezapisuje: uživatel mezitím chatuje a tah i writer by si ukazatel
   // navzájem nulovaly; panel Stránek má vlastní `prubeh` v záznamu (/checkup 25. 10. 2026)
   try {
@@ -827,7 +844,7 @@ function napsat(app, e, body) {
     if (padVlastniho) chyba = cfg.podrobneChyby ? t(L, "err.aiVlastniDownAdmin", { msg: chyba }) : t(L, "err.aiVlastniDown");
     else if (!(err && err.klic) && !cfg.podrobneChyby) chyba = t(L, "err.chatFailedShort");
     for (const k of kroky) if (k.s === "bezi") k.s = "chyba";
-    try { rec.set("prubeh", { kroky: kroky, od: t0 }); rec.set("rozepsano", doc); nastavStav(app, rec, "chyba", chyba); } catch (e2) { /* záznam mezitím smazán */ }
+    try { zapis("chyba", chyba); } catch (e2) { /* záznam mezitím smazán */ }
   } finally {
     uvolni();
   }
@@ -883,6 +900,6 @@ module.exports = {
   poRestartu,
   MAX_TITLE, MAX_ZADANI, MAX_SEZNAM, STAVY, TOKEN_RE, ODDELOVAC, W,
   limity, dto, dtoSeznamu, sAutory, najdi, najdiCitelnou, seznam, seznamTymu, podleOdkazu, pocet,
-  zaloz, zadejPrepis, ulozHtml, nastavStav, prejmenuj, vratit, smazat, sdileni, nastavTym, sdilejS, lideIds, lideDto, podleTokenu, verejnaAdresa,
+  zaloz, zadejPrepis, ulozHtml, prejmenuj, vratit, smazat, sdileni, nastavTym, sdilejS, lideIds, lideDto, podleTokenu, verejnaAdresa,
   doplnChat, vratitTah, odpovedChyby, vytahniHtml, textBezTagu, slozZadani, napsat, nastrojSeznam, nastrojCteni, utf8Delka, radek, ocisti, v1Dto, v1Chyba,
 };

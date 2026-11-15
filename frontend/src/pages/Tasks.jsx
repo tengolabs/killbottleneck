@@ -57,6 +57,8 @@ import { useTasksPageData } from '@/hooks/useTasksPageData';
 import { useTaskTrees } from '@/hooks/useTaskTrees';
 import { useMapNodeActions } from '@/hooks/useMapNodeActions';
 import { PAGE_CONTAINER } from '@/lib/layout';
+import { chipFilters } from '@/lib/myDayChips';
+import { useTodayKey } from '@/hooks/useTodayKey';
 
 // kalendar = stránka /kalendar (Richard 14. 10. 2026): stejné jádro (data, dialogy, filtry), jen zamčený pohled
 // kalendáře bez lišty pohledů a bez panelu Můj den; staré /tasks?view=calendar sem přesměruje
@@ -103,8 +105,11 @@ export default function Tasks({ kalendar = false }) {
 
   // data stránky: mapy (loadMaps), organizace, členové, počty komentářů,
   // e-maily pro našeptávače — viz useTasksPageData (F3-10)
-  const { maps, setMaps, loadMaps, org, members, reloadMembers, commentCounts, emailOptions } =
+  const { maps, setMaps, loadMaps, mapsError, org, members, reloadMembers, commentCounts, emailOptions } =
     useTasksPageData({ user, items, dialogOpen });
+  // the day changes while the page stays open (midnight) → the deadline filter is recomputed
+  const todayKey = useTodayKey();
+  const loadError = mapsError || tasksApi.error;
 
   // pojistka: stránka kalendáře má pohled vždy zamčený (kdyby komponent přežil přechod z /tasks)
   useEffect(() => { if (kalendar && view !== 'calendar') setView('calendar'); }, [kalendar, view]);
@@ -186,7 +191,7 @@ export default function Tasks({ kalendar = false }) {
   // kalendář, zásobník) — viz useTaskTrees (F3-10)
   const { activeMaps, topLevel, nodeTrees, boardNodeItems, calendarItems, bufferItems } = useTaskTrees({
     items, byParent, maps, user, buffer, matchesFilters, bufferVisible,
-    mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, t,
+    mapFilter, nodeFilter, assigneeFilter, ownerFilter, statusFilter, deadlineFilter, search, t, todayKey,
   });
 
   const openNodeInMap = (item) => navigate(`/map/${item.map_id}?node=${item.node_id}`);
@@ -447,18 +452,15 @@ export default function Tasks({ kalendar = false }) {
           onOpenNode={(item) => openNodeInMap({ map_id: item.mapId, node_id: item.id })}
           // řádková akce mohla sáhnout na úkol i na uzel mapy → načíst obojí
           onChanged={() => { tasksApi.refresh(); loadMaps(); }}
+          // chip → filters is written once (lib/myDayChips.js), Home builds its link from the same
           onChipClick={(kind) => {
-            if (kind === 'delegated') {
-              setOwnerFilter('delegated');
-              setAssigneeFilter(ALL);
-              setDeadlineFilter(ALL);
-              return;
-            }
-            setOwnerFilter(ALL);
-            if (user?.email) setAssigneeFilter(user.email);
-            setDeadlineFilter(['overdue', 'today', 'week'].includes(kind) ? kind : ALL);
-            // „hotovo: N" v panelu → ukázat odbavenou práci
-            setStatusFilter(kind === 'done' ? 'done' : ALL);
+            const f = chipFilters(kind);
+            setOwnerFilter(f.owner || ALL);
+            if (f.assignee === 'me') { if (user?.email) setAssigneeFilter(user.email); } else setAssigneeFilter(ALL);
+            setDeadlineFilter(f.deadline || ALL);
+            // plain "Zadal jsem" never touched the status filter — kept; a chip with a count must
+            // open exactly the counted rows, so it resets the status
+            if (!f.owner || f.deadline) setStatusFilter(f.status || ALL);
           }}
         />
         )}
@@ -650,7 +652,7 @@ export default function Tasks({ kalendar = false }) {
               type="button"
               data-testid="tasks-strop-nacist"
               onClick={() => tasksApi.nacistVse()}
-              disabled={loading}
+              disabled={loading || tasksApi.refreshing}
               className="underline underline-offset-2 whitespace-nowrap font-medium"
             >
               {t('tasksPage.nacistVse')}
@@ -658,11 +660,21 @@ export default function Tasks({ kalendar = false }) {
           </div>
         )}
 
+        {/* A failed load must not look like "no tasks yet" (code analysis 4, F3-05): the nodes of the
+            maps ARE the content of this page. Same strip as My day, with "Try again". */}
+        {loadError && (
+          <div role="alert" data-testid="tasks-load-error" className="flex items-center gap-2 text-sm rounded-lg bg-destructive/10 text-destructive px-3 py-2 mb-4">
+            <span className="flex-1">{t('tasksPage.loadFailed')}</span>
+            <Button variant="ghost" size="sm" className="h-7" data-testid="tasks-load-retry" onClick={() => { tasksApi.refresh(); loadMaps(); }}>{t('tasksPage.loadRetry')}</Button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : view !== 'calendar' && items.length === 0 && Object.keys(nodeTrees).length === 0 && bufferItems.length === 0 ? (
+        ) : loadError && view !== 'calendar' && items.length === 0 && Object.keys(nodeTrees).length === 0 && bufferItems.length === 0 ? null
+        : view !== 'calendar' && items.length === 0 && Object.keys(nodeTrees).length === 0 && bufferItems.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4">
               <CheckSquare className="w-8 h-8 text-muted-foreground" />

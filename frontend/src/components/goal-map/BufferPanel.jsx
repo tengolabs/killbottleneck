@@ -29,8 +29,9 @@ export function useBufferNodes(user) {
   // loaded = proběhl aspoň jeden fetch — odlišuje „ještě nenačteno" od „prázdný zásobník"
   const [loaded, setLoaded] = useState(false);
 
+  const userId = user?.id || '';
   const refresh = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     setLoading(true);
     try {
       setItems(await base44.entities.BufferNode.list('-created_date'));
@@ -40,7 +41,8 @@ export function useBufferNodes(user) {
       setLoading(false);
       setLoaded(true);
     }
-  }, [user]);
+    // the ID, not the identity of the `user` object (patchUser makes a new one — F3-04)
+  }, [userId]);
 
   useEffect(() => { refresh(); }, [refresh]);
 

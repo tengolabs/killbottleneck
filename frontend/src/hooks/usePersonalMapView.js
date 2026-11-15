@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { listAllPages } from '@/lib/listAll';
 import { layoutTree } from '@/lib/treeLayout';
 import { nactiKlic } from '@/lib/storageKeys';
 import { PERSONAL_LAYOUT, buildPersonalMap, buildDelegatedMap } from '@/lib/personalMap';
@@ -30,7 +31,9 @@ export function usePersonalMapView({
   const loadPersonalMap = useCallback(async () => {
     try {
       const [allMaps, allTasks] = await Promise.all([
-        base44.entities.GoalMap.list('-updated_date', 200),
+        // all maps, archived too (the builders need them to leave out tasks of archived projects);
+        // a fixed limit of 200 silently dropped the steps of every project beyond it (F5-06)
+        listAllPages(base44.entities.GoalMap, '-updated_date,id', 200),
         user ? base44.entities.Task.list('-created_date', 1000) : Promise.resolve([]),
       ]);
       const rootLabel = user?.full_name || t('myday:myMap.rootLabel');

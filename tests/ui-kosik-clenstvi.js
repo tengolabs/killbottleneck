@@ -16,6 +16,8 @@
 //  · zvolené čtvrtletí + přepnutí na Neomezenou AI → období spadne na rok (žádná cena „undefined“)
 //  · instance, která už platí: žádná karta ani převod u žádného tarifu
 //  · bez linků: Lite převod ano, Neomezená AI „Napsat nám“; věty si neodporují
+//  · subscription ended (KB_PREDPLATNE_SKONCILO, finding N1 of the 4th review): the cart must OFFER PAYMENT —
+//    it used to say "membership is active" with the plans collapsed and no way to pay
 // SNIMKY=<složka> uloží snímky (galerie ke klik-testu).
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -195,6 +197,31 @@ const cena = async (page, tarif) => ({
     await snimek(page, '3-aktivni-clenstvi');
     await ctx.close();
 
+    console.log('== subscription ended: the locked instance offers payment (N1) ==');
+    // the account must exist BEFORE the lock (sign-up is a write) → one data volume, two starts
+    execSync(`docker volume rm -f ${NAME}-data 2>/dev/null; true`);
+    await start(`-v ${NAME}-data:/app/pb_data ${linkyEnv(LINKY)}`);
+    await start(`-v ${NAME}-data:/app/pb_data -e KB_PREDPLATNE_SKONCILO=1 ${linkyEnv(LINKY)}`);
+    ({ page, ctx } = await kosik(browser));
+    t = await sekce(page);
+    const napoveda = await page.$eval('[data-testid="membership-hint"]', (el) => el.innerText).catch(() => '');
+    expect(/Předplatné skončilo/.test(napoveda) && /po zaplacení se aplikace zase odemkne/.test(napoveda), `the cart says the subscription ended and that paying unlocks the app („${napoveda.slice(0, 70)}…“)`);
+    expect(!/Členství je aktivní/.test(t), 'it does NOT claim that the membership is active');
+    expect(await je(page, 'plan-cloud-lite'), 'the plans are open right away (choosing one is the task at hand)');
+    h = await href(page, 'pay-card');
+    expect(h && h.startsWith(LINKY['cloud-lite-year']) && /client_reference_id=/.test(h) && h.includes(`prefilled_email=${encodeURIComponent(EMAIL)}`),
+      `"Pay by card" leads to the Lite yearly link with the instance's reference and the admin's e-mail (${h})`);
+    expect(await je(page, 'order-transfer'), 'Lite yearly: ordering by bank transfer is offered too');
+    expect(!(await je(page, 'write-us')), 'no "Write to us" detour for Lite — paying works by itself');
+    // the offer follows the public price list since 12 Nov 2026 (Pro and AI Agent are hidden): Unlimited AI is
+    // paid by card as in the trial, without a bank transfer and without the e-mail detour
+    await klik(page, 'plan-ai-unlimited-5');
+    h = await href(page, 'pay-card');
+    expect(h && h.startsWith(LINKY['ai-unlimited-5-year'] + '?') && /client_reference_id=/.test(h) && !(await je(page, 'order-transfer')) && !(await je(page, 'write-us')),
+      `Unlimited AI is paid by card as in the trial — no transfer, no "Write to us" (${h})`);
+    await snimek(page, '5-predplatne-skoncilo');
+    await ctx.close();
+
     console.log('== zkušebka bez linků ==');
     await start(`-e KB_TRIAL_UNTIL=${den(20)}`);
     ({ page, ctx } = await kosik(browser));
@@ -217,6 +244,7 @@ const cena = async (page, tarif) => ({
   } finally {
     if (browser) await browser.close();
     execSync(`docker rm -f ${NAME} 2>/dev/null; true`);
+    execSync(`docker volume rm -f ${NAME}-data 2>/dev/null; true`);
     console.log(`\nVÝSLEDEK: ${pass} OK, ${fail} FAIL`);
     process.exit(fail ? 1 : 0);
   }

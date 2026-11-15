@@ -154,6 +154,14 @@ onRecordCreateRequest((e) => {
   }
   // sumář e-mailem je opt-in VLASTNÍKA (jako update): při založení účtu ho nikdo jiný než superuživatel nezapne (checkup 5. 11.)
   if (!e.hasSuperuserAuth()) e.record.set("sumar_email", false);
+  // Server-only fields (finding S4-05, 11 Nov 2026): a client that set `invited_by` at
+  // sign-up produced a fake "X invites you" e-mail and a fake "X accepted the invitation"
+  // bell for anybody. The real invitation (/invite) goes through $app.save, not this hook.
+  if (!e.hasSuperuserAuth()) {
+    e.record.set("invited_by", "");
+    e.record.set("last_login", "");
+    e.record.set("welcome_sent", false);
+  }
   const total = arrayOf(new DynamicModel({ c: 0 }));
   e.app.db().newQuery("SELECT COUNT(*) as c FROM users").all(total);
   const isFirst = total[0].c === 0;
@@ -304,10 +312,120 @@ onRecordConfirmPasswordResetRequest((e) => {
   }
 }, "users");
 
+// A NEW ACCOUNT never inherits a share just because of its address (finding S4-02,
+// 11 Nov 2026). Model hook = every path into `users`: self-registration, Google OAuth,
+// /invite, a superuser. Anything still sitting in a share mirror under this address
+// becomes a pending share; it turns real only on proof (see /share-invite/claim).
+// The parking runs in ONE transaction with the insert: when it fails, the account is not
+// created (the registration answers with an error and can be repeated). It used to run after
+// the insert and only log a failure — the next share sync then handed the share over.
+// `e.app` is switched to the transaction for the rest of the chain, as in the delete below.
+onRecordCreate((e) => {
+  const outer = e.app;
+  try {
+    outer.runInTransaction((tx) => {
+      e.app = tx;
+      const H = require(`${__hooks}/helpers.js`);
+      const email = e.record.getString("email");
+      // an address that already has an account keeps its shares (this insert fails as a duplicate)
+      if (email && !H.emailHasAccount(tx, email)) H.parkUnclaimedShares(tx, email);
+      e.next();
+    });
+  } finally {
+    e.app = outer;
+  }
+}, "users");
+
+// THE LAST ADMINISTRATOR can be neither demoted nor deleted (decision 11 Nov 2026,
+// finding S4-03). Two layers: the request hooks answer in the caller's language; the
+// model hooks below them are the backstop for every other path ($app.save / $app.delete
+// from a route, the assistant, a cron, a superuser in the admin UI) — whoever does it,
+// the instance must not end up without an administrator.
+onRecordUpdate((e) => {
+  const orig = e.record.original();
+  if (orig && orig.getString("role") === "admin" && e.record.getString("role") !== "admin") {
+    const { jePosledniAdmin } = require(`${__hooks}/helpers.js`);
+    if (jePosledniAdmin(e.app, e.record.id)) throw new BadRequestError("The last administrator cannot be demoted.");
+  }
+  e.next();
+}, "users");
+
+// DELETE of an account = ONE transaction opened here, around the whole delete (security
+// review 11 Nov 2026). Inside it, in this order: the last-administrator check (writes are
+// serialized, so two administrators deleting each other at the same moment cannot both
+// pass — the second one already sees the first delete), the cleanup of the PRIVATE
+// leftovers (helpers.cleanupBeforeUserDelete, decision M1-01, migration 1794393800) and
+// the delete itself with its cascades. Anything that fails rolls everything back: an
+// account that stays must not lose its private things.
+// `e.app` is switched to the transaction for the rest of the chain — the same pattern
+// PocketBase itself uses for the cascade — and restored afterwards.
+onRecordDelete((e) => {
+  const outer = e.app;
+  try {
+    outer.runInTransaction((tx) => {
+      e.app = tx;
+      const H = require(`${__hooks}/helpers.js`);
+      if (e.record.getString("role") === "admin" && H.jePosledniAdmin(tx, e.record.id)) {
+        throw new BadRequestError("The last administrator cannot be deleted.");
+      }
+      // Who deletes: stamped on the record by the request hook below (not a schema field,
+      // never stored). Without it (superuser, a delete from code) the shared projects
+      // without a co-admin go to the longest-standing other administrator.
+      let actor = null;
+      const actorId = String(e.record.get("kb_deleted_by") || "");
+      if (actorId) { try { actor = tx.findRecordById("users", actorId); } catch (err) { actor = null; } }
+      const handedOver = H.cleanupBeforeUserDelete(tx, e.record, actor && H.jeAdmin(actor) ? actor : null);
+      e.record.set("kb_handed_over", JSON.stringify(handedOver || []));
+      e.next();
+    });
+  } finally {
+    e.app = outer;
+  }
+}, "users");
+
+// CONCURRENCY of a demotion (security review 11 Nov 2026): the request hook reads first
+// and writes later, so two administrators demoting each other at the same moment both
+// passed. After the write the administrators are counted again; when none is left, this
+// very write is taken back (the role returns) and the request fails. Whatever the
+// interleaving, at least one of the concurrent writes sees the zero and reverts.
+onRecordUpdateExecute((e) => {
+  const orig = e.record.original();
+  const demoting = !!orig && orig.getString("role") === "admin" && e.record.getString("role") !== "admin";
+  e.next();
+  if (!demoting) return;
+  const rows = arrayOf(new DynamicModel({ c: 0 }));
+  e.app.db().newQuery("SELECT COUNT(*) as c FROM users WHERE role = 'admin'").all(rows);
+  if (rows[0].c > 0) return;
+  e.app.db().newQuery("UPDATE users SET role = 'admin' WHERE id = {:id}").bind({ id: e.record.id }).execute();
+  e.record.set("role", "admin");
+  throw new BadRequestError("The last administrator cannot be demoted.");
+}, "users");
+
+
+onRecordDeleteRequest((e) => {
+  if (e.record.getString("role") === "admin") {
+    const { jePosledniAdmin } = require(`${__hooks}/helpers.js`);
+    if (jePosledniAdmin(e.app, e.record.id)) {
+      const { t, userLang } = require(`${__hooks}/i18n.js`);
+      throw new BadRequestError(t(userLang(e.auth), "err.lastAdminDelete"));
+    }
+  }
+  // the model hook (transaction) has no request: tell it who deletes — the shared projects
+  // without a co-admin go to this administrator. Always overwritten here, so a client
+  // cannot plant the value.
+  e.record.set("kb_deleted_by", e.auth ? e.auth.id : "");
+  e.next();
+}, "users");
+
 // roli smí měnit jen admin
 onRecordUpdateRequest((e) => {
-  const { NOTIFY_TYPES, NOTIFY_ALWAYS, jeAdmin } = require(`${__hooks}/helpers.js`);
+  const { NOTIFY_TYPES, NOTIFY_ALWAYS, jeAdmin, jePosledniAdmin } = require(`${__hooks}/helpers.js`);
   const byAdmin = e.hasSuperuserAuth() || (e.auth && jeAdmin(e.auth));
+  if (byAdmin && e.record.original().getString("role") === "admin" && e.record.getString("role") !== "admin"
+    && jePosledniAdmin(e.app, e.record.id)) {
+    const { t, userLang } = require(`${__hooks}/i18n.js`);
+    throw new BadRequestError(t(userLang(e.auth), "err.lastAdminDemote"));
+  }
   // ⚠️ Zástupce zapisuje správce struktury VÝHRADNĚ routou /member-deputy.
   // Tady žádná výjimka být nesmí: `users.updateRule` pouští ne-adminovi jen
   // JEHO VLASTNÍ účet, takže by výjimka nedovolila zapsat zástupce kolegům
@@ -321,6 +439,11 @@ onRecordUpdateRequest((e) => {
     e.record.set("is_org_manager", e.record.original().getBool("is_org_manager"));
     // zástupce určuje admin — člen si ho nevybírá (ani sobě, ani jiným)
     e.record.set("deputy", e.record.original().getString("deputy"));
+  }
+  // server-only fields — never from a client, not even from an administrator (finding S4-05)
+  if (!e.hasSuperuserAuth()) {
+    e.record.set("invited_by", e.record.original().getString("invited_by"));
+    e.record.set("welcome_sent", e.record.original().getBool("welcome_sent"));
   }
   // sumář e-mailem (29. 10. 2026) je opt-in VLASTNÍKA účtu: správce ho členovi nezapne (posílal by mu maily bez souhlasu)
   if (!e.hasSuperuserAuth() && !(e.auth && e.auth.id === e.record.id)) {
@@ -469,7 +592,10 @@ onRecordAfterDeleteSuccess((e) => {
       }
     } catch (err) { /* nikdo ho neměl za zástupce */ }
     // pozice v org mapě (i archivované — data visí tak jako tak)
-    const om = findOrgMapAnyState(e.app);
+    // a refused write (the structure changed meanwhile, S3-01) is repeated on a fresh load
+    let om = null;
+    for (let pokus = 0; pokus < 4; pokus++) {
+    om = findOrgMapAnyState(e.app);
     if (om) {
       const nodes = jsonVal(om, "nodes", []);
       const uvolnene = [];
@@ -482,6 +608,7 @@ onRecordAfterDeleteSuccess((e) => {
       }
       if (changed) {
         const saved = v1SaveMapData(e.app, om, nodes, jsonVal(om, "edges", []), null, false, "", { isOwner: true, orgAllowed: true });
+        if (saved.conflict) continue;
         if (!saved.error && uvolnene.length) {
           try {
             // Uvolněné pozice hlásíme adminům I SPRÁVCŮM STRUKTURY — „jmenujte
@@ -500,10 +627,24 @@ onRecordAfterDeleteSuccess((e) => {
         }
       }
     }
+    break;
+    }
   } catch (err) {
     try { e.app.logger().warn("users delete: úklid zastupování selhal", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
 
+  // New owners of the handed-over projects learn about it — only now, the delete is done.
+  try {
+    const { notifyMapHandover } = require(`${__hooks}/helpers.js`);
+    let items = [];
+    try { items = JSON.parse(String(e.record.get("kb_handed_over") || "[]")) || []; } catch (err) { items = []; }
+    let actorEmail = "";
+    const actorId = String(e.record.get("kb_deleted_by") || "");
+    if (actorId) { try { actorEmail = e.app.findRecordById("users", actorId).getString("email"); } catch (err) { actorEmail = ""; } }
+    notifyMapHandover(e.app, items, e.record.getString("email"), actorEmail);
+  } catch (err) {
+    try { e.app.logger().warn("users delete: handover notifications failed", "error", String(err)); } catch (e2) { /* log is a bonus */ }
+  }
   // Smazaný člověk musí zmizet i ze SDÍLENÍ — org mapy i všech ostatních. Bez toho
   // po něm zůstane e-mail v `shared_with_edit` i v `map_shares` — a jakmile se tatáž
   // adresa znovu zaregistruje (nebo ji admin znovu pozve), přístup jí ožije (nález
@@ -536,20 +677,25 @@ onRecordDeleteRequest((e) => {
 // (nález panelu 15. 8.: org mapa založená dřív by zůstala s výchozím názvem).
 const propsatNazevOrgMapy = (e) => {
   try {
-    const { findOrgMap, jsonVal } = require(`${__hooks}/helpers.js`);
-    const map = findOrgMap(e.app);
-    if (!map) { e.next(); return; }
+    const { findOrgMap, jsonVal, isMapConflict } = require(`${__hooks}/helpers.js`);
     const name = String(e.record.getString("name") || "").trim();
     if (!name) { e.next(); return; }
-    const nodes = jsonVal(map, "nodes", []);
-    let changed = false;
-    for (const n of nodes) {
-      if (n && n.type === "apexNode") {
-        const d = n.data || {};
-        if (d.apexText !== name || d.title !== name) { n.data = Object.assign({}, d, { apexText: name, title: name }); changed = true; }
+    // a refused write (the structure changed meanwhile, S3-01) is repeated on a fresh load
+    for (let pokus = 0; pokus < 4; pokus++) {
+      const map = findOrgMap(e.app);
+      if (!map) break;
+      const nodes = jsonVal(map, "nodes", []);
+      let changed = false;
+      for (const n of nodes) {
+        if (n && n.type === "apexNode") {
+          const d = n.data || {};
+          if (d.apexText !== name || d.title !== name) { n.data = Object.assign({}, d, { apexText: name, title: name }); changed = true; }
+        }
       }
+      if (!changed) break;
+      map.set("nodes", nodes);
+      try { e.app.save(map); break; } catch (err) { if (!isMapConflict(err) || pokus === 3) throw err; }
     }
-    if (changed) { map.set("nodes", nodes); e.app.save(map); }
   } catch (err) {
     try { e.app.logger().warn("org_settings: propsání názvu do org mapy selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
@@ -558,6 +704,32 @@ const propsatNazevOrgMapy = (e) => {
 onRecordAfterUpdateSuccess(propsatNazevOrgMapy, "org_settings");
 
 onRecordAfterCreateSuccess(propsatNazevOrgMapy, "org_settings");
+
+// EVERY save of a map (REST, $app.save, v1, rules, the assistant) = one write transaction:
+// re-read the stored row, keep the columns this writer did not touch, refuse a write whose
+// graph changed underneath it, then the update itself (finding S3-01, see
+// helpers.mergeConcurrentMapWrite). `e.app` is switched to the transaction for the rest of
+// the chain and restored afterwards — the same pattern as the users delete above. Nothing
+// else runs inside (no notifications, no webhooks): the success hooks fire after the commit.
+onRecordUpdate((e) => {
+  const outer = e.app;
+  try {
+    outer.runInTransaction((tx) => {
+      e.app = tx;
+      const H = require(`${__hooks}/helpers.js`);
+      const stored = H.mergeConcurrentMapWrite(tx, e.record);
+      e.next();
+      H.bumpMapVersion(tx, e.record, stored);
+      // What this record object now holds IS the stored row: make it the baseline for its
+      // next save (a save does not refresh `original()` by itself; a rule writing right
+      // after the save that triggered it, or autoShareAssignees after add_nodes, would
+      // otherwise be compared with the state from before their own first write).
+      e.record.postScan();
+    });
+  } finally {
+    e.app = outer;
+  }
+}, "goalmaps");
 
 // Připomínky k uzlům sledují termín: po KAŽDÉM uložení mapy (session PATCH, v1,
 // pravidla, asistent — model hook chytá i $app.save) se přepočítá jejich den.
@@ -579,6 +751,9 @@ onRecordCreate((e) => {
   const { assignProjectNumber } = require(`${__hooks}/helpers.js`);
   assignProjectNumber(e.app, e.record);
   e.next();
+  // the stored row is now the baseline of this record object for its next save (the same
+  // reason as in the update hook above: create_map → autoShareAssignees saves it again)
+  e.record.postScan();
 }, "goalmaps");
 
 // goalmaps: owner se bere z přihlášení, ne z requestu
@@ -659,7 +834,7 @@ onRecordCreateRequest((e) => {
 
 // goalmaps: pole sdílení smí měnit jen vlastník (sdílený editor edituje jen obsah)
 onRecordUpdateRequest((e) => {
-  const { jsonVal, validateMapData, strukturaZhorsena, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, normalizeNodeShapes, logMapChanges, apexRemoved, deadlineChangeDenied, nodeDeleteDenied, stampAssignedBy, stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved, runAutomationRules, jeAdmin, transferMapOwnership, transferTargetError, syncShares } = require(`${__hooks}/helpers.js`);
+  const { jsonVal, validateMapData, strukturaZhorsena, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, triggerReadyAgents, normalizeNodeShapes, logMapChanges, apexRemoved, deadlineChangeDenied, nodeDeleteDenied, stampAssignedBy, stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved, runAutomationRules, jeAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, syncShares } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   const orig = e.record.original();
@@ -774,8 +949,8 @@ onRecordUpdateRequest((e) => {
   // check: a stale client gets "modified elsewhere", not a misleading "owner only".
   if (archivedChangedByNonOwner) throw new BadRequestError(t(L, "err.archiveOwnerOnly"));
   // stav mapy PŘED uložením (kvůli detekci odblokování po e.next())
-  const origNodes = jsonVal(orig, "nodes", []);
-  const origEdges = jsonVal(orig, "edges", []);
+  let origNodes = jsonVal(orig, "nodes", []);
+  let origEdges = jsonVal(orig, "edges", []);
   // Serverem spravovaná pole požadavku na automatizaci se musí srovnat JEŠTĚ PŘED
   // zápisem: doplnit autora nového požadavku a shodit požadavek, kterému správce
   // právě zapsal automatizaci. Notifikace až po úspěšném e.next().
@@ -793,15 +968,32 @@ onRecordUpdateRequest((e) => {
     const withAssigner = stampDeadlineRequesters(origNodes, stampAssignedBy(origNodes, res.nodes, actorEmail), actorEmail);
     const dlRes = satisfyDeadlineRequests(origNodes, withAssigner);
     deadlineResolved = dlRes.pending;
-    e.record.set("nodes", dlRes.nodes);
+    // The normalized graph is written only when the request SENDS nodes. A PATCH of another
+    // field (rename, colour, archive) must not rewrite the graph: on a map whose stored
+    // graph is not in the normalized shape (older / imported data) it would count as a
+    // change of the graph and a rename overlapping with somebody's tick got a false 409.
+    if (Object.prototype.hasOwnProperty.call(e.requestInfo().body || {}, "nodes")) e.record.set("nodes", dlRes.nodes);
   } catch (err) {
     try { e.app.logger().warn("goalmaps update: srovnání požadavků na automatizaci selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
-  e.next();
+  // The write itself is checked against the stored row in the model hook (S3-01): a graph
+  // changed by somebody else between the load of this request and its write = the same
+  // 409 as a stale `base_updated`, also for overlapping requests and without the field.
+  try { e.next(); } catch (err) {
+    if (require(`${__hooks}/helpers.js`).isMapConflict(err)) throw new ApiError(409, t(L, "err.mapConflict"));
+    throw err;
+  }
+  // this request did not change the graph and took over the one stored meanwhile → what
+  // differs from `orig` is somebody else's change: no change log, notifications or rules for it here
+  if (e.record.get("kb_graph_merged") === true) {
+    origNodes = jsonVal(e.record, "nodes", []);
+    origEdges = jsonVal(e.record, "edges", []);
+  }
   if (ownerTransferred) {
     try { syncShares(e.app, e.record); } catch (err) {
       try { e.app.logger().warn("goalmaps update: share sync failed", "map", e.record.id, "error", String(err)); } catch (e2) { /* log is a bonus */ }
     }
+    recordMapTransfer(e.app, e.record, orig.getString("owner_email"), e.record.getString("owner_email"), e.auth ? e.auth.email() : "");
   }
   // styl Projekt ↔ Proces: tvar opakovacích pravidel (obnova podkroků) sleduje styl — na serveru, ať platí pro
   // editor, asistenta, REST i budoucí v1/MCP stejně
@@ -1323,6 +1515,26 @@ onRecordUpdateRequest((e) => {
   const orig = e.record.original();
   e.record.set("owner", orig.getString("owner")); // owner pole neměnná
   e.record.set("owner_email", orig.getString("owner_email"));
+  // A finished entry cannot be finished again (finding F6-04). A tab that did not learn its
+  // timer was closed elsewhere (a new timer started in another tab or on the phone closes
+  // the old one; the 12 h auto-stop) kept ticking, and its Stop rewrote the end of the
+  // closed entry — the same time was then counted twice. The end is written once; project,
+  // client, node and note of a finished entry stay editable.
+  const origEnded = orig.getString("ended");
+  if (origEnded) {
+    const was = parsePbDate(origEnded);
+    const now = parsePbDate(e.record.getString("ended"));
+    // One exception (Richard, 14 Nov 2026): an entry closed by the 12 h auto-stop tells its owner to correct it,
+    // so its end may be moved EARLIER (the real end lies before started + 12 h). A later end stays refused —
+    // that is exactly the Stop of a tab that kept ticking.
+    // The marker is the text the cron appends to the note (runAutoStop in helpers.js). An owner could type it
+    // into any note of theirs; that only lets them SHORTEN their own entry, which they can also delete and
+    // enter again — the lock guards against counting time twice, and a shorter entry never does that.
+    const autoStopped = orig.getString("note").indexOf("(auto-stop po 12 h)") >= 0;
+    const st = parsePbDate(orig.getString("started"));
+    const earlier = autoStopped && was && now && st && now.getTime() < was.getTime() && now.getTime() > st.getTime();
+    if (!earlier && (!was || !now || was.getTime() !== now.getTime())) throw new ApiError(409, t(L, "err.timeEntryAlreadyEnded"));
+  }
   const bad = normalizeTimeEntry(e.app, e.record, L);
   if (bad) throw new BadRequestError(t(L, "err.invalidTimeEntry", { reason: bad }));
   const justStopped = !orig.getString("ended") && !!e.record.getString("ended");
@@ -1596,7 +1808,10 @@ cronAdd("prune_notifications", "40 3 * * *", () => {
   $app.db().newQuery("DELETE FROM notifications WHERE read = true AND created < datetime('now','-30 days') AND dedup_key NOT LIKE 'verze:%'").execute();
   $app.db().newQuery("DELETE FROM notifications WHERE created < datetime('now','-180 days') AND dedup_key NOT LIKE 'verze:%'").execute();
   // účetnictví e-mailového stropu drží jen pár týdnů zpět (denní řádky)
-  $app.db().newQuery("DELETE FROM mail_budget WHERE created < datetime('now','-40 days')").execute();
+  // `created` exists since migration 1794524200 (before it this statement failed every
+  // night, M1-02). The share-invitation gate `ps:<map>:<address>` stays: it means "this
+  // address was already invited to this project" for good, as it did while nothing was deleted.
+  $app.db().newQuery("DELETE FROM mail_budget WHERE created != '' AND created < datetime('now','-40 days') AND day NOT LIKE 'ps:%'").execute();
 });
 
 // Hlášení chyb a nápadů: 30 dnů. Richard 19. 8. 2026: „chybu odstraníme hned
@@ -2299,6 +2514,13 @@ kbRoute("POST", "/chat", (e) => {
     const { zkontrolujHlas } = require(`${__hooks}/prepis.js`);
     try { zkontrolujHlas($app, body, L); } catch (err) { const ch = chatChyba(e, err, L); return e.json(ch.status, ch.body); }
   }
+  // the conversation is still answering another request → 409 BEFORE the hourly limit is charged
+  // (the atomic lock is taken inside chatRun; this is only the cheap early answer)
+  if (body.chat_id && bezRezimu) {
+    const C = require(`${__hooks}/chat.js`);
+    const ch = C.nactiChat($app, e.auth, body.chat_id);
+    if (ch && C.chatBezi($app, ch.id)) { const x = chatChyba(e, C.chybaBezi(L), L); return e.json(x.status, x.body); }
+  }
   const b = chatBrzda(e, L, body, c.cfg);
   if (b) return e.json(b.status, b.body);
   let vysledek;
@@ -2319,6 +2541,11 @@ kbRoute("POST", "/chat/oprav", (e) => {
   const body = e.requestInfo().body || {};
   const c = chatCfg(e, body, L);
   if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
+  if (body.chat_id) { // still answering another request → 409 before the hourly limit is charged
+    const C = require(`${__hooks}/chat.js`);
+    const ch = C.nactiChat($app, e.auth, body.chat_id);
+    if (ch && C.chatBezi($app, ch.id)) { const x = chatChyba(e, C.chybaBezi(L), L); return e.json(x.status, x.body); }
+  }
   const b = chatBrzda(e, L, null, c.cfg);
   if (b) return e.json(b.status, b.body);
   let vysledek;
@@ -2338,6 +2565,11 @@ kbRoute("POST", "/chat/potvrdit", (e) => {
   const body = e.requestInfo().body || {};
   const c = chatCfg(e, body, L);
   if (c.chyba) return e.json(c.chyba.status, c.chyba.body);
+  if (body.chat_id) { // still answering another request → 409 before the hourly limit is charged
+    const C = require(`${__hooks}/chat.js`);
+    const ch = C.nactiChat($app, e.auth, body.chat_id);
+    if (ch && C.chatBezi($app, ch.id)) { const x = chatChyba(e, C.chybaBezi(L), L); return e.json(x.status, x.body); }
+  }
   const b = chatBrzda(e, L, null, c.cfg);
   if (b) return e.json(b.status, b.body);
   let vysledek;
@@ -2765,92 +2997,49 @@ kbRoute("POST", "/ai-kredity/nastaveni", (e) => {
   return e.json(200, Object.assign({ success: true }, proApi($app, 4)));
 }, $apis.requireAuth());
 
-// ---------- konec zkušební doby: instance jede dál, ale JEN PRO ČTENÍ ----------
+// ---------- instance lock: the instance keeps running, but READ-ONLY ----------
 //
-// Zavedeno 6. 8. 2026 s registračním trychtýřem (zkušebka 30 dní). Zámek je
-// v JEDNOM middleware, ne v osmnácti record hoocích — vlastní routy zapisují
-// přes $app.save a record hooky je NEVIDÍ, takže by se přes ně dalo psát dál.
+// Introduced on 6 Aug 2026 with the sign-up funnel (30-day trial). The lock is ONE middleware, not
+// eighteen record hooks — custom routes write through $app.save, record hooks do not see them and
+// writing would go on through them.
 //
-// Co zůstává povolené i po vypršení, aby zákazník nepřišel o data ani o přístup:
-//   · všechno čtení (GET) → prohlížení i EXPORT map
-//   · přihlášení, obnova tokenu a reset hesla → jinak by se nedostal dovnitř
-//   · /config → frontend podle něj ukáže pruh „zkušebka skončila"
-// Zablokované je psaní: 402 Payment Required (ne 403 — není to zákaz, je to účet).
+// Four states lock the instance: the move to another server (503), the end of the trial (402), the
+// end of the subscription (402) and more accounts than the plan covers (409). Reading (GET) always
+// passes — browsing and the EXPORT of maps. What else passes, and why, is ONE table:
+// lock-exceptions.js. Do not add conditions here; add a row there (tests/zamek-vyjimky.js walks it).
+// Blocked writes answer 402 Payment Required (not 403 — it is not a ban, it is the account).
 routerUse((e) => {
   const metoda = String(e.request.method || "GET").toUpperCase();
   if (metoda === "GET" || metoda === "HEAD" || metoda === "OPTIONS") return e.next();
-  const cesta = String(e.request.url.path || "");
-  // ⚠️ Kotvit na CELOU cestu, ne na koncovku. Sufixový regexp šlo obejít
-  // pojmenováním uzlu: `POST /api/kb/v1/maps/<id>/nodes/auth-refresh` končí na
-  // „auth-refresh", takže výjimka pro přihlašovací cesty propustila i zápis do
-  // mapy po vypršení zkušebky. Ověřeno reprodukcí (kontrolní panel 6. 8. 2026).
-  const povolene = /^\/api\/collections\/[^/]+\/(auth-with-password|auth-with-oauth2|auth-refresh|request-password-reset|confirm-password-reset|request-verification|confirm-verification)$/;
-  if (povolene.test(cesta)) return e.next();
-  // Čtecí POSTy: veřejně sdílená mapa a odběr změn. Zámek má vypnout ZÁPIS, ne
-  // čtení — bez téhle výjimky by odkaz na veřejnou mapu, který zákazník někomu
-  // poslal, po vypršení zkušebky zhasnul a UI by přestalo dostávat aktualizace.
-  if (cesta === "/api/kb/public-maps" || cesta === "/api/flowmap/public-maps"
-      || cesta === "/api/realtime") return e.next();
-  // Nahlásit chybu musí jít i po vypršení zkušebky — na zamčené instanci má
-  // člověk k psaní nejvíc důvodů a odmítnout ho s 402 by bylo absurdní.
-  // ⚠️ Kotveno na CELOU cestu, jako všechny výjimky výše (sufix šlo obejít
-  // pojmenováním uzlu, nález kontrolního panelu 6. 8. 2026).
-  if (cesta === "/api/kb/report" || cesta === "/api/flowmap/report") return e.next();
-  // Čtení přes POST: MCP (JSON-RPC je vždy POST) a výpis sdílení. Zámek má
-  // vypnout zápis, ne čtení — bez tohohle po vypršení zkušebky zhasl i
-  // `tools/list` a dialog sdílení (nález S7-01). Tělo se čte AŽ když zámek
-  // platí (ne na každém požadavku zdravé instance — panel 27. 8.) a jen pro
-  // tyhle cesty; nečitelné tělo = normální zámek (fail-closed).
-  const jeCteciPost = () => {
-    if (cesta !== "/mcp" && cesta !== "/api/kb/share" && cesta !== "/api/flowmap/share") return false;
-    try {
-      const b = e.requestInfo().body || {};
-      if (cesta !== "/mcp") return b.action === "list";
-      const metodaRpc = String(b.method || "");
-      const cteciMetody = ["initialize", "notifications/initialized", "ping", "tools/list"];
-      const cteciNastroje = ["list_maps", "get_map", "list_rules", "list_rule_runs", "list_rule_templates", "get_org_structure", "list_people", "get_portfolio", "list_pages", "get_page"];
-      if (cteciMetody.includes(metodaRpc)) return true;
-      return metodaRpc === "tools/call" && cteciNastroje.includes(String(((b.params || {}).name) || ""));
-    } catch (err) { return false; }
-  };
-  // Superuser = MY, provozovatel. Musíme umět na zamčené instanci zasáhnout
-  // (záloha, oprava, ruční spuštění). Zákazník se superuserem nestane: na
-  // hostované instanci Caddy zvenku zavírá /api/collections/_superusers,
-  // /api/settings, /api/crons i /_/ (viz tenant-add.sh), a self-host zkušebku
-  // nemá, takže tam je trialExpired() vždy false.
+  // Superuser = US, the operator. We must be able to act on a locked instance (backup, repair, manual
+  // run). A customer cannot become one: on a hosted instance Caddy closes /api/collections/_superusers,
+  // /api/settings, /api/crons and /_/ from outside (tenant-add.sh), and a self-hosted instance has no
+  // trial, so trialExpired() is always false there.
   if (e.hasSuperuserAuth()) return e.next();
   const { trialExpired, userLimitExceeded, stehujeme, predplatneSkoncilo } = require(`${__hooks}/helpers.js`);
+  // The first state that holds decides the answer. The move comes first: the instance is about to be
+  // transferred and a write would be lost (503 = temporary, not the customer's fault).
+  const stav = stehujeme() ? "migrating"
+    : trialExpired() ? "trial_expired"
+    : predplatneSkoncilo() ? "subscription_ended"
+    : userLimitExceeded($app) ? "user_limit" : "";
+  if (!stav) return e.next();
+  const cesta = String(e.request.url.path || "");
+  const { lockException } = require(`${__hooks}/lock-exceptions.js`);
+  // the body is parsed only when the instance IS locked and only for the rows that need it
+  if (lockException(stav, metoda, cesta, () => e.requestInfo().body)) return e.next();
   const { t, userLang } = require(`${__hooks}/i18n.js`);
-  // Stěhování má přednost před vším ostatním: instance se za chvíli přesune
-  // a zápis by se ztratil. 503 = dočasné, ne chyba zákazníka.
-  if (stehujeme()) {
-    return e.json(503, { error: t(userLang(e.auth), "err.stehujeme"), code: "migrating" });
-  }
-  if (trialExpired() && !jeCteciPost()) {
-    return e.json(402, { error: t(userLang(e.auth), "err.trialExpired") });
-  }
-  // Předplatné skončilo = stejný zámek jako vypršená zkušebka, jiná hláška (KB_PREDPLATNE_SKONCILO=1)
-  if (predplatneSkoncilo() && !jeCteciPost()) {
-    return e.json(402, { error: t(userLang(e.auth), "err.predplatneSkoncilo"), code: "subscription_ended" });
-  }
-  // Účtů je víc, než na kolik je tarif. Stane se přechodem ze zkušebky (ta počet
-  // lidí neomezuje) na Cloud Start (dva). Zápis se zamkne, dokud si zákazník
-  // účty neprobere — mazat je za něj nebudeme. Odebírání účtů proto musí projít,
-  // jinak by se z toho nedalo dostat.
-  // čtecí POSTy (MCP výpisy, výpis sdílení) projdou i při překročeném počtu účtů — záměrně, ne pořadím
-  if (userLimitExceeded($app) && !jeCteciPost()) {
-    const jeMazaniUctu = metoda === "DELETE"
-      && /^\/api\/collections\/users\/records\/[^/]+$/.test(cesta);
-    if (!jeMazaniUctu) {
-      const { userLimit, userCount } = require(`${__hooks}/helpers.js`);
-      return e.json(409, {
-        error: t(userLang(e.auth), "err.userLimitExceeded",
-                 { count: userCount($app), max: userLimit() }),
-        code: "user_limit_exceeded",
-      });
-    }
-  }
-  return e.next();
+  const L = userLang(e.auth);
+  if (stav === "migrating") return e.json(503, { error: t(L, "err.stehujeme"), code: "migrating" });
+  if (stav === "trial_expired") return e.json(402, { error: t(L, "err.trialExpired") });
+  if (stav === "subscription_ended") return e.json(402, { error: t(L, "err.predplatneSkoncilo"), code: "subscription_ended" });
+  // More accounts than the plan covers: happens on the way from the trial (no cap on people) to a plan
+  // with a cap. Writing stays locked until the customer sorts the accounts out — we do not delete them.
+  const { userLimit, userCount } = require(`${__hooks}/helpers.js`);
+  return e.json(409, {
+    error: t(L, "err.userLimitExceeded", { count: userCount($app), max: userLimit() }),
+    code: "user_limit_exceeded",
+  });
 });
 
 // ⚠️ KOMPRESE ZDE ZÁMĚRNĚ NENÍ — a stojí za to vědět proč.
@@ -3272,10 +3461,13 @@ kbRoute("POST", "/advisor", (e) => {
 // a další autosave nespadl na falešný 409 (routa ukládá mimo request hook).
 // Transfer of project ownership (feature analysis 5 Nov 2026: the server only knew a
 // bare PATCH of `owner` with no button; deleting the account then cascaded to its
-// projects). Owner or administrator; the previous owner stays a co-admin (edit).
-// The org structure can only be taken over by an administrator.
+// projects). The owner, or an administrator who ALREADY has access to the project under
+// the ordinary rules (team access / named share) — decision 11 Nov 2026: an administrator
+// must not take over a private project of another person, and to them it does not exist
+// (404). The previous owner stays a co-admin (edit), is notified, and the transfer is
+// written to the project's change log. The org structure can only go to an administrator.
 kbRoute("POST", "/maps/{id}/transfer", (e) => {
-  const { jeAdmin, transferMapOwnership, transferTargetError } = require(`${__hooks}/helpers.js`);
+  const { jeAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, userSeesMap } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   if (!e.auth) return e.json(401, { error: t(L, "err.transferOwnerOnly") });
@@ -3283,56 +3475,86 @@ kbRoute("POST", "/maps/{id}/transfer", (e) => {
   try { map = $app.findRecordById("goalmaps", e.request.pathValue("id")); } catch (err) { return e.json(404, { error: t(L, "err.mapNotFound") }); }
   const isOwner = map.getString("owner") === e.auth.id;
   if (!isOwner && !jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.transferOwnerOnly") });
+  if (!isOwner && !userSeesMap($app, map, e.auth.id, e.auth.email())) return e.json(404, { error: t(L, "err.mapNotFound") });
   const email = String((e.requestInfo().body || {}).email || "").trim();
   let newOwner = null;
   if (email) { try { newOwner = $app.findFirstRecordByData("users", "email", email); } catch (err) { newOwner = null; } }
   const bad = transferTargetError($app, map, newOwner, L);
   if (bad) return e.json(400, { error: bad });
+  let prevEmail = map.getString("owner_email");
+  if (!prevEmail) { try { prevEmail = $app.findRecordById("users", map.getString("owner")).getString("email"); } catch (err) { prevEmail = ""; } }
   transferMapOwnership($app, map, newOwner);
+  recordMapTransfer($app, map, prevEmail, newOwner.getString("email"), e.auth.email());
   return e.json(200, { id: map.id, owner_email: newOwner.getString("email"), updated: map.getString("updated") });
 });
 
-// Projects an account owns — for user administration before deleting the account
-// (deletion cascades through the owner relation, so its projects would go with it).
-kbRoute("GET", "/users/{id}/maps", (e) => {
+// How many projects each account owns — one number per person for user administration
+// (finding F4-06: the list used to count only the projects the administrator could see,
+// so the row and the delete dialog disagreed). Numbers only, no titles.
+kbRoute("GET", "/users/map-counts", (e) => {
   const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   if (!e.hasSuperuserAuth() && (!e.auth || !jeAdmin(e.auth))) return e.json(403, { error: t(L, "err.adminOnly") });
-  const uid = e.request.pathValue("id");
-  try { $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
-  const rows = $app.findRecordsByFilter("goalmaps", "owner = {:u}", "-updated", 5000, 0, { u: uid });
-  const maps = rows.map((m) => ({ id: m.id, title: m.getString("title"), archived: m.getBool("archived"), kind: m.getString("kind") }));
-  return e.json(200, { count: maps.length, maps: maps });
+  const rows = arrayOf(new DynamicModel({ owner: "", c: 0 }));
+  $app.db().newQuery("SELECT owner, COUNT(*) as c FROM goalmaps GROUP BY owner").all(rows);
+  const counts = {};
+  for (const r of rows) counts[r.owner] = r.c;
+  return e.json(200, { counts: counts });
 });
 
-// Transfer all projects of an account to another member (default = the calling
-// administrator) — the step before deleting the account, so the previous owner is NOT
-// kept as a co-admin (a share row for a soon-deleted address would revive on
-// re-registration). Returns the count and the maps that could not be transferred
-// (the org structure when the target is not an admin) — the client must refuse to
-// delete the account while `skipped` is non-empty.
-kbRoute("POST", "/users/{id}/transfer-maps", (e) => {
-  const { jeAdmin, transferMapOwnership, transferTargetError } = require(`${__hooks}/helpers.js`);
+// Projects an account owns — for user administration before deleting the account.
+// `count` is the total; `maps` lists ONLY the projects the calling administrator already
+// has access to (those can be taken over). Private projects of another person are
+// reported as a number, never by title or id (decision 11 Nov 2026).
+kbRoute("GET", "/users/{id}/maps", (e) => {
+  const { jeAdmin, ownedMapsFor, userDeletionSummary } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   if (!e.hasSuperuserAuth() && (!e.auth || !jeAdmin(e.auth))) return e.json(403, { error: t(L, "err.adminOnly") });
   const uid = e.request.pathValue("id");
   try { $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
+  const o = ownedMapsFor($app, uid, e.hasSuperuserAuth() ? null : e.auth);
+  const maps = o.visible.map((m) => ({ id: m.id, title: m.getString("title"), archived: m.getBool("archived"), kind: m.getString("kind") }));
+  return e.json(200, Object.assign({ count: o.total, maps: maps, private_count: o.privateCount, hidden_shared_count: o.hiddenSharedCount },
+    userDeletionSummary($app, uid, e.hasSuperuserAuth() ? null : e.auth)));
+});
+
+// Transfer the projects of an account to another member (default = the calling
+// administrator) — the step before deleting the account. Only the projects the caller
+// already has access to are transferred; private ones stay untouched and are reported
+// as `private_count` / `hidden_shared_count` (decision 11 Nov 2026). The previous owner
+// STAYS a co-admin and is notified: the route does not know whether the account will
+// really be deleted, and a living account must never silently lose its projects
+// (findings S4-01/S3-02). When the account is deleted, the users delete hook removes its
+// address from every share list, so nothing revives on re-registration.
+// `skipped` = visible maps that could not be transferred (the org structure when the
+// target is not an admin) — the client must refuse to delete the account while it is
+// non-empty.
+kbRoute("POST", "/users/{id}/transfer-maps", (e) => {
+  const { jeAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, ownedMapsFor } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  if (!e.hasSuperuserAuth() && (!e.auth || !jeAdmin(e.auth))) return e.json(403, { error: t(L, "err.adminOnly") });
+  const uid = e.request.pathValue("id");
+  let prev;
+  try { prev = $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
   const email = String((e.requestInfo().body || {}).email || "").trim();
   let newOwner = e.auth || null;
   if (email) { try { newOwner = $app.findFirstRecordByData("users", "email", email); } catch (err) { newOwner = null; } }
   if (!newOwner || newOwner.getString("kind") === "guest") return e.json(400, { error: t(L, "err.transferTargetNotMember") });
   if (newOwner.id === uid) return e.json(400, { error: t(L, "err.transferSameOwner") });
-  const rows = $app.findRecordsByFilter("goalmaps", "owner = {:u}", "", 5000, 0, { u: uid });
+  const o = ownedMapsFor($app, uid, e.hasSuperuserAuth() ? null : e.auth);
   let n = 0;
   const skipped = [];
-  for (const m of rows) {
+  for (const m of o.visible) {
     if (transferTargetError($app, m, newOwner, L)) { skipped.push({ id: m.id, title: m.getString("title"), kind: m.getString("kind") }); continue; }
-    transferMapOwnership($app, m, newOwner, { keepPrevious: false });
+    transferMapOwnership($app, m, newOwner);
+    recordMapTransfer($app, m, prev.getString("email"), newOwner.getString("email"), e.auth ? e.auth.email() : "");
     n += 1;
   }
-  return e.json(200, { transferred: n, skipped: skipped, owner_email: newOwner.getString("email") });
+  return e.json(200, { transferred: n, skipped: skipped, owner_email: newOwner.getString("email"),
+    private_count: o.privateCount, hidden_shared_count: o.hiddenSharedCount });
 });
 
 kbRoute("POST", "/share", (e) => {
@@ -3419,18 +3641,30 @@ kbRoute("POST", "/share", (e) => {
   // ⚠️ Účet se tu NIKDY nezakládá. Člen organizace vidí týmové projekty i seznam
   // lidí a zabírá křeslo — sdílení jedné mapy to nesmí udělat potichu (Richard
   // 14. 10. 2026). Založení jde jen na výslovné potvrzení z dialogu (invite_to_org výš).
-  const pozvatBezUctu = (adresa) => {
+  // `o.invite` = the pending share row (share_invites); `o.newToken` = issue a fresh
+  // one-time token (a new pending share, or an explicit "send again"). The invitation
+  // link carries the token — only whoever comes through it gets the share (S4-02).
+  // When the e-mail did NOT go out (no SMTP, daily cap, already sent earlier, failure),
+  // the person managing the sharing gets `invite_path` back and can hand the link over
+  // themselves; the plain token is never stored, so this is the only moment it exists.
+  const pozvatBezUctu = (adresa, o) => {
     const { posliPozvankuKeSdileni, registraceOtevrena } = require(`${__hooks}/pozvankaSdileni.js`);
-    const { isExternalOwner, orgManagerEmails } = require(`${__hooks}/helpers.js`);
+    const { isExternalOwner, orgManagerEmails, newShareInviteToken, shareInviteTokenValid } = require(`${__hooks}/helpers.js`);
     const { smiZvatDoOrganizace } = require(`${__hooks}/pozvaniDoOrganizace.js`);
     const otevrena = registraceOtevrena($app);
     const smiZvat = smiZvatDoOrganizace(e.auth);
+    const opt = o || {};
+    let token = "";
     const vysledek = (stav, extra) => Object.assign({
       invite: stav,
       registration_open: otevrena,
       can_invite_to_org: smiZvat,
-    }, extra || {});
+    }, (token && stav !== "sent") ? { invite_path: "/register?email=" + encodeURIComponent(adresa) + "&invite=" + encodeURIComponent(token) } : {}, extra || {});
     if (isExternalOwner(adresa)) return vysledek("external");
+    if (opt.invite && (opt.newToken || !shareInviteTokenValid(opt.invite))) token = newShareInviteToken($app, opt.invite);
+    // a pending share whose earlier invitation (and its token) is still valid: nothing is
+    // sent again and no link can be shown — the plain token is not stored
+    if (opt.invite && !token) return vysledek("already_sent");
 
     // Zavřená registrace a sdílející zvát nesmí → správci dostanou žádost přímo
     // v aplikaci (dřív mail „odpovězte na e-mail", a správce byl často ten, kdo
@@ -3438,7 +3672,7 @@ kbRoute("POST", "/share", (e) => {
     const zadostSpravcum = !otevrena && !smiZvat;
     let stav = "failed";
     try {
-      stav = posliPozvankuKeSdileni($app, { komu: adresa, odesilatel: e.auth, mapa: map, lang: L, spravceDostalZadost: zadostSpravcum });
+      stav = posliPozvankuKeSdileni($app, { komu: adresa, odesilatel: e.auth, mapa: map, lang: L, spravceDostalZadost: zadostSpravcum, token: token, znovu: opt.resend === true });
     } catch (err) {
       stav = "failed";
       try { $app.logger().warn("share: pozvánka neregistrovanému selhala", "error", String(err)); } catch (e2) { /* log je bonus */ }
@@ -3551,6 +3785,18 @@ kbRoute("POST", "/share", (e) => {
       });
       teamWorkers.sort((a, b) => a.email.localeCompare(b.email));
     }
+    // Pending shares (an address without an account, or an account that has not proved
+    // the invitation yet) — shown only here, i.e. only to those who manage the sharing.
+    const { pendingShareRows, emailHasAccount, shareInviteTokenValid } = require(`${__hooks}/helpers.js`);
+    pendingShareRows($app, map.id).forEach((r) => {
+      const em = r.getString("email");
+      if (maILc(sharedWith, em)) return;
+      members.push({
+        email: em, full_name: null, registered: emailHasAccount($app, em), pending: true,
+        permission: r.getString("permission"), has_work: !!workEmails[em],
+        invite_valid: shareInviteTokenValid(r),
+      });
+    });
     return e.json(200, { members: members, team_workers: teamWorkers, is_public: map.getBool("is_public"), team_access: map.getString("team_access") });
   }
 
@@ -3613,6 +3859,32 @@ kbRoute("POST", "/share", (e) => {
       }
     }
     const RANK = { read: 0, work: 1, edit: 2 };
+    const { emailHasAccount, isExternalOwner: jeExterni, shareInviteRow, upsertShareInvite } = require(`${__hooks}/helpers.js`);
+    const maUcet = emailHasAccount($app, email);
+    if (!maUcet && !jeExterni(email)) {
+      // PENDING SHARE (finding S4-02, 11 Nov 2026): the address has no account, so no
+      // authorization row and no entry on the project record — whoever registered the
+      // address would otherwise pick the access up. It waits in share_invites until the
+      // recipient comes through the invitation link (one-time token).
+      const drive = shareInviteRow($app, map.id, email);
+      if (drive && RANK[perm] <= RANK[drive.getString("permission")]) return e.json(400, { error: t(L, "err.alreadyShared") });
+      if (maILc(sharedWith, email)) { // leftover on the record (written by hand) — out
+        map.set("shared_with", sharedWith.filter((x) => !eqi(x, email)));
+        map.set("shared_with_edit", sharedWithEdit.filter((x) => !eqi(x, email)));
+        map.set("shared_with_work", sharedWithWork.filter((x) => !eqi(x, email)));
+        ulozSeSdilenim(map);
+      }
+      const ceka = upsertShareInvite($app, map.id, email, perm, e.auth.email());
+      return e.json(200, Object.assign(
+        { success: true, updated: map.getString("updated"), member: { email: email, full_name: null, permission: perm, registered: false, pending: true } },
+        drive ? { upgraded: true } : {},
+        pozvatBezUctu(email, { invite: ceka, newToken: !drive })
+      ));
+    }
+    // The address HAS an account: a real share. A pending share for it (the person signed
+    // up without the invitation link) ends here — whoever manages the sharing has just
+    // confirmed it for the existing account.
+    if (maUcet) { const stara = shareInviteRow($app, map.id, email); if (stara) $app.delete(stara); }
     if (maILc(sharedWith, email)) {
       // Stejné/nižší právo = „už je sdílena" — ledaže právě vznikl účet
       // (invite_to_org nad dřív nasdílenou adresou bez účtu): pak je odpověď
@@ -3692,10 +3964,16 @@ kbRoute("POST", "/share", (e) => {
   if (action === "update_permission") {
     const memberEmail = String(info.memberEmail || "").trim().toLowerCase();
     if (!memberEmail) return e.json(400, { error: t(L, "err.emailRequired") });
-    if (!maILc(sharedWith, memberEmail)) {
-      return e.json(400, { error: t(L, "err.userNoAccess") });
-    }
     const perm = ["edit", "work"].includes(info.permission) ? info.permission : "read";
+    if (!maILc(sharedWith, memberEmail)) {
+      // a pending share: the permission is kept on its own row
+      const { shareInviteRow } = require(`${__hooks}/helpers.js`);
+      const ceka = shareInviteRow($app, map.id, memberEmail);
+      if (!ceka) return e.json(400, { error: t(L, "err.userNoAccess") });
+      ceka.set("permission", perm);
+      $app.save(ceka);
+      return e.json(200, { success: true, permission: perm, updated: map.getString("updated") });
+    }
     setPermLists(memberEmail, perm);
     ulozSeSdilenim(map);
     return e.json(200, { success: true, permission: perm, updated: map.getString("updated") });
@@ -3708,10 +3986,51 @@ kbRoute("POST", "/share", (e) => {
     map.set("shared_with_edit", sharedWithEdit.filter((x) => !eqi(x, memberEmail)));
     map.set("shared_with_work", sharedWithWork.filter((x) => !eqi(x, memberEmail)));
     ulozSeSdilenim(map);
+    { // a pending share of the same address goes too
+      const { shareInviteRow } = require(`${__hooks}/helpers.js`);
+      const ceka = shareInviteRow($app, map.id, memberEmail);
+      if (ceka) $app.delete(ceka);
+    }
     return e.json(200, { success: true, updated: map.getString("updated") });
   }
 
+  // Send the invitation of a pending share again (a new one-time token; the previous
+  // link stops working). Without SMTP — or when the e-mail cannot go out — the answer
+  // carries `invite_path` and the person managing the sharing hands the link over.
+  if (action === "reinvite") {
+    const memberEmail = String(info.memberEmail || "").trim().toLowerCase();
+    const { shareInviteRow } = require(`${__hooks}/helpers.js`);
+    const ceka = memberEmail ? shareInviteRow($app, map.id, memberEmail) : null;
+    if (!ceka) return e.json(400, { error: t(L, "err.userNoAccess") });
+    return e.json(200, Object.assign({ success: true }, pozvatBezUctu(memberEmail, { invite: ceka, newToken: true, resend: true })));
+  }
+
   return e.json(400, { error: t(L, "err.unknownAction") });
+}, $apis.requireAuth());
+
+// Proof that the signed-in account received a share invitation: the one-time token from
+// the invitation link (finding S4-02, 11 Nov 2026). The web client calls it right after
+// sign-up / sign-in when it arrived through the link. A wrong, foreign or expired token
+// answers the same 400 — nothing about other people's invitations leaks. One token
+// confirms one share (its own project). Brake: 10 failed attempts per ACCOUNT and 10
+// minutes — a fresh account starts from zero, so the brake only slows one account down;
+// what protects the invitation is the 40-character random token.
+kbRoute("POST", "/share-invite/claim", (e) => {
+  const { claimShareInvitesByToken } = require(`${__hooks}/helpers.js`);
+  const { t, userLang } = require(`${__hooks}/i18n.js`);
+  const L = userLang(e.auth);
+  const store = $app.store();
+  const bucket = Math.floor(Date.now() / 600000);
+  const rlKey = "sicl:" + e.auth.id;
+  const prev = String(store.get(rlKey) || "").split(":");
+  const used = Number(prev[0]) === bucket ? Number(prev[1]) || 0 : 0;
+  if (used >= 10) return e.json(429, { error: t(L, "err.tooManyRequests") });
+  const n = claimShareInvitesByToken($app, e.auth, (e.requestInfo().body || {}).token);
+  if (n < 0) {
+    store.set(rlKey, bucket + ":" + (used + 1));
+    return e.json(400, { error: t(L, "err.shareInviteInvalid") });
+  }
+  return e.json(200, { success: true, claimed: n });
 }, $apis.requireAuth());
 
 // Cílená změna STAVU jednoho uzlu — jediná zapisovací cesta pro každého, kdo
@@ -3731,6 +4050,24 @@ kbRoute("POST", "/node-status", (e) => {
   if (!["todo", "in_progress", "done"].includes(status)) {
     return e.json(400, { error: t(L, "err.badStatus") });
   }
+  // One row action on a map at a time, on a FRESH load, repeated when the write is refused
+  // (finding S3-01, helpers.withMapWrite) — two people ticking their steps at the same
+  // moment used to lose one tick with both answers 200.
+  const HW = require(`${__hooks}/helpers.js`);
+  // The lock is taken only by somebody who SEES the map (cheap check first; everything is
+  // checked again inside, on the fresh load) — otherwise any signed-in account could hold
+  // up the row actions of a map it has no access to, or of an id that does not exist.
+  try {
+    const pre = $app.findRecordById("goalmaps", String(info.mapId || ""));
+    if (mapAccessLevel($app, pre, e.auth.id, e.auth.email()) === "") return e.json(403, { error: t(L, "err.noWriteAccess") });
+  } catch (err) {
+    return e.json(404, { error: t(L, "err.mapNotFound") });
+  }
+  // what follows the write (notifications, agent webhooks — up to seconds) runs AFTER the
+  // lock is released, so it never holds up the other people ticking in the same map
+  let potom = null;
+  const out = HW.withMapWrite($app, String(info.mapId || ""), () => {
+  potom = null;
   let map;
   try {
     map = $app.findRecordById("goalmaps", String(info.mapId || ""));
@@ -3770,8 +4107,11 @@ kbRoute("POST", "/node-status", (e) => {
     : n));
   // sdílený zapisovač: normalizace, stráže, razítka, uložení i záznamník změn
   const saved = v1SaveMapData($app, map, newNodes, origEdges, L, false, email, { isOwner: canEditMap && isOwner });
+  if (saved.conflict) return HW.MAP_RETRY;
   if (saved.error) return e.json(saved.status, { error: saved.error });
-  // zrcadlo update hooku pro dění po uložení (hooky se u $app.save nespustí)
+  // zrcadlo update hooku pro dění po uložení (hooky se u $app.save nespustí);
+  // `merged` = this request changed nothing and took over somebody else's graph → no follow-ups for it
+  if (!saved.merged) potom = () => {
   try {
     notifyUnblockedTransitions($app, origNodes, origEdges, map, email);
   } catch (err) {
@@ -3782,7 +4122,15 @@ kbRoute("POST", "/node-status", (e) => {
   } catch (err) {
     try { $app.logger().warn("node-status: spuštění agenta selhalo", "error", String(err)); } catch (e2) { /* log je bonus */ }
   }
-  return e.json(200, { success: true, status: status, updated: map.getString("updated") });
+  };
+  return { ok: true, updated: map.getString("updated") };
+  });
+  if (out === HW.MAP_RETRY) return e.json(409, { error: t(L, "err.mapConflict") });
+  if (out && out.ok === true) {
+    if (potom) potom();
+    return e.json(200, { success: true, status: status, updated: out.updated });
+  }
+  return out;
 }, $apis.requireAuth());
 
 // Žádost o změnu termínu úkolu na uzlu (Richard 7. 8. 2026). Akce:
@@ -3799,6 +4147,16 @@ kbRoute("POST", "/deadline-requests", (e) => {
   const L = userLang(e.auth);
   const info = e.requestInfo().body || {};
   const action = String(info.action || "request");
+  // one row action on a map at a time, on a fresh load, repeated when refused (S3-01, helpers.withMapWrite)
+  const HW = require(`${__hooks}/helpers.js`);
+  // the lock only for somebody who sees the map (checked again inside, on the fresh load)
+  try {
+    const pre = $app.findRecordById("goalmaps", String(info.mapId || ""));
+    if (mapAccessLevel($app, pre, e.auth.id, e.auth.email()) === "") return e.json(403, { error: t(L, "err.noWriteAccess") });
+  } catch (err) {
+    return e.json(404, { error: t(L, "err.mapNotFound") });
+  }
+  const out = HW.withMapWrite($app, String(info.mapId || ""), () => {
   let map;
   try {
     map = $app.findRecordById("goalmaps", String(info.mapId || ""));
@@ -3845,6 +4203,7 @@ kbRoute("POST", "/deadline-requests", (e) => {
     const note = String(info.note || "").slice(0, 500);
     // razítko žadatele doplní stampDeadlineRequesters uvnitř v1SaveMapData
     const saved = saveNodes({ deadlineChangeWanted: date, deadlineChangeNote: note });
+    if (saved.conflict) return HW.MAP_RETRY;
     if (saved.error) return e.json(saved.status, { error: saved.error });
     return e.json(200, { success: true, updated: map.getString("updated") });
   }
@@ -3855,6 +4214,7 @@ kbRoute("POST", "/deadline-requests", (e) => {
     }
     if (!d.deadlineChangeWanted) return e.json(400, { error: t(L, "err.deadlineRequestNone") });
     const saved = saveNodes({ deadlineChangeWanted: "", deadlineChangeNote: "" });
+    if (saved.conflict) return HW.MAP_RETRY;
     if (saved.error) return e.json(saved.status, { error: saved.error });
     if (requester && requester !== email) {
       try {
@@ -3877,11 +4237,15 @@ kbRoute("POST", "/deadline-requests", (e) => {
   if (action === "cancel") {
     if (email !== requester) return e.json(403, { error: t(L, "err.deadlineRequestRequesterOnly") });
     const saved = saveNodes({ deadlineChangeWanted: "", deadlineChangeNote: "" });
+    if (saved.conflict) return HW.MAP_RETRY;
     if (saved.error) return e.json(saved.status, { error: saved.error });
     return e.json(200, { success: true, updated: map.getString("updated") });
   }
 
   return e.json(400, { error: t(L, "err.unknownAction") });
+  });
+  if (out === HW.MAP_RETRY) return e.json(409, { error: t(L, "err.mapConflict") });
+  return out;
 }, $apis.requireAuth());
 
 // veřejné mapy — věrná replika Base44 funkce getPublicMap (bez přihlášení)
@@ -4718,6 +5082,25 @@ kbRoute("POST", "/reset-user-password", (e) => {
     return e.json(403, { error: t(L, "err.resetPasswordNotAdmin") });
   }
 
+  // Brake: at most 3 resets of ONE account in 10 minutes (code analysis 4, wave 4). Every reset signs the person
+  // out everywhere and, with SMTP, sends them a mail — a loop (or a stolen admin session) must not do that
+  // without end. Three, not one: an admin who closed the dialog with the password before copying it needs
+  // another try. Counted in the process memory (a restart clears it); the value is a "count|windowStart" string.
+  // Check and count in ONE setFunc step — a parallel burst must not read the same count and pass together.
+  {
+    const RESET_MAX = 3, RESET_WINDOW_MS = 10 * 60 * 1000;
+    const nowMs = Date.now();
+    let refused = false;
+    $app.store().setFunc("reset-hesla:" + rec.id, (cur) => {
+      const parts = String(cur || "").split("|");
+      let count = Number(parts[0]) || 0, since = Number(parts[1]) || 0;
+      if (nowMs - since >= RESET_WINDOW_MS) { count = 0; since = nowMs; }
+      if (count >= RESET_MAX) { refused = true; return count + "|" + since; }
+      return (count + 1) + "|" + since;
+    });
+    if (refused) return e.json(429, { error: t(L, "err.resetPasswordTooOften") });
+  }
+
   const tempPassword = $security.randomString(12);
   rec.setPassword(tempPassword);
   // ⚠️ Zneplatnit odhlášené relace: bez toho by ten, kdo se do účtu dostal,
@@ -4860,12 +5243,20 @@ kbRoute("POST", "/org-structure/assign", (e) => {
   const map = findOrgMap($app);
   if (!map) return e.json(404, { error: t(L, "err.orgMapMissing") });
   const info = e.requestInfo().body || {};
-  const res = setPositionAssignment($app, map, String(info.node_id || ""), {
-    holder: info.holder === undefined ? undefined : String(info.holder || ""),
-    deputy: info.deputy === undefined ? undefined : String(info.deputy || ""),
-    position_kind: info.position_kind === undefined ? undefined : String(info.position_kind || ""),
-    title: info.title === undefined ? undefined : String(info.title || ""),
-  }, e.auth.email(), L);
+  // one row action on the map at a time, on a fresh load, repeated when refused (S3-01)
+  const HW = require(`${__hooks}/helpers.js`);
+  const res = HW.withMapWrite($app, map.id, () => {
+    const fresh = findOrgMap($app);
+    if (!fresh) return { error: t(L, "err.orgMapMissing"), status: 404 };
+    const r = setPositionAssignment($app, fresh, String(info.node_id || ""), {
+      holder: info.holder === undefined ? undefined : String(info.holder || ""),
+      deputy: info.deputy === undefined ? undefined : String(info.deputy || ""),
+      position_kind: info.position_kind === undefined ? undefined : String(info.position_kind || ""),
+      title: info.title === undefined ? undefined : String(info.title || ""),
+    }, e.auth.email(), L);
+    return r.conflict ? HW.MAP_RETRY : r;
+  });
+  if (res === HW.MAP_RETRY) return e.json(409, { error: t(L, "err.mapConflict") });
   if (res.error) return e.json(res.status || 400, { error: res.error });
   return e.json(200, { position: res.row });
 }, $apis.requireAuth());
@@ -4880,7 +5271,15 @@ kbRoute("POST", "/org-structure/add", (e) => {
   const map = findOrgMap($app);
   if (!map) return e.json(404, { error: t(L, "err.orgMapMissing") });
   const info = e.requestInfo().body || {};
-  const res = addOrgPosition($app, map, String(info.parent_node_id || ""), String(info.title || ""), e.auth.email(), L);
+  // one row action on the map at a time, on a fresh load, repeated when refused (S3-01)
+  const HW = require(`${__hooks}/helpers.js`);
+  const res = HW.withMapWrite($app, map.id, () => {
+    const fresh = findOrgMap($app);
+    if (!fresh) return { error: t(L, "err.orgMapMissing"), status: 404 };
+    const r = addOrgPosition($app, fresh, String(info.parent_node_id || ""), String(info.title || ""), e.auth.email(), L);
+    return r.conflict ? HW.MAP_RETRY : r;
+  });
+  if (res === HW.MAP_RETRY) return e.json(409, { error: t(L, "err.mapConflict") });
   if (res.error) return e.json(res.status || 400, { error: res.error });
   return e.json(200, { position: res.row });
 }, $apis.requireAuth());
@@ -4935,7 +5334,16 @@ kbRoute("POST", "/org-structure/remove", (e) => {
   if (!smiEditovatOrgStrukturu(e.auth)) return e.json(403, { error: t(L, "err.orgManagerOnly") });
   const map = findOrgMap($app);
   if (!map) return e.json(404, { error: t(L, "err.orgMapMissing") });
-  const res = removeOrgPosition($app, map, String((e.requestInfo().body || {}).node_id || ""), e.auth.email(), L);
+  // one row action on the map at a time, on a fresh load, repeated when refused (S3-01)
+  const HW = require(`${__hooks}/helpers.js`);
+  const nodeIdToRemove = String((e.requestInfo().body || {}).node_id || "");
+  const res = HW.withMapWrite($app, map.id, () => {
+    const fresh = findOrgMap($app);
+    if (!fresh) return { error: t(L, "err.orgMapMissing"), status: 404 };
+    const r = removeOrgPosition($app, fresh, nodeIdToRemove, e.auth.email(), L);
+    return r.conflict ? HW.MAP_RETRY : r;
+  });
+  if (res === HW.MAP_RETRY) return e.json(409, { error: t(L, "err.mapConflict") });
   if (res.error) return e.json(res.status || 400, { error: res.error });
   return e.json(200, { success: true });
 }, $apis.requireAuth());
@@ -5568,6 +5976,13 @@ kbRoute("POST", "/agent-callback", (e) => {
   if (run.getString("token_hash") !== claim) return e.json(409, { error: t(L, "err.runAlreadyClosed") });
 
   let map = null, node = null;
+  let potom = null; // follow-ups of the write (notifications, the next agent's webhook) — run after the lock is released
+  // The node is ticked as one row action on a FRESH load of the map, repeated when the
+  // write is refused (finding S3-01, helpers.withMapWrite) — the callback used to put
+  // back whatever a person changed in the map while it was being handled.
+  const HW = require(`${__hooks}/helpers.js`);
+  const zapis = HW.withMapWrite($app, run.getString("map"), () => {
+  map = null; node = null; potom = null;
   try {
     map = $app.findRecordById("goalmaps", run.getString("map"));
     node = jsonVal(map, "nodes", []).find((n) => n.id === run.getString("node_id"));
@@ -5587,6 +6002,7 @@ kbRoute("POST", "/agent-callback", (e) => {
         : n));
       const saved = v1SaveMapData($app, map, nodes, origEdges, L, false, run.getString("agent_name") || "AI",
         { rulesDepth: run.getInt("depth") || 0 }); // hloubka řetězu pravidel platí i přes HTTP (S1-03)
+      if (saved.conflict) return HW.MAP_RETRY;
       if (saved.error) {
         // uzel se nedokončil → běh NENÍ „done": garant by dostal „hotovo" nad
         // otevřeným uzlem (nález S8-04)
@@ -5594,7 +6010,8 @@ kbRoute("POST", "/agent-callback", (e) => {
         status = "failed";
         result = ((result ? result + " | " : "") + String(saved.error)).slice(0, 4000);
       }
-      if (!saved.error) {
+      // `merged` = the node was already done and somebody else's graph was taken over → no follow-ups for it
+      if (!saved.error && !saved.merged) potom = () => {
         // TOHLE je řetěz ze zadání: dokončený uzel odblokuje navazující a jeho
         // garant dostane „můžete začít". Request hooky se u $app.save nespustí,
         // proto ručně — a stejně tak se rozjede případná navazující automatizace.
@@ -5608,13 +6025,22 @@ kbRoute("POST", "/agent-callback", (e) => {
         } catch (err) {
           try { $app.logger().warn("agent-callback: navazující automatizace selhala", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
         }
-      }
+      };
     }
 
   } catch (err) {
     try { $app.logger().warn("agent-callback: zápis mapy vyhodil výjimku", "run", run.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
     status = "failed";
     result = ((result ? result + " | " : "") + String((err && err.message) || err)).slice(0, 4000);
+  }
+  return null;
+  });
+  if (zapis !== HW.MAP_RETRY && potom) potom();
+  if (zapis === HW.MAP_RETRY) {
+    // refused on every round — the node is not done, so the run is not "done" either (S8-04)
+    try { $app.logger().warn("agent-callback: the map kept changing, the node was not marked done", "run", run.id); } catch (e2) { /* log is a bonus */ }
+    status = "failed";
+    result = ((result ? result + " | " : "") + t(L, "err.mapConflict")).slice(0, 4000);
   }
   // uzavření běhu AŽ po pokusu o zápis mapy — stav běhu odpovídá stavu mapy (S8-04)
   run.set("status", status);
@@ -6278,6 +6704,13 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
   }
   const saved = v1SaveMapData($app, map, finalNodes, origEdges, a.lang, false, a.user.email(), { isOwner: w.isOwner, via: a.via });
   if (saved.error) return e.json(saved.status, { error: saved.error });
+  // A no-op update that took over the graph somebody else stored meanwhile (saved.merged):
+  // the difference from `origNodes` is THEIR change, already notified and run through the
+  // rules by their own request — the follow-ups below must find nothing to do.
+  if (saved.merged) {
+    origNodes.splice(0, origNodes.length, ...jsonVal(map, "nodes", []));
+    origEdges.splice(0, origEdges.length, ...jsonVal(map, "edges", []));
+  }
   // nový řešitel → spolupracovník mapy (work), PŘED notifikací o přiřazení
   let shared = [];
   if (info.owner !== undefined && d.owner && d.owner !== String((origNodes[idx].data || {}).owner || "")) {

@@ -66,7 +66,12 @@ function chybaTvaruPravidla(app, auth, a, nazev) {
     if (!r) return null;
     const body = { name: a.name, trigger: a.trigger, actions: a.actions, conditions: a.conditions };
     if (a.node_id) body.node_id = SPOL().uzelId(app, auth, mid, a.node_id);
-    const v = validateRuleInput(app, r.map, body, { strict: true });
+    // the same view of people as the v1 route that will store it (rules-api.js saveRule)
+    let prevActions = null;
+    if (a.rule_id) {
+      try { prevActions = JSON.parse(app.findRecordById("automation_rules", SPOL().pravidloId(app, mid, a.rule_id)).getString("actions") || "[]"); } catch (err) { prevActions = null; }
+    }
+    const v = validateRuleInput(app, r.map, body, { strict: true, userId: auth.id, prevActions: prevActions });
     return v && v.error ? `Error: invalid rule — ${v.error}. Fix the arguments and call ${nazev || "create_rule"} again (the user has not been asked yet).` : null;
   } catch (err) { return null; }
 }

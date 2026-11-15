@@ -15,6 +15,7 @@
   "membership": {
     "heading": "Plan & payment",
     "hintActive": "Your membership is active. The plans are listed below; we'll arrange a plan change with you by e-mail.",
+    "hintEnded": "Your subscription has ended — saving is paused, your data stays. Choose a plan and payment method; once paid, the app unlocks again and your data and address stay unchanged.",
     "hintTrial": "Your trial runs until {{date}}. Choose a plan and payment method — your data and address stay unchanged.",
     "planLabel": "Plan",
     "plan": {

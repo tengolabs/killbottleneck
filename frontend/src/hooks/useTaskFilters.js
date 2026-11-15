@@ -110,7 +110,12 @@ export function useTaskFilters({ user, searchParams, setSearchParams, maps, t })
     // Úkol nese plán jako `planned_on`, uzel z useTaskTrees jako `plannedOn`.
     if (deadlineFilter !== ALL) {
       if (it.status === 'done') return false;
-      if (!odpovidaTerminu(deadlineFilter, it.planned_on ?? it.plannedOn, it.deadline)) return false;
+      // "Zadal jsem": the DEADLINE alone decides. The plan is the assignee's private decision and
+      // the server drops it for delegated items (helpers.js buildMyDay: `planned: ""`,
+      // delegatedOverdue = deadline < today) — with the plan applied, the counter "With others,
+      // overdue 2" opened a list of 1 as soon as the colleague planned the task (analysis 4, F3-02).
+      const plan = ownerFilter === 'delegated' ? '' : (it.planned_on ?? it.plannedOn);
+      if (!odpovidaTerminu(deadlineFilter, plan, it.deadline)) return false;
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();

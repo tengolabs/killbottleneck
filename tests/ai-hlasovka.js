@@ -71,6 +71,46 @@ const systemZ = (v) => ((v && v.messages) || []).find((m) => m.role === 'system'
 
 // nahrávky podle hlavičky (obsah za ní je pro přepis mocku jedno)
 const vypln = Buffer.alloc(300, 7);
+// --- recordings with a KNOWN length (S8-03): the server measures the length itself, `audio_s` is only a hint ---
+// WebM has no cheap length in the header → estimated from the size at 32 kbit/s (the recorder's bit rate): 168 000 B = 42 s
+const WEBM42 = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81]), Buffer.alloc(168000 - 8, 7)]).toString('base64');
+// WAV 8 kHz / 8 bit / mono (8000 B per second) — exact length from the header
+const wav = (sec) => {
+  const n = 8000 * sec, b = Buffer.alloc(44 + n, 0x80);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
+  b.writeUInt32LE(8000, 24); b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(n, 40);
+  return b.toString('base64');
+};
+// The same 8 kHz / 8 bit / mono audio with a CRAFTED header: decoders ignore `block align` (and the
+// byte rate), so the audio still plays `sec` seconds — the price must not follow the forged field.
+const wavBlockAlign = (sec) => { const b = Buffer.from(wav(sec), 'base64'); b.writeUInt16LE(65535, 32); b.writeUInt32LE(0x7fffffff, 28); return b.toString('base64'); };
+// A compressed stream inside a WAV (format code 0x55 = MP3): the header says nothing about the length
+// → estimated from the size at 32 kbit/s like any unknown container (160 044 B = 40 s).
+const wavCompressed = () => { const b = Buffer.from(wav(20), 'base64'); b.writeUInt16LE(0x55, 20); b.writeUInt32LE(192000, 24); b.writeUInt16LE(2, 22); b.writeUInt16LE(32, 34); return b.toString('base64'); };
+// PCM that claims an absurd density (255 channels × 192 kHz × 32 bit): charged at least as 48 kHz stereo
+// 24-bit (288 000 B per second) → 576 044 B = 2 s, not the 1 s floor.
+const wavDense = () => { const b = Buffer.from(wav(72), 'base64'); b.writeUInt16LE(255, 22); b.writeUInt32LE(192000, 24); b.writeUInt16LE(32, 34); return b.toString('base64'); };
+// Ogg/Opus: identification page + filler + last page whose granule position says where the audio ends (48 kHz)
+const oggOpus = (sec, bytes) => {
+  const page = (granule, body, typ) => {
+    const h = Buffer.alloc(28); h.write('OggS', 0); h[5] = typ; h.writeUIntLE(granule, 6, 6); h[26] = 1; h[27] = body.length;
+    return Buffer.concat([h, body]);
+  };
+  const head = Buffer.alloc(19); head.write('OpusHead', 0); head[8] = 1; head[9] = 1; head.writeUInt16LE(312, 10); head.writeUInt32LE(16000, 12);
+  const first = page(0, head, 2), last = page(sec * 48000 + 312, Buffer.alloc(10, 5), 4);
+  return Buffer.concat([first, Buffer.alloc(Math.max(0, bytes - first.length - last.length), 5), last]).toString('base64');
+};
+// M4A as a dictaphone writes it: ftyp, mdat (the audio), moov with mvhd at the END (time scale 1000)
+const m4a = (sec, bytes) => {
+  const box = (typ, body) => { const h = Buffer.alloc(8); h.writeUInt32BE(8 + body.length, 0); h.write(typ, 4); return Buffer.concat([h, body]); };
+  const mvhd = Buffer.alloc(100); mvhd.writeUInt32BE(1000, 12); mvhd.writeUInt32BE(sec * 1000, 16);
+  const ftyp = box('ftyp', Buffer.from('M4A \0\0\0\0isom')), moov = box('moov', box('mvhd', mvhd));
+  return Buffer.concat([ftyp, box('mdat', Buffer.alloc(bytes - ftyp.length - moov.length - 8, 5)), moov]).toString('base64');
+};
+// MP3 MPEG-1 Layer III, constant 64 kbit/s (frame header FF FB 50): 80 000 B = 10 s
+const MP3_10 = Buffer.concat([Buffer.from([0xff, 0xfb, 0x50, 0xc0]), Buffer.alloc(80000 - 4, 5)]).toString('base64');
+// MP3 with a variable bit rate: the first frame is a Xing header with the number of frames (957 × 1152 samples at 44.1 kHz = 25 s)
+const MP3_VBR_25 = (() => { const b = Buffer.alloc(120000, 5); Buffer.from([0xff, 0xfb, 0x50, 0xc0]).copy(b, 0); b.write('Xing', 36); b.writeUInt32BE(1, 40); b.writeUInt32BE(957, 44); return b.toString('base64'); })();
 const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81]), vypln]).toString('base64');
 const OGG = Buffer.concat([Buffer.from('OggS\0\x02'), vypln]).toString('base64');
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), vypln]).toString('base64');
@@ -95,20 +135,20 @@ H.beh(async () => {
   textyPrepisu.push('koupit barvu na plot, zavolat panu Novákovi kvůli zakázce a objednat kování');
   fronta.push(nastroj('add_ideas', { items: [{ title: 'koupit barvu na plot' }, { title: 'objednat kování' }] }));
   let predV = volani.length;
-  let r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: '', audio_base64: WEBM, audio_s: 42, context: { route: '/' } } });
+  let r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: '', audio_base64: WEBM42, audio_s: 42, context: { route: '/' } } });
   expect(r.status === 200, `hlasovka bez textu → 200 (${r.status} ${JSON.stringify(r.json).slice(0, 160)})`);
   const p1 = prepisy.at(-1) || {};
   expect(/\.webm$/.test(p1.soubor) && p1.model === 'Systran/faster-whisper-large-v3' && p1.auth === 'Bearer tajny-prepis' && p1.jazyk === 'cs', `přepis: multipart *.webm, model a token z KB_TRANSCRIBE_*, jazyk cs (${JSON.stringify(p1)})`);
   expect(p1.vad === 'true', 'vlastní přepisovač dostává vad_filter=true (bez filtru ticha si Whisper na tichu vymýšlí)');
   const v1 = volani[predV];
   const uziv = (v1.messages || []).filter((m) => m.role === 'user').pop().content;
-  expect(/\[Přepis hlasovky\]\nkoupit barvu na plot/.test(uziv) && !JSON.stringify(v1).includes(WEBM.slice(0, 40)), 'chat model dostal přepis se značkou, ne nahrávku');
+  expect(/\[Přepis hlasovky\]\nkoupit barvu na plot/.test(uziv) && !JSON.stringify(v1).includes(WEBM42.slice(0, 40)), 'chat model dostal přepis se značkou, ne nahrávku');
   expect((v1.tools || []).some((t) => t.function.name === 'add_ideas'), 'značka hlasovky otevře třídicí nástroje (add_ideas)');
   expect(/Přepis hlasovky/.test(systemZ(v1)), 'systém zná pravidlo pro „[Přepis hlasovky]“');
   let chat = r.json.chat;
   const zU = chat.messages.find((m) => m.role === 'user');
   expect(zU.hlas && zU.hlas.s === 42 && /^Hlasovka: koupit barvu/.test(chat.title), `uložená zpráva nese délku, titulek z přepisu (${chat.title})`);
-  expect(!JSON.stringify(chat).includes(WEBM.slice(0, 40)), 'nahrávka se NEukládá');
+  expect(!JSON.stringify(chat).includes(WEBM42.slice(0, 40)), 'nahrávka se NEukládá');
   expect((chat.messages.at(-1).karty || []).some((k) => k.type === 'akce' && /zásobník/i.test(k.popis || '')), 'z hlasovky vznikla karta k potvrzení (nic se neuložilo rovnou)');
 
   console.log('== WhatsApp .opus (Ogg) → .ogg; druh podle obsahu, ne podle názvu ==');
@@ -148,6 +188,7 @@ H.beh(async () => {
   expect(log.some((l) => /#hlas/.test(l.model) && Number.isInteger(l.prepis_ms) && l.prepis_ms >= 0), `ai_chat_log: prepis_ms = doba přepisu Whisperem (${log.map((l) => l.prepis_ms).join(' | ')})`);
   expect(log.some((l) => /#hlas-fail/.test(l.model) && l.stav === 'chyba'), 'nepovedený přepis je v logu jako #hlas-fail / chyba');
   // přepis „jako koupeno“ (Richard 5. 10. 2026): 42 s × referenční cena za minutu (kredity-ceny.json `prepis`) navíc k tokenům modelu
+  // (since S8-03 the 42 s are what the SERVER measured on the 168 000 B recording, not the `audio_s` the client sent)
   const CENY = require('../server/pb_hooks/kredity-ceny.json');
   const KC = (i, c, o) => ((i - c) * CENY.aki.in + c * CENY.aki.cache + o * CENY.aki.out) / 1e6 * CENY.eur_kc;
   const kreditKc = KC(CENY.referencni_tah.in, CENY.referencni_tah.cached, CENY.referencni_tah.out);
@@ -432,15 +473,48 @@ H.beh(async () => {
   r = await inst11.api('POST', '/api/kb/chat', { token: J, body: { mode: 'x', message: '', audio_base64: WEBM, audio_s: 3 } });
   expect(r.status === 429 && r.json.code === 'ai_rate', `…a ubere váhu 2: druhá při stropu 3 → 429 (${r.status})`);
 
-  console.log('== délka od klienta: nesmysl neshodí zápis do logu (a s ním započtení tahu) ==');
-  textyPrepisu.push('hlasovka s nesmyslnou délkou');
-  fronta.push({ content: 'ok' });
-  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: '', audio_base64: WEBM, audio_s: 1e16 } });
-  const logN = (await inst.api('GET', `/api/collections/ai_chat_log/records?perPage=5&filter=${encodeURIComponent(`chat='${(r.json.chat || {}).id}'`)}`, { token: su })).json.items || [];
-  expect(r.status === 200 && logN.length === 1 && Number(logN[0].audio_ms) === 3600000 && r.json.chat.messages[0].hlas.s === 3600, `audio_s 1e16 → řádek logu existuje, délka omezená na hodinu (${logN.length} ř., ${logN[0] && logN[0].audio_ms})`);
-  fronta.push({ content: 'ok' });
-  r = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: '', audio_base64: WEBM, audio_s: 'abc' } });
-  expect(r.status === 200 && r.json.chat.messages[0].hlas.s === 0, `audio_s "abc" → 0 (${r.status})`);
+  console.log('== S8-03: the length (= the price) is measured by the SERVER; `audio_s` from the client is only a hint for the bubble ==');
+  // one voice turn → the log row of that turn (what was charged) + the length shown in the bubble
+  const hlasTah = async (audio, audioS) => {
+    textyPrepisu.push('zavolat klientovi kvůli nabídce');
+    fronta.push({ content: 'ok' });
+    const body = { message: '', audio_base64: audio };
+    if (audioS !== undefined) body.audio_s = audioS;
+    const o = await inst.api('POST', '/api/kb/chat', { token: A, body });
+    const radky = (await inst.api('GET', `/api/collections/ai_chat_log/records?perPage=5&filter=${encodeURIComponent(`chat='${((o.json || {}).chat || {}).id}'`)}`, { token: su })).json.items || [];
+    return { status: o.status, radku: radky.length, ms: Number((radky[0] || {}).audio_ms), kredity: Number((radky[0] || {}).kredity), bublina: ((((o.json || {}).chat || {}).messages || [])[0] || {}).hlas };
+  };
+  // the SAME recording, whatever the client claims: 0 (what the web app sends for an uploaded file), nothing,
+  // the truth, an hour, nonsense — always 42 s and always the same credits
+  const pravda = await hlasTah(WEBM42, 42);
+  expect(pravda.status === 200 && pravda.ms === 42000 && pravda.kredity > prepisKr, `the reference turn: 42 s, credits include the transcript (${pravda.ms} ms, ${pravda.kredity})`);
+  for (const [co, bublina] of [[0, 0], [undefined, 0], [3600, 3600], [1e16, 3600], ['abc', 0], [-5, 0]]) {
+    const v = await hlasTah(WEBM42, co);
+    expect(v.status === 200 && v.radku === 1 && v.ms === 42000, `audio_s ${JSON.stringify(co)} → the log still says 42 s (${v.status}, ${v.radku} row, ${v.ms} ms)`);
+    expect(v.kredity === pravda.kredity, `audio_s ${JSON.stringify(co)} → the same credits as with the true length (${v.kredity} = ${pravda.kredity})`);
+    expect(!!v.bublina && v.bublina.s === bublina, `audio_s ${JSON.stringify(co)} → the bubble shows the client's hint, cut to 0–3600 (${v.bublina && v.bublina.s})`);
+  }
+  // an uploaded file (the web app sends audio_s 0): the length comes from the container
+  const formaty = [
+    ['WAV 20 s (160 kB)', wav(20), 20], ['Ogg/Opus 30 s (60 kB)', oggOpus(30, 60000), 30],
+    ['WAV 20 s with a forged block align', wavBlockAlign(20), 20], ['WAV carrying a compressed stream (160 kB → 40 s by size)', wavCompressed(), 40],
+    ['WAV claiming 255 channels at 192 kHz (576 kB → 2 s floor)', wavDense(), 2],
+    ['M4A 75 s (600 kB, moov at the end)', m4a(75, 600000), 75], ['MP3 10 s (64 kbit/s, 80 kB)', MP3_10, 10],
+    ['MP3 25 s (variable bit rate, 120 kB)', MP3_VBR_25, 25],
+  ];
+  for (const [nazev, audio, sec] of formaty) {
+    const v0 = await hlasTah(audio, 0);
+    const kr = sec * CENY.prepis.usd_min * CENY.prepis.usd_kc / 60 / kreditKc;
+    expect(v0.status === 200 && v0.ms === sec * 1000, `${nazev}, audio_s 0 → measured ${sec} s (${v0.status}, ${v0.ms} ms)`);
+    expect(v0.kredity > kr && v0.kredity < kr + 1, `${nazev}, audio_s 0 → the transcript is NOT free: ${kr.toFixed(2)} credits + the model's tokens (${v0.kredity})`);
+    const v1h = await hlasTah(audio, 3600);
+    expect(v1h.ms === sec * 1000 && v1h.kredity === v0.kredity, `${nazev}, audio_s 3600 → the same ${sec} s and the same credits, not 104 (${v1h.ms} ms, ${v1h.kredity})`);
+  }
+  // a crafted header moves the length only inside what the size allows (6–512 kbit/s): never zero, never an hour
+  let lez = await hlasTah(oggOpus(3600, 3000), 0);
+  expect(lez.status === 200 && lez.ms === 4000, `a 3 kB Ogg claiming an hour → 4 s (3 kB at 6 kbit/s), not 3600 (${lez.ms} ms)`);
+  lez = await hlasTah(oggOpus(1, 640000), 0);
+  expect(lez.status === 200 && lez.ms === 10000, `a 640 kB Ogg claiming 1 s → 10 s (640 kB at 512 kbit/s), not 1 (${lez.ms} ms)`);
 
   console.log('== dlouhý přepis (soubor na desítky minut): zkrácení se přizná, neztratí se potichu ==');
   textyPrepisu.push('slovo '.repeat(1700) + 'ÚPLNÝ-KONEC');

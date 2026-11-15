@@ -153,13 +153,19 @@ const sdilej = (token, body) => api('POST', '/api/kb/share', { token, body: { ac
       // textová část <b> legitimně obsahuje (je to prostý text) — kontroluje se jen HTML
       const htmlCast = dekoduj(pozv[0].raw.split(/Content-Type: text\/html/i)[1] || '');
       expect(htmlCast.length > 0 && !/<b>jaro<\/b>/.test(htmlCast) && /&lt;b&gt;jaro/.test(htmlCast), 'název projektu je v HTML escapovaný');
-      expect(/zaregistrujte se touto e-mailovou adresou/.test(txt), 'návod k registraci (otevřená registrace)');
+      // Code analysis 4, S4-02 (11 Nov 2026): the link carries a one-time token and the text says that
+      // only whoever comes through it gets access (until then: "sign up with this e-mail address").
+      expect(/zaregistrujte se tlačítkem z tohoto e-mailu/.test(txt) && /přístup dostane jen ten, kdo přijde přes něj/.test(txt), 'návod k registraci (otevřená registrace): přes odkaz z e-mailu');
+      expect(/register\?email=novy%40example\.com&(amp;)?invite=[A-Za-z0-9]{40}/.test(txt), 'odkaz nese jednorázový token pozvánky');
     }
 
     console.log('-- žádná druhá pozvánka --');
     await api('POST', '/api/kb/share', { token: A.token, body: { action: 'unshare', mapId: M.id, memberEmail: 'novy@example.com' } });
     r = await sdilej(A.token, { mapId: M.id, email: 'novy@example.com', permission: 'read' });
     expect(r.json.invite === 'already_sent', `odebrat + přidat znovu → already_sent (${r.json.invite})`);
+    // the e-mail is not sent again, so the person sharing gets the new one-time link to hand over
+    const odkazNovy = String(r.json.invite_path || '');
+    expect(/^\/register\?email=novy%40example\.com&invite=[A-Za-z0-9]{40}$/.test(odkazNovy), `…a sdílející dostal nový odkaz k předání (${odkazNovy.slice(0, 50)}…)`);
     r = await sdilej(A.token, { mapId: M.id, email: 'novy@example.com', permission: 'edit' });
     expect(r.status === 200 && r.json.upgraded && r.json.invite === 'already_sent', `povýšení práv → already_sent (${r.json.invite})`);
     await sleep(1000);
@@ -193,10 +199,18 @@ const sdilej = (token, body) => api('POST', '/api/kb/share', { token, body: { ac
     await sleep(1000);
     expect(pro('x1@example.com').length === 1, `x1 dál 1 mail (${pro('x1@example.com').length})`);
 
-    console.log('-- po registraci adresát mapu vidí --');
+    // Code analysis 4, S4-02 (decision 11 Nov 2026). Until then this block said: "after signing up the
+    // recipient sees the map" — registration alone (the e-mail is never verified) was enough, so anybody
+    // who registered the address got the share. Now the share waits until the account presents the
+    // one-time token from the invitation link.
+    console.log('-- registrace BEZ odkazu z pozvánky mapu neotevře; s tokenem z odkazu ano --');
     const N = await ucet('novy@example.com');
     r = await api('GET', `/api/collections/goalmaps/records/${M.id}`, { token: N.token });
-    expect(r.status === 200, `nově registrovaný mapu otevře (${r.status})`);
+    expect(r.status === 404, `registrace stejnou adresou bez odkazu mapu NEotevře (${r.status})`);
+    r = await api('POST', '/api/kb/share-invite/claim', { token: N.token, body: { token: decodeURIComponent(odkazNovy.split('invite=')[1] || '') } });
+    expect(r.status === 200 && r.json.claimed === 1, `token z odkazu pozvánku potvrdí (${r.status} ${JSON.stringify(r.json)})`);
+    r = await api('GET', `/api/collections/goalmaps/records/${M.id}`, { token: N.token });
+    expect(r.status === 200, `potom adresát mapu otevře (${r.status})`);
 
     console.log('== B: registrace na klíč ==');
     maily.length = 0;

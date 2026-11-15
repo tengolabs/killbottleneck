@@ -30,6 +30,8 @@
     "vsechnyProjektyTitle": "Clear the project filter — show tasks of all projects",
     "nodeFallback": "node",
     "newTask": "New task",
+    "loadFailed": "The tasks could not be loaded.",
+    "loadRetry": "Try again",
     "stropZobrazeno": "Showing {{shown}} of {{total}} tasks",
     "nacistVse": "Load all",
     "emptyTitle": "You have no tasks yet",

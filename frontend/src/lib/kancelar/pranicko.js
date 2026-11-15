@@ -4,7 +4,7 @@
 // ne v i18n — PDF musí jít vyrobit i mimo React (node test). Čistá funkce: knihovny i QR matice injektované.
 // AI obrázek (3. 11. 2026, `obrazek` = { image, w, h }): nakreslený FLUXem pro přání / pozvánku / plakát, vyplní místo
 // fotky (cover, `ops` = PDFLib kvůli ořezu); fotka uživatele má přednost. Diplom ho nemá.
-import { A4, A5, hexRgb, hexRgbSvetle, tmava, kresliBlok, kresliObrazek, kresliObrazekPres, vyskaBloku } from './textPdf.js';
+import { A4, A5, hexRgb, hexRgbSvetle, tmava, kresliBlok, kresliObrazek, kresliObrazekPres, vyskaBloku, drawableData } from './textPdf.js';
 
 export const SABLONY = ['greeting', 'invitation', 'poster', 'certificate'];
 export const POPISKY = {
@@ -20,7 +20,8 @@ export function rozmer(template) {
 }
 
 // data = { title, text, meta: { template, color, date, place, link, signature, lang } }, logo/fotka = { image, w, h }
-export function sestavPranicko({ doc, rgb, fonty, data, logo = null, fotka = null, qr = null, kresliQr = null, obrazek = null, ops = null }) {
+export function sestavPranicko({ doc, rgb, fonty, data: rawData, logo = null, fotka = null, qr = null, kresliQr = null, obrazek = null, ops = null }) {
+  const data = drawableData(rawData, fonty.regular); // F2-06
   const meta = data.meta || {};
   const template = SABLONY.includes(meta.template) ? meta.template : 'greeting';
   const L = meta.lang === 'en' ? 'en' : 'cs';

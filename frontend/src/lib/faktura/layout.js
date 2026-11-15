@@ -7,6 +7,7 @@
 // názvy identifikátorů a daně, „neplátce“, DUZP/VS jen CZ/SK, BIC a volný účet v platebním bloku, QR SPAYD/EPC.
 // Bez země = CZ → faktura z v0.86 vychází 1:1 (tests/fixtures/faktura-cz-v086.json).
 import { castka, datum, popiskyZeme } from './zeme.js';
+import { drawableData } from '../kancelar/textPdf.js';
 export { castka, datum };
 const A4 = [595.28, 841.89];
 const OKRAJ = 42;
@@ -57,7 +58,9 @@ function zalom(text, font, size, sirka) {
 
 // data = DTO faktury ze serveru (/chat/faktura/{id}); fonty = { regular, bold } (embedované pdf-lib fonty);
 // logo = { image, w, h } (pdf-lib embedPng/embedJpg) nebo null; qr = matice z qr.js (null = bez QR); kresliQr z qr.js
-export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr = null, kresliQr = null }) {
+export function sestavFakturu({ doc, rgb, fonty, data: rawData, L = 'cs', logo = null, qr = null, kresliQr = null }) {
+  // characters outside the font are rewritten before drawing, not left blank (F2-06); the QR was encoded from the raw data
+  const data = drawableData(rawData, fonty.regular);
   const T = POPISKY[L] || POPISKY.cs;
   const f = fonty.regular; const fb = fonty.bold;
   const seda = rgb(0.42, 0.45, 0.5); const cerna = rgb(0.1, 0.1, 0.12); const linka = rgb(0.82, 0.84, 0.87); const pozadi = rgb(0.95, 0.96, 0.97);
@@ -93,7 +96,8 @@ export function sestavFakturu({ doc, rgb, fonty, data, L = 'cs', logo = null, qr
   const sloupec = (nadpis, s, x, sirka) => {
     let yy = y;
     text(nadpis.toUpperCase(), x, yy, { size: 8, color: seda, bold: true }); yy -= 14;
-    text(s.name || '', x, yy, { size: 11, bold: true }); yy -= 14;
+    // the name wraps to the column like the address below — a long one ran into the other column (F2-08)
+    for (const r of zalom(s.name || '', fb, 11, sirka)) { text(r, x, yy, { size: 11, bold: true }); yy -= 14; }
     for (const r of zalom(s.address || '', f, 9.5, sirka)) { if (r) { text(r, x, yy); yy -= 12; } }
     if (s.ico) { text(`${Z.ico}: ${s.ico}`, x, yy); yy -= 12; }
     if (s.dic) { text(`${Z.dic}: ${s.dic}`, x, yy); yy -= 12; }

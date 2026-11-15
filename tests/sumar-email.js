@@ -9,6 +9,7 @@
 // Spuštění: KB_TEST_IMAGE=<image> node product/tests/sumar-email.js
 const H = require('./_harness');
 const { expect } = H;
+const M = require('./_mail');
 
 const JPEG = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDPooorhPqD/9k=';
 
@@ -88,7 +89,10 @@ H.beh(async () => {
 
   console.log('== obsah: AI text, počty, položka dne, tlačítko, banner s absolutní adresou ==');
   const tA = dekoduj(mA[0] || '');
-  expect(/Subject:.*(Váš den|V=C3=A1=C5=A1 den)/i.test(mA[0] || '') || /Váš den/.test(tA), 'předmět „Váš den – datum“');
+  // T1-07: the heading in the body is the same string as the subject, so the body must not satisfy this check —
+  // only the decoded Subject header counts (shared decoder: encoded-words glued by bytes)
+  const predmet = M.dekoduj(mA[0] || '').split('\n').find((l) => /^Subject:/i.test(l)) || '';
+  expect(/^Subject:.*Váš den – \S.*\d{4}/i.test(predmet), `předmět (hlavička Subject) je „Váš den – datum“ (${predmet.slice(0, 80)})`);
   expect(/SUMAR-AI: Dobré ráno/.test(tA), 'v mailu je text sumáře od AI');
   expect(/Dnes: 1/.test(tA) && /Schůzka s dodavatelem a/.test(tA), 'počty dne a dnešní úkol uživatele');
   expect(!/Schůzka s dodavatelem j/.test(tA), 'cizí úkol (Jany) v adminově mailu není');

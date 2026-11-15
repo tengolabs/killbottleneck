@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '@/lib/clipboard';
 import { base44 } from '@/api/base44Client';
-import { getMembers, resetUserPassword, memberDeputy, savePurpose, userMaps, transferUserMaps } from '@/api/kb';
+import { getMembers, resetUserPassword, memberDeputy, savePurpose, userMaps, userMapCounts } from '@/api/kb';
 import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAuth } from '@/lib/AuthContext';
@@ -41,6 +41,7 @@ import { fmtDateShort, fmtDateTimeShort } from '@/lib/locale';
 import { serverOrigin } from '@/lib/serverUrl';
 import { PURPOSES } from '@/lib/purpose';
 import { useMedia } from '@/lib/useMedia';
+import { serverReason } from '@/lib/serverReason';
 
 export default function UserAdmin() {
   const { t } = useTranslation('auth');
@@ -65,6 +66,8 @@ export default function UserAdmin() {
   const [loginLogs, setLoginLogs] = useState({});
   const [mapCounts, setMapCounts] = useState({});
   const [loading, setLoading] = useState(true);
+  // the list of people could not be loaded — said on the page instead of an empty table (F4-05)
+  const [loadError, setLoadError] = useState('');
   // Hostovaná instance: AI konfiguruje provozovatel, sekce AI se schovává
   // (Richard 6. 8. 2026). Než /config dorazí, sekci NEukazujeme — bliknutí
   // konfigurace, která zákazníkovi nepatří, je horší než chvilka bez ní.
@@ -85,6 +88,7 @@ export default function UserAdmin() {
   // výsledek pozvánky (dočasné heslo) — kopírovatelný panel místo window.alert
   const [inviteResult, setInviteResult] = useState(null);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteError, setInviteError] = useState('');
   // Zvoneček „pozvěte X do organizace" (člen sdílel projekt s adresou bez
   // účtu) vede sem s ?pozvat=adresa → rovnou otevřený pozvánkový dialog
   // s předvyplněnou adresou; parametr hned sundat, ať reload dialog neotvírá znovu.
@@ -158,6 +162,7 @@ export default function UserAdmin() {
   // firmy do personální agendy nepatří. Bere proto bezpečnou podmnožinu
   // z /members — a sloupce, které se z ní naplnit nedají, se mu neukazují.
   const loadMembers = async () => {
+    setLoadError('');
     try {
       const lide = await getMembers();
       setUsers(lide.map((m) => ({
@@ -167,27 +172,37 @@ export default function UserAdmin() {
       })));
     } catch (e) {
       console.error(e);
+      setLoadError(duvod(e, t('userAdmin.loadFailed')));
     } finally {
       setLoading(false);
     }
   };
 
+  // Why the server refused — our routes answer in `error`, PocketBase hooks in `message`
+  // (the SDK's own `message` is a generic "Something went wrong"). Finding F4-05: these
+  // actions used to fail silently (console only), so the administrator could not tell
+  // whether anything happened.
+  const duvod = (e, fallback) => serverReason(e) || fallback;
+
   const handleOrgSave = async () => {
     setOrgSaving(true);
     try {
       const saved = await base44.org.save({ id: org?.id, name: orgName.trim(), logoFile: orgLogoFile });
-      setOrg(saved);
+      // merge: whatever else the page knows about the organisation (the purpose) stays (F4-03)
+      setOrg((o) => ({ ...(o || {}), ...saved }));
       setOrgLogoFile(null);
       setOrgSaved(true);
       setTimeout(() => setOrgSaved(false), 2000);
     } catch (e) {
       console.error(e);
+      window.alert(duvod(e, t('userAdmin.actionFailed')));
     } finally {
       setOrgSaving(false);
     }
   };
 
   const loadUsers = async () => {
+    setLoadError('');
     try {
       const data = await base44.entities.User.list();
       setUsers(data);
@@ -200,17 +215,14 @@ export default function UserAdmin() {
         }
       }
       setLoginLogs(latest);
-      // Count maps per user
-      const allMaps = await base44.entities.GoalMap.list('-created_date', 500);
-      const counts = {};
-      for (const m of allMaps) {
-        if (m.created_by_id) {
-          counts[m.created_by_id] = (counts[m.created_by_id] || 0) + 1;
-        }
-      }
-      setMapCounts(counts);
+      // Projects per person come from the server (finding F4-06): counting the projects the
+      // administrator can SEE left out everybody's private ones, so the row said "0" while
+      // the delete dialog said "4". Numbers only — private projects are never listed.
+      // The org structure manager has no access to the route and does not see the number.
+      try { setMapCounts(await userMapCounts()); } catch { setMapCounts({}); }
     } catch (e) {
       console.error(e);
+      setLoadError(duvod(e, t('userAdmin.loadFailed')));
     } finally {
       setLoading(false);
     }
@@ -219,15 +231,20 @@ export default function UserAdmin() {
   const handleInvite = async () => {
     if (!inviteEmail.trim() || inviting) return; // Enter guard — dvojité odeslání = dvojitá pozvánka
     setInviting(true);
+    setInviteError('');
     try {
       const res = await base44.users.inviteUser(inviteEmail.trim(), inviteRole);
-      await loadUsers();
+      // the org structure manager must not read the `users` collection — reloading through it
+      // emptied their list ("0 people") after every invitation (finding F4-02)
+      await (jenStruktura ? loadMembers() : loadUsers());
       invalidateKbConfig(); // user_count/over_user_limit v configu
       // dialog zůstane otevřený a ukáže výsledek (dočasné heslo je kopírovatelné,
       // ne v nativním window.alert, který nejde označit)
       setInviteResult(res);
     } catch (e) {
       console.error(e);
+      // in the dialog, under the field: the form stays filled in and says why (F4-05)
+      setInviteError(duvod(e, t('userAdmin.inviteFailed')));
     } finally {
       setInviting(false);
     }
@@ -239,6 +256,7 @@ export default function UserAdmin() {
     setInviteRole('user');
     setInviteResult(null);
     setInviteCopied(false);
+    setInviteError('');
   };
 
   const copyInviteCredentials = async () => {
@@ -256,7 +274,9 @@ export default function UserAdmin() {
       await base44.entities.User.update(userId, { role: newRole });
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
     } catch (e) {
+      // the server says why (e.g. the last administrator cannot be demoted)
       console.error(e);
+      window.alert(duvod(e, t('userAdmin.actionFailed')));
     }
   };
 
@@ -267,7 +287,9 @@ export default function UserAdmin() {
       await base44.entities.User.update(userId, { is_ai_manager: value });
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_ai_manager: value } : u)));
     } catch (e) {
+      // the server says why (e.g. the last administrator cannot be demoted)
       console.error(e);
+      window.alert(duvod(e, t('userAdmin.actionFailed')));
     }
   };
 
@@ -279,7 +301,9 @@ export default function UserAdmin() {
       await base44.entities.User.update(userId, { is_org_manager: value });
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_org_manager: value } : u)));
     } catch (e) {
+      // the server says why (e.g. the last administrator cannot be demoted)
       console.error(e);
+      window.alert(duvod(e, t('userAdmin.actionFailed')));
     }
   };
 
@@ -320,39 +344,37 @@ export default function UserAdmin() {
   };
 
   const handleDelete = async (userId) => {
-    // Deleting the account would take its projects with it (the owner relation
-    // cascades) — offer to take them over first (feature analysis 5 Nov 2026).
-    // OK = take over, then delete; Cancel = second question whether to delete them too.
+    // Deleting an account removes only its PRIVATE things (decision 11 Nov 2026). The
+    // dialog says BEFOREHAND what passes on, what goes and what stays. Shared projects
+    // are handed over by the server inside the delete itself (to a co-admin of the
+    // project, otherwise to the administrator who deletes) — either everything happens
+    // or nothing does. Private projects are reported as a number only.
+    const clovek = users.find((u) => u.id === userId);
     let owned;
     try { owned = await userMaps(userId); } catch { owned = null; }
     if (!owned) { window.alert(t('userAdmin.mapsListFailed')); return; } // never fall through to a blind delete
-    if ((owned.count || 0) > 0) {
-      const titles = (owned.maps || []).slice(0, 5).map((m) => m.title).join(', ') + (owned.count > 5 ? '…' : '');
-      if (window.confirm(t('userAdmin.confirmTransferMaps', { count: owned.count, titles }))) {
-        let result;
-        try {
-          result = await transferUserMaps(userId);
-        } catch (e) {
-          window.alert(e?.response?.error || e?.message || t('userAdmin.transferFailed'));
-          return;
-        }
-        if (!result || result.transferred !== owned.count) {
-          window.alert(t('userAdmin.transferIncomplete', { transferred: (result && result.transferred) || 0, count: owned.count }));
-          return;
-        }
-      } else if (!window.confirm(t('userAdmin.confirmDeleteWithMaps', { count: owned.count }))) {
-        return;
-      }
-    } else if (!window.confirm(t('userAdmin.confirmDelete'))) {
-      return;
-    }
+    const sm = owned.summary || {};
+    const radky = [t('userAdmin.del.header', { email: clovek?.email || '' }), '', t('userAdmin.del.passes'),
+      t('userAdmin.del.passesCoadmin', { n: sm.maps_to_coadmin || 0 }),
+      t('userAdmin.del.passesMe', { n: sm.maps_to_admin || 0 }), '',
+      t('userAdmin.del.goes'),
+      t('userAdmin.del.goesMaps', { n: (sm.maps_private || 0) + (sm.maps_no_holder || 0) }),
+      t('userAdmin.del.goesPages', { n: sm.pages_private || 0 }),
+      t('userAdmin.del.goesOther', { events: sm.events_private || 0, templates: sm.templates_personal || 0 }), '',
+      t('userAdmin.del.stays'),
+      t('userAdmin.del.staysList', { files: sm.files_kept || 0, time: sm.time_kept || 0, templates: sm.templates_kept || 0, events: sm.events_kept || 0, pages: sm.pages_kept || 0 }), '',
+      t('userAdmin.del.confirmPlain')];
+    if (!window.confirm(radky.join('\n'))) return;
     try {
       await base44.entities.User.delete(userId);
       setUsers((prev) => prev.filter((u) => u.id !== userId));
       invalidateKbConfig(); // user_count v configu
     } catch (e) {
       console.error(e);
+      window.alert(t('userAdmin.deleteFailed', { reason: duvod(e, t('userAdmin.deleteFailedUnknown')) }));
     }
+    // the handover changed the numbers in the list either way
+    try { setMapCounts(await userMapCounts()); } catch { /* the numbers refresh on the next load */ }
   };
 
   // dokud se líný balík textů nenačte, nekreslit — bliknutí holých klíčů
@@ -622,6 +644,12 @@ export default function UserAdmin() {
             {/* ── LIDÉ ── */}
             <section {...oddilProps('lide')}>
               {nadpisOddilu('lide')}
+              {loadError && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive" role="alert" data-testid="lide-load-error">
+                  <span>{loadError}</span>
+                  <Button variant="outline" size="sm" onClick={() => (jenStruktura ? loadMembers() : loadUsers())}>{t('userAdmin.loadRetry')}</Button>
+                </div>
+              )}
               {spravciBanner && (
                 <div className="flex gap-2 rounded-xl border border-dashed bg-secondary/40 px-3 py-2.5 text-sm text-muted-foreground" data-testid="spravci-banner">
                   <Info className="w-4 h-4 shrink-0 mt-0.5" /> <span>{spravciBanner}</span>
@@ -751,7 +779,10 @@ export default function UserAdmin() {
                         invalidateKbConfig();
                         base44.org.forget();
                         setOrg((o) => ({ ...(o || {}), purpose }));
-                      } catch (err) { console.error(err); }
+                      } catch (err) {
+                        console.error(err);
+                        window.alert(duvod(err, t('userAdmin.actionFailed')));
+                      }
                     }}
                   >
                     {PURPOSES.map((p) => (
@@ -847,6 +878,9 @@ export default function UserAdmin() {
                   placeholder={t('userAdmin.inviteEmailPlaceholder')}
                   autoFocus
                 />
+                {inviteError && (
+                  <p className="text-sm text-destructive" role="alert" data-testid="invite-error">{inviteError}</p>
+                )}
               </div>
               {/* Výběr role je jen pro admina. Správce struktury zve VŽDY členy —
                   server mu vyšší roli stejně srazí, ale nabízet tlačítko

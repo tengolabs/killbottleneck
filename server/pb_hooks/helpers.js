@@ -279,6 +279,7 @@ function syncShares(app, map) {
   // NENÍ v email_edit, takže RLS mu zápis do mapy nedá; status jde routou /node-status
   const sharedWork = jsonList(map, "shared_with_work");
   const col = app.findCollectionByNameOrId("map_shares");
+  const pendingOut = [];
   for (const email of sharedWith) {
     // Serverová stráž (bezpečnostní panel 28. 8. 2026): FE býval jediný filtr —
     // řešitelé ze šablon (instantiateTemplate) i duplikace mapy sem donesou,
@@ -296,6 +297,15 @@ function syncShares(app, map) {
     }
     const isEdit = sharedEdit.includes(email);
     const isWork = !isEdit && sharedWork.includes(email);
+    // An address WITHOUT an account never gets an authorization row (finding S4-02,
+    // 11 Nov 2026): the e-mail is not verified, so whoever registered it would pick up
+    // the access. It becomes a pending share (share_invites) and leaves the project
+    // record — readers of the project must not see pending addresses either.
+    if (!emailHasAccount(app, email)) {
+      upsertShareInvite(app, map.id, email, isEdit ? "edit" : (isWork ? "work" : "read"), "");
+      pendingOut.push(email);
+      continue;
+    }
     const rec = new Record(col);
     rec.set("map", map.id);
     rec.set("email", email);
@@ -303,6 +313,153 @@ function syncShares(app, map) {
     rec.set("email_edit", isEdit ? email : ""); // párovací pole pro edit RLS (viz migrace 013)
     app.save(rec);
   }
+  if (pendingOut.length) {
+    const keep = (arr) => arr.filter((x) => pendingOut.indexOf(x) < 0);
+    writeShareMirror(app, map, keep(sharedWith), keep(sharedEdit), keep(sharedWork));
+  }
+}
+
+// ---------- pending shares: an address without an account (share_invites) ----------
+// See migration 1794393702. The plain token exists only in the invitation link; the
+// row keeps its sha256 and an expiry.
+const SHARE_INVITE_DAYS = 30;
+
+function emailHasAccount(app, email) {
+  try { app.findFirstRecordByData("users", "email", String(email || "")); return true; } catch (err) { return false; }
+}
+
+// Writes the three share mirror columns WITHOUT touching `updated` (a plain UPDATE):
+// the change is made on behalf of somebody else than the person editing the project, and
+// a moved `updated` would make their open editor hit a false "project changed" conflict.
+// The record in memory gets the same values, so a later save does not put the old ones back.
+function writeShareMirror(app, map, sharedWith, sharedEdit, sharedWork) {
+  app.db().newQuery("UPDATE goalmaps SET shared_with = {:a}, shared_with_edit = {:b}, shared_with_work = {:c} WHERE id = {:id}")
+    .bind({ a: JSON.stringify(sharedWith), b: JSON.stringify(sharedEdit), c: JSON.stringify(sharedWork), id: map.id }).execute();
+  map.set("shared_with", sharedWith);
+  map.set("shared_with_edit", sharedEdit);
+  map.set("shared_with_work", sharedWork);
+  // The record now equals the stored row → make that its baseline (the model hook of
+  // goalmaps compares a later save of this object with `original()`; left stale, the
+  // mirrors would read as "changed by this writer" and overwrite a concurrent share
+  // change). Every caller comes here right after a load or a save, never with other
+  // unsaved changes on the record — keep it that way.
+  map.postScan();
+}
+
+function shareInviteRow(app, mapId, email) {
+  try {
+    return app.findFirstRecordByFilter("share_invites", "map = {:m} && email = {:e}", { m: mapId, e: String(email || "").trim().toLowerCase() });
+  } catch (err) { return null; }
+}
+
+function pendingShareRows(app, mapId) {
+  try { return app.findRecordsByFilter("share_invites", "map = {:m}", "created", 500, 0, { m: mapId }); } catch (err) { return []; }
+}
+
+// Creates the pending share or raises its permission (never lowers it here — lowering is
+// the explicit update_permission action). An existing token is kept.
+function upsertShareInvite(app, mapId, email, permission, invitedBy) {
+  const lower = String(email || "").trim().toLowerCase();
+  let rec = shareInviteRow(app, mapId, lower);
+  if (!rec) {
+    rec = new Record(app.findCollectionByNameOrId("share_invites"));
+    rec.set("map", mapId);
+    rec.set("email", lower);
+    rec.set("permission", permission);
+  } else if ((ACCESS_RANK[permission] || 0) > (ACCESS_RANK[rec.getString("permission")] || 0)) {
+    rec.set("permission", permission);
+  }
+  if (invitedBy) rec.set("invited_by", invitedBy);
+  app.save(rec);
+  return rec;
+}
+
+function shareInviteTokenValid(rec) {
+  if (!rec || !rec.getString("token_hash")) return false;
+  const exp = parsePbDate(rec.getString("token_expires"));
+  return !!exp && exp.getTime() > Date.now();
+}
+
+// New one-time token for a pending share; returns the PLAIN token (it is not stored).
+function newShareInviteToken(app, rec) {
+  const plain = $security.randomString(40);
+  rec.set("token_hash", $security.sha256(plain));
+  rec.set("token_expires", pbDateString(new Date(Date.now() + SHARE_INVITE_DAYS * 86400000)));
+  app.save(rec);
+  return plain;
+}
+
+// The proof: the signed-in account presents the token from the invitation e-mail. The
+// token must belong to a pending share for EXACTLY this account's address and must not
+// be expired. ONE TOKEN CONFIRMS ONE SHARE — its own project, nothing else: the person
+// who shares gets the link back whenever the e-mail does not go out, so a token for
+// their own project must never open pending shares that OTHER owners gave to the same
+// address (security review 11 Nov 2026). The other pending shares keep waiting for their
+// own token or for a confirmation by whoever manages that project.
+// Mirror + authorization rows + the invite row change in ONE transaction (a failure in
+// the middle of syncShares would leave the project without any share rows).
+// Returns the number of projects (0 or 1), or -1 when the token does not fit.
+function claimShareInvitesByToken(app, user, token) {
+  const plain = String(token || "");
+  if (!user || plain.length < 20 || plain.length > 100) return -1;
+  const email = user.getString("email");
+  let rec = null;
+  try {
+    rec = app.findFirstRecordByFilter("share_invites", "token_hash = {:h} && email = {:e}",
+      { h: $security.sha256(plain), e: email.toLowerCase() });
+  } catch (err) { return -1; }
+  if (!shareInviteTokenValid(rec)) return -1;
+  let n = 0;
+  app.runInTransaction((tx) => {
+    let map = null;
+    try { map = tx.findRecordById("goalmaps", rec.getString("map")); } catch (err) { map = null; }
+    if (map && map.getString("owner") !== user.id) {
+      const perm = rec.getString("permission");
+      const w = jsonList(map, "shared_with"), ed = jsonList(map, "shared_with_edit"), wk = jsonList(map, "shared_with_work");
+      const without = (arr) => arr.filter((x) => x !== email);
+      writeShareMirror(tx, map,
+        without(w).concat([email]),
+        perm === "edit" ? without(ed).concat([email]) : without(ed),
+        perm === "work" ? without(wk).concat([email]) : without(wk));
+      syncShares(tx, map);
+      n = 1;
+    }
+    tx.delete(rec);
+  });
+  return n;
+}
+
+// A NEW account: its address must not sit in any share mirror (a mirror written by hand
+// through PATCH, or data from before migration 1794393702) — the next share sync would
+// otherwise hand it a real share without any proof. Such entries become pending shares.
+function parkUnclaimedShares(app, email) {
+  if (!email) return 0;
+  // Candidates = every project with a non-empty share mirror; the address is compared in
+  // JS. A `~` filter would miss addresses with LIKE wildcards (`%`, `_`) or characters the
+  // filter escapes — and a missed address is a share handed over without proof.
+  const ids = arrayOf(new DynamicModel({ id: "", shared_with: "", shared_with_edit: "", shared_with_work: "" }));
+  try {
+    app.db().newQuery("SELECT id, COALESCE(shared_with, '') AS shared_with, COALESCE(shared_with_edit, '') AS shared_with_edit, COALESCE(shared_with_work, '') AS shared_with_work FROM goalmaps WHERE (shared_with IS NOT NULL AND shared_with != '' AND shared_with != '[]') OR (shared_with_edit IS NOT NULL AND shared_with_edit != '' AND shared_with_edit != '[]') OR (shared_with_work IS NOT NULL AND shared_with_work != '' AND shared_with_work != '[]')").all(ids);
+  } catch (err) {
+    // never silently: an unparked address could later get a share without proof
+    try { app.logger().error("parkUnclaimedShares: reading the share mirrors failed", "error", String(err)); } catch (e2) { /* log is a bonus */ }
+    throw err;
+  }
+  const lower = email.toLowerCase();
+  const eq = (x) => String(x).toLowerCase() === lower;
+  const list = (v) => { try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (err) { return []; } };
+  let n = 0;
+  for (const row of ids) {
+    if (!list(row.shared_with).some(eq) && !list(row.shared_with_edit).some(eq) && !list(row.shared_with_work).some(eq)) continue;
+    let m = null;
+    try { m = app.findRecordById("goalmaps", row.id); } catch (err) { continue; }
+    const w = jsonList(m, "shared_with"), ed = jsonList(m, "shared_with_edit"), wk = jsonList(m, "shared_with_work");
+    if (w.some(eq)) upsertShareInvite(app, m.id, email, ed.some(eq) ? "edit" : (wk.some(eq) ? "work" : "read"), "");
+    writeShareMirror(app, m, w.filter((x) => !eq(x)), ed.filter((x) => !eq(x)), wk.filter((x) => !eq(x)));
+    app.db().newQuery("DELETE FROM map_shares WHERE map = {:m} AND LOWER(email) = {:e}").bind({ m: m.id, e: lower }).execute();
+    n += 1;
+  }
+  return n;
 }
 
 // HTML-escape pro e-mailové tělo — text notifikace nese uživatelská data (název
@@ -556,6 +713,52 @@ function resolveTreeOwners(app, items, userId, lang) {
   return "";
 }
 
+// Assignees of the sub-step checklist of a rule action (create_subnodes.items, nested
+// children included) — code analysis 4, S2-03. "none" (what the assistant's schema offers
+// for "nobody") is an empty assignee everywhere. An assignee who is not a member or a
+// visible external contact of `userId`:
+//   opts.strict  → { error } (an interactive save: the person who saves can fix it) — except
+//                  a value listed in opts.keep (it already was in the STORED shape of the same
+//                  rule: the member left meanwhile and the rule must stay editable);
+//   otherwise    → the assignee is emptied and reported in `dropped` (a rule run, a project
+//                  template, an import: nobody is there to ask and the rest must go on).
+// Rewrites item.owner in place (canonical e-mail or ""). Without `userId` (a rule template
+// with no project) only "none" is normalized.
+function resolveRuleItemOwners(app, items, userId, lang, opts) {
+  const o = opts || {};
+  const cache = {};
+  const dropped = [];
+  const stack = Array.isArray(items) ? items.slice() : [];
+  while (stack.length) {
+    const it = stack.shift();
+    if (!it || typeof it !== "object") continue;
+    if (Array.isArray(it.children)) stack.push.apply(stack, it.children);
+    if (it.owner === undefined || it.owner === null || String(it.owner) === "") continue;
+    const raw = String(it.owner).trim();
+    if (/^none$/i.test(raw)) { it.owner = ""; continue; }
+    if (!userId) continue;
+    const r = resolveOwner(app, raw, userId, lang, cache);
+    if (!r.error) { it.owner = r.owner; continue; }
+    if (o.strict && !(o.keep && o.keep[raw])) return { error: r.error };
+    it.owner = "";
+    if (dropped.indexOf(raw) < 0) dropped.push(raw);
+  }
+  return { dropped: dropped };
+}
+// every assignee named in the create_subnodes checklists of a rule's actions: { value: true }
+function ruleItemOwners(actions) {
+  const out = {};
+  const walk = (items) => {
+    for (const it of (Array.isArray(items) ? items : [])) {
+      if (!it || typeof it !== "object") continue;
+      if (it.owner) out[String(it.owner).trim()] = true;
+      walk(it.children);
+    }
+  };
+  for (const a of (Array.isArray(actions) ? actions : [])) if (a && a.type === "create_subnodes") walk(a.items);
+  return out;
+}
+
 // Adresář lidí instance — JEDEN zdroj pro /members (session) i /v1/members (klíč).
 // POZOR: bezpečná podmnožina polí, routu vidí každý přihlášený i každý klíč.
 // notify_prefs sem NIKDY nepatří.
@@ -606,6 +809,10 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, 
   // preference vyhodnocujeme TADY, na jediném místě — žádný volající je nesmí obcházet
   const ch = notifyChannels(user, type, { bezVychozihoEmailu: !!bezVychozihoEmailu });
   if (!ch.inApp && !ch.email) return;
+  // The alarms nobody can switch off (NOTIFY_ALWAYS) are outside the budget too: a busy day
+  // — or a colleague who makes one on purpose — must not turn "an admin reset your password"
+  // into "+1 over the daily limit" (code analysis 4, S2-01).
+  const always = NOTIFY_ALWAYS.includes(type);
   const i18n = require(`${__hooks}/i18n.js`);
   const lang = i18n.userLang(user);
   const p = Object.assign({}, params);
@@ -629,7 +836,7 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, 
     // téhož člověka v okně navýší počítadlo nepřečtené notifikace místo nového
     // řádku. Dedup-ované události (termínové souhrny, watchdogy) se neslévají —
     // jsou už samy souhrnné a idempotentní.
-    if (!dedupKey && B.coalesceMin > 0) {
+    if (!always && !dedupKey && B.coalesceMin > 0) {
       try {
         const since = new Date(nowMs - B.coalesceMin * 60 * 1000).toISOString().replace("T", " ");
         // ⚠️ Sdružuje se i podle KONKRÉTNÍ položky (uzel/úkol). Bez toho se
@@ -666,7 +873,7 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, 
       const cnt = arrayOf(new DynamicModel({ c: 0 }));
       app.db().newQuery("SELECT COUNT(*) as c FROM notifications WHERE user = {:u} AND created >= {:d}")
         .bind({ u: user.id, d: dayUtc + " 00:00:00" }).all(cnt);
-      overflowed = cnt[0].c >= B.dailyCap;
+      overflowed = !always && cnt[0].c >= B.dailyCap;
     } catch (err) { /* počítadlo je pojistka — při chybě normální insert */ }
     if (overflowed) {
       const key = "overflow:" + user.id + ":" + dayUtc;
@@ -734,7 +941,7 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, 
     try {
       const mb = app.findFirstRecordByFilter("mail_budget", "user = {:u} && day = {:d}",
         { u: user.id, d: dayUtc });
-      if (mb && (Number(mb.get("sent")) || 0) >= B.emailDailyCap) return;
+      if (!always && mb && (Number(mb.get("sent")) || 0) >= B.emailDailyCap) return;
     } catch (err) { /* žádný záznam = dnes ještě nic neodešlo → posílat */ }
     // E-mail-only příjemce (zvoneček vypnutý): dedup závoru nesla jen kolekce
     // notifications, takže mu termínový e-mail chodil znovu po každém restartu
@@ -1004,11 +1211,16 @@ function dalsiTermin(base, rec, opt) {
   if (rec === "monthly") {
     const den = monthDay || anchor.getUTCDate(); // kotva dne v měsíci: s month_day 31. zůstává 31.
     let y = anchor.getUTCFullYear(), m = anchor.getUTCMonth();
+    // The month of the deadline is tried first: "every month on the 15th" with the deadline
+    // moved to the 6th continues on the 15th of the SAME month, as the calendar shows and
+    // the help says (code analysis 4, S5-06). Without month_day that candidate is the
+    // deadline itself, so nothing changes there.
+    const od = Math.max(anchor.getTime(), today);
     for (let i = 0; i < 1200; i++) {
-      m += 1; if (m > 11) { m -= 12; y += 1; }
       const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
       const d = new Date(Date.UTC(y, m, Math.min(den, last)));
-      if (d.getTime() > today) return fmt(d);
+      if (d.getTime() > od) return fmt(d);
+      m += 1; if (m > 11) { m -= 12; y += 1; }
     }
     return "";
   }
@@ -1041,11 +1253,11 @@ function dalsiTerminRytmus(base, rec, every, days, monthDay) {
   if (rec === "monthly") {
     const den = monthDay || anchor.getUTCDate();
     let y = anchor.getUTCFullYear(), m = anchor.getUTCMonth();
-    for (let i = 0; i < 1200; i++) {
-      m += every; while (m > 11) { m -= 12; y += 1; }
+    for (let i = 0; i < 1200; i++) { // the month of the deadline first (S5-06, see dalsiTermin)
       const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
       const d = new Date(Date.UTC(y, m, Math.min(den, last)));
       if (d.getTime() > od) return fmt(d);
+      m += every; while (m > 11) { m -= 12; y += 1; }
     }
     return "";
   }
@@ -2164,6 +2376,15 @@ function jeAdminNeboAiManazer(auth) {
   return jeAdmin(auth) || (!!auth && auth.getBool("is_ai_manager") === true);
 }
 
+// Is this account the ONLY administrator of the instance? (Decision 11 Nov 2026, finding
+// S4-03: the last administrator can be neither demoted nor deleted — nobody but the
+// operator could repair an instance without one.)
+function jePosledniAdmin(app, userId) {
+  const rows = arrayOf(new DynamicModel({ c: 0 }));
+  app.db().newQuery("SELECT COUNT(*) as c FROM users WHERE role = 'admin' AND id != {:id}").bind({ id: String(userId || "") }).all(rows);
+  return rows[0].c === 0;
+}
+
 const ACCESS_RANK = { "": 0, read: 1, work: 2, edit: 3 };
 
 // JEDINÝ dotaz na jmenovité sdílení jednoho člověka na jedné mapě: "" (žádný
@@ -2325,6 +2546,279 @@ function transferMapOwnership(app, map, newOwner, opts) {
   syncShares(app, map);
 }
 
+// Every ownership transfer leaves a trace (decision 11 Nov 2026, findings S4-01/S3-02):
+// one row in the project's change log and — when somebody else than the previous owner
+// did it — a notification to the previous owner. Never throws: the transfer is done.
+// The row reuses kind "node" / field "owner" (no schema change); item_id is the map id,
+// so it shows in the project's "owner changed" group and in nobody's node history.
+function recordMapTransfer(app, map, prevEmail, newEmail, actorEmail, opts) {
+  const o = opts || {};
+  try {
+    const rec = new Record(app.findCollectionByNameOrId("map_changes"));
+    rec.set("map", map.id);
+    rec.set("kind", "node");
+    rec.set("item_id", map.id);
+    rec.set("title", map.getString("title").slice(0, 500));
+    rec.set("field", "owner");
+    rec.set("from", String(prevEmail || "").slice(0, 500));
+    rec.set("to", String(newEmail || "").slice(0, 500));
+    rec.set("actor_email", actorEmail || "");
+    app.save(rec);
+  } catch (err) {
+    try { app.logger().warn("ownership transfer: change log row failed", "map", map.id, "error", String(err)); } catch (e2) { /* log is a bonus */ }
+  }
+  // opts.notifyPrevious === false: the previous owner's account is being deleted — the
+  // caller notifies the NEW owner instead (notifyMapHandover), after the delete succeeded.
+  if (o.notifyPrevious === false) return;
+  try {
+    notify(app, {
+      email: prevEmail, actorEmail: actorEmail || "", type: "org_notice", mapId: map.id,
+      textKey: "notify.mapTransferred",
+      params: { actor: actorEmail || "admin", project: map.getString("title").slice(0, 80), owner: newEmail },
+    });
+  } catch (err) {
+    try { app.logger().warn("ownership transfer: notification failed", "map", map.id, "error", String(err)); } catch (e2) { /* log is a bonus */ }
+  }
+}
+
+// Deleting a member hands their SHARED projects over (decision 11 Nov 2026, Richard:
+// "there is always somebody, the administrator at least"). ONE classification for the
+// delete hook and for the numbers in the delete dialog:
+//   private   nobody else sees the project (no team access, no named share of a living
+//             account, not a public board) → it goes with the account; the administrator
+//             neither sees nor takes it over
+//   coadmin   shared (by name, with the team or as a public board) and somebody else who
+//             has already signed in has a named share with the right to manage it
+//             (map_shares permission "edit") → that co-admin becomes the owner. Several co-admins: the one shared with the LONGEST, i.e.
+//             the first of them in the project's share list (`shared_with` keeps the order
+//             in which people were added; map_shares rows are rebuilt on every change, so
+//             their `created` says nothing)
+//   actor     shared, no usable co-admin → the administrator who deletes the account
+//             (`actor`); without one (superuser, a delete from code) the longest-standing
+//             other administrator
+//   noHolder  shared, but the instance has nobody to hold it (no co-admin, no other
+//             administrator) → goes with the account like a private one
+// A candidate must pass transferTargetError (the org structure only to an administrator,
+// never a guest). Returns records, never titles for the caller to show.
+function memberMapsHandover(app, userId, actor) {
+  const out = { coadmin: [], actor: [], private: [], noHolder: [] };
+  let fallback = (actor && actor.id !== userId) ? actor : null;
+  if (!fallback) {
+    const admins = arrayOf(new DynamicModel({ id: "" }));
+    app.db().newQuery("SELECT id FROM users WHERE role = 'admin' AND id != {:id} ORDER BY created, id LIMIT 1").bind({ id: String(userId || "") }).all(admins);
+    if (admins.length) { try { fallback = app.findRecordById("users", admins[0].id); } catch (err) { fallback = null; } }
+  }
+  // every project of the account, page by page — a cap here would let the shared projects
+  // above it go with the account through the cascade
+  const maps = [];
+  for (let offset = 0; ; offset += 500) {
+    const page = app.findRecordsByFilter("goalmaps", "owner = {:u}", "created,id", 500, offset, { u: userId });
+    for (const m of page) maps.push(m);
+    if (page.length < 500) break;
+  }
+  // A share counts only when a LIVING account of somebody else stands behind it (security
+  // review 11 Nov 2026). An orphan row of a deleted account (its cleanup failed) or the
+  // owner's own address (owner_email can differ from the account e-mail) must not turn a
+  // private project into a "shared" one that the administrator then receives.
+  const accounts = {};
+  const account = (email) => {
+    if (accounts[email] === undefined) {
+      try { accounts[email] = app.findFirstRecordByData("users", "email", email); } catch (err) { accounts[email] = null; }
+    }
+    return accounts[email];
+  };
+  for (const m of maps) {
+    let rows = [];
+    try { rows = app.findRecordsByFilter("map_shares", "map = {:m}", "", 500, 0, { m: m.id }); } catch (err) { rows = []; }
+    const others = [];
+    for (const r of rows) {
+      const u = account(r.getString("email"));
+      if (u && u.id !== userId) others.push({ user: u, email: r.getString("email"), permission: r.getString("permission") });
+    }
+    const team = m.getString("team_access");
+    // a public board (is_public) counts as shared too: its public link must keep working
+    // (decision of the product owner, 11 Nov 2026)
+    if (!others.length && team !== "read" && team !== "edit" && !m.getBool("is_public")) { out.private.push(m); continue; }
+    // co-admins come from map_shares (the authorization), ordered by their place in the
+    // share list (= the order in which people were added); a row missing in the list goes last
+    const order = jsonList(m, "shared_with");
+    const rank = (email) => { const i = order.indexOf(email); return i < 0 ? order.length : i; };
+    // an account that has never signed in (invited, not active yet — `users.last_login` is
+    // empty; the field is written when the person enters the app) is skipped: a project must
+    // not pass to somebody who may never come (decision 11 Nov 2026)
+    const cands = others.filter((o) => o.permission === "edit" && !!o.user.getString("last_login"))
+      .sort((x, y) => (rank(x.email) - rank(y.email)) || (x.email < y.email ? -1 : (x.email > y.email ? 1 : 0)));
+    let holder = null;
+    for (const c of cands) {
+      if (!transferTargetError(app, m, c.user, "en")) { holder = c.user; break; }
+    }
+    if (holder) { out.coadmin.push({ map: m, owner: holder }); continue; }
+    if (fallback && !transferTargetError(app, m, fallback, "en")) out.actor.push({ map: m, owner: fallback });
+    else out.noHolder.push(m);
+  }
+  return out;
+}
+
+// The new owner of a handed-over project learns about it (after the delete succeeded —
+// never from inside the delete transaction: a rolled-back delete must not leave a mail).
+// `items` = [{ mapId, title, email }]; the administrator who did it gets no notice of
+// their own action (notify skips email === actorEmail).
+function notifyMapHandover(app, items, memberEmail, actorEmail) {
+  for (const it of items || []) {
+    try {
+      notify(app, {
+        email: it.email, actorEmail: actorEmail || "", type: "org_notice", mapId: it.mapId,
+        textKey: "notify.mapHandedOver",
+        params: { member: memberEmail, project: String(it.title || "").slice(0, 80) },
+      });
+    } catch (err) {
+      try { app.logger().warn("map handover: notification failed", "map", it.mapId, "error", String(err)); } catch (e2) { /* log is a bonus */ }
+    }
+  }
+}
+
+// How an account's projects split for somebody who administers users (decision
+// 11 Nov 2026: an administrator must not see or take over a private project of another
+// person). `visible` = projects the viewer already has access to under the ordinary
+// rules (team access / named share) — only these may be listed by name and taken over.
+// `privateCount` = nobody but the owner sees them (no team access, no named share);
+// `hiddenSharedCount` = shared with other people, but not with the viewer.
+// viewer = null means a superuser (sees everything).
+function ownedMapsFor(app, ownerId, viewer) {
+  const rows = app.findRecordsByFilter("goalmaps", "owner = {:u}", "-updated", 5000, 0, { u: ownerId });
+  const shareRows = viewer ? shareRowsFor(app, viewer.email()) : null;
+  const out = { total: rows.length, visible: [], privateCount: 0, hiddenSharedCount: 0 };
+  for (const m of rows) {
+    if (!viewer || mapAccessLevel(app, m, viewer.id, viewer.email(), { shareRows: shareRows }) !== "") { out.visible.push(m); continue; }
+    let shared = false;
+    try { app.findFirstRecordByFilter("map_shares", "map = {:m}", { m: m.id }); shared = true; } catch (err) { shared = false; }
+    if (shared) out.hiddenSharedCount += 1; else out.privateCount += 1;
+  }
+  return out;
+}
+
+// ---------- deleting a member: what is private goes, what is shared stays ----------
+// Decision 11 Nov 2026 (finding M1-01), see migration 1794393800. ONE classification for
+// the delete hook (what to remove) and for the dialog in user administration (what the
+// administrator is told BEFORE the delete):
+//   templates  personal → go; team ones stay (handed to an administrator, see below)
+//   events     no calendar and nobody else invited → go; an absence where the absent
+//              person is this account → goes (it is about them); the rest stays
+//   pages      not visible to the team, no public link, shared with nobody → go
+//   time       entries on the person's projects that GO with the account (private ones)
+//              or without a project → go; entries on other people's and handed-over
+//              projects stay
+//   images     assistant images go, except those used in a page that stays
+function userLeftovers(app, userId, goingMapIds) {
+  const out = { del: { templates: [], events: [], pages: [], time: [], images: [] },
+    keep: { templates: [], events: 0, pages: 0, linked: [], time: 0, files: 0 } };
+  const rows = (col, filter, params) => { try { return app.findRecordsByFilter(col, filter, "", 0, 0, params || { u: userId }); } catch (err) { return []; } };
+  for (const t of rows("templates", "owner = {:u}")) {
+    if (t.getString("visibility") === "personal") out.del.templates.push(t); else out.keep.templates.push(t);
+  }
+  const absenceCal = {};
+  for (const ev of rows("events", "owner = {:u}")) {
+    const others = (ev.get("participants") || []).filter((id) => id !== userId);
+    const calId = ev.getString("calendar");
+    let priv = !calId && others.length === 0;
+    if (calId && others.length === 0) {
+      if (absenceCal[calId] === undefined) {
+        try { absenceCal[calId] = app.findRecordById("calendars", calId).getString("kind") === "absence"; } catch (err) { absenceCal[calId] = false; }
+      }
+      if (absenceCal[calId]) priv = true; // the absent person is the deleted account
+    }
+    if (priv) out.del.events.push(ev); else out.keep.events += 1;
+  }
+  const keptHtml = [];
+  for (const p of rows("ai_pages", "user = {:u}")) {
+    let named = [];
+    try { named = JSON.parse(p.getString("shared_with") || "[]") || []; } catch (err) { named = []; }
+    // A public link alone does not keep a page: nobody could switch the link off once the
+    // account is gone. A page the team or named people see stays, but its public link is
+    // closed by the cleanup (`out.keep.linked`).
+    if (p.getBool("team_visible") || (Array.isArray(named) && named.length)) {
+      out.keep.pages += 1; keptHtml.push(p.getString("html"));
+      if (p.getString("share_token")) out.keep.linked.push(p);
+    } else out.del.pages.push(p);
+  }
+  // `goingMapIds` = the projects that really go with the account (the dialog passes the
+  // prediction; the delete hook calls this AFTER the handover, so the owned ones are it).
+  const ownMaps = {};
+  if (goingMapIds) { for (const id of goingMapIds) ownMaps[id] = true; }
+  else { for (const m of rows("goalmaps", "owner = {:u}")) ownMaps[m.id] = true; }
+  for (const te of rows("time_entries", "owner = {:u}")) {
+    const mid = te.getString("map");
+    // a still running timer is not a record of work yet — it goes too (nobody could stop it)
+    if (!mid || ownMaps[mid] || !te.getString("ended")) out.del.time.push(te); else out.keep.time += 1;
+  }
+  for (const f of rows("node_files", "owner = {:u}")) { if (!ownMaps[f.getString("map")]) out.keep.files += 1; }
+  const used = keptHtml.join("\n");
+  for (const img of rows("ai_images", "user = {:u}")) {
+    if (used.indexOf("/api/files/ai_images/" + img.id + "/") < 0) out.del.images.push(img);
+  }
+  return out;
+}
+
+// Numbers for the delete dialog in user administration (no titles, no content).
+// `actor` = the administrator who asks (null = superuser).
+function userDeletionSummary(app, userId, actor) {
+  const h = memberMapsHandover(app, userId, actor);
+  const going = h.private.concat(h.noHolder).map((m) => m.id);
+  const l = userLeftovers(app, userId, going);
+  return { summary: {
+    pages_private: l.del.pages.length, pages_kept: l.keep.pages,
+    templates_personal: l.del.templates.length, templates_kept: l.keep.templates.length,
+    events_private: l.del.events.length, events_kept: l.keep.events,
+    time_kept: l.keep.time, files_kept: l.keep.files,
+    maps_to_coadmin: h.coadmin.length, maps_to_admin: h.actor.length,
+    // maps_to_admin: to the calling administrator (for a superuser: to the
+    // longest-standing administrator); maps_no_holder: shared, but nobody to hold them
+    maps_private: h.private.length, maps_no_holder: h.noHolder.length,
+  } };
+}
+
+// Runs inside the users delete, BEFORE the account row goes. Removes the private
+// leftovers that no longer cascade and hands the team templates to an administrator:
+// a template without an owner would read as a built-in one (its list rule opens
+// `owner = ""` to everybody, signed in or not). `owner_email` keeps the author; the
+// automatic creation of projects from it is switched off — it would start creating
+// projects for the administrator. Throws on failure: a half-cleaned account must not
+// be deleted (the whole delete rolls back).
+function cleanupBeforeUserDelete(app, user, actor) {
+  // Shared projects are handed over FIRST (co-admin, otherwise the deleting administrator),
+  // so everything below sees only the projects that really go with the account. The
+  // deleted address leaves the share lists (keepPrevious: false). The transfer is written
+  // to the project's change log here, inside the transaction; the new owners are notified
+  // by the caller after the delete succeeded (returned list).
+  const h = memberMapsHandover(app, user.id, actor);
+  const handedOver = [];
+  const prevEmail = user.getString("email");
+  const actorEmail = actor ? actor.getString("email") : "";
+  for (const it of h.coadmin.concat(h.actor)) {
+    transferMapOwnership(app, it.map, it.owner, { keepPrevious: false, previousEmail: prevEmail });
+    recordMapTransfer(app, it.map, prevEmail, it.owner.getString("email"), actorEmail, { notifyPrevious: false });
+    handedOver.push({ mapId: it.map.id, title: it.map.getString("title"), email: it.owner.getString("email") });
+  }
+  const l = userLeftovers(app, user.id);
+  for (const group of [l.del.templates, l.del.events, l.del.pages, l.del.time, l.del.images]) {
+    for (const rec of group) app.delete(rec);
+  }
+  // the public link of a page that stays is closed — its owner is the only one who could
+  for (const p of l.keep.linked) { p.set("share_token", ""); app.save(p); }
+  if (l.keep.templates.length) {
+    const admins = arrayOf(new DynamicModel({ id: "" }));
+    app.db().newQuery("SELECT id FROM users WHERE role = 'admin' AND id != {:id} ORDER BY created LIMIT 1").bind({ id: user.id }).all(admins);
+    for (const t of l.keep.templates) {
+      if (!admins.length) { app.delete(t); continue; } // nobody to hold it — never leave it ownerless
+      t.set("owner", admins[0].id);
+      if (!t.getString("owner_email")) t.set("owner_email", user.getString("email"));
+      t.set("auto_create", "");
+      app.save(t);
+    }
+  }
+  return handedOver;
+}
+
 // Why a transfer target is not acceptable — one place for the PATCH hook and both
 // routes. Returns a translated message, or "" when the target is fine.
 // `kind === "guest"`: the users field arrives with the guest-from-another-organization
@@ -2344,12 +2838,20 @@ function transferTargetError(app, map, newOwner, lang) {
 // same address full write access to all those projects.
 function removeEmailFromAllShares(app, email) {
   if (!email) return 0;
-  const rows = app.findRecordsByFilter("goalmaps",
-    "shared_with ~ {:e} || shared_with_edit ~ {:e} || shared_with_work ~ {:e}", "", 5000, 0, { e: email });
+  // Candidates = every project with a non-empty share mirror; the address is compared in
+  // JS (exactly, like the permissions). A `~` filter missed addresses with LIKE wildcards
+  // (`%`, `_`) — the stale entry then gave the next account with that address its access
+  // back. Same approach as parkUnclaimedShares.
+  const ids = arrayOf(new DynamicModel({ id: "", shared_with: "", shared_with_edit: "", shared_with_work: "" }));
+  app.db().newQuery("SELECT id, COALESCE(shared_with, '') AS shared_with, COALESCE(shared_with_edit, '') AS shared_with_edit, COALESCE(shared_with_work, '') AS shared_with_work FROM goalmaps WHERE (shared_with IS NOT NULL AND shared_with != '' AND shared_with != '[]') OR (shared_with_edit IS NOT NULL AND shared_with_edit != '' AND shared_with_edit != '[]') OR (shared_with_work IS NOT NULL AND shared_with_work != '' AND shared_with_work != '[]')").all(ids);
+  const list = (v) => { try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (err) { return []; } };
   let n = 0;
-  for (const m of rows) {
+  for (const row of ids) {
+    if (!list(row.shared_with).includes(email) && !list(row.shared_with_edit).includes(email) && !list(row.shared_with_work).includes(email)) continue;
+    let m;
+    try { m = app.findRecordById("goalmaps", row.id); } catch (err) { continue; }
     const w = jsonList(m, "shared_with"), ed = jsonList(m, "shared_with_edit"), wk = jsonList(m, "shared_with_work");
-    if (!w.includes(email) && !ed.includes(email) && !wk.includes(email)) continue; // substring hit on another address
+    if (!w.includes(email) && !ed.includes(email) && !wk.includes(email)) continue;
     m.set("shared_with", w.filter((x) => x !== email));
     m.set("shared_with_edit", ed.filter((x) => x !== email));
     m.set("shared_with_work", wk.filter((x) => x !== email));
@@ -2557,6 +3059,150 @@ function notifyDeadlineRequestResolved(app, record, pending, actorEmail) {
   }
 }
 
+// ---------- concurrent writes into one map (code analysis 4, finding S3-01) ----------
+// A map is ONE record and a save writes ALL its columns. Every writer does "load the map →
+// change something → save the whole record", so two writers that overlapped both answered
+// 200 and the second save silently put the first one's change back (a ticked step, a
+// deadline, an assignment; a share toggle overwritten by a status change and the other
+// way round). `base_updated` could not catch it: it is compared BEFORE the write, some
+// writers do not send it at all, and two writes in one millisecond got the same `updated`.
+//
+// The fix has two layers:
+//  1) mergeConcurrentMapWrite — the model hook of goalmaps (main.pb.js) runs it for EVERY
+//     save path ($app.save, REST PATCH, v1, rules, the assistant) inside ONE write
+//     transaction together with the UPDATE (writes are serialized by the database). It
+//     re-reads the stored row and compares it with what this writer loaded
+//     (record.original()):
+//       • a column the writer did NOT touch (setting the SAME value is not a write) keeps the stored value (so a share toggle no
+//         longer reverts steps, and a status change no longer reverts sharing);
+//       • the graph (nodes + edges, one unit) changed in the database AND by the writer →
+//         the write is refused with MAP_CONFLICT_MARK. Nothing is overwritten silently;
+//       • other columns both sides changed: the later write wins, as before.
+//     `updated` is forced to grow with every write, so a version is never reused.
+//  2) withMapWrite — the row actions that carry no client version (/node-status,
+//     /deadline-requests, /agent-callback, the org-structure table) take a per-map lock
+//     (app store, one process) and repeat "load → change → save" when the write is
+//     refused, so they queue instead of failing: 24 parallel ticks = 24 ticks.
+//     Writers WITH a client version (editor PATCH, v1 / MCP writes) are not repeated — a
+//     refused write is the same 409 `err.mapConflict` a stale version always got.
+const MAP_CONFLICT_MARK = "kb_map_conflict";
+const MAP_RETRY = { kbMapRetry: true };
+function isMapConflict(err) {
+  // case-insensitive: PocketBase normalizes the message of an API error ("Kb_map_conflict.")
+  return (String((err && err.message) || "") + " " + String(err)).toLowerCase().indexOf(MAP_CONFLICT_MARK) >= 0;
+}
+function canonicalJson(v) {
+  if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+  if (v && typeof v === "object") return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+  return JSON.stringify(v === undefined ? null : v);
+}
+// same JSON value? The text differs after a re-serialization although nothing changed, and
+// an empty column has three spellings: NULL / "" (old rows), `null`, `[]` — all the same.
+// Without this a writer that always sets the share mirrors looked like it "touched" them on
+// an old map and overwrote a concurrent share change.
+function sameJsonText(a, b) {
+  if (a === b) return true;
+  const empty = (x) => x === "" || x === "null" || x === "[]";
+  if (empty(a) && empty(b)) return true;
+  if (empty(a) !== empty(b)) return false;
+  try { return canonicalJson(JSON.parse(a)) === canonicalJson(JSON.parse(b)); } catch (err) { return false; }
+}
+// Do two records hold the same value in this field? (multi-valued fields have no string form)
+function sameField(x, y, field) {
+  const name = field.getName(), type = field.type();
+  if (type === "json") return sameJsonText(x.getString(name), y.getString(name));
+  if (type === "relation" || type === "select" || type === "file") return x.getStringSlice(name).join("\u0001") === y.getStringSlice(name).join("\u0001");
+  if (type === "bool") return x.getBool(name) === y.getBool(name);
+  if (type === "number") return x.getFloat(name) === y.getFloat(name);
+  return x.getString(name) === y.getString(name);
+}
+// Called by the goalmaps model hook inside the write transaction, BEFORE the update.
+// Returns the stored `updated` (for the version guard), or "" when there is nothing to guard.
+function mergeConcurrentMapWrite(tx, rec) {
+  rec.set("kb_graph_merged", false);
+  const orig = rec.original();
+  if (!orig || !rec.id || !orig.getString("created")) return ""; // no loaded state to compare with
+  let fresh;
+  try { fresh = tx.findRecordById("goalmaps", rec.id); } catch (err) { return ""; }
+  const fields = rec.collection().fields;
+  const changedInDb = [];
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    if (f.type() === "autodate" || f.getName() === "id") continue;
+    if (!sameField(fresh, orig, f)) changedInDb.push(f);
+  }
+  if (!changedInDb.length) return fresh.getString("updated");
+  const isGraph = (f) => f.getName() === "nodes" || f.getName() === "edges";
+  if (changedInDb.some(isGraph)) {
+    const touched = fields.some((f) => isGraph(f) && !sameField(rec, orig, f));
+    if (touched) throw new BadRequestError(MAP_CONFLICT_MARK);
+    rec.set("nodes", fresh.get("nodes"));
+    rec.set("edges", fresh.get("edges"));
+    rec.set("kb_graph_merged", true); // the caller must not read the difference as its own change
+  }
+  for (const f of changedInDb) {
+    if (isGraph(f)) continue;
+    if (sameField(rec, orig, f)) rec.set(f.getName(), fresh.get(f.getName()));
+  }
+  return fresh.getString("updated");
+}
+// After the update, still inside the transaction: `updated` must be greater than the
+// stored one was (two writes in one millisecond used to share a version).
+function bumpMapVersion(tx, rec, storedUpdated) {
+  const now = rec.getString("updated");
+  if (!storedUpdated || now > storedUpdated) return;
+  const d = new Date(Date.parse(storedUpdated.replace(" ", "T")) + 1);
+  if (isNaN(d.getTime())) return;
+  const next = d.toISOString().replace("T", " ");
+  tx.db().newQuery("UPDATE goalmaps SET updated = {:u} WHERE id = {:id}").bind({ u: next, id: rec.id }).execute();
+  rec.set("updated", next);
+}
+const MAP_LOCK_STALE_MS = 60000; // a lock nobody released (cannot happen with `finally`; a restart clears the store anyway)
+const MAP_LOCK_WAIT_MS = 15000;  // waited this long → go on without the lock; the model hook still refuses a stale write
+const MAP_WRITE_ATTEMPTS = 4;
+// Runs `fn` as the only row action on this map. `fn` loads the map ITSELF (fresh on every
+// round) and returns MAP_RETRY when its save was refused (v1SaveMapData → { conflict });
+// after MAP_WRITE_ATTEMPTS rounds MAP_RETRY is returned and the caller answers 409.
+// Maps whose lock THIS request already holds (one request = one JS runtime for its whole
+// duration, and this module lives in it) — a nested withMapWrite on the same map (a rule
+// repeating its write from inside a row action) must not wait for itself.
+const mapLocksHeldHere = {};
+function withMapWrite(app, mapId, fn) {
+  const id = String(mapId || "");
+  if (!/^[a-z0-9]{15}$/.test(id)) return fn(); // not a record id → the caller answers 404; no store key for arbitrary text
+  if (mapLocksHeldHere[id]) return fn();
+  const store = app.store();
+  const key = "map:write:" + id;
+  const mine = Date.now() + ":" + $security.randomString(8);
+  const t0 = Date.now();
+  let held = false;
+  for (;;) {
+    let busy = false;
+    store.setFunc(key, (cur) => {
+      const since = Number(String(cur || "").split(":")[0]) || 0;
+      if (since && Date.now() - since < MAP_LOCK_STALE_MS) { busy = true; return cur; }
+      return mine;
+    });
+    if (!busy) { held = true; break; }
+    if (Date.now() - t0 > MAP_LOCK_WAIT_MS) break;
+    sleep(3);
+  }
+  try {
+    if (held) mapLocksHeldHere[id] = true;
+    let out = MAP_RETRY;
+    for (let i = 0; i < MAP_WRITE_ATTEMPTS && out === MAP_RETRY; i++) {
+      if (i) sleep(5 * i);
+      out = fn();
+    }
+    return out;
+  } finally {
+    // never release somebody else's lock; the key is REMOVED, not blanked — the store must not
+    // grow by one entry per map ever written
+    if (held) delete mapLocksHeldHere[id];
+    if (held && store.get(key) === mine) store.remove(key);
+  }
+}
+
 function v1SaveMapData(app, map, nodes, edges, lang, relayout, actorEmail, opts) {
   const norm = normalizeMapData(nodes, edges, lang);
   if (norm.error) return { status: 400, error: norm.error };
@@ -2622,7 +3268,20 @@ function v1SaveMapData(app, map, nodes, edges, lang, relayout, actorEmail, opts)
   // drží origNodes načtené na začátku, po app.save už je pryč.
   map.set("nodes", finalNodes);
   map.set("edges", norm.edges);
-  app.save(map);
+  try { app.save(map); } catch (err) {
+    // the map changed between this writer's load and its save (finding S3-01): nothing was
+    // written. `conflict` lets the row actions repeat on a fresh load (withMapWrite); the
+    // rest answers the same 409 as a stale `base_updated`.
+    if (!isMapConflict(err)) throw err;
+    const i18n = require(`${__hooks}/i18n.js`);
+    return { status: 409, error: i18n.t(lang, "err.mapConflict"), conflict: true };
+  }
+  // This writer changed nothing in the graph (a no-op update) and the model hook put the
+  // graph stored meanwhile into the record: what now differs from `origNodes` is SOMEBODY
+  // ELSE's change, already logged, notified and run through the rules by its own writer.
+  // Nothing of that may happen a second time under this actor — `merged` tells the caller
+  // to skip its own follow-ups too.
+  if (map.get("kb_graph_merged") === true) return { record: map, merged: true };
   try {
     // opts.via protéká z volajícího: zásah pravidla se do historie musí přiznat
     // jako pravidlo, ne jako jeho autor (viz executeRuleActions)
@@ -3250,10 +3909,17 @@ function createRulesFromList(app, mapRecord, rules, authorEmail) {
   let created = 0, skipped = all.length - list.length; // i ořez nad strop je PŘIZNANÝ skip
   if (list.length === 0) return { created: created, skipped: skipped };
   const col = app.findCollectionByNameOrId("automation_rules");
+  // Nobody is there to ask (a project template, the template cron, an import): an unknown
+  // assignee in a sub-step checklist is emptied, the rule itself is created (S2-03) — said
+  // in the log. People are checked as the author of the rules sees them.
+  let authorId = "";
+  try { authorId = app.findFirstRecordByFilter("users", "email = {:e}", { e: authorEmail }).id; } catch (err) { /* validateRuleInput falls back to the project owner */ }
+  const ownersDropped = [];
   for (const r of list) {
     try {
-      const v = validateRuleInput(app, mapRecord, r || {});
+      const v = validateRuleInput(app, mapRecord, r || {}, { lenientOwners: true, userId: authorId });
       if (v.error) { skipped++; continue; }
+      for (const d of (v.ownersDropped || [])) if (ownersDropped.indexOf(d) < 0) ownersDropped.push(d);
       const rec = new Record(col);
       rec.set("map", mapRecord.id);
       rec.set("name", v.data.name);
@@ -3269,7 +3935,10 @@ function createRulesFromList(app, mapRecord, rules, authorEmail) {
       created++;
     } catch (e) { skipped++; }
   }
-  return { created: created, skipped: skipped };
+  if (ownersDropped.length) {
+    try { app.logger().warn("rules from a list: unknown assignees of sub-steps were emptied", "map", mapRecord.id, "assignees", ownersDropped.join(", ").slice(0, 500)); } catch (e2) { /* the log is a bonus */ }
+  }
+  return { created: created, skipped: skipped, ownersDropped: ownersDropped.length };
 }
 
 // instantiace šablony na nový projekt (server, mimo request hooky — cron/routa)
@@ -3288,6 +3957,29 @@ function instantiateTemplate(app, tpl, startDate) {
   const tplRules = jsonVal(tpl, "rules", []);
   const jeKanban = Array.isArray(tplRules) && tplRules.length > 0;
   const conv = templateToMapServer(tplObj, startDate, jeKanban ? {} : undefined);
+  // An assignee the instance does not know (the person left, a typo without "@", a contact that
+  // was deleted or is somebody else's private one) is emptied — the same as in a rule's sub-steps
+  // (resolveRuleItemOwners) and in import. Kept, the step hung on nobody and the address got a
+  // pending share of the project, claimable by whoever registered it later (Richard 13 Nov 2026).
+  // resolveOwner gives the canonical address from the database ("Jana@x.cz" in a template still reaches
+  // jana@x.cz) and refuses an ambiguous or unknown one.
+  const knownOwner = {};
+  const droppedOwners = [];
+  const ownerCache = {};
+  for (const n of conv.nodes) {
+    const o = String((n.data || {}).owner || "");
+    if (!o || o === ownerEmail) continue;
+    if (!(o in knownOwner)) {
+      let r = null;
+      try { r = resolveOwner(app, o, ownerId, null, ownerCache); } catch (err) { r = null; }
+      knownOwner[o] = r && !r.error && r.owner ? r.owner : "";
+      if (!knownOwner[o]) droppedOwners.push(o);
+    }
+    if (knownOwner[o] !== o) n.data = Object.assign({}, n.data, { owner: knownOwner[o] });
+  }
+  if (droppedOwners.length) {
+    try { app.logger().warn("instantiateTemplate: unknown assignee emptied", "template", tpl.id, "assignees", droppedOwners.join(", ").slice(0, 300)); } catch (err) { /* log only */ }
+  }
   // auto-share: owneri uzlů (bez vlastníka) — task_seeds zanikly 17. 8. 2026
   const emails = {};
   for (const n of conv.nodes) {
@@ -3604,7 +4296,7 @@ function addOrgPosition(app, map, parentId, title, actorEmail, lang) {
     data: { title: cleanTitle, status: "todo", positionKind: "position" } });
   edges.push({ id: "edge-" + id, source: parent.id, target: id });
   const saved = v1SaveMapData(app, map, nodes, edges, lang, true, actorEmail, { isOwner: true, orgAllowed: true });
-  if (saved.error) return { error: saved.error, status: saved.status || 400 };
+  if (saved.error) return { error: saved.error, status: saved.status || 400, conflict: !!saved.conflict };
   return { row: orgStructureRows(map).find((r) => r.node_id === id) };
 }
 
@@ -3627,7 +4319,7 @@ function removeOrgPosition(app, map, nodeId, actorEmail, lang) {
   const zbyleNodes = nodes.filter((n) => !(n && pryc.includes(n.id)));
   const zbyleEdges = edges.filter((ed) => !(ed && (pryc.includes(ed.source) || pryc.includes(ed.target))));
   const saved = v1SaveMapData(app, map, zbyleNodes, zbyleEdges, lang, true, actorEmail, { isOwner: true, orgAllowed: true });
-  if (saved.error) return { error: saved.error, status: saved.status || 400 };
+  if (saved.error) return { error: saved.error, status: saved.status || 400, conflict: !!saved.conflict };
   return { ok: true };
 }
 
@@ -3664,7 +4356,7 @@ function setPositionAssignment(app, map, nodeId, patch, actorEmail, lang) {
   }
   node.data = d;
   const saved = v1SaveMapData(app, map, nodes, edges, lang, false, actorEmail, { isOwner: true, orgAllowed: true });
-  if (saved.error) return { error: saved.error, status: saved.status || 400 };
+  if (saved.error) return { error: saved.error, status: saved.status || 400, conflict: !!saved.conflict };
   return { row: orgStructureRows(map).find((r) => r.node_id === nodeId) };
 }
 
@@ -4787,6 +5479,10 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
   let relayout = false;
   let agentRunId = "";
   let subCounter = 0; // pořadí create_subnodes v tomto běhu — unikátní id prefix
+  // What leaves the map (notifications, a queued agent run) happens only AFTER the map is
+  // saved: a refused write (the map changed meanwhile, S3-01) is repeated once by the
+  // caller on a fresh load, and the repetition must not notify or queue a second time.
+  const later = [];
 
   const needTarget = (type) => {
     if (!target) throw new Error("action " + type + " needs a node scope"); // validace save to nepustí; obrana do hloubky
@@ -4988,10 +5684,23 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       // karta), musí být prefix unikátní i MEZI BĚHY. Bez toho druhý běh spadne
       // na "Duplicitní id uzlu" a pravidlo se navíc označí za rozbité — takže
       // akce fungovala právě jednou za život pravidla.
+      // An assignee in the checklist must be a real person here, as in set_owner above and in
+      // v1 add_nodes (P6-01; code analysis 4, S2-03): a rule saved before this check, or a
+      // member who left since, must not leave a step assigned to nobody. The sub-step is
+      // still created, WITHOUT an assignee (the other sub-steps and actions go on), and the
+      // run history says so. Checked as the rule's AUTHOR sees people (like v1 add_nodes
+      // checks as the caller). Resolved on a copy: a run does not rewrite the stored rule.
+      const items = JSON.parse(JSON.stringify(Array.isArray(a.items) ? a.items : []));
+      let authorId = map.getString("owner");
+      try { authorId = app.findFirstRecordByFilter("users", "email = {:e}", { e: authorEmail }).id; } catch (err) { /* the author is gone → as the project owner */ }
+      const resolved = resolveRuleItemOwners(app, items, authorId, null, {});
+      if (resolved.dropped.length) {
+        skips.push({ type: a.type, reason: "unknown assignee (" + resolved.dropped.join(", ").slice(0, 300) + ") — the sub-step was created without an assignee" });
+      }
       let subPrefix = "r" + rule.id + "-" + subCounter++;
       const obsazeno = (p) => nodes.some((n) => n && String(n.id).indexOf("node-" + p + "-") === 0);
       for (let bump = 1; obsazeno(subPrefix); bump++) subPrefix = "r" + rule.id + "-" + (subCounter - 1) + "-" + bump;
-      const conv = treeItemsToNodes(a.items, subPrefix, null);
+      const conv = treeItemsToNodes(items, subPrefix, null);
       if (conv.error) throw new Error("create_subnodes: " + conv.error);
       if (conv.count > 50) throw new Error("create_subnodes: too many nodes (max 50)");
       for (const n of conv.nodes) nodes.push(n);
@@ -5000,6 +5709,21 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       changed = true;
       relayout = true; // dokumentovaný vedlejší efekt — stejné chování jako v1 add_nodes
       done.push({ type: a.type, count: conv.count, parent: parent.id });
+      // The new assignees get the project shared as collaborators, like after v1 add_nodes —
+      // otherwise the step is theirs, but they cannot open the project and My day does not
+      // show it (S2-03). With the rights of the rule's AUTHOR: who may not share by hand
+      // does not share through a rule either. First in `later`, ahead of the notifications.
+      const subOwners = conv.nodes.map((n) => String((n.data || {}).owner || "")).filter(Boolean);
+      if (subOwners.length) {
+        later.unshift(() => {
+          try {
+            const author = app.findFirstRecordByFilter("users", "email = {:e}", { e: authorEmail });
+            autoShareAssignees(app, map, author, subOwners);
+          } catch (err) {
+            try { app.logger().warn("rule create_subnodes: sharing with the assignees failed", "rule", rule.id, "error", String(err)); } catch (e2) { /* the log is a bonus */ }
+          }
+        });
+      }
     } else if (a.type === "notify") {
       const d = (node && node.data) || {};
       let emails = [];
@@ -5013,7 +5737,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         } else if (String(a.to || "")) emails = [String(a.to)];
       }
       for (const email of emails) {
-        notify(app, {
+        later.push(() => notify(app, {
           email: email,
           actorEmail: "", // odesílatel je pravidlo, ne člověk — doručit vždy
           type: "rule_notice",
@@ -5021,7 +5745,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
           nodeId: node ? node.id : "",
           textKey: "notify.ruleNotice",
           params: { rule: rule.getString("name"), message: String(a.message || "").slice(0, 500), title: String(d.title || map.getString("title") || "") },
-        });
+        }));
       }
       done.push({ type: a.type, to: emails.join(", ") }); // rozřešené adresy, ne spec
     } else if (a.type === "offer_assistant") {
@@ -5040,7 +5764,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         } else if (to) emails = [to];
       }
       for (const email of emails) {
-        notify(app, {
+        later.push(() => notify(app, {
           email: email,
           actorEmail: "",
           type: "rule_notice",
@@ -5049,7 +5773,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
           textKey: "notify.ruleAssist." + mode,
           params: { rule: rule.getString("name"), title: String(d.title || map.getString("title") || ""), project: map.getString("title") },
           extra: { asistent: mode },
-        });
+        }));
       }
       done.push({ type: a.type, mode: mode, to: emails.join(", ") });
     } else if (a.type === "run_agent") {
@@ -5060,9 +5784,13 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       // v inline cestě uložení mapy nesmí viset žádné HTTP
       // autorizace agenta (allowed_emails) vůči AUTOROVI pravidla, ne vůči
       // owneru uzlu, který mohl set_owner v témže běhu přepsat
-      const run = queueAgentRun(app, map, tn, authorActor, { agentName: agentName, depth: depth + 1 });
-      if (run) agentRunId = run.id;
-      done.push({ type: a.type, agent: agentName, queued: !!run });
+      const entry = { type: a.type, agent: agentName, queued: false };
+      done.push(entry);
+      later.push(() => {
+        const run = queueAgentRun(app, map, tn, authorActor, { agentName: agentName, depth: depth + 1 });
+        if (run) agentRunId = run.id;
+        entry.queued = !!run;
+      });
     } else {
       throw new Error("unknown action type: " + String(a && a.type));
     }
@@ -5073,9 +5801,39 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
     // autor pravidla (autorizace i notifikace na něm stojí), ale historie by
     // bez tohohle tvrdila, že u cíle klikal člověk.
     const saved = v1SaveMapData(app, map, nodes, edges, null, relayout, authorActor, { isOwner: authorIsOwner, rulesDepth: depth + 1, rulesBudget: budget, via: "rule:" + rule.id });
-    if (saved.error) throw new Error("save failed: " + saved.error);
+    // a refused write (the map changed meanwhile, S3-01) is marked: it is not a broken rule
+    if (saved.error) throw new Error("save failed: " + saved.error + (saved.conflict ? " [" + MAP_CONFLICT_MARK + "]" : ""));
   }
+  for (const f of later) f();
   return { done: done, skips: skips, agentRunId: agentRunId };
+}
+
+// A rule whose write was refused because the map changed meanwhile (S3-01) is repeated
+// ONCE (decision of the product owner, 11 Nov 2026): the map is loaded again, the
+// conditions are evaluated on the fresh state and the actions run on it. Nothing of the
+// first attempt reached the map or left it (one atomic save; notifications and agent runs
+// come after the save), so nothing happens twice. A second refusal is thrown to the caller
+// (the run is logged as failed, without marking the rule broken).
+function executeRuleActionsRetry(app, map, rule, node, depth, budget) {
+  try {
+    return executeRuleActions(app, map, rule, node, depth, budget);
+  } catch (err) {
+    if (!isMapConflict(err)) throw err;
+    // the repetition runs as a row action of the map (withMapWrite: it waits until the
+    // people writing right now are done; a no-op when this request already holds the lock),
+    // so the one repetition is not lost to the next write in a busy map
+    return withMapWrite(app, map.id, () => {
+      let fresh;
+      try { fresh = app.findRecordById("goalmaps", map.id); } catch (e2) { throw err; }
+      const nodes = jsonVal(fresh, "nodes", []);
+      const freshNode = node ? (nodes.find((n) => n && n.id === node.id) || null) : null;
+      if (node && !freshNode) return { done: [], skips: [{ type: "rule", reason: "the node is no longer in the map (it changed while the rule was running)" }], agentRunId: "" };
+      if (!ruleConditionsMatch(ruleJson(rule, "conditions", []), freshNode, jsonVal(fresh, "edges", []))) {
+        return { done: [], skips: [{ type: "rule", reason: "the conditions no longer hold (the map changed while the rule was running)" }], agentRunId: "" };
+      }
+      return executeRuleActions(app, fresh, rule, freshNode, depth, budget);
+    });
+  }
 }
 
 // Společné složení řádku logu z výsledku executeRuleActions: skipy se PŘIZNÁVAJÍ.
@@ -5198,7 +5956,7 @@ function runAutomationRules(app, origNodes, origEdges, record, actorEmail, opts)
       budget.n++;
       fired++;
       try {
-        const res = executeRuleActions(app, record, ev.rule, ev.node, depth, budget);
+        const res = executeRuleActionsRetry(app, record, ev.rule, ev.node, depth, budget);
         const out = ruleRunOutcome(res);
         logRuleRun(app, Object.assign({}, base, { status: out.status, actionsDone: out.actionsDone, agentRun: res.agentRunId, detail: out.detail }));
         // první úspěšný běh maže příznak „už jsem si stěžoval"
@@ -5207,7 +5965,7 @@ function runAutomationRules(app, origNodes, origEdges, record, actorEmail, opts)
         }
       } catch (err) {
         logRuleRun(app, Object.assign({}, base, { status: "failed", detail: String(err && err.message || err) }));
-        ruleBroken(app, ev.rule, record, String(err && err.message || err));
+        if (!isMapConflict(err)) ruleBroken(app, ev.rule, record, String(err && err.message || err)); // a write conflict says nothing about the rule
       }
     } catch (err) {
       try { app.logger().warn("automation_rules: vyhodnocení selhalo", "rule", ev.rule.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
@@ -5275,7 +6033,7 @@ function runScheduledRules(app, opts) {
           depth: 0, actor: "schedule", dedupKey: dedupKey,
         };
         try {
-          const res = executeRuleActions(app, map, rule, node, 0, passBudget);
+          const res = executeRuleActionsRetry(app, map, rule, node, 0, passBudget);
           const out = ruleRunOutcome(res);
           const logged = logRuleRun(app, Object.assign({}, base, { status: out.status, actionsDone: out.actionsDone, agentRun: res.agentRunId, detail: out.detail }));
           if (!logged) return; // souběh: dedup index to už zapsal jinde
@@ -5288,7 +6046,7 @@ function runScheduledRules(app, opts) {
           // BEZ dedup klíče: selhaný běh dřív klíč spotřeboval natrvalo, takže
           // opravené pravidlo pro ten uzel/termín už nikdy nevystřelilo (nález S1-02)
           logRuleRun(app, Object.assign({}, base, { dedupKey: "", status: "failed", detail: String(err && err.message || err) }));
-          ruleBroken(app, rule, map, String(err && err.message || err));
+          if (!isMapConflict(err)) ruleBroken(app, rule, map, String(err && err.message || err)); // write conflict: no dedup key → the next pass runs it again
         }
       };
 
@@ -5492,6 +6250,7 @@ function validateRuleInput(app, map, body, opts) {
     return { error: "actions must be an array of 1-" + MAX_RULE_ACTIONS + " items" };
   }
   const actions = [];
+  const ownersDropped = []; // create_subnodes assignees emptied instead of refused (lenient mode / stored before)
   for (const a of b.actions) {
     if (!a || typeof a !== "object" || !RULE_ACTIONS.includes(a.type)) {
       return { error: "action.type must be one of: " + RULE_ACTIONS.join(", ") };
@@ -5595,6 +6354,16 @@ function validateRuleInput(app, map, body, opts) {
       if (conv.error) return { error: "create_subnodes.items: " + conv.error };
       if (!conv.count) return { error: "create_subnodes.items must contain at least one item" };
       if (conv.count > 50) return { error: "create_subnodes.items: at most 50 nodes" };
+      // an assignee must be a member or an external contact the SAVING person sees — told
+      // when the rule is saved (S2-03, see resolveRuleItemOwners). A template without a map
+      // has nobody to check against yet. Rewrites item.owner to the canonical e-mail.
+      {
+        const o = opts || {};
+        const res = resolveRuleItemOwners(app, a.items, map ? (o.userId || map.getString("owner")) : "", "en",
+          { strict: !o.lenientOwners, keep: ruleItemOwners(o.prevActions) });
+        if (res.error) return { error: "create_subnodes.items: " + res.error };
+        for (const d of res.dropped) if (ownersDropped.indexOf(d) < 0) ownersDropped.push(d);
+      }
       actions.push({ type: a.type, parent: parent, items: a.items });
     } else if (a.type === "notify") {
       const to = String(a.to || "");
@@ -5625,7 +6394,7 @@ function validateRuleInput(app, map, body, opts) {
     }
   }
 
-  return { data: { name: name, node_id: nodeId, trigger: trigger, conditions: conds, actions: actions } };
+  return { data: { name: name, node_id: nodeId, trigger: trigger, conditions: conds, actions: actions }, ownersDropped: ownersDropped };
 }
 
 // DTO pravidla pro session i v1 API — configy jdou ven celé (čtenář je editor
@@ -5878,8 +6647,21 @@ function dayMinusDays(day, n) {
 function minusMinutes(day, time, min) {
   const [y, m, d] = String(day).split("-").map(Number);
   const [H, M] = String(time || "00:00").split(":").map(Number);
-  const x = new Date(y, m - 1, d, H, M);
-  x.setMinutes(x.getMinutes() - Number(min || 0));
+  const n = Number(min || 0);
+  // Subtracted in the local clock fields, so "a day before" stays at the same hour across a
+  // clock change. One exception (code analysis 4, S5-03): on the night the clocks go forward
+  // the result can fall into the hour that does not exist; Date pushes it an hour ahead and
+  // "30 min before 03:15" came at 03:45, AFTER the start. Then — the wall-clock time asked
+  // for does not exist, or the result is not before the start — the lead is taken off in
+  // real time. A negative lead (the end of a booking) is plain field arithmetic as before.
+  const start = new Date(y, m - 1, d, H, M);
+  let x = new Date(y, m - 1, d, H, M);
+  x.setMinutes(x.getMinutes() - n);
+  if (n > 0) {
+    const wall = new Date(Date.UTC(y, m - 1, d, H, M) - n * 60000); // the wall-clock fields asked for
+    const exists = x.getHours() === wall.getUTCHours() && x.getMinutes() === wall.getUTCMinutes() && x.getDate() === wall.getUTCDate();
+    if (!exists || x.getTime() >= start.getTime()) x = new Date(start.getTime() - n * 60000);
+  }
   return fmtDateLocal(x) + " " + pad2(x.getHours()) + ":" + pad2(x.getMinutes());
 }
 
@@ -5928,7 +6710,13 @@ function runReminders(app, opts) {
   try {
     const [y, m, d] = today.split("-").map(Number);
     const okno = addDaysStr(new Date(y, m - 1, d), 8);
-    events = app.findRecordsByFilter("events", "remind = true && reminded_at = '' && day <= {:d}", "day,time", 500, 0, { d: okno });
+    // An event nobody sees any more is not reminded: its calendar is archived (hidden from
+    // the listing and read-only, so the reminder could not even be switched off) or the
+    // absence request was rejected (code analysis 4, S5-05). It is left out in the query —
+    // not stamped, so unarchiving brings the reminder back, and it does not use up the 500.
+    events = app.findRecordsByFilter("events",
+      "remind = true && reminded_at = '' && day <= {:d} && status != 'rejected' && (calendar = '' || calendar.archived = false)",
+      "day,time", 500, 0, { d: okno });
   } catch (err) { warn("reminders: načtení událostí selhalo", ["error", String(err)]); }
   for (const ev of events) {
     try {
@@ -6120,6 +6908,8 @@ function runEmailDigests(app, opts) {
   const MAX_LINES = 10; // víc řádků v e-mailu nikdo nečte; zbytek přizná emailMore
   let sent = 0;
   let posledni = "";   // komu souhrn odešel naposled (nese ho denní značka níž)
+  let failed = 0;
+  let failedUser = ""; // carries the day marker when the day is closed after three failed attempts
   for (const u of users) {
     try {
       // overflow řádek se vynechává — souhrn vyjmenovává obsah, ne meta-hlášku;
@@ -6173,8 +6963,26 @@ function runEmailDigests(app, opts) {
       sent++;
       posledni = u.id;
     } catch (err) {
+      failed++;
+      if (!failedUser) failedUser = u.id;
       try { app.logger().warn("email_digests: uživatel selhal", "user", u.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
     }
+  }
+  // Nothing went out and somebody failed (mail server down at the digest hour): neither the
+  // day stamp nor the window moves, the next hourly run tries again with the same window.
+  // Before, those notifications never reached any digest (code analysis 4, S2-06). A partial
+  // failure keeps the old behaviour — a repeat would send the digest twice to the others.
+  // At most 3 such attempts a day: a mail server that stays down (or a single recipient whose
+  // address always fails) must not be retried every hour for ever — after the third the day is
+  // closed and the window moves as it used to, with a warning. A manual run (force) neither
+  // counts nor closes anything.
+  if (failed > 0 && sent === 0) {
+    if (force) return 0;
+    const failKey = "emailDigestFail:" + today;
+    const attempts = (Number(store.get(failKey)) || 0) + 1;
+    store.set(failKey, attempts);
+    if (attempts < 3) return 0;
+    try { app.logger().warn("email_digests: the digest failed 3 times today — giving up until tomorrow, today's notifications stay in the bell only", "failed", failed); } catch (e2) { /* the log is a bonus */ }
   }
   if (!force) {
     // ruční/testovací spuštění NESMÍ umlčet ten plánovaný (stejná past jako
@@ -6182,10 +6990,10 @@ function runEmailDigests(app, opts) {
     store.set("emailDigestDay", today);
     // značka nese uživatele, kterému souhrn odešel jako poslednímu (pole je
     // povinné); rozhoduje jen existence řádku s klíčem `digest:<den>`
-    if (posledni) {
+    if (posledni || failedUser) {
       try {
         const znacka = new Record(app.findCollectionByNameOrId("mail_budget"));
-        znacka.set("user", posledni);
+        znacka.set("user", posledni || failedUser);
         znacka.set("day", "digest:" + today);
         znacka.set("sent", sent);
         app.save(znacka);
@@ -7028,7 +7836,21 @@ function importJednuMapu(app, auth, L, info, opts) {
 
   // Žadatel o automatizaci ze souboru je e-mail z CIZÍ instance — přerazítkovat
   // na importujícího, ať se do dat nedostane cizí osobní údaj ani falešné autorství.
-  const stamped = stampAutomationRequesters([], nodes, auth.email());
+  // The same holds for the other server-only stamps (code analysis 4, S2-02): who assigned
+  // the step becomes the importing user, and an open deadline-change request does not come
+  // along at all — its requester asked in ANOTHER project and would get "your request is
+  // resolved" about a copy they cannot even open.
+  // Position fields (holder, deputy) belong to the org-structure map, which an import never
+  // creates — e-mails from the file do not come along in them either.
+  let deadlineRequestsDropped = 0;
+  const withoutRequests = nodes.map((n) => {
+    const d = (n && n.data) || {};
+    const request = !!(d.deadlineChangeWanted || d.deadlineChangeNote || d.deadlineChangeRequestedBy);
+    if (!request && !d.holder && !d.deputy && !d.positionKind) return n;
+    if (request) deadlineRequestsDropped++;
+    return Object.assign({}, n, { data: Object.assign({}, d, { deadlineChangeWanted: "", deadlineChangeNote: "", deadlineChangeRequestedBy: "", holder: "", deputy: "", positionKind: "" }) });
+  });
+  const stamped = stampAssignedBy([], stampAutomationRequesters([], withoutRequests, auth.email()), auth.email());
   // ořez délek jako u autosave (normalizeNodeShapes) — importní cesta ho
   // neměla a 2MB název prošel do DB celý (nález checkup mutace před v0.13.2);
   // canonicalNodeData měnit nejde, drží bit-paritu s FE cleanMap
@@ -7087,8 +7909,10 @@ function importJednuMapu(app, auth, L, info, opts) {
     const cistiItemOwnery = (items) => (Array.isArray(items) ? items : []).map((it) => {
       if (!it) return it;
       const out = Object.assign({}, it);
-      const em = String(out.owner || "").trim();
-      if (em.includes("@") && !known[em]) { out.owner = ""; dropped++; }
+      // ALWAYS emptied, a known member too (code analysis 4, S2-03): since the rule shares the
+      // project with the assignees of its sub-steps, a kept e-mail would share the imported
+      // project on the first run — and an import shares nothing with anybody
+      if (String(out.owner || "").trim()) { out.owner = ""; dropped++; }
       if (Array.isArray(out.children)) out.children = cistiItemOwnery(out.children);
       return out;
     });
@@ -7149,6 +7973,7 @@ function importJednuMapu(app, auth, L, info, opts) {
     tasks_imported: imported,
     tasks_skipped: tasksSkipped,
     assignments_dropped: dropped,
+    deadline_requests_dropped: deadlineRequestsDropped,
     rules_imported: rulesImported,
     rules_skipped: rulesSkipped,
   });
@@ -8131,7 +8956,31 @@ function generateDailySummary(app, userId, email, cfg, lang) {
 // nedávno aktivní účty (loginlogs za FLOWMAP_SUMMARY_ACTIVE_DAYS dní, default
 // 14; 0 = všem) — neaktivním se sumář dogeneruje při otevření aplikace
 // (frontend, refresh routa), takže o nic nepřijdou a GPU se neplýtvá.
+// One batch at a time: a second run that started while the first was still asking the model,
+// drawing the banner or sending read the same "not sent yet" and mailed everybody twice
+// (findings S7-06 / S8-05; the cron ticks every 5 minutes in the summary hour and the admin
+// route runs the same batch). The overlapping run does nothing — the running one finishes
+// the job and the next tick catches up on whatever it left. A lock nobody released (cannot
+// happen with `finally`; a restart clears the store) expires after SUMMARY_LOCK_STALE_MS.
+const SUMMARY_LOCK_STALE_MS = 6 * 3600000;
 function runDailySummaries(app, opts) {
+  const store = app.store();
+  const key = "dailySummariesRunning";
+  const mine = Date.now() + ":" + $security.randomString(8);
+  let busy = false;
+  store.setFunc(key, (cur) => {
+    const since = Number(String(cur || "").split(":")[0]) || 0;
+    if (since && Date.now() - since < SUMMARY_LOCK_STALE_MS) { busy = true; return cur; }
+    return mine;
+  });
+  if (busy) return 0;
+  try {
+    return runDailySummariesLocked(app, opts);
+  } finally {
+    if (store.get(key) === mine) store.remove(key);
+  }
+}
+function runDailySummariesLocked(app, opts) {
   if (pracovatSeNesmi()) return 0;
   const force = !!(opts && opts.force);
   const now = new Date();
@@ -8273,8 +9122,8 @@ module.exports = { ASSIST_MODES,
   zrusApiKlice,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour, summaryMinute, summaryCronDue,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, transferMapOwnership, transferTargetError, removeEmailFromAllShares,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, resolveRuleItemOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour, summaryMinute, summaryCronDue,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, emailHasAccount, shareInviteRow, pendingShareRows, upsertShareInvite, shareInviteTokenValid, newShareInviteToken, claimShareInvitesByToken, parkUnclaimedShares, jePosledniAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, ownedMapsFor, userDeletionSummary, userLeftovers, cleanupBeforeUserDelete, removeEmailFromAllShares, memberMapsHandover, notifyMapHandover, MAP_CONFLICT_MARK, MAP_RETRY, isMapConflict, mergeConcurrentMapWrite, bumpMapVersion, withMapWrite,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
+import { listAllPages } from '@/lib/listAll';
 import { Button } from '@/components/ui/button';
 import { Archive as ArchiveIcon, ArchiveRestore, Loader2, Target, Hash, FolderOpen, Search } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
@@ -34,7 +35,8 @@ export default function Archive() {
   const [dotaz, setDotaz] = useState('');
 
   const load = () => {
-    base44.entities.GoalMap.filter({ archived: true }, '-updated_date', 200)
+    // the whole archive, page by page (a fixed limit of 200 hid older projects from the search too)
+    listAllPages(base44.entities.GoalMap, '-updated_date,id', 200, { rawFilter: 'archived = true' })
       .then(setMaps)
       .catch(() => setMaps([]));
   };
