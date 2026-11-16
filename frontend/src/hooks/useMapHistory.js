@@ -17,6 +17,9 @@ import { revertStep } from '@/lib/undoStep';
 //                            meta.bufferItem (F1-08: an idea inserted and undone was lost)
 //   onRefused(result)      — tell the person why the step was not undone
 //   onRestoreFailed()      — the idea could not be returned; the step stays in the history
+//   restoreProjectColor(c) — a step saved from the dialog of the top node also set the PROJECT
+//                            colour (meta.projectColor = { from, to }); it goes back only when the
+//                            project still has the colour the step gave it
 export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
   const historyRef = useRef([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -39,7 +42,7 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
 
   const pushHistory = useCallback((meta) => {
     if (pending.current) { pending.current.after = now(); pending.current = null; }
-    const entry = { before: now(), after: null, seq: ++seq.current, meta: meta && meta.bufferItem ? { bufferItem: meta.bufferItem } : null };
+    const entry = { before: now(), after: null, seq: ++seq.current, meta: meta && (meta.bufferItem || meta.projectColor) ? { bufferItem: meta.bufferItem || null, projectColor: meta.projectColor || null } : null };
     pending.current = entry;
     historyRef.current.push(entry);
     if (historyRef.current.length > 50) historyRef.current.shift();
@@ -85,6 +88,7 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
       if (!r.ok) { drop(); if (env.onRefused) env.onRefused(r); return; }
     }
     drop();
+    if (entry.meta && entry.meta.projectColor && env.restoreProjectColor) env.restoreProjectColor(entry.meta.projectColor);
     // No skipNextSave: the fingerprint in the autosave notices the difference and sends it.
     setNodes(r.nodes);
     setEdges(r.edges);

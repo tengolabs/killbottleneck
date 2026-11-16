@@ -88,6 +88,11 @@
     "rotaceHint": "Skiny se budou samy střídat — každý den další.",
     "rotaceDnes": "Dnes: {{name}} · zítra další"
   },
+  "formerMember": {
+      "badge": "bývalý člen",
+      "hint": "Bývalý člen ({{email}}) — účet už neexistuje. Přeřaďte krok na někoho jiného.",
+      "option": "bývalý člen ({{email}})"
+  },
   "externalContacts": {
     "title": "Externí kontakty",
     "description": "Lidé mimo systém — účetní, dodavatelé. Nemají účet, nechodí jim žádná upozornění a o ničem nevědí; je to čistě vaše interní evidence termínů.",

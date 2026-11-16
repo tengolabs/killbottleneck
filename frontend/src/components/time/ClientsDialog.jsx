@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import {
@@ -78,7 +79,7 @@ export default function ClientsDialog({ open, onClose, onChanged, vybranyId }) {
   };
 
   const remove = async (c) => {
-    if (!window.confirm(t('clients.confirmDelete', { name: c.name }))) return;
+    if (!(await askDelete(t('clients.confirmDelete', { name: c.name })))) return;
     try {
       await base44.entities.Client.delete(c.id);
       load();

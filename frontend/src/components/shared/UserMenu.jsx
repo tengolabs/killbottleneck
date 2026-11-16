@@ -69,6 +69,12 @@ export default function UserMenu({ onInvited }) {
     return () => { window.removeEventListener('kb-otevri-klienty', naKlienty); window.removeEventListener('kb-otevri-ucet', naUcet); };
   }, []);
   const [timeOpen, setTimeOpen] = useState(false);
+  const [timeFixId, setTimeFixId] = useState(''); // entry to correct, from the "Timer stopped" notification
+  useEffect(() => {
+    const naOpravu = (e) => { setTimeFixId((e.detail && e.detail.entryId) || ''); otevri(setTimeOpen); };
+    window.addEventListener('kb-time-fix', naOpravu);
+    return () => window.removeEventListener('kb-time-fix', naOpravu);
+  }, []);
   const [reportOpen, setReportOpen] = useState(false);
   // Dialogy z nabídky jsou od 27. 10. 2026 nemodální (pod lištou) a lišta zůstává klikací → z nabídky by šel otevřít
   // druhý dialog přes první (dva závoje nad sebou). Otevření jednoho zavře ostatní (nález panelu kvality 27. 10.).
@@ -241,7 +247,7 @@ export default function UserMenu({ onInvited }) {
       )}
       <AccountDialog open={accountOpen} sekce={accountSekce} onClose={() => { setAccountOpen(false); setAccountSekce(''); }} />
       <ClientsDialog open={klientiOpen} vybranyId={klientId} onClose={() => { setKlientiOpen(false); setKlientId(''); }} />
-      <TimeOverviewDialog open={timeOpen} onClose={() => setTimeOpen(false)} />
+      <TimeOverviewDialog open={timeOpen} fixEntryId={timeFixId} onClose={() => { setTimeOpen(false); setTimeFixId(''); }} />
       <ReportDialog
         open={reportOpen}
         onClose={() => setReportOpen(false)}

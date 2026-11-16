@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
@@ -333,11 +334,11 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
                 size="icon"
                 className="h-6 w-6 text-destructive/70 hover:text-destructive"
                 title={t('tasks:taskTable.deleteFromBuffer')}
-                onClick={() => {
+                onClick={async () => {
                   // STEJNÉ potvrzení jako na stránce Úkoly — tady chybělo a na
                   // mobilu (drobné ikonky, žádný tooltip) stálo Richarda nápad,
                   // nenávratně (7. 8. 2026 v noci, ověřeno v datech instance).
-                  if (!window.confirm(t('tasks:tasksPage.confirmDeleteIdea', { title: item.title }))) return;
+                  if (!(await askDelete(t('tasks:tasksPage.confirmDeleteIdea', { title: item.title })))) return;
                   buffer.remove(item.id);
                 }}
               >

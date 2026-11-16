@@ -2819,6 +2819,119 @@ function cleanupBeforeUserDelete(app, user, actor) {
   return handedOver;
 }
 
+// ---------- deleting a member: the open steps they were assigned to ----------
+// The steps of a deleted member stay assigned to the address (the client shows "former
+// member" for an assignee without an account). The administrator may pass the OPEN ones
+// to another member inside the delete dialog (decision 15 Nov 2026). Rules:
+//   • only steps that are not done — finished work is history and keeps its author;
+//   • only in projects the new assignee already has access to (after the handover of the
+//     deleted member's shared projects): a step in somebody's private project must not
+//     open that project to a person its owner did not choose; those steps stay marked;
+//   • never the org structure (positions use holder/deputy, cleaned up elsewhere) and
+//     never archived projects (archive = closed work).
+function isOpenStepOf(node, emailLc) {
+  if (!node || node.type !== "goalNode") return false;
+  const d = node.data || {};
+  if (d.status === "done") return false;
+  return String(d.owner || "").trim().toLowerCase() === emailLc;
+}
+
+// Ids of the projects whose graph mentions the address at all — a cheap prefilter, the
+// exact test is isOpenStepOf on the parsed graph. `instr` takes the address literally
+// (LIKE would read `%` and `_` in it as wildcards).
+function memberStepMapIds(app, emailLc) {
+  const rows = arrayOf(new DynamicModel({ id: "" }));
+  app.db().newQuery("SELECT id FROM goalmaps WHERE IFNULL(kind, '') != 'org' AND IFNULL(archived, 0) = 0 AND instr(lower(CAST(nodes AS TEXT)), {:e}) > 0 ORDER BY created, id")
+    .bind({ e: emailLc }).all(rows);
+  return rows.map((r) => r.id);
+}
+
+// Numbers for the delete dialog — never titles (the administrator must not learn about
+// other people's private projects). `open` = open steps in projects that stay after the
+// delete; `reassignable` = how many of them the chosen member (`target`) would receive,
+// null without a target.
+function memberOpenStepsSummary(app, userId, actor, target) {
+  const out = { open: 0, maps: 0, reassignable: target ? 0 : null };
+  let user;
+  try { user = app.findRecordById("users", userId); } catch (err) { return out; }
+  const em = user.getString("email").trim().toLowerCase();
+  if (!em) return out;
+  const h = memberMapsHandover(app, userId, actor);
+  const going = {};
+  for (const m of h.private.concat(h.noHolder)) going[m.id] = true;
+  const newOwner = {};
+  for (const it of h.coadmin.concat(h.actor)) newOwner[it.map.id] = it.owner.id;
+  const shareRows = target ? shareRowsFor(app, target.getString("email")) : null;
+  for (const id of memberStepMapIds(app, em)) {
+    if (going[id]) continue;
+    let map;
+    try { map = app.findRecordById("goalmaps", id); } catch (err) { continue; }
+    let n = 0;
+    for (const node of jsonVal(map, "nodes", [])) if (isOpenStepOf(node, em)) n += 1;
+    if (!n) continue;
+    out.open += n;
+    out.maps += 1;
+    if (target && (newOwner[id] === target.id || mapAccessLevel(app, map, target.id, target.getString("email"), { shareRows: shareRows }) !== "")) out.reassignable += n;
+  }
+  return out;
+}
+
+// Runs AFTER the account is gone (and its address left the share lists): a failure here
+// must never bring the delete back, the steps simply stay marked "former member". Each
+// project is written through the shared writer (change log, rules, 409 on a concurrent
+// write → repeated on a fresh load). Returns { steps, maps, skipped } — skipped = steps in
+// projects the new assignee cannot see.
+function reassignMemberSteps(app, email, target, actorEmail) {
+  const out = { steps: 0, maps: 0, skipped: 0 };
+  const em = String(email || "").trim().toLowerCase();
+  if (!em || !target) return out;
+  const targetEmail = target.getString("email");
+  if (!targetEmail || targetEmail.toLowerCase() === em) return out;
+  for (const id of memberStepMapIds(app, em)) {
+    try {
+      let title = "";
+      const res = withMapWrite(app, id, () => {
+        let map;
+        try { map = app.findRecordById("goalmaps", id); } catch (err) { return { n: 0 }; }
+        const nodes = jsonVal(map, "nodes", []);
+        let n = 0;
+        for (const node of nodes) {
+          if (!isOpenStepOf(node, em)) continue;
+          n += 1;
+        }
+        if (!n) return { n: 0 };
+        if (mapAccessLevel(app, map, target.id, targetEmail) === "") return { n: 0, skipped: n };
+        for (const node of nodes) {
+          if (isOpenStepOf(node, em)) node.data = Object.assign({}, node.data, { owner: targetEmail });
+        }
+        const saved = v1SaveMapData(app, map, nodes, jsonVal(map, "edges", []), null, false, actorEmail || "", { isOwner: true });
+        if (saved.conflict) return MAP_RETRY;
+        if (saved.error) throw new Error(saved.error);
+        title = map.getString("title");
+        return { n: n };
+      });
+      if (!res || res === MAP_RETRY) throw new Error("the project kept changing");
+      if (res.skipped) out.skipped += res.skipped;
+      if (!res.n) continue;
+      out.steps += res.n;
+      out.maps += 1;
+      try {
+        notify(app, {
+          email: targetEmail, actorEmail: actorEmail || "", type: "org_notice", mapId: id,
+          textKey: "notify.stepsReassigned",
+          params: { member: email, project: String(title || "").slice(0, 80), n: res.n },
+          // own key: without it the notice would melt into the handover notice of the same
+          // project (same type, same project → "… and 1 more") and the steps would go unsaid
+          dedupKey: "stepsre:" + id + ":" + em + ":" + target.id,
+        });
+      } catch (err) { /* the notification is a bonus */ }
+    } catch (err) {
+      try { app.logger().warn("member steps: reassignment failed", "map", id, "error", String(err)); } catch (e2) { /* log is a bonus */ }
+    }
+  }
+  return out;
+}
+
 // Why a transfer target is not acceptable — one place for the PATCH hook and both
 // routes. Returns a translated message, or "" when the target is fine.
 // `kind === "guest"`: the users field arrives with the guest-from-another-organization
@@ -4524,6 +4637,7 @@ function autoStopStaleTimers(app) {
         mapId: r.getString("map") || null,
         textKey: "notify.timerAutostop",
         params: { label: r.getString("label") || i18n.t(ownerLang, "notify.timerLabelFallback") },
+        extra: { time_entry: r.id }, // the client opens the correction of this entry's end
       });
       n++;
     } catch (err) {
@@ -9130,7 +9244,7 @@ module.exports = { ASSIST_MODES,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
   oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, resolveRuleItemOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour, summaryMinute, summaryCronDue,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, emailHasAccount, shareInviteRow, pendingShareRows, upsertShareInvite, shareInviteTokenValid, newShareInviteToken, claimShareInvitesByToken, parkUnclaimedShares, jePosledniAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, ownedMapsFor, userDeletionSummary, userLeftovers, cleanupBeforeUserDelete, removeEmailFromAllShares, memberMapsHandover, notifyMapHandover, MAP_CONFLICT_MARK, MAP_RETRY, isMapConflict, mergeConcurrentMapWrite, bumpMapVersion, withMapWrite,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, emailHasAccount, shareInviteRow, pendingShareRows, upsertShareInvite, shareInviteTokenValid, newShareInviteToken, claimShareInvitesByToken, parkUnclaimedShares, jePosledniAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, ownedMapsFor, userDeletionSummary, userLeftovers, cleanupBeforeUserDelete, memberOpenStepsSummary, reassignMemberSteps, removeEmailFromAllShares, memberMapsHandover, notifyMapHandover, MAP_CONFLICT_MARK, MAP_RETRY, isMapConflict, mergeConcurrentMapWrite, bumpMapVersion, withMapWrite,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

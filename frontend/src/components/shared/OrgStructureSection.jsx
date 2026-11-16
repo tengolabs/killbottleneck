@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { getOrgStructure, createOrgMap, orgAssign, orgAdd, orgRemove, getMembers } from '@/api/kb';
@@ -83,7 +84,7 @@ export default function OrgStructureSection() {
 
   // odebrání pozice — s podřízenými server odmítne (kaskáda jen vědomě v mapě)
   const removePosition = async (r) => {
-    if (!window.confirm(t('orgStructure.confirmRemove', { title: r.title }))) return;
+    if (!(await askDelete(t('orgStructure.confirmRemove', { title: r.title })))) return;
     setErr('');
     try {
       await orgRemove(r.node_id);

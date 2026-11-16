@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { askConfirm } from '@/lib/appDialogs';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -1159,7 +1160,24 @@ function EditorContent({ mapId, personalMap = false }) {
       duration: 12000,
     }),
     onRestoreFailed: () => toast({ title: t('tasks:tasksPage.stashFailed'), description: t('common:misc.tryAgainPlease'), variant: 'destructive' }),
+    restoreProjectColor: (c) => setColor((cur) => ((cur || '') === c.to ? c.from : cur)),
   };
+
+  // Ctrl+Z / Cmd+Z = the Undo button. Not while typing (the field keeps its own undo), not over
+  // an open dialog or menu, and only for somebody who has the button (canEdit).
+  useEffect(() => {
+    if (!canEdit) return undefined;
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'z') return;
+      const el = e.target;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || ''))) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+      e.preventDefault();
+      handleUndo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canEdit, handleUndo]);
 
   // Odpojení uzlu od rodiče (ikonka na uzlu) — smaže příchozí hrany
   const handleDetachNode = useCallback(
@@ -1229,7 +1247,7 @@ function EditorContent({ mapId, personalMap = false }) {
       if (!node) return;
       const current = node.data?.status || 'todo';
       if (current === 'todo' && waitingSet.has(nodeId)) {
-        if (!window.confirm(t('tasks:tasksPage.confirmStartWaiting'))) return;
+        if (!(await askConfirm(t('tasks:tasksPage.confirmStartWaiting')))) return;
       }
       const next = cycleStatus(current);
       try {
@@ -1279,11 +1297,11 @@ function EditorContent({ mapId, personalMap = false }) {
   }, [rhythmById, edges, nodes, mapKind, toast, t]);
 
   const handleCycleStatus = useCallback(
-    (nodeId) => {
+    async (nodeId) => {
       const node = nodes.find((n) => n.id === nodeId);
       const current = node?.data?.status || 'todo';
       if (current === 'todo' && waitingSet.has(nodeId)) {
-        if (!window.confirm(t('tasks:tasksPage.confirmStartWaiting'))) return;
+        if (!(await askConfirm(t('tasks:tasksPage.confirmStartWaiting')))) return;
       }
       if (cycleStatus(current) === 'done') ohlasPruchod(node);
       setNodes((prev) =>
@@ -1300,6 +1318,19 @@ function EditorContent({ mapId, personalMap = false }) {
 
   const handleSaveNode = useCallback(
     (nodeId, newData, nodeType) => {
+      const uzel = nodes.find((n) => n.id === nodeId);
+      // A save from the node dialog is ONE step of Undo (title, description, assignee, deadline,
+      // status…). A save that changed nothing leaves an empty step, which Undo skips. The dialog
+      // of the top node also sets the project colour — the step remembers it to take it back.
+      const barvaProjektu = uzel?.type === 'apexNode' && newData.color !== undefined && (newData.color || '') !== (color || '');
+      // nothing changed → no step (Undo would be spent on it); the unset colour of the top node
+      // shown as the project colour is not a change
+      // (a field the node never had equals the dialog's default for it)
+      const vychozi = { nodeType: uzel?.type === 'apexNode' ? 'apex' : 'normal', status: 'todo', executorKind: 'human', positionKind: 'position' };
+      const hodnota = (k, v) => JSON.stringify(v || vychozi[k] || '');
+      const zmena = barvaProjektu || Object.keys(newData).some((k) => (k !== 'color' || uzel?.type !== 'apexNode')
+        && hodnota(k, newData[k]) !== hodnota(k, uzel?.data?.[k]));
+      if (zmena) pushHistory(barvaProjektu ? { projectColor: { from: color || '', to: newData.color || '' } } : undefined);
       setNodes((prev) =>
         prev.map((n) =>
           n.id === nodeId ? { ...n, type: nodeType || n.type, data: { ...n.data, ...newData } } : n
@@ -1309,14 +1340,13 @@ function EditorContent({ mapId, personalMap = false }) {
       // PROJEKTU — táž, kterou nastavuje paleta u řádku mapy v tabulce úkolů
       // (rámeček mapy, prstenec vrcholu, nadpis). Dřív skončila jen v
       // data.color vrcholu a nikam viditelně nevedla (Richard 6. 8. 2026 večer).
-      const uzel = nodes.find((n) => n.id === nodeId);
       if (newData.status === 'done' && (uzel?.data?.status || 'todo') !== 'done') ohlasPruchod(uzel);
       if (uzel?.type === 'apexNode' && newData.color !== undefined) {
         setColor(newData.color || '');
       }
       setEditNodeId(null);
     },
-    [setNodes, nodes, ohlasPruchod]
+    [setNodes, nodes, ohlasPruchod, pushHistory, color]
   );
 
   // AI: rozpad/přepis uzlu z jeho menu — hooks/useAiActions.js (F1-07).
@@ -1372,18 +1402,23 @@ function EditorContent({ mapId, personalMap = false }) {
   const selectedEditable = nodes.filter(jeUpravitelny);
   const selectedDeadlineOk = selectedEditable.filter(smiMenitTermin).length;
 
-  const handleBulkApply = useCallback((zmeny) => {
-    const cile = nodes.filter(jeUpravitelny);
+  const handleBulkApply = useCallback(async (zmeny) => {
+    let cile = nodes.filter(jeUpravitelny);
     if (cile.length === 0) return;
     const meniTermin = Object.prototype.hasOwnProperty.call(zmeny, 'deadline');
     // „Termín je termín" (rozhodnutí 27. 7. 2026) — hromadná změna termínu se
     // potvrzuje, u ostatních polí stačí Zpět
-    if (meniTermin && !window.confirm(i18next.t('hromadne:hromadne.potvrdit', { count: cile.length }))) return;
+    if (meniTermin && !(await askConfirm(i18next.t('hromadne:hromadne.potvrdit', { count: cile.length })))) return;
+    // the question is asynchronous now: the canvas may have moved while it was open (a colleague's
+    // change merged in) — work over the canvas as it is NOW, not the one the handler was made with
+    const platno = nodesNow.current || nodes;
+    cile = platno.filter(jeUpravitelny);
+    if (cile.length === 0) return;
 
     const ids = new Set(cile.map((n) => n.id));
     let zmeneno = 0;
     let preskoceno = 0;
-    const dalsi = nodes.map((n) => {
+    const dalsi = platno.map((n) => {
       if (!ids.has(n.id)) return n;
       const patch = { ...zmeny };
       if (meniTermin && !smiMenitTermin(n)) { delete patch.deadline; preskoceno += 1; }

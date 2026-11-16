@@ -21,7 +21,7 @@ const stav = (m, id) => { const n = uzel(m, id); return n ? ((n.data || {}).stat
 const nazev = (m, id) => { const n = uzel(m, id); return n ? ((n.data || {}).title || '') : '(není)'; };
 
 // A signed-in person: own browser context (own storage, own connection), token in localStorage.
-async function clovek(browser, inst, email, chyby, { viewport = { width: 1920, height: 1000 } } = {}) {
+async function clovek(browser, inst, email, chyby, { viewport = { width: 1920, height: 1000 }, appDialogy = true } = {}) {
   const token = await inst.login(email);
   const ctx = await (browser.createBrowserContext ? browser.createBrowserContext() : browser.createIncognitoBrowserContext());
   const page = await ctx.newPage();
@@ -32,6 +32,8 @@ async function clovek(browser, inst, email, chyby, { viewport = { width: 1920, h
   }
   // window.confirm of the app (delete a node…) and the browser's "leave the page?" → yes
   page.on('dialog', (d) => { d.accept().catch(() => {}); });
+  // the app's own confirmation dialog (delete a node, start a waiting step…) → yes as well
+  if (appDialogy) await H.appDialogy(page);
   await page.evaluateOnNewDocument((tk) => {
     localStorage.setItem('pocketbase_auth', JSON.stringify({ token: tk, record: {} }));
     try { localStorage.setItem('kb-relax-rano:' + JSON.parse(atob(tk.split('.')[1])).id, new Date().toLocaleDateString('en-CA')); } catch { /* test */ }

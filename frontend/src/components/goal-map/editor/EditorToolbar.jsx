@@ -260,7 +260,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
       Ikona: Undo2,
       popisekListy: t('toolbar.undoShort'),
       popisekMenu: t('toolbar.undoTitle'),
-      titulekListy: t('toolbar.undoTitle'),
+      titulekListy: t('toolbar.undoTitleKeys', { keys: /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘Z' : 'Ctrl+Z' }),
       disabled: !canUndo,
       onClick: handleUndo,
     },

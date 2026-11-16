@@ -42,7 +42,10 @@ const SRC = path.join(__dirname, '../frontend/src');
 // v hlavičce + useAiEnabled; panel sám je LÍNÝ chunk, který se stáhne až po
 // klepnutí a sem se nepočítá) se do rezervy vejdou bez dalšího zvedání.
 // Naměřeno 4. 10. 2026 po přidání hlavičky a asistenta: viz výpis sady.
-const MAX_KB = Number(process.env.LITE_MAX_KB || 560);
+// 16 Nov 2026 (Richard: "raise the limit"): 560 → 575. v1.4.0 measured 559 kB, so any new sentence in the
+// shared texts broke the suite; this branch adds 3 kB of texts (562 kB). The app dialog that pulled the
+// dialog library in (598 kB) became a lazy chunk instead. Slimming the texts (lazy namespaces) is separate work.
+const MAX_KB = Number(process.env.LITE_MAX_KB || 575);
 
 // Balíky, které do lite režimu NESMÍ. ReactFlow = plátno mapy, Radix = dialogy
 // plné verze, recharts/jspdf/html2canvas = grafy a export.

@@ -139,5 +139,13 @@ H.beh(async () => {
     expect(mm.owner === clen1.id && (mm.shared_with_edit || []).includes(clen2.email), `i tak zůstal předchozí vlastník spolusprávcem (${(mm.shared_with_edit || []).join(',')})`);
     r = await api('PATCH', `/api/collections/goalmaps/records/${m.id}`, { token: clen1.token, body: { owner: 'neexistuje123' } });
     expect(r.status === 400, `owner na neexistující účet → 400 (${r.status})`);
+
+    console.log('== adresa nového vlastníka s velkými písmeny (nález S3-05) ==');
+    // accounts are stored lower-case; the routes must find the account whatever case the caller typed
+    r = await api('POST', `/api/kb/maps/${m.id}/transfer`, { token: clen1.token, body: { email: '  ' + clen2.email.toUpperCase() + ' ' } });
+    expect(r.status === 200 && r.json.owner_email === clen2.email, `převod jednoho projektu na „${clen2.email.toUpperCase()}“ najde účet (${r.status} ${errOf(r)})`);
+    r = await api('POST', `/api/kb/users/${clen2.id}/transfer-maps`, { token: admin.token, body: { email: clen1.email.toUpperCase() } });
+    mm = (await mapu(m.id, clen1)).json;
+    expect(r.status === 200 && mm.owner === clen1.id, `hromadný převod na adresu s velkými písmeny najde účet (${r.status} ${errOf(r)})`);
   }
 }, { nazev: 'MAPA-VLASTNICTVI' });

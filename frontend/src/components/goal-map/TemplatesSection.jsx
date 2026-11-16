@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
@@ -59,7 +60,7 @@ export default function TemplatesSection() {
   const canDelete = (t) => !!t.owner && (t.owner === user?.id || user?.role === 'admin');
 
   const handleDelete = async (t) => {
-    if (!window.confirm(tr('templates.confirmDelete', { title: t.title }))) return;
+    if (!(await askDelete(tr('templates.confirmDelete', { title: t.title })))) return;
     try {
       await base44.entities.Template.delete(t.id);
       setTemplates((prev) => prev.filter((x) => x.id !== t.id));

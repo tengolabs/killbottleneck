@@ -146,45 +146,43 @@ export default function DialogUdalost({ open, udalost, defaultDay = '', members 
   const handleDelete = async () => {
     if (!udalost?.id) return;
     if (!mazu) { setMazu(true); return; }
-    try {
+    // through f.run: one request at a time — a second quick click used to send the request again and its 404
+    // showed a red "saving failed" after a successful action (finding F3-11)
+    return f.run(async () => {
       await smazUdalost(udalost.id);
       window.dispatchEvent(new CustomEvent('kb-udalosti-changed'));
       toast?.({ title: t('udalost.smazana', { title: udalost.title }) });
       onSaved?.(null);
       onClose();
-    } catch (e) {
-      toast?.({ title: t('udalost.ulozeniSelhalo'), description: e?.message, variant: 'destructive' });
-    }
+    });
   };
 
   // celá série z jedné pozvánky (dvojklik jako u smazání jedné)
   const handleDeleteSeries = async () => {
     if (!udalost?.series) return;
     if (!mazuSerii) { setMazuSerii(true); return; }
-    try {
+    return f.run(async () => { // one request at a time, see handleDelete
       const r = await smazSerii(udalost.series);
       window.dispatchEvent(new CustomEvent('kb-udalosti-changed'));
       toast?.({ title: t('udalost.serieSmazana', { count: r?.events_deleted || pocetVSerii, title: udalost.title }) });
       onSaved?.(null);
       onClose();
-    } catch (e) {
-      toast?.({ title: t('udalost.ulozeniSelhalo'), description: e?.message, variant: 'destructive' });
-    }
+    });
   };
 
   // pozvaný se odebere sám (Richard 19. 9. 2026) — událost mu zmizí z kalendáře i Můj den
   const handleLeave = async () => {
     if (!udalost?.id || mine) return;
     if (!mazu) { setMazu(true); return; }
-    try {
+    // through f.run: one request at a time — a second quick click used to send the request again and its 404
+    // showed a red "saving failed" after a successful action (finding F3-11)
+    return f.run(async () => {
       await opustUdalost(udalost.id);
       window.dispatchEvent(new CustomEvent('kb-udalosti-changed'));
       toast?.({ title: t('udalost.opustena', { title: udalost.title }) });
       onSaved?.(null);
       onClose();
-    } catch (e) {
-      toast?.({ title: t('udalost.ulozeniSelhalo'), description: e?.message, variant: 'destructive' });
-    }
+    });
   };
 
   // schvalování nepřítomnosti: správce/manažer rozhodne rovnou, nebo si nechá od asistenta udělat sumář

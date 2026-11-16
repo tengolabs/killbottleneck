@@ -48,7 +48,10 @@ function esc(s) {
  * vedlo na /login. a skončilo 404) — proto se z konce ořezává.
  */
 function odkazuj(s) {
-  return String(s).replace(/https?:\/\/[^\s<]+/g, (u) => {
+  // The text is already escaped here: an address followed by `>` or `"` arrives as `…&gt;` / `…&quot;`. The address
+  // stops BEFORE such an entity (finding S7-03 — it used to swallow it and the link led to `…&gt`); `&amp;` inside
+  // a query string stays part of the address.
+  return String(s).replace(/https?:\/\/(?:(?!&(?:gt|lt|quot|#39);)[^\s<])+/g, (u) => {
     const orez = u.match(/[.,;:!?)“”]+$/);
     const cista = orez ? u.slice(0, -orez[0].length) : u;
     const zbytek = orez ? orez[0] : "";

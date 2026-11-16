@@ -300,4 +300,6 @@ async function vyberZListy(page, co, polozka) {
   return true;
 }
 
-module.exports = { PW, SU, sleep, expect, ok, pocty, preskoceno, KOD_PRESKOCENO, zkusit, waitFor, waitHealthy, startInstance, apiPathFirst, apiBaseFirst, smtpSink, httpMock, browser, cizihoPuvodu, finish, beh, MUTACE, vyberZListy };
+const { appDialogy } = require('./_app-dialogy');
+
+module.exports = { PW, SU, sleep, expect, ok, pocty, preskoceno, KOD_PRESKOCENO, zkusit, waitFor, waitHealthy, startInstance, apiPathFirst, apiBaseFirst, smtpSink, httpMock, browser, cizihoPuvodu, finish, beh, MUTACE, vyberZListy, appDialogy };

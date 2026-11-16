@@ -5,6 +5,7 @@
 //  - tabulka ve Správě organizace ukazuje TOTÉŽ a zápis z ní se propíše
 //    do mapy (jeden zdroj pravdy oběma směry)
 const puppeteer = require('puppeteer-core');
+const { appDialogy } = require('./_app-dialogy');
 const { execSync } = require('child_process');
 
 const NAME = 'kb-e2e-ui-org';
@@ -143,7 +144,7 @@ const api = async (method, path, { token, body } = {}) => {
     console.log('== odebrání pozice z tabulky ==');
     let r2 = await api('POST', '/api/kb/org-structure/remove', { token: SEF, body: { node_id: 'pos1' } });
     ok(r2.status === 400, `pozice s podřízenými se odmítne (${r2.status})`);
-    page.on('dialog', (d) => d.accept()); // confirm mazání
+    await appDialogy(page); // potvrzení mazání (okno aplikace) → ano
     await page.evaluate(() => {
       const inp = [...document.querySelectorAll('[data-testid^="org-title-"]')].find((i) => i.value === 'Nová pozice');
       inp?.closest('div')?.querySelector('[data-testid^="org-remove-"]')?.click();

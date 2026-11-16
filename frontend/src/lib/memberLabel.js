@@ -18,6 +18,18 @@ export const labelForEmail = (members, email) => {
   return email;
 };
 
+// The assignee is an address WITHOUT an account and not an external contact = a member
+// whose account was deleted (decision 15 Nov 2026). The pickers offer only members and
+// contacts, so an address like that cannot be typed in by hand. While the directory is
+// not loaded (no member in it) nobody is "former" — otherwise every step would flash grey.
+export const isFormerMember = (members, email) => {
+  if (!email || isExternalOwner(email)) return false;
+  const team = (members || []).filter((m) => !m.external);
+  if (!team.length) return false;
+  const wanted = String(email).trim().toLowerCase();
+  return !team.some((m) => String(m.email || '').toLowerCase() === wanted);
+};
+
 // Adresář členů pro komponenty hluboko ve stromu (uzly mapy) — plní ho
 // GoalMapEditor z /api/kb/members; default [] = spadne se zpět na e-maily.
 export const MembersContext = createContext([]);

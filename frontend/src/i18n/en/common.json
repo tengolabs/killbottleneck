@@ -48,6 +48,13 @@
     "format": "d MMM yyyy"
   },
   "nodeDeleted": "(node deleted)",
+  "appDialog": {
+    "confirmTitle": "Please confirm",
+    "deleteTitle": "Really delete?",
+    "noticeTitle": "Notice",
+    "confirm": "Confirm",
+    "ok": "Got it"
+  },
   "actions": {
     "save": "Save",
     "cancel": "Cancel",

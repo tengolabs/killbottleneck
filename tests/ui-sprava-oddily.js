@@ -99,10 +99,11 @@ H.beh(async () => {
   await page.click('tr[data-clovek="jana@example.com"] button[role="switch"]'); await sleep(800);
   const banner2 = await page.$$eval('[data-testid="spravci-banner"]', (b) => b.map((x) => x.innerText));
   expect(banner2.length === 1 && /strukturu/.test(banner2[0]) && !/Správce AI/.test(banner2[0]), `po jmenování správce AI zbude jen věta o struktuře (${banner2[0] || ''})`);
-  // odebrání přes menu ⋯ opravdu odebere (potvrzení confirm přijmout)
-  page.once('dialog', (d) => d.accept());
+  // odebrání přes menu ⋯ opravdu odebere (dialog aplikace → „Smazat účet")
   await page.click('[data-testid="akce-tomas@example.com"]'); await sleep(400);
-  await page.click('[data-testid="smazat-tomas@example.com"]'); await sleep(1200);
+  await page.click('[data-testid="smazat-tomas@example.com"]');
+  await page.waitForSelector('[data-testid="smazat-potvrdit"]', { timeout: 8000 });
+  await page.click('[data-testid="smazat-potvrdit"]'); await sleep(1500);
   const tomas = (await inst.api('GET', '/api/collections/users/records?filter=' + encodeURIComponent('email="tomas@example.com"'), { token: A })).json;
   expect(tomas && tomas.totalItems === 0 && !(await page.$('tr[data-clovek="tomas@example.com"]')), 'Smazat účet v menu ⋯ účet opravdu smaže');
 

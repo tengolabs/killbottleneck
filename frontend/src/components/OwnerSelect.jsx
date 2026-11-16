@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { askConfirm } from '@/lib/appDialogs';
 import { useTranslation } from 'react-i18next';
 import {
   Select,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import ExternalContactDialog from '@/components/shared/ExternalContactDialog';
 import { isExternalOwner, extPseudoEmail } from '@/lib/externalContacts';
+import { isFormerMember } from '@/lib/memberLabel';
 
 const NONE = '__none__';
 const ADD_CONTACT = '__add_contact__';
@@ -56,6 +58,8 @@ export default function OwnerSelect({ value, onChange, mapAccess, members = [], 
 
   const label = (email) => {
     const m = memberByEmail[email];
+    // the current value can be an address whose account was deleted — say so in the list
+    if (!m && isFormerMember(members, email)) return t('formerMember.option', { email });
     return m?.full_name ? `${m.full_name} (${email})` : email;
   };
 
@@ -74,7 +78,7 @@ export default function OwnerSelect({ value, onChange, mapAccess, members = [], 
     if (!onShareAdd) return;
     // dvě různé situace, dvě různé otázky: „vůbec nevidí" × „vidí, ale jen čte"
     const jenCte = accessible.includes(v);
-    if (!window.confirm(t(jenCte ? 'ownerSelect.confirmUpgrade' : 'ownerSelect.confirmShare', { email: v }))) {
+    if (!(await askConfirm(t(jenCte ? 'ownerSelect.confirmUpgrade' : 'ownerSelect.confirmShare', { email: v })))) {
       // odmítnutí NESMÍ zahodit přiřazení: práci na svém kroku dokončí i čtenář,
       // jen o tom zadavatel nebude mít stopu v seznamu sdílení
       if (jenCte) onChange(v);

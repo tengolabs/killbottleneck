@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { useAsistent } from '@/lib/AsistentContext';
 import { base44 } from '@/api/base44Client';
@@ -14,6 +15,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { intlLocale } from '@/lib/locale';
 import { useTranslation } from 'react-i18next';
 import { Timer, Square, Play, X as XIcon, Trash2 } from 'lucide-react';
+import FixEndDialog from '@/components/time/FixEndDialog';
+import { isAutoStopped } from '@/lib/timeFix';
 
 const NONE = '__none__';
 const parseDate = (s) => (s ? new Date(String(s).replace(' ', 'T')) : null);
@@ -39,6 +42,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
   const [maps, setMaps] = useState([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [fixEntry, setFixEntry] = useState(null); // entry closed by the 12 h auto-stop whose end is being corrected
 
   const load = () => {
     base44.entities.TimeEntry.list('-started', 20)
@@ -105,9 +109,9 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
 
   const removeEntry = async (entry) => {
     const noteText = entry.note || entry.label;
-    if (!window.confirm(noteText
+    if (!(await askDelete(noteText
       ? t('timeLog.confirmDeleteEntryNote', { time: formatMinutes(entry.duration_min), note: noteText })
-      : t('timeLog.confirmDeleteEntry', { time: formatMinutes(entry.duration_min) }))) return;
+      : t('timeLog.confirmDeleteEntry', { time: formatMinutes(entry.duration_min) })))) return;
     try {
       await base44.entities.TimeEntry.delete(entry.id);
       setEntries((prev) => prev.filter((e) => e.id !== entry.id));
@@ -198,6 +202,11 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
                   </Button>
                 </div>
                 {(e.note || e.label) && <p className="text-xs truncate">{e.note || e.label}</p>}
+                {isAutoStopped(e) && (
+                  <Button variant="outline" size="sm" className="h-7 w-full text-xs border-amber-400 text-amber-700 dark:text-amber-300" data-testid="opravit-konec" onClick={() => setFixEntry(e)}>
+                    <Timer className="w-3.5 h-3.5" /> {t('timeFix.button')}
+                  </Button>
+                )}
                 <div className="flex items-center gap-1.5">
                   {mapId && nodeOptions.length > 0 && (
                     <Select
@@ -236,6 +245,8 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
           })
         )}
       </div>
+      <FixEndDialog entry={fixEntry} onClose={() => setFixEntry(null)}
+        onSaved={(rec) => setEntries((prev) => prev.map((x) => (x.id === rec.id ? rec : x)))} />
     </div>
   );
 }

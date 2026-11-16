@@ -15,6 +15,7 @@ import AppHeader from '@/components/shared/AppHeader';
 import NotificationPrefs from '@/components/shared/NotificationPrefs';
 import { intlLocale, parsePbDate } from '@/lib/locale';
 import { NOTIFY_TYPES, notifyMeta, notifyTarget } from '@/lib/notifyMeta';
+import { openTimeFix } from '@/lib/timeFix';
 
 const PER_PAGE = 30;
 
@@ -86,6 +87,8 @@ export default function Notifications() {
       base44.entities.Notification.update(n.id, { read: true }).catch(() => {});
       setUnread((u) => Math.max(0, u - 1));
     }
+    // "Timer stopped" leads to the correction of that entry, not to another page
+    if (n.type === 'timer_autostop') { openTimeFix(n.extra && n.extra.time_entry); return; }
     navigate(notifyTarget(n));
   };
 

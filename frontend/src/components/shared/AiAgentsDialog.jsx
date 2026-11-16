@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -62,7 +63,7 @@ export default function AiAgentsDialog({ open, onClose, onChanged }) {
   };
 
   const remove = async (a) => {
-    if (!window.confirm(t('aiAgents.confirmDelete', { name: a.name }))) return;
+    if (!(await askDelete(t('aiAgents.confirmDelete', { name: a.name })))) return;
     try {
       await base44.aiAgents.remove(a.id);
       load();

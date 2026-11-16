@@ -414,6 +414,21 @@ onRecordDeleteRequest((e) => {
   // without a co-admin go to this administrator. Always overwritten here, so a client
   // cannot plant the value.
   e.record.set("kb_deleted_by", e.auth ? e.auth.id : "");
+  // `?reassign_to=<e-mail>`: the open steps of the deleted member pass to this member
+  // (decision 15 Nov 2026). Checked BEFORE the delete — a wrong target must not end in a
+  // deleted account with the steps left behind. Always overwritten, like kb_deleted_by.
+  let reassignTo = "";
+  const wanted = String((e.requestInfo().query || {}).reassign_to || "").trim().toLowerCase(); // accounts are lower-case
+  if (wanted) {
+    const { t, userLang } = require(`${__hooks}/i18n.js`);
+    let target = null;
+    try { target = e.app.findFirstRecordByData("users", "email", wanted); } catch (err) { target = null; }
+    if (!target || target.getString("kind") === "guest" || target.id === e.record.id) {
+      throw new BadRequestError(t(userLang(e.auth), "err.reassignTargetNotMember"));
+    }
+    reassignTo = target.id;
+  }
+  e.record.set("kb_reassign_to", reassignTo);
   e.next();
 }, "users");
 
@@ -655,6 +670,23 @@ onRecordAfterDeleteSuccess((e) => {
     removeEmailFromAllShares(e.app, e.record.getString("email"));
   } catch (err) {
     try { e.app.logger().warn("users delete: share cleanup failed", "error", String(err)); } catch (e2) { /* log is a bonus */ }
+  }
+  // Open steps of the deleted member pass to the member the administrator chose — last,
+  // when the handover and the share cleanup are done (the access of the new assignee is
+  // judged on the final state). Never fails the delete: what does not pass stays marked.
+  try {
+    const targetId = String(e.record.get("kb_reassign_to") || "");
+    if (targetId) {
+      const { reassignMemberSteps } = require(`${__hooks}/helpers.js`);
+      let target = null;
+      try { target = e.app.findRecordById("users", targetId); } catch (err) { target = null; }
+      let actorEmail = "";
+      const actorId = String(e.record.get("kb_deleted_by") || "");
+      if (actorId) { try { actorEmail = e.app.findRecordById("users", actorId).getString("email"); } catch (err) { actorEmail = ""; } }
+      if (target) reassignMemberSteps(e.app, e.record.getString("email"), target, actorEmail);
+    }
+  } catch (err) {
+    try { e.app.logger().warn("users delete: reassignment of open steps failed", "error", String(err)); } catch (e2) { /* log is a bonus */ }
   }
   e.next();
 }, "users");
@@ -1553,7 +1585,8 @@ onRecordUpdateRequest((e) => {
       const col = e.app.findCollectionByNameOrId("buffer_nodes");
       const idea = new Record(col);
       idea.set("title", note.slice(0, 120));
-      idea.set("description", "Měřeno " + fmt(s) + "–" + fmt(en) + " (" + e.record.getInt("duration_min") + " min)");
+      // in the language of the account (finding F6-06); the hours stay in the time zone of the server
+      idea.set("description", t(L, "timer.ideaMeasured", { from: fmt(s), to: fmt(en), minutes: e.record.getInt("duration_min") }));
       idea.set("owner", e.record.getString("owner"));
       e.app.save(idea);
     }
@@ -3478,7 +3511,7 @@ kbRoute("POST", "/maps/{id}/transfer", (e) => {
   const isOwner = map.getString("owner") === e.auth.id;
   if (!isOwner && !jeAdmin(e.auth)) return e.json(403, { error: t(L, "err.transferOwnerOnly") });
   if (!isOwner && !userSeesMap($app, map, e.auth.id, e.auth.email())) return e.json(404, { error: t(L, "err.mapNotFound") });
-  const email = String((e.requestInfo().body || {}).email || "").trim();
+  const email = String((e.requestInfo().body || {}).email || "").trim().toLowerCase(); // accounts are lower-case (finding S3-05)
   let newOwner = null;
   if (email) { try { newOwner = $app.findFirstRecordByData("users", "email", email); } catch (err) { newOwner = null; } }
   const bad = transferTargetError($app, map, newOwner, L);
@@ -3510,7 +3543,7 @@ kbRoute("GET", "/users/map-counts", (e) => {
 // has access to (those can be taken over). Private projects of another person are
 // reported as a number, never by title or id (decision 11 Nov 2026).
 kbRoute("GET", "/users/{id}/maps", (e) => {
-  const { jeAdmin, ownedMapsFor, userDeletionSummary } = require(`${__hooks}/helpers.js`);
+  const { jeAdmin, ownedMapsFor, userDeletionSummary, memberOpenStepsSummary } = require(`${__hooks}/helpers.js`);
   const { t, userLang } = require(`${__hooks}/i18n.js`);
   const L = userLang(e.auth);
   if (!e.hasSuperuserAuth() && (!e.auth || !jeAdmin(e.auth))) return e.json(403, { error: t(L, "err.adminOnly") });
@@ -3518,8 +3551,18 @@ kbRoute("GET", "/users/{id}/maps", (e) => {
   try { $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
   const o = ownedMapsFor($app, uid, e.hasSuperuserAuth() ? null : e.auth);
   const maps = o.visible.map((m) => ({ id: m.id, title: m.getString("title"), archived: m.getBool("archived"), kind: m.getString("kind") }));
-  return e.json(200, Object.assign({ count: o.total, maps: maps, private_count: o.privateCount, hidden_shared_count: o.hiddenSharedCount },
-    userDeletionSummary($app, uid, e.hasSuperuserAuth() ? null : e.auth)));
+  // `?reassign_to=<e-mail>`: how many of the open steps that member would receive
+  // (numbers only — see memberOpenStepsSummary)
+  const actor = e.hasSuperuserAuth() ? null : e.auth;
+  let target = null;
+  const wanted = String((e.requestInfo().query || {}).reassign_to || "").trim().toLowerCase(); // accounts are lower-case
+  if (wanted) {
+    try { target = $app.findFirstRecordByData("users", "email", wanted); } catch (err) { target = null; }
+    if (!target || target.getString("kind") === "guest" || target.id === uid) return e.json(400, { error: t(L, "err.reassignTargetNotMember") });
+  }
+  return e.json(200, Object.assign({ count: o.total, maps: maps, private_count: o.privateCount, hidden_shared_count: o.hiddenSharedCount,
+    steps: memberOpenStepsSummary($app, uid, actor, target) },
+    userDeletionSummary($app, uid, actor)));
 });
 
 // Transfer the projects of an account to another member (default = the calling
@@ -3541,7 +3584,7 @@ kbRoute("POST", "/users/{id}/transfer-maps", (e) => {
   const uid = e.request.pathValue("id");
   let prev;
   try { prev = $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
-  const email = String((e.requestInfo().body || {}).email || "").trim();
+  const email = String((e.requestInfo().body || {}).email || "").trim().toLowerCase(); // accounts are lower-case (finding S3-05)
   let newOwner = e.auth || null;
   if (email) { try { newOwner = $app.findFirstRecordByData("users", "email", email); } catch (err) { newOwner = null; } }
   if (!newOwner || newOwner.getString("kind") === "guest") return e.json(400, { error: t(L, "err.transferTargetNotMember") });
@@ -5084,7 +5127,9 @@ kbRoute("POST", "/reset-user-password", (e) => {
     return e.json(403, { error: t(L, "err.resetPasswordNotAdmin") });
   }
 
-  // Brake: at most 3 resets of ONE account in 10 minutes (code analysis 4, wave 4). Every reset signs the person
+  // Brake: one caller resets ONE account at most 3 times in 10 minutes (code analysis 4, wave 4). Counted per
+  // CALLER (decision 16 Nov 2026): with one shared counter a structure manager who used the three attempts
+  // blocked the administrator's reset of the same account. Every reset signs the person
   // out everywhere and, with SMTP, sends them a mail — a loop (or a stolen admin session) must not do that
   // without end. Three, not one: an admin who closed the dialog with the password before copying it needs
   // another try. Counted in the process memory (a restart clears it); the value is a "count|windowStart" string.
@@ -5093,7 +5138,7 @@ kbRoute("POST", "/reset-user-password", (e) => {
     const RESET_MAX = 3, RESET_WINDOW_MS = 10 * 60 * 1000;
     const nowMs = Date.now();
     let refused = false;
-    $app.store().setFunc("reset-hesla:" + rec.id, (cur) => {
+    $app.store().setFunc("reset-hesla:" + rec.id + ":" + e.auth.id, (cur) => {
       const parts = String(cur || "").split("|");
       let count = Number(parts[0]) || 0, since = Number(parts[1]) || 0;
       if (nowMs - since >= RESET_WINDOW_MS) { count = 0; since = nowMs; }

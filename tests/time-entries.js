@@ -111,6 +111,14 @@ const api = async (method, path, { token, body } = {}) => {
     await api('PATCH', `/api/collections/time_entries/records/${t3.id}`, { token: AT, body: { ended: new Date().toISOString(), note: 'Telefonní hovor s Novákem' } });
     const ideas1 = (await api('GET', `/api/collections/buffer_nodes/records?filter=${encodeURIComponent("title ~ 'Telefonní hovor'")}`, { token: AT })).json;
     expect(ideas1.items?.length === 1 && ideas1.items[0].description.includes('Měřeno'), `nepřiřazené+poznámka → nápad v zásobníku („${ideas1.items?.[0]?.description}")`);
+    // an English account gets the idea in English (finding F6-06)
+    await api('PATCH', `/api/collections/users/records/${JSON.parse(Buffer.from(AT.split('.')[1], 'base64').toString()).id}`, { token: AT, body: { language: 'en' } });
+    const tEn = (await api('POST', '/api/collections/time_entries/records', { token: AT, body: { ended: '', label: 'call' } })).json;
+    await sleep(1100);
+    await api('PATCH', `/api/collections/time_entries/records/${tEn.id}`, { token: AT, body: { ended: new Date().toISOString(), note: 'Call with Smith' } });
+    const ideasEn = (await api('GET', `/api/collections/buffer_nodes/records?filter=${encodeURIComponent("title ~ 'Call with Smith'")}`, { token: AT })).json;
+    expect(ideasEn.items?.length === 1 && /^Tracked \d\d:\d\d–\d\d:\d\d \(\d+ min\)$/.test(ideasEn.items[0].description), `anglický účet má nápad anglicky („${ideasEn.items?.[0]?.description}")`);
+    await api('PATCH', `/api/collections/users/records/${JSON.parse(Buffer.from(AT.split('.')[1], 'base64').toString()).id}`, { token: AT, body: { language: 'cs' } });
     // stop PŘIŘAZENÉHO měření s poznámkou → nápad NEvzniká
     const t4 = (await api('POST', '/api/collections/time_entries/records', { token: AT, body: { ended: '', map: map.id, label: 'práce na mapě' } })).json;
     await api('PATCH', `/api/collections/time_entries/records/${t4.id}`, { token: AT, body: { ended: new Date().toISOString(), note: 'Přiřazená práce' } });

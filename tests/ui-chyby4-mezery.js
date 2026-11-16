@@ -35,7 +35,7 @@ H.beh(async () => {
   const S = await E.clovek(browser, inst, 'sef@example.com', null, { viewport: { width: 1400, height: 900 } });
   const { page } = S;
   const dialogy = []; // E.clovek accepts every dialog; here they are only written down
-  page.on('dialog', (d) => { dialogy.push({ typ: d.type(), text: d.message() }); });
+  await H.appDialogy(page, (d) => { dialogy.push(d); return true; }); // dialogs of the app (lib/appDialogs.js)
 
   // forged answers: podvrh = [{ method, url: RegExp, status, body, abort }]
   let podvrh = [];

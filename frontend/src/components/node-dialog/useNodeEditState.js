@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
 import { pb } from '@/api/pb';
@@ -266,7 +267,7 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
   };
 
   const handleRemoveFile = async (f) => {
-    if (!window.confirm(t('nodeDialog.files.confirmDelete', { name: f.name }))) return;
+    if (!(await askDelete(t('nodeDialog.files.confirmDelete', { name: f.name })))) return;
     try {
       await base44.nodeFiles.remove(f.id);
       loadFiles();

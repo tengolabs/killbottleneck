@@ -42,6 +42,7 @@
     "railTasksTitle": "Úkoly tohoto projektu",
     "undoShort": "Zpět",
     "undoTitle": "Vrátit zpět",
+    "undoTitleKeys": "Vrátit zpět ({{keys}})",
     "align": "Zarovnat",
     "alignTitle": "Zarovnat mapu — ikona ukazuje styl, který na mapě právě je; v nabídce zvolíte jiný (mapa se hned přerovná) nebo styl zamknete pro všechny mapy.",
     "share": "Sdílet",
@@ -533,6 +534,8 @@
     "allowedSome_other": "Smí spustit {{count}} lidí"
   },
   "importMap": {
+    "from_asana": "Rozpoznán export z Asany —",
+    "from_trello": "Rozpoznán export z Trella —",
     "title": "Importovat projekt z JSON",
     "button": "Importovat",
     "description": "Nahrajte soubor, který někdo vyexportoval z killBottlenecku. Vznikne z něj nový projekt.",

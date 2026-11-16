@@ -57,7 +57,10 @@ H.beh(async () => {
   const { browser, page, chyby } = await H.browser({ viewport: { width: 1900, height: 950 } });
   const dialogy = [];
   let potvrdit = true;
-  page.on('dialog', async (d) => { dialogy.push({ typ: d.type(), text: d.message() }); if (d.type() === 'confirm' && !potvrdit) await d.dismiss(); else await d.accept(); });
+  // since 15 Nov 2026 the questions and notices are dialogs of the app (lib/appDialogs.js)
+  const nativni = [];
+  page.on('dialog', async (d) => { nativni.push(d.message()); await d.accept(); });
+  await H.appDialogy(page, (d) => { dialogy.push(d); return d.typ !== 'confirm' || potvrdit; });
   const kontext = async (opts = {}) => {
     const ctx = await (browser.createBrowserContext ? browser.createBrowserContext() : browser.createIncognitoBrowserContext());
     const p = await ctx.newPage();
@@ -233,8 +236,10 @@ H.beh(async () => {
   await (await page.$(`[data-testid="akce-${clen.email}"]`)).click();
   await page.waitForSelector(`[data-testid="smazat-${clen.email}"]`, { timeout: 5000 });
   await (await page.$(`[data-testid="smazat-${clen.email}"]`)).click();
-  await H.waitFor(() => dialogy.some((d) => d.typ === 'confirm'), { timeout: 8000, popis: 'dialog mazání' }).catch(() => {});
-  const dotaz = (dialogy.find((d) => d.typ === 'confirm') || {}).text || '';
+  // the delete dialog is a dialog of the app since 15 Nov 2026: read it and leave by "Zrušit"
+  await page.waitForSelector('[data-testid="smazat-dialog"]', { timeout: 8000 }).catch(() => {});
+  const dotaz = await page.$eval('[data-testid="smazat-dialog"]', (el) => el.innerText).catch(() => '');
+  if (await page.$('[data-testid="smazat-zrusit"]')) { await page.click('[data-testid="smazat-zrusit"]'); await sleep(500); }
   const cisla = [/na spolusprávce projektu: (\d+)/, /na vás \(projekt nemá jiného spolusprávce\): (\d+)/, /soukromé projekty \(nikdo jiný je nevidí\): (\d+)/].map((re) => Number((dotaz.match(re) || [])[1]));
   expect(cisla.every((n) => Number.isInteger(n)) && cisla[0] + cisla[1] + cisla[2] === 2, `dialog mazání dává dohromady tytéž 2 projekty (${cisla.join(' + ')})`);
   expect(!!dotaz && !/TAJNY-SOUKROMY-PROJEKT/.test(dotaz) && !/TAJNY-SOUKROMY-PROJEKT/.test(await text(page)), 'název soukromého projektu není v dialogu ani na stránce');

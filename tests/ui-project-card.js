@@ -8,6 +8,7 @@
 //   • Dashboard z dlaždice vede rovnou do přehledu projektu („šéf se ptá,
 //     v jaké fázi to je").
 const puppeteer = require('puppeteer-core');
+const { appDialogy } = require('./_app-dialogy');
 const { execSync } = require('child_process');
 const BASE = 'http://127.0.0.1:20517';
 const NAME = 'flowmap-e2e-ui-card';
@@ -175,7 +176,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     console.log('== archivace se ptá (stejně jako mazání) ==');
     let asked = null;
-    page.on('dialog', async (d) => { asked = d.message(); await d.dismiss(); });
+    await appDialogy(page, (d) => { asked = d.text; return false; }); // the app's dialog → Cancel
     await page.evaluate((title) => {
       const els = [...document.querySelectorAll('div')]
         .filter((e) => (e.innerText || '').includes(title) && e.className.includes('rounded-xl'));

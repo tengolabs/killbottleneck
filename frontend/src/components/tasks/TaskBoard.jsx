@@ -13,7 +13,8 @@ import {
 import { Calendar, Map as MapIcon, ListChecks, MessageSquare, Target, CalendarCheck, Handshake } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { STATUSES } from '@/lib/statusMeta';
-import { labelForEmail } from '@/lib/memberLabel';
+import { labelForEmail, isFormerMember } from '@/lib/memberLabel';
+import FormerMemberBadge from '@/components/shared/FormerMemberBadge';
 import { isExternalOwner } from '@/lib/externalContacts';
 import { getDeadlineStatus, formatDeadline, getInitials } from '@/lib/nodeMeta';
 import { planState } from '@/lib/taskActions';
@@ -33,7 +34,7 @@ const orderCmp = (a, b) =>
 // Kolečko řešitele. EXTERNÍ kontakt vypadá jinak než člen (Richard 21. 8. 2026):
 // plné kolečko budí dojem, že „na tom někdo dělá" — externímu nikdy nic nechodí.
 // Kroužek s iniciálami nestačil (klik-test) → celý štítek se jménem a „externě".
-function AssigneeDot({ email, labelOf }) {
+function AssigneeDot({ email, labelOf, isFormer }) {
   const { t } = useTranslation('nav');
   const label = labelOf ? labelOf(email) : email;
   if (isExternalOwner(email)) {
@@ -47,6 +48,7 @@ function AssigneeDot({ email, labelOf }) {
       </span>
     );
   }
+  if (isFormer && isFormer(email)) return <FormerMemberBadge email={email} className="max-w-[9rem]" />;
   return (
     <span
       className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold inline-flex items-center justify-center"
@@ -57,7 +59,7 @@ function AssigneeDot({ email, labelOf }) {
   );
 }
 
-function TaskCard({ task, mapTitle, subStats, commentCount, onEdit, labelOf }) {
+function TaskCard({ task, mapTitle, subStats, commentCount, onEdit, labelOf, isFormer }) {
   const { t: tt } = useTranslation('tasks');
   return (
     <div
@@ -102,7 +104,7 @@ function TaskCard({ task, mapTitle, subStats, commentCount, onEdit, labelOf }) {
               <Calendar className="w-3 h-3" /> {formatDeadline(task.deadline)}
             </span>
           ) : <span />}
-          {task.assignee_email && <AssigneeDot email={task.assignee_email} labelOf={labelOf} />}
+          {task.assignee_email && <AssigneeDot email={task.assignee_email} labelOf={labelOf} isFormer={isFormer} />}
         </div>
       )}
     </div>
@@ -127,7 +129,7 @@ function DraggableTaskCard({ task, children }) {
 }
 
 // karta odvozená z uzlu mapy — nejde přetahovat (stav se mění v mapě)
-function NodeCard({ item, mapTitle, onOpenNode, labelOf }) {
+function NodeCard({ item, mapTitle, onOpenNode, labelOf, isFormer }) {
   const { t } = useTranslation('tasks');
   return (
     <div
@@ -157,7 +159,7 @@ function NodeCard({ item, mapTitle, onOpenNode, labelOf }) {
               <Calendar className="w-3 h-3" /> {formatDeadline(item.deadline)}
             </span>
           ) : <span />}
-          {item.assignee_email && <AssigneeDot email={item.assignee_email} labelOf={labelOf} />}
+          {item.assignee_email && <AssigneeDot email={item.assignee_email} labelOf={labelOf} isFormer={isFormer} />}
         </div>
       )}
     </div>
@@ -200,6 +202,7 @@ export default function TaskBoard({ tasks, byParent, maps, nodeItems = [], membe
   const mapById = useMemo(() => Object.fromEntries(maps.map((m) => [m.id, m])), [maps]);
   // jméno místo e-mailu (a jméno kontaktu místo pseudo-e-mailu externího řešitele)
   const labelOf = useMemo(() => (em) => labelForEmail(members, em), [members]);
+  const isFormer = useMemo(() => (em) => isFormerMember(members, em), [members]);
 
   const columns = useMemo(
     () => STATUSES.map((s) => ({
@@ -278,7 +281,7 @@ export default function TaskBoard({ tasks, byParent, maps, nodeItems = [], membe
         {columns.map((col) => (
           <Column key={col.value} col={col} highlighted={overCol === col.value}>
             {col.nodes.map((n) => (
-              <NodeCard key={n.id} item={n} mapTitle={mapById[n.map_id]?.title || ''} onOpenNode={onOpenNode} labelOf={labelOf} />
+              <NodeCard key={n.id} item={n} mapTitle={mapById[n.map_id]?.title || ''} onOpenNode={onOpenNode} labelOf={labelOf} isFormer={isFormer} />
             ))}
             {col.tasks.map((task) => (
               <DraggableTaskCard key={task.id} task={task}>
@@ -288,7 +291,7 @@ export default function TaskBoard({ tasks, byParent, maps, nodeItems = [], membe
                   subStats={subStats(task)}
                   commentCount={commentCounts[task.id] || 0}
                   onEdit={onEdit}
-                  labelOf={labelOf}
+                  labelOf={labelOf} isFormer={isFormer}
                 />
               </DraggableTaskCard>
             ))}
@@ -306,7 +309,7 @@ export default function TaskBoard({ tasks, byParent, maps, nodeItems = [], membe
               mapTitle={activeTask.map_id ? (mapById[activeTask.map_id]?.title || '') : ''}
               subStats={subStats(activeTask)}
               commentCount={commentCounts[activeTask.id] || 0}
-              labelOf={labelOf}
+              labelOf={labelOf} isFormer={isFormer}
             />
           </div>
         )}

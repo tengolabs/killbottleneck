@@ -35,13 +35,19 @@ H.beh(async () => {
   expect(await S.otevriDialog('k2'), 'šéf: dialog k2');
   await S.page.click('[role="dialog"] #title', { clickCount: 3 });
   await S.page.keyboard.type('Krok dva PŘEPSÁN');
-  expect(await S.klikText('Uložit', '[role="dialog"]'), 'šéf: nový název k2 uložen z dialogu (do historie nejde)');
+  expect(await S.klikText('Uložit', '[role="dialog"]'), 'šéf: nový název k2 uložen z dialogu (od rozhodnutí 15. 11. 2026 vlastní krok historie)');
   expect(await E.cekej(async () => { const m = await db(A.id); return (m.nodes || []).length === 4 && E.nazev(m, 'k2') === 'Krok dva PŘEPSÁN' && E.stav(m, 'k2') === 'in_progress'; }, 10000, 'uloženo'), `před Zpět je v databázi podcíl i obě úpravy (${popis(await db(A.id))})`);
-  expect(await S.klikTitulek('Vrátit zpět'), 'šéf: klik „Vrátit zpět“');
-  expect(await E.cekej(async () => ((await db(A.id)).nodes || []).length === 3, 10000, 'podcíl pryč'), 'Zpět odebralo přidaný podcíl (v databázi 3 uzly)');
+  // The rename from the dialog is a step of its own now: the first Undo takes back the rename
+  // only, the second one the sub-goal. The status (clicked, never in the history) stays.
+  const nazevPred = E.NODES().find((n) => n.id === 'k2').data.title;
+  expect(await S.klikTitulek('Vrátit zpět'), 'šéf: klik „Vrátit zpět“ (1.)');
+  expect(await E.cekej(async () => E.nazev(await db(A.id), 'k2') === nazevPred, 10000, 'název zpět'), `1. Zpět vrátilo jen název k2 („${E.nazev(await db(A.id), 'k2')}“)`);
+  expect(((await db(A.id)).nodes || []).length === 4, 'podcíl po 1. Zpět zůstal (4 uzly)');
+  expect(await S.klikTitulek('Vrátit zpět'), 'šéf: klik „Vrátit zpět“ (2.)');
+  expect(await E.cekej(async () => ((await db(A.id)).nodes || []).length === 3, 10000, 'podcíl pryč'), '2. Zpět odebralo přidaný podcíl (v databázi 3 uzly)');
   await sleep(1500);
   const aPo = await db(A.id);
-  expect(E.nazev(aPo, 'k2') === 'Krok dva PŘEPSÁN', `název k2 změněný PO kroku zůstal („${E.nazev(aPo, 'k2')}“)`);
+  expect(E.nazev(aPo, 'k2') === nazevPred, `název k2 je původní („${E.nazev(aPo, 'k2')}“)`);
   expect(E.stav(aPo, 'k2') === 'in_progress', `stav k2 změněný PO kroku zůstal (${E.stav(aPo, 'k2')})`);
   expect((await S.stavNaPlatne('k2')).includes('Probíhá') && (await S.uzlyNaPlatne()).length === 3, 'plátno šéfa odpovídá: 3 uzly, k2 Probíhá');
   expect((await S.zpetAktivni()) === false, 'historie je prázdná — Zpět zašedlé');

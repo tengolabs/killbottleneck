@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTasks } from '@/hooks/useTasks';
 import { statusConfig } from '@/lib/statusMeta';
 import { getDeadlineStatus, formatDeadline, getInitials } from '@/lib/nodeMeta';
-import { labelForEmail } from '@/lib/memberLabel';
+import { labelForEmail, isFormerMember } from '@/lib/memberLabel';
 import { useToast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
 
@@ -36,8 +37,8 @@ export default function NodeTasksDialog({ map, nodeId, canEdit, onClose, onChang
     [items, nodeId]
   );
 
-  const handleDelete = (task) => {
-    if (!window.confirm(t('nodeTasksDialog.confirmDeleteTask', { title: task.title }))) return;
+  const handleDelete = async (task) => {
+    if (!(await askDelete(t('nodeTasksDialog.confirmDeleteTask', { title: task.title })))) return;
     tasksApi.remove(task.id)
       .then(() => onChanged?.())
       .catch(() => toast({ title: t('tasksPage.deleteFailed'), variant: 'destructive' }));
@@ -113,9 +114,9 @@ export default function NodeTasksDialog({ map, nodeId, canEdit, onClose, onChang
                   {task.assignee_email && (
                     <span
                       className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold inline-flex items-center justify-center"
-                      title={labelForEmail(members, task.assignee_email)}
+                      title={isFormerMember(members, task.assignee_email) ? t('nav:formerMember.hint', { email: task.assignee_email }) : labelForEmail(members, task.assignee_email)}
                     >
-                      {getInitials(labelForEmail(members, task.assignee_email))}
+                      {isFormerMember(members, task.assignee_email) ? '—' : getInitials(labelForEmail(members, task.assignee_email))}
                     </span>
                   )}
                   {canEdit && (

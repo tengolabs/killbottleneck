@@ -59,7 +59,10 @@ H.beh(async () => {
   const { browser, page, chyby } = await H.browser({ viewport: { width: 1900, height: 950 } });
   const dialogy = [];
   let odpoved = () => true; // what to answer to the next native dialog
-  page.on('dialog', async (d) => { dialogy.push({ typ: d.type(), text: d.message() }); if (d.type() === 'confirm' && !odpoved(d.message())) await d.dismiss(); else await d.accept(); });
+  // since 15 Nov 2026 the questions and notices are dialogs of the app (lib/appDialogs.js)
+  const nativni = [];
+  page.on('dialog', async (d) => { nativni.push(d.message()); await d.accept(); });
+  await H.appDialogy(page, (d) => { dialogy.push(d); return d.typ !== 'confirm' || !!odpoved(d.text); });
   const prihlas = async (p, email) => {
     await p.goto(`${inst.base}/login`, { waitUntil: 'networkidle2' });
     await p.waitForSelector('#email');
@@ -153,10 +156,21 @@ H.beh(async () => {
   }, email);
   txt = await radekTxt(clen.email);
   expect(/4 mapy/.test(txt), `řádek člena: 4 mapy — i ty, které admin nevidí („${txt.slice(0, 90)}")`);
+  // The delete dialog is a dialog of the APP since 15 Nov 2026 (it offers to reassign the
+  // member's open steps). It is recorded like the former native confirm — { typ: 'confirm',
+  // text } — and answered by `odpoved` ("Smazat účet" / "Zrušit"), so the checks below read
+  // the same sentences. No dialog within the wait = the list of projects failed (an alert).
   const smazat = async (email) => {
+    const otevreny = await page.$('[data-testid="smazat-zrusit"]'); // left open by a failed delete
+    if (otevreny) { await otevreny.click(); await sleep(400); }
     await (await page.$(`[data-testid="akce-${email}"]`)).click();
     await page.waitForSelector(`[data-testid="smazat-${email}"]`, { timeout: 5000 });
     await (await page.$(`[data-testid="smazat-${email}"]`)).click();
+    const otevren = await page.waitForSelector('[data-testid="smazat-dialog"]', { timeout: 6000 }).then(() => true).catch(() => false);
+    if (!otevren) return;
+    const text = await page.$eval('[data-testid="smazat-dialog"]', (el) => el.innerText);
+    dialogy.push({ typ: 'confirm', text });
+    await page.click(odpoved(text) ? '[data-testid="smazat-potvrdit"]' : '[data-testid="smazat-zrusit"]');
   };
 
   console.log('== C) smazání SELŽE → správce se to dozví a nic není napůl ==');
@@ -259,7 +273,7 @@ H.beh(async () => {
   expect(/soukromé projekty \(nikdo jiný je nevidí\): 1/.test(dotaz) && /soukromé stránky: 0/.test(dotaz), 'vypíše, co ZANIKNE (počty soukromých projektů a stránek)');
   expect(/ZŮSTANE/.test(dotaz) && /přílohy \(0\), záznamy času \(0\), komentáře a faktury/.test(dotaz) && /bývalý člen/.test(dotaz), 'vypíše, co ZŮSTANE, a že u autora bude „bývalý člen"');
   expect(/PŘEJDE na nového vlastníka/.test(dotaz) && /na spolusprávce projektu: 1/.test(dotaz) && /na vás \(projekt nemá jiného spolusprávce\): 2/.test(dotaz), 'vypíše, co PŘEJDE: 1 projekt na spolusprávce, 2 na mě (týmový a veřejná vývěska)');
-  expect(dotaz.indexOf('PŘEJDE') < dotaz.indexOf('ZANIKNE') && /OK = smazat účet/.test(dotaz), 'pořadí: přejde → zanikne → zůstane, jedno potvrzení');
+  expect(dotaz.indexOf('PŘEJDE') < dotaz.indexOf('ZANIKNE') && dotaz.indexOf('ZANIKNE') < dotaz.indexOf('ZŮSTANE') && /Zrušit\s+Smazat účet/.test(dotaz), 'pořadí: přejde → zanikne → zůstane, dvě tlačítka: Zrušit a Smazat účet');
   expect(!/TAJNY-SOUKROMY-PROJEKT|TAJNY-SDILENY-S-DRUHYM|druhy@ui4\.cz/.test(dotaz), 'projekty, které admin nevidí, ani jejich spolusprávce nejmenuje');
   expect(dialogy.filter((d) => d.typ === 'confirm').length === 1, `jediný dotaz (${dialogy.filter((d) => d.typ === 'confirm').length})`);
   expect((await inst.api('GET', `/api/collections/users/records/${clen.id}`, { token: ST })).status === 404, 'účet je smazaný');

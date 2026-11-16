@@ -108,6 +108,11 @@ function vicerad(s, max, maxRadku) { return ocisti(s, max * 2).replace(/\r\n?/g,
 const jeMail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(String(s || ""));
 const jeDen = (s) => { const t = String(s || ""); if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return false; const d = new Date(t + "T00:00:00Z"); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === t; }; // 2026-02-30 → NE (Date by přetočil na 2. 3.)
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+// Money is multiplied in WHOLE units (thousandths of quantity × hellers, hellers × hundredths of a percent): a binary
+// float cannot hold x.xx5, so round2(21.5 * 21 / 100) gave 4.51 instead of 4.52 and 8.5 × 1.15 gave 9.77 (finding
+// S6-02). The integer products are exact and a half is exact too, so Math.round rounds it up as the invoice expects.
+const lineTotal = (quantity, unitPrice) => Math.round(Math.round(Number(quantity) * 1000) * Math.round(Number(unitPrice) * 100) / 1000) / 100;
+const vatAmount = (base, ratePercent) => Math.round(Math.round(Number(base) * 100) * Math.round(Number(ratePercent) * 100) / 10000) / 100;
 
 // ---------- bankovní účet, IBAN, SPAYD (čisté) ----------
 // mod 97 nad dlouhým číselným řetězcem bez BigInt (goja BigInt nemá jistý)
@@ -197,14 +202,14 @@ function validujPolozky(items) {
     if (!Number.isFinite(unit_price) || unit_price < 0 || unit_price > 1e9) return { error: `item ${i + 1} ("${description}"): unit_price must be a number ≥ 0 (price per unit WITHOUT tax, in the invoice currency).` };
     const q = Math.round(quantity * 1000) / 1000; // řádek i součet z TÉHOŽ zaokrouhleného množství (1,0005 × 1000 dřív dalo řádek 1000,50 a součet 1001)
     const cena = round2(unit_price);
-    out.push({ description, quantity: q, unit: radek(it.unit, 12), unit_price: cena, total: round2(q * cena) });
+    out.push({ description, quantity: q, unit: radek(it.unit, 12), unit_price: cena, total: lineTotal(q, cena) });
   }
   return { items: out };
 }
 function soucty(items, vatPayer, vatRate) {
-  const subtotal = round2(items.reduce((s, it) => s + round2(it.total !== undefined ? it.total : it.quantity * it.unit_price), 0));
+  const subtotal = round2(items.reduce((s, it) => s + round2(it.total !== undefined ? it.total : lineTotal(it.quantity, it.unit_price)), 0));
   const sazba = vatPayer ? Number(vatRate) : 0;
-  const vat = vatPayer ? round2(subtotal * sazba / 100) : 0;
+  const vat = vatPayer ? vatAmount(subtotal, sazba) : 0;
   return { subtotal, vat, total: round2(subtotal + vat), vat_rate: sazba };
 }
 // 1 600,00 Kč · 1 600,00 € (cs; pro kartu a text modelu) · en: $1,600.00 · €1,600.00 · 1,600.00 CZK — PDF má totéž

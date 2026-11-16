@@ -90,7 +90,8 @@ export default function LiteQuickAdd({ onClose, onAdded }) {
       }
       onAdded();
     } catch (err) {
-      setError(serverReason(err) || t('add.failed'));
+      // ulozDoMapy throws a code, not a sentence (finding F4-09) — the project was deleted or unshared meanwhile
+      setError(err?.message === 'mapNotFound' ? t('tasks:tasksPage.mapNotFound') : (serverReason(err) || t('add.failed')));
       setSaving(false);
     }
   };

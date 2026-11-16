@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useTranslation } from 'react-i18next';
 import { useLazyNs } from '@/i18n/lazyNs';
 import {
@@ -80,7 +81,7 @@ export default function RulesDialog({ open, mapId, nodes, edges, members, mapAcc
     }
   };
   const handleDelete = async (rule) => {
-    if (!window.confirm(t('rules.confirmDelete', { name: rule.name }))) return;
+    if (!(await askDelete(t('rules.confirmDelete', { name: rule.name })))) return;
     try {
       await rulesApi.remove(rule.id);
       reload();
@@ -103,7 +104,7 @@ export default function RulesDialog({ open, mapId, nodes, edges, members, mapAcc
     rulesApi.templates().then(setTemplates).catch(() => setTemplates([]));
   };
   const handleDeleteTemplate = async (tpl) => {
-    if (!window.confirm(t('rules.confirmDeleteTemplate', { name: tpl.name }))) return;
+    if (!(await askDelete(t('rules.confirmDeleteTemplate', { name: tpl.name })))) return;
     try {
       await rulesApi.templateRemove(tpl.id);
       rulesApi.templates().then(setTemplates).catch(() => {});

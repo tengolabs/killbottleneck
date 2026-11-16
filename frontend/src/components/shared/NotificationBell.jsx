@@ -14,6 +14,7 @@ import { pb } from '@/api/pb';
 import { useAuth } from '@/lib/AuthContext';
 import { intlLocale, parsePbDate } from '@/lib/locale';
 import { notifyMeta, notifyTarget } from '@/lib/notifyMeta';
+import { openTimeFix } from '@/lib/timeFix';
 
 const PREVIEW = 20; // kolik se vejde do rozbalovátka; zbytek je na /notifications
 
@@ -73,6 +74,8 @@ export default function NotificationBell() {
       setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)));
       setUnread((u) => Math.max(0, u - 1));
     }
+    // "Timer stopped" leads to the correction of that entry, not to another page
+    if (n.type === 'timer_autostop') { openTimeFix(n.extra && n.extra.time_entry); return; }
     navigate(notifyTarget(n));
   };
 

@@ -68,7 +68,9 @@ const DialogContent = React.forwardRef(({ className, children, size, overlayClas
       // lišta (vč. proužku) a rozbalovací nabídky z ní (zvoneček, panáček — portály Radix) dialog nezavírají;
       // ani oznámení (toasty): leží přes okno a klik do nich („Klíč vytvořen“ přes tlačítko Kopírovat v API klíčích,
       // regrese 27. 10. 2026) nesmí zahodit rozepsaný formulář
-      if (cil && cil.closest && cil.closest('[data-app-header-obal], [data-app-header], [data-radix-popper-content-wrapper], [data-testid="toast-viewport"]')) e.preventDefault()
+      // nor the app's own question / notice (lib/appDialogs.js): it lies over the window that asked and must not
+      // close it — neither on opening (focus moves into it) nor on a click on Cancel
+      if (cil && cil.closest && cil.closest('[data-app-header-obal], [data-app-header], [data-radix-popper-content-wrapper], [data-testid="toast-viewport"], [data-testid="potvrzeni-dialog"], [data-testid="oznameni-dialog"]')) e.preventDefault()
     }
     if (onInteractOutside) onInteractOutside(e)
   }

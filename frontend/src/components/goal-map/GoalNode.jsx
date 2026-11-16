@@ -1,7 +1,9 @@
 import { memo, useContext, useMemo } from 'react';
+import { askConfirm, askDelete } from '@/lib/appDialogs';
 import { useTranslation } from 'react-i18next';
 import { useLazyNs } from '@/i18n/lazyNs';
-import { MembersContext, labelForEmail } from '@/lib/memberLabel';
+import { MembersContext, labelForEmail, isFormerMember } from '@/lib/memberLabel';
+import FormerMemberBadge from '@/components/shared/FormerMemberBadge';
 import { isExternalOwner } from '@/lib/externalContacts';
 import { Handle, Position } from '@xyflow/react';
 import { Plus, Pencil, Trash2, ChevronDown, Loader2, Flag, TrendingUp, AlertTriangle, List, Wand2, Check, Calendar, CalendarClock, CalendarCheck, MessageSquare, Inbox, Unlink, CheckSquare, Timer, Bot, Zap, RotateCw , Paperclip, Handshake, Flame } from 'lucide-react';
@@ -119,9 +121,9 @@ function GoalNode({ id, data, selected }) {
           </span>
           {!readOnly && (
             <button
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                if (!window.confirm(t('node.confirmDelete', { title: data.title || '' }))) return;
+                if (!(await askDelete(t('node.confirmDelete', { title: data.title || '' })))) return;
                 onDeleteNode(id);
               }}
               className="text-muted-foreground hover:text-destructive transition-colors"
@@ -273,9 +275,9 @@ function GoalNode({ id, data, selected }) {
               a smazání bylo nevratné (nález Richarda 7. 8. 2026 v noci). */}
           {!readOnly && onStashNode && (
             <button
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                if (!window.confirm(t('node.confirmStash', { title: data.title || '' }))) return;
+                if (!(await askConfirm(t('node.confirmStash', { title: data.title || '' })))) return;
                 onStashNode(id);
               }}
               className="text-muted-foreground hover:text-primary transition-colors"
@@ -286,9 +288,9 @@ function GoalNode({ id, data, selected }) {
           )}
           {!readOnly && (
             <button
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                if (!window.confirm(t('node.confirmDelete', { title: data.title || '' }))) return;
+                if (!(await askDelete(t('node.confirmDelete', { title: data.title || '' })))) return;
                 onDeleteNode(id);
               }}
               className="text-muted-foreground hover:text-destructive transition-colors"
@@ -368,6 +370,8 @@ function GoalNode({ id, data, selected }) {
               <Handshake className="w-2.5 h-2.5 shrink-0" />
               <span className="truncate">{t('nav:externalContacts.cardBadge', { name: ownerLabel })}</span>
             </span>
+          ) : isFormerMember(members, data.owner) ? (
+            <FormerMemberBadge email={data.owner} />
           ) : (
             <span
               className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold flex items-center justify-center shrink-0"

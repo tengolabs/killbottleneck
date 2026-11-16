@@ -7,6 +7,36 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.5.0 — 2026-11-16
+
+**Former members and handing over their steps, Undo for edits with Ctrl+Z, the app's own dialogs, fixing a forgotten timer**
+
+**Upgrade notes:** no schema migration. Invoice line totals and VAT are now computed in whole hellers / cents, so a
+newly issued invoice may differ by 0.01 from what the old float arithmetic would have printed (21.50 × 21 % is 4.52,
+not 4.51); invoices already issued do not change.
+
+- **Deleting a member: their open steps can be handed over.** The delete dialog shows how many open steps the member
+  is assigned to and lets an administrator pass them to another member in the same click (API: `?reassign_to=<email>`
+  on the delete). Steps that stay assigned to somebody who is no longer in the team show a red **former member**
+  badge instead of initials, so nobody waits for a person who left.
+- **Undo takes back edits of a step.** A change saved from the step dialog (title, owner, deadline, status…) is one
+  Undo step, and **Ctrl+Z / Cmd+Z** works on the map (never while you type in a field).
+- **Confirmations and notices are dialogs of the app.** The browser's own windows with the page address are gone:
+  one dialog everywhere — web, phone, desktop app — with a red **Delete** for deleting, **Confirm** for other
+  questions and **Got it** for a notice. Escape and Cancel mean no, Enter confirms.
+- **A forgotten timer can be fixed.** An entry closed by the 12-hour auto-stop gets a **Correct the end** button (in the time
+  overview, in the map's time panel, and straight from the "Timer stopped" notification): pick when you really
+  finished — any time between the start and the automatic stop.
+- **Password reset by an administrator** is rate-limited per caller (three resets of one account in ten minutes each),
+  so one manager can no longer use up the attempts of another.
+- Invoices: line totals and VAT are multiplied in whole hellers (see the upgrade note).
+- System mails: an address written in angle brackets or quotes no longer produces a broken link.
+- Transferring maps and handing over steps find the account whatever case the address was typed in.
+- The idea created from a stopped unassigned timer is written in the language of the account.
+- Event dialog: Delete / Leave / Delete series can no longer be sent twice by a quick second click.
+- Quick add into a project that was deleted meanwhile says so instead of failing silently.
+- Import from Asana / Trello: the missing texts of the import dialog are back in both languages.
+
 ## v1.4.0 — 2026-11-16
 
 **Brain training: eleven games and a game of the day, a calmer app start**

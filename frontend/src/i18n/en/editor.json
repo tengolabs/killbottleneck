@@ -42,6 +42,7 @@
     "railTasksTitle": "Tasks of this project",
     "undoShort": "Undo",
     "undoTitle": "Undo",
+    "undoTitleKeys": "Undo ({{keys}})",
     "align": "Arrange",
     "alignTitle": "Arrange the map — the icon shows the style currently on the map; pick another one in the menu (the map is rearranged right away) or lock the style for every map.",
     "share": "Share",
@@ -533,6 +534,8 @@
     "allowedSome_other": "{{count}} people may run it"
   },
   "importMap": {
+    "from_asana": "Recognised an Asana export —",
+    "from_trello": "Recognised a Trello export —",
     "title": "Import a project from JSON",
     "button": "Import",
     "description": "Upload a file someone exported from killBottleneck. It becomes a new project.",

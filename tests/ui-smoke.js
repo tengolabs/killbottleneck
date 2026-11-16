@@ -102,7 +102,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const predPridanim = await pocetUzlu();
     const klikZpet = () => page.evaluate(() => {
       const b = [...document.querySelectorAll('button')].find((x) =>
-        (x.getAttribute('title') || '') === 'Vrátit zpět' && !x.disabled && x.offsetParent !== null);
+        (x.getAttribute('title') || '').startsWith('Vrátit zpět') && !x.disabled && x.offsetParent !== null);
       if (!b) return false; b.click(); return true;
     });
     expect(await page.evaluate(() => {

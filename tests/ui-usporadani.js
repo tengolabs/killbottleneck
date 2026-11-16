@@ -154,7 +154,7 @@ H.beh(async () => {
   expect(posDB.a1 && posDB.a10 && posDB.a1.x < posDB.a10.x && posDB.a10.x < posDB.a0.x, `pořadí je ZAPSANÉ v DB (x: a1=${posDB.a1?.x}, a10=${posDB.a10?.x}, a0=${posDB.a0?.x})`);
 
   console.log('== Zpět vrátí původní rozmístění ==');
-  await klikHandle('button[title="Vrátit zpět"]');
+  await klikHandle('button[title^="Vrátit zpět"]');
   await pockejNaUlozeni();
   const poZpet = await poradi(listyA, false);
   expect(poZpet === pred, `po Zpět je pořadí jako před (${poZpet})`);
@@ -265,7 +265,7 @@ H.beh(async () => {
   await kosticka();
   const updKost2 = (await inst.api('GET', `/api/collections/goalmaps/records/${mapa.id}`, { token: T })).json.updated;
   expect(updKost2 === updKost, `srovnaná mapa: další kostička nic nezapíše (updated ${updKost} → ${updKost2})`);
-  await klikHandle('button[title="Vrátit zpět"]');
+  await klikHandle('button[title^="Vrátit zpět"]');
   await pockejNaUlozeni();
   expect((await poradi(listyA, false)) === rucne, `Zpět vrátí ruční pořadí před kostičkou (${await poradi(listyA, false)})`);
 

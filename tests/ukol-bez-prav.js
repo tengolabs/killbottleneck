@@ -15,6 +15,7 @@
 // cizí uzel, cizí mapa i veřejná vývěska. Sada JE ověřená proti starému buildu —
 // tam padá na těch samých místech, na kterých nález vznikl.
 const puppeteer = require('puppeteer-core');
+const { appDialogy } = require('./_app-dialogy');
 const { execSync } = require('child_process');
 
 const NAME = 'kb-e2e-ukol-bez-prav';
@@ -318,7 +319,7 @@ const stavUzlu = async (token, mapId, nodeId) =>
     const stranka = await browser.newPage();
     await stranka.setViewport({ width: 1500, height: 950 });
     const dotazy = [];
-    stranka.on('dialog', async (d) => { dotazy.push(d.message().slice(0, 60)); await d.accept(); });
+    await appDialogy(stranka, (d) => { dotazy.push(d.text.slice(0, 60)); return true; }); // okno aplikace → ano
     await stranka.goto(`${BASE}/login`, { waitUntil: 'networkidle2' });
     await stranka.waitForSelector('#email');
     await stranka.type('#email', VLASTNIK);

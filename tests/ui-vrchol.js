@@ -87,7 +87,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     txt = await page.evaluate(() => document.body.innerText);
     expect(!txt.includes('Podřízený'), 'běžný uzel jde smazat jako dřív');
     const zpet = await page.evaluate(() => {
-      const b = [...document.querySelectorAll('header button')].find((x) => (x.getAttribute('title') || '') === 'Vrátit zpět');
+      const b = [...document.querySelectorAll('header button')].find((x) => (x.getAttribute('title') || '').startsWith('Vrátit zpět'));
       if (!b || b.disabled) return { nasel: !!b, disabled: b?.disabled };
       b.click(); return { nasel: true, disabled: false };
     });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { base44 } from '@/api/base44Client';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -14,6 +15,8 @@ import { intlLocale } from '@/lib/locale';
 import { useTranslation } from 'react-i18next';
 import { Clock, Trash2, Briefcase } from 'lucide-react';
 import ClientsDialog from '@/components/time/ClientsDialog';
+import FixEndDialog from '@/components/time/FixEndDialog';
+import { isAutoStopped } from '@/lib/timeFix';
 
 const NONE = '__none__';
 const parseDate = (s) => (s ? new Date(String(s).replace(' ', 'T')) : null);
@@ -21,7 +24,7 @@ const parseDate = (s) => (s ? new Date(String(s).replace(' ', 'T')) : null);
 // Přehled odpracovaného času (user-menu) — souhrn dnes/týden + poslední záznamy
 // s možností DODATEČNĚ přiřadit projekt/klienta (use-case: stopky puštěné
 // narychlo bez cíle se sem zpětně roztřídí).
-export default function TimeOverviewDialog({ open, onClose }) {
+export default function TimeOverviewDialog({ open, onClose, fixEntryId = '' }) {
   const { t } = useTranslation('tasks');
   const { toast } = useToast();
   const [maps, setMaps] = useState([]);
@@ -31,6 +34,16 @@ export default function TimeOverviewDialog({ open, onClose }) {
   // Správa klientů bydlí TADY, ne v user-menu — klient je vlastnost měření
   // času, samostatná položka v menu matla (Richard 8. 8. 2026).
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [fixEntry, setFixEntry] = useState(null);
+  // Opened from the "Timer stopped" notification: go straight to the correction of that entry, if it is still
+  // correctable (not deleted, not corrected already). Fetched by id — it need not be among the last 20.
+  useEffect(() => {
+    if (!open || !fixEntryId) return undefined;
+    let alive = true;
+    base44.entities.TimeEntry.get(fixEntryId).then((rec) => { if (alive && isAutoStopped(rec)) setFixEntry(rec); }).catch(() => {});
+    return () => { alive = false; };
+  }, [open, fixEntryId]);
+  useEffect(() => { if (!open) setFixEntry(null); }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -52,9 +65,9 @@ export default function TimeOverviewDialog({ open, onClose }) {
   };
 
   const removeEntry = async (entry) => {
-    if (!window.confirm(entry.label
+    if (!(await askDelete(entry.label
       ? t('timeLog.confirmDeleteEntryNote', { time: formatMinutes(entry.duration_min), note: entry.label })
-      : t('timeLog.confirmDeleteEntry', { time: formatMinutes(entry.duration_min) }))) return;
+      : t('timeLog.confirmDeleteEntry', { time: formatMinutes(entry.duration_min) })))) return;
     try {
       await base44.entities.TimeEntry.delete(entry.id);
       setEntries((prev) => prev.filter((e) => e.id !== entry.id));
@@ -65,7 +78,8 @@ export default function TimeOverviewDialog({ open, onClose }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    // while the correction dialog is open on top, its focus must not close this one underneath
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !fixEntry) onClose(); }}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-2 pr-6">
@@ -95,6 +109,11 @@ export default function TimeOverviewDialog({ open, onClose }) {
                 </span>
                 <span className="text-sm font-medium tabular-nums shrink-0 w-16">{formatMinutes(e.duration_min)}</span>
                 <span className="text-xs text-muted-foreground truncate flex-1 min-w-[80px]">{e.note || e.label}</span>
+                {isAutoStopped(e) && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs shrink-0 border-amber-400 text-amber-700 dark:text-amber-300" data-testid="opravit-konec" onClick={() => setFixEntry(e)}>
+                    {t('timeFix.button')}
+                  </Button>
+                )}
                 <Select value={e.map_id || NONE} onValueChange={(v) => patchEntry(e.id, v === NONE
                   ? { map_id: '', node_id: '' }
                   : { map_id: v, ...(v !== e.map_id ? { node_id: '' } : {}) })}>
@@ -123,6 +142,8 @@ export default function TimeOverviewDialog({ open, onClose }) {
           </div>
         )}
       </DialogContent>
+      <FixEndDialog entry={fixEntry} onClose={() => setFixEntry(null)}
+        onSaved={(rec) => { setEntries((prev) => prev.map((x) => (x.id === rec.id ? rec : x))); setReloadKey((k) => k + 1); }} />
       <ClientsDialog open={clientsOpen}
         onClose={() => { setClientsOpen(false); setReloadKey((k) => k + 1); }} />
     </Dialog>

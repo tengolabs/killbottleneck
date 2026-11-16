@@ -297,6 +297,17 @@
     "currencyInvalid": "The currency must be a three-letter code (CZK, EUR, USD…) or empty.",
     "currencyHint": "e.g. EUR"
   },
+  "timeFix": {
+    "button": "Correct the end",
+    "title": "Correct the end of the entry",
+    "description": "The timer ran for over 12 hours and stopped by itself. Enter when you really finished.",
+    "range": "Entry: {{from}} – {{to}}",
+    "endLabel": "Real end",
+    "rule": "The end must be after the start and before the automatic stop.",
+    "saveButton": "Save the end",
+    "saved": "End of the entry corrected",
+    "saveFailed": "The end could not be corrected"
+  },
   "timeOverview": {
     "recentHeading": "Recent entries — a project/client can be assigned retroactively",
     "fromToTitle": "From–to",

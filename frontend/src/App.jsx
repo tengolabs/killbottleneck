@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
+import AppDialogs from "@/components/shared/AppDialogsHost"
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -183,6 +184,7 @@ function App() {
       <AuthProvider>
         <NativeOnboarding />
         <Toaster />
+        <AppDialogs />
       </AuthProvider>
     );
   }
@@ -197,6 +199,7 @@ function App() {
             <AuthenticatedApp />
           </Router>
           <Toaster />
+          <AppDialogs />
         </AsistentProvider>
       </TimerProvider>
     </AuthProvider>

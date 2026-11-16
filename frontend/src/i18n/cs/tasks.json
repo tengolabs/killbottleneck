@@ -297,6 +297,17 @@
     "currencyInvalid": "Měna musí být třípísmenný kód (CZK, EUR, USD…) nebo prázdná.",
     "currencyHint": "např. EUR"
   },
+  "timeFix": {
+    "button": "Opravit konec",
+    "title": "Opravit konec měření",
+    "description": "Stopky běžely přes 12 hodin a zastavily se samy. Zadejte, kdy jste doopravdy skončili.",
+    "range": "Záznam: {{from}} – {{to}}",
+    "endLabel": "Skutečný konec",
+    "rule": "Konec musí být po začátku a dřív než automatické zastavení.",
+    "saveButton": "Uložit konec",
+    "saved": "Konec měření opraven",
+    "saveFailed": "Konec se nepodařilo opravit"
+  },
   "timeOverview": {
     "recentHeading": "Poslední záznamy — projekt/klienta jde přiřadit i zpětně",
     "fromToTitle": "Od–do",

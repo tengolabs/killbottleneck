@@ -421,6 +421,10 @@ const STRINGS = {
     cs: "Stopky „{label}\" běžely přes 12 hodin — automaticky zastaveno, upravte záznam podle skutečnosti",
     en: "Timer \"{label}\" ran for over 12 hours — stopped automatically, adjust the entry to reality",
   },
+  "timer.ideaMeasured": {
+    cs: "Měřeno {from}–{to} ({minutes} min)",
+    en: "Tracked {from}–{to} ({minutes} min)",
+  },
   "notify.timerLabelFallback": {
     cs: "měření času",
     en: "time tracking",
@@ -442,6 +446,11 @@ const STRINGS = {
   "notify.mapHandedOver": {
     cs: "Účet {member} byl smazán. Projekt „{project}\" přešel na vás — jste jeho novým vlastníkem.",
     en: "The account {member} was deleted. The project \"{project}\" passed to you — you are its new owner.",
+  },
+  // deleting a member: their open steps passed to the member the administrator chose
+  "notify.stepsReassigned": {
+    cs: "Účet {member} byl smazán. V projektu „{project}\" na vás přešly jeho otevřené kroky (počet: {n}).",
+    en: "The account {member} was deleted. Their open steps in the project \"{project}\" passed to you (number: {n}).",
   },
   "notify.inviteRequest": {
     cs: "{actor} sdílí projekt „{project}\" s {email} — ten zatím nemá účet. Pozvěte ho do organizace.",
@@ -700,6 +709,7 @@ const STRINGS = {
   "err.archiveOwnerOnly": { cs: "Archivovat nebo obnovit projekt smí jen jeho vlastník.", en: "Only the project owner can archive or restore it." },
   "err.transferOwnerOnly": { cs: "Vlastnictví projektu smí předat jen jeho vlastník nebo administrátor.", en: "Only the project owner or an administrator can transfer ownership." },
   "err.transferTargetNotMember": { cs: "Nový vlastník musí být člen instance s vlastním účtem.", en: "The new owner must be a member of this instance with an account." },
+  "err.reassignTargetNotMember": { cs: "Kroky jde přeřadit jen na jiného člena s vlastním účtem.", en: "Steps can be reassigned only to another member with an account." },
   "err.transferSameOwner": { cs: "Tento účet už je vlastníkem projektu.", en: "This account already owns the project." },
   "err.nothingToUpdate": { cs: "Není co změnit — pošlete title nebo description.", en: "Nothing to update — send title or description." },
   "err.badMapKind": { cs: "Neplatný styl mapy — povolené hodnoty jsou project (dokončit) a process (nepřetržitý běh).", en: "Invalid map kind — allowed values are project (to finish) and process (keeps running)." },
@@ -746,8 +756,8 @@ const STRINGS = {
   "err.shareInviteInvalid": { cs: "Odkaz z pozvánky neplatí — vypršel, už byl použit, nebo patří jiné adrese. Požádejte toho, kdo s vámi projekt sdílí, o novou pozvánku.", en: "The invitation link is not valid — it expired, was already used, or belongs to another address. Ask the person sharing the project to send a new invitation." },
   "err.userNotFound": { cs: "Takový uživatel na instanci není.", en: "No such user on this instance." },
   "err.resetPasswordTooOften": {
-    cs: "Heslo tohoto účtu už bylo za posledních 10 minut obnoveno třikrát. Zkuste to prosím později.",
-    en: "This account's password has already been reset three times in the last 10 minutes. Please try again later.",
+    cs: "Heslo tohoto účtu jste za posledních 10 minut obnovili už třikrát. Zkuste to prosím později.",
+    en: "You have already reset this account's password three times in the last 10 minutes. Please try again later.",
   },
   "err.resetPasswordNotSelf": {
     cs: "Vlastní heslo si takhle obnovit nelze — v hostované verzi si nechte poslat e-mail, na vlastním serveru vede cesta přes konzoli PocketBase.",

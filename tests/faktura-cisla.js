@@ -35,6 +35,18 @@ s = F.soucty(v.items, true, 21);
 expect(s.subtotal === 1950.5 && s.vat === 409.61 && s.total === 2360.11 && s.vat_rate === 21, `plátce 21 %: základ 1950,50, DPH 409,61 (je ${s.vat}), celkem 2360,11`);
 s = F.soucty(F.validujPolozky([{ description: 'x', quantity: 3, unit_price: 0.1 }]).items, true, 12);
 expect(s.subtotal === 0.3 && s.vat === 0.04 && s.total === 0.34, 'haléře: 3 × 0,10 = 0,30; 12 % = 0,04 (zaokrouhlení, ne 0,036)');
+// half a heller (finding S6-02): a float cannot hold x.xx5, the amounts are multiplied in whole hellers
+s = F.soucty(F.validujPolozky([{ description: 'x', quantity: 1, unit_price: 21.5 }]).items, true, 21);
+expect(s.vat === 4.52 && s.total === 26.02, `půlhaléř u DPH: 21,50 × 21 % = 4,515 → 4,52, celkem 26,02 (je ${s.vat} / ${s.total})`);
+v = F.validujPolozky([{ description: 'hodiny', quantity: 8.5, unit_price: 1.15 }, { description: 'kusy', quantity: 0.3, unit_price: 199.95 }]);
+expect(v.items[0].total === 9.78 && v.items[1].total === 59.99, `půlhaléř na řádku: 8,5 × 1,15 = 9,78 a 0,3 × 199,95 = 59,99 (je ${v.items[0].total} / ${v.items[1].total})`);
+s = F.soucty(F.validujPolozky([{ description: 'x', quantity: 1, unit_price: 1000.5 }]).items, true, 21);
+expect(s.vat === 210.11 && s.total === 1210.61, `1000,50 × 21 % = 210,105 → 210,11 (je ${s.vat})`);
+{
+  let spatne = 0;
+  for (let h = 1; h <= 30000; h++) { const z = h / 100; const ceka = Math.round(h * 21 / 100) / 100; if (F.soucty([{ quantity: 1, unit_price: z, total: z }], true, 21).vat !== ceka) spatne++; }
+  expect(spatne === 0, `DPH 21 % sedí na haléř pro každý základ 0,01–300,00 Kč (${spatne} odchylek z 30 000)`);
+}
 expect(/non-empty/.test(F.validujPolozky([]).error) && /non-empty/.test(F.validujPolozky(null).error), 'prázdné položky = chyba');
 expect(/description is required/.test(F.validujPolozky([{ unit_price: 1 }]).error), 'bez popisu = chyba');
 expect(/quantity must be a positive/.test(F.validujPolozky([{ description: 'a', quantity: 0, unit_price: 1 }]).error) && /quantity/.test(F.validujPolozky([{ description: 'a', quantity: -2, unit_price: 1 }]).error), 'množství 0 / záporné = chyba');

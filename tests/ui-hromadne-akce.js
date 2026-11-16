@@ -9,6 +9,7 @@
 //   • Zapnuté pole s prázdnou hodnotou = VYČISTIT (jinak nejde vzít zpátky).
 //   • Změna jde vzít Zpět.
 const puppeteer = require('puppeteer-core');
+const { appDialogy } = require('./_app-dialogy');
 const { execSync } = require('child_process');
 
 const NAME = 'flowmap-e2e-hromadne';
@@ -94,6 +95,7 @@ const register = async (email) => {
     browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
     const page = await browser.newPage();
     await page.setViewport({ width: 1920, height: 1000 });
+    await appDialogy(page);   // the app's own confirmation („Opravdu změnit…“) is accepted
     const chyby = [];
     const cizihoPuvodu = (m) => /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test((m.location() && m.location().url) || '');
     page.on('console', (m) => { if (m.type() === 'error' && !cizihoPuvodu(m)) chyby.push(m.text()); });
@@ -181,7 +183,6 @@ const register = async (email) => {
     ok(await page.$('[data-bulk-termin-omezeni]') !== null,
       'okno předem hlásí, že u cizího zadání se termín nezmění');
 
-    page.once('dialog', async (d) => { await d.accept(); });   // „Opravdu změnit…"
     await page.click('[data-bulk-pouzit]');
     await sleep(1200);
     await sleep(2500);

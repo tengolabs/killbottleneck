@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { askDelete } from '@/lib/appDialogs';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -81,7 +82,7 @@ export default function ExternalContactDialog({ open, onClose, onCreated }) {
 
   const remove = async (c) => {
     // potvrzení VŽDY — na mobilu není druhá šance (poučení ze ztráty dat v zásobníku)
-    if (!window.confirm(t('externalContacts.deleteConfirm', { name: c.name }))) return;
+    if (!(await askDelete(t('externalContacts.deleteConfirm', { name: c.name })))) return;
     try {
       await base44.entities.ExternalContact.delete(c.id);
       if (editId === c.id) setEditId(null);

@@ -48,6 +48,13 @@
     "format": "d. M. yyyy"
   },
   "nodeDeleted": "(uzel smazán)",
+  "appDialog": {
+    "confirmTitle": "Potvrzení",
+    "deleteTitle": "Opravdu smazat?",
+    "noticeTitle": "Upozornění",
+    "confirm": "Potvrdit",
+    "ok": "Rozumím"
+  },
   "actions": {
     "save": "Uložit",
     "cancel": "Zrušit",

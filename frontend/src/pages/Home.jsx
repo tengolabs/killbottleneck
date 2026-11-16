@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { askConfirm, askDelete } from '@/lib/appDialogs';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { base44 } from '@/api/base44Client';
@@ -140,7 +141,7 @@ export default function Home() {
   const handleArchive = async (mapId) => {
     // Potvrzení stejně jako u mazání — archivace projekt schová z titulky
     // a bez dotazu je to omylem jedno kliknutí (Richard 27. 7. 2026).
-    if (!window.confirm(t('confirmArchiveProject'))) return;
+    if (!(await askConfirm(t('confirmArchiveProject')))) return;
     try {
       await base44.entities.GoalMap.update(mapId, { archived: true });
       setMaps((prev) => prev.map((m) => (m.id === mapId ? { ...m, archived: true } : m)));
@@ -153,7 +154,7 @@ export default function Home() {
   };
 
   const handleDelete = async (mapId) => {
-    if (!window.confirm(t('confirmDeleteProject'))) return;
+    if (!(await askDelete(t('confirmDeleteProject')))) return;
     try {
       await base44.entities.GoalMap.delete(mapId);
       setMaps(maps.filter((m) => m.id !== mapId));

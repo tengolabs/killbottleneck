@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { askConfirm, askDelete } from '@/lib/appDialogs';
 import { base44 } from '@/api/base44Client';
 import { shareMap } from '@/api/kb';
 import { cycleStatus } from '@/lib/statusMeta';
@@ -120,7 +121,7 @@ export function useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editN
   // dialogu). Čerstvý fetch mapy vytáhne i popis/barvu uzlu — jinak by se
   // odložením ztratily (řádek nese jen titulek a termín).
   const handleStashNodeItem = useCallback(async (item) => {
-    if (!window.confirm(t('tasksPage.confirmStashNode', { title: item.title }))) return;
+    if (!(await askConfirm(t('tasksPage.confirmStashNode', { title: item.title })))) return;
     try {
       const fresh = (await base44.entities.GoalMap.filter({ id: item.map_id }))[0];
       const raw = (fresh?.nodes || []).find((n) => n.id === item.node_id);
@@ -143,9 +144,9 @@ export function useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editN
     }
   }, [buffer, nodeRemovalBlockedBy, removeMapNode, t, toast]);
 
-  const handleCycleNodeItem = useCallback((item) => {
+  const handleCycleNodeItem = useCallback(async (item) => {
     if (item.status === 'todo' && item.waiting) {
-      if (!window.confirm(t('tasksPage.confirmStartWaiting'))) return;
+      if (!(await askConfirm(t('tasksPage.confirmStartWaiting')))) return;
     }
     updateMapNode(item, { status: cycleStatus(item.status) }).catch(() => {});
   }, [t, updateMapNode]);
@@ -155,7 +156,7 @@ export function useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editN
     if (email && !nodeHasWorkAccess(map, email)) {
       const jenCte = nodeIsShared(map, email);
       const otazka = jenCte ? 'tasksPage.confirmUpgradeAssign' : 'tasksPage.confirmShareAssign';
-      if (!window.confirm(t(otazka, { email, title: map?.title }))) {
+      if (!(await askConfirm(t(otazka, { email, title: map?.title })))) {
         // odmítnutí povýšení přiřazení NERUŠÍ — práci na svém kroku dokončí i čtenář
         if (!jenCte) return;
       } else {
@@ -193,7 +194,7 @@ export function useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editN
 
   const handleDeleteNodeFromTable = useCallback(async (nodeId) => {
     const item = editNodeItem;
-    if (!window.confirm(t('tasksPage.confirmDeleteNode', { title: item?.title }))) return;
+    if (!(await askDelete(t('tasksPage.confirmDeleteNode', { title: item?.title })))) return;
     try {
       await removeMapNode(item.map_id, nodeId);
       setEditNodeItem(null);

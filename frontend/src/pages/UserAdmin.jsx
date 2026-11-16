@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { askConfirm, showNotice } from '@/lib/appDialogs';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '@/lib/clipboard';
 import { base44 } from '@/api/base44Client';
-import { getMembers, resetUserPassword, memberDeputy, savePurpose, userMaps, userMapCounts } from '@/api/kb';
+import { getMembers, resetUserPassword, memberDeputy, savePurpose, userMaps, userMapCounts, deleteMember } from '@/api/kb';
 import { loadKbConfig, invalidateKbConfig } from '@/hooks/useKbConfig';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useAuth } from '@/lib/AuthContext';
@@ -36,6 +37,7 @@ import BillingSection from '@/components/shared/BillingSection';
 import InvoicingSection from '@/components/shared/InvoicingSection';
 import { useAsistent } from '@/lib/AsistentContext';
 import MembershipSection from '@/components/shared/MembershipSection';
+import DeleteMemberDialog from '@/components/shared/DeleteMemberDialog';
 import CustomDomainSection from '@/components/shared/CustomDomainSection';
 import { fmtDateShort, fmtDateTimeShort } from '@/lib/locale';
 import { serverOrigin } from '@/lib/serverUrl';
@@ -63,6 +65,7 @@ export default function UserAdmin() {
   // texty správcovské stránky žijí v líném balíku `admin` (mimo lite rozpočet)
   const adminNsReady = useLazyNs('admin');
   const [users, setUsers] = useState([]);
+  const [delDialog, setDelDialog] = useState(null); // { member, summary } while the delete dialog is open
   const [loginLogs, setLoginLogs] = useState({});
   const [mapCounts, setMapCounts] = useState({});
   const [loading, setLoading] = useState(true);
@@ -195,7 +198,7 @@ export default function UserAdmin() {
       setTimeout(() => setOrgSaved(false), 2000);
     } catch (e) {
       console.error(e);
-      window.alert(duvod(e, t('userAdmin.actionFailed')));
+      showNotice(duvod(e, t('userAdmin.actionFailed')));
     } finally {
       setOrgSaving(false);
     }
@@ -276,7 +279,7 @@ export default function UserAdmin() {
     } catch (e) {
       // the server says why (e.g. the last administrator cannot be demoted)
       console.error(e);
-      window.alert(duvod(e, t('userAdmin.actionFailed')));
+      showNotice(duvod(e, t('userAdmin.actionFailed')));
     }
   };
 
@@ -289,7 +292,7 @@ export default function UserAdmin() {
     } catch (e) {
       // the server says why (e.g. the last administrator cannot be demoted)
       console.error(e);
-      window.alert(duvod(e, t('userAdmin.actionFailed')));
+      showNotice(duvod(e, t('userAdmin.actionFailed')));
     }
   };
 
@@ -303,7 +306,7 @@ export default function UserAdmin() {
     } catch (e) {
       // the server says why (e.g. the last administrator cannot be demoted)
       console.error(e);
-      window.alert(duvod(e, t('userAdmin.actionFailed')));
+      showNotice(duvod(e, t('userAdmin.actionFailed')));
     }
   };
 
@@ -312,7 +315,7 @@ export default function UserAdmin() {
   // NEVRACÍ. Bez SMTP vrátí dočasné heslo, které správce člověku předá —
   // ukazuje se ve stejném kopírovatelném panelu jako u pozvánky, ne v alertu.
   const handleResetPassword = async (email) => {
-    if (!window.confirm(t('userAdmin.confirmResetPassword', { email }))) return;
+    if (!(await askConfirm(t('userAdmin.confirmResetPassword', { email })))) return;
     try {
       const res = await resetUserPassword(email);
       setInviteResult({ mode: 'reset', email, temp_password: res?.temp_password, sent_via_email: !!res?.sent_via_email });
@@ -320,7 +323,7 @@ export default function UserAdmin() {
     } catch (e) {
       // PB SDK má v `message` vždy obecné „Something went wrong." — konkrétní
       // důvod (jiný admin, sám sobě, neznámý e-mail) je v těle odpovědi
-      window.alert(e?.response?.error || t('userAdmin.resetPasswordFailed'));
+      showNotice(e?.response?.error || t('userAdmin.resetPasswordFailed'));
     }
   };
 
@@ -339,39 +342,35 @@ export default function UserAdmin() {
       // PocketBase („Something went wrong…"). Když se čte jen `message`,
       // uživatel dostane „něco se pokazilo" místo věty, proč to nešlo
       // (Richardův klik-test 18. 8.).
-      window.alert(e?.response?.error || e?.response?.message || e?.message || t('userAdmin.deputyFailed'));
+      showNotice(e?.response?.error || e?.response?.message || e?.message || t('userAdmin.deputyFailed'));
     }
   };
 
+  // Deleting an account removes only its PRIVATE things (decision 11 Nov 2026). The
+  // dialog says BEFOREHAND what passes on, what goes and what stays, and offers to pass
+  // the member's open steps to somebody else (decision 15 Nov 2026). Shared projects are
+  // handed over by the server inside the delete itself (to a co-admin of the project,
+  // otherwise to the administrator who deletes) — either everything happens or nothing
+  // does. Private projects are reported as a number only.
   const handleDelete = async (userId) => {
-    // Deleting an account removes only its PRIVATE things (decision 11 Nov 2026). The
-    // dialog says BEFOREHAND what passes on, what goes and what stays. Shared projects
-    // are handed over by the server inside the delete itself (to a co-admin of the
-    // project, otherwise to the administrator who deletes) — either everything happens
-    // or nothing does. Private projects are reported as a number only.
     const clovek = users.find((u) => u.id === userId);
     let owned;
     try { owned = await userMaps(userId); } catch { owned = null; }
-    if (!owned) { window.alert(t('userAdmin.mapsListFailed')); return; } // never fall through to a blind delete
-    const sm = owned.summary || {};
-    const radky = [t('userAdmin.del.header', { email: clovek?.email || '' }), '', t('userAdmin.del.passes'),
-      t('userAdmin.del.passesCoadmin', { n: sm.maps_to_coadmin || 0 }),
-      t('userAdmin.del.passesMe', { n: sm.maps_to_admin || 0 }), '',
-      t('userAdmin.del.goes'),
-      t('userAdmin.del.goesMaps', { n: (sm.maps_private || 0) + (sm.maps_no_holder || 0) }),
-      t('userAdmin.del.goesPages', { n: sm.pages_private || 0 }),
-      t('userAdmin.del.goesOther', { events: sm.events_private || 0, templates: sm.templates_personal || 0 }), '',
-      t('userAdmin.del.stays'),
-      t('userAdmin.del.staysList', { files: sm.files_kept || 0, time: sm.time_kept || 0, templates: sm.templates_kept || 0, events: sm.events_kept || 0, pages: sm.pages_kept || 0 }), '',
-      t('userAdmin.del.confirmPlain')];
-    if (!window.confirm(radky.join('\n'))) return;
+    if (!owned) { showNotice(t('userAdmin.mapsListFailed')); return; } // never fall through to a blind delete
+    setDelDialog({ member: { id: userId, email: clovek?.email || '' }, summary: owned });
+  };
+
+  const confirmDelete = async (reassignTo) => {
+    const userId = delDialog?.member?.id;
+    if (!userId) return;
     try {
-      await base44.entities.User.delete(userId);
+      await deleteMember(userId, reassignTo);
       setUsers((prev) => prev.filter((u) => u.id !== userId));
       invalidateKbConfig(); // user_count v configu
+      setDelDialog(null);
     } catch (e) {
       console.error(e);
-      window.alert(t('userAdmin.deleteFailed', { reason: duvod(e, t('userAdmin.deleteFailedUnknown')) }));
+      showNotice(t('userAdmin.deleteFailed', { reason: duvod(e, t('userAdmin.deleteFailedUnknown')) }));
     }
     // the handover changed the numbers in the list either way
     try { setMapCounts(await userMapCounts()); } catch { /* the numbers refresh on the next load */ }
@@ -781,7 +780,7 @@ export default function UserAdmin() {
                         setOrg((o) => ({ ...(o || {}), purpose }));
                       } catch (err) {
                         console.error(err);
-                        window.alert(duvod(err, t('userAdmin.actionFailed')));
+                        showNotice(duvod(err, t('userAdmin.actionFailed')));
                       }
                     }}
                   >
@@ -841,6 +840,14 @@ export default function UserAdmin() {
           </main>
         </div>
       </div>
+
+      <DeleteMemberDialog
+        member={delDialog?.member || null}
+        summary={delDialog?.summary || null}
+        people={users.filter((u) => u.id !== delDialog?.member?.id && u.kind !== 'guest')}
+        onConfirm={confirmDelete}
+        onClose={() => setDelDialog(null)}
+      />
 
       <Dialog open={inviteOpen} onOpenChange={(v) => { if (!v) closeInvite(); }}>
         <DialogContent className="sm:max-w-md">

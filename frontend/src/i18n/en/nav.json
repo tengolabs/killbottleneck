@@ -88,6 +88,11 @@
     "rotaceHint": "Skins rotate on their own — a new one each day.",
     "rotaceDnes": "Today: {{name}} · another one tomorrow"
   },
+  "formerMember": {
+      "badge": "former member",
+      "hint": "Former member ({{email}}) — the account no longer exists. Reassign the step to somebody else.",
+      "option": "former member ({{email}})"
+  },
   "externalContacts": {
     "title": "External contacts",
     "description": "People outside the system — accountants, suppliers. They have no account, receive no notifications and know nothing about this; it is purely your internal deadline tracking.",

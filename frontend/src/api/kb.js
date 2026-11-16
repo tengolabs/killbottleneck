@@ -9,6 +9,7 @@
 export { kbSend } from '@/api/kbSend';
 export { fetchMyDay, fetchPortfolio } from '@/api/myDay';
 import { kbSend } from '@/api/kbSend';
+import { pb } from '@/api/pb';
 
 // AI generování musí mít strop na klientovi: při výpadku cloudové AI by jinak
 // spinner točil, dokud to nevzdá server (120 s) — a i pak s matoucí hláškou.
@@ -66,7 +67,10 @@ export const resetUserPassword = (email) => kbSend('/api/kb/reset-user-password'
 export const memberDeputy = (id, deputy) => kbSend('/api/kb/member-deputy', { body: { id, deputy } });
 // projects an account owns (before deleting the account — deletion cascades) and their transfer
 export const userMapCounts = () => kbSend('/api/kb/users/map-counts', { method: 'GET' }).then((r) => (r && r.counts) || {});
-export const userMaps = (id) => kbSend(`/api/kb/users/${encodeURIComponent(id)}/maps`, { method: 'GET' });
+// `reassignTo` (e-mail): the answer also says how many open steps that member would receive
+export const userMaps = (id, reassignTo) => kbSend(`/api/kb/users/${encodeURIComponent(id)}/maps${reassignTo ? `?reassign_to=${encodeURIComponent(reassignTo)}` : ''}`, { method: 'GET' });
+// deleting an account; `reassignTo` passes the member's open steps to that member (server: users delete hooks)
+export const deleteMember = (id, reassignTo) => pb.collection('users').delete(id, reassignTo ? { query: { reassign_to: reassignTo } } : undefined);
 export const transferUserMaps = (id, email) => kbSend(`/api/kb/users/${encodeURIComponent(id)}/transfer-maps`, { body: email ? { email } : {} });
 export const transferMap = (mapId, email) => kbSend(`/api/kb/maps/${encodeURIComponent(mapId)}/transfer`, { body: { email } });
 export const savePurpose = (purpose, { replace } = {}) => kbSend('/api/kb/purpose', { body: { purpose, ...(replace ? { replace: true } : {}) } });

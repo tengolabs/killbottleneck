@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.5.0": {
+    cs: [
+      "Při mazání člena týmu jde jeho otevřené kroky rovnou předat někomu jinému. Kroky po člověku, který v týmu už není, poznáte podle výrazné červené značky „bývalý člen“.",
+      "Zpět vrátí i úpravu kroku (název, řešitel, termín, stav) a funguje zkratka Ctrl+Z.",
+      "Potvrzení a hlášení už nejsou okna prohlížeče, ale okna aplikace — stejná na webu, v telefonu i v desktopové aplikaci.",
+      "Zapomenuté stopky, které se samy zastavily po 12 hodinách, jdou opravit tlačítkem Opravit konec: zadáte, kdy jste doopravdy skončili.",
+    ],
+    en: [
+      "When you delete a team member, their open steps can be handed over to somebody else right away. Steps left with a person who is no longer in the team show a red \"former member\" badge.",
+      "Undo now takes back an edit of a step (title, owner, deadline, status), and the Ctrl+Z shortcut works.",
+      "Confirmations and notices are no longer browser windows but dialogs of the app — the same on the web, on the phone and in the desktop app.",
+      "A forgotten timer that stopped itself after 12 hours can be corrected with Correct the end: enter when you really finished.",
+    ],
+  },
   "v1.4.0": {
     cs: [
       "K sedmi hrám v Tréninku mozku přibyly čtyři: Bludiště (švihem prstu nebo šipkami), Posloupnost (zopakujte rostoucí řadu barev a tónů), Přesmyčky (slova z přeházených písmen, podle úrovně 5, 6 nebo 7 písmen) a Co chybí (devět obrázků, pak osm — který zmizel?).",

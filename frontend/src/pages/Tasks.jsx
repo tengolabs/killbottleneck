@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { askConfirm, askDelete } from '@/lib/appDialogs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/AuthContext';
@@ -316,8 +317,8 @@ export default function Tasks({ kalendar = false }) {
     }
   };
 
-  const handleDeleteBuffer = (item) => {
-    if (!window.confirm(t('tasksPage.confirmDeleteIdea', { title: item.title }))) return;
+  const handleDeleteBuffer = async (item) => {
+    if (!(await askDelete(t('tasksPage.confirmDeleteIdea', { title: item.title })))) return;
     buffer.remove(item.id);
   };
 
@@ -334,7 +335,7 @@ export default function Tasks({ kalendar = false }) {
     const warn = subCount > 0
       ? t('tasksPage.confirmStashTaskWithSubs', { title: task.title, subCount })
       : t('tasksPage.confirmStashTask', { title: task.title });
-    if (!window.confirm(warn)) return;
+    if (!(await askConfirm(warn))) return;
     try {
       await buffer.add({ title: task.title, description: task.description || '', deadline: task.deadline || '' });
       await tasksApi.remove(task.id);
@@ -394,12 +395,12 @@ export default function Tasks({ kalendar = false }) {
     });
   };
 
-  const handleDelete = (task) => {
+  const handleDelete = async (task) => {
     const subCount = (byParent[task.id] || []).length;
     const msg = subCount > 0
       ? t('tasksPage.confirmDeleteTaskWithSubs', { title: task.title, subCount })
       : t('tasksPage.confirmDeleteTask', { title: task.title });
-    if (!window.confirm(msg)) return;
+    if (!(await askDelete(msg))) return;
     tasksApi.remove(task.id).catch(() => toast({ title: t('tasksPage.deleteFailed'), variant: 'destructive' }));
   };
 
