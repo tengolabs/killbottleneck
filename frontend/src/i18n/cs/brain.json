@@ -1,11 +1,18 @@
 {
   "title": "Trénink mozku",
   "loading": "Načítám…",
-  "todayTitle": "Dnešní trénink",
-  "todayHint": "Hotovo {{done}} ze {{total}} úloh. Každá hra jednou denně stačí.",
-  "todayDone": "Dnešní sada je hotová. Skvělá práce!",
-  "todayShort": "Dnes {{done}}/{{total}}",
-  "streakTitle": "Dny v řadě s aspoň jednou dokončenou úlohou",
+  "todayTitle": "Hra dne",
+  "todayHint": "Jedno dohrané kolo splní dnešek a prodlouží sérii.",
+  "todayDone": "Hra dne je splněná. Každá další hra je bonus.",
+  "todayShort": "Hra dne ✓",
+  "todayShortOpen": "Hra dne: {{game}}",
+  "bonusLabel": "+{{count}} bonus",
+  "bonusTitle": "Další dohrané hry dnes",
+  "weekTitle": "Tento týden",
+  "weekHint": "{{done}} z {{total}} různých her od pondělí",
+  "weekDone": "Týden splněn – všech {{total}} her!",
+  "weekShort": "Týden {{done}}/{{total}}",
+  "streakTitle": "Dny v řadě se splněnou hrou dne",
   "streakLabel": "dní v řadě",
   "streakOneDay": "den v řadě",
   "level": "Úroveň",
@@ -25,6 +32,8 @@
   "resultWon": "Hotovo!",
   "resultLost": "Tentokrát ne.",
   "privacy": "Výsledky vidíte jen vy. Žádný žebříček, nic v organizaci.",
+  "moreGames": "Další hry",
+  "moreHint": "Každá dohraná je dnešní bonus a počítá se do týdne.",
   "game": {
     "mines": "Hledání min",
     "memory": "Pexeso",
@@ -32,7 +41,11 @@
     "math": "Rychlé počty",
     "stroop": "Barvy",
     "sudoku": "Sudoku",
-    "clock": "Hodiny"
+    "clock": "Hodiny",
+    "maze": "Bludiště",
+    "sequence": "Posloupnost",
+    "anagram": "Přesmyčky",
+    "missing": "Co chybí"
   },
   "skillLogic": "logika a rozhodování",
   "skillMemory": "paměť",
@@ -40,9 +53,19 @@
   "skillSpeed": "pohotovost",
   "skillFocus": "koncentrace",
   "skillOrientation": "orientace v čase",
+  "skillSpatial": "prostorová orientace",
   "unit": {
-    "guesses": " pokusů",
-    "correct": " správně",
-    "points": " b."
+    "guesses_one": " pokus",
+    "guesses_few": " pokusy",
+    "guesses_other": " pokusů",
+    "correct_one": " správně",
+    "correct_few": " správně",
+    "correct_other": " správně",
+    "points_one": " b.",
+    "points_few": " b.",
+    "points_other": " b.",
+    "steps_one": " krok",
+    "steps_few": " kroky",
+    "steps_other": " kroků"
   }
 }

@@ -42,12 +42,14 @@ H.beh(async () => {
   expect(!!br, 'new version: brain_results exists although its stamp is older than the applied ones');
   expect(!!br && /@request\.auth\.id/.test(br.listRule || '') && br.createRule === null && br.updateRule === null && br.deleteRule === null, 'new version: rows readable by their owner only, written only through the routes');
   const tok = await nova.login('hrac@up.cz');
-  let r = await nova.api('POST', '/api/kb/brain/start', { token: tok, body: { game: 'mines', level: 1, tzOffset: 60 } });
+  // the streak counts the game of the day → play that one
+  const hra = (await nova.api('GET', '/api/kb/brain/summary?tzOffset=60', { token: tok })).json.today.game;
+  let r = await nova.api('POST', '/api/kb/brain/start', { token: tok, body: { game: hra, level: 1, tzOffset: 60 } });
   expect(r.status === 200 && !!r.json.id, `user from the old version starts a round (${r.status})`);
   r = await nova.api('POST', '/api/kb/brain/finish', { token: tok, body: { id: r.json.id, won: true, score: 42, durationMs: 42000 } });
   expect(r.status === 200, `…and finishes it (${r.status})`);
   r = await nova.api('GET', '/api/kb/brain/summary?tzOffset=60', { token: tok });
-  expect(r.status === 200 && r.json.today && r.json.today.done.includes('mines') && r.json.streak === 1, `…and the summary counts it (${r.status}, ${JSON.stringify(r.json.today)})`);
+  expect(r.status === 200 && r.json.today && r.json.today.done.includes(hra) && r.json.today.dailyDone && r.json.streak === 1, `…and the summary counts it (${r.status}, ${JSON.stringify(r.json.today)})`);
   execSync(`docker rm -f ${nova.name}`, { stdio: 'ignore' });
 
   console.log('== second start (migration already applied) ==');

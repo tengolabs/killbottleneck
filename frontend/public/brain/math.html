@@ -232,7 +232,7 @@ button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 'use strict';
 // ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
 // Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
-// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+// Web Audio only, no files. `sfx.enabled` is stored in localStorage (key: brain-sound); the word games also keep their deck there (words.js).
 const sfx = {
   ctx: null,
   enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
@@ -422,7 +422,7 @@ const S = { phase: 'idle', level: LEVEL, ok: 0, bad: 0, problem: null, input: ''
 const HUB_ORIGIN = location.origin === 'null' ? '*' : location.origin;
 function post(msg) { if (EMBED) window.parent.postMessage(Object.assign({ type: 'kb-brain', game: GAME }, msg), HUB_ORIGIN); }
 window.addEventListener('message', ev => {
-  if (ev.origin !== location.origin || !ev.data || ev.data.type !== 'kb-brain') return;
+  if (ev.origin !== location.origin || (ev.source !== window.parent && ev.source !== window) || !ev.data || ev.data.type !== 'kb-brain') return;
   const a = ev.data.action;
   if (a === 'pause') pause(); else if (a === 'resume') resume(); else if (a === 'mute') { sfx.set(false); syncSound(); } else if (a === 'new') newGame(S.level);
   else if (a === 'theme') applyTheme(ev.data.theme); // recolour only, never restart

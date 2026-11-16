@@ -1,12 +1,25 @@
 # Brain training zone — game contract
 
-The brain training zone (🧠, sibling of the relax zone 🐟) shows a hub with a daily set of small games.
+The brain training zone (🧠, sibling of the relax zone 🐟) shows a hub with a game of the day and ten more small games.
 Every game is **one static HTML file** in `product/frontend/public/brain/<id>.html`, loaded by the hub in an
 `<iframe>`. Results are reported to the hub with `postMessage` and stored on the server (personal statistics,
 no leaderboard). This file is the contract every game must follow. Code, comments and identifiers are English;
 user-facing strings exist in Czech and English inside the file.
 
-## Games (v1)
+## Games
+
+**Game of the day** (owner's decision 16 Nov 2026, replacing the first idea of a daily set of 7): the server picks ONE
+game from the user id and the local day (`dailyGame()` in `server/pb_hooks/brain.js`, nothing stored); within each cycle of
+11 days every game comes once, never the same game two days in a row. The hub shows it on top, the other ten under "More
+games". Summary: `today.game`, `today.dailyDone`, `today.done` (all games finished today — ticked cards), `today.bonus`
+(distinct games finished today other than the game of the day), `week` (`start` = Monday, `done`/`count` = distinct
+games finished since Monday, `total` = 11 → all 11 = the week's badge). The **streak** counts days whose game of the day
+was finished — by the `daily` flag stored at /finish (`rules` = 2), so a later change of the rotation never rewrites
+history; rows from v1.3.0 (`rules` = 0) count with any finished round, as they did then (owner 16 Nov 2026). A round's
+`day` is the local day of the finish. Every finished round is stored (game, level, score, duration, won, daily, rules,
+hints — the result message may carry `hints`: anagram and sudoku send theirs, the server clamps to 0–1000)
+— the base for a future experience/character system; rounds never finished are dropped after the 2 h finish window
+(owner 16 Nov 2026: abandoned rounds are not kept — every opened game creates one).
 
 | id | game | cognitive function | levels | `score` meaning | better |
 |---|---|---|---|---|---|
@@ -17,10 +30,15 @@ user-facing strings exist in Czech and English inside the file.
 | `stroop` | Colours (word × ink colour, 60 s) | concentration | 1–3 | correct − wrong (min 0) | higher |
 | `sudoku` | Sudoku (unique solution) | logic | 1–3 | seconds | lower |
 | `clock` | Clock (analogue time, 10 questions) | orientation in time | 1–3 | correct answers (0–10) | higher |
+| `maze` | Maze (11×11 / 17×17 / 25×25 block grid, one path) | spatial orientation | 1–3 | seconds to the goal | lower |
+| `sequence` | Sequence (4 / 6 / 9 pads, colours + tones, grows by one) | working memory | 1–3 | longest sequence repeated | higher |
+| `anagram` | Anagrams (10 words of 5 / 6 / 7 letters, 60 s per word) | language | 1–3 | words solved (0–10) | higher |
+| `missing` | What's missing (9 symbols for 5 / 4 / 3 s, then 8) | visual attention | 1–3 | rounds right (0–10) | higher |
 
 `won` is `true` when the round was completed successfully (mines cleared, all pairs found, word guessed,
-sudoku solved); for timed games (`math`, `stroop`, `clock`) a finished round is always `won: true`.
-Only `won` rounds count towards "best"; every finished round counts towards the daily set.
+sudoku solved, maze goal reached); for timed or open-ended games (`math`, `stroop`, `clock`, `sequence`, `anagram`,
+`missing`) a finished round is always `won: true`. The server clamps `anagram`/`missing` to 10 and `sequence` to 1000.
+Only `won` rounds count towards "best"; every finished round (won or lost) counts as played — game of the day, bonus, week.
 
 ## File rules
 
@@ -116,4 +134,16 @@ After a finished round the game shows its own short summary (score, best is show
   in `mines.html`): on a phone the board would scroll inside the frame and the scrolling fights the long press.
 - `GAMES` lives twice (`brainApi.js` for the hub, `server/pb_hooks/brain.js` for validation) — `tests/brain-api.js`
   parses both and fails when ids, levels or `better` differ. The shared kit block (`const sfx = {` … `// Theme + level
-  plumbing`) is byte-identical in all seven games — the same suite fails when one copy drifts.
+  plumbing`) is byte-identical in all games — the same suite fails when one copy drifts.
+- One shared word list `public/brain/words.js` (`window.BRAIN_WORDS = { cs, en, cs6, en6, cs7, en7 }` — five letters for both games, six/seven for anagram levels 2/3; owner's decision 16 Nov 2026) for
+  `word` and `anagram` — the only exception to "one file per game". Both games load it with `<script src="words.js">`
+  and their self-tests fail when it did not load. Words are our own selection reviewed by hand (sources in
+  `wordlists/`), never from ispell/hunspell (GPL).
+- No repeats in the word games (owner 16 Nov 2026): `window.BRAIN_DECK` in `words.js` hands out words like a deck —
+  per game, language and level (`localStorage` key `brain-deck-<game>-<lang>[-<level>]`, the only other thing a game
+  stores besides the sound switch) a word comes back only after the whole list was used, and a new deck never starts
+  with the words of the round just played. Browser-local on purpose (no server state for it): another device starts its
+  own deck. What's missing asks for ten different missing symbols in a round (24 symbols, no storage needed). The other
+  games generate their content (mines, sudoku, maze, sums, colours, clock, sequence, pairs layout).
+- The game of the day is derived, not stored: the same user sees the same game all day, a new one at local midnight.
+  Games are not weighted (all equal) — weights belong to the future experience system, decided from the collected data.

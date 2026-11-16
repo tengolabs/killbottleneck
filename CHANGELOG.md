@@ -7,6 +7,35 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.4.0 — 2026-11-16
+
+**Brain training: eleven games and a game of the day, a calmer app start**
+
+**Upgrade notes:** one schema migration adds `daily`, `rules` and `hints` to `brain_results` (existing rows count as
+v1.3.0 rounds). The app start no longer shows the aquarium — set `KB_START_RELAX=1` to get it back; `KB_START_RELAX=0`
+still turns the start off completely.
+
+- **"Connect your AI agent" is no longer scary.** After the first sign-in the dialog says up front that anyone without an
+  agent, or not sure what it is, can simply close it — the big coloured button is **Close**, Copy is the smaller one.
+- **The app no longer starts with the aquarium.** On start only the assistant panel opens; the aquarium is one click away
+  (🐟 in the panel header). Operators who liked the old start set `KB_START_RELAX=1`; `0` still turns the start off.
+- **Brain training: four new games — eleven in total.** **Maze** (spatial orientation; swipe to run to the next junction,
+  on-screen arrows or the keyboard; 11×11 / 17×17 / 25×25), **Sequence** (working memory; repeat a growing sequence of
+  coloured pads with their own tones, 4 / 6 / 9 pads), **Anagrams** (language; ten words from shuffled letters, 5 / 6 / 7
+  letters by level, 60 s per word, a hint costs 10 s) and **What's missing** (visual attention; nine symbols for 5 / 4 / 3 s, then eight —
+  pick the one that disappeared).
+- **A game of the day instead of a daily set.** Every day one of the eleven games is the game of the day (the same all
+  day long, every game once in each eleven-day cycle and never two days in a row; derived from the account and the
+  date on the server). Each finished round remembers whether it was the game of the day, so the history stays as it
+  was played. **Upgrading from v1.3.0:** days played before the upgrade keep counting for the streak with any finished
+  game, as they did then. A round counts for the day it was finished on. Finishing it completes the day and keeps the streak going; every other game finished that day is a **bonus**,
+  and **This week** counts the different games finished since Monday — all eleven make a complete week.
+- The maze starts in a different corner every round, with the goal at the farthest point of the maze.
+- The keyboard works in a game right after it opens (maze arrows, sudoku digits) — no click into the game needed.
+- The five-letter word and the anagrams share one word list (`public/brain/words.js`), about 300–500 words per
+  language and length, and hand them out like a deck: a word comes back only after the whole list was played.
+  What's missing asks for a different symbol in each of its ten turns.
+
 ## v1.3.0 — 2026-11-16
 
 **Brain training zone 🧠 — seven daily puzzles next to the chat, personal statistics**

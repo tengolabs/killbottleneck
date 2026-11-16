@@ -3248,9 +3248,11 @@ kbRoute("GET", "/config", (e) => {
     // testovací sady ho posílají všechny (harness i staré docker run), takže nový dialog
     // žádné kliky neblokuje bez úprav sad.
     agent_setup_ask: (env("AGENT_SETUP_ASK") || "").trim() !== "0" && (env("PURPOSE_ASK") || "").trim() !== "0",
-    // start aplikace s akváriem a otevřeným asistentem (Richard 25. 10. 2026). KB_START_RELAX=0 vypne; KB_PURPOSE_ASK=0
-    // (testovací sady) vypíná taky, ať vrstva neblokuje kliky — sada, která to testuje, dá KB_START_RELAX=1 (přednost).
-    start_relax: (() => { const sr = (env("START_RELAX") || "").trim(); return sr === "1" || (sr !== "0" && (env("PURPOSE_ASK") || "").trim() !== "0"); })(),
+    // App start (owner 16 Nov 2026: the aquarium on every start was too pushy): the assistant panel opens by itself
+    // (start_open), the aquarium beside it only with KB_START_RELAX=1 (start_relax). KB_START_RELAX=0 turns both off;
+    // KB_PURPOSE_ASK=0 (test suites) too, so nothing covers their clicks — a suite that tests it sets KB_START_RELAX=1.
+    start_open: (() => { const sr = (env("START_RELAX") || "").trim(); return sr === "1" || (sr !== "0" && (env("PURPOSE_ASK") || "").trim() !== "0"); })(),
+    start_relax: (env("START_RELAX") || "").trim() === "1",
     over_user_limit: (() => { const { userLimitExceeded } = require(`${__hooks}/helpers.js`);
       return userLimitExceeded($app); })(),
     // strop tarifu, na který zkušebka překlápí — ať jde varovat před nákupem

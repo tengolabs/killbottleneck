@@ -50,6 +50,18 @@ H.beh(async () => {
   expect(!!(await dialog(page)), 'po uložení účelu naskočil dialog „Připoj svého AI agenta"');
   const text = await page.evaluate(() => document.querySelector('[data-testid="agent-setup-dialog"]').innerText);
   expect(/Připoj svého AI agenta/.test(text), 'titulek česky');
+  // Richard 16. 11. 2026: for most people the dialog was scary → say up front that closing is fine, big coloured Close
+  expect(/Nemáš AI agenta nebo nevíš, co to je\? Nevadí/.test(text), 'uklidnění: bez agenta okno klidně zavřete');
+  {
+    const m = await page.evaluate(() => {
+      const d = document.querySelector('[data-testid="agent-setup-dialog"]').getBoundingClientRect();
+      const z = document.querySelector('[data-testid="agent-setup-skip"]'), k = document.querySelector('[data-testid="agent-setup-copy"]');
+      const r = z.getBoundingClientRect(), bg = (el) => getComputedStyle(el).backgroundColor;
+      return { text: z.textContent.trim(), h: r.height, w: r.width, dw: d.width, bgZ: bg(z), bgK: bg(k) };
+    });
+    expect(m.text === 'Zavřít' && m.h >= 44 && m.w >= m.dw * 0.45 && m.bgZ !== m.bgK && !/rgba\(0, 0, 0, 0\)/.test(m.bgZ),
+      `velké barevné tlačítko Zavřít (${m.text}, ${Math.round(m.w)}×${Math.round(m.h)} px z ${Math.round(m.dw)}, ${m.bgZ} vs Zkopírovat ${m.bgK})`);
+  }
   expect(!/\b(title|description|copyLabel|agent\.)\b/.test(text), 'žádné syrové i18n klíče');
   const radek = await page.$eval('[data-testid="agent-setup-line"]', (el) => el.textContent);
   // Richard 13. 10.: řádek v jazyce uživatele — anglický řádek v české appce = agent odpovídá anglicky
@@ -80,7 +92,7 @@ H.beh(async () => {
   await page.waitForSelector('[data-testid="menu-connect-agent"]', { timeout: 5000 });
   await page.click('[data-testid="menu-connect-agent"]');
   await page.waitForSelector('[data-testid="agent-setup-dialog"]', { timeout: 10000 });
-  expect(!(await page.$('[data-testid="agent-setup-skip"]')), 'z menu bez „Zatím přeskočit" (není co přeskakovat)');
+  expect(!(await page.$('[data-testid="agent-setup-skip"]')), 'z menu bez velkého Zavřít (přišel si pro to, hlavní je Zkopírovat)');
   await page.keyboard.press('Escape');
   await sleep(400);
   expect(!(await dialog(page)), 'Escape zavře dialog z menu');
@@ -94,7 +106,7 @@ H.beh(async () => {
   expect(!(await p2.$('[data-testid="purpose-dialog"]')), 'člen dotazník účelu nevidí, dialog agenta ano');
   await p2.click('[data-testid="agent-setup-skip"]');
   await sleep(600);
-  expect(!(await dialog(p2)), 'Zatím přeskočit zavřelo');
+  expect(!(await dialog(p2)), 'Zavřít zavřelo');
   await p2.reload({ waitUntil: 'networkidle2' });
   await sleep(1500);
   expect(!(await dialog(p2)), 'po přeskočení už se neukáže');

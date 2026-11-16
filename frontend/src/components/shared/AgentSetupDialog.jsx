@@ -19,6 +19,9 @@ import { useLazyNs } from '@/i18n/lazyNs';
 // (Přeskočit, Hotovo, Escape, klik mimo) zapíše users.agent_setup_seen; dialog zůstává
 // trvale v menu pod jménem (UserMenu, fromMenu=true → příznak se neřeší).
 // Načítá se LÍNĚ (viz PurposeGate) kvůli stropu balíčku /lite (lite-bundle.js).
+// Owner 16 Nov 2026: for most people the dialog was scary ("what is this?") → after the first login it says up front
+// that closing is fine without an agent, and the big coloured button is Close; Copy is the secondary one. Opened
+// from the menu (the person came for it) it keeps Copy as the main action.
 export default function AgentSetupDialog({ open = true, onClose, fromMenu = false }) {
   const nsReady = useLazyNs('agent');
   const { t, i18n } = useTranslation('agent');
@@ -62,6 +65,12 @@ export default function AgentSetupDialog({ open = true, onClose, fromMenu = fals
           <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
 
+        {!fromMenu && (
+          <p className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-2.5 text-sm font-medium" data-testid="agent-setup-not-sure">
+            {t('notSure')}
+          </p>
+        )}
+
         <div className="rounded-lg border bg-secondary/40 p-3 space-y-2">
           <p className="text-xs text-muted-foreground">{t('copyLabel')}</p>
           <div className="flex items-center gap-2">
@@ -76,21 +85,24 @@ export default function AgentSetupDialog({ open = true, onClose, fromMenu = fals
           </p>
         </div>
 
-        <div className="flex items-center justify-between pt-1 gap-3">
-          {fromMenu ? (
-            <span className="text-xs text-muted-foreground" />
-          ) : (
-            <button type="button" className="text-xs text-muted-foreground underline underline-offset-2" onClick={close} data-testid="agent-setup-skip" title={t('later')}>
-              {t('skip')}
-            </button>
-          )}
-          {copied ? (
-            <Button onClick={close} data-testid="agent-setup-done"><Check className="w-4 h-4 mr-1" /> {t('done')}</Button>
-          ) : (
-            <Button onClick={copy} data-testid="agent-setup-copy"><Copy className="w-4 h-4 mr-1" /> {t('copy')}</Button>
-          )}
-        </div>
-        {!fromMenu && <p className="text-[11px] text-muted-foreground -mt-2">{t('later')}</p>}
+        {fromMenu ? (
+          <div className="flex items-center justify-end pt-1 gap-3">
+            {copied ? (
+              <Button onClick={close} data-testid="agent-setup-done"><Check className="w-4 h-4 mr-1" /> {t('done')}</Button>
+            ) : (
+              <Button onClick={copy} data-testid="agent-setup-copy"><Copy className="w-4 h-4 mr-1" /> {t('copy')}</Button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-stretch gap-3 pt-1">
+            {copied ? (
+              <Button variant="outline" className="h-12" onClick={close} data-testid="agent-setup-done"><Check className="w-4 h-4 mr-1" /> {t('done')}</Button>
+            ) : (
+              <Button variant="outline" className="h-12" onClick={copy} data-testid="agent-setup-copy"><Copy className="w-4 h-4 mr-1" /> {t('copy')}</Button>
+            )}
+            <Button className="h-12 flex-1 text-base font-semibold" onClick={close} data-testid="agent-setup-skip" autoFocus>{t('close')}</Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

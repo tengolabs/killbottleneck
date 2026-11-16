@@ -4,14 +4,16 @@
 // the duration and the score bounds are decided by the server. Personal data: the owner only.
 //
 //   POST /api/kb/brain/start    { game, level, tzOffset }      → { id, day }
-//   POST /api/kb/brain/finish   { id, won, score, durationMs } → { ok, summary }
-//   GET  /api/kb/brain/summary?tzOffset=60                     → summary (today, streak, bests, last30)
+//   POST /api/kb/brain/finish   { id, won, score, durationMs, tzOffset, hints? } → { ok, summary }
+//   The round's `day` is the local day of the FINISH (a game of the day opened at 23:59 and finished at 0:01 counts for
+//   the new day — functionality checkup 16 Nov 2026); /start writes a provisional day for unfinished rounds.
+//   GET  /api/kb/brain/summary?tzOffset=60                     → summary (game of the day, bonus, week, streak, bests, last30)
 
 
 routerAdd("POST", "/api/kb/brain/start", (e) => {
   const B = require(`${__hooks}/brain.js`);
   const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
-  if (minuteLimitHit($app.store(), "brain:start:" + e.auth.id, 60)) return e.json(429, { error: "Too many requests" });
+  if (minuteLimitHit($app.store(), "brain:start:" + e.auth.id, B.ROUNDS_PER_MINUTE)) return e.json(429, { error: "Too many requests" });
   const v = B.validateStart(e.requestInfo().body);
   if (v.error) return e.json(400, { error: v.error });
   const now = Date.now();
@@ -35,7 +37,7 @@ routerAdd("POST", "/api/kb/brain/start", (e) => {
 routerAdd("POST", "/api/kb/brain/finish", (e) => {
   const B = require(`${__hooks}/brain.js`);
   const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
-  if (minuteLimitHit($app.store(), "brain:finish:" + e.auth.id, 60)) return e.json(429, { error: "Too many requests" });
+  if (minuteLimitHit($app.store(), "brain:finish:" + e.auth.id, B.ROUNDS_PER_MINUTE)) return e.json(429, { error: "Too many requests" });
   const body = e.requestInfo().body || {};
   const id = String(body.id || "");
   if (!/^[a-z0-9]{1,32}$/i.test(id)) return e.json(400, { error: "bad id" });
@@ -50,12 +52,19 @@ routerAdd("POST", "/api/kb/brain/finish", (e) => {
       // someone else's round looks exactly like a missing one
       if (!rec || rec.getString("user") !== e.auth.id) { status = 404; out = { error: "Not found" }; return; }
       if (rec.getString("finished")) { status = 409; out = { error: "already finished" }; return; }
-      const v = B.validateFinish(body, Date.parse(rec.getString("started")), now);
+      const v = B.validateFinish(body, Date.parse(rec.getString("started")), now, rec.getString("game"));
       if (v.error) { status = 400; out = { error: v.error }; return; }
       rec.set("finished", new Date(now).toISOString());
       rec.set("won", v.won);
       rec.set("score", v.score);
       rec.set("duration_ms", v.durationMs);
+      rec.set("hints", v.hints);
+      // without tzOffset (an old client) the day of the start stays
+      const hasTz = body.tzOffset !== undefined && body.tzOffset !== null && body.tzOffset !== "";
+      const day = hasTz ? B.localDay(now, B.clampTz(body.tzOffset)) : rec.getString("day");
+      rec.set("day", day);
+      rec.set("daily", B.dailyGame(e.auth.id, day) === rec.getString("game"));
+      rec.set("rules", B.RULES_VERSION);
       tx.save(rec);
     });
   } catch (err) {
@@ -64,7 +73,7 @@ routerAdd("POST", "/api/kb/brain/finish", (e) => {
   }
   if (status !== 200) return e.json(status, out);
   const tz = B.clampTz(body.tzOffset);
-  return e.json(200, { ok: true, summary: B.buildSummary(B.rowsOf($app, e.auth.id), now, tz) });
+  return e.json(200, { ok: true, summary: B.buildSummary(B.statsOf($app, e.auth.id, now, tz), now, tz, e.auth.id) });
 }, $apis.requireAuth(), $apis.bodyLimit(16 * 1024));
 
 routerAdd("GET", "/api/kb/brain/summary", (e) => {
@@ -72,5 +81,6 @@ routerAdd("GET", "/api/kb/brain/summary", (e) => {
   const { minuteLimitHit } = require(`${__hooks}/helpers.js`);
   if (minuteLimitHit($app.store(), "brain:summary:" + e.auth.id, 120)) return e.json(429, { error: "Too many requests" });
   const tz = B.clampTz(e.request.url.query().get("tzOffset"));
-  return e.json(200, B.buildSummary(B.rowsOf($app, e.auth.id), Date.now(), tz));
+  const now = Date.now();
+  return e.json(200, B.buildSummary(B.statsOf($app, e.auth.id, now, tz), now, tz, e.auth.id));
 }, $apis.requireAuth());

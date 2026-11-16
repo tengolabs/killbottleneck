@@ -1,11 +1,18 @@
 {
   "title": "Brain training",
   "loading": "Loading…",
-  "todayTitle": "Today's training",
-  "todayHint": "{{done}} of {{total}} tasks done. One round of each game a day is enough.",
-  "todayDone": "Today's set is complete. Great work!",
-  "todayShort": "Today {{done}}/{{total}}",
-  "streakTitle": "Days in a row with at least one finished task",
+  "todayTitle": "Game of the day",
+  "todayHint": "One finished round completes today and keeps your streak going.",
+  "todayDone": "Game of the day done. Every other game is a bonus.",
+  "todayShort": "Game of the day ✓",
+  "todayShortOpen": "Game of the day: {{game}}",
+  "bonusLabel": "+{{count}} bonus",
+  "bonusTitle": "Other games finished today",
+  "weekTitle": "This week",
+  "weekHint": "{{done}} of {{total}} different games since Monday",
+  "weekDone": "Week complete – all {{total}} games!",
+  "weekShort": "Week {{done}}/{{total}}",
+  "streakTitle": "Days in a row with the game of the day finished",
   "streakLabel": "days in a row",
   "streakOneDay": "day in a row",
   "level": "Level",
@@ -25,6 +32,8 @@
   "resultWon": "Done!",
   "resultLost": "Not this time.",
   "privacy": "Only you see your results. No leaderboard, nothing in the organisation.",
+  "moreGames": "More games",
+  "moreHint": "Each one you finish is today's bonus and counts towards the week.",
   "game": {
     "mines": "Minesweeper",
     "memory": "Pairs",
@@ -32,7 +41,11 @@
     "math": "Quick arithmetic",
     "stroop": "Colours",
     "sudoku": "Sudoku",
-    "clock": "Clock"
+    "clock": "Clock",
+    "maze": "Maze",
+    "sequence": "Sequence",
+    "anagram": "Anagrams",
+    "missing": "What's missing"
   },
   "skillLogic": "logic and decisions",
   "skillMemory": "memory",
@@ -40,9 +53,19 @@
   "skillSpeed": "processing speed",
   "skillFocus": "concentration",
   "skillOrientation": "orientation in time",
+  "skillSpatial": "spatial orientation",
   "unit": {
-    "guesses": " guesses",
-    "correct": " correct",
-    "points": " pts"
+    "guesses_one": " guess",
+    "guesses_few": " guesses",
+    "guesses_other": " guesses",
+    "correct_one": " correct",
+    "correct_few": " correct",
+    "correct_other": " correct",
+    "points_one": " pt",
+    "points_few": " pts",
+    "points_other": " pts",
+    "steps_one": " step",
+    "steps_few": " steps",
+    "steps_other": " steps"
   }
 }

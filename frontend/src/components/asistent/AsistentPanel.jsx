@@ -352,21 +352,20 @@ export default function AsistentPanel({ lite = false }) {
   // čas pauzy pro hlídač zapisuje AsistentContext.spustRelax (i pro relax od modelu); obal jen schová nabídku
   const spustRelax = useCallback((o) => { setRelaxNabidka(false); panel.spustRelax(o || {}); }, [setRelaxNabidka, panel]);
   const odmitniRelax = () => setRelaxNabidka(false); // `nabidnuto` už je zapsané → příště nejdřív za hodinu
-  // Start aplikace (Richard 25. 10. 2026: „po spuštění aplikace jako default akvárko a asistent otevřený“; nahrazuje ranní
-  // akvárium z 15. 10.): jednou za kartu prohlížeče (sessionStorage — po zavření akvárka ho F5 nevrátí, nová karta ano)
-  // otevře panel a spustí akvárium vedle chatu bez odpočtu. Jen plná aplikace na širokém okně, ne když relax běží;
-  // config.start_relax (KB_START_RELAX=0) to vypne.
+  // App start, once per browser tab (sessionStorage — F5 does not repeat it, a new tab does): the assistant panel opens
+  // (config.start_open). The aquarium beside it only when the operator wants it (config.start_relax, KB_START_RELAX=1) —
+  // owner 16 Nov 2026: "the aquarium on start was too aggressive, only the assistant". Full app on a wide window only.
   const { config: kbConfig } = useKbConfig();
   const startRef = useRef(false);
   useEffect(() => {
-    if (startRef.current || lite || !ready || !dostupny || mobil || !kbConfig || kbConfig.start_relax === false) return;
+    if (startRef.current || lite || !ready || !dostupny || mobil || !kbConfig || !(kbConfig.start_open || kbConfig.start_relax)) return;
     startRef.current = true;
     // relax už běží (stav v localStorage je společný pro karty) = start je vyřízený; jinak by se po zavření hned znovu otevřel (/checkup 25. 10.)
     let uz = false; try { uz = sessionStorage.getItem(KEY_START_RELAX) === '1'; } catch { uz = false; }
     if (uz || panel.relax) { try { sessionStorage.setItem(KEY_START_RELAX, '1'); } catch { /* nic */ } return; }
     try { sessionStorage.setItem(KEY_START_RELAX, '1'); } catch { /* bez úložiště jen tentokrát */ }
     if (!A.open) A.setOpen(true);
-    spustRelax({ scena: 'akvarium', minut: 0, rozlozeni: 'vedle' });
+    if (kbConfig.start_relax) spustRelax({ scena: 'akvarium', minut: 0, rozlozeni: 'vedle' });
     // závislosti záměrně jen stráže: běží nejvýš jednou (startRef)
   }, [lite, ready, dostupny, mobil, panel.relax, kbConfig]);
 

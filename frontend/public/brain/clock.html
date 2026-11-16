@@ -238,7 +238,7 @@ body.paused #pause-tag { display:flex; }
 'use strict';
 // ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
 // Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
-// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+// Web Audio only, no files. `sfx.enabled` is stored in localStorage (key: brain-sound); the word games also keep their deck there (words.js).
 const sfx = {
   ctx: null,
   enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
@@ -607,7 +607,7 @@ function setPaused(p) {
   else if (S.pauseAt) { S.startAt += Date.now() - S.pauseAt; S.pauseAt = 0; }
 }
 window.addEventListener('message', (e) => {
-  if (e.origin !== location.origin || !e.data || e.data.type !== 'kb-brain') return;
+  if (e.origin !== location.origin || (e.source !== window.parent && e.source !== window) || !e.data || e.data.type !== 'kb-brain') return;
   switch (e.data.action) {
     case 'pause': setPaused(true); break;
     case 'resume': setPaused(false); break;

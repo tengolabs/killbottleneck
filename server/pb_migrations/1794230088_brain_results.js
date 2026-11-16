@@ -5,14 +5,15 @@
 // can read the table like any other — personal data of the instance); deleting the account deletes the
 // rows (cascade) and "Download all my data" exports them.
 //
-//   game        text    'mines' | 'memory' | 'word' | 'math' | 'stroop' | 'sudoku' | 'clock'
+//   game        text    a game id of GAMES in pb_hooks/brain.js (7 games in v1.3.0, 11 from v1.4.0)
 //   level       number  1-based difficulty
 //   started     date    set by /start; `finished` empty = round abandoned
 //   finished    date    set by /finish
 //   won         bool    round completed successfully (timed games: always true when finished)
 //   score       number  game-specific (seconds, guesses, correct answers — see components/brain/README.md)
 //   duration_ms number  capped by the server to now − started
-//   day         text    YYYY-MM-DD, the user's local day at /start (tzOffset from the client, clamped)
+//   day         text    YYYY-MM-DD, the user's local day (tzOffset from the client, clamped; at /finish from v1.4.0)
+//   daily, rules        added by 1794620000_brain_results_daily (v1.4.0)
 migrate((app) => {
   const usersId = app.findCollectionByNameOrId("users").id;
   let col;

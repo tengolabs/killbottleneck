@@ -46,7 +46,7 @@ export default function BrainLayer({ lite = false }) {
   const L = useZoneLayout({ lite, layout: b && b.layout === 'vedle' ? 'side' : 'full', underPanelHeader: true });
   const lang = /^en/.test(i18n.language || '') ? 'en' : 'cs';
 
-  // summary from the server (today's set, streak, bests)
+  // summary from the server (game of the day, bonus, week, streak, bests)
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const refresh = useCallback(() => {
@@ -54,6 +54,17 @@ export default function BrainLayer({ lite = false }) {
     loadSummary().then((s) => { setSummary(s); setLoading(false); }, () => setLoading(false));
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
+  // a hub left open across midnight: the game of the day changes with the local day → reload the summary
+  const summaryDay = summary && summary.today ? summary.today.day : '';
+  useEffect(() => {
+    if (!summaryDay) return undefined;
+    const pad = (n) => String(n).padStart(2, '0');
+    const id = setInterval(() => {
+      const d = new Date();
+      if (`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` !== summaryDay) refresh();
+    }, 60000);
+    return () => clearInterval(id);
+  }, [summaryDay, refresh]);
 
   // the open round: { id, game, level } — the iframe is keyed by game+level so a level change reloads it
   const game = b && gameMeta(b.game) ? b.game : '';
@@ -69,6 +80,14 @@ export default function BrainLayer({ lite = false }) {
   const [loaded, setLoaded] = useState(false);
   const [last, setLast] = useState(null); // last finished result (shown as a bar under the game)
   const iframe = useRef(null);
+  // the keyboard belongs to the game (maze arrows, sudoku digits…) — otherwise keys stay in the app behind the
+  // iframe until the player clicks into the game; given on load and after our own toolbar buttons (full screen)
+  const focusGame = useCallback(() => {
+    // …but never from someone typing in the app meanwhile (the chat next to the zone: a field must not swallow typing)
+    const a = document.activeElement;
+    if (a && a !== iframe.current && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;
+    try { if (iframe.current) { iframe.current.focus({ preventScroll: true }); iframe.current.contentWindow.focus(); } } catch { /* gone */ }
+  }, []);
   // sequence number: a late answer of an OLDER /start (level changed meanwhile) must not become the open round
   const roundSeq = useRef(0);
   const openRound = useCallback((g, lvl) => {
@@ -108,7 +127,7 @@ export default function BrainLayer({ lite = false }) {
       if (e.origin !== window.location.origin || !e.data || e.data.type !== 'kb-brain') return;
       if (!iframe.current || e.source !== iframe.current.contentWindow) return;
       const d = e.data;
-      if (d.event === 'ready') { setLoaded(true); return; }
+      if (d.event === 'ready') { setLoaded(true); focusGame(); return; }
       if (d.event === 'close') { leaveGame(); return; }
       // the player picked a level inside the game: the hub takes it over and reloads the game at that level
       if (d.event === 'level') {
@@ -119,7 +138,7 @@ export default function BrainLayer({ lite = false }) {
       if (d.event !== 'result' || !game) return;
       const r = round.current;
       round.current = null;
-      const res = { game, level, won: !!d.won, score: Number(d.score) || 0, durationMs: Number(d.durationMs) || 0 };
+      const res = { game, level, won: !!d.won, score: Number(d.score) || 0, durationMs: Number(d.durationMs) || 0, hints: Number(d.hints) || 0 };
       const done = r && r.game === game && r.level === level ? finishRound(r.id, res) : Promise.reject(new Error('no open round'));
       done.then((out) => { if (out && out.summary) setSummary(out.summary); }, () => refresh());
       setLast(res);
@@ -127,7 +146,7 @@ export default function BrainLayer({ lite = false }) {
     };
     window.addEventListener('message', f);
     return () => window.removeEventListener('message', f);
-  }, [game, level, b, openRound, refresh, updateBrain, leaveGame]);
+  }, [game, level, b, openRound, refresh, updateBrain, leaveGame, focusGame]);
 
   // browser full screen (from the layer, not the iframe); Esc leaves it, the zone stays
   const [fsBrowser, setFsBrowser] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
@@ -137,10 +156,11 @@ export default function BrainLayer({ lite = false }) {
       const fs = !!document.fullscreenElement;
       setFsBrowser(fs);
       if (!fs && backToSide) updateBrain({ layout: 'vedle', zpet: '' });
+      setTimeout(focusGame, 0);
     };
     document.addEventListener('fullscreenchange', f);
     return () => document.removeEventListener('fullscreenchange', f);
-  }, [backToSide, updateBrain]);
+  }, [backToSide, updateBrain, focusGame]);
   const toggleFsBrowser = useCallback(() => {
     try {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -171,7 +191,7 @@ export default function BrainLayer({ lite = false }) {
           <span className="flex-1" />
           {A.dostupny && (side
             // on a phone the zone already fills the screen under the assistant's header bar, and that bar must stay visible → no full-screen toggle there
-            ? (L.above ? null : <Tool onClick={() => updateBrain({ layout: 'cela', zpet: 'vedle' })} title={t('layoutFull')} testid="brain-rozlozeni" active><Maximize2 className="h-4 w-4" /></Tool>)
+            ? (L.above ? null : <Tool onClick={() => { updateBrain({ layout: 'cela', zpet: 'vedle' }); setTimeout(focusGame, 0); }} title={t('layoutFull')} testid="brain-rozlozeni" active><Maximize2 className="h-4 w-4" /></Tool>)
             : chatOpen
               ? <Tool onClick={showChat} title={t(L.narrow || lite ? 'layoutAbove' : 'layoutSide')} testid="brain-rozlozeni"><Columns2 className="h-4 w-4" /></Tool>
               // the assistant panel is closed (collapsed on a phone / lite, closed on a computer): the zone fills the window and
@@ -203,9 +223,9 @@ export default function BrainLayer({ lite = false }) {
               <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center px-2">
                 <div className="pointer-events-auto flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border bg-card/95 px-3 py-1.5 text-xs shadow-lg backdrop-blur" data-testid="brain-vysledek" data-won={last.won ? '1' : '0'}>
                   <span className="font-medium">{last.won ? t('resultWon') : t('resultLost')}</span>
-                  <span>{t('score')}: <b className="tabular-nums">{formatScore(game, last.score)}{unitLabel(t, game)}</b></span>
-                  {best !== undefined && <span className="text-muted-foreground">{t('best')}: {formatScore(game, best)}{unitLabel(t, game)}</span>}
-                  {summary && <span className="text-muted-foreground" data-testid="brain-vysledek-dnes">{t('todayShort', { done: summary.today.count, total: summary.today.total })}</span>}
+                  <span>{t('score')}: <b className="tabular-nums">{formatScore(game, last.score)}{unitLabel(t, game, last.score)}</b></span>
+                  {best !== undefined && <span className="text-muted-foreground">{t('best')}: {formatScore(game, best)}{unitLabel(t, game, best)}</span>}
+                  {summary && summary.today && <span className="text-muted-foreground" data-testid="brain-vysledek-dnes" data-splneno={summary.today.dailyDone ? '1' : '0'}>{summary.today.dailyDone ? t('todayShort') : t('todayShortOpen', { game: t(`game.${summary.today.game}`) })}{summary.today.bonus > 0 ? ` · ${t('bonusLabel', { count: summary.today.bonus })}` : ''}{summary.week ? ` · ${t('weekShort', { done: summary.week.count, total: summary.week.total })}` : ''}</span>}
                   <button type="button" onClick={leaveGame} className="rounded-md border px-2 py-0.5 hover:bg-secondary" data-testid="brain-vysledek-zpet">{t('backToList')}</button>
                 </div>
               </div>

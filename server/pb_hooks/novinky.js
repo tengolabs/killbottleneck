@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.4.0": {
+    cs: [
+      "K sedmi hrám v Tréninku mozku přibyly čtyři: Bludiště (švihem prstu nebo šipkami), Posloupnost (zopakujte rostoucí řadu barev a tónů), Přesmyčky (slova z přeházených písmen, podle úrovně 5, 6 nebo 7 písmen) a Co chybí (devět obrázků, pak osm — který zmizel?).",
+      "Místo celé sady je každý den jedna hra dne. Dohraná hra dne prodlouží sérii, každá další hra je bonus a řádek Tento týden ukazuje, kolik různých her jste od pondělí zahráli — všech jedenáct je splněný týden.",
+      "Slova ve hrách se neopakují, dokud neprojdete celý seznam, a bludiště začíná pokaždé v jiném rohu.",
+      "Po spuštění aplikace se otevře jen asistent, akvárium je o klepnutí dál (🐟 v hlavičce panelu).",
+      "Okno „Připoj svého AI agenta“ hned říká, že kdo agenta nemá, ho klidně zavře — velkým tlačítkem Zavřít.",
+    ],
+    en: [
+      "Brain training gets four more games: Maze (swipe or use the arrow keys), Sequence (repeat a growing sequence of colours and tones), Anagrams (words from shuffled letters, 5, 6 or 7 letters by level) and What's missing (nine pictures, then eight — which one is gone?).",
+      "Instead of a whole set there is one game of the day. Finishing it keeps your streak, every other game is a bonus, and the This week row shows how many different games you played since Monday — all eleven make a complete week.",
+      "Words in the games don't repeat until you have gone through the whole list, and the maze starts in a different corner every time.",
+      "On app start only the assistant opens; the aquarium is one tap away (🐟 in the panel header).",
+      "The \"Connect your AI agent\" window says right away that anyone without an agent can just close it — with a big Close button.",
+    ],
+  },
   "v1.3.0": {
     cs: [
       "Nová zóna Trénink mozku: mozek 🧠 v hlavičce asistenta (nebo slovo „hlavolam“ v chatu) otevře denní sadu sedmi her — hledání min, pexeso, slovo na 5 písmen, rychlé počty, barvy, sudoku a hodiny. Každá cvičí jinou schopnost.",

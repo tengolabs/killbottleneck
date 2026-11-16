@@ -1,5 +1,5 @@
 // Brain training zone 🧠 (9 Nov 2026) — click suite (Puppeteer) against a MOCKED ollama: the word "hlavolam" opens the hub
-// next to the chat without the model, 7 cards + today's set + streak, a level choice, a game loads in an iframe and a finished
+// next to the chat without the model, 11 cards (the game of the day + 10 more) + bonus, week and streak, a level choice, a game loads in an iframe and a finished
 // round (debug API of the game) is stored on the server (card ticked, streak 1), relax and brain exclude each other, layout
 // toggle, the chat stays usable next to the zone, preferences survive F5 (the open game does not), phone = above the chat,
 // every game file is served by the instance and passes its own self-test, console clean.
@@ -15,7 +15,7 @@ const mockHandler = (req, res, body) => {
   const o = fronta.shift() || text('(empty queue)');
   res.end(JSON.stringify({ message: { role: 'assistant', content: o.content || '' }, prompt_eval_count: 100, eval_count: 20, done: true }));
 };
-const GAMES = ['mines', 'memory', 'word', 'math', 'stroop', 'sudoku', 'clock'];
+const GAMES = ['mines', 'memory', 'word', 'math', 'stroop', 'sudoku', 'clock', 'maze', 'sequence', 'anagram', 'missing'];
 
 H.beh(async () => {
   const mock = await H.httpMock(mockHandler);
@@ -31,6 +31,15 @@ H.beh(async () => {
   const textOf = (sel) => page.evaluate((s) => document.querySelector(s)?.textContent || '', sel);
   const napis = async (s) => { await page.click('[data-testid="chat-input"]'); await page.keyboard.type(s); await page.keyboard.press('Enter'); };
   const hraFrame = () => page.frames().find((f) => /\/brain\/[a-z]+\.html/.test(f.url()));
+  // a game card may sit under "More games" below the fold, and the hub re-renders when the summary arrives →
+  // wait for the card, bring it to the middle, then click
+  const hrat = async (id) => {
+    const sel = `[data-testid="brain-hrat-${id}"]`;
+    await page.waitForSelector(sel, { timeout: 10000 });
+    await page.$eval(sel, (e) => e.scrollIntoView({ block: 'center' }));
+    await sleep(250);
+    await page.click(sel);
+  };
   const klic = `kb-brain:${me.id}`;
 
   console.log('== the word "hlavolam" opens the hub next to the chat, no model ==');
@@ -46,9 +55,21 @@ H.beh(async () => {
   expect(await cekej('[data-testid="brain-vrstva"][data-rozlozeni="vedle"][data-hra="hub"]', 10000), 'hub opened next to the chat');
   expect(fronta.length === volaniPred, 'the word did not reach the model (no request consumed)');
   expect(await cekej('[data-testid="brain-souhrn"][data-nacteno="1"]', 10000), 'summary loaded from the server');
-  expect((await page.$$('[data-testid^="brain-karta-"]')).length === 7, '7 game cards');
+  // the game of the day = one of the 11, picked by the server for this user and day (the same pick the hub got)
+  const tz = await page.evaluate(() => -new Date().getTimezoneOffset());
+  const hraDne = (await inst.api('GET', `/api/kb/brain/summary?tzOffset=${tz}`, { token: A })).json.today.game;
+  const minyDne = hraDne === 'mines';
+  expect(GAMES.includes(hraDne), `the server picked a game of the day (${hraDne})`);
+  expect((await page.$$('[data-testid^="brain-karta-"]')).length === 11, '11 game cards');
+  const kartyDnes = await page.$$eval('[data-testid="brain-karty"] [data-testid^="brain-karta-"]', (els) => els.map((e) => e.dataset.testid.replace('brain-karta-', '')));
+  const kartyDalsi = await page.$$eval('[data-testid="brain-karty-dalsi"] [data-testid^="brain-karta-"]', (els) => els.map((e) => e.dataset.testid.replace('brain-karta-', '')));
+  expect(kartyDnes.join() === hraDne && kartyDalsi.length === 10 && !kartyDalsi.includes(hraDne),
+    `the game of the day on top, the other 10 under "More games" (${kartyDnes.join()} | ${kartyDalsi.join()})`);
+  expect(/Další hry/.test(await textOf('[data-testid="brain-dalsi"]')), 'the second group is titled "Další hry"');
   expect((await atr('[data-testid="brain-serie"]', 'data-serie')) === '0', 'streak 0');
-  expect(/0 ze 7/.test(await textOf('[data-testid="brain-dnes"]')), `today 0 of 7 (${await textOf('[data-testid="brain-dnes"]')})`);
+  expect((await atr('[data-testid="brain-dnes"]', 'data-splneno')) === '0' && /Hra dne/.test(await textOf('[data-testid="brain-souhrn"]')), `game of the day not done yet (${await textOf('[data-testid="brain-souhrn"]')})`);
+  expect(!(await page.$('[data-testid="brain-bonus"]')), 'no bonus yet');
+  expect((await atr('[data-testid="brain-tyden"]', 'data-tyden')) === '0' && /0 z 11/.test(await textOf('[data-testid="brain-tyden-text"]')), `week 0 of 11 (${await textOf('[data-testid="brain-tyden-text"]')})`);
   expect(await cekej('[data-testid="chat-brain-toggle"][aria-pressed="true"]'), 'toggle 🧠 is on');
   expect((await page.evaluate(() => document.querySelector('[data-testid="chat-input"]')?.value)) === '', 'input emptied');
   {
@@ -65,7 +86,7 @@ H.beh(async () => {
   await page.click('[data-testid="brain-uroven-mines-2"]');
   expect(await cekej('[data-testid="brain-uroven-mines-2"][aria-pressed="true"]'), 'level 2 chosen');
   expect(!!(await page.$('[data-testid="brain-uroven-mines-4"]')), 'on a computer the mines card offers Expert (level 4)');
-  await page.click('[data-testid="brain-hrat-mines"]');
+  await hrat('mines');
   expect(await cekej('[data-testid="brain-vrstva"][data-hra="mines"][data-uroven="2"]'), 'mines open at level 2');
   const src = await atr('[data-testid="brain-iframe"]', 'src');
   expect(/\/brain\/mines\.html\?embed=1&lang=cs&level=2&theme=(light|dark)&v=\d+$/.test(src), `iframe src (${src})`);
@@ -84,7 +105,11 @@ H.beh(async () => {
   expect(!!fr && (await fr.evaluate(() => typeof window.brainGame === 'object')), 'debug API available');
   await fr.evaluate(() => window.brainGame.finish({ won: true }));
   expect(await cekej('[data-testid="brain-vysledek"][data-won="1"]', 10000), 'result bar: done');
-  expect(/1\/7/.test(await textOf('[data-testid="brain-vysledek-dnes"]')), `result bar shows today 1/7 (${await textOf('[data-testid="brain-vysledek-dnes"]')})`);
+  {
+    await page.waitForFunction(() => /Týden 1\/11/.test(document.querySelector('[data-testid="brain-vysledek-dnes"]')?.textContent || ''), { timeout: 10000 }).catch(() => {});
+    const bar = await textOf('[data-testid="brain-vysledek-dnes"]');
+    expect((minyDne ? /Hra dne ✓/.test(bar) : /Hra dne: /.test(bar) && /\+1 bonus/.test(bar)) && /Týden 1\/11/.test(bar), `result bar: game of the day / bonus / week (${bar})`);
+  }
   await sleep(500);
   rows = (await inst.api('GET', '/api/collections/brain_results/records?perPage=50', { token: A })).json.items;
   const hotove = rows.filter((r) => r.finished);
@@ -92,12 +117,34 @@ H.beh(async () => {
   expect(rows.length === 2, 'the next round of the same game was opened right away (the game\'s own "play again" does not ask the hub)');
   await page.click('[data-testid="brain-vysledek-zpet"]');
   expect(await cekej('[data-testid="brain-karta-mines"][data-hotovo="1"]'), 'back in the hub: mines ticked for today');
-  expect((await atr('[data-testid="brain-serie"]', 'data-serie')) === '1', 'streak 1');
-  expect(/1 ze 7/.test(await textOf('[data-testid="brain-dnes"]')), 'today 1 of 7');
+  expect((await atr('[data-testid="brain-serie"]', 'data-serie')) === (minyDne ? '1' : '0'), `streak ${minyDne ? 1 : 0} (mines ${minyDne ? 'are' : 'are not'} the game of the day)`);
+  expect((await atr('[data-testid="brain-dnes"]', 'data-splneno')) === (minyDne ? '1' : '0'), 'the game of the day done only when it was mines');
+  expect(minyDne ? !(await page.$('[data-testid="brain-bonus"]')) : (await atr('[data-testid="brain-bonus"]', 'data-bonus')) === '1', 'another game than the game of the day = +1 bonus');
+  expect((await atr('[data-testid="brain-tyden"]', 'data-tyden')) === '1' && (await atr('[data-testid="brain-tyden-mines"]', 'data-hotovo')) === '1', 'week 1/11, mines marked in the week row');
   expect(/0:00/.test(await textOf('[data-testid="brain-nejlepsi-mines"]')), `best for mines level 2 shown (${await textOf('[data-testid="brain-nejlepsi-mines"]')})`);
 
+  console.log('== the game of the day through the hub: today done, streak 1 ==');
+  if (!minyDne) {
+    await hrat(hraDne);
+    expect(await cekej(`[data-testid="brain-vrstva"][data-hra="${hraDne}"][data-nacteno="1"]`, 20000), `${hraDne} (game of the day) open`);
+    let fd = hraFrame();
+    await fd.evaluate(() => { location.href = location.href + '&debug'; });
+    await sleep(1500);
+    fd = hraFrame();
+    await fd.evaluate(() => window.brainGame.finish({ won: true }));
+    expect(await cekej('[data-testid="brain-vysledek"]', 10000), `${hraDne}: result bar`);
+    // the bar shows at once, the server's new summary follows with the /finish answer
+    await cekej('[data-testid="brain-vysledek-dnes"][data-splneno="1"]', 10000);
+    const bar = await textOf('[data-testid="brain-vysledek-dnes"]');
+    expect(/Hra dne ✓/.test(bar) && /\+1 bonus/.test(bar) && /Týden 2\/11/.test(bar), `result bar after the game of the day (${bar})`);
+    await page.click('[data-testid="brain-vysledek-zpet"]');
+    expect(await cekej(`[data-testid="brain-karta-${hraDne}"][data-hotovo="1"]`), 'game of the day ticked');
+  }
+  expect((await atr('[data-testid="brain-serie"]', 'data-serie')) === '1' && (await atr('[data-testid="brain-dnes"]', 'data-splneno')) === '1', 'game of the day done → streak 1');
+  expect(/Každá další hra je bonus/.test(await textOf('[data-testid="brain-dnes"]')), `done text (${await textOf('[data-testid="brain-dnes"]')})`);
+
   console.log('== level picked inside the game → hub takes it over; app theme switch recolours the game without a restart ==');
-  await page.click('[data-testid="brain-hrat-mines"]');
+  await hrat('mines');
   expect(await cekej('[data-testid="brain-vrstva"][data-hra="mines"][data-uroven="2"][data-nacteno="1"]', 20000), 'mines open again at level 2');
   let fr2 = hraFrame();
   expect(!!fr2 && (await fr2.evaluate(() => document.querySelectorAll('#levels .lvl').length)) === 4, 'the game shows its own 4-level selector');
@@ -147,7 +194,7 @@ H.beh(async () => {
   expect(await cekej('[data-testid="brain-uroven-mines-2"][aria-pressed="true"]'), 'the hub card shows level 2');
 
   console.log('== "how to play" in every game; the word game explains itself; sudoku hint explains first, fills second, free on Easy ==');
-  await page.click('[data-testid="brain-hrat-word"]');
+  await hrat('word');
   expect(await cekej('[data-testid="brain-vrstva"][data-hra="word"][data-nacteno="1"]', 20000), 'word game open');
   let fw = hraFrame();
   const guide = await fw.evaluate(() => (document.querySelector('#guide') || {}).textContent || '');
@@ -174,7 +221,7 @@ H.beh(async () => {
   expect(nonsense.scored === 10 && /^3/.test(nonsense.attempt) && !/slovníku/.test(nonsense.toast), `a made-up word XQZJW is scored like any other guess (${JSON.stringify(nonsense)})`);
   await page.click('[data-testid="brain-zpet"]');
   expect(await cekej('[data-testid="brain-hub"]'), 'back in the hub');
-  await page.click('[data-testid="brain-hrat-sudoku"]');
+  await hrat('sudoku');
   expect(await cekej('[data-testid="brain-vrstva"][data-hra="sudoku"][data-uroven="1"][data-nacteno="1"]', 20000), 'sudoku open at level 1');
   let fs = hraFrame();
   await fs.evaluate(() => { location.href = location.href + '&debug'; });
@@ -235,6 +282,59 @@ H.beh(async () => {
   await page.click('[data-testid="brain-zpet"]');
   expect(await cekej('[data-testid="brain-hub"]'), 'back in the hub');
 
+  console.log('== a phase 2 game through the hub: an anagram round is stored and ticked ==');
+  await hrat('anagram');
+  expect(await cekej('[data-testid="brain-vrstva"][data-hra="anagram"][data-nacteno="1"]', 20000), 'anagram open, the game reported ready');
+  let fa = hraFrame();
+  await fa.evaluate(() => { location.href = location.href + '&debug'; });
+  await sleep(1500);
+  fa = hraFrame();
+  // one hint in the running round → the server stores hints 1 with the result
+  await fa.evaluate(() => document.querySelector('.overlay:not([hidden]) .btn')?.click());
+  await sleep(900);
+  await fa.evaluate(() => document.getElementById('hintBtn').click());
+  await sleep(300);
+  const hintsInGame = await fa.evaluate(() => window.brainGame.state().hints);
+  await fa.evaluate(() => window.brainGame.finish({ won: true }));
+  expect(await cekej('[data-testid="brain-vysledek"][data-won="1"]', 10000), 'anagram: result bar');
+  await sleep(500);
+  const rowsA = (await inst.api('GET', '/api/collections/brain_results/records?perPage=100', { token: A })).json.items;
+  expect(rowsA.some((r) => r.game === 'anagram' && r.finished && r.won), 'anagram: the round is finished on the server');
+  expect(hintsInGame === 1 && rowsA.some((r) => r.game === 'anagram' && r.finished && r.hints === 1), `anagram: the hint used in the game is stored with the round (game ${hintsInGame})`);
+  await page.click('[data-testid="brain-vysledek-zpet"]');
+  expect(await cekej('[data-testid="brain-karta-anagram"][data-hotovo="1"]'), 'anagram ticked in the hub (in or outside today\'s set)');
+
+  console.log('== word games hand out words like a deck: the next anagram rounds share no word ==');
+  {
+    await hrat('anagram');
+    expect(await cekej('[data-testid="brain-vrstva"][data-hra="anagram"][data-nacteno="1"]', 20000), 'anagram open again');
+    let fd = hraFrame();
+    await fd.evaluate(() => { location.href = location.href + '&debug'; });
+    await sleep(1500);
+    fd = hraFrame();
+    const kola = [await fd.evaluate(() => window.brainGame.state().words)];
+    for (let k = 0; k < 3; k++) kola.push(await fd.evaluate(() => { window.brainGame.newGame(); return window.brainGame.state().words; }));
+    const vsechna = kola.flat();
+    const deck = await fd.evaluate(() => { try { return JSON.parse(localStorage.getItem('brain-deck-anagram-cs-1') || 'null'); } catch { return null; } });
+    expect(kola.every((k) => k.length === 10) && new Set(vsechna).size === 40 && !!deck && Array.isArray(deck.used) && deck.used.length >= 40,
+      `4 rounds = 40 different words, the deck is stored in the browser (${new Set(vsechna).size} different, deck ${deck && deck.used && deck.used.length})`);
+    await page.click('[data-testid="brain-zpet"]');
+    expect(await cekej('[data-testid="brain-hub"]'), 'back in the hub after the deck check');
+  }
+
+  console.log('== keyboard goes to the game right after it opens (maze arrows without clicking into it first) ==');
+  await hrat('maze');
+  expect(await cekej('[data-testid="brain-vrstva"][data-hra="maze"][data-nacteno="1"]', 20000), 'maze open, the game reported ready');
+  await sleep(600);
+  const active = await page.evaluate(() => document.activeElement && document.activeElement.tagName);
+  // every direction twice: from the corner start at least one of them is open, so the step counter must move
+  for (const k of ['ArrowRight', 'ArrowRight', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowUp']) { await page.keyboard.press(k); await sleep(200); }
+  await sleep(400);
+  const steps = Number(await hraFrame().$eval('#steps', (e) => e.textContent));
+  expect(active === 'IFRAME' && steps > 0, `maze: real keyboard arrows move the ball straight from the hub (focus ${active}, ${steps} steps)`);
+  await page.click('[data-testid="brain-zpet"]');
+  expect(await cekej('[data-testid="brain-hub"]'), 'back in the hub after the maze');
+
   console.log('== layout: full screen and back; close ==');
   await page.click('[data-testid="brain-rozlozeni"]');
   expect(await cekej('[data-testid="brain-vrstva"][data-rozlozeni="cela"]'), 'full screen');
@@ -259,7 +359,7 @@ H.beh(async () => {
   expect(!(await page.$('[data-testid="relax-vrstva"]')), 'relax closed by brain');
   const prefs = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), klic);
   expect(!!prefs && prefs.levels && prefs.levels.mines === 2 && prefs.layout === undefined, `preferences per account: the levels, not the layout (${JSON.stringify(prefs)})`);
-  await page.click('[data-testid="brain-hrat-sudoku"]');
+  await hrat('sudoku');
   expect(await cekej('[data-testid="brain-vrstva"][data-hra="sudoku"]'), 'sudoku open');
   await page.reload({ waitUntil: 'networkidle2' });
   await sleep(800);
@@ -281,6 +381,26 @@ H.beh(async () => {
     await sleep(300);
     const dbg = await p2.evaluate(() => typeof window.brainGame === 'object' && typeof window.brainGame.finish === 'function' && !/[ěščřžýůťďňĚŠČŘŽÝŮŤĎŇ]/.test(document.body.innerText));
     expect(dbg, `${g}: debug API present, English UI without Czech letters (French accents allowed — mines)`);
+    if (['maze', 'sequence', 'anagram', 'missing'].includes(g)) {
+      // phase 2 games: the hub's pause/resume and a hidden tab both pause, and the game wakes up again (phase 1 checkup bug)
+      const pr = await p2.evaluate(async () => {
+        const send = (action) => window.postMessage({ type: 'kb-brain', action }, location.origin);
+        const wait = () => new Promise((r) => setTimeout(r, 150));
+        // games with a Start card ignore a pause before the round runs (nothing to pause) — start it first
+        const start = document.querySelector('#startBtn'); if (start) { start.click(); await new Promise((r) => setTimeout(r, 1200)); }
+        send('pause'); await wait(); const a = window.brainGame.state().paused;
+        send('resume'); await wait(); const b = window.brainGame.state().paused;
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange')); await wait(); const c = window.brainGame.state().paused;
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+        document.dispatchEvent(new Event('visibilitychange')); await wait();
+        if (window.brainGame.state().paused) { const tag = document.querySelector('#pause-tag, #pauseTag, #pause, .pause-tag'); if (tag) tag.click(); await wait(); }
+        return { a, b, c, d: window.brainGame.state().paused };
+      });
+      expect(pr.a === true && pr.b === false && pr.c === true && pr.d === false, `${g}: pause/resume from the hub, autopause on a hidden tab and waking up (${JSON.stringify(pr)})`);
+    }
     await p2.close();
   }
 
@@ -306,7 +426,7 @@ H.beh(async () => {
     expect(!(await page.$('[data-testid="brain-rozlozeni"]')), 'phone: no full-screen toggle — the bar must stay visible');
     expect(!!(await page.$('[data-testid="brain-uroven-mines-3"]')) && !(await page.$('[data-testid="brain-uroven-mines-4"]')), 'phone: the mines card offers three levels, Expert 30×16 is not among them');
   }
-  await page.click('[data-testid="brain-hrat-sudoku"]');
+  await hrat('sudoku');
   expect(await cekej('[data-testid="brain-vrstva"][data-rozlozeni="nad"][data-hra="sudoku"][data-nacteno="1"]', 20000), 'phone: a game opens in the same place');
   {
     const v = await (await page.$('[data-testid="brain-iframe"]')).boundingBox();
@@ -320,7 +440,7 @@ H.beh(async () => {
   await page.click('[data-testid="chat-brain-toggle"]');
   expect(await cekej('[data-testid="brain-vrstva"][data-rozlozeni="nad"][data-hra="hub"]', 10000), 'phone: 🧠 again opens the list under the bar');
   // mines by touch: a long press flags a square once even when the browser also fires contextmenu (Android), the next tap still reveals
-  await page.click('[data-testid="brain-hrat-mines"]');
+  await hrat('mines');
   expect(await cekej('[data-testid="brain-vrstva"][data-nacteno="1"][data-hra="mines"]', 20000), 'phone: mines open under the bar');
   await sleep(500);
   // touch emulation switched on through CDP (a viewport change with hasTouch would reload the page)
@@ -342,8 +462,10 @@ H.beh(async () => {
     await page.touchscreen.tap(x, y); await sleep(300);
     expect(await cells[2].evaluate((el) => el.classList.contains('down')), 'phone: a short tap right after a long press still reveals (not swallowed)');
     // regression: a flag before the first reveal used to skip mine placement — a board with no mines that could never be won
+    // the board follows the remembered level (2 = 16×16 / 40 here) — a board without mines would open every square
     const opened = await f.$$eval('.cell.down', (a) => a.length);
-    expect(opened > 0 && opened <= 81 - 10, `phone: mines are placed even when the first move was a flag (${opened} squares open, 9×9 with 10 mines)`);
+    const total = cells.length, mines = { 81: 10, 256: 40, 280: 50, 480: 99 }[total];
+    expect(!!mines && opened > 0 && opened <= total - mines, `phone: mines are placed even when the first move was a flag (${opened} of ${total} squares open, ${mines} mines)`);
   }
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await page.click('[data-testid="brain-zpet"]');

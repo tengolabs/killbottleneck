@@ -222,7 +222,7 @@ body.paused .boardWrap { opacity:.4; pointer-events:none; }
 'use strict';
 // ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
 // Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
-// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+// Web Audio only, no files. `sfx.enabled` is stored in localStorage (key: brain-sound); the word games also keep their deck there (words.js).
 const sfx = {
   ctx: null,
   enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
@@ -505,7 +505,9 @@ globalThis.MS = MS;
 // Opened from disk (file://) the origin is opaque, so origins cannot be matched; relax the checks for local testing only.
 const LOCAL_FILE = location.protocol === 'file:';
 const HUB_ORIGIN = LOCAL_FILE ? '*' : location.origin;
-const fromHub = (ev) => LOCAL_FILE ? (ev.origin === 'null' || ev.origin === location.origin) : ev.origin === location.origin;
+// only the hub (parent) or the game itself may steer it, not another window of the same origin
+const fromHub = (ev) => (ev.source === window.parent || ev.source === window)
+  && (LOCAL_FILE ? (ev.origin === 'null' || ev.origin === location.origin) : ev.origin === location.origin);
 function post(msg) { if (!EMBED) return; try { window.parent.postMessage(msg, HUB_ORIGIN); } catch { /* opaque origin */ } }
 
 /* =========================================================

@@ -244,7 +244,7 @@ button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   'use strict';
 // ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
 // Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
-// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+// Web Audio only, no files. `sfx.enabled` is stored in localStorage (key: brain-sound); the word games also keep their deck there (words.js).
 const sfx = {
   ctx: null,
   enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
@@ -564,7 +564,7 @@ function buildLevels(names, infos, current, onPick) {
   var HUB_ORIGIN = location.origin === 'null' ? '*' : location.origin;
   function post(msg) { if (!embed) return; msg.type = 'kb-brain'; msg.game = GAME; window.parent.postMessage(msg, HUB_ORIGIN); }
   window.addEventListener('message', function (e) {
-    if (e.origin !== location.origin || !e.data || e.data.type !== 'kb-brain') return;
+    if (e.origin !== location.origin || (e.source !== window.parent && e.source !== window) || !e.data || e.data.type !== 'kb-brain') return;
     if (e.data.action === 'pause') pause(); else if (e.data.action === 'resume') resume();
     else if (e.data.action === 'mute') { sfx.set(false); syncSound(); } else if (e.data.action === 'new') newGame(level);
     else if (e.data.action === 'theme') applyTheme(e.data.theme); // recolour only, never restart
@@ -685,7 +685,7 @@ function buildLevels(names, infos, current, onPick) {
     renderTime(); $('endTime').textContent = fmt(total); $('endDetail').textContent = T.detail(st.hints, st.penaltyMs); hideHintBar();
     $('endOverlay').hidden = false;
     if (won) { sfx.win(); confetti(); }
-    post({ event: 'result', level: level, won: won, score: Math.round(total / 1000), durationMs: durationMs });
+    post({ event: 'result', level: level, won: won, score: Math.round(total / 1000), durationMs: durationMs, hints: st.hints });
   }
   function pause() {
     if (!st || !st.running || st.paused || st.finished) return;

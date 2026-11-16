@@ -1,4 +1,4 @@
-import { Bomb, Calculator, Clock, Copy, LayoutGrid, Palette, SpellCheck } from 'lucide-react';
+import { Bomb, Calculator, Clock, Copy, Eye, LayoutGrid, Palette, Repeat, Route, Shuffle, SpellCheck } from 'lucide-react';
 import { pb } from '@/api/pb';
 
 // Brain training zone — client side of the game contract (README.md in this folder) and of the server
@@ -13,12 +13,17 @@ export const GAMES = [
   { id: 'stroop', Icon: Palette, levels: 3, better: 'high', unit: 'points', skill: 'skillFocus' },
   { id: 'sudoku', Icon: LayoutGrid, levels: 3, better: 'low', unit: 'seconds', skill: 'skillLogic' },
   { id: 'clock', Icon: Clock, levels: 3, better: 'high', unit: 'correct', skill: 'skillOrientation' },
+  // phase 2 (16 Nov 2026) — one of the 11 is the game of the day, picked by the server (summary.today.game)
+  { id: 'maze', Icon: Route, levels: 3, better: 'low', unit: 'seconds', skill: 'skillSpatial' },
+  { id: 'sequence', Icon: Repeat, levels: 3, better: 'high', unit: 'steps', skill: 'skillMemory' },
+  { id: 'anagram', Icon: Shuffle, levels: 3, better: 'high', unit: 'correct', skill: 'skillLanguage' },
+  { id: 'missing', Icon: Eye, levels: 3, better: 'high', unit: 'correct', skill: 'skillFocus' },
 ];
 export const GAME_IDS = GAMES.map((g) => g.id);
 export const gameMeta = (id) => GAMES.find((g) => g.id === id) || null;
 // how many levels the hub offers here: fewer on a narrow window when the game says so (phoneLevels)
 export const maxLevels = (id, narrow) => { const m = gameMeta(id); return !m ? 1 : narrow && m.phoneLevels ? Math.min(m.levels, m.phoneLevels) : m.levels; };
-export const GAMES_VERSION = 3; // bump when files in public/brain change (the service worker never caches them, the browser does)
+export const GAMES_VERSION = 9; // bump when files in public/brain change (the service worker never caches them, the browser does)
 
 // minutes EAST of UTC (Prague winter = 60); the server clamps it to ±14 h and derives the local day itself
 export const tzOffset = () => -new Date().getTimezoneOffset();
@@ -26,15 +31,16 @@ export const tzOffset = () => -new Date().getTimezoneOffset();
 export async function startRound(game, level) {
   return pb.send('/api/kb/brain/start', { method: 'POST', body: { game, level, tzOffset: tzOffset() } });
 }
-export async function finishRound(id, { won, score, durationMs }) {
-  return pb.send('/api/kb/brain/finish', { method: 'POST', body: { id, won: !!won, score, durationMs, tzOffset: tzOffset() } });
+export async function finishRound(id, { won, score, durationMs, hints }) {
+  return pb.send('/api/kb/brain/finish', { method: 'POST', body: { id, won: !!won, score, durationMs, hints: Number(hints) || 0, tzOffset: tzOffset() } });
 }
 export async function loadSummary() {
   return pb.send(`/api/kb/brain/summary?tzOffset=${encodeURIComponent(tzOffset())}`, { method: 'GET' });
 }
 
 // Unit label after the score (seconds are already m:ss → no label).
-export const unitLabel = (t, game) => { const m = gameMeta(game); return !m || m.unit === 'seconds' ? '' : t(`unit.${m.unit}`); };
+// plural forms by the number (cs: 1 krok / 2 kroky / 5 kroků)
+export const unitLabel = (t, game, n) => { const m = gameMeta(game); return !m || m.unit === 'seconds' ? '' : t(`unit.${m.unit}`, { count: Math.round(Number(n)) || 0 }); };
 
 // Score as text: seconds → m:ss, guesses/correct/points → number (the unit label comes from unitLabel).
 export function formatScore(game, score) {

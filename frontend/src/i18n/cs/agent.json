@@ -1,6 +1,7 @@
 {
   "title": "Připoj svého AI agenta",
   "description": "Vlož jeden řádek do Claude Code, Cursoru nebo Codexu. Agent si killBottleneck nastaví sám a pak s ním stavíš mapy rozhovorem – „udělej mapu z tohohle zápisu z porady“.",
+  "notSure": "Nemáš AI agenta nebo nevíš, co to je? Nevadí – okno klidně zavři, aplikace funguje i bez něj. Kdyby se hodilo, najdeš ho kdykoli v menu pod svým jménem.",
   "copyLabel": "Zkopíruj do svého agenta",
   "line": "Nastav mi killBottleneck: stáhni si a postupuj podle tohoto návodu {{url}}/agent-setup.md",
   "copy": "Zkopírovat",
@@ -8,7 +9,6 @@
   "copyManual": "Kopírování se nepovedlo – označ text a zkopíruj ho ručně.",
   "afterCopy": "Až agent skončí, přihlásíš se v prohlížeči a schválíš přístup. Žádné heslo ani klíč se do agenta nevkládá.",
   "docs": "Jak to funguje",
-  "skip": "Zatím přeskočit",
-  "later": "Najdeš to kdykoli v menu pod svým jménem.",
-  "done": "Hotovo"
+  "done": "Hotovo",
+  "close": "Zavřít"
 }
