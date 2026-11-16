@@ -10,6 +10,20 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.3.0": {
+    cs: [
+      "Nová zóna Trénink mozku: mozek 🧠 v hlavičce asistenta (nebo slovo „hlavolam“ v chatu) otevře denní sadu sedmi her — hledání min, pexeso, slovo na 5 písmen, rychlé počty, barvy, sudoku a hodiny. Každá cvičí jinou schopnost.",
+      "Výsledky, série dnů a nejlepší časy se ukládají k vašemu účtu a vidíte je jen vy — žádný žebříček, nic v organizaci. Najdete je i v exportu „Stáhnout všechna moje data“.",
+      "Každá hra má tlačítko „Jak hrát“ s pravidly pro úplného začátečníka; nápověda v sudoku nejdřív vysvětlí, kam které číslo patří a proč, a až na druhé stisknutí ho doplní.",
+      "Na telefonu zóna vyplní obrazovku pod hlavičkou asistenta, hry se ovládají prstem (vlaječka u min dlouhým stiskem); tréninkem i relaxem se přepíná jedním klepnutím.",
+    ],
+    en: [
+      "New Brain training zone: the 🧠 brain in the assistant's header (or the word \"puzzle\" in the chat) opens a daily set of seven games — minesweeper, pairs, five-letter word, quick arithmetic, colours, sudoku and clock. Each trains a different skill.",
+      "Results, your day streak and best times are stored with your account and only you can see them — no leaderboard, nothing in the organisation. They are part of \"Download all my data\" too.",
+      "Every game has a \"How to play\" button with rules written for a first-time player; the sudoku hint first explains which digit belongs where and why, and fills it in only on the second press.",
+      "On a phone the zone fills the screen under the assistant's header bar, the games are played by touch (hold a square to flag a mine); one tap switches between training and relax.",
+    ],
+  },
   "v1.2.0": {
     cs: [
       "Práce se neztrácí potichu: když se uložení mapy nepovede, uvidíte to i s důvodem a aplikace to zkusí znovu. „Vrátit zpět“ bere zpět jeden krok, ne celou mapu.",

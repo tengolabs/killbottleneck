@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pairs</title>
+<style>
+/* ===== Deluxe look — shared design kit for every brain game (inline this block; keep the names) =====
+   Source of the look: "Minesweeper Deluxe" (miny-modely/deluxe, 3. 11. 2026) chosen by Richard 14. 11. 2026.
+   Light = :root, dark = :root[data-theme="dark"]. No external URLs, no web fonts (system stack only). */
+:root {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #f5f7fc 0%, #d3dae8 100%);
+  --panel: rgba(255,255,255,.78); --panel-solid:#ffffff; --line: rgba(30,41,59,.14);
+  --panel-shadow: 0 20px 40px rgba(30,41,59,.16), 0 0 0 1px rgba(30,41,59,.06);
+  --text:#0f172a; --muted:#5b6578;
+  --tile: linear-gradient(145deg,#ffffff,#dde4ef); --tile-border:#aab6ca; --tile-hover: linear-gradient(145deg,#ffffff,#eef2f8);
+  --tile-down:#cbd4e1; --tile-down-border:#b3bfd0; --tile-shine: rgba(255,255,255,.95);
+  --well: rgba(30,41,59,.07);                 /* darker inset area (board wrapper, status panel) */
+  --accent:#4f46e5; --accent-hover:#4338ca; --accent-text:#ffffff; --accent-glow: rgba(99,102,241,.35);
+  --ok:#10b981; --bad:#ef4444; --warn:#f59e0b; --info:#06b6d4; --pink:#ec4899; --violet:#8b5cf6;
+  --n1:#3b82f6; --n2:#10b981; --n3:#ef4444; --n4:#8b5cf6; --n5:#f59e0b; --n6:#06b6d4; --n7:#ec4899; --n8:#64748b;
+  --radius:18px; --radius-s:10px;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #1e1e38 0%, #0d0e1a 100%);
+  --panel: rgba(26,27,46,.75); --panel-solid:#1a1b2e; --line: rgba(255,255,255,.1);
+  --panel-shadow: 0 20px 50px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
+  --text:#f0f3f8; --muted:#8c93a8;
+  --tile: linear-gradient(145deg,#2a2d48,#20233b); --tile-border:#3b3f63; --tile-hover: linear-gradient(145deg,#35395c,#272a47);
+  --tile-down:#141524; --tile-down-border:#1f2136; --tile-shine: rgba(255,255,255,.1);
+  --well: rgba(0,0,0,.25);
+  --accent:#6366f1; --accent-hover:#4f46e5; --accent-text:#ffffff;
+  color-scheme: dark;
+}
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; }
+body { background:var(--bg-gradient) fixed; color:var(--text); overflow:hidden; display:flex; flex-direction:column; -webkit-tap-highlight-color:transparent;
+       user-select:none; -webkit-user-select:none; }
+button { font:inherit; color:inherit; cursor:pointer; }
+button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+[hidden] { display:none !important; }
+
+/* glowing background blobs: <div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div> as the first child of body */
+.blobs { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+.blobs i { position:absolute; border-radius:50%; filter:blur(70px); opacity:.34; animation: blobfloat 14s infinite alternate ease-in-out; }
+:root[data-theme="dark"] .blobs i { opacity:.22; }
+.blobs i:nth-child(1) { width:45vmax; height:45vmax; background:#6366f1; top:-15vmax; left:5%; }
+.blobs i:nth-child(2) { width:50vmax; height:50vmax; background:#ec4899; bottom:-20vmax; right:0; animation-duration:18s; }
+.blobs i:nth-child(3) { width:35vmax; height:35vmax; background:#06b6d4; top:40%; left:55%; animation-duration:12s; }
+@keyframes blobfloat { to { transform: translateY(30px) scale(1.08); } }
+
+/* glass card = the game panel; sits above the blobs */
+.glass { position:relative; z-index:1; background:var(--panel); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+         border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--panel-shadow); }
+#app { height:calc(100% - 16px); margin:8px; display:flex; flex-direction:column; gap:8px; padding:10px 12px; min-height:0; }
+@media (max-height:360px) { #app { height:calc(100% - 8px); margin:4px; padding:6px 8px; gap:6px; } }
+
+/* status panel (HUD) with digital displays */
+.status { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none;
+          background:var(--well); border:1px solid var(--line); border-radius:14px; padding:6px 12px; }
+.display { display:flex; flex-direction:column; align-items:center; min-width:56px; }
+.display .label { font-size:.62rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+.digits { font-family:var(--mono); font-size:1.25rem; font-weight:700; color:#ef4444; text-shadow:0 0 10px rgba(239,68,68,.5);
+          background:#000; padding:1px 8px; border-radius:8px; letter-spacing:2px; border:1px solid rgba(239,68,68,.2);
+          font-variant-numeric:tabular-nums; line-height:1.3; }
+.digits.green { color:#10b981; text-shadow:0 0 10px rgba(16,185,129,.5); border-color:rgba(16,185,129,.25); }
+.digits.blue { color:#60a5fa; text-shadow:0 0 10px rgba(96,165,250,.5); border-color:rgba(96,165,250,.25); }
+.pill { background:var(--well); border:1px solid var(--line); border-radius:999px; padding:3px 12px; font-size:.78rem; color:var(--muted); white-space:nowrap; }
+.pill strong { color:var(--ok); }
+.badge { font-size:.62rem; font-weight:700; text-transform:uppercase; background:linear-gradient(135deg,#f59e0b,#ec4899); color:#fff;
+         padding:2px 8px; border-radius:999px; letter-spacing:.5px; }
+
+/* 3D tiles (cells, cards, keys) */
+.tile { background:var(--tile); border:1px solid var(--tile-border); border-radius:8px; color:var(--text);
+        box-shadow: inset 0 1px 0 var(--tile-shine), 0 2px 4px rgba(0,0,0,.2); transition: background .1s, transform .1s, box-shadow .1s; }
+.tile:hover { background:var(--tile-hover); transform:translateY(-1px); }
+.tile:active { transform:translateY(1px) scale(.97); }
+.tile.down { background:var(--tile-down); border-color:var(--tile-down-border); box-shadow: inset 0 2px 4px rgba(0,0,0,.4); transform:none; }
+.well { background:var(--well); border:1px solid var(--line); border-radius:14px; padding:8px; }
+
+/* buttons */
+.btn { background:var(--accent); color:var(--accent-text); border:0; border-radius:var(--radius-s); padding:9px 18px; font-weight:700;
+       box-shadow:0 4px 14px var(--accent-glow); transition: background .2s, transform .15s; }
+.btn:hover { background:var(--accent-hover); transform:translateY(-1px); }
+.btn:active { transform:translateY(1px); }
+.btn.ghost { background:var(--well); color:var(--text); box-shadow:none; border:1px solid var(--line); }
+.icon-btn { width:34px; height:34px; border-radius:10px; background:var(--well); border:1px solid var(--line); display:inline-flex;
+            align-items:center; justify-content:center; font-size:1rem; transition: background .2s, transform .2s; flex:none; }
+.icon-btn:hover { transform:translateY(-1px); background:rgba(127,127,127,.18); }
+.icon-btn[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; }
+
+/* overlays (start / end / pause) — centred glass card */
+.overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:12px; z-index:20;
+           background:rgba(0,0,0,.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border-radius:inherit; animation: fadeIn .2s ease; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:16px 20px; max-width:360px; width:100%;
+        text-align:center; box-shadow:var(--panel-shadow); color:var(--text); }
+.card h2 { margin:0 0 6px; font-size:1.15rem; font-weight:800; letter-spacing:-.3px; }
+.card p { margin:0 0 12px; color:var(--muted); font-size:.85rem; line-height:1.4; }
+.card .big { font-family:var(--mono); font-size:2rem; font-weight:800; color:var(--accent); margin:2px 0 8px; font-variant-numeric:tabular-nums; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes popIn { 0% { transform:scale(.85); opacity:.6; } 100% { transform:scale(1); opacity:1; } }
+@keyframes shake { 0%,100% { transform:translate(0,0); } 25% { transform:translate(-4px,2px); } 50% { transform:translate(4px,-2px); } 75% { transform:translate(-2px,-2px); } }
+#confetti { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50; }
+#selftest { position:fixed; left:0; bottom:0; z-index:99; font:11px var(--mono); color:#fff; background:#000; padding:2px 6px; }
+@media (prefers-reduced-motion: reduce) { .blobs i, .overlay, .tile, .btn { animation:none !important; transition:none !important; } }
+/* in-game level choice (games with more than one level): <div class="levels" role="group" id="levels"></div> filled with
+   <button class="lvl" type="button" data-level="N" aria-pressed="true|false"><b>Name</b><small>info</small></button> */
+.levels { display:flex; gap:6px; flex:none; flex-wrap:wrap; }
+.lvl { flex:1 1 72px; min-width:0; background:var(--well); border:1px solid var(--line); border-radius:12px; padding:5px 8px; display:flex; flex-direction:column;
+       align-items:center; gap:1px; transition: background .2s; }
+.lvl b { font-weight:700; font-size:.85rem; white-space:nowrap; } .lvl small { font-size:.66rem; color:var(--muted); white-space:nowrap; }
+.lvl:hover { background:rgba(127,127,127,.14); }
+.lvl[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; box-shadow:0 4px 14px var(--accent-glow); }
+.lvl[aria-pressed="true"] small { color:rgba(255,255,255,.8); }
+@media (max-height:360px) { .lvl small { display:none; } .lvl { padding:3px 6px; } }
+/* "How to play" (added 15. 11. after Richard's klik-test — the word game had no explanation at all): a labelled button in the
+   .status HUD <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button> opens
+   <div class="overlay" id="helpOverlay" hidden><div class="card rules"><button class="close" id="helpClose" type="button"
+   aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div></div>
+   filled by bindHelp(T) from STR keys `help`, `rulesTitle`, `rules` (array of short HTML items, <b>…</b> for the keyword). */
+.icon-btn.help { width:auto; padding:0 10px; gap:6px; font-size:.78rem; font-weight:700; color:var(--text); }
+.icon-btn.help span { white-space:nowrap; }
+@media (max-width:479px), (max-height:360px) { .icon-btn.help span { display:none; } .icon-btn.help { padding:0; width:34px; } }
+.card.rules { position:relative; max-width:440px; max-height:calc(100% - 8px); display:flex; flex-direction:column; }
+.card.rules .modal-body { overflow:auto; min-height:0; }
+.modal-body ul { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px; font-size:.86rem; line-height:1.4; text-align:left; }
+.modal-body li b { color:var(--text); }
+.card .close { position:absolute; right:10px; top:6px; background:none; border:0; font-size:1.4rem; color:var(--muted); cursor:pointer; }
+/* example tiles inside the rules (word game): <span class="ex"><i class="hit">S</i><i class="near">T</i><i class="miss">A</i></span> */
+.ex { display:inline-flex; gap:3px; vertical-align:middle; margin:0 2px; }
+.ex i { font-style:normal; font-weight:800; font-size:.8rem; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
+        border-radius:5px; background:var(--tile); border:1px solid var(--tile-border); color:var(--text); text-transform:uppercase; }
+.ex i.hit { background:var(--ok); border-color:var(--ok); color:#fff; } .ex i.near { background:var(--warn); border-color:var(--warn); color:#fff; }
+.ex i.miss { background:var(--tile-down); border-color:var(--tile-down-border); color:var(--muted); }
+/* ===== Pairs — game-specific styles (kit variables only) ===== */
+.status { justify-content:center; gap:10px; }
+#board-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding:2px; min-height:0; }
+#board { display:grid; gap:var(--gap,6px); width:var(--w); height:var(--h); }
+.pcard { position:relative; border:0; padding:0; margin:0; background:transparent; cursor:pointer;
+         perspective:600px; border-radius:8px; outline-offset:2px; }
+.pcard:focus-visible { outline:2px solid var(--accent); }
+.pcard .inner { position:absolute; inset:0; transition:transform .35s; transform-style:preserve-3d; }
+.pcard.open .inner, .pcard.done .inner { transform:rotateY(180deg); }
+.face { position:absolute; inset:0; border-radius:8px; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+        display:flex; align-items:center; justify-content:center; }
+.face.back::after { content:""; width:38%; height:38%; border-radius:50%; border:3px solid var(--accent); opacity:.3; }
+.face.front { background:var(--panel-solid); border:1px solid var(--line); transform:rotateY(180deg);
+              box-shadow:0 2px 4px rgba(0,0,0,.2); }
+.face.front svg { width:72%; height:72%; }
+.pcard.done { cursor:default; }
+.pcard.done .face.front { border-color:var(--ok); box-shadow:0 0 0 2px var(--ok) inset, 0 0 10px var(--ok); }
+.pcard:disabled { cursor:default; }
+#overlay { display:none; }
+#overlay.show { display:flex; }
+body.paused #board { opacity:.35; pointer-events:none; }
+#pause-tag { display:none; pointer-events:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; }
+body.paused #pause-tag { display:flex; }
+#pause-tag .card { width:auto; padding:10px 24px; font-size:1.2rem; font-weight:800; }
+@media (max-width:380px) { .status { gap:6px; padding:6px 8px; } .display { min-width:0; } .digits { font-size:1.05rem; letter-spacing:1px; padding:1px 6px; } }
+@media (max-height:360px) { .status { padding:4px 10px; } .digits { font-size:1.05rem; } .display .label { font-size:.56rem; } }
+</style>
+</head>
+<body>
+<div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div>
+<div id="app" class="glass">
+  <div id="hud" class="status" aria-live="polite">
+    <div class="display"><span class="label" id="l-time"></span><span class="digits" id="time">0:00</span></div>
+    <div class="display"><span class="label" id="l-moves"></span><span class="digits blue" id="moves">0</span></div>
+    <div class="display"><span class="label" id="l-pairs"></span><span class="digits green" id="pairs">0/0</span></div>
+    <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button>
+    <button class="icon-btn" id="soundBtn" type="button"></button>
+  </div>
+  <div class="levels" id="levels" role="group"></div>
+  <div id="board-wrap"><div id="board" role="grid" aria-label="Pairs board"></div></div>
+  <div id="pause-tag" class="overlay"><div class="card"><span id="pause-text"></span></div></div>
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true">
+    <div class="card">
+      <h2 id="ov-title"></h2>
+      <p id="ov-text"></p>
+      <button class="btn" id="ov-again" type="button"></button>
+    </div>
+  </div>
+  <div class="overlay" id="helpOverlay" hidden><div class="card rules"><button class="close" id="helpClose" type="button" aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div></div>
+</div>
+<canvas id="confetti"></canvas>
+<div id="selftest" hidden></div>
+<script>
+'use strict';
+// ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
+// Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
+// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+const sfx = {
+  ctx: null,
+  enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
+  ac() {
+    if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) this.ctx = new AC(); }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  set(on) { this.enabled = !!on; try { localStorage.setItem('brain-sound', on ? '1' : '0'); } catch { /* private mode */ } },
+  tone(f, d = 0.08, type = 'square', g = 0.04, delay = 0) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const o = c.createOscillator(), v = c.createGain();
+    o.type = type; o.frequency.value = f;
+    const t0 = c.currentTime + delay;
+    v.gain.setValueAtTime(0.0001, t0);
+    v.gain.linearRampToValueAtTime(g, t0 + 0.012);
+    v.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    o.connect(v).connect(c.destination);
+    o.start(t0); o.stop(t0 + d + 0.05);
+  },
+  noise(d = 0.4, g = 0.15) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const n = Math.floor(c.sampleRate * d), buf = c.createBuffer(1, n, c.sampleRate), data = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 800;
+    const v = c.createGain(); v.gain.value = g;
+    src.connect(fl).connect(v).connect(c.destination); src.start();
+  },
+  // vocabulary shared by all games
+  click() { this.tone(920, 0.05, 'square', 0.02); },          // reveal / flip / key press
+  flag()  { this.tone(430, 0.07, 'square', 0.03); },          // secondary action (flag, note)
+  ok()    { this.tone(660, 0.06, 'square', 0.03); this.tone(990, 0.08, 'square', 0.03, 0.06); }, // correct answer
+  bad()   { this.tone(180, 0.14, 'sawtooth', 0.05); },        // wrong answer
+  boom()  { this.noise(0.5, 0.2); this.tone(65, 0.45, 'sawtooth', 0.12); },                     // mine hit / game lost
+  win()   { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.13, 'square', 0.04, i * 0.11)); },
+};
+
+// Confetti burst on a won round (canvas#confetti, fixed, pointer-events:none). Honour reduced motion.
+function confetti() {
+  const canvas = document.getElementById('confetti');
+  if (!canvas || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6'];
+  const ps = Array.from({ length: 110 }, () => ({ x: canvas.width / 2, y: canvas.height / 2, vx: (Math.random() - .5) * 18, vy: (Math.random() - .7) * 20,
+    size: Math.random() * 8 + 4, color: colors[Math.floor(Math.random() * colors.length)], a: 1, rot: Math.random() * 360, rs: (Math.random() - .5) * 10 }));
+  (function step() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    for (const p of ps) {
+      p.x += p.vx; p.y += p.vy; p.vy += .4; p.rot += p.rs; p.a -= .012;
+      if (p.a <= 0) continue;
+      alive = true;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180); ctx.globalAlpha = p.a; ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.restore();
+    }
+    if (alive) requestAnimationFrame(step); else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  })();
+}
+
+// Sound toggle button: <button class="icon-btn" id="soundBtn" type="button"></button>; the hub's `mute` action calls sfx.set(false) + syncSound().
+function syncSound() { const b = document.getElementById('soundBtn'); if (!b) return; b.textContent = sfx.enabled ? '🔊' : '🔇'; b.setAttribute('aria-pressed', String(!sfx.enabled)); }
+
+// Theme + level plumbing shared by all games (added 14. 11. evening, Richard's klik-test):
+// - the hub sends { action: 'theme', theme: 'light'|'dark' } when the app theme or skin changes → recolour WITHOUT restarting the game
+// - the player picks the level inside the game: when embedded, the game only reports it ({ event: 'level' }) and the hub reloads
+//   the game at that level (the hub is the source of truth for the round on the server); standalone, the game restarts itself.
+function applyTheme(theme) { if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; }
+// Builds the level buttons; `names` = STR.levels (array of display names), `infos` = optional array of short hints, `current` = 1-based.
+function buildLevels(names, infos, current, onPick) {
+  const box = document.getElementById('levels'); if (!box) return;
+  box.innerHTML = '';
+  names.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'lvl'; b.dataset.level = i + 1; b.setAttribute('aria-pressed', String(i + 1 === current));
+    b.innerHTML = `<b>${name}</b>${infos && infos[i] ? `<small>${infos[i]}</small>` : ''}`;
+    b.addEventListener('click', () => { if (i + 1 !== current) onPick(i + 1); });
+    box.appendChild(b);
+  });
+}
+// "How to play" modal (added 15. 11.): wires #helpBtn / #helpOverlay / #helpClose and fills the texts from STR
+// (`help` = button label, `rulesTitle`, `rules` = array of short HTML items). Escape closes it; a click on the backdrop too.
+function bindHelp(T) {
+  const btn = document.getElementById('helpBtn'), ov = document.getElementById('helpOverlay'); if (!btn || !ov) return;
+  const lbl = document.getElementById('helpLbl'); if (lbl) lbl.textContent = T.help; btn.title = T.help; btn.setAttribute('aria-label', T.help);
+  document.getElementById('rulesTitle').textContent = T.rulesTitle;
+  document.getElementById('rulesList').innerHTML = T.rules.map((r) => `<li>${r}</li>`).join('');
+  const open = () => { ov.hidden = false; btn.setAttribute('aria-expanded', 'true'); };
+  const close = () => { ov.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.addEventListener('click', () => (ov.hidden ? open() : close()));
+  document.getElementById('helpClose').addEventListener('click', close);
+  ov.addEventListener('click', (ev) => { if (ev.target === ov) close(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !ov.hidden) { close(); ev.stopPropagation(); } }, true);
+}
+// ---------- i18n ----------
+const STR = {
+  cs: { time: 'Čas', moves: 'Tahy', pairs: 'Páry', won: 'Hotovo!', again: 'Hrát znovu', paused: 'Pauza',
+        summary: (s, m) => `Všechny páry nalezeny za ${fmtTime(s)} na ${m} tahů.`, card: 'Karta', sound: 'Zvuk',
+        levels: ['Lehká', 'Střední', 'Těžká'], levelInfos: ['4×4', '6×6', '8×6'], levelsAria: 'Obtížnost',
+        help: 'Jak hrát', rulesTitle: 'Jak hrát', rules: [
+          '<b>Cíl:</b> najít všechny dvojice stejných obrázků na co nejméně tahů a v co nejkratším čase.',
+          '<b>Tah:</b> klepni (nebo klikni) na dvě zakryté karty – obě se otočí. Jsou-li stejné, zůstanou odkryté; jinak se po chvíli zase zakryjí.',
+          '<b>Pamatuj si</b>, kde jaký obrázek ležel – příště ho najdeš rovnou.',
+          '<b>Čas</b> běží od prvního otočení, <b>Tahy</b> počítají každou otočenou dvojici, <b>Páry</b> ukazují, kolik dvojic už máš z celkového počtu.',
+          '<b>Úrovně:</b> Lehká 4×4 (8 dvojic), Střední 6×6 (18 dvojic), Těžká 8×6 (24 dvojic).',
+          '<b>Klávesnice:</b> Tab přechází mezi kartami, Enter nebo mezerník kartu otočí.'] },
+  en: { time: 'Time', moves: 'Moves', pairs: 'Pairs', won: 'Done!', again: 'Play again', paused: 'Paused',
+        summary: (s, m) => `All pairs found in ${fmtTime(s)} with ${m} moves.`, card: 'Card', sound: 'Sound',
+        levels: ['Easy', 'Medium', 'Hard'], levelInfos: ['4×4', '6×6', '8×6'], levelsAria: 'Difficulty',
+        help: 'How to play', rulesTitle: 'How to play', rules: [
+          '<b>Goal:</b> find every pair of matching pictures in as few moves and as little time as possible.',
+          '<b>A turn:</b> tap (or click) two face-down cards and both turn over. If they match they stay open; otherwise they turn back after a moment.',
+          '<b>Remember</b> where each picture was so you can find it straight away next time.',
+          '<b>Time</b> starts with the first flip, <b>Moves</b> counts every pair you turned over, <b>Pairs</b> shows how many pairs you have found out of the total.',
+          '<b>Levels:</b> Easy 4×4 (8 pairs), Medium 6×6 (18 pairs), Hard 8×6 (24 pairs).',
+          '<b>Keyboard:</b> Tab moves between cards, Enter or Space turns a card over.'] },
+};
+const GAME_ID = 'memory';
+const LEVELS = { 1: { cols: 4, rows: 4 }, 2: { cols: 6, rows: 6 }, 3: { cols: 8, rows: 6 } };
+
+// ---------- symbols (24 inline SVG icons, distinct colours) ----------
+// Each entry: [colour, svg body]. Drawn in a 24x24 viewBox.
+const ICONS = [
+  ['#f59e0b', '<path d="M12 2l3 6.5 7 .8-5.2 4.8 1.4 7-6.2-3.5L5.8 21l1.4-7L2 9.3l7-.8z"/>'],            // star
+  ['#16a34a', '<path d="M20 4C9 4 4 10 4 20c10 0 16-5 16-16zM4 20L15 9"/><path d="M4 20L15 9" fill="none" stroke="#fff" stroke-width="1.5"/>'], // leaf
+  ['#e11d48', '<path d="M12 21s-8-5.5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.5-8 11-8 11z"/>'],  // heart
+  ['#0ea5e9', '<path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-1 5h2v3h3v2h-3v8.9c3.2-.5 5.5-2.6 6-5.9h2c-.6 4.8-4.4 8-9 8s-8.4-3.2-9-8h2c.5 3.3 2.8 5.4 6 5.9V12H8v-2h3z"/>'], // anchor
+  ['#a16207', '<path d="M14 2a6 6 0 0 0-5.7 7.9L2 16.2V22h4v-3h3v-3h3l1.3-1.3A6 6 0 1 0 14 2zm1.5 3.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/>'], // key
+  ['#7c3aed', '<path d="M4 6h12v9a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zm12 2h2a3 3 0 0 1 0 6h-2v-2h2a1 1 0 0 0 0-2h-2zM3 20h14v2H3z"/>'], // mug
+  ['#2563eb', '<path d="M12 2c5.5 0 10 4 10 9H2c0-5 4.5-9 10-9zm-1 10h2v7a1 1 0 0 0 2 0h2a3 3 0 0 1-6 0z"/>'], // umbrella
+  ['#db2777', '<path d="M10 3h2v12.5A3.5 3.5 0 1 1 10 12.3V3zm2 0 7 2v4l-7-2z"/>'],                    // note
+  ['#f97316', '<circle cx="12" cy="12" r="5"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke-width="2" stroke-linecap="round"/>'], // sun
+  ['#6366f1', '<path d="M20 15.5A8.5 8.5 0 1 1 8.5 4a7 7 0 0 0 11.5 11.5z"/>'],                          // moon
+  ['#0891b2', '<path d="M2 12c3-5 7-7 12-7 2 0 4 .5 5 1.5L22 4v16l-3-2.5c-1 1-3 1.5-5 1.5-5 0-9-2-12-7zm6 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0z"/>'], // fish
+  ['#15803d', '<path d="M12 2l5 7h-3l4 5h-3l4 5H5l4-5H6l4-5H7zm-1 17h2v3h-2z"/>'],                       // tree
+  ['#b45309', '<path d="M12 3l9 8h-2v10h-5v-6h-4v6H5V11H3z"/>'],                                        // house
+  ['#475569', '<circle cx="12" cy="12" r="9" fill="none" stroke-width="2.5"/><circle cx="12" cy="12" r="2"/><path d="M12 5v14M5 12h14M7 7l10 10M17 7L7 17" stroke-width="1.6"/>'], // wheel
+  ['#9333ea', '<path d="M4 4h7v16H6a2 2 0 0 1-2-2zm9 0h7v14a2 2 0 0 1-2 2h-5zM6 7h3v1.5H6zm9 0h3v1.5h-3z"/>'], // book
+  ['#ca8a04', '<path d="M12 2a1.5 1.5 0 0 1 1.5 1.5V4a6 6 0 0 1 4.5 5.8V15l2 2v1H4v-1l2-2V9.8A6 6 0 0 1 10.5 4v-.5A1.5 1.5 0 0 1 12 2zm-2.5 17h5a2.5 2.5 0 0 1-5 0z"/>'], // bell
+  ['#dc2626', '<path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7zm0 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>'], // pin
+  ['#0d9488', '<path d="M4 7l8-4 8 4v10l-8 4-8-4zm8-1.8L7.2 7.5 12 9.9l4.8-2.4zM6 9.2v6.6l5 2.5v-6.6zm12 0-5 2.5v6.6l5-2.5z"/>'], // cube
+  ['#be185d', '<path d="M12 2c2 3 6 6 6 11a6 6 0 0 1-12 0c0-2 .7-3.5 1.5-5 .5 1.5 1.5 2.5 2.5 3 0-4 1-6.5 2-9z"/>'], // flame
+  ['#1d4ed8', '<path d="M2 14l2-6h3V5h5v3h3l3 3h3a2 2 0 0 1 2 2v2h-2.3a2.5 2.5 0 0 1-4.4 0H8.7a2.5 2.5 0 0 1-4.4 0H2zm4.5 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm11 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>'], // car
+  ['#65a30d', '<path d="M12 2l3 3-3 3-3-3zm-7 4l3 3-3 3-3-3zm14 0l3 3-3 3-3-3zm-7 4l3 3-3 3-3-3zm0 6l3 3-3 3-3-3z"/>'], // diamonds
+  ['#ea580c', '<path d="M12 2a10 10 0 0 1 10 10h-2a8 8 0 0 0-8-8zm0 4a6 6 0 0 1 6 6h-2a4 4 0 0 0-4-4zm-7 7h2v3h3v2H5zm10 0h4v5h-2v-3h-2zM5 5l5 5-5 5z" fill-rule="evenodd"/>'], // signal
+  ['#4f46e5', '<path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm-1 4h2v5.6l3.5 2-1 1.7-4.5-2.6z"/>'],       // clock
+  ['#047857', '<path d="M12 2l10 18H2zm0 5l-6 11h12z"/>'],                                             // triangle
+];
+
+// ---------- helpers ----------
+function fmtTime(sec) { const m = Math.floor(sec / 60), s = sec % 60; return `${m}:${String(s).padStart(2, '0')}`; }
+function shuffle(arr, rnd = Math.random) {
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+// Pure deck generator: `pairs` symbol ids (0..ICONS.length-1), each exactly twice, shuffled.
+function makeDeck(pairs, rnd = Math.random) {
+  const ids = shuffle(ICONS.map((_, i) => i), rnd).slice(0, pairs);
+  return shuffle(ids.concat(ids), rnd);
+}
+function isFinished(found, pairs) { return found >= pairs; }
+function iconSvg(id) {
+  const [color, body] = ICONS[id];
+  return `<svg viewBox="0 0 24 24" fill="${color}" stroke="${color}" stroke-width="0" aria-hidden="true">${body}</svg>`;
+}
+
+// ---------- params ----------
+const params = new URLSearchParams(location.search);
+const embed = params.get('embed') === '1';
+const lang = params.get('lang') === 'cs' ? 'cs' : 'en';
+const T = STR[lang];
+const level = LEVELS[params.get('level')] ? +params.get('level') : 1;
+const theme = params.get('theme');
+document.documentElement.lang = lang;
+if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
+
+// Hub origin; `file://` pages report origin "null", which postMessage rejects — fall back to "*" there.
+const HUB_ORIGIN = location.origin === 'null' ? '*' : location.origin;
+function post(msg) { if (embed) window.parent.postMessage(msg, HUB_ORIGIN); }
+
+// ---------- game state ----------
+const S = { level, deck: [], flipped: [], found: 0, moves: 0, startAt: 0, elapsed: 0, timer: 0, paused: false,
+            finished: false, locked: false, cards: [] };
+const $ = (id) => document.getElementById(id);
+
+function newGame(lv) {
+  if (LEVELS[lv]) S.level = +lv;
+  const { cols, rows } = LEVELS[S.level];
+  const pairs = (cols * rows) / 2;
+  clearInterval(S.timer); S.timer = 0;
+  Object.assign(S, { deck: makeDeck(pairs), flipped: [], found: 0, moves: 0, startAt: 0, elapsed: 0,
+                     finished: false, locked: false, pairs });
+  $('overlay').classList.remove('show');
+  renderBoard();
+  updateHud();
+  paintLevels(); // before layout(): the selector takes its height first, the board gets what is left
+  layout();
+}
+
+// Level choice inside the game: embedded → the hub reloads the game at that level (?level=n); standalone → restart here.
+function pickLevel(n) { if (embed) post({ type: 'kb-brain', event: 'level', game: GAME_ID, level: n }); else newGame(n); }
+function paintLevels() { buildLevels(T.levels, T.levelInfos, S.level, pickLevel); }
+
+function renderBoard() {
+  const board = $('board');
+  board.innerHTML = '';
+  S.cards = S.deck.map((id, i) => {
+    const b = document.createElement('button');
+    b.className = 'pcard'; b.type = 'button'; b.dataset.i = i; b.setAttribute('role', 'gridcell');
+    b.setAttribute('aria-label', `${T.card} ${i + 1}`);
+    b.innerHTML = `<div class="inner"><div class="face back tile"></div><div class="face front">${iconSvg(id)}</div></div>`;
+    b.addEventListener('click', () => flip(i));
+    board.appendChild(b);
+    return b;
+  });
+}
+
+function flip(i) {
+  if (S.paused || S.finished || S.locked) return;
+  const card = S.cards[i];
+  if (card.classList.contains('open') || card.classList.contains('done')) return;
+  if (!S.startAt) { S.startAt = Date.now(); S.timer = setInterval(tick, 250); }
+  card.classList.add('open');
+  sfx.click();
+  S.flipped.push(i);
+  if (S.flipped.length === 2) {
+    S.moves++;
+    const [a, b] = S.flipped;
+    if (S.deck[a] === S.deck[b]) {
+      S.cards[a].classList.add('done'); S.cards[b].classList.add('done');
+      S.cards[a].classList.remove('open'); S.cards[b].classList.remove('open');
+      S.flipped = []; S.found++;
+      updateHud();
+      if (isFinished(S.found, S.pairs)) finish({ won: true }); else sfx.ok();
+    } else {
+      S.locked = true;
+      setTimeout(() => {
+        S.cards[a].classList.remove('open'); S.cards[b].classList.remove('open');
+        S.flipped = []; S.locked = false;
+      }, 800);
+    }
+  }
+  updateHud();
+}
+
+function tick() {
+  if (S.paused || S.finished) return;
+  S.elapsed = Math.floor((Date.now() - S.startAt) / 1000);
+  $('time').textContent = fmtTime(S.elapsed);
+}
+
+function updateHud() {
+  $('moves').textContent = S.moves;
+  $('pairs').textContent = `${S.found}/${S.pairs}`;
+  $('time').textContent = fmtTime(S.elapsed);
+}
+
+function finish({ won }) {
+  if (S.finished) return;
+  S.finished = true;
+  clearInterval(S.timer);
+  const durationMs = S.startAt ? Date.now() - S.startAt : 0;
+  const score = Math.round(durationMs / 1000);
+  S.elapsed = score; updateHud();
+  post({ type: 'kb-brain', event: 'result', game: GAME_ID, level: S.level, won: !!won, score, durationMs });
+  $('ov-title').textContent = T.won;
+  $('ov-text').textContent = T.summary(score, S.moves);
+  $('overlay').classList.add('show');
+  $('ov-again').focus();
+  if (won) { sfx.win(); confetti(); }
+}
+
+// Fit the grid into the available area: pick the column count that gives the largest square cards
+// for the current aspect ratio (so 4×4 may become 8×2 in a wide strip, 6×6 → 4×9 on a tall phone).
+function layout() {
+  const wrap = $('board-wrap');
+  const n = S.deck.length;
+  const W = wrap.clientWidth - 4, H = wrap.clientHeight - 4; // wrapper padding 2px each side
+  if (W <= 0 || H <= 0) return;
+  const gap = Math.max(3, Math.min(8, Math.round(Math.min(W, H) / 60)));
+  let best = { size: 0, cols: 1, rows: n };
+  for (let cols = 1; cols <= n; cols++) {
+    if (n % cols) continue;
+    const rows = n / cols;
+    const size = Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows);
+    if (size > best.size) best = { size, cols, rows };
+  }
+  const size = Math.floor(best.size);
+  const board = $('board');
+  board.style.setProperty('--gap', gap + 'px');
+  board.style.gridTemplateColumns = `repeat(${best.cols}, ${size}px)`;
+  board.style.gridAutoRows = `${size}px`;
+  board.style.width = ''; board.style.height = '';
+  board.style.setProperty('--w', `${best.cols * size + gap * (best.cols - 1)}px`);
+  board.style.setProperty('--h', `${best.rows * size + gap * (best.rows - 1)}px`);
+  for (const c of S.cards) c.style.aspectRatio = '1 / 1';
+}
+
+function setPaused(p) {
+  S.paused = p;
+  document.body.classList.toggle('paused', p);
+  if (p) { if (S.startAt) S.pauseAt = Date.now(); }
+  else if (S.pauseAt) { S.startAt += Date.now() - S.pauseAt; S.pauseAt = 0; }
+}
+
+window.addEventListener('message', (e) => {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'kb-brain') return;
+  switch (e.data.action) {
+    case 'pause': setPaused(true); break;
+    case 'resume': setPaused(false); break;
+    case 'mute': sfx.set(false); syncSound(); break;
+    case 'theme': applyTheme(e.data.theme); break;
+    case 'new': newGame(S.level); break;
+  }
+});
+window.addEventListener('resize', layout);
+
+// ---------- selftest ----------
+function brainSelftest() {
+  const fails = [];
+  // deterministic PRNG for repeatable tests
+  let seed = 12345; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (const lv of [1, 2, 3]) {
+    const { cols, rows } = LEVELS[lv]; const pairs = cols * rows / 2;
+    const deck = makeDeck(pairs, rnd);
+    if (deck.length !== cols * rows) fails.push(`level ${lv}: deck length ${deck.length}`);
+    const counts = {};
+    for (const id of deck) counts[id] = (counts[id] || 0) + 1;
+    if (Object.keys(counts).length !== pairs) fails.push(`level ${lv}: ${Object.keys(counts).length} symbols, expected ${pairs}`);
+    for (const [id, c] of Object.entries(counts)) if (c !== 2) fails.push(`level ${lv}: symbol ${id} appears ${c}×`);
+    if (deck.some((id) => !ICONS[id])) fails.push(`level ${lv}: unknown icon id`);
+  }
+  if (ICONS.length < 24) fails.push(`only ${ICONS.length} icons`);
+  // shuffling changes order (with overwhelming probability over 10 tries)
+  const sorted = Array.from({ length: 48 }, (_, i) => i);
+  let same = 0; for (let t = 0; t < 10; t++) if (shuffle(sorted.slice(), rnd).join() === sorted.join()) same++;
+  if (same > 0) fails.push('shuffle left the deck sorted');
+  // win detection
+  if (isFinished(7, 8)) fails.push('finished too early'); if (!isFinished(8, 8)) fails.push('finish not detected');
+  if (fmtTime(73) !== '1:13' || fmtTime(0) !== '0:00') fails.push('fmtTime');
+  for (const l of Object.keys(STR)) for (const k of Object.keys(STR.en)) if (!(k in STR[l])) fails.push(`STR.${l}.${k} missing`);
+  return fails;
+}
+window.brainSelftest = brainSelftest;
+
+// ---------- boot ----------
+$('l-time').textContent = T.time; $('l-moves').textContent = T.moves; $('l-pairs').textContent = T.pairs;
+$('pause-text').textContent = T.paused; $('ov-again').textContent = T.again;
+$('soundBtn').title = T.sound; $('soundBtn').setAttribute('aria-label', T.sound); syncSound();
+$('soundBtn').addEventListener('click', () => { sfx.set(!sfx.enabled); syncSound(); });
+$('levels').setAttribute('aria-label', T.levelsAria);
+bindHelp(T);
+$('ov-again').addEventListener('click', () => newGame(S.level));
+newGame(level);
+if (params.has('selftest')) {
+  const f = brainSelftest(); const el = $('selftest'); el.hidden = false;
+  el.textContent = f.length ? 'SELFTEST FAIL: ' + f.join('; ') : 'SELFTEST PASS';
+}
+if (params.has('debug')) {
+  window.brainGame = {
+    state: () => ({ level: S.level, deck: S.deck.slice(), found: S.found, pairs: S.pairs, moves: S.moves,
+                    finished: S.finished, paused: S.paused, elapsed: S.elapsed }),
+    finish: ({ won = true } = {}) => finish({ won }),
+    newGame: (lv) => newGame(lv),
+  };
+}
+post({ type: 'kb-brain', event: 'ready', game: GAME_ID });
+</script>
+</body>
+</html>

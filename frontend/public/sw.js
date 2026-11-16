@@ -67,7 +67,8 @@ self.addEventListener('fetch', (e) => {
   // Relax (15. 10. 2026): načtení scény do iframe je taky navigace — bez výjimky by networkFirst uložil
   // /relax/*.html pod klíč „/“ (offline by se místo aplikace otevřelo akvárium a offline iframe by dostal
   // index.html → aplikace vnořená sama do sebe). Scény jdou vždy po síti; offline relax není.
-  if (req.destination === 'iframe' || url.pathname.startsWith('/relax/')) return;
+  // Brain training games (/brain/*.html, 9 Nov 2026) are iframes too — same rule.
+  if (req.destination === 'iframe' || url.pathname.startsWith('/relax/') || url.pathname.startsWith('/brain/')) return;
   if (req.mode === 'navigate') {
     e.respondWith(networkFirst(req, SHELL, new Request('/')));
     return;

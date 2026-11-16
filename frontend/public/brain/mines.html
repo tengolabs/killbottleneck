@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minesweeper</title>
+<style>
+/* ===== Deluxe look — shared design kit for every brain game (inline this block; keep the names) =====
+   Source of the look: "Minesweeper Deluxe" (miny-modely/deluxe, 3. 11. 2026) chosen by Richard 14. 11. 2026.
+   Light = :root, dark = :root[data-theme="dark"]. No external URLs, no web fonts (system stack only). */
+:root {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #f5f7fc 0%, #d3dae8 100%);
+  --panel: rgba(255,255,255,.78); --panel-solid:#ffffff; --line: rgba(30,41,59,.14);
+  --panel-shadow: 0 20px 40px rgba(30,41,59,.16), 0 0 0 1px rgba(30,41,59,.06);
+  --text:#0f172a; --muted:#5b6578;
+  --tile: linear-gradient(145deg,#ffffff,#dde4ef); --tile-border:#aab6ca; --tile-hover: linear-gradient(145deg,#ffffff,#eef2f8);
+  --tile-down:#cbd4e1; --tile-down-border:#b3bfd0; --tile-shine: rgba(255,255,255,.95);
+  --well: rgba(30,41,59,.07);                 /* darker inset area (board wrapper, status panel) */
+  --accent:#4f46e5; --accent-hover:#4338ca; --accent-text:#ffffff; --accent-glow: rgba(99,102,241,.35);
+  --ok:#10b981; --bad:#ef4444; --warn:#f59e0b; --info:#06b6d4; --pink:#ec4899; --violet:#8b5cf6;
+  --n1:#3b82f6; --n2:#10b981; --n3:#ef4444; --n4:#8b5cf6; --n5:#f59e0b; --n6:#06b6d4; --n7:#ec4899; --n8:#64748b;
+  --radius:18px; --radius-s:10px;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #1e1e38 0%, #0d0e1a 100%);
+  --panel: rgba(26,27,46,.75); --panel-solid:#1a1b2e; --line: rgba(255,255,255,.1);
+  --panel-shadow: 0 20px 50px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
+  --text:#f0f3f8; --muted:#8c93a8;
+  --tile: linear-gradient(145deg,#2a2d48,#20233b); --tile-border:#3b3f63; --tile-hover: linear-gradient(145deg,#35395c,#272a47);
+  --tile-down:#141524; --tile-down-border:#1f2136; --tile-shine: rgba(255,255,255,.1);
+  --well: rgba(0,0,0,.25);
+  --accent:#6366f1; --accent-hover:#4f46e5; --accent-text:#ffffff;
+  color-scheme: dark;
+}
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; }
+body { background:var(--bg-gradient) fixed; color:var(--text); overflow:hidden; display:flex; flex-direction:column; -webkit-tap-highlight-color:transparent;
+       user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.cell { touch-action:manipulation; }
+button { font:inherit; color:inherit; cursor:pointer; }
+button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+[hidden] { display:none !important; }
+
+/* glowing background blobs: <div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div> as the first child of body */
+.blobs { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+.blobs i { position:absolute; border-radius:50%; filter:blur(70px); opacity:.34; animation: blobfloat 14s infinite alternate ease-in-out; }
+:root[data-theme="dark"] .blobs i { opacity:.22; }
+.blobs i:nth-child(1) { width:45vmax; height:45vmax; background:#6366f1; top:-15vmax; left:5%; }
+.blobs i:nth-child(2) { width:50vmax; height:50vmax; background:#ec4899; bottom:-20vmax; right:0; animation-duration:18s; }
+.blobs i:nth-child(3) { width:35vmax; height:35vmax; background:#06b6d4; top:40%; left:55%; animation-duration:12s; }
+@keyframes blobfloat { to { transform: translateY(30px) scale(1.08); } }
+
+/* glass card = the game panel; sits above the blobs */
+.glass { position:relative; z-index:1; background:var(--panel); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+         border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--panel-shadow); }
+#app { height:calc(100% - 16px); margin:8px; display:flex; flex-direction:column; gap:8px; padding:10px 12px; min-height:0; }
+@media (max-height:360px) { #app { height:calc(100% - 8px); margin:4px; padding:6px 8px; gap:6px; } }
+
+/* status panel (HUD) with digital displays */
+.status { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none;
+          background:var(--well); border:1px solid var(--line); border-radius:14px; padding:6px 12px; }
+.display { display:flex; flex-direction:column; align-items:center; min-width:56px; }
+.display .label { font-size:.62rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+.digits { font-family:var(--mono); font-size:1.25rem; font-weight:700; color:#ef4444; text-shadow:0 0 10px rgba(239,68,68,.5);
+          background:#000; padding:1px 8px; border-radius:8px; letter-spacing:2px; border:1px solid rgba(239,68,68,.2);
+          font-variant-numeric:tabular-nums; line-height:1.3; }
+.digits.green { color:#10b981; text-shadow:0 0 10px rgba(16,185,129,.5); border-color:rgba(16,185,129,.25); }
+.digits.blue { color:#60a5fa; text-shadow:0 0 10px rgba(96,165,250,.5); border-color:rgba(96,165,250,.25); }
+.pill { background:var(--well); border:1px solid var(--line); border-radius:999px; padding:3px 12px; font-size:.78rem; color:var(--muted); white-space:nowrap; }
+.pill strong { color:var(--ok); }
+.badge { font-size:.62rem; font-weight:700; text-transform:uppercase; background:linear-gradient(135deg,#f59e0b,#ec4899); color:#fff;
+         padding:2px 8px; border-radius:999px; letter-spacing:.5px; }
+
+/* 3D tiles (cells, cards, keys) */
+.tile { background:var(--tile); border:1px solid var(--tile-border); border-radius:8px; color:var(--text);
+        box-shadow: inset 0 1px 0 var(--tile-shine), 0 2px 4px rgba(0,0,0,.2); transition: background .1s, transform .1s, box-shadow .1s; }
+.tile:hover { background:var(--tile-hover); transform:translateY(-1px); }
+.tile:active { transform:translateY(1px) scale(.97); }
+.tile.down { background:var(--tile-down); border-color:var(--tile-down-border); box-shadow: inset 0 2px 4px rgba(0,0,0,.4); transform:none; }
+.well { background:var(--well); border:1px solid var(--line); border-radius:14px; padding:8px; }
+
+/* buttons */
+.btn { background:var(--accent); color:var(--accent-text); border:0; border-radius:var(--radius-s); padding:9px 18px; font-weight:700;
+       box-shadow:0 4px 14px var(--accent-glow); transition: background .2s, transform .15s; }
+.btn:hover { background:var(--accent-hover); transform:translateY(-1px); }
+.btn:active { transform:translateY(1px); }
+.btn.ghost { background:var(--well); color:var(--text); box-shadow:none; border:1px solid var(--line); }
+.icon-btn { width:34px; height:34px; border-radius:10px; background:var(--well); border:1px solid var(--line); display:inline-flex;
+            align-items:center; justify-content:center; font-size:1rem; transition: background .2s, transform .2s; flex:none; }
+.icon-btn:hover { transform:translateY(-1px); background:rgba(127,127,127,.18); }
+.icon-btn[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; }
+
+/* overlays (start / end / pause) — centred glass card */
+.overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:12px; z-index:20;
+           background:rgba(0,0,0,.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border-radius:inherit; animation: fadeIn .2s ease; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:16px 20px; max-width:360px; width:100%;
+        text-align:center; box-shadow:var(--panel-shadow); color:var(--text); }
+.card h2 { margin:0 0 6px; font-size:1.15rem; font-weight:800; letter-spacing:-.3px; }
+.card p { margin:0 0 12px; color:var(--muted); font-size:.85rem; line-height:1.4; }
+.card .big { font-family:var(--mono); font-size:2rem; font-weight:800; color:var(--accent); margin:2px 0 8px; font-variant-numeric:tabular-nums; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes popIn { 0% { transform:scale(.85); opacity:.6; } 100% { transform:scale(1); opacity:1; } }
+@keyframes shake { 0%,100% { transform:translate(0,0); } 25% { transform:translate(-4px,2px); } 50% { transform:translate(4px,-2px); } 75% { transform:translate(-2px,-2px); } }
+#confetti { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50; }
+#selftest { position:fixed; left:0; bottom:0; z-index:99; font:11px var(--mono); color:#fff; background:#000; padding:2px 6px; }
+@media (prefers-reduced-motion: reduce) { .blobs i, .overlay, .tile, .btn { animation:none !important; transition:none !important; } }
+/* in-game level choice (games with more than one level): <div class="levels" role="group" id="levels"></div> filled with
+   <button class="lvl" type="button" data-level="N" aria-pressed="true|false"><b>Name</b><small>info</small></button> */
+.levels { display:flex; gap:6px; flex:none; flex-wrap:wrap; }
+/* Expert 30×16 is not offered on a phone (the hub does the same): the board would scroll inside the frame and the
+   scrolling fights the long press */
+@media (max-width:639px) { .levels .lvl:nth-child(4) { display:none; } }
+.lvl { flex:1 1 72px; min-width:0; background:var(--well); border:1px solid var(--line); border-radius:12px; padding:5px 8px; display:flex; flex-direction:column;
+       align-items:center; gap:1px; transition: background .2s; }
+.lvl b { font-weight:700; font-size:.85rem; white-space:nowrap; } .lvl small { font-size:.66rem; color:var(--muted); white-space:nowrap; }
+.lvl:hover { background:rgba(127,127,127,.14); }
+.lvl[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; box-shadow:0 4px 14px var(--accent-glow); }
+.lvl[aria-pressed="true"] small { color:rgba(255,255,255,.8); }
+@media (max-height:360px) { .lvl small { display:none; } .lvl { padding:3px 6px; } }
+/* "How to play" (added 15. 11. after Richard's klik-test — the word game had no explanation at all): a labelled button in the
+   .status HUD <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button> opens
+   <div class="overlay" id="helpOverlay" hidden><div class="card rules"><button class="close" id="helpClose" type="button"
+   aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div></div>
+   filled by bindHelp(T) from STR keys `help`, `rulesTitle`, `rules` (array of short HTML items, <b>…</b> for the keyword). */
+.icon-btn.help { width:auto; padding:0 10px; gap:6px; font-size:.78rem; font-weight:700; color:var(--text); }
+.icon-btn.help span { white-space:nowrap; }
+@media (max-width:479px), (max-height:360px) { .icon-btn.help span { display:none; } .icon-btn.help { padding:0; width:34px; } }
+.card.rules { position:relative; max-width:440px; max-height:calc(100% - 8px); display:flex; flex-direction:column; }
+.card.rules .modal-body { overflow:auto; min-height:0; }
+.modal-body ul { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px; font-size:.86rem; line-height:1.4; text-align:left; }
+.modal-body li b { color:var(--text); }
+.card .close { position:absolute; right:10px; top:6px; background:none; border:0; font-size:1.4rem; color:var(--muted); cursor:pointer; }
+/* example tiles inside the rules (word game): <span class="ex"><i class="hit">S</i><i class="near">T</i><i class="miss">A</i></span> */
+.ex { display:inline-flex; gap:3px; vertical-align:middle; margin:0 2px; }
+.ex i { font-style:normal; font-weight:800; font-size:.8rem; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
+        border-radius:5px; background:var(--tile); border:1px solid var(--tile-border); color:var(--text); text-transform:uppercase; }
+.ex i.hit { background:var(--ok); border-color:var(--ok); color:#fff; } .ex i.near { background:var(--warn); border-color:var(--warn); color:#fff; }
+.ex i.miss { background:var(--tile-down); border-color:var(--tile-down-border); color:var(--muted); }
+/* ---- Minesweeper (Deluxe look): header, difficulty bar, status panel, board, modal ---- */
+#app { gap:10px; }
+.header { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none; border-bottom:1px solid var(--line); padding-bottom:8px; }
+.brand { display:flex; align-items:center; gap:8px; font-size:1.15rem; font-weight:800; letter-spacing:-.4px; }
+.brand .icon { font-size:1.4rem; filter:drop-shadow(0 2px 8px rgba(0,0,0,.3)); }
+.top { display:flex; gap:6px; }
+.status { padding:6px 14px; }
+.face { width:46px; height:46px; border-radius:50%; font-size:1.45rem; display:flex; align-items:center; justify-content:center; border:2px solid var(--tile-border);
+        background:var(--tile); box-shadow:0 4px 12px rgba(0,0,0,.3); transition: transform .15s; flex:none; }
+.face:hover { transform:scale(1.08); } .face:active { transform:scale(.95); }
+.right { display:flex; align-items:center; gap:6px; }
+.modes { display:none; gap:8px; flex:none; }
+.modes.show { display:flex; }
+.mode { flex:1; padding:7px; border-radius:12px; background:var(--well); border:1px solid var(--line); font-weight:600; font-size:.88rem; }
+.mode[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; }
+.boardWrap { flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; overflow:auto; padding:6px;
+             background:var(--well); border:1px solid var(--line); border-radius:14px; position:relative; }
+.board { display:grid; gap:3px; margin:auto; }
+.cell { width:var(--cs); height:var(--cs); padding:0; font-family:var(--mono); font-size:calc(var(--cs) * .5); font-weight:800; line-height:1;
+        display:flex; align-items:center; justify-content:center; }
+.cell.flag { animation: flagBounce .25s ease-out; }
+@keyframes flagBounce { 0% { transform:scale(.6) rotate(-15deg); } 50% { transform:scale(1.2) rotate(8deg); } 100% { transform:none; } }
+.cell.down { animation: popIn .18s cubic-bezier(.175,.885,.32,1.275); cursor:default; }
+.cell.down:hover { transform:none; }
+.cell.hit { background:var(--bad) !important; box-shadow:0 0 15px rgba(239,68,68,.45); animation: shake .3s ease-in-out; }
+.cell.wrong { background:rgba(239,68,68,.25); }
+.cell[data-n="1"] { color:var(--n1); text-shadow:0 0 8px rgba(59,130,246,.4); } .cell[data-n="2"] { color:var(--n2); text-shadow:0 0 8px rgba(16,185,129,.4); }
+.cell[data-n="3"] { color:var(--n3); text-shadow:0 0 8px rgba(239,68,68,.4); }  .cell[data-n="4"] { color:var(--n4); text-shadow:0 0 8px rgba(139,92,246,.4); }
+.cell[data-n="5"] { color:var(--n5); text-shadow:0 0 8px rgba(245,158,11,.4); } .cell[data-n="6"] { color:var(--n6); text-shadow:0 0 8px rgba(6,182,212,.4); }
+.cell[data-n="7"] { color:var(--n7); text-shadow:0 0 8px rgba(236,72,153,.4); } .cell[data-n="8"] { color:var(--n8); text-shadow:0 0 8px rgba(100,116,139,.4); }
+.hint { flex:none; text-align:center; font-size:.72rem; color:var(--muted); opacity:.85; }
+.hint b { color:var(--text); }
+/* a lost round keeps the mines visible: no blur, the card sits at the top (the hub's own result bar is at the bottom) */
+.overlay.lost { background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; align-items:flex-start; pointer-events:none; }
+.overlay.lost .card { pointer-events:auto; max-width:300px; padding:10px 16px; }
+.overlay.lost .big { font-size:1.4rem; margin:0 0 4px; }
+body.paused .boardWrap { opacity:.4; pointer-events:none; }
+@media (max-height:360px) { #app { gap:6px; } .header { display:none; } .hint { display:none; } .status { padding:3px 10px; } .face { width:38px; height:38px; font-size:1.2rem; }
+  .digits { font-size:1.05rem; } .display .label { display:none; } }
+@media (max-width:420px) { .hint { display:none; } .lvl small { display:none; } }
+@media (prefers-reduced-motion: reduce) { .cell { animation:none !important; } }
+</style>
+</head>
+<body>
+<div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div>
+<div id="app" class="glass">
+  <div class="header" id="header">
+    <div class="brand"><span class="icon">💣</span><span id="title"></span><span class="badge">Deluxe</span></div>
+    <div class="top">
+      <button class="icon-btn" id="themeBtn" type="button">🌓</button>
+    </div>
+  </div>
+  <div class="levels" id="levels" role="group"></div>
+  <div class="status">
+    <div class="display"><span class="label" id="lblMines"></span><span class="digits" id="mineCount">010</span></div>
+    <button class="face" id="face" type="button">😊</button>
+    <div class="right">
+      <div class="display"><span class="label" id="lblTime"></span><span class="digits" id="clock">000</span></div>
+      <button class="icon-btn" id="soundBtn" type="button"></button>
+      <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button>
+    </div>
+  </div>
+  <div class="modes" id="modes">
+    <button class="mode" id="modeDig" type="button" aria-pressed="true"></button>
+    <button class="mode" id="modeFlag" type="button" aria-pressed="false"></button>
+  </div>
+  <div class="boardWrap" id="boardWrap">
+    <div class="board" id="board" role="grid"></div>
+    <div class="overlay" id="endOverlay" hidden>
+      <div class="card"><h2 id="endTitle"></h2><div class="big" id="endTime"></div><p id="endText"></p><button class="btn" id="againBtn" type="button"></button></div>
+    </div>
+    <div class="overlay" id="pauseOverlay" hidden><div class="card"><h2 id="pauseText" style="margin:0"></h2></div></div>
+    <div class="overlay" id="helpOverlay" hidden>
+      <div class="card rules"><button class="close" id="helpClose" type="button" aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div>
+    </div>
+  </div>
+  <div class="hint" id="hint"></div>
+</div>
+<canvas id="confetti"></canvas>
+<script>
+'use strict';
+// ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
+// Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
+// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+const sfx = {
+  ctx: null,
+  enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
+  ac() {
+    if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) this.ctx = new AC(); }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  set(on) { this.enabled = !!on; try { localStorage.setItem('brain-sound', on ? '1' : '0'); } catch { /* private mode */ } },
+  tone(f, d = 0.08, type = 'square', g = 0.04, delay = 0) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const o = c.createOscillator(), v = c.createGain();
+    o.type = type; o.frequency.value = f;
+    const t0 = c.currentTime + delay;
+    v.gain.setValueAtTime(0.0001, t0);
+    v.gain.linearRampToValueAtTime(g, t0 + 0.012);
+    v.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    o.connect(v).connect(c.destination);
+    o.start(t0); o.stop(t0 + d + 0.05);
+  },
+  noise(d = 0.4, g = 0.15) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const n = Math.floor(c.sampleRate * d), buf = c.createBuffer(1, n, c.sampleRate), data = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 800;
+    const v = c.createGain(); v.gain.value = g;
+    src.connect(fl).connect(v).connect(c.destination); src.start();
+  },
+  // vocabulary shared by all games
+  click() { this.tone(920, 0.05, 'square', 0.02); },          // reveal / flip / key press
+  flag()  { this.tone(430, 0.07, 'square', 0.03); },          // secondary action (flag, note)
+  ok()    { this.tone(660, 0.06, 'square', 0.03); this.tone(990, 0.08, 'square', 0.03, 0.06); }, // correct answer
+  bad()   { this.tone(180, 0.14, 'sawtooth', 0.05); },        // wrong answer
+  boom()  { this.noise(0.5, 0.2); this.tone(65, 0.45, 'sawtooth', 0.12); },                     // mine hit / game lost
+  win()   { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.13, 'square', 0.04, i * 0.11)); },
+};
+
+// Confetti burst on a won round (canvas#confetti, fixed, pointer-events:none). Honour reduced motion.
+function confetti() {
+  const canvas = document.getElementById('confetti');
+  if (!canvas || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6'];
+  const ps = Array.from({ length: 110 }, () => ({ x: canvas.width / 2, y: canvas.height / 2, vx: (Math.random() - .5) * 18, vy: (Math.random() - .7) * 20,
+    size: Math.random() * 8 + 4, color: colors[Math.floor(Math.random() * colors.length)], a: 1, rot: Math.random() * 360, rs: (Math.random() - .5) * 10 }));
+  (function step() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    for (const p of ps) {
+      p.x += p.vx; p.y += p.vy; p.vy += .4; p.rot += p.rs; p.a -= .012;
+      if (p.a <= 0) continue;
+      alive = true;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180); ctx.globalAlpha = p.a; ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.restore();
+    }
+    if (alive) requestAnimationFrame(step); else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  })();
+}
+
+// Sound toggle button: <button class="icon-btn" id="soundBtn" type="button"></button>; the hub's `mute` action calls sfx.set(false) + syncSound().
+function syncSound() { const b = document.getElementById('soundBtn'); if (!b) return; b.textContent = sfx.enabled ? '🔊' : '🔇'; b.setAttribute('aria-pressed', String(!sfx.enabled)); }
+
+// Theme + level plumbing shared by all games (added 14. 11. evening, Richard's klik-test):
+// - the hub sends { action: 'theme', theme: 'light'|'dark' } when the app theme or skin changes → recolour WITHOUT restarting the game
+// - the player picks the level inside the game: when embedded, the game only reports it ({ event: 'level' }) and the hub reloads
+//   the game at that level (the hub is the source of truth for the round on the server); standalone, the game restarts itself.
+function applyTheme(theme) { if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; }
+// Builds the level buttons; `names` = STR.levels (array of display names), `infos` = optional array of short hints, `current` = 1-based.
+function buildLevels(names, infos, current, onPick) {
+  const box = document.getElementById('levels'); if (!box) return;
+  box.innerHTML = '';
+  names.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'lvl'; b.dataset.level = i + 1; b.setAttribute('aria-pressed', String(i + 1 === current));
+    b.innerHTML = `<b>${name}</b>${infos && infos[i] ? `<small>${infos[i]}</small>` : ''}`;
+    b.addEventListener('click', () => { if (i + 1 !== current) onPick(i + 1); });
+    box.appendChild(b);
+  });
+}
+
+/* ---------- i18n ---------- */
+// "How to play" modal (added 15. 11.): wires #helpBtn / #helpOverlay / #helpClose and fills the texts from STR
+// (`help` = button label, `rulesTitle`, `rules` = array of short HTML items). Escape closes it; a click on the backdrop too.
+function bindHelp(T) {
+  const btn = document.getElementById('helpBtn'), ov = document.getElementById('helpOverlay'); if (!btn || !ov) return;
+  const lbl = document.getElementById('helpLbl'); if (lbl) lbl.textContent = T.help; btn.title = T.help; btn.setAttribute('aria-label', T.help);
+  document.getElementById('rulesTitle').textContent = T.rulesTitle;
+  document.getElementById('rulesList').innerHTML = T.rules.map((r) => `<li>${r}</li>`).join('');
+  const open = () => { ov.hidden = false; btn.setAttribute('aria-expanded', 'true'); };
+  const close = () => { ov.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.addEventListener('click', () => (ov.hidden ? open() : close()));
+  document.getElementById('helpClose').addEventListener('click', close);
+  ov.addEventListener('click', (ev) => { if (ev.target === ov) close(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !ov.hidden) { close(); ev.stopPropagation(); } }, true);
+}
+
+const STR = {
+  cs: { title: 'Hledání min', mines: 'Miny', time: 'Čas', sound: 'Zvuk', help: 'Jak hrát', theme: 'Přepnout motiv', newGame: 'Nová hra',
+        dig: '⛏️ Odkrýt', flag: '🚩 Vlaječka', paused: 'Pauza', again: 'Hrát znovu', retry: 'Zkusit znovu',
+        won: 'Vyčištěno!', lost: 'Bum!', wonText: (s) => `Všechny miny nalezeny za ${s} s.`, lostText: 'Mina vybuchla. Zkus to znovu.',
+        levels: ['Lehká', 'Střední', 'Těžká', 'Expert'], levelsAria: 'Obtížnost', cell: (r, c) => `Řádek ${r}, sloupec ${c}`,
+        hint: '💡 <b>Pravé tlačítko</b> nebo <b>dlouhý stisk</b>: vlaječka · <b>klik na číslo</b>: odkryje sousedy · <b>F</b>: vlaječka z klávesnice',
+        rulesTitle: 'Jak hrát', rules: ['<b>Cíl:</b> odkrýt všechna bezpečná políčka, aniž by vybuchla mina.',
+          '<b>Levé kliknutí</b> odkryje políčko. První kliknutí je vždy bezpečné.',
+          '<b>Pravé kliknutí</b> (na telefonu dlouhý stisk nebo režim vlaječky) označí políčko 🚩.',
+          '<b>Klik na odhalené číslo:</b> je-li kolem označen správný počet vlaječek, odkryjí se zbylí sousedé.',
+          '<b>Čísla</b> říkají, kolik min sousedí s políčkem (1–8).', '<b>Klávesnice:</b> šipky, Enter/mezerník odkryje, F dá vlaječku.'] },
+  en: { title: 'Minesweeper', mines: 'Mines', time: 'Time', sound: 'Sound', help: 'How to play', theme: 'Toggle theme', newGame: 'New game',
+        dig: '⛏️ Dig', flag: '🚩 Flag', paused: 'Paused', again: 'Play again', retry: 'Try again',
+        won: 'Cleared!', lost: 'Boom!', wonText: (s) => `All mines found in ${s} s.`, lostText: 'A mine went off. Try again.',
+        levels: ['Easy', 'Medium', 'Hard', 'Expert'], levelsAria: 'Difficulty', cell: (r, c) => `Row ${r}, column ${c}`,
+        hint: '💡 <b>Right click</b> or <b>long press</b>: flag · <b>click a number</b>: reveal its neighbours · <b>F</b>: flag from the keyboard',
+        rulesTitle: 'How to play', rules: ['<b>Goal:</b> reveal every safe square without setting off a mine.',
+          '<b>Left click</b> reveals a square. The first click is always safe.',
+          '<b>Right click</b> (long press or flag mode on a phone) marks a square with 🚩.',
+          '<b>Click a revealed number:</b> when the right number of flags surrounds it, the remaining neighbours open.',
+          '<b>Numbers</b> tell how many mines touch the square (1–8).', '<b>Keyboard:</b> arrows move, Enter/Space reveals, F flags.'] },
+};
+const GAME_ID = 'mines';
+const PARAMS = new URLSearchParams(location.search);
+const EMBED = PARAMS.get('embed') === '1';
+const LANG = PARAMS.get('lang') === 'cs' ? 'cs' : 'en';
+const T = STR[LANG];
+document.documentElement.lang = LANG;
+const themeParam = PARAMS.get('theme');
+if (themeParam === 'light' || themeParam === 'dark') document.documentElement.dataset.theme = themeParam;
+else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
+
+/* =========================================================
+   PURE GAME LOGIC (no DOM) — testable in Node as well
+   ========================================================= */
+const MS = (() => {
+  // level 1..4 → board; Expert is the classic 30×16/99
+  const DIFFS = [
+    { rows: 9,  cols: 9,  mines: 10 },
+    { rows: 16, cols: 16, mines: 40 },
+    { rows: 14, cols: 20, mines: 50 },
+    { rows: 16, cols: 30, mines: 99 },
+  ];
+
+  function createGame(diff) {
+    const { rows, cols, mines } = diff;
+    const n = rows * cols;
+    const cells = new Array(n);
+    for (let i = 0; i < n; i++) cells[i] = { mine: false, adj: 0, state: 'hidden' };
+    const nb = new Array(n);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const list = [];
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        const rr = r + dr, cc = c + dc;
+        if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue;
+        list.push(rr * cols + cc);
+      }
+      nb[r * cols + c] = list;
+    }
+    return { diff, rows, cols, mines, n, cells, nb, opened: 0, placed: false };
+  }
+
+  // the first click and its neighbours never hold a mine
+  function placeMines(g, safeIdx, rng = Math.random) {
+    const forbidden = new Set([safeIdx, ...g.nb[safeIdx]]);
+    const pool = [];
+    for (let i = 0; i < g.n; i++) if (!forbidden.has(i)) pool.push(i);
+    const want = Math.min(g.mines, pool.length);
+    for (let k = 0; k < want; k++) {                 // partial Fisher–Yates shuffle
+      const j = k + Math.floor(rng() * (pool.length - k));
+      const t = pool[k]; pool[k] = pool[j]; pool[j] = t;
+      g.cells[pool[k]].mine = true;
+    }
+    computeAdj(g);
+    g.placed = true;
+    return g;
+  }
+
+  function computeAdj(g) {
+    for (let i = 0; i < g.n; i++) {
+      let a = 0;
+      for (const j of g.nb[i]) if (g.cells[j].mine) a++;
+      g.cells[i].adj = a;
+    }
+    return g;
+  }
+
+  // Reveal: BFS from start, floods only through cells with adj===0. Returns {hit, opened}.
+  function flood(g, start) {
+    const opened = [], seen = new Set([start]), q = [start];
+    let hit = null;
+    while (q.length) {
+      const i = q.shift(), cell = g.cells[i];
+      if (cell.state !== 'hidden') continue;
+      cell.state = 'open';
+      opened.push(i);
+      if (cell.mine) { hit = i; continue; }
+      g.opened++;
+      if (cell.adj === 0) for (const j of g.nb[i]) if (g.cells[j].state === 'hidden' && !seen.has(j)) { seen.add(j); q.push(j); }
+    }
+    return { hit, opened };
+  }
+
+  // chord: a revealed number with exactly adj flags around it opens its remaining hidden neighbours
+  function chordTargets(g, i) {
+    const cell = g.cells[i];
+    if (cell.state !== 'open' || cell.adj === 0) return [];
+    const flags = g.nb[i].filter((j) => g.cells[j].state === 'flag').length;
+    return flags === cell.adj ? g.nb[i].filter((j) => g.cells[j].state === 'hidden') : [];
+  }
+
+  const remainingMines = (g) => g.mines - g.cells.reduce((s, c) => s + (c.state === 'flag' ? 1 : 0), 0);
+  const isWin = (g) => g.opened === g.n - g.mines;
+
+  // ?level=1..4 → DIFFS index; anything else → 0
+  function levelIndex(v) { const n = parseInt(v, 10); return n >= 1 && n <= DIFFS.length ? n - 1 : 0; }
+  // score = seconds on the clock (lower is better); durationMs derived from it
+  function resultOf(diffIdx, won, seconds) {
+    return { type: 'kb-brain', event: 'result', game: GAME_ID, level: diffIdx + 1, won: !!won, score: seconds, durationMs: seconds * 1000 };
+  }
+
+  function selftest() {
+    const fails = [];
+    const ok = (cond, msg) => { if (!cond) fails.push(msg); };
+    DIFFS.forEach((d, di) => {
+      const name = `L${di + 1}`;
+      const g = createGame(d);
+      ok(g.cells.length === d.rows * d.cols, name + ': cell count');
+      ok(g.nb.every((a) => a.length >= 3 && a.length <= 8), name + ': neighbours');
+      ok(g.nb[0].length === 3, name + ': corner has 3 neighbours');
+      ok(g.nb[Math.floor(d.cols / 2)].length === 5, name + ': edge has 5 neighbours');
+      const s = Math.floor(g.n / 2);
+      placeMines(g, s);
+      let mines = 0, unsafe = 0;
+      for (let i = 0; i < g.n; i++) if (g.cells[i].mine) mines++;
+      for (const j of [s, ...g.nb[s]]) if (g.cells[j].mine) unsafe++;
+      ok(mines === d.mines, name + ': mine count ' + mines + '/' + d.mines);
+      ok(unsafe === 0, name + ': first move is safe');
+      for (let i = 0; i < g.n; i++) {
+        let a = 0; for (const j of g.nb[i]) if (g.cells[j].mine) a++;
+        if (g.cells[i].adj !== a) { fails.push(name + ': adj of cell ' + i); break; }
+      }
+      const res = flood(g, s);
+      ok(res.hit === null && res.opened.length >= 1, name + ': flood from the safe start opens cells and hits no mine');
+      ok(g.cells.every((c) => !(c.state === 'open' && c.mine)), name + ': no opened cell with a mine');
+      // flooding onto a mine reports the hit and opens nothing else
+      const g1 = createGame(d); placeMines(g1, 0);
+      const mi = g1.cells.findIndex((c) => c.mine);
+      const r1 = flood(g1, mi);
+      ok(r1.hit === mi && r1.opened.length === 1 && g1.opened === 0, name + ': hitting a mine');
+      // win detection + counters
+      const g2 = createGame(d); placeMines(g2, 0);
+      for (let i = 0; i < g2.n; i++) if (!g2.cells[i].mine) { g2.cells[i].state = 'open'; g2.opened++; }
+      ok(isWin(g2), name + ': win detection');
+      ok(remainingMines(g2) === d.mines, name + ': flag counter');
+      for (let i = 0; i < g2.n; i++) if (g2.cells[i].mine) g2.cells[i].state = 'flag';
+      ok(remainingMines(g2) === 0, name + ': flags cover all mines');
+      // chord: a number with all its mines flagged opens exactly the hidden non-mine neighbours
+      const g3 = createGame(d); placeMines(g3, 0);
+      const num = g3.cells.findIndex((c) => !c.mine && c.adj > 0);
+      g3.cells[num].state = 'open'; g3.opened++;
+      ok(chordTargets(g3, num).length === 0, name + ': chord needs flags first');
+      for (const j of g3.nb[num]) if (g3.cells[j].mine) g3.cells[j].state = 'flag';
+      const targets = chordTargets(g3, num);
+      ok(targets.length === g3.nb[num].filter((j) => !g3.cells[j].mine).length && targets.every((j) => !g3.cells[j].mine), name + ': chord opens the safe neighbours');
+    });
+    ok(levelIndex('2') === 1 && levelIndex('4') === 3 && levelIndex('9') === 0 && levelIndex(null) === 0 && levelIndex('x') === 0, 'level parsing');
+    const r = resultOf(1, true, 73);
+    ok(r.type === 'kb-brain' && r.event === 'result' && r.game === 'mines' && r.level === 2 && r.won === true && r.score === 73 && r.durationMs === 73000, 'result message shape');
+    for (const l of Object.keys(STR)) for (const k of Object.keys(STR.en)) if (!(k in STR[l])) fails.push(`STR.${l}.${k} missing`);
+    return fails;
+  }
+
+  return { DIFFS, createGame, placeMines, computeAdj, flood, chordTargets, remainingMines, isWin, selftest, levelIndex, resultOf };
+})();
+globalThis.MS = MS;
+
+/* ---- messaging with the hub (no-op when not embedded) ---- */
+// Opened from disk (file://) the origin is opaque, so origins cannot be matched; relax the checks for local testing only.
+const LOCAL_FILE = location.protocol === 'file:';
+const HUB_ORIGIN = LOCAL_FILE ? '*' : location.origin;
+const fromHub = (ev) => LOCAL_FILE ? (ev.origin === 'null' || ev.origin === location.origin) : ev.origin === location.origin;
+function post(msg) { if (!EMBED) return; try { window.parent.postMessage(msg, HUB_ORIGIN); } catch { /* opaque origin */ } }
+
+/* =========================================================
+   USER INTERFACE
+   ========================================================= */
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const el = { board: $('board'), wrap: $('boardWrap'), levels: $('levels'), face: $('face'), mineCount: $('mineCount'), clock: $('clock'),
+               modes: $('modes'), end: $('endOverlay'), pause: $('pauseOverlay'), help: $('helpOverlay') };
+  const S = { diffIdx: MS.levelIndex(PARAMS.get('level')), g: null, started: false, over: false, paused: false, time: 0, timer: null,
+              flagMode: false, pressTimer: null, suppressClick: false, touchDown: false, touchFlagged: false, focus: 0 };
+  const levelIdx = () => S.diffIdx;
+
+  /* ---- static texts ---- */
+  $('title').textContent = T.title;
+  $('lblMines').textContent = T.mines; $('lblTime').textContent = T.time;
+  $('soundBtn').title = T.sound; $('themeBtn').title = T.theme;
+  el.face.title = T.newGame; el.face.setAttribute('aria-label', T.newGame);
+  $('modeDig').textContent = T.dig; $('modeFlag').textContent = T.flag;
+  $('pauseText').textContent = T.paused; bindHelp(T);
+  $('hint').innerHTML = T.hint;
+  el.levels.setAttribute('aria-label', T.levelsAria);
+  el.board.setAttribute('aria-label', T.title);
+  // embedded in the hub: the hub picks the level and the theme → hide the header and the difficulty bar
+  if (EMBED) $('header').hidden = true;
+
+  /* ---- level choice inside the game: embedded → the hub reloads the game at that level; standalone → restart here ---- */
+  const paintDiffs = () => buildLevels(T.levels, MS.DIFFS.map((d) => `${d.cols}×${d.rows} • ${d.mines}`), S.diffIdx + 1,
+    (n) => { if (EMBED) post({ type: 'kb-brain', event: 'level', game: GAME_ID, level: n }); else { S.diffIdx = n - 1; newGame(); } });
+
+  /* ---- timer + counters ---- */
+  const pad3 = (n) => (n < 0 ? '-' + String(Math.min(99, -n)).padStart(2, '0') : String(Math.min(999, n)).padStart(3, '0'));
+  function startTimer() { stopTimer(); S.timer = setInterval(() => { S.time++; el.clock.textContent = pad3(S.time); }, 1000); }
+  function stopTimer() { clearInterval(S.timer); S.timer = null; }
+  const paintCount = () => { el.mineCount.textContent = pad3(MS.remainingMines(S.g)); };
+
+  /* ---- board ---- */
+  function newGame() {
+    stopTimer();
+    S.g = MS.createGame(MS.DIFFS[S.diffIdx]);
+    S.started = false; S.over = false; S.time = 0; S.focus = 0;
+    el.clock.textContent = '000'; el.face.textContent = '😊';
+    el.end.hidden = true; el.help.hidden = true;
+    paintDiffs(); paintCount(); build(); fit();
+  }
+
+  function build() {
+    const { rows, cols } = S.g;
+    el.board.innerHTML = '';
+    el.board.style.gridTemplateColumns = `repeat(${cols}, var(--cs))`;
+    el.board.style.gridTemplateRows = `repeat(${rows}, var(--cs))`;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < S.g.n; i++) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'cell tile'; b.dataset.i = i; b.setAttribute('role', 'gridcell');
+      b.setAttribute('aria-label', T.cell(Math.floor(i / cols) + 1, (i % cols) + 1));
+      b.tabIndex = i === 0 ? 0 : -1;
+      frag.appendChild(b);
+    }
+    el.board.appendChild(frag);
+  }
+
+  // cell size: fit the board into the wrapper (18–46 px); bigger boards scroll inside the wrapper
+  function fit() {
+    const { rows, cols } = S.g;
+    const W = el.wrap.clientWidth - 14, H = el.wrap.clientHeight - 14;
+    if (W <= 0 || H <= 0) return;
+    const cs = Math.max(18, Math.min(46, Math.floor(Math.min((W - 3 * (cols - 1)) / cols, (H - 3 * (rows - 1)) / rows))));
+    el.board.style.setProperty('--cs', cs + 'px');
+  }
+
+  function paint(i) {
+    const c = S.g.cells[i], b = el.board.children[i];
+    b.classList.toggle('down', c.state === 'open');
+    b.classList.toggle('flag', c.state === 'flag');
+    delete b.dataset.n;
+    if (c.state === 'open') { if (c.mine) b.textContent = '💣'; else if (c.adj) { b.textContent = c.adj; b.dataset.n = c.adj; } else b.textContent = ''; }
+    else b.textContent = c.state === 'flag' ? '🚩' : '';
+  }
+
+  /* ---- moves ---- */
+  function reveal(i) {
+    if (S.over || S.paused) return;
+    const c = S.g.cells[i];
+    if (c.state === 'flag') return;
+    if (c.state === 'open') { chord(i); return; }
+    // mines are placed on the first reveal — also when a flag came first (that set `started`, so the old
+    // `if (!started) placeMines` skipped placement: a board without mines that could never be won; found 15 Nov 2026)
+    if (!S.g.placed) MS.placeMines(S.g, i);
+    if (!S.started) { S.started = true; startTimer(); }
+    const res = MS.flood(S.g, i);
+    for (const j of res.opened) paint(j);
+    if (res.hit !== null) { defeat(res.hit); return; }
+    sfx.click();
+    if (MS.isWin(S.g)) victory();
+  }
+
+  function chord(i) {
+    const targets = MS.chordTargets(S.g, i);
+    if (!targets.length) return;
+    let hit = null;
+    for (const j of targets) { const r = MS.flood(S.g, j); for (const k of r.opened) paint(k); if (r.hit !== null && hit === null) hit = r.hit; }
+    if (hit !== null) { defeat(hit); return; }
+    sfx.click();
+    if (MS.isWin(S.g)) victory();
+  }
+
+  function toggleFlag(i) {
+    if (S.over || S.paused) return;
+    const c = S.g.cells[i];
+    if (c.state === 'open') return;
+    if (!S.started) { S.started = true; startTimer(); }        // mines are placed on the first reveal, flags may come first
+    c.state = c.state === 'flag' ? 'hidden' : 'flag';
+    sfx.flag(); paint(i); paintCount();
+  }
+
+  function victory() {
+    S.over = true; stopTimer();
+    el.face.textContent = '😎';
+    for (let i = 0; i < S.g.n; i++) { const c = S.g.cells[i]; if (c.mine && c.state !== 'flag') { c.state = 'flag'; paint(i); } }
+    paintCount();
+    sfx.win(); confetti();
+    post(MS.resultOf(levelIdx(), true, S.time));
+    showEnd(true);
+  }
+
+  function defeat(hit) {
+    S.over = true; stopTimer();
+    el.face.textContent = '😵';
+    sfx.boom();
+    for (let i = 0; i < S.g.n; i++) {
+      const c = S.g.cells[i], b = el.board.children[i];
+      if (c.mine && c.state === 'hidden') { c.state = 'open'; paint(i); }
+      else if (!c.mine && c.state === 'flag') { b.classList.add('wrong'); b.textContent = '❌'; }
+    }
+    el.board.children[hit].classList.add('hit');
+    post(MS.resultOf(levelIdx(), false, S.time));
+    setTimeout(() => showEnd(false), 700);
+  }
+
+  function showEnd(won) {
+    if (!S.over) return;
+    $('endTitle').textContent = won ? T.won : T.lost;
+    $('endTime').textContent = pad3(S.time) + ' s';
+    $('endText').textContent = won ? T.wonText(S.time) : T.lostText;
+    $('againBtn').textContent = won ? T.again : T.retry;
+    el.end.classList.toggle('lost', !won);
+    el.end.hidden = false;
+    $('againBtn').focus();
+  }
+
+  /* ---- input: mouse, touch (long press / flag mode), keyboard ---- */
+  const cellOf = (ev) => { const b = ev.target.closest('.cell'); return b ? +b.dataset.i : -1; };
+  el.board.addEventListener('click', (ev) => {
+    const i = cellOf(ev); if (i < 0) return;
+    if (S.suppressClick) { S.suppressClick = false; return; }
+    S.focus = i;
+    if (S.flagMode) toggleFlag(i); else reveal(i);
+  });
+  // Long press on a phone (15 Nov 2026, Richard: "the flag must work when you hold a square"): Android Chrome fires
+  // `contextmenu` on a long press as well, so our 380 ms timer and the browser's menu would toggle the same flag twice
+  // (= no flag). Whichever comes first flags; the other is ignored; the browser menu never opens on the board.
+  el.board.addEventListener('contextmenu', (ev) => {
+    const i = cellOf(ev); if (i < 0) return; ev.preventDefault();
+    if (S.touchDown) { clearTimeout(S.pressTimer); if (S.touchFlagged) return; S.touchFlagged = true; S.suppressClick = true; }
+    toggleFlag(i);
+  });
+  el.board.addEventListener('mousedown', (ev) => { if (ev.button === 0 && !S.over && cellOf(ev) >= 0) el.face.textContent = '😮'; });
+  window.addEventListener('mouseup', () => { if (!S.over) el.face.textContent = '😊'; });
+  el.board.addEventListener('pointerdown', (ev) => {
+    if (ev.pointerType !== 'touch') return;
+    const i = cellOf(ev); if (i < 0) return;
+    clearTimeout(S.pressTimer);
+    // a new touch starts clean: a long press that produced no click (Android) must not swallow the next tap
+    S.touchDown = true; S.touchFlagged = false; S.suppressClick = false;
+    S.pressTimer = setTimeout(() => { S.touchFlagged = true; S.suppressClick = true; toggleFlag(i); if (navigator.vibrate) navigator.vibrate(20); }, 380);
+  });
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) el.board.addEventListener(t, () => { clearTimeout(S.pressTimer); S.touchDown = false; });
+  el.board.addEventListener('keydown', (ev) => {
+    const { rows, cols } = S.g;
+    let i = S.focus, r = Math.floor(i / cols), c = i % cols;
+    switch (ev.key) {
+      case 'ArrowLeft': c = Math.max(0, c - 1); break;
+      case 'ArrowRight': c = Math.min(cols - 1, c + 1); break;
+      case 'ArrowUp': r = Math.max(0, r - 1); break;
+      case 'ArrowDown': r = Math.min(rows - 1, r + 1); break;
+      case 'Enter': case ' ': ev.preventDefault(); reveal(i); return;
+      case 'f': case 'F': ev.preventDefault(); toggleFlag(i); return;
+      default: return;
+    }
+    ev.preventDefault();
+    el.board.children[S.focus].tabIndex = -1;
+    S.focus = r * cols + c;
+    const b = el.board.children[S.focus]; b.tabIndex = 0; b.focus();
+  });
+  el.board.addEventListener('focusin', (ev) => { const i = cellOf(ev); if (i >= 0) S.focus = i; });
+
+  /* ---- chrome ---- */
+  el.face.addEventListener('click', () => { sfx.tone(660, 0.06); newGame(); });
+  $('againBtn').addEventListener('click', () => newGame());
+  $('soundBtn').addEventListener('click', () => { sfx.set(!sfx.enabled); syncSound(); if (sfx.enabled) sfx.click(); });
+  $('themeBtn').addEventListener('click', () => {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  });
+  $('modeDig').addEventListener('click', () => setFlagMode(false));
+  $('modeFlag').addEventListener('click', () => setFlagMode(true));
+  function setFlagMode(on) { S.flagMode = on; $('modeDig').setAttribute('aria-pressed', String(!on)); $('modeFlag').setAttribute('aria-pressed', String(on)); }
+  // the dig/flag switch only where there is no right mouse button
+  const coarse = matchMedia('(pointer: coarse)');
+  const paintModes = () => el.modes.classList.toggle('show', coarse.matches);
+  paintModes(); coarse.addEventListener('change', paintModes);
+  window.addEventListener('resize', fit);
+
+  /* ---- hub → game actions ---- */
+  function setPaused(p) {
+    S.paused = p;
+    document.body.classList.toggle('paused', p);
+    el.pause.hidden = !p || S.over;
+    if (p) stopTimer(); else if (S.started && !S.over) startTimer();
+  }
+  window.addEventListener('message', (ev) => {
+    if (!fromHub(ev) || !ev.data || ev.data.type !== 'kb-brain') return;
+    switch (ev.data.action) {
+      case 'pause': setPaused(true); break;
+      case 'resume': setPaused(false); break;
+      case 'mute': sfx.set(false); syncSound(); break;
+      case 'theme': applyTheme(ev.data.theme); break;
+      case 'new': newGame(); break;
+    }
+  });
+
+  /* ---- start ---- */
+  if (PARAMS.has('debug')) {
+    window.brainGame = {
+      state() { return { level: levelIdx() + 1, started: S.started, over: S.over, paused: S.paused, time: S.time, opened: S.g.opened, remaining: MS.remainingMines(S.g) }; },
+      // Ends the current round through the same victory()/defeat() path as real play (posts `result`).
+      finish({ won } = {}) {
+        if (S.over) return;
+        if (!S.g.placed) { MS.placeMines(S.g, 0); S.started = true; }
+        if (won) {
+          for (let i = 0; i < S.g.n; i++) { const c = S.g.cells[i]; if (!c.mine && c.state !== 'open') { c.state = 'open'; S.g.opened++; paint(i); } }
+          victory();
+        } else {
+          const hit = S.g.cells.findIndex((c) => c.mine && c.state === 'hidden');
+          S.g.cells[hit].state = 'open'; paint(hit);
+          defeat(hit);
+        }
+      },
+      newGame(level) { S.diffIdx = MS.levelIndex(level); newGame(); },
+    };
+  }
+  syncSound();
+  newGame();
+
+  window.brainSelftest = MS.selftest;
+  if (PARAMS.has('selftest')) {
+    const fails = MS.selftest();
+    const line = document.createElement('div');
+    line.id = 'selftest';
+    line.textContent = fails.length ? 'SELFTEST FAIL: ' + fails.join('; ') : 'SELFTEST PASS';
+    document.body.appendChild(line);
+    document.title = fails.length ? 'SELFTEST FAIL' : 'SELFTEST PASS';
+  }
+  post({ type: 'kb-brain', event: 'ready', game: GAME_ID });
+})();
+</script>
+</body>
+</html>

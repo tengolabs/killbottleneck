@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useLazyNs } from '@/i18n/lazyNs';
 import { useRelaxOdpocet, formatOdpocet, cinkni } from './useRelaxOdpocet';
 import RelaxZamek from './RelaxZamek';
-import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
+import { useZoneLayout, ABOVE_SHARE } from '@/components/zones/useZoneLayout';
 
 // Relax (Richard 14. 10. 2026): „pustí se akvárko nebo úl“ s odpočtem 5 / 15 minut.
 // Dvě rozložení:
@@ -21,7 +21,7 @@ const SOUBOR = { akvarium: 'akvarium', ul: 'vceli-ul', mraveniste: 'mraveniste' 
 const SCENY = [{ id: 'akvarium', Ikona: Fish, klic: 'scenaAkvarium' }, { id: 'ul', Ikona: Flower2, klic: 'scenaUl' }, { id: 'mraveniste', Ikona: Bug, klic: 'scenaMraveniste' }];
 const VERZE = 1; // zvednout při změně souborů v public/relax (service worker je necachuje, prohlížeč ano)
 const KLID_MS = 4000; // po 4 s bez pohybu myši lišta ztlumí (jen celá obrazovka)
-export const NAD_PODIL = '40%'; // výška scény nad chatem na telefonu (panel asistenta začíná pod ní — AsistentPanel)
+export const NAD_PODIL = ABOVE_SHARE; // výška scény nad chatem na telefonu (panel asistenta začíná pod ní — AsistentPanel)
 
 const Tlacitko = ({ onClick, title, testid, aktivni, disabled, children, className = '' }) => (
   <button type="button" onClick={onClick} title={title} aria-label={title} disabled={disabled} aria-pressed={aktivni === undefined ? undefined : !!aktivni}
@@ -37,40 +37,11 @@ export default function RelaxVrstva({ lite = false }) {
   const A = useAsistent();
   const { user } = useAuth();
   const r = A.relax;
-  const [uzke, setUzke] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
-  // nízké okno = telefon na ležato (Richard 15. 10.: lišta a sloupec scén zabraly většinu místa) → lišta jako jeden pruh
-  // nahoře s malými ikonami scén uvnitř, bez sloupce
-  const [nizke, setNizke] = useState(() => typeof window !== 'undefined' && window.innerHeight < 500);
-  useEffect(() => {
-    const f = () => { setUzke(window.innerWidth < 640); setNizke(window.innerHeight < 500); };
-    window.addEventListener('resize', f);
-    return () => window.removeEventListener('resize', f);
-  }, []);
-  const pruh = uzke || nizke;
   const zamceno = !!(r && r.zamek);
-  // dělené rozložení: na počítači „vedle“ (vlevo scéna, vpravo chat), na úzkém okně (telefon na výšku) „nad“ — scéna v horních
-  // NAD_PODIL výšky, chat pod ní (Richard 15. 10.: „scéna menší“); ležící telefon je širší než 640 px → chová se jako počítač
-  // lite (zjednodušené zobrazení) má vlastní stav otevření panelu (liteOpen) a panel vždy přes celou šířku → dělení jen „nad“
-  const otevren = lite ? A.liteOpen : A.open;
-  // telefon se ZMENŠENÝM panelem (lišta dole, chat-bar): scéna má zabrat všechno nad lištou, ne ji zakrýt — Richard 15. 10.:
-  // „chtěl bych si zmenšit dolů jenom lištu asistenta, abych mohl posílat hlasovky a vidět akvárko“
-  const [vyskaListy, setVyskaListy] = useState(0);
-  useEffect(() => {
-    if (!uzke || lite || otevren) { setVyskaListy(0); return undefined; }
-    const el = document.querySelector('[data-testid="chat-bar"]');
-    if (!el) { setVyskaListy(0); return undefined; }
-    const zmer = () => setVyskaListy(Math.round(el.getBoundingClientRect().height));
-    zmer();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(zmer) : null;
-    if (ro) ro.observe(el);
-    return () => { if (ro) ro.disconnect(); };
-  }, [uzke, lite, otevren, r && r.rozlozeni]);
-  const nadListou = uzke && !lite && !otevren && A.dostupny && vyskaListy > 0;
-  // scéna začíná pod ukotvenou horní lištou (lite ji nemá → 0)
-  const spodek = useSpodekHlavicky(!lite);
-  const vedleMozne = (otevren && A.dostupny && (uzke || lite || A.width > 0)) || nadListou;
-  const vedle = !!r && r.rozlozeni === 'vedle' && vedleMozne && !zamceno;
-  const nad = vedle && (uzke || lite);
+  // placement full / vedle / nad is shared with the brain zone — components/zones/useZoneLayout.js (9 Nov 2026);
+  // the behaviour described there (Richard 15. 10. / 27. 10. 2026) is unchanged, ui-relax guards it
+  const L = useZoneLayout({ lite, layout: r && r.rozlozeni === 'vedle' ? 'side' : 'full', locked: zamceno });
+  const { narrow: uzke, low: nizke, strip: pruh, aboveBar: nadListou, sideAllowed: vedleMozne, side: vedle, above: nad } = L;
   const scena = r && SOUBOR[r.scena] ? r.scena : 'akvarium';
 
   // iframe scény: po načtení pošle kb-relax-ready → prolnutí
@@ -171,8 +142,8 @@ export default function RelaxVrstva({ lite = false }) {
   const ztlumeno = !!r.hotovo;
   // vedle: celá levá část POD horní lištou (Richard 27. 10. 2026: „ať pořád máš notifikace a víš, kde jsi“ — ruší
   // 15. 10. „na vodu je pruh aplikace, to ne“); i telefonní „nad“ začíná pod lištou. Celá obrazovka (zámek s PINem) lištu zakrývá dál.
-  const styl = nad ? (nadListou ? { top: spodek, left: 0, right: 0, bottom: vyskaListy } : { top: spodek, left: 0, right: 0, height: NAD_PODIL }) : vedle ? (A.side === 'left' ? { top: spodek, left: A.width, right: 0, bottom: 0 } : { top: spodek, right: A.width, left: 0, bottom: 0 }) : undefined; // assistant on the left → scene to its right
-  const tridy = vedle ? 'fixed z-40' : 'fixed inset-0 z-[60]';
+  const styl = L.style;
+  const tridy = L.classes;
   // na úzkém okně (telefon) má scéna vlastní hlavičku přes celou šířku → lišta je pruh NAD scénou, ne přes ni
   const lista = pruh
     ? 'absolute inset-x-0 top-0 z-10 flex h-11 items-center justify-center gap-1 overflow-x-auto bg-black/70 px-1'

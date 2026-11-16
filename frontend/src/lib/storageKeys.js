@@ -55,6 +55,8 @@ export const KEY_RELAX_SCENA = 'kb-relax-scena';          // 'akvarium' | 'ul' |
 export const KEY_RELAX_ROZLOZENI = 'kb-relax-rozlozeni';  // 'cela' | 'vedle'
 export const KEY_RELAX_AKTIVITA = 'kb-relax-aktivita';    // + ':uid' {start, posledni, nabidnuto, posledniRelax} — hlídač 50 min práce
 export const KEY_START_RELAX = 'kb-start-relax';         // sessionStorage: start aplikace s akváriem už v téhle kartě proběhl (25. 10. 2026)
+// Brain training zone (9 Nov 2026): preferences per account (`${KEY_BRAIN}:${user.id}` = { layout, levels }); results live on the server
+export const KEY_BRAIN = 'kb-brain';
 
 // Při odhlášení / vypršení session smazat všechny klíče asistenta (`kb-chat-*`):
 // rozhovor, model, porada, aktivita — patří k účtu, další člověk u téhož
@@ -71,7 +73,7 @@ export function smazKliceAsistenta() {
       if (k && k.startsWith('kb-chat-') && !k.includes(':') && k !== 'kb-chat-open' && k !== 'kb-chat-width' && k !== 'kb-chat-model' && k !== 'kb-chat-side') smazat.push(k);
       // relax (/checkup 15. 10.): stav pauzy s otiskem PINu, hlídač aktivity a ranní razítko patří k účtu → po odhlášení pryč
       // (otisk 4 číslic jde offline projít za milisekundy a lidé PIN recyklují); předvolby scény/rozložení (bez `:`) zůstávají
-      if (k && (k.startsWith('kb-relax:') || k.startsWith('kb-relax-aktivita:') || k.startsWith('kb-relax-rano:'))) smazat.push(k);
+      if (k && (k.startsWith('kb-relax:') || k.startsWith('kb-relax-aktivita:') || k.startsWith('kb-relax-rano:') || k.startsWith('kb-brain:'))) smazat.push(k);
     }
     smazat.forEach((k) => localStorage.removeItem(k));
   } catch (err) { /* úložiště nedostupné — není co mazat */ }

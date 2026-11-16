@@ -193,4 +193,27 @@ body.kb-tah.kb-presun { cursor: grabbing; }
 .kb-chat-hrana { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; pointer-events: none; background: hsl(var(--primary) / 0.55); transition: background-color 150ms; }
 .kb-chat-hrana::after { content: ''; position: absolute; top: 0; bottom: 0; right: 100%; width: 18px; background: linear-gradient(to left, hsl(var(--primary) / 0.22), transparent); }
 .kb-chat-hrana-vlevo { left: auto; right: 0; }
+/* New conversation (13 Nov 2026): the message area turns like a page and the ✎ button pulses once, so a press in an
+   already empty chat is visible too; reduced motion → a plain fade */
+/* 15 Nov 2026: WITHOUT perspective, like the Office turn — with perspective(900px) the list's hit area moved for 0.4 s and a chip
+   clicked right after "New conversation" missed (ui-relax: the Relax chip started nothing); a flat turn keeps every button in place */
+@keyframes kb-chat-list { 0% { opacity: 0.15; transform: rotateY(-16deg) translateX(18px); } 55% { opacity: 1; } 100% { transform: none; } }
+@keyframes kb-chat-novy-puls { 0% { transform: scale(1); background: hsl(var(--primary) / 0.35); } 50% { transform: scale(1.25); } 100% { transform: scale(1); background: transparent; } }
+.kb-chat-list { animation: kb-chat-list 420ms ease-out; transform-origin: left center; backface-visibility: hidden; }
+@keyframes kb-chat-list-r { 0% { opacity: 0.15; transform: rotateY(16deg) translateX(-18px); } 55% { opacity: 1; } 100% { transform: none; } }
+.kb-chat-list-r { animation: kb-chat-list-r 420ms ease-out; transform-origin: right center; backface-visibility: hidden; }
+/* Office panel: the same turn WITHOUT perspective — the 3D bulge spilled over the top bar for 0.4 s (ui-dokumenty: a bar button
+   was covered), a flat turn stays inside the panel's box */
+@keyframes kb-dok-list { 0% { opacity: 0.15; transform: rotateY(22deg) translateX(-24px); } 55% { opacity: 1; } 100% { transform: none; } }
+@keyframes kb-dok-list-l { 0% { opacity: 0.15; transform: rotateY(-22deg) translateX(24px); } 55% { opacity: 1; } 100% { transform: none; } }
+.kb-dok-list { animation: kb-dok-list 420ms ease-out; transform-origin: right center; }
+.kb-dok-list-l { animation: kb-dok-list-l 420ms ease-out; transform-origin: left center; }
+.kb-chat-novy-puls { animation: kb-chat-novy-puls 450ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  @keyframes kb-chat-list { 0% { opacity: 0.15; } 100% { opacity: 1; } }
+  @keyframes kb-chat-list-r { 0% { opacity: 0.15; } 100% { opacity: 1; } }
+  @keyframes kb-dok-list { 0% { opacity: 0.15; } 100% { opacity: 1; } }
+  @keyframes kb-dok-list-l { 0% { opacity: 0.15; } 100% { opacity: 1; } }
+  .kb-chat-novy-puls { animation: none; }
+}
 .kb-chat-hrana-vlevo::after { right: auto; left: 100%; background: linear-gradient(to right, hsl(var(--primary) / 0.22), transparent); }

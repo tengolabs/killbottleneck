@@ -208,6 +208,8 @@
   "relaxChip": "🐟 Relax 5 min",
   "relaxChipVolny": "🐟 Relax",
   "relaxToggle": "Relax: fish instead of the map (toggle)",
+  "brainToggle": "Brain training: puzzles instead of the map (toggle)",
+  "brainChip": "🧠 Brain training",
   "relaxBeziVolne": "Relax running",
   "relaxSablona": "{{count}} min",
   "relaxMin": "min",

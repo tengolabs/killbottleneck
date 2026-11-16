@@ -120,6 +120,8 @@ H.beh(async () => {
   await inst.api('PATCH', `/api/collections/goalmaps/records/${map.id}`, { token: A, body: { nodes: map.nodes.map((n) => (n.id === 'n1' ? { ...n, data: { ...n.data, deadline: '2026-01-01' } } : n)) } });
   await page.click('[data-testid="chat-novy"]'); // nový rozhovor: další krok (Enter) počítá bubliny od téhle zprávy
   await sleep(300);
+  // 13 Nov 2026: every press turns the page (data-list counts presses, the class runs the animation) — visible even in an empty chat
+  expect(!!(await page.$('[data-testid="chat-zpravy"][data-list="1"].kb-chat-list')), 'New conversation: the message area turned the page (data-list=1 + animation class)');
   fronta.push(nastroj('map_risks', { map_id: map.id }), text('RIZIKA-MOCK: Poslat poptávku je po termínu.'));
   await page.click('[data-testid="chat-input"]');
   await page.keyboard.type('Kde mám úzké hrdlo?');

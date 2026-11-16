@@ -7695,6 +7695,12 @@ function buildExport(app, userId, email, opts) {
   }));
   if (notifications.length >= ROWS) truncated.notifications = true;
   const ruleTemplates = rowsOf("rule_templates", "id != ''", {}, ROWS, "created").map(ruleTemplateDto);
+  // brain training results (15 Nov 2026) — personal activity data, so the export carries them too (checkup: missing)
+  const brainResults = rowsOf("brain_results", "user = {:u}", { u: userId }, ROWS, "-started").map((b) => ({
+    game: b.getString("game"), level: b.get("level"), started: b.getString("started"), finished: b.getString("finished"),
+    won: b.getBool("won"), score: b.get("score"), duration_ms: b.get("duration_ms"), day: b.getString("day"),
+  }));
+  if (brainResults.length >= ROWS) truncated.brain_results = true;
   let org = null;
   try {
     const rec = app.findFirstRecordByFilter("org_settings", "id != ''");
@@ -7726,6 +7732,7 @@ function buildExport(app, userId, email, opts) {
     external_contacts: contacts,
     notifications: notifications,
     rule_templates: ruleTemplates,
+    brain_results: brainResults,
     counts: { maps: mapsOut.length, tasks: sum("tasks"), comments: sum("comments"), files: sum("files"), changes: sum("changes"), buffer_nodes: buffer.length, events: eventsOut.length, calendars: calendarsOut.length, node_reminders: nodeReminders.length, documents: documents.length, pages: pages.length, time_entries: timeEntries.length, external_contacts: contacts.length, notifications: notifications.length },
     truncated: Object.keys(truncated).length ? truncated : null,
     errors: errors.length ? errors : null,

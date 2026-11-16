@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, ArrowLeftRight, Bot, ChevronDown, ChevronUp, FileText, Files, Fish, ImagePlus, List, Loader2, PanelLeftClose, PanelRightClose, RefreshCw, Send, Sparkles, SquarePen, Sunrise, Moon, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, Bot, Brain, ChevronDown, ChevronUp, FileText, Files, Fish, ImagePlus, List, Loader2, PanelLeftClose, PanelRightClose, RefreshCw, Send, Sparkles, SquarePen, Sunrise, Moon, X } from 'lucide-react';
 import { nactiKlic, ulozKlic, KEY_PORADA_NE, KEY_PORADA_DEN, KEY_AKTIVITA, KEY_RELAX_AKTIVITA, KEY_START_RELAX } from '@/lib/storageKeys';
 import { useRelaxOdpocet, formatOdpocet } from '@/components/relax/useRelaxOdpocet';
 import { NAD_PODIL } from '@/components/relax/RelaxVrstva';
@@ -53,6 +53,8 @@ const CHYBA_TEXTU = { textDlouhy: 'textTooLong', textPrazdny: 'textEmpty', textC
 // ---- Relax (Richard 14. 10. 2026) ----
 // Slovo „relax“ / „relax 15“ (i čip „🐟 Relax 5 min“) spustí pauzu v PROHLÍŽEČI, bez modelu — 0 tokenů, žádný tah.
 const RX_RELAX = /^\s*(?:🐟\s*)?relax(?:\s+(\d{1,3}))?(?:\s*min(?:ut|uty|utes|s)?\.?)?\s*[.!]?\s*$/iu;
+// Brain training (9 Nov 2026): the Czech words for puzzle / brain training, "brain training" or "puzzle" open the zone in the browser, no model
+const RX_BRAIN = /^\s*(?:🧠\s*)?(?:hlavolamy?|tr[eé]nink(?:\s+mozku)?|brain(?:\s+training)?|puzzles?)\s*[.!]?\s*$/iu;
 // Hlídač pauzy: po ~50 minutách souvislé práce (psaní, kliky; mezera > 10 min = nový blok) nabídne relax,
 // nejvýš 1× za hodinu a ne do hodiny po pauze. Stav per účet v localStorage, ať reload nezačíná od nuly.
 const HLIDAC_BLOK_MS = 50 * 60000;
@@ -346,7 +348,7 @@ export default function AsistentPanel({ lite = false }) {
   const odmitniPoradu = () => { ulozKlic(klicUctu(KEY_PORADA_NE), dnes); setPoradaOdmitnuta(true); };
   // Relax: hlídač 50 minut práce (nabídka v panelu + tečka na oušku) a jednotné spuštění (zapíše čas pauzy pro hlídač)
   const klicRelax = `${KEY_RELAX_AKTIVITA}:${user?.id || ''}`;
-  const [relaxNabidka, setRelaxNabidka] = useHlidacPauzy(klicRelax, dostupny && !panel.relax);
+  const [relaxNabidka, setRelaxNabidka] = useHlidacPauzy(klicRelax, dostupny && !panel.relax && !panel.brain);
   // čas pauzy pro hlídač zapisuje AsistentContext.spustRelax (i pro relax od modelu); obal jen schová nabídku
   const spustRelax = useCallback((o) => { setRelaxNabidka(false); panel.spustRelax(o || {}); }, [setRelaxNabidka, panel]);
   const odmitniRelax = () => setRelaxNabidka(false); // `nabidnuto` už je zapsané → příště nejdřív za hodinu
@@ -453,6 +455,7 @@ export default function AsistentPanel({ lite = false }) {
     // „relax“ / „relax 15“ / čip: pauza v prohlížeči bez modelu (jde i během odpovědi — model k tomu není potřeba)
     const rel = !obr && !prilohaPdf && v.match(RX_RELAX);
     if (rel) { if (zPolicka) setText(''); spustRelax({ minut: rel[1] ? Number(rel[1]) : 0 }); return; }
+    if (!obr && !prilohaPdf && RX_BRAIN.test(v)) { if (zPolicka) setText(''); panel.startBrain({ layout: 'vedle' }); return; }
     // bez AI zpráva neodejde: text zůstane v políčku a pruh stavu blikne
     // (z lišty na telefonu se panel rozbalí, ať je pruh vidět)
     if (!funkcni) { setBlik((n) => n + 1); if (!A.open) A.setOpen(true); return; }
@@ -584,7 +587,14 @@ export default function AsistentPanel({ lite = false }) {
   const prepniStranu = useCallback(() => setSide((s) => (s === 'left' ? 'right' : 'left')), [setSide]);
   // conversations list: open / new / back (the list replaces messages + input; Esc is handled by the list)
   const zpetDoChatu = useCallback(() => setPohled('chat'), []);
-  const novyRozhovor = useCallback(() => { setPohled('chat'); A.novy(); }, [A]);
+  // "New conversation" with the chat already empty changed nothing on screen (Richard 13 Nov 2026: "you don't know whether
+  // anything happened") → every press turns the page: the message area flips in like a fresh sheet (CSS kb-chat-list, keyed so
+  // it restarts on each press) and the button pulses once
+  const [listovani, setListovani] = useState(0);
+  const novyRozhovor = useCallback(() => { setPohled('chat'); A.novy(); setListovani((n) => n + 1); }, [A]);
+  // Office button: the same pulse (the panel itself turns in on mount, see DokumentyPanel)
+  const [dokPuls, setDokPuls] = useState(0);
+  const prepniDokumenty = useCallback(() => { setDokPuls((n) => n + 1); if (panel.dokOpen) panel.opatrne(() => panel.setDokOpen(false)); else panel.setDokOpen(true); }, [panel]);
   const otevriRozhovor = useCallback((id) => { setPohled('chat'); A.otevriChat(id); }, [A]);
 
   // balíček spuštěný odjinud (Nový projekt → „Navrhnout s AI“, zásobník → „Roztřídit s AI“): vyřídit, až je
@@ -717,6 +727,7 @@ export default function AsistentPanel({ lite = false }) {
   const chyba = A.error ? (A.error === 'rate' ? t('errorRate') : A.error === 'timeout' ? t('errorTimeout') : A.error === 'lost' ? t('errorLost') : A.error === 'generic' ? t('errorGeneric') : A.error === 'offline' ? t('errorOffline') : A.error === 'offlineSend' ? t('errorOfflineSend') : A.error) : null;
   const chips = t('chips', { returnObjects: true });
   // telefon na výšku + relax „vedle“ = scéna NAD chatem (RelaxVrstva), panel začíná pod ní
+  // the brain zone sits UNDER the panel header instead (useZoneLayout underPanelHeader), so the panel keeps its place
   const relaxNad = mobil && !!panel.relax && panel.relax.rozlozeni === 'vedle' && !panel.relax.zamek; // i lite (panel přes celou šířku)
   // čip „🐟 Relax 5 min“ navíc mezi „co dál“ po větší akci (průvodce, nebo tah s ≥ 3 nástroji), ne do hodiny po pauze
   let relaxNavrh = '';
@@ -765,12 +776,14 @@ export default function AsistentPanel({ lite = false }) {
           <span className="text-sm font-semibold truncate" data-testid="chat-nazev">{pohled === 'rozhovory' ? t('conversations') : (A.chat && A.chat.title) || t('title')}</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8" title={t('newChat')} aria-label={t('newChat')} onClick={novyRozhovor} data-testid="chat-novy"><SquarePen className="w-4 h-4" /></Button>
+          <Button key={`novy-${listovani}`} variant="ghost" size="icon" className={`h-8 w-8 ${listovani ? 'kb-chat-novy-puls' : ''}`} title={t('newChat')} aria-label={t('newChat')} onClick={novyRozhovor} data-testid="chat-novy"><SquarePen className="w-4 h-4" /></Button>
           {/* Dokumenty (30. 9. 2026): poznámky, e-maily a sumáře od asistenta — panel vedle chatu */}
           {/* Kancelář (1. 11. 2026; od 11. 11. uprostřed, akvárko vpravo — Richard): jedna ikonka = panel se záložkami Dokumenty | Stránky | PDF (dřív zvlášť „složka“ a „dokument“ pro PDF — mátlo) */}
-          <Button variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('dok.kancelarTitle')} aria-label={t('dok.kancelarTitle')} aria-pressed={panel.dokOpen} onClick={() => (panel.dokOpen ? panel.opatrne(() => panel.setDokOpen(false)) : panel.setDokOpen(true))} data-testid="chat-dokumenty-btn"><Files className="w-4 h-4" /></Button>
+          <Button key={`dok-${dokPuls}`} variant={panel.dokOpen ? 'default' : 'ghost'} size="icon" className={`h-8 w-8 ${dokPuls ? 'kb-chat-novy-puls' : ''}`} title={t('dok.kancelarTitle')} aria-label={t('dok.kancelarTitle')} aria-pressed={panel.dokOpen} onClick={prepniDokumenty} data-testid="chat-dokumenty-btn"><Files className="w-4 h-4" /></Button>
           {/* relax (Richard 15. 10. 2026): stálý přepínač mapa ⇄ rybičky v hlavičce — bez odpočtu, vedle chatu (na telefonu celá) */}
           <Button variant={panel.relax ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('relaxToggle')} aria-label={t('relaxToggle')} aria-pressed={!!panel.relax} onClick={() => (panel.relax ? panel.ukonciRelax() : spustRelax({ minut: 0, rozlozeni: 'vedle' }))} data-testid="chat-relax-toggle"><Fish className="w-4 h-4" /></Button>
+          {/* brain training (9 Nov 2026): second zone toggle 🧠 — hub next to the chat (on a phone above it) */}
+          <Button variant={panel.brain ? 'default' : 'ghost'} size="icon" className="h-8 w-8" title={t('brainToggle')} aria-label={t('brainToggle')} aria-pressed={!!panel.brain} onClick={() => (panel.brain ? panel.stopBrain() : panel.startBrain({ layout: 'vedle' }))} data-testid="chat-brain-toggle"><Brain className="w-4 h-4" /></Button>
           <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
           {!mobil && <Button variant="ghost" size="icon" className="h-8 w-8" title={`${t(vlevo ? 'moveRight' : 'moveLeft')} — ${t('moveHint')}`} aria-label={t(vlevo ? 'moveRight' : 'moveLeft')} onClick={prepniStranu} data-testid="chat-strana"><ArrowLeftRight className="w-4 h-4" /></Button>}
           {!vlevo && zavrit}
@@ -783,7 +796,7 @@ export default function AsistentPanel({ lite = false }) {
         <ConversationList items={A.seznam} activeId={A.chat && A.chat.id} modeIcons={IKONA_REZIMU} t={t} onOpen={otevriRozhovor} onNew={novyRozhovor} onDelete={A.smaz} onBack={zpetDoChatu} />
       ) : (
         <>
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2" data-testid="chat-zpravy">
+          <div key={`list-${listovani}`} className={`flex-1 overflow-y-auto px-3 py-3 space-y-2 ${listovani ? 'kb-chat-list' : ''}`} data-testid="chat-zpravy" data-list={listovani}>
             {/* Výpadek: historie rovnou v panelu (schválený náhled 19. 10.) — bez AI je to hlavní, co tu jde dělat;
                 otevřený rozhovor je zvýrazněný, ostatní jedním klepnutím */}
             {stav === 'vypadek' && A.seznam.length > 0 && (
@@ -872,6 +885,7 @@ export default function AsistentPanel({ lite = false }) {
               {strankyOn && <button type="button" onClick={otevriNovouStranku} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-stranka">{kontext.map_id ? t('chipStrankaMapa') : t('chipStranka')}</button>}
               {/* relax (14. 10. 2026): pauza s akváriem / úlem — bez modelu */}
               {!panel.relax && <button type="button" onClick={() => spustRelax({ minut: 0 })} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-relax">{t('relaxChipVolny')}</button>}
+              {!panel.brain && <button type="button" onClick={() => panel.startBrain({ layout: 'vedle' })} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-brain">{t('brainChip')}</button>}
               {chips.map((c) => (
                 <button key={c} type="button" onClick={() => odesli(c)} disabled={A.loading} className="text-xs rounded-full border px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip">{c}</button>
               ))}

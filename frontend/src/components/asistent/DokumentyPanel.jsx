@@ -659,6 +659,9 @@ export default function DokumentyPanel({ mobil }) {
       )}
       {/* same accent edge + glow as the assistant column (Richard 11 Nov 2026: "add it to the next column too") */}
       {!mobil && <div aria-hidden="true" data-testid="chat-dok-hrana" className={`kb-chat-hrana ${vlevo ? 'kb-chat-hrana-vlevo' : ''} peer-hover:bg-primary`} />}
+      {/* Office turns in like a page from the chat's edge (Richard 13 Nov 2026, same as New conversation) — on an inner wrapper,
+          so the panel's own box (position, width) stays put while the content animates */}
+      <div className={`flex flex-col flex-1 min-h-0 ${vlevo || mobil ? 'kb-dok-list-l' : 'kb-dok-list'}`} data-testid="chat-dok-list">
       <div className="h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           {mobil ? (
@@ -700,6 +703,7 @@ export default function DokumentyPanel({ mobil }) {
         : A.dokId
         ? <Detail key={A.dokId} id={A.dokId} mobil={mobil} verze={A.dokVerze} zmenene={A.dokZmenene} hlidac={hlidac} onProjekt={naProjekt} onZpet={() => A.setDokId('')} onSmazano={() => { A.setDokId(''); A.obnovDokumenty(); }} />
         : <Seznam verze={A.dokVerze} onOtevri={(id) => A.setDokId(id)} onNova={otevriNovy} skupina={skupina} setSkupina={setSkupina} q={q} setQ={setQ} />}
+      </div>
     </aside>
   );
 }

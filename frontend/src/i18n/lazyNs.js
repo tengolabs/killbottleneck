@@ -107,6 +107,11 @@ const LOADERS = {
     cs: () => import('./cs/relax.json'),
     en: () => import('./en/relax.json'),
   },
+  // Brain training zone (9 Nov 2026) — lazy chunk components/brain, texts travel with it
+  brain: {
+    cs: () => import('./cs/brain.json'),
+    en: () => import('./en/brain.json'),
+  },
 };
 const nactene = new Set();
 

@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sudoku</title>
+<style>
+/* ===== Deluxe look — shared design kit for every brain game (inline this block; keep the names) =====
+   Source of the look: "Minesweeper Deluxe" (miny-modely/deluxe, 3. 11. 2026) chosen by Richard 14. 11. 2026.
+   Light = :root, dark = :root[data-theme="dark"]. No external URLs, no web fonts (system stack only). */
+:root {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #f5f7fc 0%, #d3dae8 100%);
+  --panel: rgba(255,255,255,.78); --panel-solid:#ffffff; --line: rgba(30,41,59,.14);
+  --panel-shadow: 0 20px 40px rgba(30,41,59,.16), 0 0 0 1px rgba(30,41,59,.06);
+  --text:#0f172a; --muted:#5b6578;
+  --tile: linear-gradient(145deg,#ffffff,#dde4ef); --tile-border:#aab6ca; --tile-hover: linear-gradient(145deg,#ffffff,#eef2f8);
+  --tile-down:#cbd4e1; --tile-down-border:#b3bfd0; --tile-shine: rgba(255,255,255,.95);
+  --well: rgba(30,41,59,.07);                 /* darker inset area (board wrapper, status panel) */
+  --accent:#4f46e5; --accent-hover:#4338ca; --accent-text:#ffffff; --accent-glow: rgba(99,102,241,.35);
+  --ok:#10b981; --bad:#ef4444; --warn:#f59e0b; --info:#06b6d4; --pink:#ec4899; --violet:#8b5cf6;
+  --n1:#3b82f6; --n2:#10b981; --n3:#ef4444; --n4:#8b5cf6; --n5:#f59e0b; --n6:#06b6d4; --n7:#ec4899; --n8:#64748b;
+  --radius:18px; --radius-s:10px;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #1e1e38 0%, #0d0e1a 100%);
+  --panel: rgba(26,27,46,.75); --panel-solid:#1a1b2e; --line: rgba(255,255,255,.1);
+  --panel-shadow: 0 20px 50px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
+  --text:#f0f3f8; --muted:#8c93a8;
+  --tile: linear-gradient(145deg,#2a2d48,#20233b); --tile-border:#3b3f63; --tile-hover: linear-gradient(145deg,#35395c,#272a47);
+  --tile-down:#141524; --tile-down-border:#1f2136; --tile-shine: rgba(255,255,255,.1);
+  --well: rgba(0,0,0,.25);
+  --accent:#6366f1; --accent-hover:#4f46e5; --accent-text:#ffffff;
+  color-scheme: dark;
+}
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; }
+body { background:var(--bg-gradient) fixed; color:var(--text); overflow:hidden; display:flex; flex-direction:column; -webkit-tap-highlight-color:transparent;
+       user-select:none; -webkit-user-select:none; }
+button { font:inherit; color:inherit; cursor:pointer; }
+button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+[hidden] { display:none !important; }
+
+/* glowing background blobs: <div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div> as the first child of body */
+.blobs { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+.blobs i { position:absolute; border-radius:50%; filter:blur(70px); opacity:.34; animation: blobfloat 14s infinite alternate ease-in-out; }
+:root[data-theme="dark"] .blobs i { opacity:.22; }
+.blobs i:nth-child(1) { width:45vmax; height:45vmax; background:#6366f1; top:-15vmax; left:5%; }
+.blobs i:nth-child(2) { width:50vmax; height:50vmax; background:#ec4899; bottom:-20vmax; right:0; animation-duration:18s; }
+.blobs i:nth-child(3) { width:35vmax; height:35vmax; background:#06b6d4; top:40%; left:55%; animation-duration:12s; }
+@keyframes blobfloat { to { transform: translateY(30px) scale(1.08); } }
+
+/* glass card = the game panel; sits above the blobs */
+.glass { position:relative; z-index:1; background:var(--panel); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+         border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--panel-shadow); }
+#app { height:calc(100% - 16px); margin:8px; display:flex; flex-direction:column; gap:8px; padding:10px 12px; min-height:0; }
+@media (max-height:360px) { #app { height:calc(100% - 8px); margin:4px; padding:6px 8px; gap:6px; } }
+
+/* status panel (HUD) with digital displays */
+.status { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none;
+          background:var(--well); border:1px solid var(--line); border-radius:14px; padding:6px 12px; }
+.display { display:flex; flex-direction:column; align-items:center; min-width:56px; }
+.display .label { font-size:.62rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+.digits { font-family:var(--mono); font-size:1.25rem; font-weight:700; color:#ef4444; text-shadow:0 0 10px rgba(239,68,68,.5);
+          background:#000; padding:1px 8px; border-radius:8px; letter-spacing:2px; border:1px solid rgba(239,68,68,.2);
+          font-variant-numeric:tabular-nums; line-height:1.3; }
+.digits.green { color:#10b981; text-shadow:0 0 10px rgba(16,185,129,.5); border-color:rgba(16,185,129,.25); }
+.digits.blue { color:#60a5fa; text-shadow:0 0 10px rgba(96,165,250,.5); border-color:rgba(96,165,250,.25); }
+.pill { background:var(--well); border:1px solid var(--line); border-radius:999px; padding:3px 12px; font-size:.78rem; color:var(--muted); white-space:nowrap; }
+.pill strong { color:var(--ok); }
+.badge { font-size:.62rem; font-weight:700; text-transform:uppercase; background:linear-gradient(135deg,#f59e0b,#ec4899); color:#fff;
+         padding:2px 8px; border-radius:999px; letter-spacing:.5px; }
+
+/* 3D tiles (cells, cards, keys) */
+.tile { background:var(--tile); border:1px solid var(--tile-border); border-radius:8px; color:var(--text);
+        box-shadow: inset 0 1px 0 var(--tile-shine), 0 2px 4px rgba(0,0,0,.2); transition: background .1s, transform .1s, box-shadow .1s; }
+.tile:hover { background:var(--tile-hover); transform:translateY(-1px); }
+.tile:active { transform:translateY(1px) scale(.97); }
+.tile.down { background:var(--tile-down); border-color:var(--tile-down-border); box-shadow: inset 0 2px 4px rgba(0,0,0,.4); transform:none; }
+.well { background:var(--well); border:1px solid var(--line); border-radius:14px; padding:8px; }
+
+/* buttons */
+.btn { background:var(--accent); color:var(--accent-text); border:0; border-radius:var(--radius-s); padding:9px 18px; font-weight:700;
+       box-shadow:0 4px 14px var(--accent-glow); transition: background .2s, transform .15s; }
+.btn:hover { background:var(--accent-hover); transform:translateY(-1px); }
+.btn:active { transform:translateY(1px); }
+.btn.ghost { background:var(--well); color:var(--text); box-shadow:none; border:1px solid var(--line); }
+.icon-btn { width:34px; height:34px; border-radius:10px; background:var(--well); border:1px solid var(--line); display:inline-flex;
+            align-items:center; justify-content:center; font-size:1rem; transition: background .2s, transform .2s; flex:none; }
+.icon-btn:hover { transform:translateY(-1px); background:rgba(127,127,127,.18); }
+.icon-btn[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; }
+
+/* overlays (start / end / pause) — centred glass card */
+.overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:12px; z-index:20;
+           background:rgba(0,0,0,.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border-radius:inherit; animation: fadeIn .2s ease; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:16px 20px; max-width:360px; width:100%;
+        text-align:center; box-shadow:var(--panel-shadow); color:var(--text); }
+.card h2 { margin:0 0 6px; font-size:1.15rem; font-weight:800; letter-spacing:-.3px; }
+.card p { margin:0 0 12px; color:var(--muted); font-size:.85rem; line-height:1.4; }
+.card .big { font-family:var(--mono); font-size:2rem; font-weight:800; color:var(--accent); margin:2px 0 8px; font-variant-numeric:tabular-nums; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes popIn { 0% { transform:scale(.85); opacity:.6; } 100% { transform:scale(1); opacity:1; } }
+@keyframes shake { 0%,100% { transform:translate(0,0); } 25% { transform:translate(-4px,2px); } 50% { transform:translate(4px,-2px); } 75% { transform:translate(-2px,-2px); } }
+#confetti { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50; }
+#selftest { position:fixed; left:0; bottom:0; z-index:99; font:11px var(--mono); color:#fff; background:#000; padding:2px 6px; }
+@media (prefers-reduced-motion: reduce) { .blobs i, .overlay, .tile, .btn { animation:none !important; transition:none !important; } }
+/* in-game level choice (games with more than one level): <div class="levels" role="group" id="levels"></div> filled with
+   <button class="lvl" type="button" data-level="N" aria-pressed="true|false"><b>Name</b><small>info</small></button> */
+.levels { display:flex; gap:6px; flex:none; flex-wrap:wrap; }
+.lvl { flex:1 1 72px; min-width:0; background:var(--well); border:1px solid var(--line); border-radius:12px; padding:5px 8px; display:flex; flex-direction:column;
+       align-items:center; gap:1px; transition: background .2s; }
+.lvl b { font-weight:700; font-size:.85rem; white-space:nowrap; } .lvl small { font-size:.66rem; color:var(--muted); white-space:nowrap; }
+.lvl:hover { background:rgba(127,127,127,.14); }
+.lvl[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; box-shadow:0 4px 14px var(--accent-glow); }
+.lvl[aria-pressed="true"] small { color:rgba(255,255,255,.8); }
+@media (max-height:360px) { .lvl small { display:none; } .lvl { padding:3px 6px; } }
+/* "How to play" (added 15. 11. after Richard's klik-test — the word game had no explanation at all): a labelled button in the
+   .status HUD <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button> opens
+   <div class="overlay" id="helpOverlay" hidden><div class="card rules"><button class="close" id="helpClose" type="button"
+   aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div></div>
+   filled by bindHelp(T) from STR keys `help`, `rulesTitle`, `rules` (array of short HTML items, <b>…</b> for the keyword). */
+.icon-btn.help { width:auto; padding:0 10px; gap:6px; font-size:.78rem; font-weight:700; color:var(--text); }
+.icon-btn.help span { white-space:nowrap; }
+@media (max-width:479px), (max-height:360px) { .icon-btn.help span { display:none; } .icon-btn.help { padding:0; width:34px; } }
+.card.rules { position:relative; max-width:440px; max-height:calc(100% - 8px); display:flex; flex-direction:column; }
+.card.rules .modal-body { overflow:auto; min-height:0; }
+.modal-body ul { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px; font-size:.86rem; line-height:1.4; text-align:left; }
+.modal-body li b { color:var(--text); }
+.card .close { position:absolute; right:10px; top:6px; background:none; border:0; font-size:1.4rem; color:var(--muted); cursor:pointer; }
+/* example tiles inside the rules (word game): <span class="ex"><i class="hit">S</i><i class="near">T</i><i class="miss">A</i></span> */
+.ex { display:inline-flex; gap:3px; vertical-align:middle; margin:0 2px; }
+.ex i { font-style:normal; font-weight:800; font-size:.8rem; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
+        border-radius:5px; background:var(--tile); border:1px solid var(--tile-border); color:var(--text); text-transform:uppercase; }
+.ex i.hit { background:var(--ok); border-color:var(--ok); color:#fff; } .ex i.near { background:var(--warn); border-color:var(--warn); color:#fff; }
+.ex i.miss { background:var(--tile-down); border-color:var(--tile-down-border); color:var(--muted); }
+/* explanatory hint (15. 11.): the strip above the number pad + the explained cell */
+.hintbar { display:none; background:color-mix(in srgb, var(--violet) 14%, var(--panel)); border:1px solid color-mix(in srgb, var(--violet) 45%, transparent);
+           border-radius:12px; padding:7px 10px; font-size:.8rem; line-height:1.35; color:var(--text); text-align:left; }
+.hintbar.show { display:block; }
+.hintbar b { color:var(--violet); }
+.hintbar small { display:block; color:var(--muted); margin-top:2px; }
+.cell.hinted { box-shadow: inset 0 0 0 2px var(--violet); }
+@media (max-height:420px) { .controls { position:relative; } .hintbar { position:absolute; left:0; right:0; bottom:100%; margin-bottom:4px; z-index:5;
+  background:color-mix(in srgb, var(--violet) 22%, var(--panel-solid, var(--panel))); font-size:.74rem; padding:5px 8px; } .hintbar small { display:none; } }
+
+  /* ===== Sudoku-specific (kit variables only) ===== */
+  body { display:flex; flex-direction:column; } /* flex: #app's margin must not collapse through body */
+  .main { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .boardWrap { flex:1 1 auto; min-height:0; min-width:0; width:100%; display:flex; align-items:center; justify-content:center; }
+  .boardWell { flex:none; line-height:0; }
+  .board { display:grid; grid-template-columns:repeat(9, 1fr); grid-template-rows:repeat(9, 1fr); background:var(--panel-solid);
+           border:2px solid var(--text); border-radius:10px; overflow:hidden; touch-action:manipulation;
+           box-shadow:0 6px 18px rgba(0,0,0,.18); }
+  .cell { position:relative; display:flex; align-items:center; justify-content:center; border:0; border-right:1px solid var(--line);
+          border-bottom:1px solid var(--line); background:transparent; cursor:pointer; font-weight:700;
+          font-size:calc(var(--cs) * .55); line-height:1; color:var(--accent); padding:0; border-radius:0;
+          transition: background .08s; }
+  .cell:nth-child(3n) { border-right:2px solid var(--muted); }
+  .cell:nth-child(9n) { border-right:0; }
+  .cell:nth-child(n+19):nth-child(-n+27), .cell:nth-child(n+46):nth-child(-n+54) { border-bottom:2px solid var(--muted); }
+  .cell:nth-child(n+73) { border-bottom:0; }
+  .cell.given { color:var(--text); }
+  .cell.hint { color:var(--violet); }
+  .cell.peer { background:var(--well); }
+  .cell.same { background:color-mix(in srgb, var(--accent) 18%, transparent); }
+  .cell.sel { background:color-mix(in srgb, var(--accent) 35%, transparent); }
+  .cell.bad { color:var(--bad) !important; }
+  .cell .notes { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); width:100%; height:100%;
+                 font-size:calc(var(--cs) * .27); font-weight:500; color:var(--muted); line-height:1; }
+  .cell .notes i { font-style:normal; display:flex; align-items:center; justify-content:center; }
+
+  .controls { flex:none; display:flex; flex-direction:column; gap:6px; width:100%; max-width:420px; }
+  .pad { display:grid; grid-template-columns:repeat(10, 1fr); gap:4px; }
+  .pad .tile { height:40px; font-weight:700; font-size:17px; min-width:0; padding:0; font-variant-numeric:tabular-nums; }
+  .pad .tile.down { color:var(--muted); opacity:.6; }
+  .tools { display:flex; gap:6px; }
+  .tools button { flex:1 1 0; min-width:0; height:36px; border-radius:10px; border:1px solid var(--line); background:var(--well); font-size:13px;
+                  font-weight:600; display:flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; overflow:hidden;
+                  transition: background .2s, transform .2s; }
+  .tools button:hover { transform:translateY(-1px); background:rgba(127,127,127,.18); }
+  .tools button[aria-pressed="true"] { background:var(--accent); color:var(--accent-text); border-color:transparent; box-shadow:0 4px 14px var(--accent-glow); }
+  @media (max-width: 400px) { .tools .pen { display:none; } }
+  .tools svg { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* wide & short (e.g. 1280×300): board left, controls right */
+  @media (min-aspect-ratio: 5/4) {
+    .main { flex-direction:row; align-items:stretch; justify-content:center; gap:14px; }
+    .boardWrap { width:auto; flex:0 1 auto; }
+    .controls { width:auto; flex:0 1 300px; justify-content:center; }
+    .pad { grid-template-columns:repeat(5, 1fr); }
+    .pad .tile { height:34px; font-size:15px; }
+    .tools { flex-wrap:wrap; }
+    .tools button { flex:1 1 45%; height:32px; }
+  }
+  /* short strips: tighter HUD and controls so the board keeps its size */
+  @media (max-height:360px) {
+    .digits { font-size:1rem; padding:0 6px; letter-spacing:1px; }
+    .display .label { font-size:.55rem; margin-bottom:1px; }
+    .status { padding:4px 10px; }
+    .well { padding:5px; }
+    .pad .tile { height:32px; font-size:15px; }
+    .tools button { height:30px; }
+    .card { padding:8px 14px; } .card .big { font-size:1.4rem; margin:0; }
+  }
+  .pause-note { font-size:1.1rem; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div>
+<div id="app" class="glass">
+  <div class="status">
+    <span class="pill" id="title"></span>
+    <div class="display"><span class="label" id="lblTime"></span><span class="digits" id="time">0:00</span></div>
+    <div class="display"><span class="label" id="lblLeft"></span><span class="digits blue" id="left">81</span></div>
+    <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button>
+    <button class="icon-btn" id="soundBtn" type="button"></button>
+  </div>
+  <div class="levels" id="levels" role="group"></div>
+  <div class="main" id="main">
+    <div class="boardWrap" id="boardWrap"><div class="well boardWell"><div class="board" id="board" role="grid"></div></div></div>
+    <div class="controls">
+      <div class="hintbar" id="hintBar" role="status" aria-live="polite"></div>
+      <div class="pad" id="pad"></div>
+      <div class="tools">
+        <button id="notesBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span id="notesLbl"></span></button>
+        <button id="checkBtn" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span id="checkLbl"></span></button>
+        <button id="hintBtn"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg><span id="hintLbl"></span><span class="pen" id="hintPen"></span></button>
+      </div>
+    </div>
+  </div>
+  <div class="overlay" id="endOverlay" hidden>
+    <div class="card"><h2 id="endTitle"></h2><div class="big" id="endTime"></div><p id="endDetail"></p><button class="btn" id="againBtn"></button></div>
+  </div>
+  <div class="overlay" id="pauseOverlay" hidden><div class="card"><div class="pause-note" id="pauseText"></div></div></div>
+  <div class="overlay" id="helpOverlay" hidden><div class="card rules"><button class="close" id="helpClose" type="button" aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div></div>
+</div>
+<canvas id="confetti"></canvas>
+<div id="selftest" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+// ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
+// Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
+// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+const sfx = {
+  ctx: null,
+  enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
+  ac() {
+    if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) this.ctx = new AC(); }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  set(on) { this.enabled = !!on; try { localStorage.setItem('brain-sound', on ? '1' : '0'); } catch { /* private mode */ } },
+  tone(f, d = 0.08, type = 'square', g = 0.04, delay = 0) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const o = c.createOscillator(), v = c.createGain();
+    o.type = type; o.frequency.value = f;
+    const t0 = c.currentTime + delay;
+    v.gain.setValueAtTime(0.0001, t0);
+    v.gain.linearRampToValueAtTime(g, t0 + 0.012);
+    v.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    o.connect(v).connect(c.destination);
+    o.start(t0); o.stop(t0 + d + 0.05);
+  },
+  noise(d = 0.4, g = 0.15) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const n = Math.floor(c.sampleRate * d), buf = c.createBuffer(1, n, c.sampleRate), data = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 800;
+    const v = c.createGain(); v.gain.value = g;
+    src.connect(fl).connect(v).connect(c.destination); src.start();
+  },
+  // vocabulary shared by all games
+  click() { this.tone(920, 0.05, 'square', 0.02); },          // reveal / flip / key press
+  flag()  { this.tone(430, 0.07, 'square', 0.03); },          // secondary action (flag, note)
+  ok()    { this.tone(660, 0.06, 'square', 0.03); this.tone(990, 0.08, 'square', 0.03, 0.06); }, // correct answer
+  bad()   { this.tone(180, 0.14, 'sawtooth', 0.05); },        // wrong answer
+  boom()  { this.noise(0.5, 0.2); this.tone(65, 0.45, 'sawtooth', 0.12); },                     // mine hit / game lost
+  win()   { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.13, 'square', 0.04, i * 0.11)); },
+};
+
+// Confetti burst on a won round (canvas#confetti, fixed, pointer-events:none). Honour reduced motion.
+function confetti() {
+  const canvas = document.getElementById('confetti');
+  if (!canvas || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6'];
+  const ps = Array.from({ length: 110 }, () => ({ x: canvas.width / 2, y: canvas.height / 2, vx: (Math.random() - .5) * 18, vy: (Math.random() - .7) * 20,
+    size: Math.random() * 8 + 4, color: colors[Math.floor(Math.random() * colors.length)], a: 1, rot: Math.random() * 360, rs: (Math.random() - .5) * 10 }));
+  (function step() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    for (const p of ps) {
+      p.x += p.vx; p.y += p.vy; p.vy += .4; p.rot += p.rs; p.a -= .012;
+      if (p.a <= 0) continue;
+      alive = true;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180); ctx.globalAlpha = p.a; ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.restore();
+    }
+    if (alive) requestAnimationFrame(step); else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  })();
+}
+
+// Sound toggle button: <button class="icon-btn" id="soundBtn" type="button"></button>; the hub's `mute` action calls sfx.set(false) + syncSound().
+function syncSound() { const b = document.getElementById('soundBtn'); if (!b) return; b.textContent = sfx.enabled ? '🔊' : '🔇'; b.setAttribute('aria-pressed', String(!sfx.enabled)); }
+
+// Theme + level plumbing shared by all games (added 14. 11. evening, Richard's klik-test):
+// - the hub sends { action: 'theme', theme: 'light'|'dark' } when the app theme or skin changes → recolour WITHOUT restarting the game
+// - the player picks the level inside the game: when embedded, the game only reports it ({ event: 'level' }) and the hub reloads
+//   the game at that level (the hub is the source of truth for the round on the server); standalone, the game restarts itself.
+function applyTheme(theme) { if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; }
+// Builds the level buttons; `names` = STR.levels (array of display names), `infos` = optional array of short hints, `current` = 1-based.
+function buildLevels(names, infos, current, onPick) {
+  const box = document.getElementById('levels'); if (!box) return;
+  box.innerHTML = '';
+  names.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'lvl'; b.dataset.level = i + 1; b.setAttribute('aria-pressed', String(i + 1 === current));
+    b.innerHTML = `<b>${name}</b>${infos && infos[i] ? `<small>${infos[i]}</small>` : ''}`;
+    b.addEventListener('click', () => { if (i + 1 !== current) onPick(i + 1); });
+    box.appendChild(b);
+  });
+}
+
+  var GAME = 'sudoku', HINT_PENALTY_MS = 30000, GEN_BUDGET_MS = 2500; // the self-test generates with THIS budget and checks the clue range (checkup 15 Nov 2026)
+  var params = new URLSearchParams(location.search);
+  var embed = params.get('embed') === '1';
+  var lang = params.get('lang') === 'cs' ? 'cs' : 'en';
+  var level = Math.min(3, Math.max(1, parseInt(params.get('level'), 10) || 1));
+  var theme = params.get('theme');
+  if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme);
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+  document.documentElement.lang = lang;
+
+  // "How to play" modal (added 15. 11.): wires #helpBtn / #helpOverlay / #helpClose and fills the texts from STR
+  // (`help` = button label, `rulesTitle`, `rules` = array of short HTML items). Escape closes it; a click on the backdrop too.
+  function bindHelp(T) {
+    const btn = document.getElementById('helpBtn'), ov = document.getElementById('helpOverlay'); if (!btn || !ov) return;
+    const lbl = document.getElementById('helpLbl'); if (lbl) lbl.textContent = T.help; btn.title = T.help; btn.setAttribute('aria-label', T.help);
+    document.getElementById('rulesTitle').textContent = T.rulesTitle;
+    document.getElementById('rulesList').innerHTML = T.rules.map((r) => `<li>${r}</li>`).join('');
+    const open = () => { ov.hidden = false; btn.setAttribute('aria-expanded', 'true'); };
+    const close = () => { ov.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+    btn.addEventListener('click', () => (ov.hidden ? open() : close()));
+    document.getElementById('helpClose').addEventListener('click', close);
+    ov.addEventListener('click', (ev) => { if (ev.target === ov) close(); });
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !ov.hidden) { close(); ev.stopPropagation(); } }, true);
+  }
+
+  var STR = {
+    cs: { title: 'Sudoku', levels: ['Lehká', 'Střední', 'Těžká'], levelInfos: ['40–45 zadaných', '32–36', '26–30'], levelsAria: 'Obtížnost',
+          time: 'Čas', left: 'Zbývá', notes: 'Poznámky', check: 'Kontrola', hint: 'Nápověda', hintPen: '(+30 s)', erase: 'Smazat',
+          paused: 'Pauza', endTitle: 'Vyřešeno!', again: 'Hrát znovu', sound: 'Zvuk',
+          detail: function (h, pen) { return h ? 'Nápověd: ' + h + (pen ? ' (+' + Math.round(pen / 1000) + ' s)' : '') : 'Bez nápovědy'; },
+          cellLabel: function (r, c) { return 'řádek ' + (r + 1) + ', sloupec ' + (c + 1); },
+          help: 'Jak hrát', rulesTitle: 'Jak hrát',
+          rules: ['<b>Cíl:</b> doplnit do mřížky čísla 1–9 tak, aby se žádné číslo neopakovalo v řádku, ve sloupci ani ve čtverci 3×3.',
+            '<b>Tah:</b> klikni na prázdné pole a pak na číslo dole (nebo ho napiš na klávesnici). Předvyplněná čísla jsou pevná.',
+            '<b>Kontrola</b> (zapnutá): špatně zadané číslo zčervená. Vypni ji, chceš-li hrát bez napovídání.',
+            '<b>Poznámky:</b> zapni tužku a zapisuj si do pole čísla, která tam ještě připadají v úvahu.',
+            '<b>Nápověda</b> vysvětlí, kam které číslo patří a proč – označí pole a napíše důvod. Druhé stisknutí číslo doplní. Na lehké úrovni je zdarma, na střední a těžké přičte 30 s k času.',
+            '<b>Úrovně</b> se liší počtem předvyplněných čísel: lehká 40–45, střední 32–36, těžká 26–30. Klávesnice: šipky, 1–9, Smazat, N = poznámky.'],
+          hintSingle: function (d) { return 'Do označeného pole patří jen <b>' + d + '</b>: všechna ostatní čísla už jsou v jeho řádku, sloupci nebo čtverci.'; },
+          hintRow: function (d) { return 'Číslo <b>' + d + '</b> může být v tomto řádku jen v označeném poli – v ostatních prázdných polích mu brání sloupec nebo čtverec.'; },
+          hintCol: function (d) { return 'Číslo <b>' + d + '</b> může být v tomto sloupci jen v označeném poli – v ostatních prázdných polích mu brání řádek nebo čtverec.'; },
+          hintBox: function (d) { return 'Číslo <b>' + d + '</b> může být v tomto čtverci jen v označeném poli – v ostatních prázdných polích mu brání řádek nebo sloupec.'; },
+          hintPlain: function (d) { return 'Do označeného pole patří <b>' + d + '</b>.'; },
+          hintWrong: 'Číslo v označeném poli tam nepatří – smaž ho a zkus jiné.',
+          hintAgain: 'Zadej ho sám, nebo stiskni Nápovědu znovu a doplním ho.', hintAgainWrong: 'Druhé stisknutí Nápovědy ho smaže.' },
+    en: { title: 'Sudoku', levels: ['Easy', 'Medium', 'Hard'], levelInfos: ['40–45 given', '32–36', '26–30'], levelsAria: 'Difficulty',
+          time: 'Time', left: 'Left', notes: 'Notes', check: 'Check', hint: 'Hint', hintPen: '(+30 s)', erase: 'Erase',
+          paused: 'Paused', endTitle: 'Solved!', again: 'Play again', sound: 'Sound',
+          detail: function (h, pen) { return h ? 'Hints: ' + h + (pen ? ' (+' + Math.round(pen / 1000) + ' s)' : '') : 'No hints'; },
+          cellLabel: function (r, c) { return 'row ' + (r + 1) + ', column ' + (c + 1); },
+          help: 'How to play', rulesTitle: 'How to play',
+          rules: ['<b>Goal:</b> fill the grid with digits 1–9 so that no digit repeats in any row, column or 3×3 box.',
+            '<b>A turn:</b> click an empty cell, then a digit below (or type it). The pre-filled digits are fixed.',
+            '<b>Check</b> (on): a wrong digit turns red. Switch it off to play without feedback.',
+            '<b>Notes:</b> switch the pencil on and jot down the digits still possible in a cell.',
+            '<b>Hint</b> explains where a digit belongs and why – it marks the cell and gives the reason. A second press fills it in. Free on Easy, +30 s on Medium and Hard.',
+            '<b>Levels</b> differ in the number of pre-filled digits: Easy 40–45, Medium 32–36, Hard 26–30. Keyboard: arrows, 1–9, Delete, N = notes.'],
+          hintSingle: function (d) { return 'Only <b>' + d + '</b> fits the marked cell: every other digit is already in its row, column or box.'; },
+          hintRow: function (d) { return 'Digit <b>' + d + '</b> can go only in the marked cell of this row – the other empty cells are blocked by their column or box.'; },
+          hintCol: function (d) { return 'Digit <b>' + d + '</b> can go only in the marked cell of this column – the other empty cells are blocked by their row or box.'; },
+          hintBox: function (d) { return 'Digit <b>' + d + '</b> can go only in the marked cell of this box – the other empty cells are blocked by their row or column.'; },
+          hintPlain: function (d) { return '<b>' + d + '</b> belongs in the marked cell.'; },
+          hintWrong: 'The digit in the marked cell is wrong – erase it and try another.',
+          hintAgain: 'Enter it yourself, or press Hint again and it will be filled in.', hintAgainWrong: 'A second press of Hint erases it.' }
+  };
+  var T = STR[lang];
+  var CLUES = { 1: [40, 45], 2: [32, 36], 3: [26, 30] };
+
+  // ---------- pure logic: solver & generator (bitmask, MRV) ----------
+  function shuffle(a, rng) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  var BOX = []; for (var i = 0; i < 81; i++) BOX[i] = Math.floor(i / 27) * 3 + Math.floor((i % 9) / 3);
+
+  // grid: array of 81 numbers 0..9 (0 = empty). Returns number of solutions found, stops at `limit`.
+  // If `out` is given, the first solution is copied there.
+  function countSolutions(grid, limit, out) {
+    var rows = new Array(9).fill(0), cols = new Array(9).fill(0), boxes = new Array(9).fill(0), g = grid.slice(), count = 0;
+    for (var i = 0; i < 81; i++) if (g[i]) { var b = 1 << g[i]; var r = (i / 9) | 0, c = i % 9;
+      if ((rows[r] & b) || (cols[c] & b) || (boxes[BOX[i]] & b)) return 0; rows[r] |= b; cols[c] |= b; boxes[BOX[i]] |= b; }
+    function rec() {
+      var best = -1, bestMask = 0, bestN = 10;
+      for (var i = 0; i < 81; i++) if (!g[i]) {
+        var used = rows[(i / 9) | 0] | cols[i % 9] | boxes[BOX[i]], mask = ~used & 0x3FE, n = 0, m = mask;
+        while (m) { m &= m - 1; n++; }
+        if (n === 0) return;
+        if (n < bestN) { bestN = n; best = i; bestMask = mask; if (n === 1) break; }
+      }
+      if (best < 0) { count++; if (out && count === 1) for (var k = 0; k < 81; k++) out[k] = g[k]; return; }
+      var r = (best / 9) | 0, c = best % 9, bx = BOX[best];
+      for (var d = 1; d <= 9; d++) { var b = 1 << d; if (!(bestMask & b)) continue;
+        g[best] = d; rows[r] |= b; cols[c] |= b; boxes[bx] |= b;
+        rec();
+        g[best] = 0; rows[r] &= ~b; cols[c] &= ~b; boxes[bx] &= ~b;
+        if (count >= limit) return; }
+    }
+    rec();
+    return count;
+  }
+  function solve(grid) { var out = new Array(81).fill(0); return countSolutions(grid, 1, out) >= 1 ? out : null; }
+
+  function fullGrid(rng) {
+    var g = new Array(81).fill(0), rows = new Array(9).fill(0), cols = new Array(9).fill(0), boxes = new Array(9).fill(0);
+    var digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    function rec(i) {
+      if (i === 81) return true;
+      var r = (i / 9) | 0, c = i % 9, bx = BOX[i], order = shuffle(digits.slice(), rng);
+      for (var k = 0; k < 9; k++) { var d = order[k], b = 1 << d;
+        if ((rows[r] | cols[c] | boxes[bx]) & b) continue;
+        g[i] = d; rows[r] |= b; cols[c] |= b; boxes[bx] |= b;
+        if (rec(i + 1)) return true;
+        g[i] = 0; rows[r] &= ~b; cols[c] &= ~b; boxes[bx] &= ~b; }
+      return false;
+    }
+    rec(0); return g;
+  }
+  // Can cell i hold any digit other than its current one, given the other clues? If not, removing it keeps uniqueness.
+  function otherCandidate(g, i) {
+    var r = (i / 9) | 0, c = i % 9, used = 0;
+    for (var k = 0; k < 9; k++) { used |= 1 << g[r * 9 + k]; used |= 1 << g[k * 9 + c]; }
+    var br = r - r % 3, bc = c - c % 3;
+    for (var y = 0; y < 3; y++) for (var x = 0; x < 3; x++) used |= 1 << g[(br + y) * 9 + bc + x];
+    used &= ~(1 << g[i]);
+    return (~used & 0x3FE) !== 0;
+  }
+  // Returns { puzzle, solution, clues, ms, target }
+  function generate(lvl, rng, budgetMs) {
+    rng = rng || Math.random; budgetMs = budgetMs || GEN_BUDGET_MS;
+    var t0 = performance.now(), range = CLUES[lvl] || CLUES[1];
+    var target = range[0] + Math.floor(rng() * (range[1] - range[0] + 1));
+    var solution = fullGrid(rng), puzzle = solution.slice(), clues = 81;
+    var order = shuffle(Array.from({ length: 81 }, function (_, i) { return i; }), rng);
+    for (var k = 0; k < order.length && clues > target; k++) {
+      if (performance.now() - t0 > budgetMs) break;
+      var i = order[k], v = puzzle[i];
+      puzzle[i] = 0;
+      if (otherCandidate(puzzle, i) && countSolutions(puzzle, 2) !== 1) { puzzle[i] = v; continue; }
+      clues--;
+    }
+    return { puzzle: puzzle, solution: solution, clues: clues, target: target, ms: performance.now() - t0 };
+  }
+  var KNOWN = '530070000600195000098000060800060003400803001700020006060000280000419005000080079';
+  var KNOWN_SOL = '534678912672195348198342567859761423426853791713924856961537284287419635345286179';
+  function fromString(s) { return s.split('').map(Number); }
+
+  // ---------- pure logic: explanatory hint (15. 11., Richard's klik-test: "it could advise me on the easy level") ----------
+  // Candidate bitmask (bits 1..9) for an empty cell given the current grid.
+  function candMask(grid, i) {
+    var used = 0, r = (i / 9) | 0, c = i % 9, b = BOX[i];
+    for (var k = 0; k < 81; k++) if (grid[k] && (((k / 9) | 0) === r || k % 9 === c || BOX[k] === b)) used |= 1 << grid[k];
+    return (~used) & 0x3FE;
+  }
+  function onlyBit(m) { for (var d = 1; d <= 9; d++) if (m === (1 << d)) return d; return 0; }
+  // One explainable next step: { i, d, kind } with kind 'wrong' (a player's entry contradicts the solution — fix that first),
+  // 'single' (only one digit fits the cell), 'row' | 'col' | 'box' (the digit fits nowhere else in that unit) or 'plain' (no simple
+  // reason — the solution digit is revealed). `prefer` = the selected cell, explained first when it is empty. null when solved.
+  function findHint(grid, solution, given, prefer) {
+    var k, wrong = -1;
+    for (k = 0; k < 81; k++) if (!given[k] && grid[k] && grid[k] !== solution[k]) { if (wrong < 0 || k === prefer) wrong = k; }
+    if (wrong >= 0) return { i: wrong, d: 0, kind: 'wrong' };
+    var masks = new Array(81), empties = [];
+    for (k = 0; k < 81; k++) { masks[k] = grid[k] ? 0 : candMask(grid, k); if (!grid[k]) empties.push(k); }
+    if (!empties.length) return null;
+    function explain(i) {
+      var d = onlyBit(masks[i]); if (d) return { i: i, d: d, kind: 'single' };
+      var r = (i / 9) | 0, c = i % 9, b = BOX[i];
+      for (var dd = 1; dd <= 9; dd++) {
+        if (!((masks[i] >> dd) & 1)) continue;
+        var inRow = 0, inCol = 0, inBox = 0;
+        for (var j = 0; j < 81; j++) if (!grid[j] && ((masks[j] >> dd) & 1)) { if (((j / 9) | 0) === r) inRow++; if (j % 9 === c) inCol++; if (BOX[j] === b) inBox++; }
+        if (inRow === 1) return { i: i, d: dd, kind: 'row' };
+        if (inCol === 1) return { i: i, d: dd, kind: 'col' };
+        if (inBox === 1) return { i: i, d: dd, kind: 'box' };
+      }
+      return null;
+    }
+    var e;
+    if (prefer >= 0 && !grid[prefer]) { e = explain(prefer); if (e) return e; }
+    for (k = 0; k < empties.length; k++) { var d1 = onlyBit(masks[empties[k]]); if (d1) return { i: empties[k], d: d1, kind: 'single' }; }
+    for (k = 0; k < empties.length; k++) { e = explain(empties[k]); if (e) return e; }
+    var pick = empties[Math.floor(Math.random() * empties.length)];
+    return { i: pick, d: solution[pick], kind: 'plain' };
+  }
+
+  function selftest() {
+    var fails = [], timing = {};
+    var s = solve(fromString(KNOWN));
+    if (!s || s.join('') !== KNOWN_SOL) fails.push('known puzzle not solved');
+    if (countSolutions(fromString(KNOWN), 2) !== 1) fails.push('known puzzle solution count != 1');
+    for (var lvl = 1; lvl <= 3; lvl++) {
+      var range = CLUES[lvl], maxMs = 0, sumMs = 0;
+      for (var n = 0; n < 20; n++) {
+        var g = generate(lvl);
+        maxMs = Math.max(maxMs, g.ms); sumMs += g.ms;
+        var c = g.puzzle.filter(Boolean).length;
+        if (c !== g.clues) fails.push('L' + lvl + ' #' + n + ' clue bookkeeping');
+        if (c < range[0] || c > range[1]) fails.push('L' + lvl + ' #' + n + ' clues ' + c + ' outside ' + range.join('-'));
+        var out = new Array(81).fill(0);
+        if (countSolutions(g.puzzle, 2, out) !== 1) fails.push('L' + lvl + ' #' + n + ' solutions != 1');
+        else if (out.join('') !== g.solution.join('')) fails.push('L' + lvl + ' #' + n + ' solver result differs from generator solution');
+        for (var i = 0; i < 81; i++) if (g.puzzle[i] && g.puzzle[i] !== g.solution[i]) fails.push('L' + lvl + ' #' + n + ' clue mismatch');
+      }
+      timing['L' + lvl] = { avgMs: Math.round(sumMs / 20), maxMs: Math.round(maxMs) };
+      if (maxMs > 1000) fails.push('L' + lvl + ' generation max ' + Math.round(maxMs) + ' ms > 1000');
+    }
+    // explanatory hints: every deduction must match the solution; a wrong entry is reported first; easy puzzles solve by reasons alone
+    var kg = fromString(KNOWN), ks = fromString(KNOWN_SOL), kgiven = kg.map(Boolean);
+    var h0 = findHint(kg, ks, kgiven, -1);
+    if (!h0 || h0.kind === 'wrong' || h0.d !== ks[h0.i]) fails.push('known puzzle: first hint ' + JSON.stringify(h0));
+    var wrongGrid = kg.slice(), firstEmpty = kg.indexOf(0); wrongGrid[firstEmpty] = ks[firstEmpty] === 1 ? 2 : 1;
+    var hw = findHint(wrongGrid, ks, kgiven, -1);
+    if (!hw || hw.kind !== 'wrong' || hw.i !== firstEmpty) fails.push('wrong entry not reported first ' + JSON.stringify(hw));
+    var plain = 0, steps = 0;
+    for (var m = 0; m < 10; m++) {
+      var gg = generate(1, Math.random, 5000), grid = gg.puzzle.slice(), gv = gg.puzzle.map(Boolean), guard = 0, hh;
+      while ((hh = findHint(grid, gg.solution, gv, -1)) && guard++ < 81) {
+        if (hh.kind === 'wrong' || hh.d !== gg.solution[hh.i]) { fails.push('hint contradicts solution ' + JSON.stringify(hh)); break; }
+        if (hh.kind === 'plain') plain++; steps++; grid[hh.i] = hh.d;
+      }
+      if (grid.join('') !== gg.solution.join('')) fails.push('L1 #' + m + ' not solved by hints');
+    }
+    timing.hints = { steps: steps, plain: plain };
+    selftest.timing = timing;
+    return fails;
+  }
+  window.brainSelftest = selftest;
+  if (params.has('selftest')) {
+    var fl = selftest(), el = document.getElementById('selftest');
+    el.hidden = false; el.textContent = fl.length ? 'SELFTEST FAIL: ' + fl.join('; ') : 'SELFTEST PASS';
+    el.dataset.timing = JSON.stringify(selftest.timing);
+  }
+
+  // ---------- messaging ----------
+  // Hub origin; `file://` pages report origin "null", which postMessage rejects — fall back to "*" there.
+  var HUB_ORIGIN = location.origin === 'null' ? '*' : location.origin;
+  function post(msg) { if (!embed) return; msg.type = 'kb-brain'; msg.game = GAME; window.parent.postMessage(msg, HUB_ORIGIN); }
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'kb-brain') return;
+    if (e.data.action === 'pause') pause(); else if (e.data.action === 'resume') resume();
+    else if (e.data.action === 'mute') { sfx.set(false); syncSound(); } else if (e.data.action === 'new') newGame(level);
+    else if (e.data.action === 'theme') applyTheme(e.data.theme); // recolour only, never restart
+  });
+
+  // ---------- game state ----------
+  var $ = function (id) { return document.getElementById(id); };
+  $('title').textContent = T.title; $('lblTime').textContent = T.time; $('lblLeft').textContent = T.left;
+  $('notesLbl').textContent = T.notes; $('checkLbl').textContent = T.check; $('hintLbl').textContent = T.hint; $('hintPen').textContent = T.hintPen; $('hintBtn').title = T.hint + ' ' + T.hintPen;
+  $('pauseText').textContent = T.paused; $('endTitle').textContent = T.endTitle; $('againBtn').textContent = T.again; bindHelp(T);
+  $('soundBtn').title = T.sound; syncSound();
+  $('soundBtn').addEventListener('click', function () { sfx.set(!sfx.enabled); syncSound(); });
+  $('levels').setAttribute('aria-label', T.levelsAria);
+  // level choice inside the game: embedded → the hub reloads the game at that level (server round); standalone → restart here
+  function paintLevels() { buildLevels(T.levels, T.levelInfos, level, function (n) { if (embed) post({ event: 'level', level: n }); else newGame(n); }); }
+
+  var st = null, cells = [], timer = null, checkOn = true, notesMode = false;
+  function blank() { return { puzzle: null, solution: null, grid: null, notes: null, given: null, hints: 0, sel: -1, startedAt: 0, elapsedMs: 0,
+                              lastTick: 0, running: false, paused: false, finished: false, penaltyMs: 0, pending: null }; }
+  // hints are free on Easy (that level is for learning), +30 s on Medium and Hard
+  function penaltyFor(lvl) { return lvl === 1 ? 0 : HINT_PENALTY_MS; }
+  function paintHintPen() { $('hintPen').textContent = penaltyFor(level) ? T.hintPen : ''; $('hintBtn').title = T.hint + (penaltyFor(level) ? ' ' + T.hintPen : ''); }
+  function hideHintBar() { st.pending = null; $('hintBar').classList.remove('show'); $('hintBar').innerHTML = ''; }
+  function showHintBar(h) {
+    var txt = h.kind === 'wrong' ? T.hintWrong : h.kind === 'single' ? T.hintSingle(h.d) : h.kind === 'row' ? T.hintRow(h.d)
+      : h.kind === 'col' ? T.hintCol(h.d) : h.kind === 'box' ? T.hintBox(h.d) : T.hintPlain(h.d);
+    $('hintBar').innerHTML = txt + '<small>' + (h.kind === 'wrong' ? T.hintAgainWrong : T.hintAgain) + '</small>';
+    $('hintBar').classList.add('show');
+  }
+
+  function buildBoard() {
+    var b = $('board'); b.innerHTML = ''; cells = [];
+    for (var i = 0; i < 81; i++) {
+      var c = document.createElement('button'); c.className = 'cell'; c.dataset.i = i; c.setAttribute('role', 'gridcell');
+      c.setAttribute('aria-label', T.cellLabel((i / 9) | 0, i % 9));
+      c.addEventListener('click', function (ev) { select(parseInt(ev.currentTarget.dataset.i, 10)); });
+      b.appendChild(c); cells.push(c);
+    }
+    var pad = $('pad'); pad.innerHTML = '';
+    for (var d = 1; d <= 9; d++) { var pb = document.createElement('button'); pb.className = 'tile'; pb.textContent = d; pb.dataset.d = d;
+      pb.addEventListener('click', function (ev) { input(parseInt(ev.currentTarget.dataset.d, 10)); }); pad.appendChild(pb); }
+    var eb = document.createElement('button'); eb.className = 'tile'; eb.innerHTML = '⌫'; eb.setAttribute('aria-label', T.erase); eb.dataset.d = 0;
+    eb.addEventListener('click', function () { input(0); }); pad.appendChild(eb);
+  }
+  function fitBoard() {
+    var w = $('boardWrap'), main = $('main'), ctl = main.querySelector('.controls'), well = w.firstElementChild;
+    var row = getComputedStyle(main).flexDirection === 'row', lv = $('levels');
+    if (row && lv.parentNode !== ctl) ctl.insertBefore(lv, ctl.firstChild); else if (!row && lv.parentNode !== main.parentNode) main.parentNode.insertBefore(lv, main);
+    var wellPad = well.offsetWidth - $('board').offsetWidth; // the .well frame around the board (padding + border)
+    if (!(wellPad > 0)) wellPad = 18;
+    var availW = row ? main.clientWidth - ctl.offsetWidth - 14 : w.clientWidth;
+    var size = Math.max(90, Math.floor(Math.min(availW, w.clientHeight) - wellPad));
+    var b = $('board'); b.style.width = size + 'px'; b.style.height = size + 'px'; b.style.setProperty('--cs', (size / 9) + 'px');
+  }
+
+  function newGame(lvl) {
+    if (lvl) level = Math.min(3, Math.max(1, lvl | 0));
+    clearInterval(timer); timer = null;
+    var g = generate(level, Math.random);
+    st = blank(); st.puzzle = g.puzzle; st.solution = g.solution; st.grid = g.puzzle.slice();
+    st.given = g.puzzle.map(Boolean); st.notes = new Array(81).fill(0); st.sel = -1;
+    $('endOverlay').hidden = true; $('pauseOverlay').hidden = true;
+    paintLevels(); paintHintPen(); hideHintBar();
+    renderAll(); renderTime();
+  }
+  function startTimer() {
+    if (st.running || st.finished) return;
+    st.running = true; st.startedAt = Date.now(); st.lastTick = performance.now(); timer = setInterval(tick, 250);
+  }
+  function tick() { var now = performance.now(); st.elapsedMs += now - st.lastTick; st.lastTick = now; renderTime(); }
+  function fmt(ms) { var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+  function renderTime() { $('time').textContent = fmt(st.elapsedMs + st.penaltyMs); }
+
+  function select(i) {
+    if (st.finished || st.paused) return;
+    st.sel = (st.sel === i) ? -1 : i; startTimer(); renderAll();
+  }
+  function input(d) {
+    if (st.finished || st.paused || st.sel < 0 || st.given[st.sel]) return;
+    startTimer();
+    var i = st.sel;
+    if (st.pending && st.pending.i === i) hideHintBar();
+    if (d === 0) { st.grid[i] = 0; st.notes[i] = 0; sfx.click(); }
+    else if (notesMode && !st.grid[i]) { st.notes[i] ^= (1 << d); sfx.flag(); }
+    else if (notesMode && st.grid[i]) { st.grid[i] = 0; st.notes[i] = 1 << d; sfx.flag(); }
+    else { st.grid[i] = d; st.notes[i] = 0; clearPeerNotes(i, d);
+      if (checkOn && d !== st.solution[i]) sfx.bad(); else sfx.click(); }
+    renderAll(); checkWin();
+  }
+  function clearPeerNotes(i, d) {
+    var r = (i / 9) | 0, c = i % 9, b = BOX[i];
+    for (var k = 0; k < 81; k++) if (k !== i && (((k / 9) | 0) === r || k % 9 === c || BOX[k] === b)) st.notes[k] &= ~(1 << d);
+  }
+  // First press: explain one step (mark the cell, say why) — counts as a hint. Second press on the same, still open step: do it.
+  function hint() {
+    if (st.finished || st.paused) return;
+    startTimer();
+    var p = st.pending;
+    if (p && p.kind === 'wrong' && st.grid[p.i] && st.grid[p.i] !== st.solution[p.i]) { st.grid[p.i] = 0; st.notes[p.i] = 0; st.sel = p.i; hideHintBar(); sfx.click(); renderAll(); return; }
+    if (p && p.kind !== 'wrong' && !st.grid[p.i]) {
+      st.grid[p.i] = p.d; st.notes[p.i] = 0; st.given[p.i] = true; st.sel = p.i; clearPeerNotes(p.i, p.d); hideHintBar();
+      sfx.flag(); renderAll(); checkWin(); return;
+    }
+    var h = findHint(st.grid, st.solution, st.given, st.sel);
+    if (!h) return;
+    st.pending = h; st.sel = h.i; st.hints++; st.penaltyMs += penaltyFor(level);
+    showHintBar(h); sfx.flag();
+    renderAll(); renderTime();
+  }
+  function isSolved() { for (var i = 0; i < 81; i++) if (st.grid[i] !== st.solution[i]) return false; return true; }
+  function checkWin() { if (isSolved()) finish({ won: true }); }
+  function finish(opts) {
+    if (!st || st.finished) return;
+    var won = !opts || opts.won !== false;
+    if (!st.running) startTimer();
+    clearInterval(timer); timer = null; st.running = false; st.finished = true;
+    var total = st.elapsedMs + st.penaltyMs, durationMs = Math.round(st.elapsedMs);
+    renderTime(); $('endTime').textContent = fmt(total); $('endDetail').textContent = T.detail(st.hints, st.penaltyMs); hideHintBar();
+    $('endOverlay').hidden = false;
+    if (won) { sfx.win(); confetti(); }
+    post({ event: 'result', level: level, won: won, score: Math.round(total / 1000), durationMs: durationMs });
+  }
+  function pause() {
+    if (!st || !st.running || st.paused || st.finished) return;
+    st.paused = true; clearInterval(timer); timer = null; $('pauseOverlay').hidden = false;
+  }
+  function resume() {
+    if (!st || !st.paused) return;
+    st.paused = false; $('pauseOverlay').hidden = true; st.lastTick = performance.now(); timer = setInterval(tick, 250);
+  }
+
+  function renderAll() {
+    var sel = st.sel, selVal = sel >= 0 ? st.grid[sel] : 0, left = 0, counts = new Array(10).fill(0);
+    var sr = (sel / 9) | 0, sc = sel % 9, sb = sel >= 0 ? BOX[sel] : -1;
+    for (var i = 0; i < 81; i++) {
+      var c = cells[i], v = st.grid[i]; if (!v) left++; else counts[v]++;
+      c.className = 'cell' + (st.given[i] ? (st.puzzle[i] ? ' given' : ' hint') : '');
+      if (i === sel) c.classList.add('sel');
+      if (st.pending && st.pending.i === i) c.classList.add('hinted');
+      else if (selVal && v === selVal) c.classList.add('same');
+      else if (sel >= 0 && (((i / 9) | 0) === sr || i % 9 === sc || BOX[i] === sb)) c.classList.add('peer');
+      if (checkOn && v && !st.given[i] && v !== st.solution[i]) c.classList.add('bad');
+      if (v) c.textContent = v;
+      else if (st.notes[i]) { var h = '<span class="notes">'; for (var d = 1; d <= 9; d++) h += '<i>' + ((st.notes[i] >> d) & 1 ? d : '') + '</i>'; c.innerHTML = h + '</span>'; }
+      else c.textContent = '';
+    }
+    $('left').textContent = left;
+    var pads = $('pad').children; for (var d2 = 1; d2 <= 9; d2++) pads[d2 - 1].classList.toggle('down', counts[d2] >= 9);
+  }
+
+  $('notesBtn').addEventListener('click', function () { notesMode = !notesMode; this.setAttribute('aria-pressed', String(notesMode)); });
+  $('checkBtn').addEventListener('click', function () { checkOn = !checkOn; this.setAttribute('aria-pressed', String(checkOn)); renderAll(); });
+  $('hintBtn').addEventListener('click', hint);
+  $('againBtn').addEventListener('click', function () { newGame(level); });
+  document.addEventListener('keydown', function (e) {
+    if (!st || st.finished || st.paused) return;
+    var k = e.key;
+    if (k >= '1' && k <= '9') { input(parseInt(k, 10)); e.preventDefault(); }
+    else if (k === '0' || k === 'Backspace' || k === 'Delete') { input(0); e.preventDefault(); }
+    else if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
+      var i = st.sel < 0 ? 0 : st.sel, r = (i / 9) | 0, c = i % 9;
+      if (k === 'ArrowUp') r = (r + 8) % 9; if (k === 'ArrowDown') r = (r + 1) % 9; if (k === 'ArrowLeft') c = (c + 8) % 9; if (k === 'ArrowRight') c = (c + 1) % 9;
+      st.sel = r * 9 + c; startTimer(); renderAll(); e.preventDefault();
+    }
+    else if (k === 'n' || k === 'N') { $('notesBtn').click(); }
+  });
+  // a hidden tab pauses the clock; coming back resumes it (before, only a hub message could — and the hub never sends one)
+  document.addEventListener('visibilitychange', function () { if (document.hidden) pause(); else resume(); });
+  $('pauseOverlay').addEventListener('click', resume);
+  window.addEventListener('resize', fitBoard);
+  if (window.ResizeObserver) new ResizeObserver(fitBoard).observe($('boardWrap'));
+
+  if (params.has('debug')) {
+    window.brainGame = {
+      state: function () { return { level: level, running: st.running, paused: st.paused, finished: st.finished, left: st.grid.filter(function (v) { return !v; }).length,
+                                     clues: st.puzzle.filter(Boolean).length, hints: st.hints, elapsedMs: st.elapsedMs, penaltyMs: st.penaltyMs, grid: st.grid.slice(), solution: st.solution.slice(),
+                                     pending: st.pending, hintText: $('hintBar').textContent }; },
+      hint: function () { hint(); return st.pending; },
+      finish: function (o) { finish(o || { won: true }); },
+      newGame: function (l) { newGame(l); }
+    };
+  }
+
+  buildBoard(); newGame(level); fitBoard();
+  post({ event: 'ready' });
+})();
+</script>
+</body>
+</html>

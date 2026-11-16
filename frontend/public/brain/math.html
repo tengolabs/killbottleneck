@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quick arithmetic</title>
+<style>
+/* ===== Deluxe look — shared design kit for every brain game (inline this block; keep the names) =====
+   Source of the look: "Minesweeper Deluxe" (miny-modely/deluxe, 3. 11. 2026) chosen by Richard 14. 11. 2026.
+   Light = :root, dark = :root[data-theme="dark"]. No external URLs, no web fonts (system stack only). */
+:root {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #f5f7fc 0%, #d3dae8 100%);
+  --panel: rgba(255,255,255,.78); --panel-solid:#ffffff; --line: rgba(30,41,59,.14);
+  --panel-shadow: 0 20px 40px rgba(30,41,59,.16), 0 0 0 1px rgba(30,41,59,.06);
+  --text:#0f172a; --muted:#5b6578;
+  --tile: linear-gradient(145deg,#ffffff,#dde4ef); --tile-border:#aab6ca; --tile-hover: linear-gradient(145deg,#ffffff,#eef2f8);
+  --tile-down:#cbd4e1; --tile-down-border:#b3bfd0; --tile-shine: rgba(255,255,255,.95);
+  --well: rgba(30,41,59,.07);                 /* darker inset area (board wrapper, status panel) */
+  --accent:#4f46e5; --accent-hover:#4338ca; --accent-text:#ffffff; --accent-glow: rgba(99,102,241,.35);
+  --ok:#10b981; --bad:#ef4444; --warn:#f59e0b; --info:#06b6d4; --pink:#ec4899; --violet:#8b5cf6;
+  --n1:#3b82f6; --n2:#10b981; --n3:#ef4444; --n4:#8b5cf6; --n5:#f59e0b; --n6:#06b6d4; --n7:#ec4899; --n8:#64748b;
+  --radius:18px; --radius-s:10px;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg-gradient: radial-gradient(circle at 50% 0%, #1e1e38 0%, #0d0e1a 100%);
+  --panel: rgba(26,27,46,.75); --panel-solid:#1a1b2e; --line: rgba(255,255,255,.1);
+  --panel-shadow: 0 20px 50px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
+  --text:#f0f3f8; --muted:#8c93a8;
+  --tile: linear-gradient(145deg,#2a2d48,#20233b); --tile-border:#3b3f63; --tile-hover: linear-gradient(145deg,#35395c,#272a47);
+  --tile-down:#141524; --tile-down-border:#1f2136; --tile-shine: rgba(255,255,255,.1);
+  --well: rgba(0,0,0,.25);
+  --accent:#6366f1; --accent-hover:#4f46e5; --accent-text:#ffffff;
+  color-scheme: dark;
+}
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; }
+body { background:var(--bg-gradient) fixed; color:var(--text); overflow:hidden; display:flex; flex-direction:column; -webkit-tap-highlight-color:transparent;
+       user-select:none; -webkit-user-select:none; }
+button { font:inherit; color:inherit; cursor:pointer; }
+button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+[hidden] { display:none !important; }
+
+/* glowing background blobs: <div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div> as the first child of body */
+.blobs { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+.blobs i { position:absolute; border-radius:50%; filter:blur(70px); opacity:.34; animation: blobfloat 14s infinite alternate ease-in-out; }
+:root[data-theme="dark"] .blobs i { opacity:.22; }
+.blobs i:nth-child(1) { width:45vmax; height:45vmax; background:#6366f1; top:-15vmax; left:5%; }
+.blobs i:nth-child(2) { width:50vmax; height:50vmax; background:#ec4899; bottom:-20vmax; right:0; animation-duration:18s; }
+.blobs i:nth-child(3) { width:35vmax; height:35vmax; background:#06b6d4; top:40%; left:55%; animation-duration:12s; }
+@keyframes blobfloat { to { transform: translateY(30px) scale(1.08); } }
+
+/* glass card = the game panel; sits above the blobs */
+.glass { position:relative; z-index:1; background:var(--panel); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+         border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--panel-shadow); }
+#app { height:calc(100% - 16px); margin:8px; display:flex; flex-direction:column; gap:8px; padding:10px 12px; min-height:0; }
+@media (max-height:360px) { #app { height:calc(100% - 8px); margin:4px; padding:6px 8px; gap:6px; } }
+
+/* status panel (HUD) with digital displays */
+.status { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none;
+          background:var(--well); border:1px solid var(--line); border-radius:14px; padding:6px 12px; }
+.display { display:flex; flex-direction:column; align-items:center; min-width:56px; }
+.display .label { font-size:.62rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+.digits { font-family:var(--mono); font-size:1.25rem; font-weight:700; color:#ef4444; text-shadow:0 0 10px rgba(239,68,68,.5);
+          background:#000; padding:1px 8px; border-radius:8px; letter-spacing:2px; border:1px solid rgba(239,68,68,.2);
+          font-variant-numeric:tabular-nums; line-height:1.3; }
+.digits.green { color:#10b981; text-shadow:0 0 10px rgba(16,185,129,.5); border-color:rgba(16,185,129,.25); }
+.digits.blue { color:#60a5fa; text-shadow:0 0 10px rgba(96,165,250,.5); border-color:rgba(96,165,250,.25); }
+.pill { background:var(--well); border:1px solid var(--line); border-radius:999px; padding:3px 12px; font-size:.78rem; color:var(--muted); white-space:nowrap; }
+.pill strong { color:var(--ok); }
+.badge { font-size:.62rem; font-weight:700; text-transform:uppercase; background:linear-gradient(135deg,#f59e0b,#ec4899); color:#fff;
+         padding:2px 8px; border-radius:999px; letter-spacing:.5px; }
+
+/* 3D tiles (cells, cards, keys) */
+.tile { background:var(--tile); border:1px solid var(--tile-border); border-radius:8px; color:var(--text);
+        box-shadow: inset 0 1px 0 var(--tile-shine), 0 2px 4px rgba(0,0,0,.2); transition: background .1s, transform .1s, box-shadow .1s; }
+.tile:hover { background:var(--tile-hover); transform:translateY(-1px); }
+.tile:active { transform:translateY(1px) scale(.97); }
+.tile.down { background:var(--tile-down); border-color:var(--tile-down-border); box-shadow: inset 0 2px 4px rgba(0,0,0,.4); transform:none; }
+.well { background:var(--well); border:1px solid var(--line); border-radius:14px; padding:8px; }
+
+/* buttons */
+.btn { background:var(--accent); color:var(--accent-text); border:0; border-radius:var(--radius-s); padding:9px 18px; font-weight:700;
+       box-shadow:0 4px 14px var(--accent-glow); transition: background .2s, transform .15s; }
+.btn:hover { background:var(--accent-hover); transform:translateY(-1px); }
+.btn:active { transform:translateY(1px); }
+.btn.ghost { background:var(--well); color:var(--text); box-shadow:none; border:1px solid var(--line); }
+.icon-btn { width:34px; height:34px; border-radius:10px; background:var(--well); border:1px solid var(--line); display:inline-flex;
+            align-items:center; justify-content:center; font-size:1rem; transition: background .2s, transform .2s; flex:none; }
+.icon-btn:hover { transform:translateY(-1px); background:rgba(127,127,127,.18); }
+.icon-btn[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; }
+
+/* overlays (start / end / pause) — centred glass card */
+.overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:12px; z-index:20;
+           background:rgba(0,0,0,.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border-radius:inherit; animation: fadeIn .2s ease; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:16px 20px; max-width:360px; width:100%;
+        text-align:center; box-shadow:var(--panel-shadow); color:var(--text); }
+.card h2 { margin:0 0 6px; font-size:1.15rem; font-weight:800; letter-spacing:-.3px; }
+.card p { margin:0 0 12px; color:var(--muted); font-size:.85rem; line-height:1.4; }
+.card .big { font-family:var(--mono); font-size:2rem; font-weight:800; color:var(--accent); margin:2px 0 8px; font-variant-numeric:tabular-nums; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes popIn { 0% { transform:scale(.85); opacity:.6; } 100% { transform:scale(1); opacity:1; } }
+@keyframes shake { 0%,100% { transform:translate(0,0); } 25% { transform:translate(-4px,2px); } 50% { transform:translate(4px,-2px); } 75% { transform:translate(-2px,-2px); } }
+#confetti { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50; }
+#selftest { position:fixed; left:0; bottom:0; z-index:99; font:11px var(--mono); color:#fff; background:#000; padding:2px 6px; }
+@media (prefers-reduced-motion: reduce) { .blobs i, .overlay, .tile, .btn { animation:none !important; transition:none !important; } }
+/* in-game level choice (games with more than one level): <div class="levels" role="group" id="levels"></div> filled with
+   <button class="lvl" type="button" data-level="N" aria-pressed="true|false"><b>Name</b><small>info</small></button> */
+.levels { display:flex; gap:6px; flex:none; flex-wrap:wrap; }
+.lvl { flex:1 1 72px; min-width:0; background:var(--well); border:1px solid var(--line); border-radius:12px; padding:5px 8px; display:flex; flex-direction:column;
+       align-items:center; gap:1px; transition: background .2s; }
+.lvl b { font-weight:700; font-size:.85rem; white-space:nowrap; } .lvl small { font-size:.66rem; color:var(--muted); white-space:nowrap; }
+.lvl:hover { background:rgba(127,127,127,.14); }
+.lvl[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:transparent; box-shadow:0 4px 14px var(--accent-glow); }
+.lvl[aria-pressed="true"] small { color:rgba(255,255,255,.8); }
+@media (max-height:360px) { .lvl small { display:none; } .lvl { padding:3px 6px; } }
+/* "How to play" (added 15. 11. after Richard's klik-test — the word game had no explanation at all): a labelled button in the
+   .status HUD <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button> opens
+   <div class="overlay" id="helpOverlay" hidden><div class="card rules"><button class="close" id="helpClose" type="button"
+   aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div></div>
+   filled by bindHelp(T) from STR keys `help`, `rulesTitle`, `rules` (array of short HTML items, <b>…</b> for the keyword). */
+.icon-btn.help { width:auto; padding:0 10px; gap:6px; font-size:.78rem; font-weight:700; color:var(--text); }
+.icon-btn.help span { white-space:nowrap; }
+@media (max-width:479px), (max-height:360px) { .icon-btn.help span { display:none; } .icon-btn.help { padding:0; width:34px; } }
+.card.rules { position:relative; max-width:440px; max-height:calc(100% - 8px); display:flex; flex-direction:column; }
+.card.rules .modal-body { overflow:auto; min-height:0; }
+.modal-body ul { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px; font-size:.86rem; line-height:1.4; text-align:left; }
+.modal-body li b { color:var(--text); }
+.card .close { position:absolute; right:10px; top:6px; background:none; border:0; font-size:1.4rem; color:var(--muted); cursor:pointer; }
+/* example tiles inside the rules (word game): <span class="ex"><i class="hit">S</i><i class="near">T</i><i class="miss">A</i></span> */
+.ex { display:inline-flex; gap:3px; vertical-align:middle; margin:0 2px; }
+.ex i { font-style:normal; font-weight:800; font-size:.8rem; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
+        border-radius:5px; background:var(--tile); border:1px solid var(--tile-border); color:var(--text); text-transform:uppercase; }
+.ex i.hit { background:var(--ok); border-color:var(--ok); color:#fff; } .ex i.near { background:var(--warn); border-color:var(--warn); color:#fff; }
+.ex i.miss { background:var(--tile-down); border-color:var(--tile-down-border); color:var(--muted); }
+
+/* ===== Quick arithmetic — game-specific styles (kit variables only) ===== */
+#app { max-width:720px; width:calc(100% - 16px); margin-left:auto; margin-right:auto; }
+.status .display { min-width:52px; }
+.digits .unit { font-size:.65em; letter-spacing:0; margin-left:2px; opacity:.85; }
+.bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; flex:none; }
+.bar i { display:block; height:100%; width:100%; background:var(--accent); box-shadow:0 0 8px var(--accent-glow); transition: width .2s linear; }
+.main { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:8px; position:relative; } /* overlays cover only this part, the HUD + level choice stay usable */
+.main > .overlay { border-radius:14px; }
+.quiz { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:8px 12px;
+        flex:1 1 auto; min-height:0; position:relative; overflow:hidden; }
+.quiz.flash-ok { animation: fok .45s ease-out; }
+.quiz.flash-bad { animation: fbad .9s ease-out; }
+@keyframes fok { 0% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--ok) 35%, transparent); } 100% { box-shadow: inset 0 0 0 999px transparent; } }
+@keyframes fbad { 0% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--bad) 35%, transparent); } 100% { box-shadow: inset 0 0 0 999px transparent; } }
+.expr { font-family:var(--mono); font-size: clamp(22px, 7vmin, 44px); font-weight:700; letter-spacing:.02em; font-variant-numeric: tabular-nums;
+        line-height:1.1; text-align:center; }
+.answer { font-family:var(--mono); min-width:4ch; font-size: clamp(22px, 7vmin, 44px); font-weight:800; font-variant-numeric: tabular-nums;
+          border-bottom:3px solid var(--accent); padding:0 6px; min-height:1.2em; line-height:1.2; color:var(--accent); text-align:center;
+          text-shadow:0 0 12px var(--accent-glow); }
+.answer.caret::after { content:""; display:inline-block; width:2px; height:.9em; background:var(--accent); margin-left:2px; vertical-align:-0.1em; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.correction { font-family:var(--mono); font-size:14px; font-weight:700; color:var(--bad); min-height:1.2em; }
+.pad { display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; flex:0 0 auto; }
+.pad button { font-family:var(--mono); font-size: clamp(16px, 4.5vmin, 22px); font-weight:700; padding:0; height: clamp(34px, 8vmin, 52px);
+              touch-action:manipulation; }
+.pad .tile:active { background:var(--tile-down); box-shadow: inset 0 2px 4px rgba(0,0,0,.4); }
+.pad .enter { grid-row: span 2; height:auto; padding:0; font-size: clamp(18px, 5vmin, 26px); }
+.pad button[disabled] { opacity:.35; cursor:default; }
+.pad button.hidden { visibility:hidden; }
+.overlay .big { font-size: clamp(28px, 9vmin, 48px); line-height:1; }
+.hidden { display:none !important; }
+@media (max-height: 420px) {
+  #app { max-width:none; }
+  .main { flex-direction:row; }
+  .quiz { flex:1 1 55%; }
+  .pad { flex:0 0 45%; max-width:360px; }
+  .pad button { height:auto; min-height:28px; }
+  .expr, .answer { font-size: clamp(18px, 4vw, 40px); }
+  .card { padding:10px 14px; } .card p { margin-bottom:6px; } .overlay .big { font-size:26px; margin:0 0 4px; }
+}
+@media (max-width: 360px) {
+  .status { padding:6px 8px; gap:5px; }
+  .status .display { min-width:0; }
+  .digits { font-size:1.05rem; padding:1px 6px; letter-spacing:1px; }
+  .pill { padding:3px 8px; font-size:.72rem; }
+}
+@media (prefers-reduced-motion: reduce) { .quiz { animation:none !important; } }
+</style>
+</head>
+<body>
+<div class="blobs" aria-hidden="true"><i></i><i></i><i></i></div>
+<div id="app" class="glass">
+  <div class="status">
+    <span class="pill" id="levelTag" hidden></span>
+    <div class="display"><span class="label">⏱</span><span class="digits"><span id="time">60</span><span class="unit" id="secLabel">s</span></span></div>
+    <div class="display" title=""><span class="label">✓</span><span class="digits green" id="okCount">0</span></div>
+    <div class="display" title=""><span class="label">✗</span><span class="digits" id="badCount">0</span></div>
+    <button class="icon-btn help" id="helpBtn" type="button">❓<span id="helpLbl"></span></button>
+    <button class="icon-btn" id="soundBtn" type="button"></button>
+  </div>
+  <div class="levels" id="levels" role="group"></div>
+  <div class="bar"><i id="barFill"></i></div>
+  <div class="main">
+    <div class="well quiz" id="card">
+      <div class="expr" id="expr">&nbsp;</div>
+      <div class="answer caret" id="answer">&nbsp;</div>
+      <div class="correction" id="correction"></div>
+    </div>
+    <div class="pad" id="pad"></div>
+    <div class="overlay" id="startLayer">
+      <div class="card">
+        <h2 id="startTitle"></h2>
+        <p id="startHint"></p>
+        <button class="btn" id="startBtn"></button>
+      </div>
+    </div>
+    <div class="overlay hidden" id="endLayer">
+      <div class="card">
+        <h2 id="endTitle"></h2>
+        <div class="big" id="endScore"></div>
+        <p id="endDetail"></p>
+        <button class="btn" id="againBtn"></button>
+      </div>
+    </div>
+    <div class="overlay hidden" id="pauseLayer">
+      <div class="card"><h2 id="pauseText"></h2></div>
+    </div>
+    <div class="overlay" id="helpOverlay" hidden><div class="card rules"><button class="close" id="helpClose" type="button" aria-label="close">&times;</button><h2 id="rulesTitle"></h2><div class="modal-body"><ul id="rulesList"></ul></div></div></div>
+  </div>
+</div>
+<canvas id="confetti"></canvas>
+<div id="selftest" class="hidden"></div>
+<script>
+'use strict';
+// ===== Deluxe kit — shared sound + confetti for every brain game (inline this block; keep the names) =====
+// Sounds come from "NEON::MINES" (miny-modely/cyber), chosen by Richard 14. 11. 2026: short square-wave tones,
+// Web Audio only, no files. `sfx.enabled` is the only thing stored in localStorage (key: brain-sound).
+const sfx = {
+  ctx: null,
+  enabled: (() => { try { return localStorage.getItem('brain-sound') !== '0'; } catch { return true; } })(),
+  ac() {
+    if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) this.ctx = new AC(); }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  set(on) { this.enabled = !!on; try { localStorage.setItem('brain-sound', on ? '1' : '0'); } catch { /* private mode */ } },
+  tone(f, d = 0.08, type = 'square', g = 0.04, delay = 0) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const o = c.createOscillator(), v = c.createGain();
+    o.type = type; o.frequency.value = f;
+    const t0 = c.currentTime + delay;
+    v.gain.setValueAtTime(0.0001, t0);
+    v.gain.linearRampToValueAtTime(g, t0 + 0.012);
+    v.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    o.connect(v).connect(c.destination);
+    o.start(t0); o.stop(t0 + d + 0.05);
+  },
+  noise(d = 0.4, g = 0.15) {
+    if (!this.enabled) return;
+    const c = this.ac(); if (!c) return;
+    const n = Math.floor(c.sampleRate * d), buf = c.createBuffer(1, n, c.sampleRate), data = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 800;
+    const v = c.createGain(); v.gain.value = g;
+    src.connect(fl).connect(v).connect(c.destination); src.start();
+  },
+  // vocabulary shared by all games
+  click() { this.tone(920, 0.05, 'square', 0.02); },          // reveal / flip / key press
+  flag()  { this.tone(430, 0.07, 'square', 0.03); },          // secondary action (flag, note)
+  ok()    { this.tone(660, 0.06, 'square', 0.03); this.tone(990, 0.08, 'square', 0.03, 0.06); }, // correct answer
+  bad()   { this.tone(180, 0.14, 'sawtooth', 0.05); },        // wrong answer
+  boom()  { this.noise(0.5, 0.2); this.tone(65, 0.45, 'sawtooth', 0.12); },                     // mine hit / game lost
+  win()   { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.13, 'square', 0.04, i * 0.11)); },
+};
+
+// Confetti burst on a won round (canvas#confetti, fixed, pointer-events:none). Honour reduced motion.
+function confetti() {
+  const canvas = document.getElementById('confetti');
+  if (!canvas || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6'];
+  const ps = Array.from({ length: 110 }, () => ({ x: canvas.width / 2, y: canvas.height / 2, vx: (Math.random() - .5) * 18, vy: (Math.random() - .7) * 20,
+    size: Math.random() * 8 + 4, color: colors[Math.floor(Math.random() * colors.length)], a: 1, rot: Math.random() * 360, rs: (Math.random() - .5) * 10 }));
+  (function step() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    for (const p of ps) {
+      p.x += p.vx; p.y += p.vy; p.vy += .4; p.rot += p.rs; p.a -= .012;
+      if (p.a <= 0) continue;
+      alive = true;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180); ctx.globalAlpha = p.a; ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.restore();
+    }
+    if (alive) requestAnimationFrame(step); else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  })();
+}
+
+// Sound toggle button: <button class="icon-btn" id="soundBtn" type="button"></button>; the hub's `mute` action calls sfx.set(false) + syncSound().
+function syncSound() { const b = document.getElementById('soundBtn'); if (!b) return; b.textContent = sfx.enabled ? '🔊' : '🔇'; b.setAttribute('aria-pressed', String(!sfx.enabled)); }
+
+// Theme + level plumbing shared by all games (added 14. 11. evening, Richard's klik-test):
+// - the hub sends { action: 'theme', theme: 'light'|'dark' } when the app theme or skin changes → recolour WITHOUT restarting the game
+// - the player picks the level inside the game: when embedded, the game only reports it ({ event: 'level' }) and the hub reloads
+//   the game at that level (the hub is the source of truth for the round on the server); standalone, the game restarts itself.
+function applyTheme(theme) { if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; }
+// Builds the level buttons; `names` = STR.levels (array of display names), `infos` = optional array of short hints, `current` = 1-based.
+function buildLevels(names, infos, current, onPick) {
+  const box = document.getElementById('levels'); if (!box) return;
+  box.innerHTML = '';
+  names.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'lvl'; b.dataset.level = i + 1; b.setAttribute('aria-pressed', String(i + 1 === current));
+    b.innerHTML = `<b>${name}</b>${infos && infos[i] ? `<small>${infos[i]}</small>` : ''}`;
+    b.addEventListener('click', () => { if (i + 1 !== current) onPick(i + 1); });
+    box.appendChild(b);
+  });
+}
+// "How to play" modal (added 15. 11.): wires #helpBtn / #helpOverlay / #helpClose and fills the texts from STR
+// (`help` = button label, `rulesTitle`, `rules` = array of short HTML items). Escape closes it; a click on the backdrop too.
+function bindHelp(T) {
+  const btn = document.getElementById('helpBtn'), ov = document.getElementById('helpOverlay'); if (!btn || !ov) return;
+  const lbl = document.getElementById('helpLbl'); if (lbl) lbl.textContent = T.help; btn.title = T.help; btn.setAttribute('aria-label', T.help);
+  document.getElementById('rulesTitle').textContent = T.rulesTitle;
+  document.getElementById('rulesList').innerHTML = T.rules.map((r) => `<li>${r}</li>`).join('');
+  const open = () => { ov.hidden = false; btn.setAttribute('aria-expanded', 'true'); };
+  const close = () => { ov.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.addEventListener('click', () => (ov.hidden ? open() : close()));
+  document.getElementById('helpClose').addEventListener('click', close);
+  ov.addEventListener('click', (ev) => { if (ev.target === ov) close(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !ov.hidden) { close(); ev.stopPropagation(); } }, true);
+}
+
+// ---------- Strings ----------
+const STR = {
+  cs: { title: 'Rychlé počty', start: 'Start', hint: 'Máš 60 sekund. Počítej příklady a potvrď Enterem.',
+        level: 'Úroveň', correct: 'správně', wrong: 'chybně', done: 'Hotovo!', again: 'Hrát znovu',
+        detail: (ok, bad) => `${ok} správně · ${bad} chybně · úspěšnost ${pct(ok, bad)} %`,
+        paused: 'Pauza', right: 'Správně', seconds: 's', sound: 'Zvuk',
+        levels: ['Lehká', 'Střední', 'Těžká'], levelInfos: ['do 20', 'do 100 + násobilka', 'do 1000'], levelsAria: 'Obtížnost',
+        help: 'Jak hrát', rulesTitle: 'Jak hrát', rules: [
+          '<b>Cíl:</b> za 60 sekund správně vyřešit co nejvíc příkladů.',
+          '<b>Start:</b> klepni na Start (nebo stiskni Enter). Nahoře se objeví příklad, například 7 + 5 =.',
+          '<b>Odpověď:</b> napiš výsledek na číselníku pod příkladem nebo na klávesnici a potvrď tlačítkem ⏎ nebo klávesou Enter. ⌫ (Backspace) smaže poslední číslici.',
+          '<b>Správně</b> = hned další příklad. <b>Chybně</b> = na sekundu se ukáže správný výsledek a pak jede další příklad.',
+          '<b>Skóre</b> je počet správných odpovědí (✓); ⏱ odpočítává zbývající sekundy, chyby ✗ se jen počítají.',
+          '<b>Úrovně:</b> Lehká – sčítání a odčítání do 20; Střední – do 100 a malá násobilka; Těžká – do 1000, násobení, dělení, závorky a výsledek může být záporný (klávesa −).'] },
+  en: { title: 'Quick arithmetic', start: 'Start', hint: 'You have 60 seconds. Solve the problems and confirm with Enter.',
+        level: 'Level', correct: 'correct', wrong: 'wrong', done: 'Time is up!', again: 'Play again',
+        detail: (ok, bad) => `${ok} correct · ${bad} wrong · accuracy ${pct(ok, bad)} %`,
+        paused: 'Paused', right: 'Correct', seconds: 's', sound: 'Sound',
+        levels: ['Easy', 'Medium', 'Hard'], levelInfos: ['up to 20', 'up to 100 + tables', 'up to 1000'], levelsAria: 'Difficulty',
+        help: 'How to play', rulesTitle: 'How to play', rules: [
+          '<b>Goal:</b> solve as many problems correctly as you can in 60 seconds.',
+          '<b>Start:</b> tap Start (or press Enter). A problem appears at the top, for example 7 + 5 =.',
+          '<b>Answer:</b> type the result on the number pad below the problem or on your keyboard and confirm with the ⏎ button or the Enter key. ⌫ (Backspace) deletes the last digit.',
+          '<b>Correct</b> = the next problem appears at once. <b>Wrong</b> = the right answer is shown for a second, then the next problem follows.',
+          '<b>Score</b> is the number of correct answers (✓); ⏱ counts down the remaining seconds, mistakes ✗ are only counted.',
+          '<b>Levels:</b> Easy – addition and subtraction up to 20; Medium – up to 100 plus times tables; Hard – up to 1000 with multiplication, division, brackets, and the result can be negative (the − key).'] }
+};
+function pct(ok, bad) { return ok + bad ? Math.round(100 * ok / (ok + bad)) : 0; }
+
+// ---------- Params ----------
+const params = new URLSearchParams(location.search);
+const EMBED = params.get('embed') === '1';
+const LANG = params.get('lang') === 'cs' ? 'cs' : 'en';
+const T = STR[LANG];
+let LEVEL = clampLevel(parseInt(params.get('level'), 10));
+function clampLevel(n) { return n >= 1 && n <= 3 ? n : 1; }
+const theme = params.get('theme');
+if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme);
+else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+document.documentElement.lang = LANG;
+document.title = T.title;
+
+const ROUND_MS = 60000;
+const GAME = 'math';
+
+// ---------- Problem generator (pure, testable) ----------
+function rnd(min, max) { return min + Math.floor(Math.random() * (max - min + 1)); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+// Returns { text, answer } — answer is always an integer within level bounds.
+function makeProblem(level) {
+  if (level === 1) {
+    if (Math.random() < 0.5) { const a = rnd(0, 20), b = rnd(0, 20 - a); return { text: `${a} + ${b}`, answer: a + b }; }
+    const a = rnd(0, 20), b = rnd(0, a); return { text: `${a} − ${b}`, answer: a - b };
+  }
+  if (level === 2) {
+    const kind = pick(['add', 'sub', 'mul', 'mul']);
+    if (kind === 'add') { const a = rnd(1, 99), b = rnd(1, 100 - a); return { text: `${a} + ${b}`, answer: a + b }; }
+    if (kind === 'sub') { const a = rnd(1, 100), b = rnd(1, a); return { text: `${a} − ${b}`, answer: a - b }; }
+    const a = rnd(2, 10), b = rnd(2, 10); return { text: `${a} × ${b}`, answer: a * b };
+  }
+  const kind = pick(['add', 'sub', 'mul', 'div', 'paren']);
+  if (kind === 'add') { const a = rnd(10, 990), b = rnd(10, 1000 - a); return { text: `${a} + ${b}`, answer: a + b }; }
+  if (kind === 'sub') { const a = rnd(10, 1000), b = rnd(10, 1000); return { text: `${a} − ${b}`, answer: a - b }; } // may be negative
+  if (kind === 'mul') { const a = rnd(11, 99), b = rnd(2, 9); return { text: `${a} × ${b}`, answer: a * b }; }
+  if (kind === 'div') { const b = rnd(2, 9), q = rnd(2, 99); return { text: `${b * q} ÷ ${b}`, answer: q }; }
+  const c = rnd(2, 9), s = rnd(3, Math.floor(1000 / c)), a = rnd(1, s - 1), b = s - a;
+  return { text: `(${a} + ${b}) × ${c}`, answer: s * c };
+}
+// Independent evaluator used by the self-test to cross-check `answer` against `text`.
+function evalText(text) {
+  const m = text.match(/^\((\d+) \+ (\d+)\) × (\d+)$/);
+  if (m) return (+m[1] + +m[2]) * +m[3];
+  const p = text.match(/^(\d+) ([+−×÷]) (\d+)$/);
+  if (!p) return NaN;
+  const a = +p[1], b = +p[3];
+  return p[2] === '+' ? a + b : p[2] === '−' ? a - b : p[2] === '×' ? a * b : a / b;
+}
+function checkAnswer(problem, input) {
+  if (input === '' || input === '-') return false;
+  return parseInt(input, 10) === problem.answer;
+}
+
+// ---------- State ----------
+const S = { phase: 'idle', level: LEVEL, ok: 0, bad: 0, problem: null, input: '', remaining: ROUND_MS,
+            lastTick: 0, timer: 0, locked: false, paused: false, startedAt: 0, resultSent: false };
+
+// ---------- Messaging ----------
+// Hub origin; `file://` pages report origin "null", which postMessage rejects — fall back to "*" there.
+const HUB_ORIGIN = location.origin === 'null' ? '*' : location.origin;
+function post(msg) { if (EMBED) window.parent.postMessage(Object.assign({ type: 'kb-brain', game: GAME }, msg), HUB_ORIGIN); }
+window.addEventListener('message', ev => {
+  if (ev.origin !== location.origin || !ev.data || ev.data.type !== 'kb-brain') return;
+  const a = ev.data.action;
+  if (a === 'pause') pause(); else if (a === 'resume') resume(); else if (a === 'mute') { sfx.set(false); syncSound(); } else if (a === 'new') newGame(S.level);
+  else if (a === 'theme') applyTheme(ev.data.theme); // recolour only, never restart
+});
+
+// ---------- DOM ----------
+const $ = id => document.getElementById(id);
+const el = { expr: $('expr'), answer: $('answer'), corr: $('correction'), card: $('card'), time: $('time'), ok: $('okCount'), bad: $('badCount'),
+             bar: $('barFill'), pad: $('pad'), start: $('startLayer'), end: $('endLayer'), pause: $('pauseLayer'), level: $('levelTag') };
+$('startTitle').textContent = T.title; $('startHint').textContent = T.hint; $('startBtn').textContent = T.start;
+$('againBtn').textContent = T.again; $('endTitle').textContent = T.done; $('pauseText').textContent = T.paused; $('secLabel').textContent = T.seconds;
+$('okCount').parentElement.title = T.correct; $('badCount').parentElement.title = T.wrong;
+$('startBtn').addEventListener('click', startRound);
+$('againBtn').addEventListener('click', () => newGame(S.level));
+$('soundBtn').title = T.sound; $('soundBtn').setAttribute('aria-label', T.sound);
+$('soundBtn').addEventListener('click', () => { sfx.set(!sfx.enabled); syncSound(); });
+syncSound();
+$('levels').setAttribute('aria-label', T.levelsAria);
+bindHelp(T);
+// level choice inside the game: embedded → the hub reloads the game at that level; standalone → restart here at the new level
+function pickLevel(n) { if (EMBED) post({ event: 'level', level: n }); else newGame(n); }
+
+const KEYS = ['7', '8', '9', '⌫', '4', '5', '6', '⏎', '1', '2', '3', '−', '0'];
+function buildPad() {
+  el.pad.innerHTML = '';
+  for (const k of KEYS) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = k; b.dataset.k = k; b.className = 'tile';
+    if (k === '⏎') { b.className = 'btn enter'; b.setAttribute('aria-label', 'Enter'); }
+    if (k === '⌫') b.setAttribute('aria-label', 'Backspace');
+    if (k === '−') { b.setAttribute('aria-label', 'minus'); if (S.level < 3) b.classList.add('hidden'); }
+    if (k === '0') b.style.gridColumn = 'span 2';
+    b.addEventListener('pointerdown', e => { e.preventDefault(); keyPress(k); });
+    el.pad.appendChild(b);
+  }
+}
+function keyPress(k) {
+  if (S.phase !== 'running' || S.locked || S.paused) return;
+  if (k === '⏎') return submit();
+  if (k === '⌫') { sfx.click(); S.input = S.input.slice(0, -1); return renderInput(); }
+  if (k === '−') { if (S.level >= 3 && S.input === '') { sfx.click(); S.input = '-'; } return renderInput(); }
+  if (/^\d$/.test(k) && S.input.replace('-', '').length < 5) { sfx.click(); S.input += k; renderInput(); }
+}
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (S.phase === 'idle' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); return startRound(); }
+  if (S.phase === 'ended' && e.key === 'Enter') { e.preventDefault(); return newGame(S.level); }
+  if (e.key === 'Enter') { e.preventDefault(); keyPress('⏎'); }
+  else if (e.key === 'Backspace') { e.preventDefault(); keyPress('⌫'); }
+  else if (e.key === '-') { e.preventDefault(); keyPress('−'); }
+  else if (/^\d$/.test(e.key)) { e.preventDefault(); keyPress(e.key); }
+});
+
+function renderInput() { el.answer.textContent = S.input || ' '; }
+function renderHud() {
+  el.ok.textContent = S.ok; el.bad.textContent = S.bad;
+  el.time.textContent = Math.ceil(S.remaining / 1000);
+  el.bar.style.width = (100 * S.remaining / ROUND_MS) + '%';
+  el.level.textContent = `${T.level} ${S.level}`;
+}
+function nextProblem() {
+  S.problem = makeProblem(S.level); S.input = ''; S.locked = false;
+  el.expr.textContent = S.problem.text + ' =';
+  el.corr.textContent = ''; renderInput();
+}
+function submit() {
+  if (S.input === '' || S.input === '-') return;
+  const good = checkAnswer(S.problem, S.input);
+  el.card.classList.remove('flash-ok', 'flash-bad'); void el.card.offsetWidth;
+  if (good) { S.ok++; el.card.classList.add('flash-ok'); sfx.ok(); renderHud(); nextProblem(); return; }
+  S.bad++; S.locked = true; el.card.classList.add('flash-bad'); sfx.bad(); renderHud();
+  el.corr.textContent = `${T.right}: ${S.problem.answer}`;
+  setTimeout(() => { if (S.phase === 'running') nextProblem(); }, 1000);
+}
+
+// ---------- Round control ----------
+function newGame(level) {
+  S.level = clampLevel(level); S.phase = 'idle'; S.ok = 0; S.bad = 0; S.input = ''; S.remaining = ROUND_MS; S.locked = false; S.resultSent = false;
+  clearInterval(S.timer); S.timer = 0;
+  el.start.classList.remove('hidden'); el.end.classList.add('hidden');
+  el.expr.textContent = ' '; el.corr.textContent = ''; renderInput(); renderHud(); buildPad();
+  buildLevels(T.levels, T.levelInfos, S.level, pickLevel);
+}
+function startRound() {
+  if (S.phase !== 'idle') return;
+  S.phase = 'running'; S.startedAt = Date.now(); el.start.classList.add('hidden');
+  nextProblem(); S.lastTick = Date.now();
+  S.timer = setInterval(tick, 100);
+}
+function tick() {
+  if (S.paused) return;
+  const now = Date.now(); S.remaining -= now - S.lastTick; S.lastTick = now;
+  if (S.remaining <= 0) { S.remaining = 0; renderHud(); return endRound(true, ROUND_MS); }
+  renderHud();
+}
+function endRound(won, durationMs) {
+  if (S.phase === 'ended') return;
+  S.phase = 'ended'; clearInterval(S.timer); S.timer = 0; S.locked = true;
+  $('endScore').textContent = S.ok; $('endDetail').textContent = T.detail(S.ok, S.bad);
+  el.end.classList.remove('hidden');
+  if (won) { sfx.win(); confetti(); } else sfx.boom();
+  if (!S.resultSent) { S.resultSent = true; post({ event: 'result', level: S.level, won: !!won, score: S.ok, durationMs }); }
+}
+function pause() { if (S.paused) return; S.paused = true; el.pause.classList.remove('hidden'); }
+function resume() { if (!S.paused) return; S.paused = false; S.lastTick = Date.now(); el.pause.classList.add('hidden'); }
+// a hidden tab pauses the round; coming back resumes it (before, only a hub message could — and the hub never sends one)
+document.addEventListener('visibilitychange', () => { if (S.phase !== 'running') return; if (document.hidden) pause(); else resume(); });
+el.pause.addEventListener('click', resume);
+
+// ---------- Self-test ----------
+function brainSelftest() {
+  const fail = [];
+  const limits = { 1: 20, 2: 100, 3: 1000 };
+  for (let level = 1; level <= 3; level++) {
+    const seen = new Set();
+    for (let i = 0; i < 2000; i++) {
+      const p = makeProblem(level);
+      if (!Number.isInteger(p.answer)) { fail.push(`L${level} non-integer answer: ${p.text}`); break; }
+      if (Math.abs(p.answer) > limits[level]) { fail.push(`L${level} out of bounds: ${p.text} = ${p.answer}`); break; }
+      if (level < 3 && p.answer < 0) { fail.push(`L${level} negative answer: ${p.text}`); break; }
+      if (evalText(p.text) !== p.answer) { fail.push(`L${level} answer mismatch: ${p.text} = ${p.answer}`); break; }
+      for (const n of p.text.match(/\d+/g)) if (+n > limits[level]) { fail.push(`L${level} operand too big: ${p.text}`); break; }
+      seen.add(p.text[0] === '(' ? '(' : p.text.split(' ')[1]);
+    }
+    if (level === 1 && !(seen.has('+') && seen.has('−'))) fail.push('L1 missing operation kinds');
+    if (level === 2 && !(seen.has('+') && seen.has('−') && seen.has('×'))) fail.push('L2 missing operation kinds');
+    if (level === 3 && !(seen.has('+') && seen.has('−') && seen.has('×') && seen.has('÷') && seen.has('('))) fail.push('L3 missing operation kinds');
+  }
+  let neg = false; for (let i = 0; i < 500 && !neg; i++) neg = makeProblem(3).answer < 0;
+  if (!neg) fail.push('L3 never produced a negative result');
+  const p = { text: '7 − 12', answer: -5 };
+  if (!checkAnswer(p, '-5')) fail.push('checkAnswer -5 should pass');
+  if (checkAnswer(p, '5')) fail.push('checkAnswer 5 should fail');
+  if (checkAnswer(p, '') || checkAnswer(p, '-')) fail.push('empty input should fail');
+  if (!checkAnswer({ text: '(2 + 3) × 4', answer: 20 }, '20')) fail.push('checkAnswer 20 should pass');
+  if (evalText('(2 + 3) × 4') !== 20 || evalText('81 ÷ 9') !== 9) fail.push('evalText broken');
+  if (clampLevel(0) !== 1 || clampLevel(4) !== 1 || clampLevel(3) !== 3) fail.push('clampLevel broken');
+  return fail;
+}
+window.brainSelftest = brainSelftest;
+if (params.has('selftest')) {
+  const f = brainSelftest(); const d = $('selftest'); d.classList.remove('hidden');
+  d.textContent = f.length ? 'SELFTEST FAIL: ' + f.join('; ') : 'SELFTEST PASS';
+}
+if (params.has('debug')) {
+  window.brainGame = {
+    state: () => ({ phase: S.phase, level: S.level, ok: S.ok, bad: S.bad, remaining: S.remaining, paused: S.paused, problem: S.problem, input: S.input }),
+    finish: ({ won = true } = {}) => { if (S.phase === 'idle') startRound(); endRound(won, S.phase === 'ended' ? ROUND_MS : Math.min(ROUND_MS, Date.now() - S.startedAt)); },
+    newGame: level => newGame(level)
+  };
+}
+
+// ---------- Boot ----------
+newGame(LEVEL);
+post({ event: 'ready' });
+</script>
+</body>
+</html>

@@ -245,6 +245,8 @@ H.beh(async () => {
 
   console.log('== tlačítko Nový v seznamu (v každé podsekci) + čipy druhů v prázdném filtru ==');
   if (!(await page.$('[data-testid="chat-dokumenty"]'))) await page.click('[data-testid="chat-dokumenty-btn"]');
+  // 13 Nov 2026: the Office panel turns in like a page (class from the chat's edge) and the 📁 button pulses once
+  expect(!!(await page.$('[data-testid="chat-dok-list"].kb-dok-list, [data-testid="chat-dok-list"].kb-dok-list-l')), 'Office: the content turned in (page-turn class on the inner wrapper, the panel box stays put)');
   if (await page.$('[data-testid="chat-dok-zpet"]')) await page.click('[data-testid="chat-dok-zpet"]');
   expect(await cekej('[data-testid="chat-dok-novy"]'), 'tlačítko Nový v hlavičce seznamu');
   await page.click('[data-testid="chat-dok-filtr"][data-skupina="emaily"]');

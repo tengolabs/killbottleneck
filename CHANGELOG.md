@@ -7,6 +7,36 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.3.0 — 2026-11-16
+
+**Brain training zone 🧠 — seven daily puzzles next to the chat, personal statistics**
+
+**Upgrade notes:** one schema migration adds the `brain_results` collection (rows are visible to their owner only).
+
+- **Brain training zone** as a sibling of relax: the 🧠 button in the assistant header, the word *brain training* /
+  *puzzle* (Czech: *hlavolam*) in the chat or a chip in an empty conversation opens a hub next to the chat (under the
+  assistant's header bar on a phone) with a daily set of seven games — Minesweeper, Pairs, Five-letter word, Quick arithmetic, Colours
+  (Stroop), Sudoku and Clock — each training a different cognitive skill, with the difficulty on the card and inside the
+  game; switching the app theme or skin recolours a running game without restarting it. All games
+  share one look (dark/light glass panels, 3D tiles, digital counters), short synthesized sounds with a mute button,
+  confetti on a won round and a **"How to play"** button with the rules written for a first-time player. On a phone the zone fills the screen under the assistant's header bar, which stays visible (🧠 in it closes the
+  zone); when the panel is collapsed the zone's toolbar offers an **Assistant** button that opens it again (before, ✕
+  was the only way out). Minesweeper: a long press flags a
+  square once on Android Chrome too (its own long-press event no longer takes the flag away), and a flag placed before
+  the first reveal no longer skips mine placement (such a round had no mines and could never be won); Expert 30×16
+  is offered from 640 px of width (on a phone the board would scroll and the scrolling fights the long press). The word game
+  shows what to do and a colour legend right above the grid, and any five letters count as a guess (the word list is
+  for the hidden word only); the sudoku **hint explains the step first** (which digit, why:
+  only one fits the cell, or the digit fits nowhere else in the row/column/box) and fills it in on the second press —
+  free on Easy, +30 s on Medium and Hard.
+- **Streak and personal bests** are stored on the server per account (`POST /api/kb/brain/start`, `/finish`,
+  `GET /api/kb/brain/summary`): the day and the duration are decided by the server, only you can read your rows, nothing
+  appears in the organisation. Relax and brain training exclude each other.
+- The "New conversation" page turn runs without perspective (like the Office one): with it the message area's buttons
+  moved for 0.4 s and a chip clicked right after the press could miss.
+- The placement of a zone (full screen / next to the chat / above the chat) is shared code now (`useZoneLayout`); relax
+  behaves exactly as before.
+
 ---
 
 ## v1.2.0 — 2026-11-15

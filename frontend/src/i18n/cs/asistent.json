@@ -208,6 +208,8 @@
   "relaxChip": "🐟 Relax 5 min",
   "relaxChipVolny": "🐟 Relax",
   "relaxToggle": "Relax: rybičky místo mapy (přepínač)",
+  "brainToggle": "Trénink mozku: hlavolamy místo mapy (přepínač)",
+  "brainChip": "🧠 Trénink mozku",
   "relaxBeziVolne": "Relax běží",
   "relaxSablona": "{{count}} min",
   "relaxMin": "min",

@@ -1,6 +1,6 @@
 import { useMedia } from '@/lib/useMedia';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { nactiKlic, ulozKlic, smazKlic, KEY_RELAX, KEY_RELAX_SCENA, KEY_RELAX_ROZLOZENI, KEY_RELAX_AKTIVITA } from '@/lib/storageKeys';
+import { nactiKlic, ulozKlic, smazKlic, KEY_RELAX, KEY_RELAX_SCENA, KEY_RELAX_ROZLOZENI, KEY_RELAX_AKTIVITA, KEY_BRAIN } from '@/lib/storageKeys';
 import { useAuth } from '@/lib/AuthContext';
 
 // Stav AI chatu na boku (13. 9. 2026), který musí přežít přepnutí jazyka:
@@ -164,6 +164,12 @@ export function AsistentProvider({ children }) {
   const spust = useCallback((mode, target) => { setZadost({ mode, target: target || {} }); setOpen(true); }, [setOpen]);
   const vyridZadost = useCallback(() => setZadost(null), []);
 
+  // ---- Brain training zone (9 Nov 2026) ----
+  // { game: '' | id, layout: 'vedle' | 'cela', levels: { game: level }, zpet?: 'vedle' }. Preferences (layout, levels) persist
+  // per account in localStorage (`kb-brain:<uid>`); the open game does not (F5 → hub). Relax and brain exclude each
+  // other: one zone over the map at a time. Results are on the server (brain.pb.js), not here.
+  const [brain, setBrainState] = useState(null);
+
   // ---- Relax ----
   // { scena, minut, start, konecV, rozlozeni, zamek (otisk PINu | ''), hotovo, pokusy, blokDo }
   const { user } = useAuth();
@@ -194,6 +200,7 @@ export function AsistentProvider({ children }) {
       let a = {}; try { a = JSON.parse(nactiKlic(k) || '{}') || {}; } catch { a = {}; }
       ulozKlic(k, JSON.stringify({ ...a, start: ted, posledni: ted, posledniRelax: ted }));
     }
+    setBrainState(null);
     zapisRelax({ scena: s, minut: m, start: ted, konecV: m ? ted + m * 60000 : 0, rozlozeni: roz, zamek: '', hotovo: false, pokusy: 0, blokDo: 0 });
   }, [zapisRelax]);
   const ukonciRelax = useCallback(() => zapisRelax(null), [zapisRelax]);
@@ -214,6 +221,31 @@ export function AsistentProvider({ children }) {
     return { ...r, ...zbytek };
   }), [zapisRelax]);
 
+  useEffect(() => { setBrainState(null); }, [uid]);
+  const readBrainPrefs = useCallback(() => {
+    const u = uidRef.current; if (!u) return {};
+    try { const p = JSON.parse(nactiKlic(`${KEY_BRAIN}:${u}`) || '{}'); return p && typeof p === 'object' ? p : {}; } catch { return {}; }
+  }, []);
+  // only the chosen levels persist; the layout always starts 'vedle' (full screen is a momentary zoom with a way back,
+  // never a preference — the stored-layout branch was dead code, checkup 15 Nov 2026)
+  const writeBrainPrefs = useCallback((b) => {
+    const u = uidRef.current; if (!u || !b) return;
+    ulozKlic(`${KEY_BRAIN}:${u}`, JSON.stringify({ levels: b.levels || {} }));
+  }, []);
+  const startBrain = useCallback(({ game, layout } = {}) => {
+    const p = readBrainPrefs();
+    const lay = layout === 'cela' ? 'cela' : 'vedle';
+    zapisRelax(null);
+    setBrainState({ game: typeof game === 'string' ? game : '', layout: lay, levels: p.levels && typeof p.levels === 'object' ? p.levels : {}, zpet: '' });
+  }, [readBrainPrefs, zapisRelax]);
+  const stopBrain = useCallback(() => setBrainState(null), []);
+  const updateBrain = useCallback((patch) => setBrainState((b) => {
+    if (!b) return b;
+    const next = { ...b, ...(patch || {}) };
+    if (patch && patch.levels) writeBrainPrefs(next);
+    return next;
+  }), [writeBrainPrefs]);
+
   // ---- Prohlížeč obrázků (4. 11. 2026, Richard: „ne nové okno — vlevo místo mapy, nebo přes celou obrazovku s křížkem“) ----
   // { polozky: [dto obrázku], index, sprava (záložka Obrázky: natrvalo / smazat), onZmena } — jen v paměti, vrstva ObrazekVrstva
   const [prohlizec, setProhlizec] = useState(null);
@@ -226,13 +258,14 @@ export function AsistentProvider({ children }) {
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
     zadost, spust, vyridZadost, pdfSoubory, setPdfSoubory,
     relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax,
+    brain, startBrain, stopBrain, updateBrain,
     prohlizec, otevriObrazek, zavriObrazek, setProhlizec,
-  }), [open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, leftPanelWidth, setLeftPanelWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, docPreview, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, prohlizec, otevriObrazek, zavriObrazek]);
+  }), [open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, leftPanelWidth, setLeftPanelWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, docPreview, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, brain, startBrain, stopBrain, updateBrain, prohlizec, otevriObrazek, zavriObrazek]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, odsun: 0, leftInset: 0, side: 'right', setSide: () => {}, railOffset: 0, setLeftTabShown: () => {}, leftPanelWidth: 0, setLeftPanelWidth: () => {}, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, docPreview: '', setDocPreview: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {}, prohlizec: null, otevriObrazek: () => {}, zavriObrazek: () => {}, setProhlizec: () => {} };
+const PRAZDNO = { open: false, width: 0, odsun: 0, leftInset: 0, side: 'right', setSide: () => {}, railOffset: 0, setLeftTabShown: () => {}, leftPanelWidth: 0, setLeftPanelWidth: () => {}, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, docPreview: '', setDocPreview: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {}, brain: null, startBrain: () => {}, stopBrain: () => {}, updateBrain: () => {}, prohlizec: null, otevriObrazek: () => {}, zavriObrazek: () => {}, setProhlizec: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }
