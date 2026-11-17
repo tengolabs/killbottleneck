@@ -8,6 +8,11 @@
 // i admin instance (updateRule v 1751900011) a jeho úpravy se nesmí potichu zahodit
 // (/checkup 6. 11. 2026): upravená se ponechá a zaloguje. Osobní kopie uživatelů
 // (owner ≠ '') se nemění. Idempotentní.
+// LIMIT of the check (code analysis 4, S8-02): "original wording" is recognised by the DESCRIPTION only
+// (Business Model Canvas: both descriptions; Lean Canvas: the end of the description + one English node).
+// An administrator who edited the nodes of the template and left the description as it was gets the nodes
+// replaced by this migration — it is logged below so that the change is at least visible.
+// A fresh instance (the seed already wrote the new texts) is skipped without a line in the log.
 const PUVODNI = {
   "Business Model Canvas": (r) => r.getString("description") === "9 stavebních bloků byznys modelu na jedné mapě."
     && r.getString("description_en") === "The 9 building blocks of a business model on one map.",
@@ -24,11 +29,14 @@ migrate((app) => {
     try {
       rec = app.findFirstRecordByFilter("templates", "title = {:title} && owner = ''", { title: t.title });
     } catch (err) { continue; /* instance bez systémových šablon — seed to doplní */ }
+    // already the new wording (fresh instance, or this migration ran before) — nothing to do, nothing to report
+    if (rec.getString("description") === t.description && rec.getString("description_en") === t.description_en) continue;
     if (!PUVODNI[t.title](rec)) {
       console.log("canvas_texty_vlastni: šablona „" + t.title + "“ je upravená adminem — ponechána");
       continue;
     }
     for (const k of ["description", "description_en", "ai_nodes", "ai_nodes_en"]) rec.set(k, t[k]);
     app.save(rec);
+    console.log("canvas_texts_rewritten: template \"" + t.title + "\" rewritten with the new wording (description and nodes)");
   }
 }, () => { /* zpět netřeba — texty jsou jen jiná formulace */ });

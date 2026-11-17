@@ -139,8 +139,7 @@ function overZapis(app, auth, name, a) {
       if (a.email && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(String(a.email))) return "Error: email must be a valid e-mail address.";
       if (a.ico && !F().jeIco(String(a.ico).replace(/\s+/g, ""), false)) return "Error: ico must be a registration number (letters, digits, dash; Czech IČO has 8 digits).";
       if (a.currency !== undefined && a.currency !== "" && !F().jeMena(String(a.currency).toUpperCase().trim())) return "Error: currency must be a 3-letter ISO 4217 code (CZK, EUR, USD…).";
-      if (!a.client && !a.address && !a.ico && !a.dic && !a.email && !a.currency) return null; // jen jméno — v pořádku (zbytek doplní později)
-      return null;
+      return null; // a name alone is fine too — the rest is filled in later
     }
     case "set_invoicing_profile": {
       a.scope = rozsahProfilu(auth, a.scope);

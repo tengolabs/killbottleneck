@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useTimer } from '@/lib/TimerContext';
+import { useTodayKey } from '@/hooks/useTodayKey';
 import { Button } from '@/components/ui/button';
 import TimeEntryDialog from '@/components/time/TimeEntryDialog';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,7 @@ export default function TimeSummary({ maps = [], onStats }) {
   // po zastavení stopek (running → null) se souhrn přenačte
   useEffect(() => { if (!running) load(); }, [running]);
 
+  const todayKey = useTodayKey(); // "today" must move when the page stays open over midnight (F6-08)
   const stats = useMemo(() => {
     const now = new Date();
     const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -49,27 +51,34 @@ export default function TimeSummary({ maps = [], onStats }) {
     for (const e of entries) {
       if (!e.duration_min || !e.ended) continue; // běžící se započte po zastavení
       const day = parseDate(e.started);
-      if (!day || day < week0) continue;
-      weekMin += e.duration_min;
-      if (day >= today0) todayMin += e.duration_min;
+      const end = parseDate(e.ended);
+      if (!day || !end || end <= week0) continue;
+      // A measurement over midnight (or over Monday 00:00) is split by the time that really falls into
+      // today / this week — it used to count whole to the day it started (F6-08).
+      const span = end - day;
+      const part = (from) => (span > 0 ? e.duration_min * Math.max(0, end - Math.max(day, from)) / span : (day >= from ? e.duration_min : 0));
+      const inWeek = part(week0);
+      if (inWeek <= 0) continue;
+      weekMin += inWeek;
+      todayMin += part(today0);
       const pKey = e.map_id || '';
       const pName = pKey ? (mapTitle[pKey] || t('timeSummary.deletedProject')) : (e.label || t('common:misc.noProject'));
-      byProject[pName] = (byProject[pName] || 0) + e.duration_min;
+      byProject[pName] = (byProject[pName] || 0) + inWeek;
       if (e.client_id) {
         const c = clientById[e.client_id];
         const cName = c?.name || t('timeSummary.deletedClient');
         if (!byClient[cName]) byClient[cName] = { min: 0, color: c?.color || '' };
-        byClient[cName].min += e.duration_min;
+        byClient[cName].min += inWeek;
       }
     }
     const top = (obj, val) => Object.entries(obj).sort((a, b) => val(b[1]) - val(a[1])).slice(0, 5);
     return {
-      todayMin,
-      weekMin,
-      projects: top(byProject, (v) => v).map(([name, min]) => ({ name, min })),
-      clients: top(byClient, (v) => v.min).map(([name, v]) => ({ name, min: v.min, color: v.color })),
+      todayMin: Math.round(todayMin),
+      weekMin: Math.round(weekMin),
+      projects: top(byProject, (v) => v).map(([name, min]) => ({ name, min: Math.round(min) })),
+      clients: top(byClient, (v) => v.min).map(([name, v]) => ({ name, min: Math.round(v.min), color: v.color })),
     };
-  }, [entries, clients, maps, t]);
+  }, [entries, clients, maps, t, todayKey]);
 
   useEffect(() => { onStats?.(stats); }, [stats, onStats]);
 

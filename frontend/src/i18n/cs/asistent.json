@@ -447,6 +447,8 @@
     "previewHide": "Skrýt náhled",
     "previewAlt": "Náhled první strany",
     "previewError": "Náhled se nepodařilo vyrobit.",
+    "fileShortened": "Soubor je stažený, ale text se na stranu nevešel celý — končí třemi tečkami. Zkraťte ho, nebo zvolte Word / PowerPoint.",
+    "outlineOverCap": "V souborech bude jen prvních {{slides}} snímků a {{bullets}} odrážek na snímek — zbytek osnovy se do nich nedostane.",
     "fileError": "Soubor se nepodařilo vyrobit.",
     "template": "Šablona",
     "color": "Barva",

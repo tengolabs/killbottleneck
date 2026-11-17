@@ -217,7 +217,13 @@ function posliOpenAI(cfg, base, bohate, hole, limit, timeout) {
       return v;
     };
     let r = posli(learned ? variant(learned) : t);
-    if (learned) return r;
+    if (learned) {
+      // What was learned can stop being true (the gateway or the model behind the same name changed):
+      // a refusal that names reasoning forgets it and the request is tried from the start (S1-07).
+      if (r.statusCode !== 400 || !/reasoning/i.test(errDetail(r))) return r;
+      store.remove(effortKey);
+      r = posli(t);
+    }
     for (const e of (t.reasoning_effort === "none" ? ["omit"] : ["none", "omit"])) {
       if (r.statusCode !== 400 || !/reasoning/i.test(errDetail(r))) break;
       r = posli(variant(e));

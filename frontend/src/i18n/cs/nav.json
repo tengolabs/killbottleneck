@@ -19,6 +19,7 @@
     "docs": "Dokumentace",
     "myAccount": "Můj účet",
     "orgStructure": "Organizační struktura",
+    "orgStructureFailed": "Organizační strukturu se nepodařilo založit",
     "portal": "Portál serveru (agent)"
   },
   "nav": {

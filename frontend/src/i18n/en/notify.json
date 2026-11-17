@@ -62,7 +62,7 @@
     "emailModeInstant": "Instantly",
     "emailModeInstantDesc": "Every checked event is e-mailed right away.",
     "emailModeDigest": "Daily digest",
-    "emailModeDigestDesc": "No individual e-mails; one digest arrives once a day.",
+    "emailModeDigestDesc": "No individual e-mails; one digest arrives once a day. It lists the events switched on in the “In app” column.",
     "emailModeNone": "Nothing",
     "emailModeNoneDesc": "Nothing is e-mailed. Notifications stay in the app.",
     "navratTitle": "Come-back e-mails when I have not signed in for a while",

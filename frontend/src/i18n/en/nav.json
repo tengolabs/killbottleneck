@@ -19,6 +19,7 @@
     "docs": "Documentation",
     "myAccount": "My account",
     "orgStructure": "Org structure",
+    "orgStructureFailed": "The organization structure could not be created",
     "portal": "Server portal (agent)"
   },
   "nav": {

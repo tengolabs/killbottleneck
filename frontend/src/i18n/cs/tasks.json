@@ -32,6 +32,8 @@
     "newTask": "Nový úkol",
     "loadFailed": "Úkoly se nepodařilo načíst.",
     "loadRetry": "Zkusit znovu",
+    "eventsLoadFailed": "Události kalendáře se nepodařilo načíst — vidíte poslední známý stav.",
+    "eventsTruncated": "Kalendář neukazuje všechny události — je jich víc, než se sem vejde.",
     "stropZobrazeno": "Zobrazeno {{shown}} z {{total}} úkolů",
     "nacistVse": "Načíst vše",
     "emptyTitle": "Zatím nemáte žádné úkoly",
@@ -298,6 +300,7 @@
     "currencyHint": "např. EUR"
   },
   "timeFix": {
+    "mark": "(auto-stop po 12 h)",
     "button": "Opravit konec",
     "title": "Opravit konec měření",
     "description": "Stopky běžely přes 12 hodin a zastavily se samy. Zadejte, kdy jste doopravdy skončili.",
@@ -338,7 +341,9 @@
     "inputPlaceholder": "Napsat komentář...",
     "addTitle": "Přidat komentář",
     "taskDiscussionHeading": "Diskuse z úkolů ({{count}})",
-    "forTask": "k úkolu: {{title}}"
+    "forTask": "k úkolu: {{title}}",
+    "deleteFailed": "Komentář se nepodařilo smazat",
+    "olderHidden": "Zobrazeno je posledních {{count}} komentářů, starší tu vidět nejsou."
   },
   "newNode": {
     "title": "Nový úkol",

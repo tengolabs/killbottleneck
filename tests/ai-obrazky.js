@@ -111,6 +111,12 @@ H.beh(async () => {
   fronta.push(text('Ahoj.'));
   await inst.api('POST', '/api/kb/chat', { token: A1, body: { message: 'Co mám dnes dělat?' } });
   expect(!jmena(posledniVolani()).includes('generate_image'), 'bez klíčového slova generate_image v nabídce není (úspora tokenů)');
+  // the transcript marker of an attached photo is the app's own text, not a wish to draw (S1-04)
+  for (const znacka of ['[Přepis obrázku]', '[Image transcript]']) {
+    fronta.push(text('Rozumím.'));
+    await inst.api('POST', '/api/kb/chat', { token: A1, body: { message: `Co s tím mám udělat?\n\n${znacka}\nFaktura za elektřinu 1 200 Kč, splatnost 30. 11.` } });
+    expect(!jmena(posledniVolani()).includes('generate_image'), `značka přepisu fotky „${znacka}“ sama kreslení neotevře`);
+  }
 
   fronta.push(nastroj('generate_image', { prompt: 'flat vector illustration of a calm morning desk with coffee and plants, pastel colors, no text', title: 'Ranní stůl', format: 'banner' }), text('Kreslím ho.'));
   let r = await inst.api('POST', '/api/kb/chat', { token: A1, body: { message: 'Nakresli mi banner do mailu, ranní stůl s kávou' } });

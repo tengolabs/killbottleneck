@@ -42,10 +42,13 @@ const cacheFirst = async (req) => {
   return res;
 };
 
-const networkFirst = async (req, cacheName, fallbackReq) => {
+const networkFirst = async (req, cacheName, fallbackReq, htmlOnly) => {
   try {
     const res = await fetch(req);
-    if (res.ok) (await caches.open(cacheName)).put(fallbackReq || req, res.clone());
+    // htmlOnly: the offline shell under '/' must only ever be an HTML page — an attachment or a JSON
+    // answer opened as a navigation used to overwrite it and the app then opened as a file offline
+    const html = /text\/html/i.test(res.headers.get('content-type') || '');
+    if (res.ok && (!htmlOnly || html)) (await caches.open(cacheName)).put(fallbackReq || req, res.clone());
     return res;
   } catch (err) {
     const hit = await caches.match(fallbackReq || req);
@@ -70,7 +73,9 @@ self.addEventListener('fetch', (e) => {
   // Brain training games (/brain/*.html, 9 Nov 2026) are iframes too — same rule.
   if (req.destination === 'iframe' || url.pathname.startsWith('/relax/') || url.pathname.startsWith('/brain/')) return;
   if (req.mode === 'navigate') {
-    e.respondWith(networkFirst(req, SHELL, new Request('/')));
+    // server answers opened in a tab (attachments, exports, OAuth redirects, the admin UI) are not the app
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_/')) return;
+    e.respondWith(networkFirst(req, SHELL, new Request('/'), true));
     return;
   }
   if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icon-')) {

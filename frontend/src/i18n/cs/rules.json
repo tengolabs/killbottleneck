@@ -4,6 +4,8 @@
     "dialogHint": "Když se stane X, mapa sama udělá Y. Počet spuštění se nepočítá a neúčtuje.",
     "newRule": "Nové pravidlo",
     "createButton": "Založit pravidlo",
+    "loadFailed": "Pravidla se nepodařilo načíst.",
+    "retry": "Zkusit znovu",
     "empty": "Zatím žádná pravidla. Založte první — třeba „když je uzel hotový, přiřaď dalšího a pošli zprávu“.",
     "nameLabel": "Název pravidla",
     "namePlaceholder": "např. Hotový návrh → předat výrobě",

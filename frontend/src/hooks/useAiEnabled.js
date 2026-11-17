@@ -21,6 +21,7 @@ const EMPTY = { enabled: false, configured: false, provider: 'none', modes: [], 
 let cached = null;
 const listeners = new Set();
 let recheckTimer = null;
+let firstLoadRetries = 0; // failed attempts before the config arrived for the first time
 
 function publish(next) {
   cached = next;
@@ -50,9 +51,14 @@ function load(fresh = false) {
     })
     // Nedorazil ani config (síť / server dole): když už jednou dorazil, je to výpadek — asistent
     // zůstane vidět s pruhem a doptávání běží dál; jinak (první načtení) zůstává schovaný.
-    .catch(() => publish(cached && cached.hosted !== undefined
-      ? { ...cached, enabled: false, modes: [], healthy: false }
-      : { ...EMPTY }));
+    .catch(() => {
+      if (cached && cached.hosted !== undefined) { publish({ ...cached, enabled: false, modes: [], healthy: false }); return; }
+      // The very first config request failed: the assistant and the AI buttons stay hidden, but not until
+      // a manual reload — ask again (15 s, then every minute). `publish` clears the timer, so set it after.
+      publish({ ...EMPTY });
+      firstLoadRetries += 1;
+      recheckTimer = setTimeout(() => load(true), firstLoadRetries <= 2 ? 15000 : 60000);
+    });
 }
 
 // The browser reports the connection back → ask right away instead of waiting for the 2-minute
@@ -61,7 +67,7 @@ function load(fresh = false) {
 if (typeof window !== 'undefined') {
   // `healthy === false` alone: an instance with only the assistant's own model (ai_provider "none")
   // is not `configured`, yet it is marked as down the same way when the config request fails
-  window.addEventListener('online', () => { if (cached && cached.healthy === false) load(true); });
+  window.addEventListener('online', () => { if (cached && (cached.healthy === false || cached.hosted === undefined)) load(true); });
 }
 
 // ruční obnova (po uložení nastavení AI v administraci) — překreslí všechna

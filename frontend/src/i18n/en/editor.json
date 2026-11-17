@@ -23,6 +23,10 @@
     "keptSaved": "Your version has been saved.",
     "keepFailed": "Saving failed — the map may have changed again. Please try once more."
   },
+  "loadError": {
+    "message": "The map could not be loaded. Check your connection and try again.",
+    "retry": "Try again"
+  },
   "notFound": {
     "message": "Map not found.",
     "backToOverview": "Back to overview"
@@ -176,7 +180,9 @@
     "opsAppliedDesc": "{{count}} operations were applied to the map.",
     "aiUndone": "Undone",
     "aiUndoneDesc": "The AI changes were reverted.",
+    "jsonExportedCapped": "Note: the file holds only the first 1,000 tasks.",
     "jsonExported": "Schema downloaded as JSON",
+    "exportFailed": "The export failed. For a very large map, try collapsing some branches.",
     "jsonExportFailed": "JSON export failed",
     "mapMergedStatus": "An automation completed a goal in the meantime — the map is up to date.",
     "mapMergedRule": "A rule updated the map in the meantime — you have the latest version.",

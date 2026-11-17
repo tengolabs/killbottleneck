@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getOrgStructure, createOrgMap } from '@/api/kb';
+import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import InviteDialog from '@/components/tasks/InviteDialog';
 import AboutDialog from '@/components/shared/AboutDialog';
@@ -118,6 +119,8 @@ export default function UserMenu({ onInvited }) {
       if (id) { setOrgMapId(id); navigate(`/map/${id}`); }
     } catch (e) {
       console.error(e);
+      // the menu item used to do nothing at all when the creation failed (code analysis 4, F6-09)
+      toast({ title: t('menu.orgStructureFailed'), description: e?.response?.error || e?.message, variant: 'destructive' });
     } finally {
       setZakladamStrukturu(false);
     }

@@ -14,14 +14,17 @@ export function buildChildrenMap(edges) {
 }
 
 export function countDescendants(childrenMap, nodeId) {
-  let count = 0;
+  // `seen`: a damaged map can hold a cycle (the editor offers "Repair the tree" for it) — without the
+  // guard this loop never ended and froze the tab before the offer could show (finding F1-07)
+  const seen = new Set([nodeId]);
   const stack = [...(childrenMap[nodeId] || [])];
   while (stack.length > 0) {
     const current = stack.pop();
-    count += 1;
+    if (seen.has(current)) continue;
+    seen.add(current);
     stack.push(...(childrenMap[current] || []));
   }
-  return count;
+  return seen.size - 1;
 }
 
 // id uzlů skrytých sbalením předka (celý podstrom sbaleného uzlu)
@@ -32,6 +35,7 @@ export function hiddenByCollapse(nodes, childrenMap) {
       const stack = [...(childrenMap[node.id] || [])];
       while (stack.length > 0) {
         const current = stack.pop();
+        if (hidden.has(current)) continue; // a cycle or a second parent: each node once
         hidden.add(current);
         stack.push(...(childrenMap[current] || []));
       }
@@ -54,23 +58,27 @@ export function computeProgressMap(nodes, childrenMap) {
   const nodeMap = {};
   for (const node of nodes) nodeMap[node.id] = node;
 
-  const compute = (nodeId) => {
+  // `path` = the nodes on the way down: a node met again is a cycle and counts as nothing (no endless recursion)
+  const compute = (nodeId, path) => {
     const children = childrenMap[nodeId] || [];
     if (children.length === 0) {
       return { total: 1, done: nodeMap[nodeId]?.data?.status === 'done' ? 1 : 0 };
     }
     let total = 0, done = 0;
+    path.add(nodeId);
     for (const childId of children) {
-      const r = compute(childId);
+      if (path.has(childId)) continue;
+      const r = compute(childId, path);
       total += r.total;
       done += r.done;
     }
+    path.delete(nodeId);
     return { total, done };
   };
 
   const result = {};
   for (const node of nodes) {
-    const { total, done } = compute(node.id);
+    const { total, done } = compute(node.id, new Set());
     result[node.id] = total > 0 ? Math.round((done / total) * 100) : 0;
   }
   return result;

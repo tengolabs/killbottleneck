@@ -7,6 +7,45 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.6.1 — 2026-11-17
+
+**Fixes from the code review: missed recurring projects are caught up, sharing follows a changed e-mail, clearer error states**
+
+**Upgrade notes:** no schema migration. Behaviour that changes for existing data and API clients:
+a recurring template whose day was missed (the instance was down or locked) creates its project on the next
+hourly run, one missed occurrence at most; `/node-status`, `/deadline-requests` and the rule routes answer
+**404** instead of 403 for a private project the caller cannot see (a public project keeps 403); a second row
+of organization settings is refused (400); an idea in the buffer refuses a deadline or plan that is not a real
+date; an absence can no longer be "left" by an invited person (400); share lists written straight through the
+REST API now rebuild the access rows; `tasks_imported` in the import answer is always 0.
+
+- **Recurring templates catch up.** A weekly or monthly project that was not created on its day is created
+  afterwards (once), and a creation that failed is tried again the next hour.
+- **A changed account e-mail keeps everything.** Sharing, project ownership and the people on steps move to the
+  new address; nothing stays on the old one for whoever registers it next.
+- **A public project opens for a signed-in colleague** who has no share (it used to say "Map not found").
+- **Loading errors say so.** A project, the rules overview and the notification bell show "could not be loaded"
+  with **Try again** instead of "not found" / "no rules" / "no notifications"; a failed image or PDF export of a
+  map and a failed creation of the organization structure are reported.
+- **Step dialog:** the title and the description stop at the length the server stores (500 and 10 000).
+- **Office files:** text that does not fit a greeting card or a slide ends with "…" and the panel says so; an
+  outline over 20 slides or 8 bullets is flagged; a logo in a Word document keeps its proportions; an invoice
+  has no empty table header above the totals on its last page.
+- **Invoices:** a quantity that rounds to zero is refused; the QR payment has an upper amount limit.
+- **Assistant:** drawings started at the same moment can no longer overdraw the weekly credit quota; a stuck
+  drawing shows a sentence instead of the word "timeout"; a picture card in the chat follows a redraw or a
+  deletion made in the Pictures tab.
+- **Notifications:** "New member signed in" and "Organization" are in the notification preferences, and a click
+  on them no longer opens the task table; a deleted "new version" notice does not come back; the daily e-mail
+  digest keeps its window across a restart (at most 7 days back).
+- **Rules:** the reasons in the run history are in the language of the project owner; resetting sub-steps in a
+  process writes the tasks only after the project is saved.
+- **Time tracking:** the "(auto-stop after 12 h)" note is shown in the language of the app.
+- **My day, lite mode, trial:** a shortened overview says so; the lite mode explains a locked instance; an
+  expired trial says "ended" with a readable date; an English user gets the English price list.
+- **Own server address:** `http://` is accepted for names that cannot be public (`http://nas:8090`, `.lan`).
+- The first project created from an empty draft behaves as your own at once, not after a reload.
+
 ## v1.6.0 — 2026-11-17
 
 **The assistant finishes a request in several steps, the align button tidies kanban boards, a foldable phone bar**

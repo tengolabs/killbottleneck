@@ -316,6 +316,13 @@ export default function MyDaySection({ user, ideas = [], onOpenTask, onOpenNode,
             </div>
           )}
 
+          {/* the server caps the overview and says so — lite showed it, the full app did not (F3-09) */}
+          {day?.truncated && !dayError && (
+            <div data-testid="myday-truncated" className="text-sm rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 px-3 py-2">
+              {t('panel.truncated')}
+            </div>
+          )}
+
           {aiAvailable && (
             <div className="flex items-start gap-2 text-sm rounded-lg bg-secondary/40 px-3 py-2">
               <span className="leading-relaxed flex-1 min-w-0 whitespace-pre-wrap">

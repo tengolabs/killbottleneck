@@ -393,6 +393,9 @@ function KartaPdfOprava({ karta, onPotvrd, loading, najdiPdf, ulozPdf, drivejsiO
   const [chyba, setChyba] = useState('');
   const [maSoubor, setMaSoubor] = useState(() => !!(najdiPdf && najdiPdf(jmeno, stran)));
   const inputRef = useRef(null);
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+  const [odlozene, setOdlozene] = useState(null); // result waiting for the running turn to end
   const zivy = useRef(true);
   useEffect(() => () => { zivy.current = false; }, []);
   const vk = karta.vysledek_klienta;
@@ -436,8 +439,18 @@ function KartaPdfOprava({ karta, onPotvrd, loading, najdiPdf, ulozPdf, drivejsiO
       if (zivy.current) setBezi(false);
     }
     // model dostane pravdu: co se povedlo, co ne a co uživatel odškrtl
-    onPotvrd(karta.id, true, hlaseni);
+    // Another turn is running (the person sent a message while the PDF was being rewritten): the confirm call
+    // would be dropped without a word and the card would stay "waiting" on the server for good. Hold the
+    // result and send it as soon as that turn ends (code analysis 4, F2-14).
+    if (loadingRef.current && zivy.current) setOdlozene(hlaseni);
+    else onPotvrd(karta.id, true, hlaseni);
   };
+  useEffect(() => {
+    if (!odlozene || loading) return;
+    const h = odlozene;
+    setOdlozene(null);
+    onPotvrd(karta.id, true, h);
+  }, [odlozene, loading, karta.id, onPotvrd]);
   const stahni = () => { if (vysledek) saveBlob(vysledek.blob, safeFilename(jmeno.replace(/\.pdf$/i, ''), 'dokument') + '-opraveno.pdf'); };
   const popisek = { ceka: t('actionWaiting'), hotovo: t('pdf.cardDone'), zamitnuto: t('actionDeclined'), chyba: t('actionError') }[stav];
   return (
@@ -603,6 +616,14 @@ function KartaObrazek({ karta }) {
     }).catch((e) => { if (!zrus) setChyba(e.message); });
     return () => { zrus = true; };
   }, [karta.image_id, nakresli]);
+  useEffect(() => { // redrawn or deleted in the picture viewer / the Pictures tab → read the state again (F2-11)
+    const f = (e) => {
+      if (!e.detail || e.detail.id !== karta.image_id) return;
+      nactiObrazek(karta.image_id).then((r) => setO(r.obrazek || { id: karta.image_id, stav: 'smazano' })).catch(() => {});
+    };
+    window.addEventListener('kb-obrazek-zmenen', f);
+    return () => window.removeEventListener('kb-obrazek-zmenen', f);
+  }, [karta.image_id]);
   useEffect(() => { // kreslí jiná karta / prohlížeč → za 3 s zjistit, jak to dopadlo
     if (!o || o.stav !== 'pise' || kresli) return undefined;
     const tm = setTimeout(() => nactiObrazek(karta.image_id).then((r) => setO(r.obrazek || { id: karta.image_id, stav: 'smazano' })).catch(() => {}), 3000);
@@ -611,7 +632,7 @@ function KartaObrazek({ karta }) {
   const src = o && o.url ? pb.baseURL.replace(/\/$/, '') + o.url : '';
   const nazev = (o && o.title) || karta.title || t('img.untitled');
   const stahni = async () => {
-    try { const res = await fetch(src); await saveBlob(await res.blob(), `${safeFilename(nazev)}.jpg`); } catch (e) { setChyba(e.message); }
+    try { const res = await fetch(src); if (!res.ok) throw new Error(t('img.failed')); await saveBlob(await res.blob(), `${safeFilename(nazev)}.jpg`); } catch (e) { setChyba(e.message); }
   };
   const w = (o && o.width) || 1024, h = (o && o.height) || 1024;
   const hotovo = o && o.stav === 'hotovo' && src;
@@ -760,6 +781,15 @@ function useObrazkyKarty(ids) {
       for (const id of seznam) if (['ceka', 'pise'].includes(stavy[id].stav)) stavy[id] = { ...stavy[id], stav: 'chyba' };
       if (zive.current) { setObr({ ...stavy }); setKresli(false); }
     })();
+  }, [klic]);
+  useEffect(() => { // a picture of this document was redrawn or deleted elsewhere → read that one again (F2-11)
+    const f = (e) => {
+      const id = e.detail && e.detail.id;
+      if (!id || !klic.split(',').includes(id)) return;
+      nactiObrazek(id).then((r) => { if (zive.current) setObr((p) => ({ ...p, [id]: r.obrazek || { id, stav: 'smazano' } })); }).catch(() => {});
+    };
+    window.addEventListener('kb-obrazek-zmenen', f);
+    return () => window.removeEventListener('kb-obrazek-zmenen', f);
   }, [klic]);
   return { obr, kresli };
 }

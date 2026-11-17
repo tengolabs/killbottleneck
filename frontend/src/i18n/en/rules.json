@@ -4,6 +4,8 @@
     "dialogHint": "When X happens, the map does Y by itself. Runs are never counted or billed.",
     "newRule": "New rule",
     "createButton": "Create rule",
+    "loadFailed": "The rules could not be loaded.",
+    "retry": "Try again",
     "empty": "No rules yet. Create the first one — e.g. “when a node is done, assign the next person and send a message”.",
     "nameLabel": "Rule name",
     "namePlaceholder": "e.g. Design done → hand over to production",

@@ -277,7 +277,7 @@ function runNavratMaily(app, opts) {
     const lastLogin = rec.getString("last_login");
     let st = H.jsonVal(rec, "navrat", null);
     if (!st || typeof st !== "object" || Array.isArray(st)) st = {};
-    if (st.cyklus !== lastLogin) st = { cyklus: lastLogin, krok: 0, odhlasit: st.odhlasit || "", odhlaseno: st.odhlaseno === true };
+    if (st.cyklus !== lastLogin) st = { cyklus: lastLogin, krok: 0, odhlasit: st.odhlasit || "", odhlasitStarsi: st.odhlasitStarsi, odhlaseno: st.odhlaseno === true };
     return { lastLogin: lastLogin, st: st };
   };
   for (const kandidat of kandidati) {
@@ -296,7 +296,9 @@ function runNavratMaily(app, opts) {
       if (!cil || cil <= (Number(st.krok) || 0)) continue;
 
       // odhlašovací token: v DB jen otisk (vzor api_keys / oauth_codes), čistý text
-      // jen v odkazu tohoto mailu; každý mail dostane nový, starší odkazy tím přestanou platit
+      // jen v odkazu tohoto mailu. Each mail gets a new token, but the links of the previous mails
+      // keep working (their fingerprints stay in `odhlasitStarsi`): someone who clicks "Unsubscribe"
+      // in the 7-day mail after the 14-day one has left must still be unsubscribed (finding S7-02).
       const plain = $security.randomString(40);
       const odhlasitUrl = info.base + "/api/kb/navrat/odhlasit?u=" + encodeURIComponent(u.id) + "&t=" + encodeURIComponent(plain);
       const vysledek = posliNavratMail(app, u, {
@@ -327,7 +329,9 @@ function runNavratMaily(app, opts) {
         const n = H.jsonVal(app.findRecordById("users", u.id), "navrat", null);
         if (n && typeof n === "object" && !Array.isArray(n)) odhlasenoTed = n.odhlaseno === true;
       } catch (err) { /* deleted meanwhile — the UPDATE below changes nothing */ }
-      const novy = { cyklus: lastLogin, krok: cil, odhlasit: $security.sha256(plain), odhlaseno: odhlasenoTed, odeslano: now.toISOString() };
+      const starsi = [st.odhlasit].concat(Array.isArray(st.odhlasitStarsi) ? st.odhlasitStarsi : [])
+        .filter((x) => typeof x === "string" && x).slice(0, 5);
+      const novy = { cyklus: lastLogin, krok: cil, odhlasit: $security.sha256(plain), odhlasitStarsi: starsi, odhlaseno: odhlasenoTed, odeslano: now.toISOString() };
       app.db().newQuery("UPDATE users SET navrat = {:n} WHERE id = {:id}").bind({ n: JSON.stringify(novy), id: u.id }).execute();
       sent++;
       sentToday++;
@@ -360,7 +364,10 @@ function odhlasitNavrat(app, userId, token) {
   try { u = app.findRecordById("users", String(userId || "")); } catch (err) { return { ok: false, lang: "cs" }; }
   const lang = userLang(u);
   const st = jsonVal(u, "navrat", null);
-  if (!st || !st.odhlasit || !token || $security.sha256(String(token)) !== st.odhlasit) return { ok: false, lang: lang };
+  if (!st || !st.odhlasit || !token) return { ok: false, lang: lang };
+  const otisk = $security.sha256(String(token));
+  const platne = [st.odhlasit].concat(Array.isArray(st.odhlasitStarsi) ? st.odhlasitStarsi : []); // links of earlier mails stay valid
+  if (platne.indexOf(otisk) < 0) return { ok: false, lang: lang };
   if (st.odhlaseno !== true) {
     st.odhlaseno = true;
     u.set("navrat", st);

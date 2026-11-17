@@ -626,9 +626,17 @@ export const base44 = {
       form.append('name', name || '');
       if (logoFile) form.append('logo', logoFile);
       if (removeLogo) form.append('logo', '');
-      const r = id
-        ? await pb.collection('org_settings').update(id, form)
-        : await pb.collection('org_settings').create(form);
+      let r;
+      if (id) r = await pb.collection('org_settings').update(id, form);
+      else {
+        try { r = await pb.collection('org_settings').create(form); } catch (err) {
+          // the server keeps ONE row: somebody created it in the meantime (a double submit, a second
+          // administrator) — find it and update it instead (code analysis 4, M1-07)
+          const again = (await pb.collection('org_settings').getList(1, 1)).items[0];
+          if (!again) throw err;
+          r = await pb.collection('org_settings').update(again.id, form);
+        }
+      }
       orgCache = null;   // po přejmenování/výměně loga musí ostatní místa číst znovu
       // same shape as get() — a caller that replaces its state with the result must not lose `purpose` (finding F4-03)
       return { id: r.id, name: r.name || '', logo_url: r.logo ? pb.files.getURL(r, r.logo) : '', purpose: r.purpose || '' };

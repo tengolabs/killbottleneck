@@ -190,7 +190,7 @@ function napisPopis(app, e, b, L) {
   // týdenní strop obrázků dřív než model (popis by jinak stál tokeny zbytečně)
   const tyden = tydenBrzda(app, L);
   if (tyden) { const err = new Error(String(tyden.body.error)); err.status = tyden.status; err.odpoved = tyden.body; throw err; }
-  const brzda = C.chatBrzda(e, L, { _popisObrazku: true }, cfg); // jako textový tah (váha 1); kreslení pak samo ubere svou váhu
+  const brzda = C.chatBrzda(e, L, null, cfg, { popisObrazku: true }); // jako textový tah (váha 1); kreslení pak samo ubere svou váhu
   if (brzda) { const err = new Error(String((brzda.body && brzda.body.error) || "")); err.status = brzda.status; err.odpoved = brzda.body; throw err; }
   const text = String((b && b.text) || "").trim();
   // české „notebook“ = laptop; model ho bez nápovědy překládal jako papírový sešit (změřeno 4. 11.)
@@ -346,7 +346,7 @@ function nakreslenoTydne(app, ted) {
   const rows = arrayOf(new DynamicModel({ n: 0 }));
   try {
     app.db().newQuery("SELECT COUNT(*) AS n FROM ai_chat_log WHERE tools = 'image_draw' AND stav = 'ok' AND created >= {:od}").bind({ od: od }).all(rows);
-  } catch (err) { return 0; }
+  } catch (err) { try { app.logger().warn("obrazky: the weekly count failed — the weekly cap does not brake", "error", String(err)); } catch (e2) { /* the log is a bonus */ } return 0; }
   return rows.length ? Number(rows[0].n) || 0 : 0;
 }
 function tydenBrzda(app, L) {
@@ -389,10 +389,6 @@ function zdarma() {
   const p = parseFloat(env("OBRAZEK_KREDITY"));
   return Number.isFinite(p) && p === 0;
 }
-function stavTydne(app) {
-  const strop = stropTydne();
-  return strop ? { strop: strop, nakresleno: nakreslenoTydne(app) } : null;
-}
 
 // POST /chat/obrazek/vytvorit {id, znovu?} → {status, body}. Nakreslí obrázek ve stavu ceka/chyba;
 // znovu = hotový obrázek nakreslit znovu s novým seedem (soubor se nahradí). Odpověď píše routa.
@@ -431,14 +427,17 @@ function vytvorit(app, e, body) {
   });
   if (obsazeno) return { status: 409, body: { error: t(L, "err.imageDrawing") } };
   let week = null;
+  // the price of this drawing, reserved under the credit quota in the same step as the check (S8-04)
+  const kredit = { kredity: zdarma() ? 0 : require(`${__hooks}/kredity.js`).kredityObrazku(rec.getString("model")) };
   try {
     // weekly cap first, as chatBrzda has it — and held until the drawing ended (S8-04)
     week = reserveWeek(app, L);
     if (week.refused) return odmitni(week.refused);
-    const brzda = C.chatBrzda(e, L, { _obrazek: true }, null);
+    const brzda = C.chatBrzda(e, L, null, null, { obrazek: true, rezervace: kredit });
     if (brzda) return odmitni(brzda);
     return nakresli(app, e.auth, rec, cfg, L, znovu);
   } finally {
+    if (kredit.release) kredit.release();
     if (week && week.release) week.release();
     store.set(klic, 0);
   }
@@ -676,7 +675,7 @@ function seznam(app, userId, o) {
   let filtr = "user = {:u} && stav = 'hotovo' && banner = false";
   if (q) filtr += " && (title ~ {:q} || prompt ~ {:q})";
   let rows = [];
-  try { rows = app.findRecordsByFilter("ai_images", filtr, "-created", MAX_SEZNAM + 1, strana * MAX_SEZNAM, { u: userId, q: q }); } catch (err) { rows = []; }
+  try { rows = app.findRecordsByFilter("ai_images", filtr, "-created", MAX_SEZNAM + 1, strana * MAX_SEZNAM, { u: userId, q: q }); } catch (err) { rows = []; try { app.logger().warn("obrazky: reading the picture list failed", "error", String(err)); } catch (e2) { /* the log is a bonus */ } }
   const strana0 = rows.slice(0, MAX_SEZNAM);
   const vse = pouzitiVsech(app, userId, strana0.map((r) => r.id));
   return { obrazky: strana0.map((r) => dtoSprava(app, r, vse ? vse[r.id] : undefined)), dalsi: rows.length > MAX_SEZNAM };
@@ -730,4 +729,4 @@ function uklid(app) {
   return smazano;
 }
 
-module.exports = { tydenBrzda, stavTydne, zdarma, poRestartu, novy, PRESETY_NOVY, STYLY, vycistiPopis, cestyObrazku, DNI_NEPOUZITY, DNI_BANNER, pouziti, dtoSprava, seznam, ponechat, smazat, poSmazaniChatu, uklid, MAX_OBRAZKU_DOKUMENTU, BEZ_OBRAZKU, presetDokumentu, zalozProDokument, vlastniObrazky, obrazkyDokumentu, smazObrazky, PRESETY, MAX_ILUSTRACI, doplnChat, vratitTah, dosadIlustrace, maZnackyIlustraci, nakresli, MAX_PROMPT, konfigurace, dostupne, najdi, dto, zaloz, vytvorit, chybaS };
+module.exports = { tydenBrzda, zdarma, poRestartu, novy, PRESETY_NOVY, STYLY, vycistiPopis, cestyObrazku, DNI_NEPOUZITY, DNI_BANNER, pouziti, dtoSprava, seznam, ponechat, smazat, poSmazaniChatu, uklid, MAX_OBRAZKU_DOKUMENTU, BEZ_OBRAZKU, presetDokumentu, zalozProDokument, vlastniObrazky, obrazkyDokumentu, smazObrazky, PRESETY, MAX_ILUSTRACI, doplnChat, vratitTah, dosadIlustrace, maZnackyIlustraci, nakresli, MAX_PROMPT, konfigurace, dostupne, najdi, dto, zaloz, vytvorit, chybaS };

@@ -106,6 +106,9 @@ function EditorContent({ mapId, personalMap = false }) {
   const toggleTheme = () => { const next = theme === 'dark' ? 'light' : 'dark'; setTheme(next); setThemeState(next); };
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // the map failed to load for a reason other than "it does not exist" (network, 5xx) — offer a retry
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [editNodeId, setEditNodeId] = useState(null);
   // minimapa jde schovat — překrývá malůvku skinu a na malých mapách zavazí
   const [miniMapOpen, setMiniMapOpen] = useState(() => nactiKlic('kb-minimap-open') !== '0');
@@ -407,6 +410,7 @@ function EditorContent({ mapId, personalMap = false }) {
     // NEPŘEMOUNTUJE — příznaky by přežily. A `isTemplatePreview`/`isPublicView`
     // vypínají autosave, takže by se nad reálnou mapou tiše ztrácely úpravy.
     // Příznaky si zapíná až ta větev, které patří.
+    setLoadError(false);
     setIsTemplatePreview(false);
     setIsPublicView(false);
     setMapKind(''); // styl si nastaví až větev, které patří (jinak by přežil z minulé mapy)
@@ -488,6 +492,36 @@ function EditorContent({ mapId, personalMap = false }) {
         return;
       }
 
+      // A publicly shared map: editable on screen, never saved. Used for a visitor without an account and for a
+      // signed-in colleague the map is not shared with — the server hands the public copy to both, the editor
+      // used to ask for it only when nobody was signed in (code analysis 4, F1-05).
+      const openPublic = async () => {
+        const result = await getPublicMap({ mapId });
+        const map = result?.map;
+        if (!map) return false;
+        setCanEdit(true);
+        setCanShare(false);
+        // Veřejně sdílená mapa NENÍ demo — nápis „Demo režim" u cizí mapy
+        // mate (Richardův nález 6. 8.). Chování zůstává stejné (nic se
+        // neukládá), mění se jen to, co se návštěvníkovi říká.
+        setIsPublicView(true);
+        setMapKind(map.kind === 'process' ? 'process' : '');
+        skipNextSave.current = true;
+        setTitle(map.title || '');
+        setColor(map.color || '');
+        // sdílení se z veřejného DTO záměrně NEPOSÍLÁ (osobní údaje)
+        setOwnerEmails([user?.email].filter(Boolean));
+        setNodes((map.nodes || []).map((n) => ({
+          ...n,
+          type: n.type === 'note' ? 'note' : (isApexNodeShared(n) ? 'apexNode' : 'goalNode'),
+          data: { ...n.data, collapsed: n.data?.collapsed || false },
+        })));
+        setEdges((map.edges || []).map((e) => ({ ...e, type: 'deletable' })));
+        const vadaVer = poskozeneHrany(map.nodes || [], map.edges || []);
+        setPoskozenaMapa(vadaVer.edgeIds.length ? vadaVer : null);
+        return true;
+      };
+
       try {
         if (user) {
           // Authenticated — load via SDK
@@ -525,40 +559,18 @@ function EditorContent({ mapId, personalMap = false }) {
             const vada = poskozeneHrany(m.nodes || [], m.edges || []);
             setPoskozenaMapa(vada.edgeIds.length ? vada : null);
           } else {
-            setNotFound(true);
+            // not mine and not shared with me — it may still be public (the route answers 403/404 otherwise)
+            let opened = false;
+            try { opened = await openPublic(); } catch (e) { if (!(e?.status >= 400 && e?.status < 500)) throw e; }
+            if (!opened) setNotFound(true);
           }
         } else {
-          // Unauthenticated — load public map via backend function (editable but not saved)
-          const result = await getPublicMap({ mapId });
-          const map = result?.map;
-          if (map) {
-            setCanEdit(true);
-            setCanShare(false);
-            // Veřejně sdílená mapa NENÍ demo — nápis „Demo režim" u cizí mapy
-            // mate (Richardův nález 6. 8.). Chování zůstává stejné (nic se
-            // neukládá), mění se jen to, co se návštěvníkovi říká.
-            setIsPublicView(true);
-            setMapKind(map.kind === 'process' ? 'process' : '');
-            skipNextSave.current = true;
-            setTitle(map.title || '');
-            setColor(map.color || '');
-            // sdílení se z veřejného DTO záměrně NEPOSÍLÁ (osobní údaje)
-            setOwnerEmails([user?.email].filter(Boolean));
-            setNodes((map.nodes || []).map((n) => ({
-              ...n,
-              type: n.type === 'note' ? 'note' : (isApexNodeShared(n) ? 'apexNode' : 'goalNode'),
-              data: { ...n.data, collapsed: n.data?.collapsed || false },
-            })));
-            setEdges((map.edges || []).map((e) => ({ ...e, type: 'deletable' })));
-            const vadaVer = poskozeneHrany(map.nodes || [], map.edges || []);
-            setPoskozenaMapa(vadaVer.edgeIds.length ? vadaVer : null);
-          } else {
-            setNotFound(true);
-          }
+          if (!(await openPublic())) setNotFound(true);
         }
       } catch (e) {
         console.error(e);
-        setNotFound(true);
+        // "Map not found" only when the server said so; a dropped connection or a 5xx is not a missing map
+        if (e?.status >= 400 && e?.status < 500) setNotFound(true); else setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -582,7 +594,7 @@ function EditorContent({ mapId, personalMap = false }) {
       // (kontrolní panel 31. 8. 2026; detaily v hooks/useMapAutosave.js).
       if (fn) fn(true);
     };
-  }, [mapId, personalMap]);
+  }, [mapId, personalMap, loadAttempt]);
 
   // „Moje mapa": přepnutí záložky (Mám udělat/Zadal jsem) nebo seskupení.
   // Dofit až PO dokončení přestavby — load je async; dřívější recenter v onClick
@@ -673,7 +685,7 @@ function EditorContent({ mapId, personalMap = false }) {
   } = useMapAutosave({
     mapId, activeMapId, setActiveMapId, isDraft, canEdit, isPublicView, isTemplatePreview,
     nodes, edges, title, color, setNodes, setEdges, setTitle, setColor,
-    nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t, noteForeign,
+    nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t, noteForeign, setIsMapOwner,
   });
 
   // Rozložení mapy (efekt směru, layoutAllForView, Zarovnat + zámek stylu,
@@ -1354,7 +1366,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // centerOnNode vznikají výš v tomhle pořadí, žádný podmíněný return nad tím
   // není a výstupy (expandingNodeId, handler) čte teprve contextValue a JSX pod ním.
   const { expandingNodeId, handleExpandNode } = useAiActions({
-    nodes, edges, setNodes, setEdges, pushHistory, layoutAllForView, centerOnNode, toast, t,
+    nodes, edges, nodesNow, edgesNow, setNodes, setEdges, pushHistory, layoutAllForView, centerOnNode, toast, t,
   });
 
   const handleDeleteSelected = useCallback(() => {
@@ -1519,6 +1531,20 @@ function EditorContent({ mapId, personalMap = false }) {
     return (
       <div className="h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center gap-4" data-testid="map-load-error">
+        <p className="text-muted-foreground">{t('loadError.message')}</p>
+        <div className="flex gap-2">
+          <Button data-testid="map-load-retry" onClick={() => { setLoading(true); setLoadAttempt((n) => n + 1); }}>{t('loadError.retry')}</Button>
+          <Button variant="outline" onClick={() => navigate('/')}>
+            <ArrowLeft className="w-4 h-4" /> {t('notFound.backToOverview')}
+          </Button>
+        </div>
       </div>
     );
   }

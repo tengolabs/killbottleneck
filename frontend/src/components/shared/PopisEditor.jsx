@@ -30,6 +30,7 @@ export default function PopisEditor({
   rows = 6,
   placeholder,
   prilohy = [],
+  maxLength, // the server's cap for this field — beyond it the text would be cut on save without a word
 }) {
   const { t } = useTranslation('popis');
   const nsReady = useLazyNs('popis');
@@ -126,6 +127,7 @@ export default function PopisEditor({
         onChange={(e) => { pisuSam.current = true; onChange(e.target.value); }}
         placeholder={placeholder}
         rows={rows}
+        maxLength={maxLength}
       />
     );
   }
@@ -268,6 +270,7 @@ export default function PopisEditor({
           ref={ref}
           id={id}
           value={text}
+          maxLength={maxLength}
           onChange={(e) => { pisuSam.current = true; onChange(e.target.value); }}
           onKeyDown={klavesa}
           onSelect={() => { dotknutoRef.current = true; }}

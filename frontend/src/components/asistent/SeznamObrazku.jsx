@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { fmtDateShort } from '@/lib/locale';
 import { AlertTriangle, ImageIcon, ImagePlus, Loader2, Pin, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -164,7 +165,7 @@ export default function SeznamObrazku() {
                   <span className="truncate">{o.title || t('img.untitled')}</span>
                 </p>
                 <p className="truncate text-[11px] text-muted-foreground" title={pouzito ? o.pouziti.map((x) => x.title).join(', ') : ''}>
-                  {pouzito ? t('obr.pouzitoKratce', { kde: o.pouziti[0].title || '?' }) + (o.pouziti.length > 1 ? ` +${o.pouziti.length - 1}` : '') : new Date(o.created.replace(' ', 'T')).toLocaleDateString()}
+                  {pouzito ? t('obr.pouzitoKratce', { kde: o.pouziti[0].title || '?' }) + (o.pouziti.length > 1 ? ` +${o.pouziti.length - 1}` : '') : fmtDateShort(new Date(o.created.replace(' ', 'T')))}
                 </p>
               </button>
             );

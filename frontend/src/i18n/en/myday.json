@@ -31,6 +31,7 @@
     "more": "+ {{count}} more …",
     "allMyTasks": "all my tasks →",
     "ideaBadge": "idea",
+    "truncated": "The overview is shortened — there is more work than fits here. The full list is in the task table.",
     "loadFailed": "Couldn't load your overview.",
     "retry": "Try again",
     "focusBadge": {

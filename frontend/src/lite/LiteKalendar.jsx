@@ -52,7 +52,7 @@ export default function LiteKalendar() {
       {failed && <p className="px-4 text-sm text-destructive">{t('loadFailed')}</p>}
       {dny.map((d, i) => {
         const items = udalosti.filter((ev) => vDen(ev, d));
-        const kdo = pryc.filter((a) => a.from <= d && a.to >= d).map((a) => a.email);
+        const kdo = pryc.filter((a) => a.from <= d && a.to >= d).map((a) => a.name || a.email);
         if (!items.length && !kdo.length) return null;
         return (
           <section key={d} className="mb-4" data-testid={`lite-kal-den-${d}`}>

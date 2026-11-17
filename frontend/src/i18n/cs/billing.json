@@ -16,6 +16,7 @@
     "heading": "Členství a platba",
     "hintActive": "Členství je aktivní. Přehled tarifů je níže; změnu tarifu s vámi domluvíme e-mailem.",
     "hintEnded": "Předplatné skončilo — zápis je pozastavený, data zůstávají. Vyberte tarif a způsob platby; po zaplacení se aplikace zase odemkne, data i adresa zůstanou beze změny.",
+    "hintTrialExpired": "Zkušební verze skončila {{date}}. Vyberte tarif a způsob platby — data i adresa zůstanou beze změny.",
     "hintTrial": "Zkušební verze běží do {{date}}. Vyberte tarif a způsob platby — data i adresa zůstanou beze změny.",
     "planLabel": "Tarif",
     "plan": {

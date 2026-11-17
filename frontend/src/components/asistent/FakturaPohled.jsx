@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, ChevronLeft, Download, Loader2, Receipt, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { faktury as apiFaktury, faktura as apiFaktura, fakturaZaplaceno } from '@/api/asistentApi';
+import { mnozstvi } from '@/lib/faktura/layout';
 import { castka as castkaZeme, datum as datumZeme, popiskyZeme, souctyPoMenach } from '@/lib/faktura/zeme';
 
 // Faktury v panelu Dokumentů (9. 10. 2026): seznam vystavených faktur (vlastní; správce všechny) a detail
@@ -141,7 +142,7 @@ export function FakturaDetail({ id, onZpet }) {
               {(f.items || []).map((it, i) => (
                 <tr key={i} className="border-b border-border/60">
                   <td className="py-1 pr-2 break-words">{it.description}</td>
-                  <td className="py-1 pr-2 text-right whitespace-nowrap text-muted-foreground">{it.quantity}{it.unit ? ` ${it.unit}` : ''} × {castka(it.unit_price, f.currency, lang)}</td>
+                  <td className="py-1 pr-2 text-right whitespace-nowrap text-muted-foreground">{mnozstvi(it.quantity, lang)}{it.unit ? ` ${it.unit}` : ''} × {castka(it.unit_price, f.currency, lang)}</td>
                   <td className="py-1 text-right whitespace-nowrap">{castka(it.total != null ? it.total : it.quantity * it.unit_price, f.currency, lang)}</td>
                 </tr>
               ))}

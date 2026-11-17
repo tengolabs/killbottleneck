@@ -687,10 +687,15 @@ function napsat(app, e, body) {
   const uvolni = () => { store.set(klic, 0); store.setFunc(klicU, (n) => Math.max(0, (Number(n) || 0) - 1)); };
   if (moc) { store.set(klic, 0); return { status: 429, body: { error: t(L, "err.pageTooManyWriting", { max: MAX_SOUBEH_NA_UZIVATELE }) } }; }
   // konfigurace PŘED brzdou: na vlastním modelu zákazníka stránka kvótu nečerpá (jako tah chatu), hodinová brzda zůstává
-  const cfgR = C.chatCfg(e, body || {}, L);
+  // An exception here (before the main try below) used to leave the counter raised: the user then got
+  // 429 "too many pages being written" until the instance restarted (code analysis 4, S6-04).
+  let cfgR, brzda;
+  try {
+    cfgR = C.chatCfg(e, body || {}, L);
+    brzda = cfgR.chyba ? null : C.chatBrzda(e, L, null, cfgR.cfg, { stranka: true });
+  } catch (err) { uvolni(); throw err; }
   if (cfgR.chyba) { uvolni(); return cfgR.chyba; }
   const cfg = cfgR.cfg;
-  const brzda = C.chatBrzda(e, L, { _stranka: true }, cfg);
   if (brzda) { uvolni(); return brzda; }
   const timeout = cfg.vlastni ? Math.min(l.timeout, Number(cfg.timeout) || l.timeout) : l.timeout;
   const numPredict = cfg.vlastni ? Math.min(l.numPredict, VLASTNI_PAGE_NUM_PREDICT) : l.numPredict;
@@ -698,7 +703,8 @@ function napsat(app, e, body) {
 
   const prepis = !!rec.getString("html");
   const O = require(`${__hooks}/obrazky.js`);
-  const obr = O.dostupne(app); // ilustrace jen tam, kde instance kreslí
+  let obr = false;
+  try { obr = O.dostupne(app); } catch (err) { obr = false; } // ilustrace jen tam, kde instance kreslí
   const sysW = W.system + (obr ? ILUSTRACE.system : "");
   const stats = { calls: 0, in: 0, out: 0, cached: 0, tools: ["page_writer"], skupiny: ["stranky"], modely: [], volani: [] };
   const t0 = Date.now();
@@ -832,7 +838,7 @@ function napsat(app, e, body) {
     // ilustrace: značky <img data-kb-image> nakreslit a dosadit (bez kreslení na instanci se značky jen odstraní)
     if (O.maZnackyIlustraci(doc)) {
       const kI = krok("obrazky", ""); kI.s = "bezi"; kI.od = Date.now(); uloz();
-      const il = O.dosadIlustrace(app, e.auth, doc, { L: L, chat: rec.getString("chat"), brzda: () => { store.set(klic, Date.now()); return C.chatBrzda(e, L, { _obrazek: true }, null); } }); // zámek stránky obnovit před každou ilustrací (až 3 × 90 s)
+      const il = O.dosadIlustrace(app, e.auth, doc, { L: L, chat: rec.getString("chat"), brzda: () => { store.set(klic, Date.now()); return C.chatBrzda(e, L, null, null, { obrazek: true }); } }); // zámek stránky obnovit před každou ilustrací (až 3 × 90 s)
       doc = il.html; kI.info = il.pocet; kI.ms = Date.now() - kI.od; kI.s = "hotovo";
     }
     ulozHtml(app, e.auth.id, rec.id, { html: doc });

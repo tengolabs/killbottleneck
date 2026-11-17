@@ -37,6 +37,7 @@ export default function RulesDialog({ open, mapId, nodes, edges, members, mapAcc
   const { toast } = useToast();
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false); // a failed load is not "no rules" (code analysis 4, F6-09)
   const [editing, setEditing] = useState(null);   // null = seznam; {} = nové; rule = editace
   // předvolby builderu: propojka (uzel/Chování) je předá jen PRVNÍMU automaticky
   // otevřenému builderu; ruční „+ Nové pravidlo" v přehledu trigger nedědí
@@ -52,9 +53,10 @@ export default function RulesDialog({ open, mapId, nodes, edges, members, mapAcc
   const reload = useCallback(() => {
     if (!mapId) return;
     setLoading(true);
+    setLoadFailed(false);
     rulesApi.list(mapId)
       .then((r) => { setRules(r); onRulesChanged?.(r); })
-      .catch(() => setRules([]))
+      .catch(() => { setRules([]); setLoadFailed(true); })
       .finally(() => setLoading(false));
   }, [mapId, onRulesChanged]);
   useEffect(() => {
@@ -190,7 +192,13 @@ export default function RulesDialog({ open, mapId, nodes, edges, members, mapAcc
                 </div>
               )}
               {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-              {!loading && rules.length === 0 && (
+              {!loading && loadFailed && (
+                <p className="text-sm text-destructive flex items-center gap-2" data-testid="rules-load-error">
+                  {t('rules.loadFailed')}
+                  <button type="button" className="underline" onClick={reload} data-testid="rules-load-retry">{t('rules.retry')}</button>
+                </p>
+              )}
+              {!loading && !loadFailed && rules.length === 0 && (
                 <p className="text-sm text-muted-foreground">{t('rules.empty')}</p>
               )}
               {rules.map((r) => (

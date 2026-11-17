@@ -157,7 +157,7 @@ export default function ClientsDialog({ open, onClose, onChanged, vybranyId }) {
                 ) : (
                   <div className="flex items-center gap-2.5">
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.color || '#94a3b8' }} />
-                    <span className="text-sm font-medium truncate flex-1 min-w-0">{c.name}{c.ico ? <span className="ml-1.5 text-[11px] text-muted-foreground font-normal" data-testid="client-ico">IČO {c.ico}</span> : null}</span>
+                    <span className="text-sm font-medium truncate flex-1 min-w-0">{c.name}{c.ico ? <span className="ml-1.5 text-[11px] text-muted-foreground font-normal" data-testid="client-ico">{t('clients.ico')} {c.ico}</span> : null}</span>
                     {canEdit(c) && (
                       <>
                         <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0"

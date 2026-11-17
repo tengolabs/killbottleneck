@@ -10,12 +10,15 @@ async function organizace() {
   try { const o = await base44.org.get(); return { name: (o && o.name) || '', logoUrl: (o && o.logo_url) || '' }; } catch { return { name: '', logoUrl: '' }; }
 }
 // id nebo DTO → stáhne soubor ve formátu (pdf | pptx | docx); vrací DTO. Chyba se `status` (404 = cizí/smazaný).
-export async function stahniDokument(idNeboDto, format, { lang = 'cs', barva = '', fotka = null } = {}) {
+// `naZkraceno` is called when a PDF had to end a text with "…" because it did not fit the page (F2-07).
+export async function stahniDokument(idNeboDto, format, { lang = 'cs', barva = '', fotka = null, naZkraceno = null } = {}) {
   const d = typeof idNeboDto === 'object' ? idNeboDto : (await apiDokument(idNeboDto)).dokument;
   const f = formaty(d.kind).includes(format) ? format : formaty(d.kind)[0];
   const org = await organizace();
-  const blob = await vyrobSoubor(d, f, { lang, org: { name: org.name }, logoUrl: org.logoUrl, fotka, zakladna: pb.baseURL, ...(barva ? { barva } : {}) });
+  const info = {};
+  const blob = await vyrobSoubor(d, f, { lang, org: { name: org.name }, logoUrl: org.logoUrl, fotka, zakladna: pb.baseURL, info, ...(barva ? { barva } : {}) });
   await saveBlob(blob, `${safeFilename(d.title || '', 'dokument')}.${f}`);
+  if (info.zkraceno && typeof naZkraceno === 'function') naZkraceno();
   return d;
 }
 // náhled první strany PDF (data URL) pro panel — jen PDF formáty

@@ -23,6 +23,10 @@
     "keptSaved": "Vaše verze byla uložena.",
     "keepFailed": "Uložení se nepovedlo — mapa se možná změnila znovu. Zkuste to ještě jednou."
   },
+  "loadError": {
+    "message": "Mapu se nepodařilo načíst. Zkontrolujte připojení a zkuste to znovu.",
+    "retry": "Zkusit znovu"
+  },
   "notFound": {
     "message": "Mapa nebyla nalezena.",
     "backToOverview": "Zpět na přehled"
@@ -176,7 +180,9 @@
     "opsAppliedDesc": "{{count}} operací bylo aplikováno na mapu.",
     "aiUndone": "Vráceno zpět",
     "aiUndoneDesc": "AI změny byly vráceny.",
+    "jsonExportedCapped": "Pozor: v souboru je jen prvních 1000 úkolů.",
     "jsonExported": "Schéma staženo jako JSON",
+    "exportFailed": "Export se nepovedl. U velmi rozsáhlé mapy zkuste sbalit část větví.",
     "jsonExportFailed": "Export JSON se nepovedl",
     "mapMergedStatus": "Automatizace mezitím dokončila cíl — mapa je aktuální.",
     "mapMergedRule": "Pravidlo mezitím upravilo mapu — máte to nejnovější.",

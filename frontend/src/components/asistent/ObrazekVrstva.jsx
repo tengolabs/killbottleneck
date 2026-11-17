@@ -28,6 +28,10 @@ const Tlacitko = ({ onClick, title, testid, aktivni, disabled, children, classNa
 
 const datum = (iso, lang) => { const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleDateString(lang); };
 
+// The same picture may be shown by a card in the chat next to this viewer: tell it that the file was redrawn
+// or deleted, otherwise it keeps the address of a file the server has already removed (code analysis 4, F2-11).
+const oznamZmenu = (id) => { try { window.dispatchEvent(new CustomEvent('kb-obrazek-zmenen', { detail: { id } })); } catch { /* old browser */ } };
+
 export default function ObrazekVrstva() {
   const { t, i18n } = useTranslation('asistent');
   const A = useAsistent();
@@ -74,6 +78,7 @@ export default function ObrazekVrstva() {
   const zmenPolozku = useCallback((nova) => {
     A.setProhlizec((x) => (x ? { ...x, polozky: x.polozky.map((y) => (y.id === nova.id ? { ...y, ...nova } : y)) } : x));
     if (p && p.onZmena) p.onZmena();
+    oznamZmenu(nova.id);
   }, [A, p]);
   const prepniTrvale = async () => {
     setPrace(true); setChyba('');
@@ -88,6 +93,7 @@ export default function ObrazekVrstva() {
     setPrace(true); setChyba('');
     try {
       await obrazekSmazat(o.id);
+      oznamZmenu(o.id);
       const zbyle = polozky.filter((y) => y.id !== o.id);
       if (p && p.onZmena) p.onZmena();
       if (!zbyle.length) zavri();
@@ -99,7 +105,8 @@ export default function ObrazekVrstva() {
   const src = o.src || (o.url ? pb.baseURL.replace(/\/$/, '') + o.url : '');
   const nazev = o.title || t('img.untitled');
   const stahni = async () => {
-    try { const res = await fetch(src); await saveBlob(await res.blob(), `${safeFilename(nazev)}.jpg`); } catch (e) { setChyba(e.message); }
+    // an error page saved as Name.jpg is worse than a message (F2-11)
+    try { const res = await fetch(src); if (!res.ok) throw new Error(t('img.failed')); await saveBlob(await res.blob(), `${safeFilename(nazev)}.jpg`); } catch (e) { setChyba(e.message); }
   };
   const lang = i18n.language || 'cs';
   const info = !p.sprava ? ''
@@ -152,7 +159,7 @@ export default function ObrazekVrstva() {
       <div className="relative flex min-h-0 flex-1 items-center justify-center p-3">
         {src
           ? <img src={src} alt={nazev} className={`max-h-full max-w-full rounded-md object-contain shadow-2xl transition-opacity ${kresli ? 'opacity-40' : ''}`} data-testid="obrazek-vrstva-img" />
-          : <p className="text-sm text-white/70">{o.chyba || t('img.failed')}</p>}
+          : <p className="text-sm text-white/70">{o.chyba === 'timeout' ? t('img.timeout') : (o.chyba || t('img.failed'))}</p>}
         {kresli && <span className="absolute inset-0 flex items-center justify-center gap-2 text-sm" data-testid="obrazek-vrstva-kreslim"><Loader2 className="w-5 h-5 animate-spin" />{t('img.drawing')}</span>}
       </div>
       {(info || chyba) && (

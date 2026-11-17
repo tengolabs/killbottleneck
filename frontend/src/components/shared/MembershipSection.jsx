@@ -1,3 +1,4 @@
+import { fmtDateShort } from '@/lib/locale';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pb } from '@/api/pb';
@@ -110,7 +111,7 @@ export default function MembershipSection({ billingComplete }) {
         {skoncilo
           ? t('membership.hintEnded')
           : zkusebka
-            ? t('membership.hintTrial', { date: config.trial_until })
+            ? t(config.trial_expired ? 'membership.hintTrialExpired' : 'membership.hintTrial', { date: fmtDateShort(new Date(String(config.trial_until).slice(0, 10) + 'T12:00:00')) })
             : t('membership.hintActive')}
       </p>
 

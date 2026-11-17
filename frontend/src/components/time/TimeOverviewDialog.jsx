@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { Clock, Trash2, Briefcase } from 'lucide-react';
 import ClientsDialog from '@/components/time/ClientsDialog';
 import FixEndDialog from '@/components/time/FixEndDialog';
-import { isAutoStopped } from '@/lib/timeFix';
+import { isAutoStopped, noteForDisplay } from '@/lib/timeFix';
 
 const NONE = '__none__';
 const parseDate = (s) => (s ? new Date(String(s).replace(' ', 'T')) : null);
@@ -108,7 +108,7 @@ export default function TimeOverviewDialog({ open, onClose, fixEntryId = '' }) {
                   {formatTimeRange(e.started, e.ended)}
                 </span>
                 <span className="text-sm font-medium tabular-nums shrink-0 w-16">{formatMinutes(e.duration_min)}</span>
-                <span className="text-xs text-muted-foreground truncate flex-1 min-w-[80px]">{e.note || e.label}</span>
+                <span className="text-xs text-muted-foreground truncate flex-1 min-w-[80px]" data-testid="time-entry-note">{noteForDisplay(e.note, t) || e.label}</span>
                 {isAutoStopped(e) && (
                   <Button variant="outline" size="sm" className="h-7 text-xs shrink-0 border-amber-400 text-amber-700 dark:text-amber-300" data-testid="opravit-konec" onClick={() => setFixEntry(e)}>
                     {t('timeFix.button')}

@@ -271,8 +271,13 @@ function userSeesMap(app, map, userId, email, opts) {
 
 // přestaví map_shares řádky podle JSON zrcadla na mapě (autorizační zdroj pravdy)
 function syncShares(app, map) {
-  const rows = app.findRecordsByFilter("map_shares", "map = {:id}", "", 500, 0, { id: map.id });
-  for (const r of rows) app.delete(r);
+  // ALL rows, page by page: with one page of 500 the rest stayed, re-inserting every address then hit the
+  // unique index and a project with more than 500 named shares could not change its sharing any more (M1-03).
+  for (let page = 0; page < 200; page++) {
+    const rows = app.findRecordsByFilter("map_shares", "map = {:id}", "", 500, 0, { id: map.id });
+    if (!rows.length) break;
+    for (const r of rows) app.delete(r);
+  }
   const sharedWith = jsonList(map, "shared_with");
   const sharedEdit = jsonList(map, "shared_with_edit");
   // třetí úroveň „spolupracovník" (work): vidí mapu, plní jen svoje úkoly —
@@ -533,6 +538,13 @@ function oznamNovouVerzi(app) {
     app.findFirstRecordByFilter("notifications", "dedup_key = {:k}", { k: "verze:" + verze });
     return 0;
   } catch (err) { /* nenalezeno = ještě se neoznamovalo, pokračujeme */ }
+  // The notification rows can be deleted by their owners (and go with a deleted account): when the
+  // last one disappeared, the announcement came back within five minutes (code analysis 4, S7-04).
+  // A second marker lives in the locked collection mail_budget (`verze:<v>`), out of the users' reach.
+  try {
+    app.findFirstRecordByFilter("mail_budget", "day = {:k}", { k: "verze:" + verze });
+    return 0;
+  } catch (err) { /* no marker either */ }
 
   // Pár bodů česky místo odkazu na anglický changelog (Richard 18. 8. 2026).
   // Body se plní ručně při vydání do pb_hooks/novinky.js; není-li pro verzi
@@ -575,6 +587,19 @@ function oznamNovouVerzi(app) {
     } catch (err) {
       try { app.logger().warn("oznamNovouVerzi: účet přeskočen", "email", email, "error", String(err)); } catch (e2) { /* log je bonus */ }
     }
+  }
+  // the marker carries the oldest account (the field is required; only the row's existence decides).
+  // Only when at least one announcement went out: with none (a locked database right after the
+  // start) the next run must try again.
+  if (n > 0) {
+    try {
+      const nejstarsi = lide.slice().sort((a, b) => String(a.getString("created")).localeCompare(String(b.getString("created"))))[0];
+      const znacka = new Record(app.findCollectionByNameOrId("mail_budget"));
+      znacka.set("user", nejstarsi.id);
+      znacka.set("day", "verze:" + verze);
+      znacka.set("sent", n);
+      app.save(znacka);
+    } catch (err) { /* the marker is a second safeguard */ }
   }
   return n;
 }
@@ -980,7 +1005,7 @@ function notify(app, { email, actorEmail, type, taskId, mapId, nodeId, eventId, 
         from: { address: app.settings().meta.senderAddress, name: app.settings().meta.senderName },
         to: [{ address: email }],
         // předmět začíná názvem organizace; bez ní zůstává „killBottleneck: " jako dřív
-        subject: predmetOrg(app, text, { bezOrg: i18n.t(lang, "mail.subjectPrefix") }),
+        subject: predmetOrg(app, text.length > 150 ? text.slice(0, 149).trimEnd() + "…" : text, { bezOrg: i18n.t(lang, "mail.subjectPrefix") }), // the body carries the whole text (S7-07)
         html: mailHtml(podklad),
         text: mailText(podklad),
       });
@@ -1461,6 +1486,20 @@ function normalizeExecutorKind(kind) {
 // Musí odpovídat frontendu lib/cleanMap.js VČETNĚ POŘADÍ KLÍČŮ (parita se testuje
 // přes JSON.stringify v product/tests/cleanmap-parity.js).
 function canonicalNodeData(d) {
+  // Text fields must be text. A hand-built request or an edited import file can carry an object, an array
+  // or a number here: the length caps only ever applied to strings (a 100 kB array as a title went through
+  // whole). Numbers become text, anything else is dropped. Kept inside this function on purpose —
+  // tests/cleanmap-parity.js lifts the function out of this file on its own.
+  const src = d || {};
+  d = src;
+  for (const k of ["title", "description", "color", "icon", "nodeType", "goalType", "apexText", "deadline", "owner",
+    "plannedOn", "pinnedOn", "executorKind", "executorName", "automationNote", "automationRequestedBy", "assignedBy",
+    "deadlineChangeWanted", "deadlineChangeNote", "deadlineChangeRequestedBy", "positionKind", "holder", "deputy"]) {
+    const v = src[k];
+    if (v == null || typeof v === "string") continue;
+    if (d === src) d = Object.assign({}, src);
+    d[k] = typeof v === "number" && isFinite(v) ? String(v) : "";
+  }
   return {
     title: d.title,
     status: d.status,
@@ -1533,7 +1572,7 @@ function normalizeMapData(nodes, edges, lang) {
   const { t } = require(`${__hooks}/i18n.js`);
   if (!Array.isArray(nodes)) return { error: t(lang, "err.nodesMustBeArray") };
   if (!Array.isArray(edges)) return { error: t(lang, "err.edgesMustBeArray") };
-  const seen = {};
+  const seen = Object.create(null); // an id like "constructor" must not look already seen (S2-11)
   const outNodes = [];
   for (const n of nodes) {
     if (!n || typeof n !== "object" || typeof n.id !== "string" || !n.id) {
@@ -1555,7 +1594,7 @@ function normalizeMapData(nodes, edges, lang) {
     outNodes.push({ id: n.id, type: type, position: pos, data: canonicalNodeData(d) });
   }
   const outEdges = [];
-  const parentOf = {};
+  const parentOf = Object.create(null);
   for (const ed of edges) {
     if (!ed || typeof ed !== "object" || typeof ed.id !== "string" || !ed.id) {
       return { error: t(lang, "err.edgeNoId") };
@@ -1804,6 +1843,23 @@ function validatePlannedOn(v) {
   const diff = Math.round((dt - today0) / 86400000);
   if (diff < -1 || diff > 8) return { error: true };
   return { value: s };
+}
+// Request hook of buffer_nodes (main.pb.js): a changed deadline / plan must be a real day, the colour short.
+function checkBufferDates(e) {
+  const orig = e.record.original ? e.record.original() : null;
+  const isNew = e.record.isNew();
+  const changed = (f) => isNew || !orig || orig.getString(f) !== e.record.getString(f);
+  const realDay = (v) => {
+    if (v === "") return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    const d = new Date(v + "T00:00:00Z");
+    return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+  };
+  const { t, requestLang } = require(`${__hooks}/i18n.js`);
+  for (const f of ["deadline", "planned_on"]) {
+    if (changed(f) && !realDay(e.record.getString(f))) throw new BadRequestError(t(requestLang(e), "err.bufferDateInvalid"));
+  }
+  if (changed("color") && e.record.getString("color").length > 32) throw new BadRequestError(t(requestLang(e), "err.bufferColorLong"));
 }
 // rozsah plánu u položek stromu (tvar hlídá treeItemsToNodes); vrací název
 // první špatné položky nebo null
@@ -2803,6 +2859,11 @@ function cleanupBeforeUserDelete(app, user, actor) {
   for (const group of [l.del.templates, l.del.events, l.del.pages, l.del.time, l.del.images]) {
     for (const rec of group) app.delete(rec);
   }
+  // Private contacts are visible to their owner only: left behind, nobody could ever see, edit or delete
+  // them (finding M1-06). Contacts shared with the team stay.
+  try {
+    for (const c of app.findRecordsByFilter("external_contacts", "owner = {:u} && private = true", "", 0, 0, { u: user.id })) app.delete(c);
+  } catch (err) { /* the collection is older than this cleanup on some instances — nothing to clean */ }
   // the public link of a page that stays is closed — its owner is the only one who could
   for (const p of l.keep.linked) { p.set("share_token", ""); app.save(p); }
   if (l.keep.templates.length) {
@@ -2973,6 +3034,87 @@ function removeEmailFromAllShares(app, email) {
     n += 1;
   }
   return n;
+}
+
+// The account's e-mail changed (the PocketBase "confirm e-mail change" flow, a superuser edit):
+// the address is the key of sharing, of project ownership (`owner_email`) and of the people on
+// steps, and none of it used to follow. The user lost every shared project, notices "to the
+// owner" looked for the old address, and whoever registered the old address afterwards
+// inherited the access (code analysis 4, S4-04 — the same hole v1.0.1 closed for a DELETED
+// account). Rewrites the old address to the new one everywhere it is stored as text — the same
+// places as migrations 1787830245 + 1788254663: text fields by the live schema, the share lists
+// and the e-mail fields of steps. `map_shares` rows are rebuilt from the lists (syncShares).
+const EMAIL_TEXT_FIELDS = ["owner_email", "created_by", "deputy", "assignee_email", "triggered_by", "invited_by", "email", "email_edit", "author_email", "actor_email", "actor"];
+// share_invites: a pending share means "nobody has proven they hold this address" — it must stay on the
+// address it was sent to; moving it would hand somebody else's invitation to whoever registered the
+// address first and then changed it (security review 18 Nov 2026).
+const EMAIL_SKIP_COLLECTIONS = ["clients", "externi_kontakty", "external_contacts", "map_shares", "share_invites"];
+const EMAIL_NODE_FIELDS = ["owner", "assignedBy", "holder", "deputy", "automationRequestedBy", "deadlineChangeRequestedBy"];
+// JSON columns outside projects that carry an address as a whole string value: rule actions and
+// conditions (set_owner / notify to a literal address), assignees in template nodes.
+const EMAIL_JSON_COLLECTIONS = ["automation_rules", "templates", "rule_templates"];
+// `app` = the transaction of the account update (main.pb.js): either everything follows the new
+// address, or the address does not change at all. Plain columns go with one UPDATE each (history and
+// notification tables can hold tens of thousands of rows); projects go through app.save (their hooks).
+function renameEmailEverywhere(app, oldEmail, newEmail) {
+  if (!oldEmail || !newEmail || oldEmail === newEmail) return 0;
+  let changed = 0;
+  const ident = (x) => /^[A-Za-z0-9_]+$/.test(x); // names come from the schema; never interpolate anything else
+  for (const col of app.findAllCollections()) {
+    const name = col.name;
+    if (EMAIL_SKIP_COLLECTIONS.includes(name) || name.startsWith("_") || !ident(name)) continue;
+    let isView = false;
+    try { isView = (typeof col.type === "function" ? col.type() : col.type) === "view"; } catch (err) { isView = false; }
+    if (isView) continue;
+    for (const f of col.fields) {
+      const type = typeof f.type === "function" ? f.type() : f.type; // in Goja `type` is a method
+      if (!ident(f.name)) continue;
+      if (EMAIL_TEXT_FIELDS.includes(f.name) && (type === "text" || type === "email")) {
+        if (name === "users" && f.name === "email") continue; // the account itself — saved by the caller
+        // OR IGNORE: a row that would collide with a unique index stays; it is removed below
+        app.db().newQuery("UPDATE OR IGNORE `" + name + "` SET `" + f.name + "` = {:n} WHERE `" + f.name + "` = {:o}").bind({ n: newEmail, o: oldEmail }).execute();
+        app.db().newQuery("DELETE FROM `" + name + "` WHERE `" + f.name + "` = {:o}").bind({ o: oldEmail }).execute();
+        changed++;
+      } else if (type === "json" && EMAIL_JSON_COLLECTIONS.includes(name)) {
+        // only the address as a WHOLE quoted value ("a@b.cz"), never a part of a longer text
+        app.db().newQuery("UPDATE `" + name + "` SET `" + f.name + "` = replace(`" + f.name + "`, {:o}, {:n}) WHERE instr(COALESCE(`" + f.name + "`, ''), {:o}) > 0")
+          .bind({ o: JSON.stringify(oldEmail), n: JSON.stringify(newEmail) }).execute();
+      }
+    }
+  }
+  // projects: candidates by substring (exact comparison follows in JS)
+  const ids = arrayOf(new DynamicModel({ id: "" }));
+  app.db().newQuery("SELECT id FROM goalmaps WHERE instr(COALESCE(shared_with, ''), {:e}) > 0 OR instr(COALESCE(shared_with_edit, ''), {:e}) > 0 OR instr(COALESCE(shared_with_work, ''), {:e}) > 0 OR instr(COALESCE(nodes, ''), {:e}) > 0").bind({ e: oldEmail }).all(ids);
+  for (const row of ids) {
+    const m = app.findRecordById("goalmaps", row.id);
+    let lists = false, dirty = false;
+    for (const p of ["shared_with", "shared_with_edit", "shared_with_work"]) {
+      const list = jsonList(m, p);
+      if (!list.includes(oldEmail)) continue;
+      // the new address may already be on the list (invited before the change) — once is enough
+      const next = [];
+      for (const x of list) { const v = x === oldEmail ? newEmail : x; if (!next.includes(v)) next.push(v); }
+      m.set(p, next); lists = true; dirty = true;
+    }
+    const nodes = jsonVal(m, "nodes", []);
+    if (Array.isArray(nodes) && nodes.some((n) => n && n.data && EMAIL_NODE_FIELDS.some((k) => n.data[k] === oldEmail))) {
+      m.set("nodes", nodes.map((n) => {
+        if (!n || !n.data || !EMAIL_NODE_FIELDS.some((k) => n.data[k] === oldEmail)) return n;
+        const data = Object.assign({}, n.data);
+        for (const k of EMAIL_NODE_FIELDS) if (data[k] === oldEmail) data[k] = newEmail;
+        return Object.assign({}, n, { data: data });
+      }));
+      dirty = true;
+    }
+    if (!dirty) continue;
+    app.save(m);
+    if (lists) syncShares(app, m);
+    changed++;
+  }
+  // no authorization row may stay on the old address (a row without a counterpart in the lists
+  // would otherwise wait for whoever registers the address next)
+  app.db().newQuery("DELETE FROM map_shares WHERE email = {:o}").bind({ o: oldEmail }).execute();
+  return changed;
 }
 
 // v1: společný zápis obsahu mapy — normalizace (parita cleanMap + sémantika) →
@@ -3472,7 +3614,7 @@ function assignSeriesNumber(app, record, tpl) {
   const n = row.next_number - 1;
   record.set("series", tpl.id);
   record.set("series_number", n);
-  record.set("series_title", tpl.getString("title"));
+  record.set("series_title", tpl.getString("title").slice(0, 200)); // the field holds 200 characters; a longer template name blocked the project and still moved the counter (M1-05)
   record.set("series_year", y);
   record.set("title", formatSeriesTitle(fmt, n, record.getString("title") || tpl.getString("title")));
   return true;
@@ -3633,9 +3775,9 @@ function fmtDateLocal(d) {
 }
 
 function addDaysStr(start, days) {
-  const x = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  x.setDate(x.getDate() + Number(days));
-  return fmtDateLocal(x);
+  // Calendar arithmetic in UTC: local midnight does not exist on the day DST starts at 00:00
+  // (Chile, Cuba, Lebanon…), there "day + 1" used to return the same day again.
+  return new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate() + Number(days))).toISOString().slice(0, 10);
 }
 
 // port lib/treeLayout.js:layoutTree — KOMPAKTNÍ tidy tree (Reingold–Tilford / Buchheim).
@@ -4055,7 +4197,7 @@ function createRulesFromList(app, mapRecord, rules, authorEmail) {
 }
 
 // instantiace šablony na nový projekt (server, mimo request hooky — cron/routa)
-function instantiateTemplate(app, tpl, startDate) {
+function instantiateTemplate(app, tpl, startDate, state) {
   const ownerId = tpl.getString("owner");
   const ownerEmail = tpl.getString("owner_email");
   if (!ownerId) return null; // systémová šablona nemá komu projekt založit
@@ -4121,6 +4263,7 @@ function instantiateTemplate(app, tpl, startDate) {
     rec.set("title", tpl.getString("title") + " " + d.getDate() + "." + (d.getMonth() + 1) + "." + d.getFullYear());
   }
   app.save(rec);
+  if (state) state.saved = true; // the project exists — a later failure must not make the caller create it again
   syncShares(app, rec);
   // task_seeds se od 17. 8. 2026 NEROZBALUJÍ (slovník: úkol = uzel s řešitelem
   // nebo termínem; řešitele a lhůty nesou uzly šablony samy)
@@ -4485,6 +4628,8 @@ function autoHour() {
 // default UTC), takže „pondělí"/„N-tý den" odpovídají časové zóně klienta. Založí se
 // až od cílové hodiny (autoHour) — s catch-up, když server cílovou hodinu prospal.
 // Guard auto_last (lokální dnešek) se zapisuje PŘED instantiací: pád nesmí založit 2x.
+// A missed day is caught up (one occurrence at most) and a failed creation is retried the
+// next hour — see inside.
 // opts.force (ruční/superuser spuštění) obchází pouze hodinovou bránu, ne guard ani den.
 function runAutoTemplates(app, opts) {
   if (pracovatSeNesmi()) return 0;
@@ -4502,21 +4647,65 @@ function runAutoTemplates(app, opts) {
   } catch (err) {
     return 0;
   }
+  // The last scheduled day that is not in the future (local TZ): today's occurrence, or the one
+  // that was missed — the instance was down or locked on "its" day (trial over, subscription
+  // ended, moving), and a weekly project then appeared a week later, a monthly one a month
+  // later (code analysis 4, S8-06; Richard 17 Nov 2026: catch up, one occurrence at most).
+  const lastScheduled = (mode, day) => {
+    if (mode === "weekly") {
+      if (!(day >= 1 && day <= 7)) return "";
+      return addDaysStr(now, -((dow - day + 7) % 7));
+    }
+    if (mode === "monthly") {
+      if (!(day >= 1)) return "";
+      const thisMonth = Math.min(day, daysInMonth);
+      if (thisMonth <= dom) return fmtDateLocal(new Date(now.getFullYear(), now.getMonth(), thisMonth));
+      const prevDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+      return fmtDateLocal(new Date(now.getFullYear(), now.getMonth() - 1, Math.min(day, prevDays)));
+    }
+    return "";
+  };
+  // The stamp is written without touching `updated`, so `updated` stays "when somebody last
+  // edited the template" — the catch-up reads it.
+  const stamp = (tpl, value) => {
+    app.db().newQuery("UPDATE templates SET auto_last = {:v} WHERE id = {:id}").bind({ v: value, id: tpl.id }).execute();
+    tpl.set("auto_last", value);
+  };
   for (const tpl of tpls) {
+    let before = null;
+    const state = { saved: false };
     try {
       const mode = tpl.getString("auto_create");
       const day = tpl.getInt("auto_day");
-      let isDue = false;
-      if (mode === "weekly") isDue = day >= 1 && day <= 7 && day === dow;
-      else if (mode === "monthly") isDue = day >= 1 && dom === Math.min(day, daysInMonth);
-      if (!isDue) continue;
-      if (tpl.getString("auto_last") === today) continue;
-      tpl.set("auto_last", today);
-      app.save(tpl);
-      instantiateTemplate(app, tpl, now);
+      const scheduled = lastScheduled(mode, day);
+      if (!scheduled) continue;
+      const last = tpl.getString("auto_last");
+      if (last === today) continue;
+      if (scheduled !== today) {
+        // A missed occurrence. Only for a template that has already run (a new one, or one whose
+        // schedule was just switched on, does not start with a project "for last week"), whose
+        // last project is older than the missed day, and that nobody edited since that day —
+        // moving the day from Friday to Monday on a Wednesday must not create a project at once.
+        if (!last || !(last < scheduled)) continue;
+        const edited = parsePbDate(tpl.getString("updated"));
+        if (edited && fmtDateLocal(edited) > scheduled) continue;
+      }
+      // The stamp goes in BEFORE the project: a crash in the middle must not create it twice.
+      before = last;
+      stamp(tpl, today);
+      instantiateTemplate(app, tpl, now, state);
       createdCount++;
     } catch (err) {
       try { app.logger().warn("auto_templates: instantiace selhala", "template", tpl.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
+      // The project was not created (a validation error, a locked database): give the stamp back
+      // so the next hourly run tries again — before, the day was lost. At most 3 attempts a day;
+      // a manual run does not count. Not when the project already exists (the failure came after).
+      if (before !== null && !state.saved) {
+        const failKey = "autoTplFail:" + tpl.id + ":" + today;
+        const attempts = (Number(app.store().get(failKey)) || 0) + (force ? 0 : 1);
+        app.store().set(failKey, attempts);
+        if (attempts < 3) { try { stamp(tpl, before); } catch (e3) { /* the stamp stays: no retry today */ } }
+      }
     }
   }
   return createdCount;
@@ -5510,6 +5699,20 @@ function positionRef(spec) {
   return null;
 }
 
+// The reasons written to the history of rule runs (rule_runs.detail, actions_done[].reason) are sentences for
+// people. They used to be Czech for everybody; now they are written in the language of the project's owner
+// (code analysis 4, S2-07) — the history belongs to the project and is read mostly by the person who runs it.
+function ruleLang(app, map) {
+  try {
+    const email = map && map.getString ? map.getString("owner_email") : "";
+    if (!email) return "en";
+    return require(`${__hooks}/i18n.js`).userLang(app.findFirstRecordByFilter("users", "email = {:e}", { e: email }));
+  } catch (err) { return "en"; }
+}
+function ruleText(app, map, key, params) {
+  return require(`${__hooks}/i18n.js`).t(ruleLang(app, map), "ruleRun." + key, params);
+}
+
 // Rozřešení dynamického cíle. Vrací:
 //   null                          — spec není dynamický cíl (literál e-mail apod.)
 //   { emails: [...] }             — rozřešeno (notify smí víc adres, set_owner právě jednu)
@@ -5524,7 +5727,7 @@ function resolveDynamicTarget(app, map, node, spec) {
   const s = String(spec || "");
   if (s === "deputy_of_node_owner") {
     const owner = String(((node && node.data) || {}).owner || "").trim();
-    if (!owner) return { skip: "uzel nemá zodpovědnou osobu, jejíhož zástupce by šlo najít" };
+    if (!owner) return { skip: ruleText(app, map, "noOwnerForDeputy") };
     // 1) ORG STRUKTURA (přesnější): zástupci pozic, které owner drží.
     //    Víc pozic s různými zástupci = ambiguous (notify všem, set_owner
     //    přiznaný skip s radou — rozhodnutí Richarda 14. 8. 2026).
@@ -5549,20 +5752,20 @@ function resolveDynamicTarget(app, map, node, spec) {
       if (!u) u = app.findFirstRecordByFilter("users", "email = {:e}", { e: owner.toLowerCase() });
       if (u) deputy = String(u.getString("deputy") || "").trim();
     } catch (err) { /* nenalezen = bez zástupce */ }
-    if (!deputy) return { skip: "„" + owner + "“ nemá zástupce (žádná držená pozice se zástupcem ani osobní zástupce)" };
+    if (!deputy) return { skip: ruleText(app, map, "noDeputy", { owner: owner }) };
     return { emails: [deputy] };
   }
   const ref = positionRef(s);
   if (ref) {
     const org = findOrgMap(app);
-    if (!org) return { skip: "organizační struktura neexistuje" };
+    if (!org) return { skip: ruleText(app, map, "noOrg") };
     const row = orgStructureRows(org).find((r) => r.node_id === ref.id);
-    if (!row) return { skip: "pozice už v organizační struktuře není" };
+    if (!row) return { skip: ruleText(app, map, "positionGone") };
     if (ref.deputy) {
-      if (!row.deputy) return { skip: "pozice „" + row.title + "“ nemá zástupce" };
+      if (!row.deputy) return { skip: ruleText(app, map, "positionNoDeputy", { title: row.title }) };
       return { emails: [row.deputy] };
     }
-    if (!row.holder) return { skip: "pozice „" + row.title + "“ je neobsazená" };
+    if (!row.holder) return { skip: ruleText(app, map, "positionVacant", { title: row.title }) };
     return { emails: [row.holder] };
   }
   return null;
@@ -5615,11 +5818,11 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       if (!node) throw new Error("action " + a.type + " target=parent needs a node scope");
       const ed = edges.find((e2) => e2 && e2.target === node.id);
       const p = ed ? nodes.find((n2) => n2 && n2.id === ed.source && n2.type !== "note") : null;
-      if (!p) return { skip: "uzel nemá nadřazený uzel" };
+      if (!p) return { skip: ruleText(app, map, "noParent") };
       return { node: p };
     }
     const n2 = nodes.find((x) => x && x.id === tgt && x.type === "goalNode");
-    if (!n2) return { skip: "cílový uzel už v mapě není" };
+    if (!n2) return { skip: ruleText(app, map, "targetGone") };
     return { node: n2 };
   };
 
@@ -5644,7 +5847,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         if (dyn.ambiguous) {
           // úkol nejde rozdvojit a tichá volba jednoho z kandidátů by přesouvala
           // odpovědnost náhodně (Richard 14. 8. 2026) → přiznaný skip s radou
-          skips.push({ type: a.type, reason: "zodpovědná osoba drží více pozic s různými zástupci (" + dyn.emails.join(", ") + ") — nastavte v pravidle zástupce konkrétní pozice" });
+          skips.push({ type: a.type, reason: ruleText(app, map, "ambiguousDeputy", { emails: dyn.emails.join(", ") }) });
           continue;
         }
         owner = dyn.emails[0]; // do logu i uzlu jde ROZŘEŠENÝ e-mail (vzor notify)
@@ -5703,22 +5906,33 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         const st2 = (n2.data || {}).status || "todo";
         if (st2 !== "todo") { n2.data = Object.assign({}, n2.data, { status: "todo" }); uzlu++; changed = true; }
       }
-      let ukolu = 0;
+      // The tasks are only collected here and written AFTER the map is saved (`later`): the steps
+      // change in memory and go in with one save at the end, which may be refused — the tasks
+      // used to be back on "todo" while their steps stayed done (code analysis 4, S2-05).
+      const kObnove = [];
       const ids = Object.keys(pod);
+      let cteniSelhalo = false;
       try {
         for (let i0 = 0; i0 < ids.length; i0 += 40) {
           const params = { m: map.id };
           const parts = ids.slice(i0, i0 + 40).map((id, k) => { params["n" + k] = id; return "node_id = {:n" + k + "}"; });
-          for (const t of app.findRecordsByFilter("tasks", "map = {:m} && status != 'todo' && (" + parts.join(" || ") + ")", "", 500, 0, params)) {
-            t.set("status", "todo");
-            app.save(t);
-            ukolu++;
-          }
+          for (const t of app.findRecordsByFilter("tasks", "map = {:m} && status != 'todo' && (" + parts.join(" || ") + ")", "", 500, 0, params)) kObnove.push(t);
         }
       } catch (err) {
-        skips.push({ type: a.type, reason: "úkoly kroku se nepodařilo obnovit" });
+        cteniSelhalo = true;
+        skips.push({ type: a.type, reason: ruleText(app, map, "tasksNotRestored") });
       }
-      done.push({ type: a.type, nodes: uzlu, tasks: ukolu, node: tn.id });
+      const zaznam = { type: a.type, nodes: uzlu, tasks: kObnove.length, node: tn.id };
+      done.push(zaznam);
+      later.push(() => {
+        let ulozeno = 0;
+        try {
+          for (const t of kObnove) { t.set("status", "todo"); app.save(t); ulozeno++; }
+        } catch (err) {
+          if (!cteniSelhalo) skips.push({ type: a.type, reason: ruleText(app, map, "tasksNotRestored") });
+        }
+        zaznam.tasks = ulozeno;
+      });
     } else if (a.type === "move_node") {
       // KANBAN POSUN: přesune TRIGGER uzel pod uzel `to` (přepis rodičovské
       // hrany). Zmizelý cíl / cyklus / vrchol = přiznaný skip, ne failed —
@@ -5727,12 +5941,12 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       // vrcholu spustí legitimně a failed by lhal — nález panelu.)
       // Org strukturu smí přeskládat jen správce PŘÍMO (goalmaps hook) —
       // pravidlo běží právy autora a admin-only stráž by obešlo.
-      if (map.getString("kind") === "org") { skips.push({ type: a.type, reason: "organizační strukturu přeskládává jen správce přímo, ne pravidla" }); continue; }
+      if (map.getString("kind") === "org") { skips.push({ type: a.type, reason: ruleText(app, map, "orgNoRestructure") }); continue; }
       const tn = needTarget(a.type);
-      if (tn.type === "apexNode") { skips.push({ type: a.type, reason: "vrchol mapy nejde přesunout" }); continue; }
+      if (tn.type === "apexNode") { skips.push({ type: a.type, reason: ruleText(app, map, "apexNoMove") }); continue; }
       const dest = nodes.find((x) => x && x.id === String(a.to || "") && x.type !== "note");
-      if (!dest) { skips.push({ type: a.type, reason: "cílový uzel už v mapě není" }); continue; }
-      if (dest.id === tn.id) { skips.push({ type: a.type, reason: "uzel nejde přesunout sám pod sebe" }); continue; }
+      if (!dest) { skips.push({ type: a.type, reason: ruleText(app, map, "targetGone") }); continue; }
+      if (dest.id === tn.id) { skips.push({ type: a.type, reason: ruleText(app, map, "selfMove") }); continue; }
       // cíl nesmí ležet v podstromu přesouvaného uzlu — vznikl by cyklus
       // a celé uložení by spadlo (err.mapCycle), i za ostatní akce
       const podstrom = { }; podstrom[tn.id] = true;
@@ -5743,7 +5957,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
           if (ed && podstrom[ed.source] && !podstrom[ed.target]) { podstrom[ed.target] = true; pribylo = true; }
         }
       }
-      if (podstrom[dest.id]) { skips.push({ type: a.type, reason: "cílový uzel leží pod přesouvaným uzlem (vznikl by cyklus)" }); continue; }
+      if (podstrom[dest.id]) { skips.push({ type: a.type, reason: ruleText(app, map, "cycleMove") }); continue; }
       const rodicovske = edges.filter((ed) => ed && ed.target === tn.id);
       if (rodicovske.length === 1 && rodicovske[0].source === dest.id) {
         done.push({ type: a.type, to: dest.id, node: tn.id, noop: true }); // už tam je
@@ -5787,7 +6001,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       done.push({ type: a.type, to: dest.id, node: tn.id });
     } else if (a.type === "create_subnodes") {
       // org strukturu rozšiřuje jen správce přímo (viz move_node výš)
-      if (map.getString("kind") === "org") { skips.push({ type: a.type, reason: "organizační strukturu mění jen správce přímo, ne pravidla" }); continue; }
+      if (map.getString("kind") === "org") { skips.push({ type: a.type, reason: ruleText(app, map, "orgNoChange") }); continue; }
       // šablonka = stejný TREE_ITEM strom jako MCP add_nodes — žádný nový formát
       const parentId = a.parent === "trigger_node" || !a.parent ? (node && node.id) : String(a.parent);
       const parent = nodes.find((n) => n && n.id === parentId);
@@ -5809,7 +6023,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
       try { authorId = app.findFirstRecordByFilter("users", "email = {:e}", { e: authorEmail }).id; } catch (err) { /* the author is gone → as the project owner */ }
       const resolved = resolveRuleItemOwners(app, items, authorId, null, {});
       if (resolved.dropped.length) {
-        skips.push({ type: a.type, reason: "unknown assignee (" + resolved.dropped.join(", ").slice(0, 300) + ") — the sub-step was created without an assignee" });
+        skips.push({ type: a.type, reason: ruleText(app, map, "unknownAssignee", { who: resolved.dropped.join(", ").slice(0, 300) }) });
       }
       let subPrefix = "r" + rule.id + "-" + subCounter++;
       const obsazeno = (p) => nodes.some((n) => n && String(n.id).indexOf("node-" + p + "-") === 0);
@@ -5919,7 +6133,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
     if (saved.error) throw new Error("save failed: " + saved.error + (saved.conflict ? " [" + MAP_CONFLICT_MARK + "]" : ""));
   }
   for (const f of later) f();
-  return { done: done, skips: skips, agentRunId: agentRunId };
+  return { done: done, skips: skips, agentRunId: agentRunId, lang: skips.length ? ruleLang(app, map) : "" };
 }
 
 // A rule whose write was refused because the map changed meanwhile (S3-01) is repeated
@@ -5941,9 +6155,9 @@ function executeRuleActionsRetry(app, map, rule, node, depth, budget) {
       try { fresh = app.findRecordById("goalmaps", map.id); } catch (e2) { throw err; }
       const nodes = jsonVal(fresh, "nodes", []);
       const freshNode = node ? (nodes.find((n) => n && n.id === node.id) || null) : null;
-      if (node && !freshNode) return { done: [], skips: [{ type: "rule", reason: "the node is no longer in the map (it changed while the rule was running)" }], agentRunId: "" };
+      if (node && !freshNode) return { done: [], skips: [{ type: "rule", reason: ruleText(app, map, "nodeGone") }], agentRunId: "", lang: ruleLang(app, map) };
       if (!ruleConditionsMatch(ruleJson(rule, "conditions", []), freshNode, jsonVal(fresh, "edges", []))) {
-        return { done: [], skips: [{ type: "rule", reason: "the conditions no longer hold (the map changed while the rule was running)" }], agentRunId: "" };
+        return { done: [], skips: [{ type: "rule", reason: ruleText(app, map, "conditionsGone") }], agentRunId: "", lang: ruleLang(app, map) };
       }
       return executeRuleActions(app, fresh, rule, freshNode, depth, budget);
     });
@@ -5958,11 +6172,12 @@ function ruleRunOutcome(res) {
   const doneTypes = res.done.map((x) => x.type).join(", ");
   const skips = res.skips || [];
   const skipTxt = skips.map((s) => s.type + " (" + s.reason + ")").join("; ");
+  const skippedWord = require(`${__hooks}/i18n.js`).t(res.lang || "en", "ruleRun.skipped");
   const actionsDone = res.done.concat(skips.map((s) => ({ type: s.type, skipped: true, reason: s.reason })));
   if (skips.length && !res.done.length && !res.agentRunId) {
-    return { status: "skipped", detail: "přeskočeno: " + skipTxt, actionsDone: actionsDone };
+    return { status: "skipped", detail: skippedWord + ": " + skipTxt, actionsDone: actionsDone };
   }
-  return { status: "ok", detail: skips.length ? doneTypes + "; přeskočeno: " + skipTxt : doneTypes, actionsDone: actionsDone };
+  return { status: "ok", detail: skips.length ? doneTypes + "; " + skippedWord + ": " + skipTxt : doneTypes, actionsDone: actionsDone };
 }
 
 // SDÍLENÝ vyhodnocovač diffových triggerů — stejný podpis jako triggerReadyAgents.
@@ -6047,7 +6262,7 @@ function runAutomationRules(app, origNodes, origEdges, record, actorEmail, opts)
       logRuleRun(app, {
         rule: ev.rule, mapId: record.id, nodeId: ev.node ? ev.node.id : "",
         nodeTitle: ev.node ? (ev.node.data || {}).title : "", triggerType: ev.type,
-        status: "skipped", detail: "řetěz pravidel přerušen (pojistka proti smyčce, hloubka " + depth + ")",
+        status: "skipped", detail: ruleText(app, record, "chainCut", { depth: depth }),
         depth: depth, actor: actorEmail || "",
       });
     }
@@ -6064,7 +6279,7 @@ function runAutomationRules(app, origNodes, origEdges, record, actorEmail, opts)
         depth: depth, actor: actorEmail || "",
       };
       if (budget.n >= MAX_RULE_FIRINGS_PER_SAVE) {
-        logRuleRun(app, Object.assign({}, base, { status: "skipped", detail: "strop spuštění na jedno uložení (" + MAX_RULE_FIRINGS_PER_SAVE + ", vč. řetězu)" }));
+        logRuleRun(app, Object.assign({}, base, { status: "skipped", detail: ruleText(app, record, "saveCap", { n: MAX_RULE_FIRINGS_PER_SAVE }) }));
         continue;
       }
       budget.n++;
@@ -6211,7 +6426,7 @@ function runScheduledRules(app, opts) {
           logRuleRun(app, {
             rule: rule, mapId: map.id, nodeId: "", nodeTitle: "", triggerType: trig.type,
             status: "skipped", depth: 0, actor: "schedule",
-            detail: "strop " + MAX_RULE_FIRINGS_PER_SAVE + " běhů na průchod — zbylých " + passSkipped + " uzlů dožene další hodina",
+            detail: ruleText(app, map, "passCap", { n: MAX_RULE_FIRINGS_PER_SAVE, left: passSkipped }),
           });
         }
       }
@@ -6754,7 +6969,7 @@ function nowLocalMinute() {
 // den − n dní pro řetězec YYYY-MM-DD (přes lokální Date, den zůstává dnem)
 function dayMinusDays(day, n) {
   const [y, m, d] = String(day).split("-").map(Number);
-  return addDaysStr(new Date(y, m - 1, d), -Number(n || 0));
+  return new Date(Date.UTC(y, m - 1, d - Number(n || 0))).toISOString().slice(0, 10); // a plain calendar day never depends on the instance time zone
 }
 
 // "YYYY-MM-DD HH:MM" = den + čas − minuty (přechod přes půlnoc je v pořádku)
@@ -7012,18 +7227,44 @@ function runEmailDigests(app, opts) {
     const znacka = app.findFirstRecordByFilter("mail_budget", "day = {:d}", { d: "digest:" + today });
     if (!force && znacka) return 0;
   } catch (err) { /* žádná značka = dnes se ještě neposílalo */ }
-  const sinceIso = String(store.get("emailDigestLast") || "")
-    || new Date(now.getTime() - 24 * 3600 * 1000).toISOString().replace("T", " ");
+  // The window starts at the previous run. The in-memory stamp is lost with every restart (a
+  // deployment, a plan change, unlocking a locked instance), and the window then fell back to
+  // 24 hours: after a day without a digest the older notifications never reached any e-mail
+  // (code analysis 4, S8-07). The last FINISHED day marker in the database survives — its
+  // `created` is the start of that run. At most 7 days back; a marker of an interrupted run
+  // (`sent` = -1) and markers dated by the migration (midnight, not the real hour) do not count.
+  let sinceIso = String(store.get("emailDigestLast") || "");
+  if (!sinceIso) {
+    try {
+      const last = app.findRecordsByFilter("mail_budget", "day ~ 'digest:%' && sent >= 0 && created != ''", "-created", 1, 0)[0];
+      const c = last ? last.getString("created") : "";
+      const d = c && !/ 00:00:00\.000Z$/.test(c) ? parsePbDate(c) : null;
+      if (d && d.getTime() < now.getTime()) sinceIso = new Date(Math.max(d.getTime(), now.getTime() - 7 * 24 * 3600 * 1000)).toISOString().replace("T", " ");
+    } catch (err) { /* no marker = the 24-hour fallback below */ }
+  }
+  if (!sinceIso) sinceIso = new Date(now.getTime() - 24 * 3600 * 1000).toISOString().replace("T", " ");
   const { t, plural, userLang } = require(`${__hooks}/i18n.js`);
   let users = [];
   try {
     users = app.findRecordsByFilter("users", "notify_email_mode = 'digest'", "", 500, 0);
   } catch (err) { return 0; }
   const MAX_LINES = 10; // víc řádků v e-mailu nikdo nečte; zbytek přizná emailMore
+  // The day marker is written BEFORE the batch (`sent` = -1 = running) and closed after it: a
+  // restart in the middle of the batch used to leave no marker, and everybody who already had
+  // the digest got it again after the start (S8-07). The field `user` is required — it carries
+  // the first recipient; only the existence of the row `digest:<day>` decides.
+  let znackaDne = null;
+  if (!force && users.length) {
+    try {
+      znackaDne = new Record(app.findCollectionByNameOrId("mail_budget"));
+      znackaDne.set("user", users[0].id);
+      znackaDne.set("day", "digest:" + today);
+      znackaDne.set("sent", -1);
+      app.save(znackaDne);
+    } catch (err) { znackaDne = null; /* the marker is a safeguard; the digest goes out anyway */ }
+  }
   let sent = 0;
-  let posledni = "";   // komu souhrn odešel naposled (nese ho denní značka níž)
   let failed = 0;
-  let failedUser = ""; // carries the day marker when the day is closed after three failed attempts
   for (const u of users) {
     try {
       // overflow řádek se vynechává — souhrn vyjmenovává obsah, ne meta-hlášku;
@@ -7075,10 +7316,8 @@ function runEmailDigests(app, opts) {
       });
       app.newMailClient().send(message);
       sent++;
-      posledni = u.id;
     } catch (err) {
       failed++;
-      if (!failedUser) failedUser = u.id;
       try { app.logger().warn("email_digests: uživatel selhal", "user", u.id, "error", String(err)); } catch (e2) { /* log je bonus */ }
     }
   }
@@ -7095,23 +7334,18 @@ function runEmailDigests(app, opts) {
     const failKey = "emailDigestFail:" + today;
     const attempts = (Number(store.get(failKey)) || 0) + 1;
     store.set(failKey, attempts);
-    if (attempts < 3) return 0;
+    if (attempts < 3) {
+      if (znackaDne) { try { app.delete(znackaDne); } catch (err) { /* stays as an interrupted run */ } }
+      return 0;
+    }
     try { app.logger().warn("email_digests: the digest failed 3 times today — giving up until tomorrow, today's notifications stay in the bell only", "failed", failed); } catch (e2) { /* the log is a bonus */ }
   }
   if (!force) {
     // ruční/testovací spuštění NESMÍ umlčet ten plánovaný (stejná past jako
     // u runDeadlineNotices) — proto se značka zapisuje jen u řádného běhu
     store.set("emailDigestDay", today);
-    // značka nese uživatele, kterému souhrn odešel jako poslednímu (pole je
-    // povinné); rozhoduje jen existence řádku s klíčem `digest:<den>`
-    if (posledni || failedUser) {
-      try {
-        const znacka = new Record(app.findCollectionByNameOrId("mail_budget"));
-        znacka.set("user", posledni || failedUser);
-        znacka.set("day", "digest:" + today);
-        znacka.set("sent", sent);
-        app.save(znacka);
-      } catch (err) { /* pojistka je bonus, souhrn už odešel */ }
+    if (znackaDne) {
+      try { znackaDne.set("sent", sent); app.save(znackaDne); } catch (err) { /* the marker stays "interrupted": tomorrow's window reaches one run further back */ }
     }
   }
   store.set("emailDigestLast", now.toISOString().replace("T", " "));
@@ -7928,15 +8162,14 @@ function importJednuMapu(app, auth, L, info, opts) {
     }
   }
   const known = {};
-  const extHelpers = { isExternalOwner: isExternalOwner, extContactId: extContactId };
   for (const email of Object.keys(wanted)) {
     // pseudo-e-mail externího kontaktu: platí, jen když kontakt v TÉHLE instanci
     // existuje a importér ho smí vidět (cizí či privátní cizí id → zahodit stejně
     // jako neregistrovaného uživatele — id z jiné instance by ukazovalo na
     // náhodný, potenciálně cizí privátní kontakt)
-    if (extHelpers.isExternalOwner(email)) {
+    if (isExternalOwner(email)) {
       try {
-        const c = app.findRecordById("external_contacts", extHelpers.extContactId(email));
+        const c = app.findRecordById("external_contacts", extContactId(email));
         if (!c.getBool("private") || c.getString("owner") === auth.id) known[email] = true;
       } catch (err) { /* kontakt tu neexistuje → přiřazení zahodíme */ }
       continue;
@@ -8075,7 +8308,6 @@ function importJednuMapu(app, auth, L, info, opts) {
   // Položky-úkoly se NEIMPORTUJÍ (slovník 17. 8. 2026): úkol = uzel s řešitelem
   // nebo termínem a import nesmí zakládat, co by dnes nešlo vytvořit. Úkoly ze
   // starých záloh se poctivě spočítají jako přeskočené — data v záloze zůstávají.
-  const imported = 0;
   const tasksSkipped = srcTasks.filter((tk) => tk && String((tk.title || "")).trim()).length;
 
   // Přání o automatizaci z importované mapy musí dojít správcům AI — jinak by
@@ -8091,7 +8323,7 @@ function importJednuMapu(app, auth, L, info, opts) {
     id: rec.id,
     title: rec.getString("title"),
     nodes_imported: finalNodes.length,
-    tasks_imported: imported,
+    tasks_imported: 0, // tasks are not imported any more; the field stays for clients of the API
     tasks_skipped: tasksSkipped,
     assignments_dropped: dropped,
     deadline_requests_dropped: deadlineRequestsDropped,
@@ -9243,8 +9475,8 @@ module.exports = { ASSIST_MODES,
   zrusApiKlice,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,
-  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, resolveRuleItemOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour, summaryMinute, summaryCronDue,
-  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, emailHasAccount, shareInviteRow, pendingShareRows, upsertShareInvite, shareInviteTokenValid, newShareInviteToken, claimShareInvitesByToken, parkUnclaimedShares, jePosledniAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, ownedMapsFor, userDeletionSummary, userLeftovers, cleanupBeforeUserDelete, memberOpenStepsSummary, reassignMemberSteps, removeEmailFromAllShares, memberMapsHandover, notifyMapHandover, MAP_CONFLICT_MARK, MAP_RETRY, isMapConflict, mergeConcurrentMapWrite, bumpMapVersion, withMapWrite,
+  oznamNovouVerzi, env, zalozUvodniMapu, instancePurpose, jeNedotcenaUvodniMapa, isExternalOwner, extContactId, extPseudoEmail, resolveOwner, resolveTreeOwners, resolveRuleItemOwners, memberRows, externalContactRows, userLimitReached, userLimit, userCount, userLimitExceeded, stehujeme, predplatneSkoncilo, trialUntil, trialExpired, odmitnutiBrany, apexNodeId, assertTaskNode, userSeesMap, jsonList, jsonVal, mapToDto, publicMapDto, syncShares, notify, NOTIFY_TYPES, NOTIFY_ALWAYS, notifyChannels, nodesToWaitState, aiConfig, extraJson, dalsiTermin, validateMapData, poskozeneHrany, strukturaZhorsena, apiKeyAuth, normalizeMapData, normalizeNodeShapes, canonicalNodeData, normalizeExecutorKind, treeItemsToNodes, ikonaUzlu, mapToTree, V1_NODE_FIELDS, V1_TREE_ITEM_FIELDS, V1_BODY_FIELDS, FOREIGN_FIELD_HINTS, unknownKeys, hintsFor, unknownFieldsError, unknownTreeItemKeys, unknownTreeItemsError, strictRuleShapeError, validatePlannedOn, checkBufferDates, checkTreePlans, notifyUnblockedTransitions, notifyOwnerChanges, notifyAutomationRequests, satisfyAutomationRequests, stampAutomationRequesters, notifyAutomationReady, aiManagerEmails, smiEditovatOrgStrukturu, orgManagerEmails, layoutTreeServer, mapAccessLevel, shareLevel, jeAdmin, jeAdminNeboAiManazer, shareRowsFor, nodeIsMine, v1ReadableMap, v1WritableMap, autoShareAssignees, v1SaveMapData, formatSeriesTitle, assignSeriesNumber, formatProjectNumber, prefixProjectNumber, assignProjectNumber, notifyAssignedFromNodes, runAutoTemplates, autoHour, deadlineHour, runDeadlineNotices, digestHour, runEmailDigests, notifyBudget, summaryHour, summaryMinute, summaryCronDue,
+  buildMyDay, buildPortfolio, buildExport, mapStagnantNodes, importJednuMapu, minuteLimitHit, mapCompletion, rhythmOfAction, recurrenceOfRule, prepniObnovuPodkroku, mapRecurrence, recurrenceByMaps, processHealth, logMapChanges, logTaskChange, startAgentRun, queueAgentRun, dispatchAgentRun, dispatchQueuedAgentRuns, triggerReadyAgents, agentRunByToken, agentRunFiles, webhookHostBlocked, webhookVyjimka, aiHostBlocked, puvodUrl, sifrujTajemstvi, odsifrujTajemstvi, sifrovaciKlic, vlastniAiZaznam, vlastniAiConfig, vlastniAiDto, vlastniOtisk, extraZakazane, isPrivateHost, ipv6Privatni, prelozenyHost, failStaleAgentRuns, agentTimeoutMin, publicBaseUrl, publicBaseUrlFromRequest, readHooksText, collectUserTaskDigest, generateDailySummary, summaryModelText, runDailySummaries, summaryAiConfig, pracovatSeNesmi, dgOf, findBlockingForOwnerServer, parsePbDate, nowUtcString, pbDateString, normalizeTimeEntry, stopRunningEntries, autoStopStaleTimers, sanitizeUserSkin, sanitizeUserFocus, apexRemoved, taskDeadlineDenied, userOwnsTaskMap, logTaskDeleted, stampAssignedBy, deadlineChangeDenied, nodeDeleteDenied, emailHasAccount, shareInviteRow, pendingShareRows, upsertShareInvite, shareInviteTokenValid, newShareInviteToken, claimShareInvitesByToken, parkUnclaimedShares, jePosledniAdmin, transferMapOwnership, transferTargetError, recordMapTransfer, ownedMapsFor, userDeletionSummary, userLeftovers, cleanupBeforeUserDelete, memberOpenStepsSummary, reassignMemberSteps, removeEmailFromAllShares, renameEmailEverywhere, memberMapsHandover, notifyMapHandover, MAP_CONFLICT_MARK, MAP_RETRY, isMapConflict, mergeConcurrentMapWrite, bumpMapVersion, withMapWrite,
   stampDeadlineRequesters, satisfyDeadlineRequests, notifyDeadlineRequests, notifyDeadlineRequestResolved,
   billingNacti, billingKompletni,
   runAutomationRules, runScheduledRules, ruleConditionsMatch, rulesDisabled,

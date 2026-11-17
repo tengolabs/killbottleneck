@@ -49,7 +49,7 @@ const retryDelay = (n) => Math.min(30000, 3000 * 2 ** Math.min(n, 4));
 export function useMapAutosave({
   mapId, activeMapId, setActiveMapId, isDraft, canEdit, isPublicView, isTemplatePreview,
   nodes, edges, title, color, setNodes, setEdges, setTitle, setColor,
-  nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t, noteForeign,
+  nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t, noteForeign, setIsMapOwner,
 }) {
   const [conflict, setConflict] = useState(false); // B3: mapa změněna z jiného místa
   // Hlídání na pozadí zjistilo cizí změnu DŘÍV, než uživatel začal psát.
@@ -283,6 +283,9 @@ export function useMapAutosave({
           const { cleanNodes, cleanEdges } = cleanMapData();
           const newMap = await createProjectRecord({ title: title.trim() || t('defaults.newMapTitle'), nodes: cleanNodes, edges: cleanEdges, color });
           setActiveMapId(newMap.id);
+          // the project just created from an empty draft is the user's own — without this the owner-only
+          // actions stayed off until the page was reloaded (code analysis 4, F1-14)
+          setIsMapOwner?.(true);
           // B3 — základna patří NOVÉ mapě; nechat v ní uzly té předchozí by
           // z prvního zásahu pravidla udělalo falešnou kolizi
           zapamatujServer({ ...newMap, title, color, nodes: newMap.nodes || cleanNodes, edges: newMap.edges || cleanEdges });

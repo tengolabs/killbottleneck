@@ -26,6 +26,7 @@ export const NOTIFY_TYPES = [
   'ai_request',
   'agent_done',
   'agent_failed',
+  'user_joined',
   'rule_notice',
   'rule_broken',
   'timer_autostop',
@@ -35,6 +36,7 @@ export const NOTIFY_TYPES = [
   // nepřítomnost se schvalováním (týmový kalendář, 14. 10. 2026)
   'absence_requested',
   'absence_decided',
+  'org_notice',
 ];
 
 // E-mail výchozí ZAPNUTÝ (zrcadlo helpers.js NOTIFY_EMAIL_DEFAULT_ON): připomínka
@@ -104,6 +106,10 @@ export const notifyTarget = (n) => {
     if (n.map_id) return `/map/${n.map_id}${n.node_id ? `?node=${n.node_id}` : ''}`;
     return '/kalendar';
   }
+  // a new member → Users; alarms and news that belong to no task stay on the notifications page
+  // (they used to open the task table, code analysis 4, F5-09)
+  if (n.type === 'user_joined') return '/admin/users';
+  if (n.type === 'password_reset' || n.type === 'new_version') return '/notifications';
   if (n.type === 'deadline') {
     if (n.task_id) return `/tasks?task=${n.task_id}`;
     if (n.map_id) return `/map/${n.map_id}${n.node_id ? `?node=${n.node_id}` : ''}`;

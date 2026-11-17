@@ -29,7 +29,8 @@ const ASSIST_MODES = ['rozbor', 'po_schuzce', 'priprava', 'revize', 'trideni', '
 const COND_FIELDS = ['status', 'owner', 'deadline', 'executor_kind', 'parent'];
 const COND_OPS = ['eq', 'ne', 'empty', 'not_empty', 'before', 'after'];
 // podmínka „nadřazený uzel" (kanban: karta POD sloupcem) umí jen je/není
-const OPS_FOR = (field) => (field === 'parent' ? ['eq', 'ne'] : COND_OPS);
+// before/after compare dates: the server accepts them for the deadline only ("status is before…" was refused on save)
+const OPS_FOR = (field) => (field === 'parent' ? ['eq', 'ne'] : field === 'deadline' ? COND_OPS : COND_OPS.filter((o) => o !== 'before' && o !== 'after'));
 const STATUSES = ['todo', 'in_progress', 'done'];
 
 // What the form SHOWS must be what gets saved: the frequency select displays "daily" for a
@@ -201,12 +202,13 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
         {trigType === 'deadline_approaching' && (
           <div className="space-y-1">
             <div className="flex gap-2">
-              <select className={selectCls} value={trigger.when || 'before'} onChange={(e) => setTrigger({ ...trigger, type: trigType, when: e.target.value })}>
+              <select className={selectCls} value={trigger.when || 'before'} onChange={(e) => setTrigger({ ...trigger, type: trigType, when: e.target.value, ...(e.target.value === 'overdue' && !((trigger.days ?? 1) >= 1) ? { days: 1 } : {}) })}>
                 <option value="before">{t('rules.dlBefore')}</option>
                 <option value="overdue">{t('rules.dlOverdue')}</option>
               </select>
-              <Input type="number" min={0} max={365} className="w-24" value={trigger.days ?? 1}
-                onChange={(e) => setTrigger({ ...trigger, type: trigType, days: Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0)) })} />
+              {/* "0 days overdue" is refused by the server — the smallest value is 1 there */}
+              <Input type="number" min={trigger.when === 'overdue' ? 1 : 0} max={365} className="w-24" value={trigger.days ?? 1}
+                onChange={(e) => setTrigger({ ...trigger, type: trigType, days: Math.max(trigger.when === 'overdue' ? 1 : 0, Math.min(365, parseInt(e.target.value, 10) || 0)) })} />
               <span className="self-center text-sm text-muted-foreground">{t('rules.days')}</span>
             </div>
             {/* „nic se nestalo" z Richardova klik-testu: termínové spouštěče
@@ -280,7 +282,7 @@ export default function RuleBuilder({ mapId, nodes = [], members = [], mapAccess
               {OPS_FOR(c.field).map((o) => <option key={o} value={o}>{t(`rules.condOps.${o}`)}</option>)}
             </select>
             {c.op !== 'empty' && c.op !== 'not_empty' && (
-              c.field === 'deadline' && (c.op === 'before' || c.op === 'after')
+              c.field === 'deadline' // a deadline is always compared with a date — "deadline is…" used to offer a person
                 ? <DatePicker value={c.value || ''} onChange={(v) => setConds((p) => p.map((x, xi) => (xi === i ? { ...x, value: v } : x)))} className="h-9 w-40" />
                 : c.field === 'status'
                   ? (

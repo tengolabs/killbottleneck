@@ -168,6 +168,13 @@ H.beh(async () => {
   expect(dekoduj(mailyPro('c@example.com')[2] || '').includes('40 dní jste se nepřihlásili'), 'úvod posledního stupně nese počet dní');
   n = await spust();
   expect(n === 0 && mailyPro('c@example.com').length === 3, 'po posledním stupni ticho');
+  // the link of an EARLIER mail must still unsubscribe after the next stage has left (finding S7-02)
+  {
+    const starsiOdkaz = (String(mailyPro('c@example.com')[1] || '').match(/^List-Unsubscribe:\s*<([^>]+)>/mi) || [])[1];
+    const rs = await fetch(starsiOdkaz, { redirect: 'manual' });
+    expect(rs.status === 200 && /Hotovo — připomínky jsou vypnuté/.test(await rs.text()), 'odkaz ze staršího mailu (stupeň 14) odhlásí i po odeslání dalšího stupně');
+    expect((await ctiU('c@example.com')).navrat.odhlaseno === true, 'c@ je odhlášený');
+  }
 
   console.log('== přihlášení začíná nový cyklus ==');
   await zpetne('b@example.com', 4);

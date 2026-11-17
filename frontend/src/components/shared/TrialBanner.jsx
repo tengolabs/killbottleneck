@@ -19,11 +19,12 @@ import { Clock, Lock } from 'lucide-react';
 // Instance bez zkušebky (self-host, placené tarify) pruh nikdy neuvidí —
 // VÝJIMKA: placená instance po konci předplatného (config.subscription_ended,
 // 28. 10. 2026): týž červený pruh „zápis pozastaven" + export, jen jiný text a CTA.
-const CENIK = 'https://killbottleneck.cz/ceny';
+// the price list in the user's language: the .cz site for Czech, the .com one for everybody else (F6-11)
+const cenik = (lang) => (String(lang || '').startsWith('cs') ? 'https://killbottleneck.cz/ceny' : 'https://killbottleneck.com/pricing');
 const DNI_PRED = 7;
 
 export default function TrialBanner() {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ export default function TrialBanner() {
       onClick: (e) => { e.preventDefault(); navigate('/admin/users?oddil=platby'); },
       href: '/admin/users?oddil=platby',
     }
-    : { href: CENIK, target: '_blank', rel: 'noopener noreferrer' };
+    : { href: cenik(i18n.language), target: '_blank', rel: 'noopener noreferrer' };
 
   useEffect(() => {
     let zivy = true;

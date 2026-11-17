@@ -447,6 +447,8 @@
     "previewHide": "Hide preview",
     "previewAlt": "Preview of the first page",
     "previewError": "Could not render the preview.",
+    "fileShortened": "The file is downloaded, but the text did not fit the page — it ends with an ellipsis. Shorten it, or choose Word / PowerPoint.",
+    "outlineOverCap": "The files will hold only the first {{slides}} slides and {{bullets}} bullets per slide — the rest of the outline is left out.",
     "fileError": "Could not create the file.",
     "template": "Template",
     "color": "Colour",

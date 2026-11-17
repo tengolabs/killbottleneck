@@ -21,7 +21,13 @@ function editableMapSession(app, e, mapId) {
   } catch (err) {
     return { error: { status: 404, body: { error: t(lang, "err.mapNotFound") } } };
   }
-  if (!mapEditAccess(app, map, e.auth)) return { error: { status: 403, body: { error: t(lang, "err.noWriteAccess") } } };
+  if (!mapEditAccess(app, map, e.auth)) {
+    // somebody who does not see the project at all gets the same answer as for an id that does not exist
+    // (S4-06, Richard 17 Nov 2026)
+    const { mapAccessLevel } = require(`${__hooks}/helpers.js`);
+    if (mapAccessLevel(app, map, e.auth.id, e.auth.email()) === "" && !map.getBool("is_public")) return { error: { status: 404, body: { error: t(lang, "err.mapNotFound") } } };
+    return { error: { status: 403, body: { error: t(lang, "err.noWriteAccess") } } };
+  }
   return { map: map, lang: lang };
 }
 

@@ -203,7 +203,7 @@ export default function Tasks({ kalendar = false }) {
   const zpetDoMapy = () => navigate(`/map/${projektFiltru.id}`);
 
   // události + připomínky k uzlům — jen když je kalendář otevřený
-  const { items: udalostiItems, udalosti, pripominkyPodleUzlu, kalendare, nacteno: udalostiNacteny } = useUdalosti({ aktivni: view === 'calendar', userEmail: user?.email });
+  const { items: udalostiItems, udalosti, pripominkyPodleUzlu, kalendare, nacteno: udalostiNacteny, chyba: udalostiChyba, zkraceno: udalostiZkraceno, reload: udalostiReload } = useUdalosti({ aktivni: view === 'calendar', userEmail: user?.email });
   // deep-link ze zvonečku: /tasks?view=calendar&udalost=<id> otevře detail události
   useEffect(() => {
     const uid = searchParams.get('udalost');
@@ -701,6 +701,16 @@ export default function Tasks({ kalendar = false }) {
             onOpenNode={setEditNodeItem}
           />
         ) : view === 'calendar' ? (
+          <>
+          {udalostiChyba && (
+            <div role="alert" data-testid="calendar-load-error" className="flex items-center gap-2 text-sm rounded-lg bg-destructive/10 text-destructive px-3 py-2 mb-3">
+              <span className="flex-1">{t('tasksPage.eventsLoadFailed')}</span>
+              <Button variant="ghost" size="sm" className="h-7" data-testid="calendar-load-retry" onClick={() => udalostiReload()}>{t('tasksPage.loadRetry')}</Button>
+            </div>
+          )}
+          {udalostiZkraceno && !udalostiChyba && (
+            <p data-testid="calendar-truncated" className="mb-3 text-xs text-muted-foreground">{t('tasksPage.eventsTruncated')}</p>
+          )}
           <KalendarSPresunem
             items={udalostiItems.length ? [...calendarItems, ...udalostiItems] : calendarItems}
             maps={activeMaps}
@@ -715,6 +725,7 @@ export default function Tasks({ kalendar = false }) {
             onOpen={(it) => (it.kind === 'event' ? setUdalostDialog({ udalost: it.raw, den: it.raw.day })
               : it.kind === 'node' ? setEditNodeItem(it.raw) : openEdit(it.raw))}
           />
+          </>
         ) : view === 'board' ? (
           <TaskBoard
             tasks={topLevel}

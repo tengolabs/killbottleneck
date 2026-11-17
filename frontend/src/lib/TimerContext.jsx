@@ -20,6 +20,9 @@ export function TimerProvider({ children }) {
   const [elapsed, setElapsed] = useState(0); // sekundy
 
   const gen = useRef(0);
+  const retries = useRef(0);
+  const retryTimer = useRef(null);
+  const refreshRef = useRef(null);
   const refresh = useCallback(() => {
     if (!user) {
       setRunning(null);
@@ -28,9 +31,18 @@ export function TimerProvider({ children }) {
     // a re-read started before a Start/Stop/assign of this tab must not overwrite its result
     const g = ++gen.current;
     return base44.entities.TimeEntry.filter({ ended: '' }, '-started', 1)
-      .then((list) => { if (g === gen.current) setRunning(list?.[0] || null); })
-      .catch(() => {});
+      .then((list) => { if (g === gen.current) { retries.current = 0; setRunning(list?.[0] || null); } })
+      // A failed read leaves the header without the running timer, which reads as "nothing is running"
+      // (code analysis 4, F5-08) — ask again a few times instead of waiting for a manual reload.
+      .catch(() => {
+        if (g !== gen.current || retries.current >= 4) return;
+        retries.current += 1;
+        clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(() => refreshRef.current?.(), retries.current === 1 ? 5000 : 30000);
+      });
   }, [user]);
+  refreshRef.current = refresh;
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
 
   useEffect(() => { refresh(); }, [refresh]);
 

@@ -16,7 +16,7 @@ import { intlLocale } from '@/lib/locale';
 import { useTranslation } from 'react-i18next';
 import { Timer, Square, Play, X as XIcon, Trash2 } from 'lucide-react';
 import FixEndDialog from '@/components/time/FixEndDialog';
-import { isAutoStopped } from '@/lib/timeFix';
+import { isAutoStopped, noteForDisplay } from '@/lib/timeFix';
 
 const NONE = '__none__';
 const parseDate = (s) => (s ? new Date(String(s).replace(' ', 'T')) : null);
@@ -108,7 +108,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
   };
 
   const removeEntry = async (entry) => {
-    const noteText = entry.note || entry.label;
+    const noteText = noteForDisplay(entry.note, t) || entry.label;
     if (!(await askDelete(noteText
       ? t('timeLog.confirmDeleteEntryNote', { time: formatMinutes(entry.duration_min), note: noteText })
       : t('timeLog.confirmDeleteEntry', { time: formatMinutes(entry.duration_min) })))) return;
@@ -201,7 +201,7 @@ export default function TimeLogPanel({ mapId = '', nodes = [], fixed = false, op
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
-                {(e.note || e.label) && <p className="text-xs truncate">{e.note || e.label}</p>}
+                {(e.note || e.label) && <p className="text-xs truncate" data-testid="time-entry-note">{noteForDisplay(e.note, t) || e.label}</p>}
                 {isAutoStopped(e) && (
                   <Button variant="outline" size="sm" className="h-7 w-full text-xs border-amber-400 text-amber-700 dark:text-amber-300" data-testid="opravit-konec" onClick={() => setFixEntry(e)}>
                     <Timer className="w-3.5 h-3.5" /> {t('timeFix.button')}

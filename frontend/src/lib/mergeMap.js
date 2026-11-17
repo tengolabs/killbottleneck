@@ -181,6 +181,17 @@ export function trojcestnyMerge(zaklad, moje, server) {
   if (!u) return { ok: false, duvod: 'uzel' };
   const h = slijSadu(zaklad.edges, moje.edges, server.edges, false);
   if (!h) return { ok: false, duvod: 'hrana' };
+  // Nodes and edges are merged independently: my new edge can point to a node the other side deleted
+  // meanwhile (or the other way round). An edge into nothing is a broken tree — that is a real
+  // collision for a person, not something to merge silently (finding F1-11).
+  // Only what the MERGE broke counts: a map that already carried such an edge on one side (older damage,
+  // the editor offers a repair for it) must keep merging as before.
+  const visici = (nodes, edges) => {
+    const ids = new Set((nodes || []).map((n) => n.id));
+    return (edges || []).filter((e) => !ids.has(e.source) || !ids.has(e.target)).map((e) => e.id);
+  };
+  const uzZnicene = new Set([...visici(moje.nodes, moje.edges), ...visici(server.nodes, server.edges)]);
+  if (visici(u.polozky, h.polozky).some((id) => !uzZnicene.has(id))) return { ok: false, duvod: 'hrana' };
 
   const title = t.volba === 'server' ? (server.title || '') : (moje.title || '');
   const color = c.volba === 'server' ? (server.color || '') : (moje.color || '');

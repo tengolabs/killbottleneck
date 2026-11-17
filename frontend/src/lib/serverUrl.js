@@ -39,11 +39,17 @@ export const serverOrigin = () => getServerUrl() || window.location.origin;
 // Privátní rozsahy, kde je tolerované http:// (LAN self-host, Tailscale).
 // Android network security config neumí IP rozsahy, proto se to hlídá tady.
 const isPrivateHost = (host) => {
-  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return true;
+  if (host === 'localhost' || host.endsWith('.local')) return true;
+  // names that cannot be public: a bare host name (`nas`), the home and internal zones, IPv6 loopback and
+  // local ranges (code analysis 4, F4-10)
+  if (!host.includes('.') && !host.includes(':')) return true;
+  if (/\.(lan|home|internal|localdomain|home\.arpa)$/.test(host)) return true;
+  const v6 = host.replace(/^\[|\]$/g, '').toLowerCase();
+  if (v6 === '::1' || /^f[cd][0-9a-f]{2}:/.test(v6) || /^fe[89ab][0-9a-f]:/.test(v6)) return true;
   const m = host.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
   if (!m) return false;
   const a = +m[1], b = +m[2];
-  return a === 10
+  return a === 10 || a === 127
     || (a === 172 && b >= 16 && b <= 31)
     || (a === 192 && b === 168)
     || (a === 100 && b >= 64 && b <= 127);

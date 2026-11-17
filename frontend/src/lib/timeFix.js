@@ -3,6 +3,10 @@
 // autoStopStaleTimers writes it). The marker is Czech for every account, it is data, not a text of the app.
 export const AUTO_STOP_MARK = '(auto-stop po 12 h)';
 
+// The marker as the user reads it: stored Czech for everybody (the server recognizes the entry by it),
+// shown in the language of the app (code analysis 4). `t` = the translator of the `tasks` namespace.
+export const noteForDisplay = (note, t) => String(note || '').split(AUTO_STOP_MARK).join(t('timeFix.mark'));
+
 export const isAutoStopped = (entry) => !!entry && !!entry.ended && String(entry.note || '').includes(AUTO_STOP_MARK);
 
 // the note without the marker — once the end is corrected, "auto-stop after 12 h" is no longer true

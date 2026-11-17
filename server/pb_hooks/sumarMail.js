@@ -53,7 +53,8 @@ function bannerDne(app, den, vlastnik, L) {
 
 function datumLidsky(den, L) {
   const [y, m, d] = String(den).split("-").map(Number);
-  return L === "en" ? `${d}/${m}/${y}` : `${d}. ${m}. ${y}`;
+  // "10/11/2026" reads as October in the US and November in Europe — the month by name (S7-08)
+  return L === "en" ? `${d} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1] || m} ${y}` : `${d}. ${m}. ${y}`;
 }
 
 // podklad mailu jednoho uživatele (stejná data jako panel Můj den)

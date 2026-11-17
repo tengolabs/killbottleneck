@@ -72,6 +72,5 @@ export const userMaps = (id, reassignTo) => kbSend(`/api/kb/users/${encodeURICom
 // deleting an account; `reassignTo` passes the member's open steps to that member (server: users delete hooks)
 export const deleteMember = (id, reassignTo) => pb.collection('users').delete(id, reassignTo ? { query: { reassign_to: reassignTo } } : undefined);
 export const transferUserMaps = (id, email) => kbSend(`/api/kb/users/${encodeURIComponent(id)}/transfer-maps`, { body: email ? { email } : {} });
-export const transferMap = (mapId, email) => kbSend(`/api/kb/maps/${encodeURIComponent(mapId)}/transfer`, { body: { email } });
 export const savePurpose = (purpose, { replace } = {}) => kbSend('/api/kb/purpose', { body: { purpose, ...(replace ? { replace: true } : {}) } });
 

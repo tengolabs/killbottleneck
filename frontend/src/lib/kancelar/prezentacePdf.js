@@ -36,6 +36,7 @@ export function sestavPrezentaciPdf({ doc, rgb, fonty, osnova: rawOsnova, barva 
       p.drawCircle({ x: W * 0.19, y: H * 0.5, size: 18, color: k, opacity: 0.7 });
     }
   }
+  let zkraceno = false;
   osnova.snimky.forEach((s, i) => {
     const p = doc.addPage([W, H]);
     // pictures are keyed by the RAW slide heading (index.js, pptx.js) — the cleaned one would miss "📌 Steps"
@@ -55,13 +56,21 @@ export function sestavPrezentaciPdf({ doc, rgb, fonty, osnova: rawOsnova, barva 
     let size = 24;
     const dostupne = y - 50;
     while (size > 14 && s.odrazky.reduce((a, o) => a + vyskaBloku(o, fonty.regular, size, sirkaOdr, 1.3) + size * 0.5, 0) > dostupne) size -= 1;
+    // Bullets that do not fit even at the smallest size used to run under the footer and the rest was
+    // skipped without a word. The last one that fits now ends with "…" and the document says so
+    // (`doc.kbZkraceno`) — the PowerPoint file keeps them all (code analysis 4, F2-07).
     for (const o of s.odrazky) {
+      const mista = Math.floor((y - 40) / (size * 1.3));
+      if (mista < 1) { zkraceno = true; break; }
+      const cely = vyskaBloku(o, fonty.regular, size, sirkaOdr, 1.3) <= y - 40;
+      if (!cely) zkraceno = true;
       p.drawCircle({ x: OKRAJ + 7, y: y - size * 0.62, size: size * 0.2, color: akcent });
-      y = kresliBlok(p, { text: o, font: fonty.regular, size, x: OKRAJ + 26, y, sirka: sirkaOdr, barva: text, radkovani: 1.3 }) - size * 0.5;
-      if (y < 40) break;
+      y = kresliBlok(p, { text: o, font: fonty.regular, size, x: OKRAJ + 26, y, sirka: sirkaOdr, barva: text, radkovani: 1.3, max: cely ? 0 : mista }) - size * 0.5;
+      if (!cely) break;
     }
     const pata = `${titul}  ·  ${i + 1} / ${osnova.snimky.length}`;
     p.drawText(pata, { x: OKRAJ, y: 22, size: 10, font: fonty.regular, color: sedá });
   });
+  doc.kbZkraceno = zkraceno;
   return doc;
 }

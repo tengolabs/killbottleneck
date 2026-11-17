@@ -32,6 +32,8 @@
     "newTask": "New task",
     "loadFailed": "The tasks could not be loaded.",
     "loadRetry": "Try again",
+    "eventsLoadFailed": "Calendar events could not be loaded — you see the last known state.",
+    "eventsTruncated": "The calendar does not show all events — there are more than fit here.",
     "stropZobrazeno": "Showing {{shown}} of {{total}} tasks",
     "nacistVse": "Load all",
     "emptyTitle": "You have no tasks yet",
@@ -298,6 +300,7 @@
     "currencyHint": "e.g. EUR"
   },
   "timeFix": {
+    "mark": "(stopped automatically after 12 h)",
     "button": "Correct the end",
     "title": "Correct the end of the entry",
     "description": "The timer ran for over 12 hours and stopped by itself. Enter when you really finished.",
@@ -338,7 +341,9 @@
     "inputPlaceholder": "Write a comment...",
     "addTitle": "Add comment",
     "taskDiscussionHeading": "Task discussion ({{count}})",
-    "forTask": "on task: {{title}}"
+    "forTask": "on task: {{title}}",
+    "deleteFailed": "The comment could not be deleted",
+    "olderHidden": "Showing the latest {{count}} comments; older ones are not listed here."
   },
   "newNode": {
     "title": "New task",

@@ -36,10 +36,14 @@ export default function NotificationBell() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
+  const [failed, setFailed] = useState(false);
   const timerRef = useRef(null);
 
   const load = useCallback(() => {
-    base44.entities.Notification.list('-created_date', PREVIEW).then(setItems).catch(() => {});
+    // a failed load must not look like "no notifications yet" (code analysis 4, F5-08)
+    base44.entities.Notification.list('-created_date', PREVIEW)
+      .then((list) => { setItems(list); setFailed(false); })
+      .catch(() => setFailed(true));
     // počet nepřečtených musí jít ze serveru: kdybychom ho počítali z načtené
     // dvacítky, uživatel s 50 nepřečtenými by na zvonku viděl 20
     base44.entities.Notification.count({ rawFilter: 'read = false' }).then(setUnread).catch(() => {});
@@ -106,9 +110,15 @@ export default function NotificationBell() {
             </button>
           )}
         </div>
-        {items.length === 0 ? (
+        {failed && (
+          <div data-testid="bell-load-error" className="flex items-center gap-2 px-3 py-2 text-xs bg-destructive/10 text-destructive">
+            <span className="flex-1">{t('bell.loadFailed')}</span>
+            <button type="button" data-testid="bell-load-retry" onClick={load} className="underline underline-offset-2 font-medium">{t('bell.retry')}</button>
+          </div>
+        )}
+        {items.length === 0 ? (failed ? null : (
           <p className="text-xs text-muted-foreground text-center py-6">{t('bell.empty')}</p>
-        ) : (
+        )) : (
           <div className="max-h-80 overflow-y-auto">
             {items.map((n) => {
               const { icon: Icon, className } = notifyMeta(n.type);

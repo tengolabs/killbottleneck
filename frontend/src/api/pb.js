@@ -25,3 +25,21 @@ pb.afterSend = (response, data) => {
   } catch { /* the hook must never break a request */ }
   return data;
 };
+
+// Realtime reconnect = reload. While the connection was down the server sent nothing, so the bell, the
+// calendar and the chat kept showing the state from before the outage until the next event (finding F5-04).
+// Listeners of `kb-native-resume` already know how to re-read; the same event is raised after every
+// reconnect. The watcher is attached with the first real subscription, so signed-out pages open no stream.
+let reconnectWatch = false;
+const subscribeOrig = pb.realtime.subscribe.bind(pb.realtime);
+pb.realtime.subscribe = (topic, callback, options) => {
+  if (!reconnectWatch && topic !== 'PB_CONNECT') {
+    reconnectWatch = true;
+    let connectedOnce = pb.realtime.isConnected;
+    subscribeOrig('PB_CONNECT', () => {
+      if (!connectedOnce) { connectedOnce = true; return; } // the first connect is not a reconnect
+      try { window.dispatchEvent(new Event('kb-native-resume')); } catch { /* never break realtime */ }
+    }).catch(() => { reconnectWatch = false; });
+  }
+  return subscribeOrig(topic, callback, options);
+};

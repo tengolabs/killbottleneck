@@ -7,7 +7,7 @@
 // (isExternalOwner/extContactId/extPseudoEmail), formát držet 1:1. Jméno žije
 // JEN v kolekci external_contacts pod RLS: privátní kontakt vidí jen zakladatel,
 // ostatním se totéž id ukáže jako anonymní „Externí kontakt".
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getMembers } from '@/api/kb';
 
@@ -55,15 +55,31 @@ export const listExternalContacts = async () => {
 export function useMembersWithContacts(user) {
   const [members, setMembers] = useState([]);
   const userId = user?.id || '';
+  const retries = useRef(0);
+  const retryTimer = useRef(null);
+  const reloadRef = useRef(null);
   const reload = useCallback(() => {
     if (!userId) return;
+    let teamFailed = false;
     Promise.all([
-      getMembers().catch(() => []),
+      getMembers().catch(() => { teamFailed = true; return null; }),
       listExternalContacts(),
-    ]).then(([team, contacts]) => setMembers([...team, ...contactsToMemberRows(contacts)]));
+    ]).then(([team, contacts]) => {
+      // A failed read of the members used to leave an empty list until a manual reload: an empty assignee
+      // picker and e-mails instead of names (code analysis 4, F5-08). Keep what is already shown and ask
+      // again — 5 s, 20 s, then once a minute, six times at most.
+      setMembers((prev) => [...(team || prev.filter((m) => !m.external)), ...contactsToMemberRows(contacts)]);
+      clearTimeout(retryTimer.current);
+      if (teamFailed && retries.current < 6) {
+        retries.current += 1;
+        retryTimer.current = setTimeout(() => reloadRef.current?.(), retries.current === 1 ? 5000 : retries.current === 2 ? 20000 : 60000);
+      } else if (!teamFailed) retries.current = 0;
+    });
     // the ID, not the identity of the `user` object (patchUser makes a new one — F3-04); the name
     // is there so that a rename in the account dialog shows in the member list
   }, [userId, user?.full_name, user?.name]);
+  reloadRef.current = reload;
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
   return [members, reload];
 }

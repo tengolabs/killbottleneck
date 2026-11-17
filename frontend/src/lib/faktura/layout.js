@@ -30,7 +30,7 @@ export const POPISKY = {
     zaplaceno: 'Paid', strana: 'Page', bezUctu: 'Agree the payment with the supplier.',
   },
 };
-function mnozstvi(q, L) {
+export function mnozstvi(q, L) {
   const s = String(Number(q || 0));
   return L === 'en' ? s : s.replace('.', ',');
 }
@@ -42,8 +42,13 @@ function zalom(text, font, size, sirka) {
     for (const slovo of odst.split(/\s+/).filter(Boolean)) {
       let s = slovo;
       while (font.widthOfTextAtSize(s, size) > sirka) { // slovo delší než řádek
-        let i = s.length;
-        while (i > 1 && font.widthOfTextAtSize(s.slice(0, i), size) > sirka) i--;
+        // the longest beginning that fits, by halving: stepping back one character at a time measured the
+        // whole rest again and again — a long "word" without spaces froze the tab (finding F2-05)
+        let i = 1;
+        for (let hi = s.length; i < hi;) {
+          const mid = Math.ceil((i + hi) / 2);
+          if (font.widthOfTextAtSize(s.slice(0, mid), size) <= sirka) i = mid; else hi = mid - 1;
+        }
         if (radek) { out.push(radek); radek = ''; }
         out.push(s.slice(0, i)); s = s.slice(i);
       }
@@ -129,7 +134,9 @@ export function sestavFakturu({ doc, rgb, fonty, data: rawData, L = 'cs', logo =
     vpravo(T.castka, sl.castka - 4, y - 1, { size: 8, color: seda, bold: true });
     y -= 22;
   };
-  const novaStrana = () => { page = doc.addPage(A4); y = A4[1] - OKRAJ; text(`${T.titul} ${T.cislo} ${data.cislo || ''}`, OKRAJ, y - 10, { size: 10, bold: true }); y -= 30; hlavickaTabulky(); };
+  // sTabulkou = false: the page continues with totals, the note or the payment block — a table header with no
+  // item under it does not belong there (code analysis 4, F2-10)
+  const novaStrana = (sTabulkou = true) => { page = doc.addPage(A4); y = A4[1] - OKRAJ; text(`${T.titul} ${T.cislo} ${data.cislo || ''}`, OKRAJ, y - 10, { size: 10, bold: true }); y -= 30; if (sTabulkou) hlavickaTabulky(); };
   hlavickaTabulky();
   const sirkaPopisu = sl.mnozstvi - sl.popis - 60;
   for (const it of data.items || []) {
@@ -148,7 +155,7 @@ export function sestavFakturu({ doc, rgb, fonty, data: rawData, L = 'cs', logo =
   // ---- součty ----
   const souhrn = [];
   if (platce) { souhrn.push([T.zaklad, castka(data.subtotal, L, mena)]); souhrn.push([`${Z.dan} ${Number(data.vat_rate || 0)} %`, castka(data.vat, L, mena)]); }
-  if (y - (souhrn.length + 1) * 16 - 30 < SPODEK) novaStrana();
+  if (y - (souhrn.length + 1) * 16 - 30 < SPODEK) novaStrana(false);
   for (const [n, v] of souhrn) { vpravo(n, sl.cenaJ, y, { color: seda }); vpravo(v, sl.castka - 4, y); y -= 15; }
   if (souhrn.length) y -= 8; // rámeček celkem nesmí překrýt řádek DPH
   page.drawRectangle({ x: OKRAJ + SIRKA * 0.5, y: y - 8, width: SIRKA * 0.5, height: 24, color: pozadi });
@@ -160,7 +167,7 @@ export function sestavFakturu({ doc, rgb, fonty, data: rawData, L = 'cs', logo =
   // ---- poznámka ----
   if (data.note) {
     const radky = zalom(data.note, f, 9, SIRKA);
-    if (y - radky.length * 11 - 16 < SPODEK) novaStrana();
+    if (y - radky.length * 11 - 16 < SPODEK) novaStrana(false);
     text(T.poznamka.toUpperCase(), OKRAJ, y, { size: 8, color: seda, bold: true }); y -= 12;
     for (const r of radky) { text(r, OKRAJ, y, { size: 9 }); y -= 11; }
     y -= 10;
@@ -176,7 +183,7 @@ export function sestavFakturu({ doc, rgb, fonty, data: rawData, L = 'cs', logo =
   const radkyUctu = String(s.bank_account || '').split('\n').map((r) => r.trim()).filter(Boolean).flatMap((r) => zalom(r, fb, 9.5, sirkaUctu));
   const pocetRadku = radkyUctu.length + (s.iban ? 1 : 0) + (s.bic ? 1 : 0) + 1 + 1;
   const blokVyska = Math.max(qrVelikost + 10, 72, 22 + pocetRadku * 13 + 6);
-  if (y - blokVyska < SPODEK) novaStrana();
+  if (y - blokVyska < SPODEK) novaStrana(false);
   page.drawRectangle({ x: OKRAJ, y: y - blokVyska, width: SIRKA, height: blokVyska, borderColor: linka, borderWidth: 0.8 });
   let py = y - 14;
   text(T.platba.toUpperCase(), OKRAJ + 10, py, { size: 8, color: seda, bold: true }); py -= 14;

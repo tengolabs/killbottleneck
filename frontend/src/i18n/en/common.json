@@ -111,6 +111,8 @@
   "misc": {
     "untitled": "(untitled)",
     "saveFailed": "Saving failed",
+    "requestFailed": "The request failed. Please try again.",
+    "serverUnreachable": "The server did not answer. Check the connection and try again.",
     "statusChangeFailed": "Status change failed",
     "timerToggleFailed": "Couldn't toggle the timer",
     "tryAgainPlease": "Please try again.",

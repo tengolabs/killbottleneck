@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { getInitials } from '@/lib/nodeMeta';
 import { intlLocale } from '@/lib/locale';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/components/ui/use-toast';
+
+const PAGE = 100; // comments loaded at once — the NEWEST ones
 
 // Jedno diskusní vlákno pro obě kolekce (comments uzlů i task_comments úkolů).
 // entity = 'Comment' | 'TaskComment'; filter = identifikace vlákna
@@ -16,6 +19,8 @@ export default function CommentThread({ entity, filter, onCountChange }) {
   const { user } = useAuth();
   const [comments, setComments] = useState([]);
   const [text, setText] = useState('');
+  const { toast } = useToast();
+  const [olderHidden, setOlderHidden] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,9 +31,12 @@ export default function CommentThread({ entity, filter, onCountChange }) {
     if (!ready) return;
     setLoading(true);
     try {
-      const result = await base44.entities[entity].filter(filter, 'created_date', 100);
-      setComments(result || []);
-      onCountChange?.((result || []).length);
+      // newest first from the server, shown oldest → newest: with more than PAGE comments it used to be
+      // the newest ones that were missing — including the one just written, after reopening (F6-07)
+      const result = ((await base44.entities[entity].filter(filter, '-created_date', PAGE)) || []).slice().reverse();
+      setComments(result);
+      setOlderHidden(result.length >= PAGE);
+      onCountChange?.(result.length);
     } catch (e) {
       console.error(e);
     } finally {
@@ -56,6 +64,7 @@ export default function CommentThread({ entity, filter, onCountChange }) {
       setText('');
     } catch (e) {
       console.error(e);
+      toast({ title: t('common:misc.saveFailed'), variant: 'destructive' }); // the text stays in the field
     } finally {
       setSubmitting(false);
     }
@@ -71,6 +80,7 @@ export default function CommentThread({ entity, filter, onCountChange }) {
       });
     } catch (e) {
       console.error(e);
+      toast({ title: t('comments.deleteFailed'), variant: 'destructive' });
     }
   };
 
@@ -96,6 +106,7 @@ export default function CommentThread({ entity, filter, onCountChange }) {
         <p className="text-xs text-muted-foreground py-2">{t('comments.empty')}</p>
       ) : (
         <div className="space-y-2 max-h-40 overflow-y-auto">
+          {olderHidden && <p className="text-[10px] text-muted-foreground" data-testid="comments-older-hidden">{t('comments.olderHidden', { count: PAGE })}</p>}
           {comments.map((c) => (
             <div key={c.id} className="flex gap-2 p-2 rounded-lg bg-secondary/50">
               <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">

@@ -45,6 +45,7 @@ export default function BasicsSection({ s, withColor }) {
               value={s.title}
               onChange={(e) => s.setTitle(e.target.value)}
               placeholder={t('nodeDialog.titlePlaceholder')}
+              maxLength={500}
             />
           </div>
           <div className="space-y-2">
@@ -55,6 +56,7 @@ export default function BasicsSection({ s, withColor }) {
               onChange={s.setDescription}
               placeholder={t('nodeDialog.descriptionPlaceholder')}
               rows={6}
+              maxLength={10000}
               prilohy={s.files}
             />
             <OdkazyVPopisu text={s.description} />

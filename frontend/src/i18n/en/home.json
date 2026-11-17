@@ -174,6 +174,8 @@
     "minutesAgo": "{{count}} min ago",
     "hoursAgo": "{{count}} h ago",
     "title": "Notifications",
+    "loadFailed": "Notifications could not be loaded.",
+    "retry": "Try again",
     "markAllRead": "Mark all as read",
     "empty": "No notifications yet."
   },

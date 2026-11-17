@@ -54,6 +54,11 @@ const diffDays = (d1, d2) => {
 // Číslo ISO týdne (lib/kalendar.js:isoTyden — klíč bloku i popisek z téhož ISO roku, F3-06)
 const getWeekNumber = (d) => isoTyden(d).tyden;
 
+// week range in the header: Czech keeps "10.11. – 16.11.", other languages use their own order (F3-10)
+const weekRange = (a, b) => (intlLocale().startsWith('cs')
+  ? `${a.getDate()}.${a.getMonth() + 1}. – ${b.getDate()}.${b.getMonth() + 1}.`
+  : new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'numeric' }).formatRange(a, b));
+
 export default function TaskTimeline({
   tasks = [],
   byParent = {},
@@ -458,7 +463,7 @@ export default function TaskTimeline({
             key: curWeek,
             weekNum: getWeekNumber(wStartD),
             label: t('timeline.weekLabel', '{{num}}. týden', { num: getWeekNumber(wStartD) }),
-            dateRange: `${wStartD.getDate()}.${wStartD.getMonth() + 1}. – ${wEndD.getDate()}.${wEndD.getMonth() + 1}.`,
+            dateRange: weekRange(wStartD, wEndD),
             left: curWeekStart * columnWidth,
             width: (idx - curWeekStart) * columnWidth,
             weekIndex: weeks.length,
@@ -502,7 +507,7 @@ export default function TaskTimeline({
         key: curWeek,
         weekNum: getWeekNumber(wStartD),
         label: t('timeline.weekLabel', '{{num}}. týden', { num: getWeekNumber(wStartD) }),
-        dateRange: `${wStartD.getDate()}.${wStartD.getMonth() + 1}. – ${wEndD.getDate()}.${wEndD.getMonth() + 1}.`,
+        dateRange: weekRange(wStartD, wEndD),
         left: curWeekStart * columnWidth,
         width: (datesArray.length - curWeekStart) * columnWidth,
         weekIndex: weeks.length,
@@ -1002,7 +1007,8 @@ export default function TaskTimeline({
                       group.items.map((item) => {
                         const startDays = diffDays(minDate, item.startDate);
                         const endDays = diffDays(minDate, item.endDate);
-                        const duration = Math.max(1, endDays - startDays);
+                        // the deadline day belongs to the bar: a task due today must not look finished yesterday (F3-07)
+                        const duration = Math.max(1, endDays - startDays + (item.deadline ? 1 : 0));
 
                         const left = startDays * columnWidth;
                         const width = Math.max(scale === 'month' ? 14 : 28, duration * columnWidth);
@@ -1035,6 +1041,7 @@ export default function TaskTimeline({
                               style={{ left: `${left}px`, width: `${width}px` }}
                               data-testid={`osa-pruh-${item.key}`}
                               data-od={fmtDateKey(item.startDate)}
+                              data-dni={duration}
                               className={`absolute h-6 rounded-md shadow-xs cursor-pointer flex items-center px-1.5 sm:px-2 text-[11px] font-medium transition-all group hover:ring-2 hover:ring-primary hover:z-30 ${
                                 item.status === 'done'
                                   ? 'bg-emerald-600 text-white'

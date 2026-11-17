@@ -133,6 +133,11 @@ H.beh(async () => {
   expect(r.status === 200 && r.json.kvota === 50 && r.json.zdroj === 'nastaveni' && r.json.podil_admin === 0 && r.json.rezerva_admin === 0 && r.json.admin.kvota === 50 && r.json.ostatni.kvota === 50, 'vlastní hodnota env jen SNÍŽÍ (50 < 200); rezerva 0 % zůstane 0 (ne výchozích 30) = společný balík');
   r = await inst2.api('POST', '/api/kb/chat', { token: A2, body: { message: 'Ahoj', context: { route: '/' } } });
   expect(r.status === 200, 'rezerva 0 % správce NEblokuje (čerpá ze společného balíku)');
+  // security review 18 Nov 2026: the server-only flags must not be accepted from the client's body — a huge
+  // "reservation" sent with an ordinary message used to block the AI of the whole organization for 5 minutes
+  r = await inst2.api('POST', '/api/kb/chat', { token: A2, body: { message: 'Ahoj', context: { route: '/' }, _rezervace: { kredity: 1000000 }, _obrazek: true, _popisObrazku: true, _stranka: true } });
+  const poPodvrhu = await inst2.api('POST', '/api/kb/chat', { token: A2, body: { message: 'Ještě', context: { route: '/' } } });
+  expect(r.status === 200 && poPodvrhu.status === 200, `podvržená „rezervace“ v těle zprávy kvótu nikomu nezablokuje (${r.status}, další tah ${poPodvrhu.status})`);
   r = await inst2.api('POST', '/api/kb/ai-kredity/nastaveni', { token: A2, body: { kvota_tyden: 50, podil_admin: 100 } });
   expect(r.status === 200 && r.json.admin.kvota === 50 && r.json.ostatni.kvota === 0, 'rezerva 100 % = ostatní nemají nic, správci celá kvóta');
 

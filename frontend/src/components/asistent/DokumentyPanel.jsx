@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { parsujOsnovu, MAX_SNIMKU, MAX_ODRAZEK } from '@/lib/kancelar/osnova';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { AlertTriangle, Brain, Check, ChevronLeft, Copy, Download, ExternalLink, Eye, EyeOff, FileText, FolderKanban, Gift, ImagePlus, Loader2, Mail, Maximize2, Pencil, Phone, Plus, Presentation, RefreshCw, ScrollText, Search, Trash2, Undo2, Users, X, NotebookPen, ClipboardList } from 'lucide-react';
@@ -276,6 +277,13 @@ function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti, mobil }) {
   const [nahled, setNahled] = useState(''); // data URL nebo ''
   const meta = dok.meta || PRAZDNA_META;
   const jeKarta = dok.kind === 'card';
+  // an outline edited by hand over the cap: the panel shows all of it, the files only the first 20 slides
+  // and 8 bullets per slide — say so before the person finds out while presenting (code analysis 4, F2-12)
+  const orezOsnovy = useMemo(() => {
+    if (dok.kind !== 'presentation') return false;
+    const o = parsujOsnovu(dok.text).orez;
+    return o.snimky > 0 || o.odrazky > 0;
+  }, [dok.kind, dok.text]);
   useEffect(() => { let z = true; import('@/lib/kancelar').then((K) => { if (z) setFormaty(K.formaty(dok.kind)); }); return () => { z = false; }; }, [dok.kind]);
   const obrKlic = (dok.obrazky || []).map((o) => o.id + o.url).join(','); // nakreslený / vyměněný obrázek
   useEffect(() => { setNahled(''); }, [dok.updated, fotka, obrKlic]); // změna textu, barvy, fotky nebo obrázku = starý náhled neplatí
@@ -284,7 +292,9 @@ function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti, mobil }) {
     setBeh(format); setChyba('');
     try {
       const { stahniDokument } = await import('@/lib/kancelar/stahni');
-      await stahniDokument(dok, format, { lang, barva: jeKarta ? meta.color || '' : '', fotka: fotka ? fotka.bytes : null });
+      let zkraceno = false;
+      await stahniDokument(dok, format, { lang, barva: jeKarta ? meta.color || '' : '', fotka: fotka ? fotka.bytes : null, naZkraceno: () => { zkraceno = true; } });
+      if (zkraceno) setChyba(t('dok.fileShortened'));
     } catch { setChyba(t('dok.fileError')); }
     setBeh('');
   };
@@ -377,6 +387,7 @@ function KancelarOvladani({ dok, onMeta, uklada, onDok, onNacti, mobil }) {
           <img src={nahled} alt={t('dok.previewAlt')} className="w-full rounded-md border border-border bg-white" data-testid="chat-dok-nahled-obrazek" />
         </button>
       )}
+      {orezOsnovy && <p className="text-amber-700 dark:text-amber-400" data-testid="chat-dok-osnova-strop">{t('dok.outlineOverCap', { slides: MAX_SNIMKU, bullets: MAX_ODRAZEK })}</p>}
       {chyba && <p className="text-destructive" data-testid="chat-dok-kancelar-chyba">{chyba}</p>}
     </div>
   );

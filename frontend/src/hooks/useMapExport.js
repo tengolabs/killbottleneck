@@ -18,6 +18,8 @@ export function useMapExport({ visibleNodes, title, cleanMapData, activeMapId, u
       await captureAndSave(visibleNodes, title, format);
     } catch (e) {
       console.error(e);
+      // a failed picture / PDF export used to end in silence (code analysis 4, F1-13)
+      toast({ title: t('toasts.exportFailed'), variant: 'destructive' });
     } finally {
       setExporting(false);
     }
@@ -32,7 +34,11 @@ export function useMapExport({ visibleNodes, title, cleanMapData, activeMapId, u
       let exportTasks = [];
       try {
         exportTasks = await base44.entities.Task.filter({ map_id: activeMapId }, 'created_date', 1000);
-      } catch (err) { /* projekt bez úkolů nebo bez práv na ně */ }
+      } catch (err) {
+        // no rights to the tasks (4xx) → the export goes without them, as before; a dropped connection or
+        // a server error must not produce a "backup" that silently lacks the tasks (code analysis 4, F1-13)
+        if (!(err?.status >= 400 && err?.status < 500)) throw err;
+      }
       let exportRules = [];
       try {
         // čerstvě ze serveru (stav v editoru může být starší); GET /rules chce
@@ -48,7 +54,8 @@ export function useMapExport({ visibleNodes, title, cleanMapData, activeMapId, u
         includePeople,
         exportedBy: user?.email || '',
       }));
-      toast({ title: t('toasts.jsonExported') });
+      // the list is capped — say so instead of handing over a file that looks complete
+      toast({ title: t('toasts.jsonExported'), ...(exportTasks.length >= 1000 ? { description: t('toasts.jsonExportedCapped') } : {}) });
     } catch (e) {
       console.error(e);
       toast({ title: t('toasts.jsonExportFailed'), variant: 'destructive' });

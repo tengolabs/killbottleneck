@@ -43,8 +43,8 @@ const MAX_EVENTS_BATCH = 30;
 function validDay(s) {
   if (!DAY_RE.test(String(s || ""))) return false;
   const [y, m, d] = String(s).split("-").map(Number);
-  const x = new Date(y, m - 1, d);
-  return x.getFullYear() === y && x.getMonth() === m - 1 && x.getDate() === d;
+  const x = new Date(Date.UTC(y, m - 1, d)); // UTC: local midnight is missing on the day DST starts at 00:00 (Chile, Cuba…) and the day came out "invalid"
+  return x.getUTCFullYear() === y && x.getUTCMonth() === m - 1 && x.getUTCDate() === d;
 }
 
 // den + n dní (záporné = zpět)
@@ -832,6 +832,10 @@ function decideAbsence(app, user, rec, info, ctx) {
 // Vlastník tudy nejde (má smazat), nezvaný = 404 přes findEvent.
 function leaveEvent(app, user, rec, lang) {
   const { t } = require(`${__hooks}/i18n.js`);
+  // Participants of time off mean "who is away" and an empty list means the author: leaving would hand
+  // the (already approved) time off over to whoever wrote it down. Time off is edited or deleted instead.
+  const cal = kalendarUdalosti(app, rec);
+  if (cal && cal.getString("kind") === "absence") return { status: 400, body: { error: t(lang, "err.absenceCannotLeave") } };
   if (rec.getString("owner") === user.id) return { status: 400, body: { error: t(lang, "err.eventOwnerCannotLeave") } };
   // kdo není účastník (firemní akci jen vidí), nemá co opouštět — jinak „odešel“ a událost mu zůstala
   if ((rec.get("participants") || []).indexOf(user.id) < 0) return { status: 400, body: { error: t(lang, "err.eventNotParticipant") } };

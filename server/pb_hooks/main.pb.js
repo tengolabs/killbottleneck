@@ -276,7 +276,26 @@ onRecordCreateRequest((e) => {
 onRecordUpdate((e) => {
   const mailLower = e.record.getString("email").trim().toLowerCase();
   if (mailLower && mailLower !== e.record.getString("email")) e.record.set("email", mailLower);
-  e.next();
+  let before = "";
+  try { before = e.record.original().getString("email"); } catch (err) { before = ""; }
+  if (!before || !mailLower || before === mailLower) { e.next(); return; }
+  // The address changed → sharing, project ownership and the people on steps follow it; the old
+  // address must not keep any access for whoever registers it next (code analysis 4, S4-04).
+  // ONE transaction with the save (as the create hook below): when the rewrite fails, the address
+  // does not change and the request answers with an error — a half-rewritten state is the very
+  // thing this is here to prevent. `e.app` is switched to the transaction for the rest of the chain.
+  const outer = e.app;
+  try {
+    outer.runInTransaction((tx) => {
+      e.app = tx;
+      e.next();
+      const { renameEmailEverywhere } = require(`${__hooks}/helpers.js`);
+      renameEmailEverywhere(tx, before, mailLower);
+    });
+  } finally {
+    e.app = outer;
+  }
+  try { outer.logger().info("users: e-mail changed, references rewritten", "user", e.record.id); } catch (err) { /* the log is a bonus */ }
 }, "users");
 
 // S7 (audit 14. 10. 2026): změní-li uživatel heslo (vlastní PATCH s `password`),
@@ -798,6 +817,12 @@ onRecordCreateRequest((e) => {
   const L = userLang(e.auth);
   e.record.set("owner", e.auth.id);
   e.record.set("owner_email", e.auth.email());
+  // the owner is never in the share lists of their own project (a copy of a project shared WITH them
+  // carried their address and they got a share row for themselves — finding M1-04)
+  for (const f of ["shared_with", "shared_with_edit", "shared_with_work"]) {
+    const list = jsonVal(e.record, f, []);
+    if (Array.isArray(list) && list.indexOf(e.auth.email()) >= 0) e.record.set(f, list.filter((x) => x !== e.auth.email()));
+  }
   const bad = validateMapData(jsonVal(e.record, "nodes", []), jsonVal(e.record, "edges", []), L);
   if (bad) throw new BadRequestError(t(L, "err.invalidMapData", { reason: bad }));
   // Mapa je STROM: nová mapa se s ničím neporovnává, takže plná přísnost. Kryje
@@ -881,6 +906,18 @@ onRecordUpdateRequest((e) => {
   // /maps/{id}/transfer route: owner_email is derived, the new owner leaves the share
   // lists, the previous one stays a co-admin. A bare PATCH of `owner` used to keep the
   // old owner_email and a share row for the owner.
+  // The share lists on the project are a MIRROR; access is decided by map_shares rows. An owner who
+  // writes the lists straight through the API (the app uses the /share route) must end with the same
+  // rows the route would make — before, the lists and the rows drifted apart (finding M1-04).
+  const shareMirror = (rec) => JSON.stringify(["shared_with", "shared_with_edit", "shared_with_work"].map((f) => jsonVal(rec, f, [])));
+  if (isOwner && shareMirror(e.record) !== shareMirror(orig)) {
+    const ownerEmail = orig.getString("owner_email");
+    for (const f of ["shared_with", "shared_with_edit", "shared_with_work"]) {
+      const list = jsonVal(e.record, f, []);
+      if (Array.isArray(list) && list.indexOf(ownerEmail) >= 0) e.record.set(f, list.filter((x) => x !== ownerEmail));
+    }
+  }
+  const mirrorChanged = isOwner && shareMirror(e.record) !== shareMirror(orig);
   let ownerTransferred = false;
   if (isOwner && e.record.getString("owner") !== orig.getString("owner")) {
     let newOwner = null;
@@ -1026,6 +1063,10 @@ onRecordUpdateRequest((e) => {
       try { e.app.logger().warn("goalmaps update: share sync failed", "map", e.record.id, "error", String(err)); } catch (e2) { /* log is a bonus */ }
     }
     recordMapTransfer(e.app, e.record, orig.getString("owner_email"), e.record.getString("owner_email"), e.auth ? e.auth.email() : "");
+  } else if (mirrorChanged) {
+    try { syncShares(e.app, e.record); } catch (err) {
+      try { e.app.logger().warn("goalmaps update: share sync failed", "map", e.record.id, "error", String(err)); } catch (e2) { /* log is a bonus */ }
+    }
   }
   // styl Projekt ↔ Proces: tvar opakovacích pravidel (obnova podkroků) sleduje styl — na serveru, ať platí pro
   // editor, asistenta, REST i budoucí v1/MCP stejně
@@ -1254,6 +1295,26 @@ onRecordUpdateRequest((e) => {
   }
   e.next();
 }, "templates");
+
+// One row of organization settings (code analysis 4, M1-07): the "single row" was kept only by the
+// find-or-create pattern in the client; a double submit or two administrators at once made two rows
+// and readers then took "the first one". The second create is refused; the client finds the row and updates it.
+onRecordCreateRequest((e) => {
+  let exists = false;
+  try { exists = !!e.app.findFirstRecordByFilter("org_settings", "id != ''"); } catch (err) { exists = false; }
+  if (exists) {
+    const { t, requestLang } = require(`${__hooks}/i18n.js`);
+    throw new BadRequestError(t(requestLang(e), "err.orgSettingsExist"));
+  }
+  e.next();
+}, "org_settings");
+
+// Ideas in the buffer (code analysis 4, M1-08): the deadline and the plan are text fields without a
+// pattern — the REST API stored "pozitri" or "2099-99-99", and 4000 characters in the colour. Only a
+// value that CHANGES is checked, so old rows with odd data can still be edited.
+// (the check lives in helpers.js — a handler runs in its own runtime and does not see functions of this file)
+onRecordCreateRequest((e) => { require(`${__hooks}/helpers.js`).checkBufferDates(e); e.next(); }, "buffer_nodes");
+onRecordUpdateRequest((e) => { require(`${__hooks}/helpers.js`).checkBufferDates(e); e.next(); }, "buffer_nodes");
 
 // tasks: vytváření ZAKÁZÁNO (slovník, Richard 17. 8. 2026): úkol = uzel
 // s řešitelem nebo termínem, nová práce = nový uzel. Kolekce zůstává jen ke
@@ -1844,7 +1905,7 @@ cronAdd("prune_notifications", "40 3 * * *", () => {
   // `created` exists since migration 1794524200 (before it this statement failed every
   // night, M1-02). The share-invitation gate `ps:<map>:<address>` stays: it means "this
   // address was already invited to this project" for good, as it did while nothing was deleted.
-  $app.db().newQuery("DELETE FROM mail_budget WHERE created != '' AND created < datetime('now','-40 days') AND day NOT LIKE 'ps:%'").execute();
+  $app.db().newQuery("DELETE FROM mail_budget WHERE created != '' AND created < datetime('now','-40 days') AND day NOT LIKE 'ps:%' AND day NOT LIKE 'verze:%'").execute();
 });
 
 // Hlášení chyb a nápadů: 30 dnů. Richard 19. 8. 2026: „chybu odstraníme hned
@@ -3585,7 +3646,8 @@ kbRoute("POST", "/users/{id}/transfer-maps", (e) => {
   let prev;
   try { prev = $app.findRecordById("users", uid); } catch (err) { return e.json(404, { error: t(L, "err.userNotFound") }); }
   const email = String((e.requestInfo().body || {}).email || "").trim().toLowerCase(); // accounts are lower-case (finding S3-05)
-  let newOwner = e.auth || null;
+  // a superuser is not a member: without `email` there is nobody to hand the projects to (S3-06)
+  let newOwner = e.hasSuperuserAuth() ? null : (e.auth || null);
   if (email) { try { newOwner = $app.findFirstRecordByData("users", "email", email); } catch (err) { newOwner = null; } }
   if (!newOwner || newOwner.getString("kind") === "guest") return e.json(400, { error: t(L, "err.transferTargetNotMember") });
   if (newOwner.id === uid) return e.json(400, { error: t(L, "err.transferSameOwner") });
@@ -3860,7 +3922,7 @@ kbRoute("POST", "/share", (e) => {
   }
 
   if (action === "share") {
-    const email = (info.email || "").trim().toLowerCase();
+    const email = String(info.email || "").trim().toLowerCase(); // a number or an object in `email` ended with a bare TypeError (S3-10)
     if (!email) return e.json(400, { error: t(L, "err.emailRequired") });
     // Bez tvaru e-mailu by `map_shares.email` (typ email) odmítl zápis AŽ po
     // uložení mapy → zrcadlo říká „sdíleno", řádky chybí (nález S7-04).
@@ -4104,7 +4166,12 @@ kbRoute("POST", "/node-status", (e) => {
   // up the row actions of a map it has no access to, or of an id that does not exist.
   try {
     const pre = $app.findRecordById("goalmaps", String(info.mapId || ""));
-    if (mapAccessLevel($app, pre, e.auth.id, e.auth.email()) === "") return e.json(403, { error: t(L, "err.noWriteAccess") });
+    if (mapAccessLevel($app, pre, e.auth.id, e.auth.email()) === "") {
+      // 403 told a stranger that the private project exists (S4-06, Richard 17 Nov 2026); a public
+      // project is no secret — there the answer stays "no write access"
+      if (!pre.getBool("is_public")) return e.json(404, { error: t(L, "err.mapNotFound") });
+      return e.json(403, { error: t(L, "err.noWriteAccess") });
+    }
   } catch (err) {
     return e.json(404, { error: t(L, "err.mapNotFound") });
   }
@@ -4197,7 +4264,12 @@ kbRoute("POST", "/deadline-requests", (e) => {
   // the lock only for somebody who sees the map (checked again inside, on the fresh load)
   try {
     const pre = $app.findRecordById("goalmaps", String(info.mapId || ""));
-    if (mapAccessLevel($app, pre, e.auth.id, e.auth.email()) === "") return e.json(403, { error: t(L, "err.noWriteAccess") });
+    if (mapAccessLevel($app, pre, e.auth.id, e.auth.email()) === "") {
+      // 403 told a stranger that the private project exists (S4-06, Richard 17 Nov 2026); a public
+      // project is no secret — there the answer stays "no write access"
+      if (!pre.getBool("is_public")) return e.json(404, { error: t(L, "err.mapNotFound") });
+      return e.json(403, { error: t(L, "err.noWriteAccess") });
+    }
   } catch (err) {
     return e.json(404, { error: t(L, "err.mapNotFound") });
   }
@@ -6255,19 +6327,21 @@ kbRoute("GET", "/v1/maps", (e) => {
 kbRoute("GET", "/v1/pages", (e) => {
   const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
   const S = require(`${__hooks}/stranky.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
-  if (!S.limity().zapnuto) return e.json(404, { error: "pages disabled" });
+  if (!S.limity().zapnuto) return e.json(404, { error: t(a.lang, "err.pagesOff") });
   const pages = S.seznam($app, a.user.id, {}).map((r) => S.v1Dto($app, e, r, false));
   return e.json(200, { pages: pages });
 });
 kbRoute("GET", "/v1/pages/{id}", (e) => {
   const { apiKeyAuth } = require(`${__hooks}/helpers.js`);
   const S = require(`${__hooks}/stranky.js`);
+  const { t } = require(`${__hooks}/i18n.js`);
   const a = apiKeyAuth($app, e, "read");
   if (a.error) return e.json(a.status, { error: a.error });
   const rec = S.limity().zapnuto ? S.najdi($app, a.user.id, e.request.pathValue("id")) : null;
-  if (!rec) return e.json(404, { error: "page not found" });
+  if (!rec) return e.json(404, { error: t(a.lang, "err.pageNotFound") });
   return e.json(200, { page: S.v1Dto($app, e, rec, true) });
 });
 // ---------- v1: obrázky (29. 10. 2026) — externí agent (MCP) nechá nakreslit obrázek, hned ho dostane ----------

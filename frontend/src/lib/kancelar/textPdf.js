@@ -97,8 +97,13 @@ export function zalom(text, font, size, sirka) {
     for (const slovo of odst.split(/\s+/).filter(Boolean)) {
       let s = slovo;
       while (font.widthOfTextAtSize(s, size) > sirka) {
-        let i = s.length;
-        while (i > 1 && font.widthOfTextAtSize(s.slice(0, i), size) > sirka) i--;
+        // the longest beginning that fits, by halving: stepping back one character at a time measured the
+        // whole rest again and again — a long "word" without spaces froze the tab (finding F2-05)
+        let i = 1;
+        for (let hi = s.length; i < hi;) {
+          const mid = Math.ceil((i + hi) / 2);
+          if (font.widthOfTextAtSize(s.slice(0, mid), size) <= sirka) i = mid; else hi = mid - 1;
+        }
         if (radek) { out.push(radek); radek = ''; }
         out.push(s.slice(0, i)); s = s.slice(i);
       }

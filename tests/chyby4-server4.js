@@ -217,7 +217,9 @@ H.beh(async () => {
     expect((cs === 204 || cs === 200) && sink.maily.length === pred1, `plánovaný běh při výpadku pošty: nic neodešlo (cron ${cs})`);
     await sink.zapoj(inst, ST);
     await cron();
-    const m2 = sink.maily.slice(pred1).find((m) => /dig@t\.cz/.test(m));
+    // the mail reaches the sink asynchronously — under a loaded machine (the full regression) later than the fixed pause
+    let m2 = null;
+    for (let i = 0; i < 20 && !m2; i++) { m2 = sink.maily.slice(pred1).find((m) => /dig@t\.cz/.test(m)); if (!m2) await sleep(500); }
     expect(!!m2 && m2.replace(/=\n/g, '').includes('ProjektXQ7'), `plánovaný běh po jednom neúspěchu: další běh souhrn odeslal (nových mailů ${sink.maily.length - pred1})`);
   });
 

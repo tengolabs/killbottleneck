@@ -119,7 +119,7 @@ function spotrebaOd(app, od, doo) {
   try {
     app.db().newQuery("SELECT user, COUNT(*) AS n, COALESCE(SUM(tokens_in),0) AS tokens_in, COALESCE(SUM(tokens_out),0) AS tokens_out, COALESCE(SUM(tokens_cached),0) AS tokens_cached, COALESCE(SUM(calls),0) AS calls, CAST(ROUND(COALESCE(SUM(kredity),0) * 10000) AS INTEGER) AS kredity_dt, MAX(created) AS posledni FROM ai_chat_log WHERE created >= {:od} AND created < {:do} GROUP BY user")
       .bind({ od: sql(od), do: sql(doo) }).all(rows);
-  } catch (err) { /* prázdno */ }
+  } catch (err) { try { app.logger().warn("kredity: reading the usage log failed — usage reads as zero", "error", String(err)); } catch (e2) { /* the log is a bonus */ } }
   const out = {};
   for (const r of rows) out[String(r.user)] = { n: Number(r.n) || 0, tokens_in: Number(r.tokens_in) || 0, tokens_out: Number(r.tokens_out) || 0, tokens_cached: Number(r.tokens_cached) || 0, calls: Number(r.calls) || 0, posledni: String(r.posledni || ""), kredity: (Number(r.kredity_dt) || 0) / 10000 };
   return out;
@@ -167,7 +167,7 @@ function tydny(app, kolik, ted) {
   try {
     app.db().newQuery("SELECT CAST((julianday(created) - julianday({:od0})) / 7 AS INTEGER) AS w, COUNT(*) AS n, COALESCE(SUM(tokens_in),0) AS tokens_in, COALESCE(SUM(tokens_out),0) AS tokens_out, COALESCE(SUM(tokens_cached),0) AS tokens_cached, CAST(ROUND(COALESCE(SUM(kredity),0) * 10000) AS INTEGER) AS kredity_dt FROM ai_chat_log WHERE created >= {:od0} AND created < {:do} GROUP BY w")
       .bind({ od0: sql(od0), do: sql(doo) }).all(rows);
-  } catch (err) { /* prázdno */ }
+  } catch (err) { try { app.logger().warn("kredity: reading the usage log failed — usage reads as zero", "error", String(err)); } catch (e2) { /* the log is a bonus */ } }
   const podle = {};
   for (const r of rows) podle[Number(r.w)] = r;
   const out = [];
@@ -184,7 +184,37 @@ function tydny(app, kolik, ted) {
 // na každý tah i potvrzení). Účty bez záznamu v users (smazané) patří k „ostatní“ jako v stavTydne.
 // Měkký strop: kontrola je před tahem, spotřeba se zapisuje po něm — poslední tah přestřelí
 // a souběžné tahy projdou; pro tarif doplnit in-flight počítadlo ($app.store) jako u hodinového.
-function kvotaBrzda(app, auth, L) {
+// `rezervace` = { kredity } for work whose price is known before it starts (drawing a picture). The price is
+// put on a list in the store BEFORE the quota is read and only the reservations placed earlier count against
+// this request — so of N drawings sent at once exactly as many pass as the quota has room for (code analysis 4,
+// S8-04 — quota 10 was overdrawn to 32). The caller gives the place back with `rezervace.release()` once the
+// work has ended (its log row is written by then). Chat turns have no price in advance and stay as described above.
+// ⚠️ Nothing but list arithmetic inside setFunc: a record lookup there reads the collection cache from the same
+// store and the instance stops answering (deadlock, measured 17 Nov 2026).
+const REZ_KEY = "kr:rezervace";
+const REZ_MS = 5 * 60 * 1000; // an entry nobody gave back (a restart clears the store anyway) stops counting
+function ziveRezervace(v) {
+  return String(v || "").split(",").filter((x) => x && Date.now() - (Number(x.split(":")[0]) || 0) < REZ_MS);
+}
+const soucetRezervaci = (list) => list.reduce((a, x) => a + (Number(x.split(":")[2]) || 0) / 10000, 0);
+function kvotaBrzda(app, auth, L, rezervace) {
+  const store = app.store();
+  if (!(rezervace && rezervace.kredity > 0)) return kvotaStav(app, auth, L, () => soucetRezervaci(ziveRezervace(store.get(REZ_KEY))));
+  const mine = Date.now() + ":" + $security.randomString(8) + ":" + Math.round(rezervace.kredity * 10000);
+  store.setFunc(REZ_KEY, (cur) => ziveRezervace(cur).concat([mine]).join(","));
+  const release = () => { store.setFunc(REZ_KEY, (cur) => ziveRezervace(cur).filter((x) => x !== mine).join(",")); };
+  let out = null;
+  try {
+    out = kvotaStav(app, auth, L, () => {
+      const zive = ziveRezervace(store.get(REZ_KEY));
+      const i = zive.indexOf(mine);
+      return soucetRezervaci(i < 0 ? zive : zive.slice(0, i)); // only those that came before me
+    });
+  } catch (err) { release(); throw err; }
+  if (out) release(); else rezervace.release = release;
+  return out;
+}
+function kvotaStav(app, auth, L, rozpracovano) {
   const { t } = require(`${__hooks}/i18n.js`);
   const { jeAdmin } = require(`${__hooks}/helpers.js`);
   const n = nastaveni(app);
@@ -197,15 +227,18 @@ function kvotaBrzda(app, auth, L) {
   try {
     app.db().newQuery("SELECT CAST(ROUND(COALESCE(SUM(CASE WHEN u.role = 'admin' THEN l.kredity ELSE 0 END),0) * 10000) AS INTEGER) AS kr_a, CAST(ROUND(COALESCE(SUM(CASE WHEN u.role = 'admin' THEN 0 ELSE l.kredity END),0) * 10000) AS INTEGER) AS kr_o FROM ai_chat_log l LEFT JOIN users u ON u.id = l.user WHERE l.created >= {:od} AND l.created < {:do}")
       .bind({ od: sql(od), do: sql(doo) }).all(rows);
-  } catch (err) { return null; /* bez součtu nebrzdit — chyba logu nesmí zastavit chat */ }
+  } catch (err) { try { app.logger().warn("kredity: the quota sum failed — the quota does not brake", "error", String(err)); } catch (e2) { /* the log is a bonus */ } return null; /* bez součtu nebrzdit — chyba logu nesmí zastavit chat */ }
   const r = rows.length ? rows[0] : {};
   const spravci = (Number(r.kr_a) || 0) / 10000, ostatni = (Number(r.kr_o) || 0) / 10000;
-  const celkem = spravci + ostatni;
+  // credits of the work in progress, read AFTER the log (a drawing writes its row before it gives the place back,
+  // so it is never missed); whose work it is does not matter for these seconds
+  const bezi = Number(typeof rozpracovano === "function" ? rozpracovano() : rozpracovano) || 0;
+  const celkem = spravci + ostatni + bezi;
   const odpoved = (klic, pouzito, kvota) => ({ status: 429, body: { error: t(L, klic, { pouzito: zaokrouhli(pouzito), kvota: zaokrouhli(kvota) }), code: "ai_kvota", kvota: zaokrouhli(kvota), pouzito: zaokrouhli(pouzito) } });
   // strop ostatních = kvóta bez rezervy správců; správci až celá kvóta
   if (!admin) {
     const strop = n.kvota - n.rezerva_admin;
-    if (ostatni >= strop) return odpoved("err.aiKvotaOstatni", ostatni, strop);
+    if (ostatni + bezi >= strop) return odpoved("err.aiKvotaOstatni", ostatni + bezi, strop);
   }
   if (celkem >= n.kvota) return odpoved("err.aiKvotaCelek", celkem, n.kvota);
   return null;

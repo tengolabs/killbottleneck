@@ -100,6 +100,8 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
   const panelRef = useRef(null);
   const searchInputRef = useRef(null);
   const locale = intlLocale();
+  // a day key (YYYY-MM-DD) as a date in the user's language — the raw key used to be shown as it is (F3-10)
+  const denText = (key) => { const [y, m, d] = String(key || '').split('-').map(Number); return y && m && d ? new Date(y, m - 1, d).toLocaleDateString(locale, { day: 'numeric', month: 'numeric', year: 'numeric' }) : String(key || ''); };
 
   // Project map metadata: color, title
   const projectMeta = useMemo(() => {
@@ -226,7 +228,8 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
     return Object.fromEntries(
       STATUSES.map((status) => [
         status.value,
-        validItems.filter((item) => periodKeys.has(item.deadline) && (item.status || 'todo') === status.value).length,
+        // events carry a made-up 'todo' status — status counts are about tasks only (F3-08)
+        validItems.filter((item) => periodKeys.has(item.deadline) && !jeUdalost(item) && (item.status || 'todo') === status.value).length,
       ])
     );
   }, [validItems, periodKeys]);
@@ -259,8 +262,10 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
     return periodItems.filter((item) => item.deadline < todayKey && item.status !== 'done' && !jeUdalost(item)).length;
   }, [periodItems, todayKey]);
 
+  // quick stats count tasks only: an event is not a deadline and can never be "done" (F3-08)
+  const periodTaskCount = useMemo(() => periodItems.filter((item) => !jeUdalost(item)).length, [periodItems]);
   const completedCount = useMemo(() => {
-    return periodItems.filter((item) => item.status === 'done').length;
+    return periodItems.filter((item) => item.status === 'done' && !jeUdalost(item)).length;
   }, [periodItems]);
 
   // Period label
@@ -271,6 +276,8 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
     if (view === 'week') {
       const start = week[0];
       const end = week[6];
+      // the Czech wording stays as it was; other languages get their own range format instead of the Czech "10. – 16."
+      if (!locale.startsWith('cs')) return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).formatRange(start, end);
       if (start.getMonth() === end.getMonth()) {
         return `${start.getDate()}. – ${end.getDate()}. ${start.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}`;
       }
@@ -499,7 +506,7 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
               <span className="gcal-status-pill">{statusLabel}{maPripominku(item) ? ' · ' : ''}{maPripominku(item) && <Bell size={10} />}</span>
             )}
             <span className="gcal-card-date">
-              <Clock size={11} /> {item.deadline}{item.time ? ` ${item.time}` : ''}
+              <Clock size={11} /> {denText(item.deadline)}{item.time ? ` ${item.time}` : ''}
             </span>
           </div>
         </div>
@@ -851,8 +858,8 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
               </div>
               <div className="gcal-metrics-body">
                 <div className="gcal-metric-item">
-                  <span className="gcal-metric-num">{periodItems.length}</span>
-                  <span className="gcal-metric-text">{t('v2.totalDeadlines', { count: periodItems.length })}</span>
+                  <span className="gcal-metric-num">{periodTaskCount}</span>
+                  <span className="gcal-metric-text">{t('v2.totalDeadlines', { count: periodTaskCount })}</span>
                 </div>
                 {overdueCount > 0 && (
                   <div className="gcal-metric-item overdue">
@@ -863,12 +870,12 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
                 <div className="gcal-progress-wrapper">
                   <div className="gcal-progress-header">
                     <span>{t('v2.completedCount', { count: completedCount })}</span>
-                    <span>{periodItems.length > 0 ? Math.round((completedCount / periodItems.length) * 100) : 0}%</span>
+                    <span>{periodTaskCount > 0 ? Math.round((completedCount / periodTaskCount) * 100) : 0}%</span>
                   </div>
                   <div className="gcal-progress-track">
                     <div
                       className="gcal-progress-bar"
-                      style={{ width: `${periodItems.length > 0 ? (completedCount / periodItems.length) * 100 : 0}%` }}
+                      style={{ width: `${periodTaskCount > 0 ? (completedCount / periodTaskCount) * 100 : 0}%` }}
                     />
                   </div>
                 </div>
@@ -920,7 +927,7 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
                           <button
                             type="button"
                             className="gcal-cell-quick-add"
-                            title={t('v2.addOn', { date: key })}
+                            title={t('v2.addOn', { date: denText(key) })}
                             onClick={(e) => {
                               e.stopPropagation();
                               onCreate(key);
@@ -1253,7 +1260,7 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
                     setActiveDayModalKey(null);
                   }}
                 >
-                  <Plus size={16} /> {t('v2.addOn', { date: activeDayModalKey })}
+                  <Plus size={16} /> {t('v2.addOn', { date: denText(activeDayModalKey) })}
                 </button>
               )}
               <button

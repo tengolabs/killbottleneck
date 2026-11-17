@@ -27,6 +27,7 @@ import { validateSkin } from '@/lib/skinValidator';
 import { setSkin, setTheme, effectiveTheme, hlidejRotaci } from '@/lib/theme';
 import { useAsistent } from '@/lib/AsistentContext';
 import { useAiModes, stavAsistenta } from '@/hooks/useAiEnabled';
+import { loadKbConfig } from '@/hooks/useKbConfig';
 import LiteList from './LiteList';
 import SkinPattern from '@/components/shared/SkinPattern';
 import LiteNotifications from './LiteNotifications';
@@ -61,6 +62,19 @@ export default function LiteApp() {
   const [day, setDay] = useState(null);
   const [failed, setFailed] = useState(false);
   const [adding, setAdding] = useState(false);
+
+  // A locked instance (trial or subscription over) refuses every write. The full app explains it with a red
+  // strip in its header; lite had none, so a member working only here saw actions fail without a reason
+  // (code analysis 4, F4-08). Only the "it is over" state — the countdown stays in the full app. Plain markup:
+  // the full TrialBanner pulls in the data export, which does not belong in the lite bundle.
+  const [zamceno, setZamceno] = useState('');
+  useEffect(() => {
+    let zivy = true;
+    loadKbConfig()
+      .then((cfg) => { if (zivy) setZamceno(cfg?.subscription_ended ? 'subscription.ended' : (cfg?.trial_until && cfg?.trial_expired ? 'trial.expired' : '')); })
+      .catch(() => { /* no config → no strip */ });
+    return () => { zivy = false; };
+  }, []);
 
   const reload = useCallback(() => {
     if (!user?.email) return;
@@ -194,6 +208,11 @@ export default function LiteApp() {
           <ExternalLink className="w-4 h-4" /> {t('switch.toFullShort')}
         </button>
       </header>
+      {zamceno && (
+        <div role="status" data-testid="lite-zamceno" className="max-w-xl mx-auto mx-4 px-4 py-2 text-sm font-medium border-y bg-red-50 border-red-200 text-red-900 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200">
+          {tCommon(zamceno)}
+        </div>
+      )}
       <Routes>
         <Route index element={
           <LiteList kind="today" day={day} failed={failed} onReload={reload} onChanged={changed} onFailed={failedAction} />

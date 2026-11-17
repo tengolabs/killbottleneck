@@ -22,6 +22,15 @@ export function rozmer(template) {
 // data = { title, text, meta: { template, color, date, place, link, signature, lang } }, logo/fotka = { image, w, h }
 export function sestavPranicko({ doc, rgb, fonty, data: rawData, logo = null, fotka = null, qr = null, kresliQr = null, obrazek = null, ops = null }) {
   const data = drawableData(rawData, fonty.regular); // F2-06
+  // The body text shrinks to a floor size; what still does not fit used to be drawn over the signature and the
+  // logo and off the page. It now ends with "…" at the last line that fits and the document says so
+  // (`doc.kbZkraceno`, shown next to the download buttons) — code analysis 4, F2-07.
+  let zkraceno = false;
+  const doMista = (txt, size, sirkaB, rad, misto) => {
+    if (vyskaBloku(txt, fonty.regular, size, sirkaB, rad) <= misto) return 0;
+    zkraceno = true;
+    return Math.max(1, Math.floor(misto / (size * rad)));
+  };
   const meta = data.meta || {};
   const template = SABLONY.includes(meta.template) ? meta.template : 'greeting';
   const L = meta.lang === 'en' ? 'en' : 'cs';
@@ -62,7 +71,7 @@ export function sestavPranicko({ doc, rgb, fonty, data: rawData, logo = null, fo
     y -= 26;
     let size = 12.5;
     while (size > 9 && vyskaBloku(telo, fonty.regular, size, sirka, 1.4) > y - 70) size -= 0.5;
-    kresliBlok(page, { text: telo, font: fonty.regular, size, x, y, sirka, barva: text, radkovani: 1.4 });
+    kresliBlok(page, { text: telo, font: fonty.regular, size, x, y, sirka, barva: text, radkovani: 1.4, max: doMista(telo, size, sirka, 1.4, y - 70) });
     if (podpis) kresliBlok(page, { text: podpis, font: fonty.italic || fonty.regular, size: 11, x, y: 58, sirka, barva: text, zarovnani: 'right', max: 2 });
     if (logo) kresliObrazek(page, logo, { x, y: 18, w: 90, h: 26, zarovnani: 'left' });
   } else if (template === 'invitation') {
@@ -79,7 +88,7 @@ export function sestavPranicko({ doc, rgb, fonty, data: rawData, logo = null, fo
     const rezerva = 60 + (blok.length ? 30 + blok.length * 22 : 0) + (qr ? qrVelikost + 10 : 0);
     let size = 12.5;
     while (size > 9 && vyskaBloku(telo, fonty.regular, size, sirka, 1.4) > y - rezerva) size -= 0.5;
-    y = kresliBlok(page, { text: telo, font: fonty.regular, size, x: 28, y, sirka, barva: text, radkovani: 1.4 });
+    y = kresliBlok(page, { text: telo, font: fonty.regular, size, x: 28, y, sirka, barva: text, radkovani: 1.4, max: doMista(telo, size, sirka, 1.4, y - rezerva) });
     if (blok.length) {
       const h = 16 + blok.length * 22;
       y -= 14;
@@ -103,7 +112,7 @@ export function sestavPranicko({ doc, rgb, fonty, data: rawData, logo = null, fo
     const sirka = W - 100;
     let size = 18;
     while (size > 12 && vyskaBloku(telo, fonty.regular, size, sirka, 1.35) > y - 230) size -= 1;
-    y = kresliBlok(page, { text: telo, font: fonty.regular, size, x: 50, y, sirka, barva: text, radkovani: 1.35, zarovnani: 'center' });
+    y = kresliBlok(page, { text: telo, font: fonty.regular, size, x: 50, y, sirka, barva: text, radkovani: 1.35, zarovnani: 'center', max: doMista(telo, size, sirka, 1.35, y - 230) });
     const blok = [meta.date ? `${T.kdy}: ${meta.date}` : '', meta.place ? `${T.kde}: ${meta.place}` : ''].filter(Boolean);
     if (blok.length) {
       y -= 24;
@@ -133,12 +142,13 @@ export function sestavPranicko({ doc, rgb, fonty, data: rawData, logo = null, fo
     }
     let size = 16;
     while (size > 11 && vyskaBloku(zbytek, fonty.regular, size, sirka, 1.4) > y - 110) size -= 0.5;
-    kresliBlok(page, { text: zbytek, font: fonty.regular, size, x: 80, y, sirka, barva: text, radkovani: 1.4, zarovnani: 'center' });
+    kresliBlok(page, { text: zbytek, font: fonty.regular, size, x: 80, y, sirka, barva: text, radkovani: 1.4, zarovnani: 'center', max: doMista(zbytek, size, sirka, 1.4, y - 110) });
     // datum vlevo, podpis vpravo
     if (meta.date) { page.drawLine({ start: { x: 90, y: 86 }, end: { x: 270, y: 86 }, thickness: 0.8, color: seda }); page.drawText(`${T.datum}: ${meta.date}`, { x: 90, y: 70, size: 11, font: fonty.regular, color: text }); }
     page.drawLine({ start: { x: W - 270, y: 86 }, end: { x: W - 90, y: 86 }, thickness: 0.8, color: seda });
     kresliBlok(page, { text: podpis || T.podpis, font: fonty.italic || fonty.regular, size: 11, x: W - 270, y: 82, sirka: 180, barva: text, zarovnani: 'center', max: 2 });
     if (fotka) kresliObrazek(page, fotka, { x: W - 190, y: H - 150, w: 100, h: 80, zarovnani: 'right' });
   }
+  doc.kbZkraceno = zkraceno;
   return doc;
 }

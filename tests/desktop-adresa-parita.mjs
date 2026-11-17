@@ -4,6 +4,10 @@
 // intranet firmy) nezamítne hned, ale ověří přes DNS, že vede jen do privátní sítě
 // (`overitPrivatni`); (2) zná privátní IPv6 (fd00::/8, fe80::, ::1), které Android neumí;
 // (3) bere jako místní i celý loopback 127.0.0.0/8 a link-local 169.254.0.0/16 (Android jen 127.0.0.1).
+// (4) since v1.6.1 Android accepts http on names that cannot be public (a bare host name, .lan, .home,
+// .internal, .localdomain, .home.arpa — code analysis 4, F4-10) by the name alone; the Windows app stays
+// stricter and still verifies such a name through DNS. The other way round (Android accepts, the app
+// refuses or returns another address) remains an error.
 // Všude jinde musí rozhodnout stejně — stejná chyba, stejná adresa.
 // Spuštění: node product/tests/desktop-adresa-parita.mjs (bez dockeru, <1 s)
 
@@ -17,13 +21,14 @@ const { normalizujAdresu } = await import(join(ROOT, 'product/desktop/lib/adresa
 const CHYBY = { errorEmpty: 'prazdne', errorInvalid: 'neplatne', errorHttpPublic: 'httpVerejne' }
 const PRIVATNI_IPV6 = /^http:\/\/\[(f[cd]|fe[89ab]|::1\])/i
 const ROZSIRENE_IPV4 = /^http:\/\/(127\.\d+\.\d+\.\d+|169\.254\.\d+\.\d+)(:\d+)?$/
+const MISTNI_JMENO = /^http:\/\/([a-z0-9-]+|[a-z0-9.-]+\.(lan|home|internal|localdomain|home\.arpa))(:\d+)?$/
 
 const VSTUPY = [
   '', '   ', 'tengo', 'Tengo', 'kb.firma.cz', 'kb.firma.cz/', 'https://kb.firma.cz', 'HTTPS://KB.Firma.cz:8443/',
   'https://kb.firma.cz/login', 'kb.firma.cz/?x=1', 'kb.firma.cz/#a', 'https://user:heslo@kb.firma.cz',
   'http://192.168.1.20:8090', 'http://10.1.2.3', 'http://172.20.0.1:2056', 'http://100.90.1.2:8090',
   'http://localhost:8090', 'http://127.0.0.1:8090', 'http://server.local', 'http://8.8.8.8',
-  'http://kb.firma.cz', 'http://server.lan:8090', 'ftp://kb.firma.cz', 'https://', 'http://[fd00::5]:8090',
+  'http://kb.firma.cz', 'http://server.lan:8090', 'http://nas:8090', 'ftp://kb.firma.cz', 'https://', 'http://[fd00::5]:8090',
   'mojefirma', 'a', 'https://kb.firma.cz:99999', 'http://[2001:db8::1]:8090', 'http://[::1]:8090',
   'http://127.0.0.2:8090', 'http://169.254.1.1', 'http://169.255.1.1', 'http://128.0.0.1',
 ]
@@ -39,7 +44,10 @@ for (const vstup of VSTUPY) {
   const a = normalizeServerUrl(vstup)
   const d = normalizujAdresu(vstup)
   const popis = `„${vstup}" → android ${a.ok ? a.url : a.error} · desktop ${d.ok ? d.url + (d.overitPrivatni ? ' (ověřit DNS)' : '') : d.chyba}`
-  if (a.ok) {
+  if (a.ok && d.ok && d.overitPrivatni) {
+    // extension (4): a local-only NAME — Android accepts it, the app accepts it and verifies DNS
+    expect(d.url === a.url && MISTNI_JMENO.test(d.url), `${popis} [aplikace přísnější: místní jméno ověří přes DNS]`)
+  } else if (a.ok) {
     expect(d.ok && d.url === a.url && !d.overitPrivatni, popis)
   } else if (a.error === 'errorHttpPublic' && d.ok && d.overitPrivatni) {
     // rozšíření (1): http na jméno (ne IP) rozhodne až DNS

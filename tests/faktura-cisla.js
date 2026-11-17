@@ -65,6 +65,8 @@ expect(sp === 'SPD*1.0*ACC:CZ6508000000192000145399*AM:1936.00*CC:CZK*X-VS:20260
 expect(/^SPD\*1\.0\*/.test(sp) && /\*AM:1936\.00\*/.test(sp) && !/,/.test(sp), 'hlavička SPD*1.0, AM s tečkou na 2 des.');
 expect(F.spayd({ ...f, cislo: 'FV20260001', supplier: { iban: 'cz65 0800 0000 1920 0014 5399' } }).includes('ACC:CZ6508000000192000145399'), 'IBAN se normalizuje (mezery, velikost)');
 expect(F.spayd({ ...f, supplier: {} }) === '' && F.spayd({ ...f, total: 0 }) === '', 'bez IBAN nebo s nulovou částkou žádný SPAYD');
+expect(F.spayd({ ...f, total: 10000000 }) === '' && F.spayd({ ...f, total: 9999999.99 }) !== '', 'SPAYD má horní mez částky 9 999 999,99 (S6-07)');
+expect(!!F.validujPolozky([{ description: 'x', quantity: 0.0004, unit_price: 100 }]).error && !F.validujPolozky([{ description: 'x', quantity: 0.0005, unit_price: 100 }]).error, 'množství, které se zaokrouhlí na 0, položka nepřijme; 0,0005 (→ 0,001) ano (S6-03)');
 expect(!/[^\x20-\x7E]/.test(F.spayd({ ...f, cislo: 'Č20260001' })) && F.spayd({ ...f, cislo: 'A*B' }).includes('MSG:Faktura A B'), 'MSG bez diakritiky a bez hvězdičky');
 expect(F.spayd({ ...f, total: 1234.5 }).includes('AM:1234.50'), 'AM vždy 2 desetinná místa');
 
@@ -146,6 +148,18 @@ expect(F.czIban('19-8742637541/1200').iban.startsWith('CZ') && F.czIban('19-2000
   expect(chyba.chyba === 'err.invAccountChecksum', 'SK: chybná kontrolní číslice = chyba (mod 11 jako CZ)');
   const prepnuti = F.profilOcisti({ country: 'CZ', bank_account: '19-2000145399/0800' }, sk.profil);
   expect(prepnuti.profil.iban === 'CZ6508000000192000145399', 'přepnutí země na CZ + český účet = CZ IBAN');
+  // only the country changes (assistant: "set the country first", API): the IBAN must follow it
+  const cz = F.profilOcisti({ name: 'Jan', address: 'Praha 1', bank_account: '19-2000145399/0800' }, {});
+  const naSk = F.profilOcisti({ country: 'SK' }, cz.profil);
+  expect(cz.profil.iban.startsWith('CZ') && !naSk.chyba && naSk.profil.iban.startsWith('SK') && F.overIban(naSk.profil.iban) && naSk.profil.currency === 'EUR',
+    `změna jen země CZ → SK přepočítá IBAN na SK (${naSk.profil && naSk.profil.iban})`);
+  expect(/\nSK\d{22}\nEUR/.test(F.epcQr({ supplier: naSk.profil, total: 100, currency: 'EUR', cislo: '1' })), 'EPC QR po změně země nese slovenský IBAN');
+  const zpet = F.profilOcisti({ country: 'CZ' }, naSk.profil);
+  expect(zpet.profil.iban === 'CZ6508000000192000145399', 'změna jen země zpět na CZ = český IBAN');
+  const primy = F.profilOcisti({ country: 'SK' }, F.profilOcisti({ name: 'Jan', address: 'Praha 1', iban: 'CZ6508000000192000145399' }, {}).profil);
+  expect(primy.profil.iban === 'CZ6508000000192000145399', 'IBAN zadaný rovnou (bez čísla účtu) se změnou země nemění');
+  const volny = F.profilOcisti({ country: 'CZ' }, F.profilOcisti({ country: 'US', name: 'J', address: 'NY', bank_account: 'routing 123' }, {}).profil);
+  expect(!volny.chyba && !volny.profil.iban && volny.profil.bank_account === 'routing 123', 'volný text účtu po změně země: bez IBAN, text zůstal');
   const hodne = F.profilOcisti({ country: 'US', bank_account: Array(60).fill('a').join('\n') }, {});
   expect(hodne.profil.bank_account.split('\n').length === 4, `volný účet: nejvýš 4 řádky (bylo 60, je ${hodne.profil.bank_account.split('\n').length})`);
   const adr = F.profilOcisti({ address: Array(40).fill('x').join('\n') }, {});

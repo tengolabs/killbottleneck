@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.6.1": {
+    cs: [
+      "Opakované šablony dohánějí: když projekt ve svůj den nevznikl (aplikace neběžela nebo byla zamčená), založí se dodatečně.",
+      "Chyba načtení už nevypadá jako prázdno: projekt, přehled pravidel i zvonek řeknou „nepodařilo se načíst“ a nabídnou Zkusit znovu.",
+      "Veřejně sdílený projekt otevře i přihlášený kolega bez sdílení.",
+      "Text, který se nevejde do přání nebo na snímek prezentace, končí třemi tečkami a panel na to upozorní. Faktura už nemá na poslední straně prázdnou hlavičku tabulky.",
+      "Kreslení spuštěná ve stejnou chvíli už nepřečerpají týdenní kvótu kreditů.",
+    ],
+    en: [
+      "Recurring templates catch up: a project that was not created on its day (the app was down or locked) is created afterwards.",
+      "A loading error no longer looks like an empty list: a project, the rules overview and the bell say \"could not be loaded\" and offer Try again.",
+      "A publicly shared project opens for a signed-in colleague who has no share.",
+      "Text that does not fit a greeting card or a slide ends with an ellipsis and the panel says so. An invoice no longer has an empty table header on its last page.",
+      "Drawings started at the same moment can no longer overdraw the weekly credit quota.",
+    ],
+  },
   "v1.6.0": {
     cs: [
       "Asistent zvládne zadání o více krocích najednou: třeba „udělej z projektu fáze, klienty dej do první a až dám hotovo, ať se posunou dál“ připraví jako jednu sadu karet a Provést vše je provede po sobě.",

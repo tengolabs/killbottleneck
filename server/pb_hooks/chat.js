@@ -1463,7 +1463,11 @@ function skupinyNastroju(msgs, ctx, rec, cfg, bezPosledni) {
   if (ctx && String(ctx.route || "").startsWith("/admin/users")) out.add("nastaveni"); // Správa organizace
   if (ctx && String(ctx.route || "").startsWith("/archive")) out.add("projekt"); // Archiv: obnovit / smazat projekt
   const text = bezDiakritiky((msgs || []).filter((m) => m.role === "user").map((m) => m.content).join("\n"));
-  for (const k of Object.keys(SKUPINY_KLICE)) if (SKUPINY_KLICE[k].test(text)) out.add(k);
+  // The transcript marker of an attachment ("[Přepis obrázku]" / "[Image transcript]") is ours, not the user's
+  // words: it switches on the tools for working with the attachment (group `obrazek`), but its word "obrázku" /
+  // "image" must not switch on DRAWING for every photo (S1-04) — that group is tested without the markers.
+  const bezZnacek = text.replace(/\[(?:prepis obrazku|image transcript)\]/gi, "");
+  for (const k of Object.keys(SKUPINY_KLICE)) if (SKUPINY_KLICE[k].test(k === "kresleni" ? bezZnacek : text)) out.add(k);
   // pozvánka / rozpis termínů (22. 10. 2026): fotka, PDF nebo dlouhý vložený e-mail s aspoň dvěma daty → kalendář,
   // i když v něm není čas ani slovo „kalendář“ (rozpis přednášek „4. 11., 11. 11., 18. 11.“)
   if (!out.has("udalosti") && (msgs || []).some((m) => m.role === "user" && jeRozpisTerminu(bezDiakritiky(String(m.content || ""))))) out.add("udalosti");
@@ -4455,7 +4459,13 @@ function zkontrolujPdf(body, L) {
   if (zn < 1) throw chyba("err.chatPdfEmpty");
   return { name: ocisti(String(body.pdf_name || "").replace(/[\r\n\]\[]/g, " "), 120) || "PDF", pages: Math.max(strany.length, Number(body.pdf_pages) || 0), text: bloky.join("\n") };
 }
-function chatBrzda(e, L, body, cfg) {
+// `vnitrni` = flags set by the SERVER only (obrazek, popisObrazku, stranka, rezervace). They used to travel
+// inside `body` as `_obrazek`, `_rezervace`…, and the /chat route passes the client's raw body here: any
+// signed-in user could send `_rezervace` with a huge amount and block the AI of the whole organization for
+// five minutes at a time, or `_popisObrazku` to skip the credit quota (security review 18 Nov 2026).
+// Nothing is read from `body` but the attachment and the mode.
+function chatBrzda(e, L, body, cfg, vnitrni) {
+  const V = vnitrni || {};
   const { env } = require(`${__hooks}/helpers.js`);
   const { t } = require(`${__hooks}/i18n.js`);
   // týdenní kvóta AI kreditů organizace (správci × ostatní) — před hodinovým
@@ -4467,9 +4477,10 @@ function chatBrzda(e, L, body, cfg) {
   const priloha = !!(body && (body.image_base64 || body.audio_base64) && !jeRezim(body.mode));
   // obrázek (kreslení i popis Nového obrázku): týdenní strop obrázků instance (KB_OBRAZKY_TYDEN) před vším ostatním;
   // obrázky za 0 kreditů (KB_OBRAZEK_KREDITY=0, „solo“) kvóta kreditů nezastaví — mají vlastní počet (Richard 5. 11. 2026)
-  const obrazkova = !!(body && (body._obrazek || body._popisObrazku));
-  if (body && body._obrazek) { const tb = require(`${__hooks}/obrazky.js`).tydenBrzda($app, L); if (tb) return tb; }
-  const kv = (cfg && cfg.vlastni && !priloha) || (obrazkova && require(`${__hooks}/obrazky.js`).zdarma()) ? null : kvotaBrzda($app, e.auth, L);
+  const obrazkova = !!(V.obrazek || V.popisObrazku);
+  if (V.obrazek) { const tb = require(`${__hooks}/obrazky.js`).tydenBrzda($app, L); if (tb) return tb; }
+  // V.rezervace = { kredity }: a drawing reserves its price in the same step as the check (S8-04)
+  const kv = (cfg && cfg.vlastni && !priloha) || (obrazkova && require(`${__hooks}/obrazky.js`).zdarma()) ? null : kvotaBrzda($app, e.auth, L, V.rezervace);
   if (kv) return kv;
   const strop = parseInt(env("AI_MAX_PER_HOUR"), 10);
   const limit = strop > 0 ? strop : 60;
@@ -4485,9 +4496,9 @@ function chatBrzda(e, L, body, cfg) {
   // hlasovka = přepis + smyčka → váha 2 (KB_AI_HLAS_VAHA; návrh 1. 10. 2026, obrázek má schválenou 3)
   const hlas = body && body.audio_base64 && !jeRezim(body.mode);
   // page writer (stranky.js napsat): jedno dlouhé volání (tisíce tokenů ven) → váha 3 jako obrázek (KB_AI_PAGE_VAHA)
-  const str = body && body._stranka;
+  const str = V.stranka;
   // obrázek (obrazky.js vytvorit): sekundy GPU, kredity za kus → váha 2 (KB_AI_GEN_VAHA)
-  const gen = body && body._obrazek;
+  const gen = V.obrazek;
   const vaha = Math.min(limit, gen ? (Number(env("AI_GEN_VAHA")) > 0 ? Number(env("AI_GEN_VAHA")) : 2) : str ? (Number(env("AI_PAGE_VAHA")) > 0 ? Number(env("AI_PAGE_VAHA")) : 3) : obr ? (Number(env("AI_IMG_VAHA")) > 0 ? Number(env("AI_IMG_VAHA")) : 3) : hlas ? (Number(env("AI_HLAS_VAHA")) > 0 ? Number(env("AI_HLAS_VAHA")) : 2) : pdf ? (Number(env("AI_PDF_VAHA")) > 0 ? Number(env("AI_PDF_VAHA")) : 2) : 1);
   // atomicky (setFunc): souběžné požadavky jinak přečetly stejné `pouzito` a strop šel obejít
   let odmitnuto = false;

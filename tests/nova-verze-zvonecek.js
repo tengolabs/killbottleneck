@@ -152,6 +152,20 @@ const zvonecek = async (token) => {
     // jinak by z každého vydání byla hromadná pošta všem uživatelům instance.
     const log = execSync(`docker logs ${NAME} 2>&1 | tail -40`).toString();
     ok(!/mail|smtp/i.test(log) || !/new_version/i.test(log), 'v logu není pokus o odeslání mailu');
+
+    console.log('== smazané oznámení se po restartu nevrátí (S7-04) ==');
+    // the only account deletes its "new version" rows; the gate must not depend on them alone
+    restartuj('-e KB_VERSION=v0.45');
+    ok(await pockej(), 'instance na v0.45 naběhla');
+    await sleep(2500);
+    const moje = await zvonecek(token);
+    ok(moje.some((n) => /v0\.45/.test(n.text || '')), 'oznámení o v0.45 přišlo');
+    for (const n of moje) await api('DELETE', `/api/collections/notifications/records/${n.id}`, { token });
+    ok((await zvonecek(token)).length === 0, 'uživatel si všechna oznámení o verzích smazal');
+    restartuj('-e KB_VERSION=v0.45');
+    ok(await pockej(), 'instance po restartu naběhla');
+    await sleep(2500);
+    ok((await zvonecek(token)).length === 0, `smazané oznámení o téže verzi se nevrátilo (${(await zvonecek(token)).length})`);
   } catch (e) {
     fail++;
     console.log(`  ❌ výjimka: ${e.message}`);

@@ -206,12 +206,15 @@ H.beh(async () => {
   expect((await S.cekajici(D.id)).some((x) => x.email === 'rucne@ck.cz'), 'a vlastník ji vidí jako čekající');
 
   console.log('== odložení selže → účet nevznikne (dřív: jen log a další přepočet sdílení přístup udělil) ==');
-  r = await S.patch(vlastnik, D.id, { shared_with: [ctenar.email, admin.email, 'selhani@ck.cz'], shared_with_edit: ['selhani@ck.cz'] });
-  expect(r.status === 200, `předpoklad: adresa bez účtu je ručně v zrcadle (${r.status})`);
   // the pending-share collection refuses every new row → parking must fail
   const siCol = (await inst.api('GET', '/api/collections/share_invites', { token: ST })).json;
   r = await inst.api('PATCH', `/api/collections/${siCol.id}`, { token: ST, body: { fields: siCol.fields.concat([{ name: 'zkouska_blok', type: 'text', required: true }]) } });
   expect(r.status === 200, `předpoklad: kolekce čekajících sdílení odmítá nové řádky (${r.status})`);
+  // The mirror is written AFTER the block: since v1.6.1 the owner's PATCH of the share lists parks an
+  // address without an account right away (M1-04), so an address stays in the mirror only when that
+  // parking failed — the very state this section is about.
+  r = await S.patch(vlastnik, D.id, { shared_with: [ctenar.email, admin.email, 'selhani@ck.cz'], shared_with_edit: ['selhani@ck.cz'] });
+  expect(r.status === 200 && (r.json.shared_with || []).includes('selhani@ck.cz'), `předpoklad: adresa bez účtu je ručně v zrcadle (${r.status})`);
   const regSelh = await inst.register('selhani@ck.cz');
   expect(regSelh.status !== 200, `registrace adresy, jejíž sdílení nejde odložit, je odmítnuta (${regSelh.status})`);
   const ucty = (await inst.api('GET', `/api/collections/users/records?filter=${encodeURIComponent('email="selhani@ck.cz"')}`, { token: ST })).json.items || [];

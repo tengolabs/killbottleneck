@@ -23,6 +23,20 @@ const mapa = (nodes, edges = [], title = 'M', color = '') => ({ title, color, no
   );
   const najdi = (r, id) => (r.nodes || []).find((n) => n.id === id);
 
+  // ---------- 0. F1-11: an edge must never end in a node the other side deleted ----------
+  {
+    const zaklad = mapa([uzel('root', 'P', 'todo'), uzel('a', 'A', 'todo'), uzel('n1', 'Smazaný', 'todo')], [hrana('e1', 'root', 'a'), hrana('e2', 'root', 'n1')]);
+    // I add a new step under n1; the server deletes n1 (untouched by me) with its edge
+    const moje = mapa([...zaklad.nodes, uzel('x', 'Můj nový krok', 'todo')], [...zaklad.edges, hrana('e3', 'n1', 'x')]);
+    const server = mapa([uzel('root', 'P', 'todo'), uzel('a', 'A', 'todo')], [hrana('e1', 'root', 'a')]);
+    const r = trojcestnyMerge(zaklad, moje, server);
+    const visi = r.ok ? (r.edges || []).filter((e) => !(r.nodes || []).some((n) => n.id === e.source) || !(r.nodes || []).some((n) => n.id === e.target)) : [];
+    ok(r.ok === false && r.duvod === 'hrana', `nový krok pod uzlem, který druhá strana smazala = kolize, ne hrana do prázdna (${JSON.stringify({ ok: r.ok, duvod: r.duvod, visi: visi.map((e) => e.id) })})`);
+    // the same without my edge merges quietly as before
+    const r2 = trojcestnyMerge(zaklad, mapa([...zaklad.nodes.map((n) => (n.id === 'a' ? uzel('a', 'A přejmenované', 'todo') : n))], zaklad.edges), server);
+    ok(r2.ok === true && !najdi(r2, 'n1') && najdi(r2, 'a').data.title === 'A přejmenované' && r2.edges.length === 1, 'smazání uzlu serverem bez mého zásahu do něj se dál slije potichu');
+  }
+
   // ---------- 1. Richardův případ: pravidlo posune kartu, já mezitím píšu ----------
   {
     const zaklad = mapa(

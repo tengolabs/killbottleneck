@@ -77,7 +77,8 @@ const node = (id, data, type) => ({ id, type: type || 'goalNode', position: { x:
     let r = await api('POST', '/api/kb/rules/save', { token: W, body: telo });
     expect(r.status === 403, `work sdílení pravidla NEspravuje (${r.status})`);
     r = await api('POST', '/api/kb/rules/save', { token: C, body: telo });
-    expect(r.status === 403, `cizí uživatel 403 (${r.status})`);
+    // 404 since code analysis 4, S4-06 (Richard 17 Nov 2026): a stranger gets the same answer as for an id that does not exist
+    expect(r.status === 404, `cizí uživatel 404 — o soukromém projektu se nedozví (${r.status})`);
     r = await api('POST', '/api/kb/rules/save', { token: E, body: telo });
     expect(r.status === 200 && !!r.json.rule.id, `sdílený EDITOR pravidlo založí (${r.status})`);
     const rule1 = r.json.rule;

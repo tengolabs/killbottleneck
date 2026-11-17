@@ -117,6 +117,20 @@ const stavUzlu = async (token, mapId, nodeId) =>
     expect(r.status === 403, `čtenář NEPŘEPNE cizí uzel (${r.status})`);
     r = await api('POST', '/api/kb/node-status', { token: X, body: { mapId, nodeId: 'n-ukol', status: 'todo' } });
     expect(r.status === 403, `kdo mapu nevidí, nezmění nic — ani přes routu (${r.status})`);
+    // ↑ this account does see the project (team access "read" above), so "no write access" is right. A project
+    // that is really private answers a stranger like an id that does not exist (Richard 17 Nov 2026, S4-06).
+    {
+      const soukroma = (await api('POST', '/api/collections/goalmaps/records', { token: V, body: { title: 'Soukromý S4-06',
+        nodes: [{ id: 'root', type: 'apexNode', position: { x: 0, y: 0 }, data: { apexText: 'Soukromý S4-06', title: 'Soukromý S4-06', status: 'todo' } }, { id: 'k1', type: 'goalNode', position: { x: 0, y: 100 }, data: { title: 'Krok', status: 'todo' } }],
+        edges: [{ id: 'e1', source: 'root', target: 'k1' }] } })).json;
+      const neex = await api('POST', '/api/kb/node-status', { token: X, body: { mapId: 'neexistuje000000', nodeId: 'k1', status: 'done' } });
+      let rr = await api('POST', '/api/kb/node-status', { token: X, body: { mapId: soukroma.id, nodeId: 'k1', status: 'done' } });
+      expect(!!soukroma.id && rr.status === 404 && neex.status === 404 && JSON.stringify(rr.json) === JSON.stringify(neex.json), `cizí SOUKROMÝ projekt: změna stavu odpoví stejně jako neexistující id (${rr.status} × ${neex.status})`);
+      rr = await api('POST', '/api/kb/deadline-requests', { token: X, body: { action: 'request', mapId: soukroma.id, nodeId: 'k1', date: '2027-01-10' } });
+      expect(rr.status === 404, `cizí SOUKROMÝ projekt: žádost o termín → 404 (${rr.status})`);
+      rr = await api('GET', `/api/kb/rules?map=${soukroma.id}`, { token: X });
+      expect(rr.status === 404, `cizí SOUKROMÝ projekt: pravidla → 404 (${rr.status})`);
+    }
     const puvodni = (await api('GET', `/api/collections/goalmaps/records/${mapId}`, { token: V })).json;
     r = await api('PATCH', `/api/collections/goalmaps/records/${mapId}`, { token: C, body: { nodes: puvodni.nodes, edges: puvodni.edges } });
     expect(r.status !== 200, `čtenář dál NEUKLÁDÁ celou mapu — RLS beze změny (${r.status})`);

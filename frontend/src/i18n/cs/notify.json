@@ -62,7 +62,7 @@
     "emailModeInstant": "Hned",
     "emailModeInstantDesc": "Každá zaškrtnutá událost přijde e-mailem hned.",
     "emailModeDigest": "Denní souhrn",
-    "emailModeDigestDesc": "Jednotlivé e-maily nechodí; jednou denně přijde jeden souhrn.",
+    "emailModeDigestDesc": "Jednotlivé e-maily nechodí; jednou denně přijde jeden souhrn. Obsahuje události zapnuté ve sloupci „V aplikaci“.",
     "emailModeNone": "Nic",
     "emailModeNoneDesc": "E-mailem nechodí nic. Notifikace zůstávají v aplikaci.",
     "navratTitle": "Návratové e-maily, když se dlouho nepřihlásím",

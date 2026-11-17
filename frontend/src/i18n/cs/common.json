@@ -111,6 +111,8 @@
   "misc": {
     "untitled": "(bez názvu)",
     "saveFailed": "Uložení se nepovedlo",
+    "requestFailed": "Požadavek se nepovedl. Zkuste to prosím znovu.",
+    "serverUnreachable": "Server neodpověděl. Zkontrolujte připojení a zkuste to znovu.",
     "statusChangeFailed": "Změna stavu se nepovedla",
     "timerToggleFailed": "Stopky se nepodařilo přepnout",
     "tryAgainPlease": "Zkuste to prosím znovu.",

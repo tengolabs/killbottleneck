@@ -9,7 +9,7 @@ import { advisor } from '@/api/kb';
 // (AIChatPanel + aplikace operací) odstraněny s tlačítky z lišty (Richard) —
 // nahrazuje je asistent na boku (components/asistent).
 export function useAiActions({
-  nodes, edges, setNodes, setEdges, pushHistory, layoutAllForView, centerOnNode, toast, t,
+  nodes, edges, nodesNow, edgesNow, setNodes, setEdges, pushHistory, layoutAllForView, centerOnNode, toast, t,
 }) {
   const [expandingNodeId, setExpandingNodeId] = useState(null);
 
@@ -99,8 +99,13 @@ export function useAiActions({
           type: 'deletable',
         }));
 
-        const allNodes = [...nodes, ...newNodes];
-        const allEdges = [...edges, ...newEdges];
+        // Compose from the map as it is NOW, not as it was at the click: the model answers after seconds to
+        // tens of seconds and whatever the person did meanwhile used to be overwritten (code analysis 4, F1-10).
+        const liveNodes = nodesNow?.current || nodes;
+        const liveEdges = edgesNow?.current || edges;
+        if (!liveNodes.some((n) => n.id === nodeId)) return; // the step was deleted while the model was thinking
+        const allNodes = [...liveNodes, ...newNodes];
+        const allEdges = [...liveEdges, ...newEdges];
         const positions = layoutAllForView(allNodes, allEdges);
         const laidOutNodes = allNodes.map((n) => ({
           ...n,
@@ -126,7 +131,7 @@ export function useAiActions({
         setExpandingNodeId(null);
       }
     },
-    [nodes, edges, toast, setNodes, setEdges, pushHistory, centerOnNode, layoutAllForView]
+    [nodes, edges, nodesNow, edgesNow, toast, setNodes, setEdges, pushHistory, centerOnNode, layoutAllForView]
   );
 
   return { expandingNodeId, handleExpandNode };

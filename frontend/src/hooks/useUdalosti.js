@@ -12,15 +12,19 @@ export function useUdalosti({ aktivni, userEmail }) {
   const [pripominky, setPripominky] = useState([]);
   const [kalendare, setKalendare] = useState([]);
   const [nacteno, setNacteno] = useState(false);
+  const [chyba, setChyba] = useState(false);         // the last load failed — the grid may be stale or empty (F5-08)
+  const [zkraceno, setZkraceno] = useState(false);   // the server cut the list of events (F3-09)
   const timer = useRef(null);
 
   const nacti = useCallback(async () => {
     try {
       const [u, p, k] = await Promise.all([listUdalosti(), listPripominkyUzlu(), listKalendare().catch(() => null)]);
       setUdalosti(u?.events || []);
+      setZkraceno(u?.truncated === true);
+      setChyba(false);
       setPripominky(p?.reminders || []);
       if (k) setKalendare(k.calendars || []);
-    } catch { /* výpadek → poslední známý stav; realtime to dožene */ }
+    } catch { setChyba(true); /* the last known state stays; shown as an error line, not as an empty calendar */ }
     finally { setNacteno(true); }
   }, []);
 
@@ -90,5 +94,5 @@ export function useUdalosti({ aktivni, userEmail }) {
     return m;
   }, [pripominky]);
 
-  return { udalosti, items, pripominky, pripominkyPodleUzlu, kalendare, nacteno, reload: nacti };
+  return { udalosti, items, pripominky, pripominkyPodleUzlu, kalendare, nacteno, chyba, zkraceno, reload: nacti };
 }

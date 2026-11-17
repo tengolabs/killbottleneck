@@ -85,6 +85,7 @@ export async function prezentacePdf(data, opts = {}) {
   const obrazky = {};
   for (const [slot, b] of Object.entries(await aiObrazky(data, opts.zakladna))) { const o = await vlozObrazek(doc, b); if (o) obrazky[slot] = o; }
   sestavPrezentaciPdf({ doc, rgb: PDFLib.rgb, fonty, osnova: os, barva: opts.barva, logo, lang: opts.lang, obrazky, ops: PDFLib });
+  if (doc.kbZkraceno && opts.info) opts.info.zkraceno = true; // text that did not fit ends with "…" — the caller says so
   return doc.save();
 }
 export async function prezentacePptx(data, opts = {}) {
@@ -103,6 +104,7 @@ export async function pranickoPdf(data, opts = {}) {
   let qr = null; let kresliQr = null;
   if (meta.link) { const Q = await import('@/lib/faktura/qr.js'); qr = await Q.qrMatice(meta.link); kresliQr = Q.kresliQr; }
   sestavPranicko({ doc, rgb: PDFLib.rgb, fonty, data: { ...data, meta }, logo, fotka, qr, kresliQr, obrazek, ops: PDFLib });
+  if (doc.kbZkraceno && opts.info) opts.info.zkraceno = true;
   return doc.save();
 }
 export async function dokumentPdf(data, opts = {}) {

@@ -343,7 +343,7 @@ export default function AsistentPanel({ lite = false }) {
     if (nova) ulozKlic(klicUctu(KEY_PORADA_DEN), dnes);
     return nova;
   });
-  const poradaDnes = (A.seznam || []).some((c) => c.mode === 'porada' && String(c.updated || '').slice(0, 10) === dnes);
+  const poradaDnes = (A.seznam || []).some((c) => c.mode === 'porada' && c.updated && new Date(String(c.updated).replace(' ', 'T')).toLocaleDateString('en-CA') === dnes); // the LOCAL day — `updated` is UTC (F2-13)
   const nabidnoutPoradu = funkcni && poradaNabidka && !poradaOdmitnuta && !poradaDnes;
   const odmitniPoradu = () => { ulozKlic(klicUctu(KEY_PORADA_NE), dnes); setPoradaOdmitnuta(true); };
   // Relax: hlídač 50 minut práce (nabídka v panelu + tečka na oušku) a jednotné spuštění (zapíše čas pauzy pro hlídač)
@@ -827,7 +827,7 @@ export default function AsistentPanel({ lite = false }) {
                 <p className="inline-flex items-center gap-1.5 font-medium"><Sunrise className="w-4 h-4 text-primary" />{t('poradaOffer')}</p>
                 <p className="text-xs text-muted-foreground mt-1">{t('poradaOfferHint')}</p>
                 <div className="mt-2 flex gap-2">
-                  <Button size="sm" onClick={() => { odmitniPoradu(); setPohled('chat'); A.zacniRezim('porada', {}, kontext, patchUser); }} data-testid="chat-porada-ano">{t('poradaYes')}</Button>
+                  <Button size="sm" onClick={() => { odmitniPoradu(); setPohled('chat'); A.zacniRezim('porada', {}, sKlientem(kontext), patchUser); }} data-testid="chat-porada-ano">{t('poradaYes')}</Button>
                   <Button size="sm" variant="outline" onClick={odmitniPoradu} data-testid="chat-porada-ne">{t('poradaNo')}</Button>
                 </div>
               </div>
@@ -841,14 +841,14 @@ export default function AsistentPanel({ lite = false }) {
                 <p className="inline-flex items-center gap-1.5 font-medium"><Moon className="w-4 h-4 text-primary" />{t('nocniOffer')}</p>
                 <p className="text-xs text-muted-foreground mt-1">{t('nocniOfferHint')}</p>
                 <div className="mt-2 flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => { odmitniPoradu(); setPohled('chat'); A.zacniRezim('nocni', {}, kontext, patchUser); }} data-testid="chat-nocni-start">{t('nocniYes')}</Button>
+                  <Button size="sm" variant="outline" onClick={() => { odmitniPoradu(); setPohled('chat'); A.zacniRezim('nocni', {}, sKlientem(kontext), patchUser); }} data-testid="chat-nocni-start">{t('nocniYes')}</Button>
                 </div>
               </div>
             )}
             {/* AI blok (fáze C, 1. 10. 2026): balíčky, které si uživatel spustí sám — pod Nočním plánováním,
                 jen v prázdném rozhovoru */}
             {zpravy.length === 0 && funkcni && !A.loading && (
-              <AiBlok mobil={mobil} userId={user?.id} vedouci={user?.role === 'admin' || user?.role === 'manager'} stranky={strankyOn} disabled={A.loading} onSpust={(mode) => { if (mode === 'stranka') { otevriNovouStranku(); return; } if (mode === 'kancelar') { otevriNovyDokument(); return; } setPohled('chat'); A.zacniRezim(mode, {}, kontext, patchUser); }} />
+              <AiBlok mobil={mobil} userId={user?.id} vedouci={user?.role === 'admin' || user?.role === 'manager'} stranky={strankyOn} disabled={A.loading} onSpust={(mode) => { if (mode === 'stranka') { otevriNovouStranku(); return; } if (mode === 'kancelar') { otevriNovyDokument(); return; } setPohled('chat'); A.zacniRezim(mode, {}, sKlientem(kontext), patchUser); }} />
             )}
             {zpravy.length === 0 && funkcni && (
               <div className="pt-6 text-center space-y-3">
@@ -881,8 +881,8 @@ export default function AsistentPanel({ lite = false }) {
           {zpravy.length === 0 && funkcni && Array.isArray(chips) && (
             <div className={`px-3 pb-2 flex gap-1.5 ${mobil ? 'flex-nowrap overflow-x-auto whitespace-nowrap [scrollbar-width:none]' : 'flex-wrap'}`} data-testid="chat-chipy">
               {/* průvodci: ranní porada, rozbor projektu (na mapě: tenhle projekt), zaseknutí; noční plánování má vlastní rámeček výš */}
-              <button type="button" onClick={() => A.zacniRezim('porada', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-porada">{t('chipPorada')}</button>
-              <button type="button" onClick={() => A.zacniRezim('rozbor', {}, kontext, patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-rozbor">{kontext.map_id ? t('chipRozborMapa') : t('chipRozbor')}</button>
+              <button type="button" onClick={() => A.zacniRezim('porada', {}, sKlientem(kontext), patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-porada">{t('chipPorada')}</button>
+              <button type="button" onClick={() => A.zacniRezim('rozbor', {}, sKlientem(kontext), patchUser)} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-rozbor">{kontext.map_id ? t('chipRozborMapa') : t('chipRozbor')}</button>
               {strankyOn && <button type="button" onClick={otevriNovouStranku} disabled={A.loading} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-stranka">{kontext.map_id ? t('chipStrankaMapa') : t('chipStranka')}</button>}
               {/* relax (14. 10. 2026): pauza s akváriem / úlem — bez modelu */}
               {!panel.relax && <button type="button" onClick={() => spustRelax({ minut: 0 })} className="text-xs rounded-full border border-primary/50 px-2.5 py-1 hover:bg-secondary" data-testid="chat-chip-relax">{t('relaxChipVolny')}</button>}

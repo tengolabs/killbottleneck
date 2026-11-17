@@ -290,6 +290,30 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'Ještě jednou' } });
   const v7l2 = volani.slice(predV);
   expect(r.status === 200 && v7l2.length === 1 && v7l2[0].reasoning_effort === 'none', `T7 Luna: instance si „none“ pamatuje → další tah jedním voláním (${r.status}, volání ${v7l2.length}, ${v7l2.map((v) => v.reasoning_effort).join(',')})`);
+  // What was learned stops being true (the gateway now runs another model under the same name: "none" is
+  // refused, tools with effort are fine): the refusal forgets it and the turn still answers (finding S1-07).
+  // Before, the learned value was sent for ever and every turn of the assistant ended with an error.
+  {
+    const puvodniEffort = EFFORT['gpt-5.6-luna'];
+    NASTROJE_JEN_NONE.delete('gpt-5.6-luna');
+    EFFORT['gpt-5.6-luna'] = ['low', 'medium', 'high'];
+    predV = volani.length;
+    fronta.push({ content: 'Luna po změně' }, { content: 'Luna po změně podruhé' });
+    r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'A teď?' } });
+    const z1 = volani.slice(predV);
+    expect(r.status === 200 && z1.length === 2 && z1[0].reasoning_effort === 'none' && z1[1].reasoning_effort === 'low' && /Luna po změně/.test(posledniA(r.json.chat).content || ''),
+      `T7 Luna: naučené „none“ odmítnuto → zapomene a zkusí znovu od začátku (${r.status}, efforty ${z1.map((v) => v.reasoning_effort).join(',')})`);
+    predV = volani.length;
+    r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'A dál?' } });
+    const z2 = volani.slice(predV);
+    expect(r.status === 200 && z2.length === 1 && z2[0].reasoning_effort === 'low', `T7 Luna: další tah už jedním voláním s „low“ (${r.status}, ${z2.map((v) => v.reasoning_effort).join(',')})`);
+    NASTROJE_JEN_NONE.add('gpt-5.6-luna');
+    EFFORT['gpt-5.6-luna'] = puvodniEffort;
+    // back to the real Luna: "low" with tools is refused again and "none" is learned anew
+    fronta.push({ content: 'Luna zpět' });
+    r = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: r.json.chat.id, message: 'Zpět' } });
+    expect(r.status === 200 && /Luna zpět/.test(posledniA(r.json.chat).content || ''), `T7 Luna: po návratu modelu tah zase odpoví (${r.status})`);
+  }
   // Advisor on Luna has no tools → keeps "low" in one call (the learned "none" applies to calls with tools only)
   predV = volani.length;
   fronta.push({ content: '{"questions":["Pro koho?","Kdy?","Za kolik?"]}' });

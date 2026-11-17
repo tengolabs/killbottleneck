@@ -353,6 +353,14 @@ H.beh(async () => {
   r = await inst.api('POST', '/api/kb/events/leave', { token: C, body: { id: SKOLENI } });
   expect(r.status === 400 && /pozván|invited/i.test(r.json.error), `nezvaný firemní akci neopouští (${r.status} ${r.json && r.json.error})`);
   expect((await udalosti(C, `?from=${den(38)}&to=${den(38)}`)).some((e) => e.id === SKOLENI), 'a dál ji vidí');
+  // (g2) time off cannot be "left": participants mean who is away, an empty list means the author —
+  // the absent colleague leaving used to hand the time off over to the manager who wrote it down
+  r = await inst.api('POST', '/api/kb/events/save', { token: B, body: { title: 'Dovolená za D', day: den(39), calendar: NEPRITOMNOSTI, participants: ['d@e2e.cz'] } });
+  const ZA_D = r.json.event.id;
+  r = await inst.api('POST', '/api/kb/events/leave', { token: D, body: { id: ZA_D } });
+  expect(r.status === 400 && /nepřítomnost|time off/i.test(r.json.error), `nepřítomnost nejde opustit (${r.status} ${r.json && r.json.error})`);
+  const poLeave = (await udalosti(B, `?from=${den(39)}&to=${den(39)}`)).find((e) => e.id === ZA_D);
+  expect(poLeave && JSON.stringify(poLeave.away) === JSON.stringify(['d@e2e.cz']), `pryč je dál D, ne autor (${poLeave && JSON.stringify(poLeave.away)})`);
   // (h) anonym přes přímé PB API nic (dřív četl celý kalendář)
   for (const col of ['calendars', 'events']) {
     r = await inst.api('GET', `/api/collections/${col}/records?perPage=5`);
@@ -455,4 +463,25 @@ H.beh(async () => {
   vych = (await inst3.api('GET', '/api/kb/calendars', { token: SEF })).json.calendars || [];
   expect(vych.map((c) => c.name).join(',') === 'Firemní,Nepřítomnosti', `česká instance má Firemní + Nepřítomnosti (${vych.map((c) => c.name).join(',')})`);
   inst3.stop();
+
+  // A plain calendar day must not depend on the instance time zone: where DST starts at midnight
+  // (Chile, Cuba), local 00:00 of that day does not exist and the day used to be "invalid".
+  console.log('== pásmo, kde letní čas začíná o půlnoci (America/Santiago) ==');
+  const posun = (ms) => { const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', timeZoneName: 'longOffset' }).formatToParts(new Date(ms)).find((x) => x.type === 'timeZoneName').value; const m = /([+-])(\d\d):(\d\d)/.exec(p); return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0; };
+  let skok = '';
+  for (let i = 1, t0 = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate(), 12); i < 400 && !skok; i++) {
+    if (posun(t0 + i * 86400000) > posun(t0 + (i - 1) * 86400000)) skok = new Date(t0 + i * 86400000).toISOString().slice(0, 10); // noon UTC = morning in Chile, already after the jump
+  }
+  expect(/^\d{4}-\d\d-\d\d$/.test(skok), `den přechodu na letní čas v Chile nalezen (${skok})`);
+  const inst4 = await H.startInstance({ slug: 'kalendare-santiago', env: { TZ: 'America/Santiago', KB_UVODNI_MAPA: 0 } });
+  await inst4.register('cl@e2e.cz');
+  const CL = await inst4.login('cl@e2e.cz');
+  const predSkokem = new Date(Date.parse(skok + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+  r = await inst4.api('POST', '/api/kb/events/save', { token: CL, body: { title: 'Den přechodu', day: skok, time: '10:00' } });
+  expect(r.status === 200 && r.json.event.day === skok, `událost v den přechodu jde uložit (${r.status} ${r.json && r.json.error})`);
+  r = await inst4.api('POST', '/api/kb/events/save', { token: CL, body: { title: 'Přes přechod', day: predSkokem, end_day: skok } });
+  expect(r.status === 200 && r.json.event.end_day === skok, `vícedenní událost končící v den přechodu (${r.status} ${r.json && r.json.error})`);
+  const vOkne = ((await inst4.api('GET', `/api/kb/events?from=${skok}&to=${skok}`, { token: CL })).json.events || []).map((e) => e.title).sort().join(',');
+  expect(vOkne === 'Den přechodu,Přes přechod', `obě jsou v okně toho dne (${vOkne})`);
+  inst4.stop();
 }, { nazev: 'KALENDARE' });

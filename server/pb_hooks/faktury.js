@@ -162,6 +162,7 @@ function bezDiakritiky(s) { return String(s || "").normalize("NFD").replace(/[̀
 // Jen pro CZK (27. 10. 2026): v cizí měně český QR banky odmítají nebo konvertují; EUR má EPC (níže), jiné měny bez QR.
 function spayd(f) {
   if (!f || !f.supplier || !f.supplier.iban || !(Number(f.total) > 0)) return "";
+  if (Number(f.total) > 9999999.99) return ""; // SPAYD: AM has at most 10 characters (S6-07)
   if (String(f.currency || "CZK").toUpperCase() !== "CZK") return "";
   const casti = ["SPD*1.0", "ACC:" + normIban(f.supplier.iban), "AM:" + Number(f.total).toFixed(2), "CC:" + (f.currency || "CZK")];
   if (f.vs) casti.push("X-VS:" + f.vs);
@@ -197,7 +198,8 @@ function validujPolozky(items) {
     const description = radek(it.description, MAX_POPIS);
     if (!description) return { error: `item ${i + 1}: description is required.` };
     const quantity = it.quantity === undefined || it.quantity === null || it.quantity === "" ? 1 : Number(it.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1e6) return { error: `item ${i + 1} ("${description}"): quantity must be a positive number.` };
+    // the check runs on the ROUNDED quantity: 0.0004 passed and the invoice got a line with quantity 0 (S6-03)
+    if (!Number.isFinite(quantity) || Math.round(quantity * 1000) / 1000 <= 0 || quantity > 1e6) return { error: `item ${i + 1} ("${description}"): quantity must be a positive number.` };
     const unit_price = Number(it.unit_price);
     if (!Number.isFinite(unit_price) || unit_price < 0 || unit_price > 1e9) return { error: `item ${i + 1} ("${description}"): unit_price must be a number ≥ 0 (price per unit WITHOUT tax, in the invoice currency).` };
     const q = Math.round(quantity * 1000) / 1000; // řádek i součet z TÉHOŽ zaokrouhleného množství (1,0005 × 1000 dřív dalo řádek 1000,50 a součet 1001)
@@ -262,6 +264,17 @@ function profilOcisti(zmeny, stav) {
       if (z.currency === undefined) p.currency = pv.currency;
       if (z.vat_rate === undefined) p.vat_rate = pv.vat_rate;
       if (z.tax_label === undefined) delete p.tax_label;
+      // The IBAN was derived from the domestic account number for the OLD country (CZ…); with only the country
+      // changed it stayed and the QR payment pointed to an account in the wrong country. Derive it again.
+      // Only an IBAN that WAS derived (it equals what the old country gives for this account number): one typed
+      // in by hand next to a free-text account (allowed outside CZ/SK) must not be wiped by a country change.
+      if (z.bank_account === undefined && z.iban === undefined && p.bank_account) {
+        const odvozeny = czIban(p.bank_account, drive);
+        if (!odvozeny.error && odvozeny.iban === p.iban) {
+          const r = czIban(p.bank_account, c);
+          p.iban = r.error ? "" : r.iban;
+        }
+      }
     }
   }
   const pv = predvolba(p.country);

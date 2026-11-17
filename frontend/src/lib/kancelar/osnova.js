@@ -19,7 +19,10 @@ export function parsujOsnovu(text) {
     if (n) akt.poznamky.push(n[1].trim());
     else akt.odrazky.push((b ? b[1] : r).trim());
   }
-  return { titul, podtitul: uvod.join(' '), snimky: snimky.slice(0, MAX_SNIMKU).map((s) => ({ ...s, odrazky: s.odrazky.slice(0, MAX_ODRAZEK) })) };
+  const orez = { snimky: Math.max(0, snimky.length - MAX_SNIMKU), odrazky: snimky.slice(0, MAX_SNIMKU).filter((s) => s.odrazky.length > MAX_ODRAZEK).length };
+  // `orez` = what the files will NOT contain (slides over the cap, slides with bullets over the cap) — the server
+  // refuses such an outline from the model, but a person can type it in the panel and must be told (F2-12)
+  return { titul, podtitul: uvod.join(' '), snimky: snimky.slice(0, MAX_SNIMKU).map((s) => ({ ...s, odrazky: s.odrazky.slice(0, MAX_ODRAZEK) })), orez };
 }
 
 // Markdown-lite pro dokumenty (e-mail, zápis, sumář) → bloky pro PDF / Word: nadpis (#), odrážka (-), odstavec, mezera

@@ -17,8 +17,9 @@ routerAdd("GET", "/p/{token}", (e) => {
   const rec = S.limity().zapnuto ? S.podleTokenu($app, e.request.pathValue("token")) : null;
   if (!rec) return e.string(404, "Not found");
   h.set("Content-Type", "text/html; charset=utf-8");
-  // sandbox chrání aplikaci (cizí původ); form-action/connect-src 'none' chrání NÁVŠTĚVNÍKA — stránka od agenta nemůže odeslat
-  // formulář ani fetch na cizí server (phishing uvnitř domény); frame-ancestors: cizí web ji nevloží do svého rámce (/checkup 25. 10. 2026)
+  // sandbox protects the APP (foreign origin, no allow-same-origin). form-action / connect-src 'none' close forms and fetch
+  // for the VISITOR, but that is NOT a full barrier: a script on the page can still carry typed data away through an image
+  // address or by navigating (links must stay allowed). frame-ancestors: no other site can frame the page (/checkup 25 Oct 2026).
   h.set("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-popups-to-escape-sandbox; form-action 'none'; connect-src 'none'; frame-ancestors 'none'");
   h.set("X-Content-Type-Options", "nosniff");
   h.set("Referrer-Policy", "no-referrer");
