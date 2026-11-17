@@ -101,7 +101,7 @@ export default function Tasks({ kalendar = false }) {
   const { openCreate: openNewProject, dialogs: mapCreationDialogs } = useMapCreation();
 
   useEffect(() => {
-    if (!isLoadingAuth && !user) navigate('/login');
+    if (!isLoadingAuth && !user) navigate('/login', { replace: true });
   }, [isLoadingAuth, user, navigate]);
 
   // data stránky: mapy (loadMaps), organizace, členové, počty komentářů,

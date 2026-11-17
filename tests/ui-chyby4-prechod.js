@@ -86,13 +86,28 @@ H.beh(async () => {
   expect(E.stav(await db(KM.id), 'k1') === 'in_progress', `změna stavu těsně před Zpět prohlížeče je uložená v MAPĚ KOLEGY (k1: ${E.stav(await db(KM.id), 'k1')})`);
   expect(((await db(D.id)).nodes || []).length === 5 && E.stav(await db(D.id), 'k1') === 'todo', 'projekt D v databázi tou změnou zasažen není');
 
-  console.log('== otevřený dialog uzlu nepřežije přechod do jiné mapy ==');
+  // Since 17 Nov 2026 browser back closes an open dialog (lib/backLayers.js): opening it adds one history entry,
+  // which (like any new entry) drops the "forward" pages — so the old "dialog + Forward into the colleague's map" path
+  // no longer exists. What stays to prove: back with the dialog open closes the dialog and the map stays.
+  console.log('== Zpět prohlížeče s otevřeným dialogem uzlu zavře dialog, mapa zůstane ==');
   expect(await S.otevriDialog('k2'), 'D: dialog kroku k2 otevřen');
-  await S.page.goForward();
-  expect(await E.cekej(async () => (await idZAdresy()) === KM.id, 15000, 'adresa mapy kolegy'), 'Vpřed prohlížeče vede do mapy kolegy');
+  await S.page.goBack();
+  expect(await E.cekej(async () => S.page.evaluate(() => !document.querySelector('[role="dialog"] #title')), 8000, 'dialog zavřen'), 'Zpět prohlížeče zavřelo dialog uzlu');
+  await sleep(1000);
+  expect((await idZAdresy()) === D.id, 'po Zpět s dialogem zůstává adresa projektu D');
+  expect((await S.uzlyNaPlatne()).length === 5, `projekt D je dál na plátně (uzlů: ${(await S.uzlyNaPlatne()).length})`);
+
+  // the old guard (an open node dialog must not survive the move into another map) through the in-app move that stays
+  // possible with a dialog open: the Windows app's notification click (desktopApp.js: pushState + popstate)
+  console.log('== otevřený dialog uzlu nepřežije přechod do jiné mapy ==');
+  expect(await S.otevriDialog('k2'), 'D: dialog kroku k2 znovu otevřen');
+  await S.page.evaluate((id) => { window.history.pushState(null, '', `/map/${id}`); window.dispatchEvent(new PopStateEvent('popstate')); }, KM.id);
+  expect(await E.cekej(async () => (await idZAdresy()) === KM.id, 15000, 'adresa mapy kolegy'), 'přechod uvnitř aplikace vede do mapy kolegy');
   await S.page.waitForSelector('.react-flow__node[data-id="k1"]', { timeout: 30000 }).catch(() => {});
   await sleep(1500);
   expect(await S.page.evaluate(() => !document.querySelector('[role="dialog"] #title')), 'v mapě kolegy není otevřený dialog uzlu z projektu D');
+  await S.page.goBack();
+  expect(await E.cekej(async () => (await idZAdresy()) === D.id, 15000, 'adresa D'), 'Zpět z mapy kolegy vede do projektu D (ne do mrtvého kroku)');
 
   expect(chyby.length === 0, `konzole šéfa bez chyb (${chyby.length}${chyby.length ? ': ' + chyby[0].slice(0, 120) : ''})`);
 }, { nazev: 'UI-CHYBY4-PRECHOD' });

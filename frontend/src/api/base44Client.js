@@ -11,6 +11,7 @@ import i18next from 'i18next';
 //   Task.map_id ↔ map · Task.parent_id ↔ parent · TaskComment.task_id ↔ task
 import { pb } from './pb';
 import { smazKliceAsistenta } from '@/lib/storageKeys';
+import { leavingApp } from '@/lib/backLayers';
 
 const COLLECTIONS = {
   GoalMap: 'goalmaps',
@@ -436,10 +437,12 @@ export const base44 = {
     logout(redirectUrl) {
       pb.authStore.clear();
       clearOfflineData(); // bez await: přesměrování čekat nemusí, smazání doběhne
-      if (redirectUrl !== undefined) window.location.href = '/login';
+      // replace: back after signing out must not reopen the app page (it would only bounce to sign-in again)
+      if (redirectUrl !== undefined) { leavingApp(); window.location.replace('/login'); }
     },
     redirectToLogin() {
-      window.location.href = '/login';
+      leavingApp(); // the layers unmounting now must not start a history step that races the redirect
+      window.location.replace('/login');
     },
   },
 

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { routeBackSteps } from '@/lib/backLayers';
 import { useTranslation } from 'react-i18next';
 import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { Button } from '@/components/ui/button';
@@ -456,7 +457,8 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
             size="icon"
             onClick={() => {
               // zpět tam, odkud uživatel přišel (např. tabulka úkolů); bez historie na titulku
-              if (window.history.state && window.history.state.idx > 0) navigate(-1);
+              // (an open zone / panel / dialog holds one extra entry on top — lib/backLayers.js — that is not a page)
+              if (window.history.state && window.history.state.idx > 0) navigate(-routeBackSteps());
               else navigate('/');
             }}
             className="shrink-0 h-11 w-9 sm:h-9 sm:w-9" // phone: 44 px tall touch target (36 px at the top edge is hard to hit); 36 px wide since 16 Nov 2026 to make room for the tools ⌄

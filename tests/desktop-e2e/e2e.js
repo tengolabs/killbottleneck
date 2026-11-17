@@ -11,7 +11,7 @@
 // postaví z aktuálního stromu, takže „starší“ server byl nový web (3 ❌ v regresi 26. 10. 2026).
 //
 // Rám se ovládá přes stdin (jen vývojová stavba s KB_DESKTOP_E2E=1: skryj, ukaz, popredi,
-// klikni <id>, obnov, probuzeni, ukonci) a své kroky zapisuje do JSONL logu (toast, odznak,
+// klikni <id>, obnov, probuzeni, ukonci, zpet) a své kroky zapisuje do JSONL logu (toast, odznak,
 // ven, stahovani, mistni…) — upozornění Windows ani ikonu u hodin Puppeteer nevidí.
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
@@ -51,13 +51,16 @@ async function spustAplikaci(vystup) {
   const log = path.join(vystup, 'udalosti.jsonl');
   fs.writeFileSync(log, '');
   execSync(`docker rm -f ${jmeno} 2>/dev/null; true`, { stdio: 'ignore' });
+  // a node_modules symlink (worktree) must resolve inside the container too
+  const nm = fs.realpathSync(path.join(DESKTOP, 'node_modules'));
+  const nmMount = nm === path.join(DESKTOP, 'node_modules') ? [] : ['-v', `${nm}:${nm}:ro`];
   const proc = spawn('docker', [
     'run', '--rm', '-i', '--name', jmeno, '--network', 'host', '--shm-size', '512m',
     '--user', `${process.getuid()}:${process.getgid()}`,
     '-e', 'KB_DESKTOP_E2E=1', '-e', 'KB_DESKTOP_E2E_LOG=/vystup/udalosti.jsonl',
     '-e', 'KB_DESKTOP_USERDATA=/vystup/profil', '-e', 'KB_DESKTOP_E2E_STAZENE=/vystup/stazene',
     '-e', 'KB_DESKTOP_HLIDAC_MS=2000', '-e', 'LANGUAGE=cs', '-e', 'LANG=C.UTF-8',
-    '-v', `${DESKTOP}:/app:ro`, '-v', `${vystup}:/vystup`, OBRAZ_ELECTRON,
+    '-v', `${DESKTOP}:/app:ro`, ...nmMount, '-v', `${vystup}:/vystup`, OBRAZ_ELECTRON,
     'sh', '-c', `Xvfb :${displej} -screen 0 1400x900x24 -nolisten tcp >/dev/null 2>&1 & export DISPLAY=:${displej}; sleep 1; `
       + `exec dbus-run-session -- /app/node_modules/electron/dist/electron --no-sandbox --remote-debugging-port=${cdpPort} /app`,
   ], { stdio: ['pipe', 'pipe', 'pipe'] });

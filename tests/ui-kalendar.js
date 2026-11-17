@@ -56,6 +56,8 @@ H.beh(async () => {
 
   const { page, chyby, novaStranka } = await H.browser();
   const prihlas = async (pg, email) => {
+    // a dialog closed just before steps its history entry away (lib/backLayers.js); a goto racing that step is aborted
+    await sleep(400);
     await pg.goto(`${inst.base}/login`, { waitUntil: 'networkidle2' });
     await pg.waitForSelector('#email');
     await pg.type('#email', email);

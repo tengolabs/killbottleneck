@@ -4,10 +4,13 @@ import App from '@/App.jsx'
 import '@/index.css'
 import { i18nReady } from '@/i18n'
 import { initTheme } from '@/lib/theme'
+import { installBackLayers } from '@/lib/backLayers'
 import { isNativeShell } from '@/lib/nativeShell'
 import { isDesktopShell } from '@/lib/shell'
 
 initTheme()
+// before the router mounts: our popstate listener must run first (lib/backLayers.js — back closes what is open)
+installBackLayers()
 
 // Service worker = podmínka pro „přidat na plochu" a offline čtení posledního
 // přehledu. Registruje se AŽ po načtení, aby nesoupeřil o linku s prvním

@@ -98,7 +98,9 @@ export default function Login() {
       // Musí zůstat na NAŠEM originu: startsWith("/") nestačí, prohlížeč
       // normalizuje `\` na `/`, takže `/\evil.com` by se stalo `//evil.com`
       // (protocol-relative) = open redirect. Proto přes URL a shodu originu.
-      window.location.href = safeNext(new URLSearchParams(window.location.search).get("next"));
+      // replace, not href: the sign-in form must not stay in the history — back from the app led straight to it
+      // (Richard 17 Nov 2026, mouse back button in a Brain training game)
+      window.location.replace(safeNext(new URLSearchParams(window.location.search).get("next")));
     } catch (err) {
       setError(err.message || t("login.error"));
     } finally {

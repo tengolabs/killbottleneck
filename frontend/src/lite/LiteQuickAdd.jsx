@@ -21,6 +21,7 @@
 // natáhnout celé mapy s JSON bloby uzlů.
 import { serverReason } from '@/lib/serverReason';
 import { useState, useEffect } from 'react';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { useTranslation } from 'react-i18next';
 import { X, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -96,8 +97,10 @@ export default function LiteQuickAdd({ onClose, onAdded }) {
     }
   };
 
+  useBackLayer(true, onClose, false, 5); // the phone's back closes the form (like ✕), not the page
+
   return (
-    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40" onClick={onClose} data-testid="lite-rychle-pridani">
       <form
         onSubmit={save}
         onClick={(e) => e.stopPropagation()}

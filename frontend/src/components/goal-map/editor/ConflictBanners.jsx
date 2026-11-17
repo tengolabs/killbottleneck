@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { Button } from '@/components/ui/button';
 import { Loader2, Archive, ArchiveRestore } from 'lucide-react';
 
@@ -12,6 +13,8 @@ export default function ConflictBanners({
   isTemplatePreview, savingTemplate, handleSaveTemplate, remoteChanged, saveError, retrySave,
 }) {
   const { t } = useTranslation('editor');
+  // back must not leave the editor in the middle of a version conflict (the unsaved map would be lost): decide first
+  useBackLayer(!!conflict, null, true, 5);
   return (
     <>
       {conflict && (

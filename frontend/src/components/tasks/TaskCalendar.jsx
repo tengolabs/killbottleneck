@@ -17,6 +17,7 @@ import { labelForEmail } from '@/lib/memberLabel';
 import { lazy, Suspense } from 'react';
 const DialogNovyKalendar = lazy(() => import('./kalendar/DialogNovyKalendar'));
 import './TaskCalendar.css';
+import { useBackLayer } from '@/hooks/useBackLayer';
 
 // Mobil (< 640 px): Měsíc = tečky + klepnutí na den otevře detail dne, Týden =
 // svislý seznam dnů (CSS @media), tažení v Měsíci vypnuté (tečky se netahají).
@@ -96,6 +97,7 @@ export default function TaskCalendar({ items = [], maps = [], kalendare = [], me
 
   // Day popover / modal state
   const [activeDayModalKey, setActiveDayModalKey] = useState(null);
+  useBackLayer(!!activeDayModalKey, () => setActiveDayModalKey(null), false, 5); // back closes the day window
 
   const panelRef = useRef(null);
   const searchInputRef = useRef(null);

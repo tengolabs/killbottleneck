@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { useTranslation } from 'react-i18next';
 import { Bug, Columns2, Expand, Fish, Flower2, Lock, Maximize2, Minimize2, Plus, Timer, X } from 'lucide-react';
 import { useAsistent, RELAX_SABLONY } from '@/lib/AsistentContext';
@@ -126,6 +127,8 @@ export default function RelaxVrstva({ lite = false }) {
     try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch { /* nevadí */ }
     ukonciRelax();
   }, [ukonciRelax]);
+  // browser back closes the pause like ✕; a pause locked with a PIN stays (back used to leave it for the sign-in page)
+  useBackLayer(!!r, ukonci, zamceno, 1);
   // křížek přímo ve scéně (vedle „Denní světlo“, Richard 25. 10. 2026): scéna pošle kb-relax-zavrit; zamčený relax se tím neodemkne
   useEffect(() => {
     const f = (e) => { if (e.origin === window.location.origin && e.data && e.data.type === 'kb-relax-zavrit' && !zamceno) ukonci(); };

@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parsujOsnovu, MAX_SNIMKU, MAX_ODRAZEK } from '@/lib/kancelar/osnova';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { AlertTriangle, Brain, Check, ChevronLeft, Copy, Download, ExternalLink, Eye, EyeOff, FileText, FolderKanban, Gift, ImagePlus, Loader2, Mail, Maximize2, Pencil, Phone, Plus, Presentation, RefreshCw, ScrollText, Search, Trash2, Undo2, Users, X, NotebookPen, ClipboardList } from 'lucide-react';
@@ -629,6 +630,11 @@ export default function DokumentyPanel({ mobil }) {
   useEffect(() => { if (A.dokId && A.dokId.startsWith(FAKTURA_PREFIX)) { setSkupina('faktury'); if (A.dokId === FAKTURA_PREFIX) A.setDokId(''); } }, [A, A.dokId]);
   const zavri = useCallback(() => opatrne(() => A.setDokOpen(false)), [A, opatrne]);
   const zpet = useCallback(() => opatrne(() => A.setDokId('')), [A, opatrne]);
+  // browser back on a phone (the Office covers the screen there) = the panel's own ←: from a document to the list, from
+  // the list the Office closes (unsaved changes ask first). On a computer it is a side panel that stays open across
+  // pages, so back keeps walking the pages.
+  useBackLayer(mobil, zavri, false, 1);
+  useBackLayer(mobil && !!A.dokId, zpet, false, 2);
   // Esc zavře panel — ne při psaní (tam Esc patří políčku) a ne, když je otevřený jiný
   // dialog nebo menu: Esc patří jemu (snímky 30. 9.: zavření dialogu účelu zavřelo i dokumenty)
   useEffect(() => {

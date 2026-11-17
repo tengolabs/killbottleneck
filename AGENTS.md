@@ -56,6 +56,13 @@ full regression automatically.
   runs in the signed-in user's browser.
 - Keep the anti-bloat rule from `CONTRIBUTING.md`: no new required settings, no new permanent
   main-navigation items.
+- **Browser back closes overlays.** Anything that covers the page (a zone, a viewer, a phone
+  panel, a dialog) registers `useBackLayer(open, close, block, level)`; `components/ui/dialog.jsx`
+  does it for every dialog. `lib/backLayers.js` keeps one history entry per open layer, wraps
+  `history.pushState`/`replaceState` and listens to `popstate` before React Router (it relies on
+  the router's `idx` in the history state — re-run `ui-zpet` and `desktop-e2e/zpet.js` after a
+  router upgrade). Never push history entries without a user's click: Chrome and the Windows app
+  skip such entries on back.
 
 ## Contributions and license
 

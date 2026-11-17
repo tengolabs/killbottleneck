@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, ArrowLeftRight, Bot, Brain, ChevronDown, ChevronUp, FileText, Files, Fish, ImagePlus, List, Loader2, PanelLeftClose, PanelRightClose, RefreshCw, Send, Sparkles, SquarePen, Sunrise, Moon, X } from 'lucide-react';
@@ -438,6 +439,8 @@ export default function AsistentPanel({ lite = false }) {
     doListy.current = vPolicku || Date.now() - psalDo.current < 800;
     A.setOpen(false);
   }), [A]);
+  // on a phone (and in lite) the panel covers the screen: browser / phone back minimises it like ⌄ instead of leaving the page
+  useBackLayer(dostupny && !!A.open && mobil, zmensit);
 
   const persistSkin = useCallback((fields) => {
     if (!user?.id) return;

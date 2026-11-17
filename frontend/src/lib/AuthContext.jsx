@@ -5,6 +5,7 @@ import { pb, AUTH_CHECK_EVENT } from '@/api/pb';
 import { forgetKbConfig } from '@/hooks/useKbConfig';
 import { LANGS, setLang } from '@/lib/lang';
 import { syncSkin } from '@/lib/theme';
+import { leavingApp } from '@/lib/backLayers';
 
 // Zachovává rozhraní původního Base44 AuthContextu (user, isAuthenticated,
 // isLoadingAuth, authError, logout, navigateToLogin, ...), ale stojí nad
@@ -124,7 +125,8 @@ export const AuthProvider = ({ children }) => {
     const { pathname, search } = window.location;
     if (AUTH_PAGES.some((p) => pathname.startsWith(p))) return;
     try { sessionStorage.setItem(SESSION_ENDED_KEY, '1'); } catch { /* the note is a courtesy */ }
-    window.location.href = `/login?next=${encodeURIComponent(pathname + search)}`;
+    leavingApp();
+    window.location.replace(`/login?next=${encodeURIComponent(pathname + search)}`); // the dead page must not wait behind the form
   };
 
   // Quiet re-check of a running session: no spinner, no login record. One at a time.

@@ -6,6 +6,7 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useSpodekHlavicky } from "@/hooks/useSpodekHlavicky"
+import { useBackLayer } from "@/hooks/useBackLayer"
 
 // Dialogy POD horní lištou (Richard 27. 10. 2026: „i v nastavení ať máš pořád horní lištu“ — všechno, na co se
 // kliká pod panáčkem): v obalu <PodListouProvider> (UserMenu) je dialog NEmodální, závoj i okno začínají pod
@@ -30,7 +31,11 @@ const Dialog = ({ open, defaultOpen, onOpenChange, ...props }) => {
     document.body.style.overflow = "hidden"
     return () => { document.body.style.overflow = puvodni }
   }, [podListou, otevren])
-  return <DialogPrimitive.Root {...props} open={open} defaultOpen={defaultOpen} onOpenChange={zmena} modal={podListou ? false : props.modal} />
+  // browser / phone back closes the open dialog (a confirmation answers "Cancel"); a dialog whose owner refuses to
+  // close (unsaved changes) stays and back keeps working — lib/backLayers.js. Always controlled (open={otevren}), so
+  // back can close an uncontrolled dialog too.
+  useBackLayer(otevren, () => zmena(false), false, 5)
+  return <DialogPrimitive.Root {...props} open={otevren} onOpenChange={zmena} modal={podListou ? false : props.modal} />
 }
 
 const DialogTrigger = DialogPrimitive.Trigger

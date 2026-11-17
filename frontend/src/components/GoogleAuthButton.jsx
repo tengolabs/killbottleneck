@@ -33,7 +33,7 @@ export default function GoogleAuthButton({ label, onError, setupCode, requireSet
       await base44.auth.loginViaGoogle({ setupCode: String(setupCode || "").trim() || undefined });
       // ?next= — návrat tam, odkud přihlášení přišlo (OAuth consent pro MCP
       // konektory apod.); stejná ochrana proti open redirectu jako Login.jsx
-      window.location.href = safeNext(new URLSearchParams(window.location.search).get("next"));
+      window.location.replace(safeNext(new URLSearchParams(window.location.search).get("next"))); // back must not return to sign-in
     } catch (err) {
       onError?.(err.message || t("google.error"));
       setLoading(false);

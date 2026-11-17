@@ -7,6 +7,24 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.6.2 — 2026-11-17
+
+**Back closes what is open instead of leaving the app**
+
+**Upgrade notes:** no schema migration. Opening a dialog or another layer now adds one entry to the browser history,
+so the pages you could go "forward" to are dropped at that moment (as with any new page).
+
+- **Back closes what is open instead of leaving the app.** The browser's back (mouse back button, Alt+←, the
+  phone's back, the Windows app) used to walk the page history under the app — in a Brain training game it jumped
+  straight to the sign-in page. Now back steps out of a game to the list of games, then closes Brain training;
+  it also closes relax, the image viewer and any open dialog (a confirmation answers "Cancel"; a dialog with unsaved
+  changes asks as with ✕). On a phone it also closes the Office (from a document first back to the list), the quick
+  add form in the simple view and the day window of the calendar, then folds the assistant away. Relax locked with a
+  PIN stays locked, and back does not leave the map editor while a version conflict waits for a decision. On a
+  computer the Office stays a side panel and back keeps walking the pages. With nothing open back works as before.
+- Signing in, signing up, a password reset and signing out no longer leave the sign-in page in the browser history,
+  so back from the app never shows the sign-in form of an account that is already signed in.
+
 ## v1.6.1 — 2026-11-17
 
 **Fixes from the code review: missed recurring projects are caught up, sharing follows a changed e-mail, clearer error states**

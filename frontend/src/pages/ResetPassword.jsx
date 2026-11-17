@@ -47,7 +47,7 @@ export default function ResetPassword() {
     setLoading(true);
     try {
       await base44.auth.resetPassword({ resetToken, newPassword });
-      window.location.href = "/login";
+      window.location.replace("/login");
     } catch (err) {
       // Prošlý/použitý token vrací PocketBase jen jako generické anglické
       // „An error occurred while validating the submitted data." s polem

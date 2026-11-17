@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.6.2": {
+    cs: [
+      "Tlačítko zpět (na myši, Alt+←, na telefonu i v aplikaci pro Windows) zavře, co je otevřené, a už nevyhodí z aplikace na přihlášení.",
+      "Ve hře Tréninku mozku vede zpět nejdřív na seznam her, další zpět zónu zavře. Zpět zavře i akvárium, zvětšený obrázek a každé okno — potvrzovací okno bere zpět jako Zrušit.",
+      "Akvárium zamčené PINem zůstane zamčené, ať mačkáte zpět kolikrát chcete.",
+      "Na telefonu zpět zavře Kancelář, rychlé přidání úkolu nebo okno dne v kalendáři a pak sbalí asistenta.",
+      "Přihlášení ani odhlášení už v historii prohlížeče nenechává přihlašovací stránku.",
+    ],
+    en: [
+      "Back (the mouse button, Alt+←, the phone's back and the Windows app) closes what is open and no longer throws you out of the app to the sign-in page.",
+      "In a Brain training game back first returns to the list of games, the next back closes the zone. Back also closes relax, an enlarged image and any dialog — a confirmation takes back as Cancel.",
+      "Relax locked with a PIN stays locked however many times you press back.",
+      "On a phone back closes the Office, the quick add form or the day window of the calendar, then folds the assistant away.",
+      "Signing in or out no longer leaves the sign-in page in the browser history.",
+    ],
+  },
   "v1.6.1": {
     cs: [
       "Opakované šablony dohánějí: když projekt ve svůj den nevznikl (aplikace neběžela nebo byla zamčená), založí se dodatečně.",

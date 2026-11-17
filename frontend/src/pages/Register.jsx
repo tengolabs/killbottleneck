@@ -31,7 +31,8 @@ export default function Register() {
   // to whoever comes through this link (the server checks the token after sign-in).
   const { isAuthenticated } = useAuth();
   const [inviteFailed, setInviteFailed] = useState("");
-  const goNext = () => { window.location.href = safeNext(new URLSearchParams(window.location.search).get("next")); };
+  // replace: back must not return to the form
+  const goNext = () => { window.location.replace(safeNext(new URLSearchParams(window.location.search).get("next"))); };
   useEffect(() => {
     const token = searchParams.get("invite");
     if (!token) return;
@@ -77,7 +78,7 @@ export default function Register() {
       // ?next= (Login sem posílá nezaložený box i s query): první uživatel, který přišel
       // z OAuth consentu agenta, se musí vrátit na /oauth/authorize, ne na titulku —
       // jinak callback agenta propadne. Stejná ochrana originu jako v Login.jsx.
-      window.location.href = safeNext(new URLSearchParams(window.location.search).get("next"));
+      window.location.replace(safeNext(new URLSearchParams(window.location.search).get("next"))); // back must not return to the form
     } catch (err) {
       setError(err.message || t("register.error"));
     } finally {

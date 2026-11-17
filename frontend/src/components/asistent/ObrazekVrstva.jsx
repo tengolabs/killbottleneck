@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Download, Loader2, Maximize2, Minimize2, Pin, PinOff, RefreshCw, Trash2, X } from 'lucide-react';
 import { useAsistent, DOK_MAX_W, sirkaDokumentu } from '@/lib/AsistentContext';
 import { useSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { obrazekPonechat, obrazekSmazat, obrazekVytvorit } from '@/api/asistentApi';
 import { pb } from '@/api/pb';
 import { saveBlob, safeFilename } from '@/lib/saveFile';
@@ -59,6 +60,7 @@ export default function ObrazekVrstva() {
   const vedle = vedleMozne && !cela;
 
   const zavri = A.zavriObrazek;
+  useBackLayer(!!o, zavri, false, 3); // browser back closes the viewer
   const posun = useCallback((d) => {
     if (polozky.length < 2) return;
     A.setProhlizec((x) => (x ? { ...x, index: (index + d + polozky.length) % polozky.length } : x));

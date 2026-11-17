@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Columns2, Expand, Maximize2, MessageSquare, Minimize2, X } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
@@ -171,6 +172,11 @@ export default function BrainLayer({ lite = false }) {
     try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch { /* fine */ }
     stopBrain();
   }, [stopBrain]);
+
+  // browser back (mouse button, Alt+←, phone): first back to the list of games, then the zone closes — never out of
+  // the app (Richard 17 Nov 2026: back in sudoku jumped to the sign-in page). The hub registers first = lies under the game.
+  useBackLayer(!!b, close, false, 1);
+  useBackLayer(!!game, leaveGame, false, 2);
 
   if (!b) return null;
   const side = L.side;
