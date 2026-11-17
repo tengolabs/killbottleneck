@@ -28,6 +28,26 @@ function Week({ week, t }) {
   );
 }
 
+// today's bonus (other games finished today) and the streak; `compact` = the phone summary card
+function Chips({ bonus, streak, t, compact = false }) {
+  const chip = compact ? 'inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-xs' : 'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm';
+  const ikona = compact ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  return (
+    <>
+      {bonus > 0 && (
+        <span className={chip} title={t('bonusTitle')} data-testid="brain-bonus" data-bonus={bonus}>
+          <Sparkles className={`${ikona} text-amber-500`} /><b className="tabular-nums">{t('bonusLabel', { count: bonus })}</b>
+        </span>
+      )}
+      <span className={chip} title={t('streakTitle')} data-testid="brain-serie" data-serie={streak}>
+        <Flame className={`${ikona} ${streak > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} />
+        <b className="tabular-nums">{streak}</b>
+        <span className="text-muted-foreground">{streak === 1 ? t('streakOneDay') : t('streakLabel')}</span>
+      </span>
+    </>
+  );
+}
+
 export default function BrainHub({ summary, loading, levels, onLevel, onPlay, narrow = false }) {
   const { t } = useTranslation('brain');
   const today = (summary && summary.today) || { done: [], bonus: 0 };
@@ -38,13 +58,14 @@ export default function BrainHub({ summary, loading, levels, onLevel, onPlay, na
   const streak = (summary && summary.streak) || 0;
   const bests = (summary && summary.bests) || {};
   const bonus = Number(today.bonus) || 0;
-  const card = ({ id, Icon, skill }) => {
+  // `bare`: the card's content without its own frame — on a phone the game of the day sits inside the summary card
+  const card = ({ id, Icon, skill }, bare = false) => {
     const max = maxLevels(id, narrow);
     const lvl = Math.min(max, Math.max(1, Number(levels[id]) || 1));
     const done = (today.done || []).includes(id);
     const best = bests[id] && bests[id][lvl];
     return (
-      <div key={id} className={`flex flex-col gap-2 rounded-2xl border bg-card p-3 transition-colors ${done ? 'border-primary/60' : ''}`} data-testid={`brain-karta-${id}`} data-hotovo={done ? '1' : '0'}>
+      <div key={id} className={bare ? 'flex flex-col gap-2' : `flex flex-col gap-2 rounded-2xl border bg-card p-3 transition-colors ${done ? 'border-primary/60' : ''}`} data-testid={`brain-karta-${id}`} data-hotovo={done ? '1' : '0'}>
         <button type="button" onClick={() => onPlay(id, lvl)} className="flex items-start gap-2 text-left" data-testid={`brain-hrat-${id}`}>
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${done ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground'}`}>
             {done ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
@@ -71,32 +92,43 @@ export default function BrainHub({ summary, loading, levels, onLevel, onPlay, na
       </div>
     );
   };
+  const nacitam = loading && !summary ? <span className="text-xs text-muted-foreground" data-testid="brain-nacitam">{t('loading')}</span> : null;
   return (
     <div className="h-full overflow-y-auto px-3 py-3 sm:px-5" data-testid="brain-hub">
       <div className="mx-auto flex max-w-4xl flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card px-4 py-3" data-testid="brain-souhrn" data-nacteno={summary ? '1' : '0'}>
-          {/* the text keeps ≥ 14rem; on a phone the bonus and streak chips wrap under it instead of squeezing it */}
-          <div className="min-w-0 flex-[1_1_14rem]">
-            <p className="text-base font-semibold">{t('todayTitle')}{daily ? ` · ${t(`game.${daily}`)}` : ''}</p>
-            <p className="text-sm text-muted-foreground" data-testid="brain-dnes" data-splneno={today.dailyDone ? '1' : '0'}>{today.dailyDone ? t('todayDone') : t('todayHint')}</p>
-          </div>
-          {bonus > 0 && (
-            <div className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm" title={t('bonusTitle')} data-testid="brain-bonus" data-bonus={bonus}>
-              <Sparkles className="h-4 w-4 text-amber-500" /><b className="tabular-nums">{t('bonusLabel', { count: bonus })}</b>
+        {narrow ? (
+          // Phone (Richard 16 Nov 2026: "the intro with the week takes the whole screen, you see no game"): the summary
+          // and the game of the day are ONE card with the chips beside the title; the week strip moves under the other
+          // games — the first games are visible without scrolling
+          <>
+            <div className="flex flex-col gap-2 rounded-2xl border bg-card p-3" data-testid="brain-souhrn" data-nacteno={summary ? '1' : '0'}>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="mr-auto text-sm font-semibold text-primary">{t('todayTitle')}</p>
+                <Chips compact bonus={bonus} streak={streak} t={t} />
+              </div>
+              {daily && <div data-testid="brain-karty">{todays.map((g) => card(g, true))}</div>}
+              <p className="text-xs text-muted-foreground" data-testid="brain-dnes" data-splneno={today.dailyDone ? '1' : '0'}>{today.dailyDone ? t('todayDone') : t('todayHint')}</p>
+              {nacitam}
             </div>
-          )}
-          <div className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm" title={t('streakTitle')} data-testid="brain-serie" data-serie={streak}>
-            <Flame className={`h-4 w-4 ${streak > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} />
-            <b className="tabular-nums">{streak}</b>
-            <span className="text-muted-foreground">{streak === 1 ? t('streakOneDay') : t('streakLabel')}</span>
-          </div>
-          {loading && !summary && <span className="text-xs text-muted-foreground" data-testid="brain-nacitam">{t('loading')}</span>}
-        </div>
-
-        <div className={daily ? 'grid grid-cols-1 gap-3 sm:max-w-xs' : 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4'} data-testid="brain-karty">
-          {todays.map(card)}
-        </div>
-        {summary && summary.week && <Week week={summary.week} t={t} />}
+            {!daily && <div className="grid grid-cols-2 gap-3" data-testid="brain-karty">{todays.map((g) => card(g))}</div>}
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card px-4 py-3" data-testid="brain-souhrn" data-nacteno={summary ? '1' : '0'}>
+              {/* the text keeps ≥ 14rem; on a narrow window the bonus and streak chips wrap under it instead of squeezing it */}
+              <div className="min-w-0 flex-[1_1_14rem]">
+                <p className="text-base font-semibold">{t('todayTitle')}{daily ? ` · ${t(`game.${daily}`)}` : ''}</p>
+                <p className="text-sm text-muted-foreground" data-testid="brain-dnes" data-splneno={today.dailyDone ? '1' : '0'}>{today.dailyDone ? t('todayDone') : t('todayHint')}</p>
+              </div>
+              <Chips bonus={bonus} streak={streak} t={t} />
+              {nacitam}
+            </div>
+            <div className={daily ? 'grid grid-cols-1 gap-3 sm:max-w-xs' : 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4'} data-testid="brain-karty">
+              {todays.map((g) => card(g))}
+            </div>
+            {summary && summary.week && <Week week={summary.week} t={t} />}
+          </>
+        )}
         {others.length > 0 && (
           <div className="flex flex-col gap-2" data-testid="brain-dalsi">
             <div>
@@ -104,10 +136,11 @@ export default function BrainHub({ summary, loading, levels, onLevel, onPlay, na
               <p className="text-xs text-muted-foreground">{t('moreHint')}</p>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" data-testid="brain-karty-dalsi">
-              {others.map(card)}
+              {others.map((g) => card(g))}
             </div>
           </div>
         )}
+        {narrow && summary && summary.week && <Week week={summary.week} t={t} />}
         <p className="text-center text-xs text-muted-foreground">{t('privacy')}</p>
       </div>
     </div>

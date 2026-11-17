@@ -293,6 +293,14 @@ export function useMapLayout({
     if (!alignMapKey) return;
     setUsporadani(platneKriterium(nactiKlic(KLIC_USPORADANI + alignMapKey)));
   }, [alignMapKey]);
+  // A map without an alignment style that just got laid out (Uspořádat, the align-all button) takes the style it was
+  // laid out in, so the Zarovnat label says what the canvas now is. Only THIS map's key — the global
+  // `kb-zarovnat-styl` for AI re-layouts stays the user's last real choice in Zarovnat.
+  const prijmiVychoziStyl = useCallback((styl) => {
+    if (alignStyle) return;
+    setAlignStyle(styl);
+    if (alignMapKey) ulozKlic('kb-zarovnat-styl:' + alignMapKey, styl);
+  }, [alignStyle, alignMapKey, setAlignStyle]);
   const handleUsporadat = useCallback((kriterium) => {
     if (!platneKriterium(kriterium)) return;
     pushHistory();
@@ -303,36 +311,37 @@ export function useMapLayout({
     const positions = layoutAllForView(vstup, edges, ALIGN_OPTS[styl] || {});
     // přes `prev`, ne přes `vstup` — umělé pořadové souřadnice se nikam nepropíšou
     setNodes((prev) => prev.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n)));
-    if (!alignStyle) {
-      setAlignStyle(styl);
-      // jen klíč TÉHLE mapy (popisek) — globální `kb-zarovnat-styl` pro AI
-      // přelayouty zůstává na poslední VOLBĚ uživatele v Zarovnat; tady nic nevolil
-      if (alignMapKey) ulozKlic('kb-zarovnat-styl:' + alignMapKey, styl);
-    }
+    prijmiVychoziStyl(styl);
     if (alignMapKey) ulozKlic(KLIC_USPORADANI + alignMapKey, kriterium);
     setUsporadani(kriterium);
     recenterMap();
-  }, [edges, setNodes, layoutAllForView, alignStyle, recenterMap, alignMapKey, pushHistory, seradUzly]);
+  }, [edges, setNodes, layoutAllForView, alignStyle, recenterMap, alignMapKey, pushHistory, seradUzly, prijmiVychoziStyl]);
 
   // KOSTIČKA = srovnat mapu podle VŠECH nastavení a oddálit na celou (Richard
   // 1. 10. 2026: „tlačítko kostky, které srovná zoom, by mohlo zároveň zarovnat
   // dle všech nastavení"). Seřadí podle zvoleného Uspořádat, rozloží ve stylu
   // Zarovnat (čitelnost se promítne sama — layout měří skutečné karty) a oddálí.
-  // Mapa, která ještě NIKDY nebyla zarovnaná (prázdný styl), se jen oddálí —
-  // nemá podle čeho se srovnat a ručně rozmístěné uzly se bez volby uživatele
-  // nepřeskládají. V Mojí mapě se kritérium nepoužije (řadí se sama, Uspořádat
-  // tam není). Bez práva editace / v kanbanu volá lišta rovnou recenterMap.
+  // (EN, 16 Nov 2026) A map without a style gets "classic" (it used to only zoom
+  // out); the criterion is not used in My map nor on a kanban board.
+  // Bez práva editace volá lišta rovnou recenterMap.
   // Když je mapa už srovnaná, nic se nezapíše ani do historie — jen oddálí.
   // ⚠️ Ve vodorovném směru layoutAllForView jako vedlejší efekt přepíše
   // kanonické (svislé) pozice, odkud čte ukládání. Když se na plátně nic
   // nehnulo, musí se kanon VRÁTIT — jinak by kostička „nic neudělala", ale
   // ručně rozmístěná svislá mapa by se s nejbližší úpravou uložila přerovnaná
   // a bez kroku Zpět (/checkup 2. 10. 2026).
-  const handleSrovnatVse = useCallback(() => {
-    if (!alignStyle) { recenterMap(); return; }
-    const kriterium = personalMap ? '' : usporadani;
+  // Richard 16. 11. 2026 („kostička by měla zarovnat“, „ano zarovnat i v kanban“): a map that was never
+  // aligned gets the classic style (it used to only zoom out), and a kanban board is aligned too — a board the
+  // assistant built had its stage columns scattered and no button could tidy it. Kanban ignores the Uspořádat
+  // criterion (the menu is hidden there, so it must not act invisibly). Undo takes it back.
+  const handleSrovnatVse = useCallback((opts) => {
+    const kanban = !!(opts && opts.kanban);
+    // a kanban board always aligns "classic" (stage columns in one row) — a locked compact / bands style of the map
+    // would stagger the columns (Richard 17 Nov 2026: "ano má se srovnat do šířky"); the map's style stays as it is
+    const styl = kanban ? 'classic' : (alignStyle || 'classic');
+    const kriterium = personalMap || kanban ? '' : usporadani;
     const kanonPred = canonicalPosRef.current;
-    const positions = layoutAllForView(seradUzly(kriterium), edges, ALIGN_OPTS[alignStyle] || {});
+    const positions = layoutAllForView(seradUzly(kriterium), edges, ALIGN_OPTS[styl] || {});
     const posunuto = nodes.some((n) => {
       const p = positions[n.id];
       return p && n.position && (Math.abs(p.x - n.position.x) > 0.5 || Math.abs(p.y - n.position.y) > 0.5);
@@ -343,8 +352,9 @@ export function useMapLayout({
     } else {
       canonicalPosRef.current = kanonPred;
     }
+    prijmiVychoziStyl(styl);
     recenterMap();
-  }, [alignStyle, personalMap, usporadani, layoutAllForView, seradUzly, edges, nodes, pushHistory, setNodes, recenterMap, canonicalPosRef]);
+  }, [alignStyle, personalMap, usporadani, layoutAllForView, seradUzly, edges, nodes, pushHistory, setNodes, recenterMap, canonicalPosRef, prijmiVychoziStyl]);
 
   // Čitelnost = výběr ze tří stupňů velikosti písma v uzlu (nabídka jako
   // Zarovnat). Na rozdíl od Zarovnat se NIC NEPŘEPOČÍTÁVÁ — uzly zůstávají na

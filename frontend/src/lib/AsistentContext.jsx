@@ -239,6 +239,13 @@ export function AsistentProvider({ children }) {
     setBrainState({ game: typeof game === 'string' ? game : '', layout: lay, levels: p.levels && typeof p.levels === 'object' ? p.levels : {}, zpet: '' });
   }, [readBrainPrefs, zapisRelax]);
   const stopBrain = useCallback(() => setBrainState(null), []);
+  // A link from the assistant / Office ("Show in map", "Open project", AI settings) means "show me that": the relax and
+  // brain zones lie over the map, so both close (a locked relax stays). One place, so a new link cannot forget one
+  // (16 Nov 2026: links closed relax but left the brain zone on top).
+  const zavriZony = useCallback(() => {
+    if (relax && !relax.zamek) zapisRelax(null);
+    setBrainState(null);
+  }, [relax, zapisRelax]);
   const updateBrain = useCallback((patch) => setBrainState((b) => {
     if (!b) return b;
     const next = { ...b, ...(patch || {}) };
@@ -258,9 +265,9 @@ export function AsistentProvider({ children }) {
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
     zadost, spust, vyridZadost, pdfSoubory, setPdfSoubory,
     relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax,
-    brain, startBrain, stopBrain, updateBrain,
+    brain, startBrain, stopBrain, updateBrain, zavriZony,
     prohlizec, otevriObrazek, zavriObrazek, setProhlizec,
-  }), [open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, leftPanelWidth, setLeftPanelWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, docPreview, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, brain, startBrain, stopBrain, updateBrain, prohlizec, otevriObrazek, zavriObrazek]);
+  }), [open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, leftPanelWidth, setLeftPanelWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, docPreview, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, brain, startBrain, stopBrain, updateBrain, zavriZony, prohlizec, otevriObrazek, zavriObrazek]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.6.0": {
+    cs: [
+      "Asistent zvládne zadání o více krocích najednou: třeba „udělej z projektu fáze, klienty dej do první a až dám hotovo, ať se posunou dál“ připraví jako jednu sadu karet a Provést vše je provede po sobě.",
+      "Karta pravidla je obyčejná věta, která říká, co se stane. Pravidlo, které mapa už má, vám asistent znovu nenabídne.",
+      "Tlačítko s rámečkem srovná i mapu, která ještě nikdy zarovnaná nebyla, a také kanban desku — sloupce do jedné řady.",
+      "Pod horními lištami je jemná barevná linka a lišty mají tři úrovně, takže se v aplikaci lépe orientujete.",
+      "Na telefonu jde druhý řádek lišty mapy schovat šipkou vpravo (výchozí je schovaný) a trénink mozku ukáže hry hned pod hrou dne.",
+    ],
+    en: [
+      "The assistant handles a request in several steps at once: \"turn the project into stages, put the clients in the first and when I mark one done, move it on\" becomes one set of cards and Do all runs them in order.",
+      "A rule card is a plain sentence saying what will happen. A rule the map already has is not offered again.",
+      "The frame button also aligns a map that was never aligned, and a kanban board — the columns in one row.",
+      "A thin coloured line under the top bars and three levels of bars make it easier to find your way around.",
+      "On a phone the second row of the map bar folds away with the arrow on the right (folded by default), and brain training shows the games right under the game of the day.",
+    ],
+  },
   "v1.5.0": {
     cs: [
       "Při mazání člena týmu jde jeho otevřené kroky rovnou předat někomu jinému. Kroky po člověku, který v týmu už není, poznáte podle výrazné červené značky „bývalý člen“.",

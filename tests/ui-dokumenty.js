@@ -183,7 +183,11 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-dok-polozka-projekt"]'), 'v seznamu je u poznámky název projektu');
   await page.click('[data-testid="chat-dok-polozka"][data-kind="note"]');
   await cekej('[data-testid="chat-dok-projekt"]');
+  // trénink mozku přes plochu: „Otevřít projekt“ ho zavře, jinak mapa zůstane schovaná (Richard 16. 11. 2026)
+  await page.click('[data-testid="chat-brain-toggle"]');
+  expect(await cekej('[data-testid="brain-vrstva"]', 10000), 'trénink mozku otevřený');
   await page.click('[data-testid="chat-dok-projekt"]');
+  expect(await page.waitForFunction(() => !document.querySelector('[data-testid="brain-vrstva"]'), { timeout: 5000 }).then(() => true).catch(() => false), '„Otevřít projekt“ u dokumentu trénink mozku zavřel');
   let doMapy = false;
   for (let i = 0; i < 40 && !doMapy; i++) { doMapy = page.url().endsWith(`/map/${map.id}`); if (!doMapy) await sleep(250); }
   expect(doMapy, `klik otevře mapu projektu (${page.url().slice(-30)})`);

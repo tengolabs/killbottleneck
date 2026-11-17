@@ -163,6 +163,8 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
         </div>
       </div>
     </header>
+    {/* bar edge glow (16 Nov 2026) — the same accent line + glow as under the map editor's bar; the sticky wrapper positions it */}
+    <div aria-hidden="true" data-testid="lista-hrana" className="kb-lista-hrana" />
     </div>
   );
 }

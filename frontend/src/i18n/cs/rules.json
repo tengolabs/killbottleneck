@@ -148,7 +148,7 @@
       "alreadyWarn": "Na této řadě už kanban pravidla existují — druhé zapnutí je zdvojí. Raději upravte stávající v přehledu."
     },
     "toolbarKanban": "Kanban",
-    "toolbarKanbanTitle": "Mapa jede v kanbanu — rozložení řídí pravidla posunu. Zarovnat se vrátí po jejich vypnutí v přehledu ⚡.",
+    "toolbarKanbanTitle": "Mapa jede v kanbanu — karty posouvají pravidla. Srovnat ji můžete tlačítkem rámečku vedle.",
     "pickAgentRegistry": "— vyber agenta z registru —",
     "agentCustomOption": "jiná automatizace (zapsat ručně)",
     "templateBadge_one": "vč. {{count}} pravidla automatizace",

@@ -634,7 +634,12 @@ export default function DokumentyPanel({ mobil }) {
 
   // odkaz na projekt: na počítači se mapa přepne POD panelem a dokument zůstane vedle;
   // na telefonu by panel mapu zakryl → schovat dokumenty i chat (jako „Ukázat v mapě“ v asistentovi)
-  const naProjekt = useCallback(() => { if (mobil) { A.setDokOpen(false); A.setOpen(false); } }, [mobil, A]);
+  // the relax / brain zone lies over the map — "open project" must show the map, like the chat card links
+  // (AsistentPanel poOdkazu; Richard 16. 11. 2026: "rovnou to zkontroluj všude")
+  const naProjekt = useCallback(() => {
+    A.zavriZony();
+    if (mobil) { A.setDokOpen(false); A.setOpen(false); }
+  }, [mobil, A]);
 
   // tažení za levou hranu = šířka (stejně jako panel chatu)
   // tažení šířky: pointer capture + úklid i nad iframe relaxu (lib/tahSirky.js, 15. 10. 2026)
@@ -662,7 +667,7 @@ export default function DokumentyPanel({ mobil }) {
       {/* Office turns in like a page from the chat's edge (Richard 13 Nov 2026, same as New conversation) — on an inner wrapper,
           so the panel's own box (position, width) stays put while the content animates */}
       <div className={`flex flex-col flex-1 min-h-0 ${vlevo || mobil ? 'kb-dok-list-l' : 'kb-dok-list'}`} data-testid="chat-dok-list">
-      <div className="h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0">
+      <div className="kb-lista-2 h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           {mobil ? (
             <Button variant="ghost" size="sm" className="h-8 px-2 -ml-1" onClick={A.dokId ? zpet : zavri} data-testid="chat-dok-zpet-chat">

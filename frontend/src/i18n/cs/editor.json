@@ -29,6 +29,8 @@
   },
   "toolbar": {
     "back": "Zpět",
+    "toolsHide": "Schovat řádek nástrojů",
+    "toolsShow": "Ukázat řádek nástrojů",
     "titlePlaceholder": "Název mapy...",
     "searchPlaceholder": "Hledat cíl...",
     "directionGroup": "Rozložení mapy",

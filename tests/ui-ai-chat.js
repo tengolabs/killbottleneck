@@ -292,11 +292,13 @@ H.beh(async () => {
   await page.keyboard.type('Vlož obě dávky');
   await page.keyboard.press('Enter');
   expect(await cekej('[data-testid="chat-akce-vse"][data-pocet="2"]'), 'nad dvěma čekajícími kartami je „Provést vše (2)"');
+  // i pod poslední čekající kartou — tam čtení končí (Richard 16. 11. 2026)
+  expect(await page.evaluate(() => { const d = document.querySelector('[data-testid="chat-akce-vse-dole"][data-pocet="2"]'); const k = [...document.querySelectorAll('[data-testid="chat-akce"][data-stav="ceka"]')].pop(); return !!d && !!k && (k.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING) > 0; }), '„Provést vše (2)" je i pod poslední kartou');
   expect((await page.$$('[data-testid="chat-akce"][data-stav="ceka"] [data-testid="chat-akce-ano"]')).length === 2, 'jednotlivé Ano u každé karty zůstává');
   fronta.push(text('OBE-VLOZENY.'));
   await page.click('[data-testid="chat-akce-vse"]');
   expect(await cekejText('OBE-VLOZENY'), 'po Provést vše model dopověděl');
-  expect((await page.$$('[data-testid="chat-akce"][data-stav="hotovo"]')).length === 3 && !(await page.$('[data-testid="chat-akce-vse"]')), 'obě karty hotovo, tlačítko zmizelo');
+  expect((await page.$$('[data-testid="chat-akce"][data-stav="hotovo"]')).length === 3 && !(await page.$('[data-testid="chat-akce-vse"]')) && !(await page.$('[data-testid="chat-akce-vse-dole"]')), 'obě karty hotovo, obě tlačítka zmizela');
   const mapDavka = (await inst.api('GET', `/api/collections/goalmaps/records/${map.id}`, { token: A })).json;
   expect(['Dávka jedna', 'Dávka dvě'].every((tt) => mapDavka.nodes.some((n) => n.data.title === tt)), 'oba nápady jsou v mapě');
 
@@ -506,9 +508,13 @@ H.beh(async () => {
   expect(uzluPo === uzluPred + 1, `nový uzel se na plátně objevil sám (${uzluPred} → ${uzluPo}, bez reloadu)`);
   expect(await page.evaluate(() => document.body.innerText.includes('Objednat dýhu')), 'uzel má název nápadu');
   // v rozhovoru už je i hotová karta plánu s odkazem → klikat na POSLEDNÍ odkaz (na nový uzel)
+  // trénink mozku přes mapu: odkaz z karty ho musí zavřít, jinak mapa zůstane schovaná (Richard 16. 11. 2026)
+  await page.click('[data-testid="chat-brain-toggle"]');
+  expect(await cekej('[data-testid="brain-vrstva"]', 10000), 'trénink mozku otevřený přes mapu');
   const odkazy = await page.$$('[data-testid="chat-akce-odkaz"]');
   await odkazy[odkazy.length - 1].click();
   await sleep(1200);
+  expect(!(await page.$('[data-testid="brain-vrstva"]')), 'odkaz z karty trénink mozku zavřel — mapa je vidět');
   expect(/\?node=/.test(page.url()), `odkaz z karty vede na ?node= (${page.url().slice(-40)})`);
   expect(await page.evaluate(() => [...document.querySelectorAll('.react-flow__node.selected')].some((n) => n.innerText.includes('Objednat dýhu'))), 'editor najel na nový uzel a označil ho (mapa byla otevřená)');
   expect(!!napad2.id, 'nápad pro editor založen');

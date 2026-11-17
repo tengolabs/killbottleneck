@@ -138,12 +138,39 @@ function chybaV1(r) {
 // proto každý odkaz na nápad/mapu/uzel bere obojí. Název se porovnává bez
 // ohledu na velikost písmen a diakritiku; při nejednoznačnosti null.
 function norm(s) { return require(`${__hooks}/helpers.js`).normText(s); }
+// A leading emoji in a step title goes to the step icon (chat.js emojiDoIkony). Code points, not \p{…} (Goja regexp).
+// Arrows (U+2190–21FF) and technical signs (U+2300–23FF) count only as emoji pictures (⌚ ⌛ ⏩…⏳ ⏸…⏺) or with the
+// emoji selector U+FE0F — a title "→ Next stage" keeps its arrow.
+const EMOJI_23XX = [0x231A, 0x231B, 0x2328, 0x23CF, 0x23E9, 0x23EA, 0x23EB, 0x23EC, 0x23ED, 0x23EE, 0x23EF, 0x23F0, 0x23F1, 0x23F2, 0x23F3, 0x23F8, 0x23F9, 0x23FA];
+function jeEmojiKod(k, dalsi) {
+  if ((k >= 0x2190 && k <= 0x21FF) || (k >= 0x2300 && k <= 0x23FF)) return EMOJI_23XX.indexOf(k) >= 0 || dalsi === 0xFE0F;
+  return (k >= 0x1F000 && k <= 0x1FAFF) || (k >= 0x2600 && k <= 0x27BF) || (k >= 0x2B00 && k <= 0x2BFF)
+    || k === 0x2122 || k === 0x2139 || k === 0x24C2 || k === 0x3030 || k === 0x303D || k === 0x3297 || k === 0x3299;
+}
+// "🆕 Noví" → { em: "🆕", title: "Noví" }; null when the title does not start with an emoji (or is only an emoji)
+function emojiZNazvu(title) {
+  const s = String(title || "");
+  let i = 0; let em = "";
+  while (i < s.length) {
+    const k = s.codePointAt(i); const d = k > 0xFFFF ? 2 : 1;
+    const dalsi = i + d < s.length ? s.codePointAt(i + d) : 0;
+    if (jeEmojiKod(k, dalsi) || (em && (k === 0xFE0F || k === 0x200D || (k >= 0x1F3FB && k <= 0x1F3FF) || (k >= 0xE0020 && k <= 0xE007F)))) { em += s.slice(i, i + d); i += d; } else break;
+  }
+  const zbytek = s.slice(i).replace(/^\s+/, "");
+  return em && zbytek ? { em: em, title: zbytek } : null;
+}
+// Comparison key of a step title that ignores a leading emoji: the step proposed as "🆕 Noví" is stored as "Noví"
+// (emoji → icon), while a move or rule in the same reply still points at "🆕 Noví" — both must match
+function klicKroku(t) { const e = emojiZNazvu(t); return norm(e ? e.title : t); }
 function podleNazvu(rows, ref, nazev) {
   const n = norm(ref);
   if (!n) return null;
   const presne = rows.filter((r) => norm(nazev(r)) === n);
   if (presne.length === 1) return presne[0];
   if (presne.length > 1) return null;
+  // the same title up to a leading emoji ("🆕 Noví" ↔ "Noví" — the emoji went to the icon when the step was created)
+  const bezEmoji = rows.filter((r) => klicKroku(nazev(r)) === klicKroku(ref));
+  if (bezEmoji.length === 1) return bezEmoji[0];
   // částečná shoda: název obsahuje odkaz, nebo odkaz obsahuje název — druhý směr jen u názvů od 3 znaků
   // (jednoznakový název je podřetězcem skoro každého id i věty: 1. 10. 2026 se tak při mazání trefil nápad „c“
   // místo nápadu, který mezitím zmizel)
@@ -361,4 +388,4 @@ function pojmenovani(app, auth) {
   return { nazevMapy, nazevNapadu, uzelData, nazevUzlu };
 }
 
-module.exports = { MAX_ZN, RE_CISLO_PROJEKTU, MAX_MAP_ZAZNAMU, V1_BASE, ocisti, dnes, dosad, TREE_ITEM, bezDiakritiky, zaznamyMap, mapyUzivatele, napadyUzivatele, sDocasnymKlicem, chybaV1, norm, podleNazvu, napadPodleId, napadyProSmazani, napadZaznam, mapaId, titulMapy, titulUzlu, pravidloId, sablonaDto, pripominkyUzlu, uzelId, uzelVSeznamu, napadNaPolozku, bezId, pravaMapy, chybaPrav, MESICE_EN, uvoz, datumKratce, ymdLocal, posunDatum, kontrolyZapisu, pojmenovani, ikonaPodleNazvu, doplnIkony };
+module.exports = { emojiZNazvu, klicKroku, MAX_ZN, RE_CISLO_PROJEKTU, MAX_MAP_ZAZNAMU, V1_BASE, ocisti, dnes, dosad, TREE_ITEM, bezDiakritiky, zaznamyMap, mapyUzivatele, napadyUzivatele, sDocasnymKlicem, chybaV1, norm, podleNazvu, napadPodleId, napadyProSmazani, napadZaznam, mapaId, titulMapy, titulUzlu, pravidloId, sablonaDto, pripominkyUzlu, uzelId, uzelVSeznamu, napadNaPolozku, bezId, pravaMapy, chybaPrav, MESICE_EN, uvoz, datumKratce, ymdLocal, posunDatum, kontrolyZapisu, pojmenovani, ikonaPodleNazvu, doplnIkony };

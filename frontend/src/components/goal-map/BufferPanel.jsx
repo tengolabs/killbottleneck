@@ -223,7 +223,7 @@ export default function BufferPanel({ buffer, canEdit, onInsert, onConvert, open
 
   return (
     <div data-testid="buffer-panel" style={fixed ? { top: spodek, left: levo } : undefined} className={`${pos} left-0 ${fixed ? '' : 'top-0'} bottom-0 w-full sm:w-72 bg-card border-r shadow-xl flex flex-col z-20`}>
-      <div className="h-12 border-b flex items-center justify-between px-4 shrink-0">
+      <div className="kb-lista-2 h-12 border-b flex items-center justify-between px-4 shrink-0">
         {/* klik na ikonku/název zavírá stejně jako křížek — jedním klikem tam i zpět */}
         <button onClick={toggle} title={t('buffer.closeTitle')} className="flex items-center gap-2 hover:opacity-70 transition-opacity">
           <Inbox className="w-4 h-4 text-primary" />

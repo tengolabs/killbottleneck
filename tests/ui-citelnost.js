@@ -429,6 +429,17 @@ const api = async (m, p, { token, body } = {}) => {
     await page.goto(`${BASE}/map/${map.id}`, { waitUntil: 'networkidle2' });
     await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length >= 12, { timeout: 45000 });
     await sleep(2500);
+    // since 16 Nov 2026 the tools row is FOLDED on a phone by default (Richard: "row 1 for looking, open row 2 to work");
+    // the ⌄ at the right end of row 1 unfolds it — a real tap, not a storage shortcut
+    const sbaleno = await page.evaluate(() => {
+      const n = document.querySelector('[data-testid="toolbar-nastroje"]');
+      const b = document.querySelector('[data-testid="toolbar-nastroje-prepni"]');
+      return { sbalene: n && n.dataset.sbalene, nastrojeVidet: !!(n && n.offsetParent), sipka: !!(b && b.offsetParent) };
+    });
+    ok(sbaleno.sbalene === '1' && !sbaleno.nastrojeVidet && sbaleno.sipka, `telefon: řada nástrojů je ve výchozím stavu schovaná a šipka ⌄ je vidět (${JSON.stringify(sbaleno)})`);
+    await page.tap('[data-testid="toolbar-nastroje-prepni"]');
+    await sleep(600);
+    ok(await page.evaluate(() => !!document.querySelector('[data-testid="toolbar-nastroje"]').offsetParent), 'telefon: šipka ⌄ řadu nástrojů rozbalí');
     const mobilTlacitka = await page.evaluate(() => {
       const vse = [...document.querySelectorAll('[data-citelnost]')];
       const vidno = vse.filter((x) => x.offsetParent);

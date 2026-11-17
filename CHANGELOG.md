@@ -7,6 +7,36 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.6.0 — 2026-11-17
+
+**The assistant finishes a request in several steps, the align button tidies kanban boards, a foldable phone bar**
+
+**Upgrade notes:** no schema migration. On a phone the second row of the map bar (map tools and **+**) is folded
+by default — the arrow at the right end of the bar unfolds it, and the phone remembers the choice.
+
+- **A request in several steps is one set of cards.** "Make the project stages Lead, Offer, Deal, put the clients
+  in the first and when I mark one done, move it on" is proposed at once — the new steps, the moves and the rules
+  may point at each other by title — and **Do all** runs them in order. A card can say what comes next
+  (**Then: …**); after the confirmation the assistant continues instead of stopping at "Done."
+- **Rules in plain words.** "When I tick it off it jumps to the next stage" opens the rule tools without the word
+  "rule", and the rule card is a plain sentence ("When you set Done on a step under "Lead", it moves under "Offer"
+  and goes back to To do") instead of technical names.
+- **No duplicate rules.** A rule the map already has is not offered again (the assistant says it already works),
+  and the same rule proposed twice in one reply is proposed once.
+- A leading emoji in a step title becomes the step's icon instead of being shown twice; a plain arrow (→) stays.
+- **Do all** is also under the last waiting card when there are two or more.
+- A step moved by the assistant is laid out under its new parent instead of staying where it stood.
+- **The align button** (frame icon) aligns a map that was never aligned (wide style) and a **kanban board** too —
+  always in the wide style, stage columns in one row; Undo takes it back.
+- Links from the assistant and from the Office (Show in map, Open project, AI settings) close the brain-training
+  zone as well, not only the relax zone.
+- **Look:** a thin accent line with a soft glow under every top bar, and three levels of bars — the app bar, panel
+  headers with a hint of the theme colour, and a zone's own bar set one step lower.
+- **Phone:** the map bar folds its tools row (and **+**) away; on a split screen (aquarium above the chat) the edge
+  between them glows like the assistant's edge on a computer; the brain-training hub shows the game of the day in
+  one card and the other games right under it.
+- A page of the assistant opened over the whole window shows its error message translated, not a technical key.
+
 ## v1.5.0 — 2026-11-16
 
 **Former members and handing over their steps, Undo for edits with Ctrl+Z, the app's own dialogs, fixing a forgotten timer**

@@ -269,7 +269,9 @@ H.beh(async () => {
   await pockejNaUlozeni();
   expect((await poradi(listyA, false)) === rucne, `Zpět vrátí ruční pořadí před kostičkou (${await poradi(listyA, false)})`);
 
-  console.log('== kostička na mapě, která nikdy nebyla zarovnaná: jen oddálí ==');
+  // Od 16. 11. 2026 kostička srovná i mapu, která NIKDY nebyla zarovnaná (Richard: „kostička by měla
+  // zarovnat“) — ve stylu do šířky, uloží a jde vzít Zpět. Styl se přitom pořád NEDĚDÍ z předchozí mapy.
+  console.log('== přechod ze zarovnané mapy na nezarovnanou uvnitř aplikace: styl se nedědí ==');
   {
     const volna = (await inst.api('POST', '/api/collections/goalmaps/records', { token: T, body: {
       title: 'Ručně rozmístěná',
@@ -280,20 +282,9 @@ H.beh(async () => {
       ],
       edges: [{ id: 'v1', source: 'apex', target: 'r1' }, { id: 'v2', source: 'apex', target: 'r2' }],
     } })).json;
-    await otevri(volna.id, 3);
-    const styl = await page.$eval('[data-testid="toolbar-zarovnat"]', (b) => b.getAttribute('data-align-style'));
-    expect(styl === 'none', `nová mapa nemá zvolený styl (${styl})`);
     const updPred = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json.updated;
-    await kosticka();
-    const po = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json;
-    const r1 = (po.nodes || []).find((n) => n.id === 'r1');
-    expect(po.updated === updPred && r1 && r1.position.x === -300 && r1.position.y === 500, `ručně rozmístěné uzly zůstaly, nic se neuložilo (r1 ${JSON.stringify(r1?.position)})`);
-
-    // PŘECHOD MEZI MAPAMI UVNITŘ APLIKACE (bez načtení stránky): editor se
-    // nepřemontuje, takže mapa bez stylu dřív ZDĚDILA styl té předchozí — a
-    // kostička ji pak přerovnala a uložila (/checkup 2. 10. 2026). `page.goto`
-    // to nechytí, proto navigace přes historii prohlížeče.
-    console.log('== přechod ze zarovnané mapy na nezarovnanou uvnitř aplikace: styl se nedědí ==');
+    // PŘECHOD MEZI MAPAMI UVNITŘ APLIKACE (bez načtení stránky): editor se nepřemontuje, takže mapa bez
+    // stylu dřív ZDĚDILA styl té předchozí (/checkup 2. 10. 2026). `page.goto` to nechytí → historie.
     await otevri(mapa.id, 8);
     expect(await page.$eval('[data-testid="toolbar-zarovnat"]', (b) => b.getAttribute('data-align-style')) !== 'none', 'výchozí mapa styl má');
     await page.evaluate((id) => { window.history.pushState({}, '', `/map/${id}`); window.dispatchEvent(new PopStateEvent('popstate')); }, volna.id);
@@ -303,10 +294,20 @@ H.beh(async () => {
     const zdedeny = await page.$eval('[data-testid="toolbar-zarovnat"]', (b) => b.getAttribute('data-align-style'));
     const klicVolne = await page.evaluate((id) => localStorage.getItem('kb-zarovnat-styl:' + id), volna.id);
     expect(zdedeny === 'none' && !klicVolne, `nezarovnaná mapa styl předchozí mapy nezdědila (tlačítko ${zdedeny}, klíč ${klicVolne})`);
+    const ulozenaPred = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json;
+    expect(ulozenaPred.updated === updPred, 'samotné otevření nic neuložilo');
+
+    console.log('== kostička na mapě, která nikdy nebyla zarovnaná: srovná do šířky ==');
     await kosticka();
-    const poPrechodu = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json;
-    const r1b = (poPrechodu.nodes || []).find((n) => n.id === 'r1');
-    expect(poPrechodu.updated === updPred && r1b && r1b.position.x === -300 && r1b.position.y === 500, `a kostička ji ani teď nepřerovnala (r1 ${JSON.stringify(r1b?.position)})`);
+    const po = (await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json;
+    const r1 = (po.nodes || []).find((n) => n.id === 'r1'), r2 = (po.nodes || []).find((n) => n.id === 'r2');
+    expect(po.updated !== updPred && r1 && r2 && r1.position.y === r2.position.y && !(r1.position.x === -300 && r1.position.y === 500), `srovnala a uložila: podcíle v jedné řadě (r1 ${JSON.stringify(r1?.position)}, r2 ${JSON.stringify(r2?.position)})`);
+    const stylPo = await page.$eval('[data-testid="toolbar-zarovnat"]', (b) => b.getAttribute('data-align-style'));
+    expect(stylPo === 'classic', `tlačítko Zarovnat teď říká do šířky (${stylPo})`);
+    await klikHandle('button[title^="Vrátit zpět"]');
+    await pockejNaUlozeni();
+    const zpet = ((await inst.api('GET', `/api/collections/goalmaps/records/${volna.id}`, { token: T })).json.nodes || []).find((n) => n.id === 'r1');
+    expect(zpet && zpet.position.x === -300 && zpet.position.y === 500, `Zpět vrátí ruční rozmístění (r1 ${JSON.stringify(zpet?.position)})`);
   }
 
   // KOSTIČKA NA ŠÍŘKU NESMÍ TIŠE PŘEPSAT ULOŽENÉ SVISLÉ ROZMÍSTĚNÍ (/checkup
@@ -388,13 +389,27 @@ H.beh(async () => {
   await page.waitForSelector('[data-testid="toolbar-kanban-mode"]', { timeout: 10000 }).catch(() => {});
   expect(await page.$('[data-testid="toolbar-kanban-mode"]') !== null, 'indikátor Kanban je v liště');
   expect(await page.$('[data-testid="toolbar-usporadat"]') === null, 'nabídka Uspořádat v kanbanu není');
-  // kostička v kanbanu jen oddálí — desku drží pravidla posunu (pojistka je na
-  // `kanbanAktivni`, ne na donačtení textů indikátoru)
-  expect(await page.$eval('[data-testid="toolbar-fit"]', (b) => b.getAttribute('data-srovna')) === 'ne', 'kostička v kanbanu mapu nesrovnává');
-  const kanbanPred = (await inst.api('GET', `/api/collections/goalmaps/records/${kanban.id}`, { token: T })).json;
+  // od 16. 11. 2026 kostička srovná i kanban desku (Richard: „ano zarovnat i v kanban“ — desku, kterou
+  // postavil asistent, nešlo srovnat žádným tlačítkem)
+  expect(await page.$eval('[data-testid="toolbar-fit"]', (b) => b.getAttribute('data-srovna')) === 'ano', 'kostička v kanbanu mapu srovnává');
   await kosticka();
   const kanbanPo = (await inst.api('GET', `/api/collections/goalmaps/records/${kanban.id}`, { token: T })).json;
-  expect(kanbanPo.updated === kanbanPred.updated && JSON.stringify((kanbanPo.nodes || []).map((n) => n.position)) === JSON.stringify((kanbanPred.nodes || []).map((n) => n.position)), 'klik na kostičku desku nepřerovnal ani neuložil');
+  const kp = (id) => ((kanbanPo.nodes || []).find((n) => n.id === id) || {}).position || {};
+  expect(kp('K1').y === kp('K2').y && kp('K1').x !== kp('K2').x && kp('x1').y > kp('K1').y, `klik na kostičku desku srovnal: sloupce v řadě, karta pod sloupcem (K1 ${JSON.stringify(kp('K1'))}, K2 ${JSON.stringify(kp('K2'))}, x1 ${JSON.stringify(kp('x1'))})`);
+  // 17. 11. 2026 (Richard: „ano má se srovnat do šířky“): a kanban board aligns in one row even when the map has the
+  // bands / compact style (they drop every other column / its cards a floor lower) — and the map's own style stays
+  // (the styles act only on columns with ≥ 2 cards — each column gets two)
+  await page.evaluate((id) => localStorage.setItem('kb-zarovnat-styl:' + id, 'bands'), kanban.id);
+  const karta = (id, x, y) => ({ id, type: 'goalNode', position: { x, y }, data: { title: id, status: 'todo' } });
+  const rozhazet = (kanbanPo.nodes || []).map((n) => (n.id === 'K2' ? { ...n, position: { x: 900, y: 900 } } : n)).concat([karta('x2', 50, 50), karta('y1', 600, 20), karta('y2', 700, 800)]);
+  const hranyNove = (kanbanPo.edges || []).concat([{ id: 'k4', source: 'K1', target: 'x2' }, { id: 'k5', source: 'K2', target: 'y1' }, { id: 'k6', source: 'K2', target: 'y2' }]);
+  await inst.api('PATCH', `/api/collections/goalmaps/records/${kanban.id}`, { token: T, body: { nodes: rozhazet, edges: hranyNove, base_updated: kanbanPo.updated } });
+  await otevri(kanban.id, 4);
+  await kosticka();
+  const kanbanKomp = (await inst.api('GET', `/api/collections/goalmaps/records/${kanban.id}`, { token: T })).json;
+  const kk = (id) => ((kanbanKomp.nodes || []).find((n) => n.id === id) || {}).position || {};
+  const stylPo = await page.evaluate((id) => localStorage.getItem('kb-zarovnat-styl:' + id), kanban.id);
+  expect(kk('K1').y === kk('K2').y && kk('K1').x !== kk('K2').x && kk('x1').y === kk('y1').y && stylPo === 'bands', `kanban se stylem „po kategoriích“: sloupce i karty i tak v řadě, styl mapy zůstal (K1 ${JSON.stringify(kk('K1'))}, K2 ${JSON.stringify(kk('K2'))}, x1 ${kk('x1').y}, y1 ${kk('y1').y}, styl ${stylPo})`);
 
   console.log('== čtenář (týmový přístup ke čtení): nabídka není ==');
   const sdil = await inst.api('POST', '/api/kb/share', { token: T, body: { mapId: mapa.id, action: 'set_team_access', access: 'read' } });

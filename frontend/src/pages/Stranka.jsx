@@ -17,23 +17,27 @@ export default function Stranka() {
   const nsReady = useLazyNs('stranky');
   const { t } = useTranslation('stranky');
   const [str, setStr] = useState(null);
-  const [chyba, setChyba] = useState('');
+  const [chyba, setChyba] = useState(null);
   useEffect(() => {
     let zivy = true;
     apiStranka(id).then((r) => { if (zivy) { setStr(r.stranka); document.title = `${r.stranka.title} · killBottleneck`; } })
-      .catch((e) => { if (zivy) setChyba(e.status === 404 ? t('notFound') : (e.message || t('errorLoad'))); });
+      // keep the KEY, translate at render: the fetch can fail before the lazy `stranky` namespace has loaded,
+      // and t() then returned the bare key ("notFound") which stayed on screen
+      .catch((e) => { if (zivy) setChyba(e.status === 404 ? { klic: 'notFound' } : e.message ? { text: e.message } : { klic: 'errorLoad' }); });
     return () => { zivy = false; };
-  }, [id, t]);
+  }, [id]);
   if (!nsReady) return <div className="p-6"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   return (
     <div className="fixed inset-0 flex flex-col bg-background" data-testid="stranka-okno">
-      <div className="h-12 border-b flex items-center gap-2 px-3 shrink-0">
+      <div className="relative z-10 h-12 border-b flex items-center gap-2 px-3 shrink-0">
         <Button variant="ghost" size="sm" className="h-8 px-2" asChild><Link to="/" data-testid="stranka-zpet"><ChevronLeft className="w-4 h-4 mr-0.5" />killBottleneck</Link></Button>
         <span className="text-sm font-semibold truncate flex-1" data-testid="stranka-titulek">{str ? str.title : ''}</span>
         {str && str.html && <Button size="sm" variant="outline" className="h-8" onClick={() => saveBlob(new Blob([sAdresouObrazku(str.html)], { type: 'text/html;charset=utf-8' }), `${safeFilename(str.title || '', 'stranka')}.html`)} data-testid="stranka-stahnout"><Download className="w-3.5 h-3.5 mr-1" />{t('download')}</Button>}
+        {/* bar edge glow (16 Nov 2026) — same as the app's other top bars */}
+        <div aria-hidden="true" data-testid="lista-hrana" className="kb-lista-hrana" />
       </div>
       <div className="flex-1 min-h-0 bg-white">
-        {chyba ? <p className="p-6 text-sm text-destructive" data-testid="stranka-chyba">{chyba}</p>
+        {chyba ? <p className="p-6 text-sm text-destructive" data-testid="stranka-chyba">{chyba.klic ? t(chyba.klic) : chyba.text}</p>
           : !str ? <div className="p-6"><Loader2 className="w-5 h-5 animate-spin" /></div>
           : <NahledStranky html={str.html} title={str.title} testid="stranka-iframe" />}
       </div>

@@ -227,6 +227,7 @@ function KartaAkce({ karta, onPotvrd, onKlientSkin, loading, onOdkaz, najdiPdf, 
     <div className={`mt-2 rounded-lg border p-2.5 text-sm ${STAV_STYL[stav] || STAV_STYL.ceka}`} data-testid="chat-akce" data-stav={stav}>
       <p className="font-medium leading-snug">{karta.popis}</p>
       {karta.detail && <p className="text-xs text-muted-foreground mt-0.5" data-testid="chat-akce-detail">{karta.detail}</p>}
+      {karta.dal && stav === 'ceka' && <p className="text-xs text-muted-foreground mt-0.5" data-testid="chat-akce-potom">{t('actionThen', { text: karta.dal })}</p>}
       {Array.isArray(karta.udalosti) && karta.udalosti.length > 0 && <KartaUdalosti udalosti={karta.udalosti} />}
       {karta.cesta && karta.cesta.mapa ? <KartaCesta cesta={karta.cesta} strom={karta.strom} /> : (Array.isArray(karta.strom) && karta.strom.length > 0 && <KartaStrom strom={karta.strom} />)}
       {karta.jednorazove && karta.jednorazove.temp_password && <DocasneHeslo udaj={karta.jednorazove} />}
@@ -941,6 +942,16 @@ export default function AsistentZprava({ zprava, posledni, odkazDole, loading, o
   // Karty vykonávané prohlížečem (oprava PDF) mají vlastní výběr — do dávky nejdou.
   const cekajici = karty.filter((k) => k.type === 'akce' && k.stav === 'ceka' && !k.klient);
   const prvniCekajici = karty.indexOf(cekajici[0]);
+  // …and once more under the last waiting card, where reading ends (Richard 16. 11. 2026: with three rule
+  // cards he looked for "confirm all" below them and did not notice the one on top)
+  const posledniCekajici = karty.indexOf(cekajici[cekajici.length - 1]);
+  const tlacitkoVse = (testId) => (
+    <div className="mt-2 flex justify-end">
+      <Button size="sm" disabled={loading} onClick={() => onPotvrd(cekajici.map((c) => c.id), true)} data-testid={testId} data-pocet={cekajici.length}>
+        <CheckCheck className="w-3.5 h-3.5 mr-1" />{t('actionAll', { count: cekajici.length })}
+      </Button>
+    </div>
+  );
   return (
     <div className={`flex ${jaUzivatel ? 'justify-end' : 'justify-start'}`} data-testid="chat-msg" data-role={zprava.role}>
       <div className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${jaUzivatel ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-secondary text-foreground rounded-bl-md'}`}>
@@ -955,14 +966,9 @@ export default function AsistentZprava({ zprava, posledni, odkazDole, loading, o
           if (k.type === 'otazky') return <KartaOtazky key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} />;
           if (k.type === 'akce') return (
             <Fragment key={i}>
-              {i === prvniCekajici && cekajici.length > 1 && (
-                <div className="mt-2 flex justify-end">
-                  <Button size="sm" disabled={loading} onClick={() => onPotvrd(cekajici.map((c) => c.id), true)} data-testid="chat-akce-vse" data-pocet={cekajici.length}>
-                    <CheckCheck className="w-3.5 h-3.5 mr-1" />{t('actionAll', { count: cekajici.length })}
-                  </Button>
-                </div>
-              )}
+              {i === prvniCekajici && cekajici.length > 1 && tlacitkoVse('chat-akce-vse')}
               <KartaAkce karta={k} onPotvrd={onPotvrd} onKlientSkin={onKlientSkin} loading={loading} onOdkaz={onOdkaz} najdiPdf={najdiPdf} ulozPdf={ulozPdf} drivejsiOpravy={drivejsiOpravy} onOtevriDokument={onOtevriDokument} onRevertNastaveni={onRevertNastaveni} />
+              {i === posledniCekajici && cekajici.length > 1 && tlacitkoVse('chat-akce-vse-dole')}
             </Fragment>
           );
           if (k.type === 'navrhy') return <KartaNavrhy key={i} karta={k} aktivni={posledni} onSend={onSend} loading={loading} extra={extraNavrh} />;

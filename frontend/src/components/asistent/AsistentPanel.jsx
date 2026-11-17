@@ -512,7 +512,7 @@ export default function AsistentPanel({ lite = false }) {
   // odkaz z karty (Ukázat v mapě, Otevřít projekt, kalendář) ukončí relax — jinak by akvárium „vedle“ cílovou stránku
   // zakrylo a klik vypadal, že nic nedělá (klik-test 19. 10., stejně jako Připojit AI); zamčený relax se nechává
   const poOdkazu = useCallback(() => {
-    if (panel.relax && !panel.relax.zamek) panel.ukonciRelax();
+    panel.zavriZony(); // relax + brain zone lie over the map (AsistentContext)
     if (mobil) zavriChat();
   }, [mobil, zavriChat, panel]);
   // Toasty (vpravo dole) zakrývaly políčko chatu, dokud nezmizely — např. „mapa sloučena“
@@ -629,7 +629,7 @@ export default function AsistentPanel({ lite = false }) {
   // bez připojené AI ani ouško na kraji, ani lišta na telefonu — jen tlačítko v hlavičce (schválený náhled 19. 10.)
   if (stav === 'nepripojeno' && !A.open) return null;
   // relax (ranní akvárium vedle chatu) by Správu organizace zakryl a klik vypadal jako „nic se nestalo“ (klik-test 19. 10.)
-  const naNastaveniAi = () => { if (panel.relax && !panel.relax.zamek) panel.ukonciRelax(); navigate('/admin/users?oddil=ai'); if (mobil) zavriChat(); };
+  const naNastaveniAi = () => { panel.zavriZony(); navigate('/admin/users?oddil=ai'); if (mobil) zavriChat(); };
   const placeholderStav = stav === 'vypadek' ? t('stav.placeholderVypadek') : stav === 'nepripojeno' ? t('stav.placeholderNepripojeno') : '';
 
   // Closed-panel tab = robot + dot, no words (Richard 11 Nov 2026: "Morning briefing waiting" lay over the left rail).
@@ -761,10 +761,12 @@ export default function AsistentPanel({ lite = false }) {
       {/* Column edge (Richard 11 Nov 2026: "make the assistant column's divider stand out, maybe with an effect"):
           a 2 px accent line + a soft accent glow spilling onto the page; brighter while the resize handle is hovered */}
       {!mobil && <div aria-hidden="true" data-testid="chat-hrana" className={`kb-chat-hrana ${vlevo ? 'kb-chat-hrana-vlevo' : ''} peer-hover:bg-primary`} />}
+      {/* phone split screen (16 Nov 2026): the aquarium above, the chat below — the same edge, turned horizontal, glowing up onto the scene */}
+      {relaxNad && <div aria-hidden="true" data-testid="chat-hrana-nahore" className="kb-chat-hrana-nahore" />}
       {/* Header (10 Nov 2026, approved mock-up): ☰ Conversations · title · ✎ New · 📄 Office · 🐟 (11 Nov: Office in the middle, aquarium right) | ⇄ side · ⇥ minimise.
           On a wide window the empty part of the header is a drag handle — drop it on the other edge to move the panel. */}
       <div
-        className={`h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0 ${mobil ? '' : 'cursor-grab active:cursor-grabbing select-none touch-none'}`}
+        className={`kb-lista-2 h-12 border-b flex items-center justify-between px-3 gap-2 shrink-0 ${mobil ? '' : 'cursor-grab active:cursor-grabbing select-none touch-none'}`}
         onPointerDown={mobil ? undefined : naPresun}
         title={mobil ? undefined : t('moveHint')}
         data-testid="chat-hlavicka"

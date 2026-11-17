@@ -175,8 +175,8 @@ export default function BrainLayer({ lite = false }) {
   if (!b) return null;
   const side = L.side;
   const barClass = L.strip
-    ? 'flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b bg-card px-1'
-    : 'flex h-11 shrink-0 items-center gap-1 border-b bg-card px-2';
+    ? 'kb-lista-3 flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b px-1'
+    : 'kb-lista-3 flex h-11 shrink-0 items-center gap-1 border-b px-2';
   const best = summary && summary.bests && summary.bests[game] ? summary.bests[game][level] : undefined;
 
   return (

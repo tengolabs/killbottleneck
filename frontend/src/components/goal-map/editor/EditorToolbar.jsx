@@ -1,8 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2, Check, AlertTriangle, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot, RotateCw, Target } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Plus, Loader2, Check, AlertTriangle, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot, RotateCw, Target } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
 import { stavAsistenta } from '@/hooks/useAiEnabled';
 import { useMedia } from '@/lib/useMedia';
@@ -22,6 +22,7 @@ import OrgLogo from '@/components/shared/OrgLogo';
 import UserMenu from '@/components/shared/UserMenu';
 import NotificationBell from '@/components/shared/NotificationBell';
 import PersonalTabs from './PersonalTabs';
+import { nactiKlic, ulozKlic } from '@/lib/storageKeys';
 
 // ikonky orientace mapy: obdélník na výšku / na šířku
 const IconPortrait = (props) => (
@@ -75,6 +76,9 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   const { t } = useTranslation('editor');
   const asistent = useAsistent();
   const sirokaLista = useMedia('(min-width: 1850px)');
+  // phone (Richard 16 Nov 2026): "+" moves into the tools row — row 1 is for looking, opening row 2 (⌄) is for working.
+  // Rendered in ONE place at a time (not a hidden twin), so text-based clicks always hit the visible button
+  const telefonLista = !useMedia('(min-width: 640px)');
   const { navigate, org } = nav;
   const {
     direction, setDirMode, recenterMap, kanbanAktivni, kanbanNsReady,
@@ -214,13 +218,19 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   // editace a v kanbanu jen oddálí. Čisté oddálení je i dole v ovládání plátna.
   // (podle `kanbanAktivni` samotného — `kanbanNsReady` je jen donačtení textů
   // indikátoru a kostička by do té doby desku přerovnala; /checkup 2. 10.)
-  const srovnaVse = (canEdit || personalMap) && !isPublicView && !kanbanAktivni;
+  // since 16 Nov 2026 it also aligns a kanban board (Richard: "ano zarovnat i v kanban") — without the Uspořádat criterion
+  const srovnaVse = (canEdit || personalMap) && !isPublicView;
+  const pridatTlacitko = (
+    <Button onClick={handleAddGoal} size="sm" className="shrink-0 max-sm:h-9 max-sm:px-3">
+      <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t(jeProces ? 'process.addStepButton' : 'toolbar.addGoal')}</span>
+    </Button>
+  );
   const kosticka = (siroka) => (
     <Button
       variant="outline"
       size={siroka ? 'sm' : 'icon'}
-      className={siroka ? 'hidden min-[1850px]:inline-flex px-2' : 'min-[1850px]:hidden h-9 w-9 shrink-0 mr-auto'}
-      onClick={srovnaVse ? handleSrovnatVse : recenterMap}
+      className={siroka ? 'hidden min-[1850px]:inline-flex px-2' : 'min-[1850px]:hidden h-9 w-9 shrink-0 sm:mr-auto'}
+      onClick={srovnaVse ? () => handleSrovnatVse({ kanban: kanbanAktivni }) : recenterMap}
       title={srovnaVse ? t('toolbar.fitAlignTitle') : t('toolbar.fitViewTitle')}
       aria-label={srovnaVse ? t('toolbar.fitAlignTitle') : t('toolbar.fitViewTitle')}
       data-testid={siroka ? 'toolbar-fit' : 'toolbar-fit-narrow'}
@@ -397,6 +407,12 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
   // Mapa pod lištou se dál zúží, ať je vedle panelu celá vidět.
   const odsunPanelu = user ? asistent.odsun : 0;
   const obalListy = useRef(null);
+  // phone: the second bar row (map tools) can be folded away with the ⌄ at the right end (Richard 16 Nov 2026) —
+  // FOLDED by default ("on a phone the top bar hidden by default"), the choice is remembered per browser;
+  // the computer bar is one row and ignores it
+  const [nastrojeSbalene, setNastrojeSbalene] = useState(() => nactiKlic('kb-lista-nastroje-sbalene') !== '0');
+  // storage write outside the state updater (an updater must stay pure — StrictMode calls it twice)
+  const prepniNastroje = () => { const nove = !nastrojeSbalene; ulozKlic('kb-lista-nastroje-sbalene', nove ? '1' : '0'); setNastrojeSbalene(nove); };
   useOhlasSpodekHlavicky(obalListy);
   // Stav ukládání v ikonové liště (640–1849 px): jen ikona, absolutně vlevo od
   // přepínače směru — nezabírá místo, takže se při uložení nic nepohne (dřív
@@ -415,7 +431,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
     </span>
   ) : null;
   return (
-      <header ref={obalListy} data-app-header style={odsunPanelu ? (asistent.side === 'left' ? { marginLeft: -odsunPanelu } : { marginRight: -odsunPanelu }) : undefined} className="transition-[margin] sticky top-0 min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-30 shrink-0">
+      <header ref={obalListy} data-app-header style={odsunPanelu ? (asistent.side === 'left' ? { marginLeft: -odsunPanelu } : { marginRight: -odsunPanelu }) : undefined} className="transition-[margin] sticky top-0 min-h-14 sm:h-14 border-b bg-card flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-1 sm:gap-x-2 gap-y-1.5 px-3 sm:px-4 py-1.5 sm:py-0 z-30 shrink-0">
         <div className="flex items-center gap-2 min-w-0 w-auto sm:flex-1">
           {/* Značka patří úplně doleva, před šipku zpět (Richard 6. 8.).
               U názvu projektu být nesmí — dvě loga vedle sebe by si konkurovala,
@@ -443,7 +459,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               if (window.history.state && window.history.state.idx > 0) navigate(-1);
               else navigate('/');
             }}
-            className="shrink-0 h-11 w-11 sm:h-9 sm:w-9" // mobil: 44px dotyková plocha (u horní hrany se 36px špatně trefuje)
+            className="shrink-0 h-11 w-9 sm:h-9 sm:w-9" // phone: 44 px tall touch target (36 px at the top edge is hard to hit); 36 px wide since 16 Nov 2026 to make room for the tools ⌄
             title={t('toolbar.back')}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -461,7 +477,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
             Dřív (shrink-0 + w-full bez zalomení) řada jedenácti tlačítek přetekla přes okraj
             a rolovala do strany celou stránku i s mapou. */}
         <div className="contents sm:flex sm:items-center sm:gap-3 sm:w-auto sm:justify-end sm:shrink-0">
-          <div className="flex items-center gap-1.5 basis-full order-last sm:contents" data-testid="toolbar-nastroje">
+          <div className={`${nastrojeSbalene ? 'hidden' : 'flex'} items-center gap-1.5 basis-full order-last sm:contents`} data-testid="toolbar-nastroje" data-sbalene={nastrojeSbalene ? '1' : '0'}>
           {/* Vyhledávání a filtr Moje úkoly se přestěhovaly do LEVÉ lišty pod
               zásobník a časovač (Richard 11. 8.: „vyhledávání dej ikonku pod
               zásobník a časovač… moje úkoly taky, je to jen filtr") — horní
@@ -554,8 +570,9 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
           {nabidkaUsporadat(false)}
           {nabidkaCitelnost(false)}
           {kosticka(false)}
+          {canEdit && telefonLista && pridatTlacitko}
           </div>
-          <div className="flex items-center gap-1.5 ml-auto sm:contents" data-testid="toolbar-akce">
+          <div className="flex items-center gap-1 ml-auto sm:contents" data-testid="toolbar-akce">
           <PersonalTabs personalMap={personalMap} personalView={personalView} setPersonalView={setPersonalView} navigate={navigate} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -568,11 +585,7 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               {akce.filter((a) => a.sekceListy === 'export' && a.viditelna).map((a) => polozkaMenu(a, true))}
             </DropdownMenuContent>
           </DropdownMenu>
-          {canEdit && (
-            <Button onClick={handleAddGoal} size="sm">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t(jeProces ? 'process.addStepButton' : 'toolbar.addGoal')}</span>
-            </Button>
-          )}
+          {canEdit && !telefonLista && pridatTlacitko}
           {/* Úzká hrdla: přepínač zvýraznění. Viditelný vždy (i pod 1850 px) —
               počítadlo je alarm, nesmí se schovat do ⋮. Počítadlo = jen REÁLNÁ
               hrdla. Stavy tlačítka: zapnuto = plné (default, jako jiné aktivní
@@ -649,8 +662,25 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
               {akce.filter((a) => a.viditelna && a.jen !== 'lista').map((a) => polozkaMenu(a, false))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* phone: ⌄ folds the tools row away — at the far right, straight above the assistant's own ⌄ (minimise),
+              so the two "fold" arrows stack (Richard 16 Nov 2026) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={prepniNastroje}
+            className="sm:hidden shrink-0 h-8 w-8"
+            title={t(nastrojeSbalene ? 'toolbar.toolsShow' : 'toolbar.toolsHide')}
+            aria-label={t(nastrojeSbalene ? 'toolbar.toolsShow' : 'toolbar.toolsHide')}
+            aria-expanded={!nastrojeSbalene}
+            data-testid="toolbar-nastroje-prepni"
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${nastrojeSbalene ? 'rotate-180' : ''}`} />
+          </Button>
           </div>
         </div>
+        {/* Bar edge (Richard 16 Nov 2026: "the effect between the assistant and the map, I want it at the top too"):
+            the same 2 px accent line + soft accent glow as the assistant column edge, spilling down onto the map */}
+        <div aria-hidden="true" data-testid="lista-hrana" className="kb-lista-hrana" />
       </header>
   );
 }

@@ -21,7 +21,7 @@
 // HOOKS: v PocketBase `__hooks`; mimo PocketBase (testy čtou NASTROJE v node) složka souboru — jako v napoveda.js
 const HOOKS = typeof __hooks !== "undefined" ? __hooks : __dirname;
 const SPOL = require(`${HOOKS}/chat-spolecne.js`);
-const { TREE_ITEM, bezDiakritiky, bezId, chybaPrav, chybaV1, datumKratce, dnes, dosad, mapaId, mapyUzivatele, napadNaPolozku, napadPodleId, napadZaznam, napadyProSmazani, napadyUzivatele, norm, ocisti, pravaMapy, sDocasnymKlicem, titulUzlu, uvoz, uzelId , kontrolyZapisu, pojmenovani, doplnIkony, ikonaPodleNazvu, uzelVSeznamu } = SPOL;
+const { TREE_ITEM, bezDiakritiky, bezId, chybaPrav, chybaV1, datumKratce, dnes, dosad, mapaId, mapyUzivatele, napadNaPolozku, napadPodleId, napadZaznam, napadyProSmazani, napadyUzivatele, norm, ocisti, pravaMapy, sDocasnymKlicem, titulUzlu, uvoz, uzelId , kontrolyZapisu, pojmenovani, doplnIkony, ikonaPodleNazvu, uzelVSeznamu, emojiZNazvu, klicKroku } = SPOL;
 const ikonaUzlu = (v) => require(`${__hooks}/helpers.js`).ikonaUzlu(v); // jediný ořez ikony (16 kódových bodů, ne UTF-16 jednotek)
 const { tydenData } = require(`${HOOKS}/chat-tym.js`);
 const MODULY = ["chat-pravidla.js", "chat-udalosti.js", "chat-prace.js", "chat-terminy.js", "chat-hledani.js", "chat-tym.js", "chat-rizika.js", "chat-faktury.js", "chat-stranky.js", "chat-kancelar.js", "chat-obrazky.js"];
@@ -1277,7 +1277,7 @@ const NASTROJE_ZAKLAD = [
     parameters: { type: "object", properties: { map_id: { type: "string" }, style: { type: "string", enum: ["project", "process"] } }, required: ["map_id", "style"], additionalProperties: false } },
   { name: "delete_project", skupina: "projekt", kind: "write", description: "Delete a project (map) with all its steps for good — cannot be undone; unless the user clearly wants it gone, offer archive_project instead. Project owner only. The user confirms first.",
     parameters: { type: "object", properties: { map_id: { type: "string" } }, required: ["map_id"], additionalProperties: false } },
-  { name: "move_node", kind: "write", description: "Move a step (node) with its whole subtree under another step of the SAME map: parent_id = the exact title of the new parent step, or \"apex\" for the top level. Editors of the map only. The user confirms first.",
+  { name: "move_node", kind: "write", description: "Move a step (node) with its whole subtree under another step of the SAME map: parent_id = the exact title of the new parent step (also a step you add with add_nodes in this same reply — propose both together), or \"apex\" for the top level. Editors of the map only. The user confirms first.",
     parameters: { type: "object", properties: { map_id: { type: "string" }, node_id: { type: "string", description: "the exact node title (from get_map)" }, parent_id: { type: "string", description: "exact title of the new parent, or \"apex\"" } }, required: ["map_id", "node_id", "parent_id"], additionalProperties: false } },
   { name: "update_idea", kind: "write", description: "Change the title and/or description of an idea in the user's idea buffer (idea = the exact title or the id from list_ideas). The user confirms first.",
     parameters: { type: "object", properties: { idea: { type: "string" }, title: { type: "string" }, description: { type: "string" } }, required: ["idea"], additionalProperties: false } },
@@ -1400,7 +1400,7 @@ const SKUPINY_KLICE = {
   // pravidla (zúženo 5. 10. 2026): holé „upozornění/připomeň/notifikace“ patří nastavení a událostem; pravidlo poznáme
   // podle podmínky („když/až/pokud/každý … upozorni/dej vědět“, „upozorni … když/po termínu“) nebo slov pravidlo/automat/hlídat/šablona
   // „připomeň“ zůstává i tady: připomínka ke kroku s termínem je pravidlo deadline_approaching (ověřené chování ai-chat.js)
-  pravidla: /pravidl|automat|hlid|spoust|\brule|trigger|sablon|template|pripom|remind|opakov|\brytm|\brepeat|recurr|kazd\w* (den|tyden|mesic|pondel|uter|stred|ctvrt|patek|sobot|nedel|vsedni|pracovni)|every (day|week|month|other|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday|working day)|(kdyz|\baz\b|pokud|jakmile|kazd[yaeou]|when|if|whenever|every)\b[^.?!\n]{0,60}\b(upozorn|dej (mi )?vedet|dat vedet|oznam|notif|remind|notify|alert|posl[iea])|\b(upozorn|oznam|notif|remind|notify|alert)\w*[^.?!\n]{0,60}\b(kdyz|\baz\b|pokud|jakmile|kazd|when|if|whenever|every|po terminu|pred terminem|overdue|before the deadline)/i,
+  pravidla: /pravidl|pravidel\b|automat|(hotov|dokonc|splnen|splnim|odskrt|odklik|zaskrt|vyrizen|\bdone\b|finish|complet)\w*[^.?!\n]{0,80}\b(skoc|posun|presun|preskoc|prejd|prejit|pujde|putuje|odjede|move|moves|jump|advance|shift)|\b(sam[oaiy]?|automaticky|by itself|on its own|automatically)\b[^.?!\n]{0,40}\b(skoc|posun|presun|preskoc|prejd|move|jump|advance)|hlid|spoust|\brule|trigger|sablon|template|pripom|remind|opakov|\brytm|\brepeat|recurr|kazd\w* (den|tyden|mesic|pondel|uter|stred|ctvrt|patek|sobot|nedel|vsedni|pracovni)|every (day|week|month|other|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday|working day)|(kdyz|\baz\b|pokud|jakmile|kazd[yaeou]|when|if|whenever|every)\b[^.?!\n]{0,60}\b(upozorn|dej (mi )?vedet|dat vedet|oznam|notif|remind|notify|alert|posl[iea])|\b(upozorn|oznam|notif|remind|notify|alert)\w*[^.?!\n]{0,60}\b(kdyz|\baz\b|pokud|jakmile|kazd|when|if|whenever|every|po terminu|pred terminem|overdue|before the deadline)/i,
   projekt: /zaloz|\bproces|\bprocess|na (normalni |obycejn\w* )?projekt|\bstyl|to a (normal |regular )?project|\bstyle\b|nov\w* (projekt|map)|vytvor\w* (projekt|map|nov)|z napad|rozjet|startup|byznys|podnikat|podnikani|create (a |new )?(project|map)|new (project|map)|start (a |new )?project|archivuj|archivov|do archivu|z archivu|prejmen|rename|smaz\w* (ten |tento |cely |to )?(projekt|map)|zrus\w* (ten |tento |cely )?(projekt|map)|delete (the |this )?(project|map)|\barchive (the |this |it|project|map)|unarchive|obnov\w* (projekt|map)|restore (the |this |it|project|map)/i,
   vzhled: /vzhled|skin|barv|\btmav|\bsvetl|\btema|theme|\bdark|\blight|colou?r/i, // \b: „osvětlení“ není světlý motiv (5. 10. 2026)
   tym: /\btym|\blid[ie]|koleg|\bkdo\b|komu|prirad|vlastnik|portfolio|prehled|organizac|\bteam|people|\bwho\b|assign|owner|overview/i,
@@ -1515,7 +1515,39 @@ function proModel(skupiny, auth, app) {
     return { ...n, parameters: { ...n.parameters, properties: props } };
   };
   return NASTROJE.filter((n) => (!n.skupina || !skupiny || skupiny.has(n.skupina)) && (!auth || (!n.jenRole && !n.jenKdy) || nastrojDostupny(n.name, "", auth, app)))
-    .map(sObrazky).map((n) => ({ name: n.name, kind: n.kind, description: n.description, parameters: n.parameters })); // kind: llm.js podle něj pouští volání napsané jako text (jen bezpečné)
+    .map(sObrazky).map(sPokracovanim).map((n) => ({ name: n.name, kind: n.kind, description: n.description, parameters: n.parameters })); // kind: llm.js podle něj pouští volání napsané jako text (jen bezpečné)
+}
+// B (16. 11. 2026): map-building writes may say what comes next. A card the user confirms used to end the turn with
+// the app's "Done." (0 tokens) — a request in several dependent steps (columns → moves → rules) stopped after the
+// first one. With `then` the model continues after the confirmation; without it the cheap ending stays as it was.
+// Only on these tools — every extra property is prompt the local models read on every turn.
+const S_POKRACOVANIM = new Set(["create_project", "create_project_from_ideas", "add_nodes", "update_node", "delete_node", "move_node", "add_idea_to_map", "set_node_icons", "create_rule", "update_rule", "set_rule_enabled"]);
+const THEN_PROP = { type: "string", description: "only if the user's request needs another step after the user confirms this one: that next step in a few words (omit when this completes the request)" };
+function bezThen(c) {
+  if (!c || !c.args || typeof c.args !== "object" || !Object.prototype.hasOwnProperty.call(c.args, "then")) return "";
+  const dal = S_POKRACOVANIM.has(c.name) && typeof c.args.then === "string" ? ocisti(c.args.then, 200).trim() : "";
+  c.args = Object.assign({}, c.args);
+  delete c.args.then;
+  return dal;
+}
+// A leading emoji in a step title goes to the step icon. Models write "🆕 Noví" AND icon "🆕" — the card then
+// shows the emoji twice, and a font without it draws two boxes (Richard 16. 11. 2026). Code points, not \p{…}
+// (Goja regexp); only a LEADING emoji run is moved, an icon the model set stays.
+// tools that write a tree of steps (items / outline)
+const STROMOVE_NASTROJE = ["add_nodes", "create_project", "create_project_from_ideas"];
+function emojiDoIkony(items) {
+  return (Array.isArray(items) ? items : []).map((it) => {
+    if (!it || typeof it !== "object") return it;
+    const o = Object.assign({}, it);
+    const e = typeof o.title === "string" ? emojiZNazvu(o.title) : null;
+    if (e) { o.title = e.title; if (!(typeof o.icon === "string" && o.icon.trim())) o.icon = e.em; }
+    if (Array.isArray(o.children)) o.children = emojiDoIkony(o.children);
+    return o;
+  });
+}
+function sPokracovanim(n) {
+  if (!S_POKRACOVANIM.has(n.name) || !n.parameters || !n.parameters.properties) return n;
+  return { ...n, parameters: { ...n.parameters, properties: { ...n.parameters.properties, then: THEN_PROP } } };
 }
 
 // ---------- podklady ----------
@@ -2213,11 +2245,23 @@ function vykonej(app, auth, L, name, args, ktx) {
       const pref = String(a.parent_id || "").trim();
       const pid = !pref || pref.toLowerCase() === "apex" ? apex : uzelId(app, auth, p.map.id, pref);
       if (!nid || !pid) return { text: "Error: node or parent not found." };
+      // the card check skips these for a parent proposed in the same reply (it did not exist yet) — repeat them now
+      if (pid === nid) return { text: "Error: a step cannot be moved under itself." };
+      const podstrom = new Set([nid]);
+      for (let zmena = true; zmena;) { zmena = false; for (const e of edges) if (podstrom.has(e.source) && !podstrom.has(e.target)) { podstrom.add(e.target); zmena = true; } }
+      if (podstrom.has(pid)) return { text: "Error: the new parent is inside the moved step's own subtree — nothing was moved." };
       let nove = edges.filter((e) => e.target !== nid);
       // hrana jako všude jinde v aplikaci (type deletable = tlačítko smazání v editoru) a base_updated = ochrana 409 proti
       // souběžné úpravě v otevřeném editoru (panel 4. 10. 2026: dřív bez obojího, autosave editoru mohl přesun tiše přepsat)
       nove.push({ id: `edge-${Date.now()}-${nid}`, source: pid, target: nid, type: "deletable" });
-      const r = http("PATCH", `/api/collections/goalmaps/records/${encodeURIComponent(p.map.id)}`, { edges: nove, base_updated: p.map.getString("updated") });
+      // The moved step used to stay where it stood, only its edge changed — a stage board the assistant built had
+      // its clients scattered across the canvas (Richard 16. 11. 2026, option A: "tidy what the app scattered").
+      // The same server re-layout as the assistant's add_nodes (v1SaveMapData relayout); rules keep moving a card
+      // locally (binding decision: a hand-made board is not reshuffled on every Done).
+      const { layoutTreeServer } = require(`${__hooks}/helpers.js`);
+      const pos = layoutTreeServer(nodes, nove);
+      const uzlyPo = nodes.map((n) => (n && n.type !== "note" && pos[n.id] ? Object.assign({}, n, { position: pos[n.id] }) : n));
+      const r = http("PATCH", `/api/collections/goalmaps/records/${encodeURIComponent(p.map.id)}`, { nodes: uzlyPo, edges: nove, base_updated: p.map.getString("updated") });
       if (r.status === 409) return { text: "Error: the map was changed by someone else meanwhile — nothing was moved; ask the user to try again." };
       if (r.status !== 200) return { text: `Error ${r.status}: ${((r.json || {}).message) || "update failed"}` };
       const pn = nodes.find((n) => n.id === pid) || { data: {} };
@@ -2657,11 +2701,21 @@ function zalozniVolby(msgs, L) {
   return [P[L].coDal];
 }
 
+// Titles of steps proposed with add_nodes that still wait for confirmation (this reply's cards and older ones) in the
+// same map — a move or a rule proposed alongside may point at them (they are created first on "Do all").
+function planovaneKroky(app, auth, mapRef, cekajici) {
+  const mid = mapaId(app, auth, mapRef);
+  if (!mid) return [];
+  const out = [];
+  const projdi = (items, hloubka) => { for (const it of (Array.isArray(items) ? items : [])) { if (it && it.title) out.push(String(it.title)); if (hloubka < 6 && it) projdi(it.children, hloubka + 1); } };
+  for (const p of (cekajici || [])) if (p && p.name === "add_nodes" && mapaId(app, auth, (p.args || {}).map_id) === mid) projdi(p.args.items, 0);
+  return out;
+}
 // Chyby, které by v1 API vrátilo až PO potvrzení karty — model je dostane hned a opraví je
 // (plán dál než 7 dní, neznámý řešitel). Strom se kontroluje na kopii (resolveTreeOwners přepisuje).
 function chybaPredKartou(app, auth, name, a) {
   const H = require(`${__hooks}/helpers.js`);
-  if (["create_project", "create_project_from_ideas", "add_nodes"].includes(name)) {
+  if (STROMOVE_NASTROJE.includes(name)) {
     const items = a.outline || a.items;
     const plan = H.checkTreePlans(items);
     if (plan) return `Error: planned_on of "${plan}" must be a date from today to +7 days (YYYY-MM-DD) — the plan says when the user works on it this week; a later agreed date is a deadline. Nothing was written.`;
@@ -2742,6 +2796,9 @@ function overZapisZaklad(app, auth, name, a) {
       if (nodes.some((n) => n.id === nid && n.type === "apexNode")) return "Error: the apex (goal) cannot be moved.";
       const apex = (nodes.find((n) => n.type === "apexNode") || {}).id || "";
       const pref = String(a.parent_id || "").trim();
+      // a parent added with add_nodes earlier in this reply does not exist yet — it is created first when the user
+      // confirms the cards (they run in card order), the move resolves it then
+      if ((a.__planned || []).some((t) => klicKroku(t) === klicKroku(pref))) return null;
       const pid = !pref || pref.toLowerCase() === "apex" ? apex : uzelId(app, auth, p.map.id, pref);
       if (!pid) return `Error: parent "${pref}" not found in the map (use get_map; pass the exact title or "apex").`;
       if (pid === nid) return "Error: a step cannot be moved under itself.";
@@ -3414,10 +3471,15 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
         msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: vykonej(app, auth, L, c.name, c.args).text });
         continue;
       }
+      // "then" = the step the model takes after this card is confirmed (B, 16. 11. 2026): offered only in the schema the
+      // model sees (sPokracovanim), never part of the action — taken off before the checks
+      const dal = bezThen(c);
       // menší modely občas pošlou pole/objekt jako JSON řetězec (qwen: ask_user
       // questions "[...]") — rozbalit, ať se kolo nezdržuje chybou a opakováním
       c.args = bezNull(def.parameters, rozbalRetezce(def.parameters, c.args || {}));
       if (c.name === "ask_user") c.args = normalizujAskUser(c.args);
+      // add_nodes carries the tree in `items`, create_project(_from_ideas) in `outline`
+      if (STROMOVE_NASTROJE.includes(c.name)) for (const k of ["items", "outline"]) if (Array.isArray(c.args[k])) c.args = Object.assign({}, c.args, { [k]: emojiDoIkony(c.args[k]) });
       const chyba = M.validujArgumenty(def.parameters, c.args, c.name);
       if (chyba) {
         msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: "Error: " + chyba });
@@ -3491,7 +3553,9 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
           konec = true;
           continue;
         }
-        const chybaOdkazu = overZapis(app, auth, c.name, c.name === "pdf_replace_text" ? Object.assign({ __msgs: msgs }, c.args || {}) : (c.args || {}));
+        const cekajici = ["move_node", "create_rule", "update_rule"].includes(c.name) ? jsonVal(rec, "pending", []).concat(pending) : null;
+        const sPlanem = cekajici ? { __planned: planovaneKroky(app, auth, c.args && c.args.map_id, cekajici), __pendingRules: cekajici.filter((p) => p && p.name === "create_rule" && (!p.stav || p.stav === "ceka")).map((p) => p.args || {}) } : null;
+        const chybaOdkazu = overZapis(app, auth, c.name, c.name === "pdf_replace_text" ? Object.assign({ __msgs: msgs }, c.args || {}) : sPlanem ? Object.assign(sPlanem, c.args || {}) : (c.args || {}));
         if (chybaOdkazu) {
           msgs.push({ role: "tool", name: c.name, toolCallId: c.id, content: chybaOdkazu });
           continue;
@@ -3502,7 +3566,8 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
           const zaznamy = c.args.all === true ? napadyUzivatele(app, auth.id) : [].concat.apply([], (c.args.idea_ids || []).map((i) => napadyProSmazani(app, auth, i)));
           c.args = { idea_ids: zaznamy.map((r) => r.id).filter((id, i, arr) => arr.indexOf(id) === i) };
         }
-        const akce = { id: "a_" + $security.randomString(10), toolCallId: c.id, name: c.name, args: c.args, popis: popisAkce(app, auth, L, c.name, c.args), stav: "ceka" };
+        const akce = { id: "a_" + $security.randomString(10), toolCallId: c.id, name: c.name, args: c.args, popis: popisAkce(app, auth, L, c.name, sPlanem ? Object.assign({}, c.args, { __planned: sPlanem.__planned }) : c.args), stav: "ceka" };
+        if (dal) akce.dal = dal;
         if (tgR && tgR.meta) akce.meta = tgR.meta; // emoji/barva/klient z dialogu Nový projekt — server, ne model
         // všechny čekající akce se musí vejít do ai_chats.pending (20 kB): velký strom s dlouhými popisy by jinak
         // shodil app.save a tah i se zprávou uživatele by zmizel → model dostane pokyn návrh zkrátit nebo rozdělit
@@ -3515,6 +3580,7 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
         pending.push(akce);
         // name: podle něj rozhovor s kartou nastavení/sdílení drží skupinu nástrojů i v dalším tahu bez klíčového slova (skupinyZeZprav)
         const karta = { type: "akce", id: akce.id, name: c.name, toolCallId: c.id, popis: akce.popis, detail: detailAkce(app, auth, L, c.name, c.args), stav: "ceka" };
+        if (dal) karta.dal = dal; // the card shows "Then: …" — the user sees the whole plan, not only this step
         if (["create_project", "create_project_from_ideas", "add_nodes"].includes(c.name)) {
           const napady = c.name === "create_project_from_ideas" ? (Array.isArray(c.args.idea_ids) ? c.args.idea_ids : []).map((i) => { const r = napadZaznam(app, auth, i); return r ? r.getString("title") : String(i); }) : null;
           const strom = stromKarty(c.args.outline || c.args.items, napady);
@@ -3532,7 +3598,12 @@ function smycka(app, auth, L, cfg, rec, stats, ctx) {
           if (ces && napad) { ces.odkud = { druh: "zasobnik", t: ocisti(napad.getString("title"), 120) }; ces.novy = { t: ces.odkud.t, druh: "novy" }; karta.cesta = cestaCista(ces); }
         }
         if (c.name === "move_node") {
-          const ces = cestaKarty(app, auth, c.args.map_id, c.args.parent_id);
+          let ces = cestaKarty(app, auth, c.args.map_id, c.args.parent_id);
+          // parent proposed in this same reply (add_nodes card above): draw the path with its title, it exists after "Do all"
+          if (!ces && sPlanem && sPlanem.__planned.some((t) => klicKroku(t) === klicKroku(c.args.parent_id))) {
+            ces = cestaKarty(app, auth, c.args.map_id, "apex");
+            if (ces) ces.rodice = [ocisti(String(c.args.parent_id), 120)];
+          }
           const nid = ces ? ces._uzel(c.args.node_id) : "";
           if (ces && nid) {
             const vsechny = ces._rodice(nid); // včetně uzlu samého (poslední)
@@ -3719,6 +3790,7 @@ function stinSmycka(app, auth, L, cfg, rec, ctx, msgsIn, stats) {
       const def = NASTROJ[c.name]; let obsah;
       if (!def || !nastrojDostupny(c.name, rezimRec, auth, app)) obsah = "Error: this tool is not available.";
       else if (def.kind === "read") {
+        bezThen(c);
         c.args = bezNull(def.parameters, rozbalRetezce(def.parameters, c.args || {}));
         const chyba = M.validujArgumenty(def.parameters, c.args, c.name);
         if (chyba) obsah = "Error: " + chyba;
@@ -4142,11 +4214,40 @@ const POTVRZENI_APLIKACE = new Set(["add_nodes", "update_node", "delete_node", "
   "delete_document", "revert_document", "add_comment", "start_timer", "stop_timer", "share_page", "delete_page", "revert_page",
   "set_preference", "set_notification", "set_skin", "set_theme", "set_instance_skin", "update_organization", "set_ai_credits",
   "create_invoice"]); // faktura: karta po potvrzení nese číslo, částku a PDF — model nemá co dodat
+// The request asks for something that should happen by itself ("when I tick it off it moves on", "remind me") and no
+// rule has been made since it was asked → the confirmed steps were only the groundwork, the model continues. Measured
+// 16. 11. 2026 (local model via Dell): a plain-language stage-board request got the columns and the moves, then the
+// app said "Done." and the "moves on by itself" part was silently dropped. The request = the last user message plus
+// the earlier ones it answered (the model's question cards), at most three.
+// Narrower than SKUPINY_KLICE.pravidla (which picks the tool group and may be generous): only an ask for something
+// that happens BY ITSELF — "when/as soon as … done … moves", "… moves by itself", a rule, a reminder, a repeat.
+// A one-off "the finished steps — move them under Archive" or "from the Wedding template" is not (checkup 17. 11. 2026).
+const RE_CEKA_PRAVIDLO = /pravidl|pravidel\b|automat|\b(kdyz|az|jakmile|pokazde|vzdy|kazdy|when|whenever|once|as soon as)\b[^.?!\n]{0,60}(hotov|dokonc|splnen|splnim|odskrt|odklik|zaskrt|vyrizen|\bdone\b|finish|complet)\w*[^.?!\n]{0,80}\b(skoc|posun|presun|preskoc|prejd|prejit|pujde|putuje|odjede|move|moves|jump|advance|shift)|\b(sam[oaiy]?|automaticky|by itself|on its own|automatically)\b[^.?!\n]{0,40}\b(skoc|posun|presun|preskoc|prejd|move|jump|advance)|\brule|trigger|hlid|pripom|remind|opakov|\brytm|\brepeat|recurr|kazd\w* (den|tyden|mesic|pondel|uter|stred|ctvrt|patek|sobot|nedel|vsedni|pracovni)|every (day|week|month|other|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday)/;
+function cekaPravidlo(msgs) {
+  let i = msgs.map((m) => m.role).lastIndexOf("user");
+  if (i < 0) return false;
+  const texty = [];
+  let od = i;
+  for (let n = 0; i >= 0 && n < 3; n++) {
+    od = i;
+    texty.push(String(msgs[i].content || ""));
+    const predtim = msgs.slice(0, i).reverse().find((m) => m.role === "assistant");
+    if (!predtim || !(predtim.karty || []).some((k) => k.type === "otazky")) break;
+    i = msgs.slice(0, i).map((m) => m.role).lastIndexOf("user");
+  }
+  if (!RE_CEKA_PRAVIDLO.test(bezDiakritiky(texty.join("\n")).toLowerCase())) return false;
+  return !msgs.slice(od).some((m) => (m.karty || []).some((k) => k.type === "akce" && k.stav === "hotovo"
+    && ((NASTROJ[k.name] && NASTROJ[k.name].skupina === "pravidla") || k.name === "create_reminder")));
+}
 function dopoviAplikace(cfg, rec, msgs, vybrane, stav, ok) {
   if (cfg.potvrzeni === "model" || !ok || stav !== "hotovo") return false;
   if (rec.getString("mode")) return false; // průvodci (porada, třídění, nový projekt…) pokračují modelem
   const posledniA = msgs.slice().reverse().find((m) => m.role === "assistant");
   if (posledniA && (posledniA.karty || []).some((k) => k.type === "otazky")) return false; // otázka modelu čeká na odpověď
+  // the model announced a next step ("then") — the request is not finished, the model continues (Richard 16. 11. 2026:
+  // the app closed a stage-board request with "Done." after the first of three steps)
+  if (vybrane.some((a) => a && a.dal)) return false;
+  if (cekaPravidlo(msgs)) return false;
   return vybrane.every((a) => POTVRZENI_APLIKACE.has(a.name) && !(a.name === "update_node" && a.args && (a.args.deadline || a.args.planned_on)));
 }
 // Nabídnout projekt s přípravou? Plán (schválený 22. 10.): ≥ 2 události, NEBO zdrojem byla fotka / PDF / vložený
@@ -4200,6 +4301,7 @@ function chatPotvrditTah(app, auth, body, cfg, L) {
   let stav;
   let akce;
   const jednorazove = {};
+  let oznameno = ""; // the last announced next step ("then") of the confirmed cards
   for (akce of vybrane) {
     const defAkce = NASTROJ[akce.name];
     const zakazano = body && body.ok && (!nastrojDostupny(akce.name, rec.getString("mode"), auth, app)
@@ -4226,7 +4328,13 @@ function chatPotvrditTah(app, auth, body, cfg, L) {
     for (const m of msgs) for (const k of (m.karty || [])) {
       if (k.type === "akce" && k.id === akce.id) { k.stav = stav; k.vysledek = vysledek.text.slice(0, 300); if (vysledek.karta) k.odkaz = vysledek.karta; if (vysledek.klient) k.vysledek_klienta = vysledek.klient; }
     }
-    msgs.push({ role: "tool", name: akce.name, toolCallId: akce.toolCallId, content: vysledek.text });
+    // the step the model planned after this one — reminded with the result, so it continues instead of re-planning
+    // "Do all": the announced step may already be among the cards confirmed together (add_nodes "then I move the
+    // clients" + the moves) — remind it only on the LAST confirmed card, worded so a step done above is not redone
+    if (akce.dal && stav === "hotovo") oznameno = akce.dal;
+    const dalsi = oznameno && akce === vybrane[vybrane.length - 1]
+      ? ` Next step you announced: ${oznameno} — continue with it now, unless it is already among the results above.` : "";
+    msgs.push({ role: "tool", name: akce.name, toolCallId: akce.toolCallId, content: vysledek.text + dalsi });
     pend.splice(pend.indexOf(akce), 1);
   }
   rec.set("pending", pend);

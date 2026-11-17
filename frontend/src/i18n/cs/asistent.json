@@ -58,6 +58,7 @@
   "actionNo": "Ne",
   "actionAll": "Provést vše ({{count}})",
   "actionWaiting": "Čeká na potvrzení",
+  "actionThen": "Potom: {{text}}",
   "actionDone": "Provedeno",
   "actionDeclined": "Zamítnuto",
   "actionError": "Nepovedlo se",

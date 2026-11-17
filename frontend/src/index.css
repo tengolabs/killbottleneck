@@ -193,6 +193,18 @@ body.kb-tah.kb-presun { cursor: grabbing; }
 .kb-chat-hrana { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; pointer-events: none; background: hsl(var(--primary) / 0.55); transition: background-color 150ms; }
 .kb-chat-hrana::after { content: ''; position: absolute; top: 0; bottom: 0; right: 100%; width: 18px; background: linear-gradient(to left, hsl(var(--primary) / 0.22), transparent); }
 .kb-chat-hrana-vlevo { left: auto; right: 0; }
+/* Top bar edge (16 Nov 2026): the column edge turned 90° — accent line on the bar's bottom border + glow onto the map below */
+.kb-lista-hrana { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none; background: hsl(var(--primary) / 0.55); }
+.kb-lista-hrana::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 18px; background: linear-gradient(to bottom, hsl(var(--primary) / 0.22), transparent); }
+/* Bar levels (Richard 16 Nov 2026: "three bars with a falling level — improve the graphics"): level 1 = the app's top bar
+   (accent line + glow above), level 2 = panel headers (assistant, Office, Buffer) with a faint accent wash and a softer accent
+   line, level 3 = a zone's own bar (brain training) sunk one step lower: the page background a touch darker (in light AND dark
+   skins — a muted fill read as raised in dark skins) + a small inner shadow from the bar above */
+.kb-lista-2 { background-image: linear-gradient(to bottom, hsl(var(--primary) / 0.10), hsl(var(--primary) / 0.04)); border-bottom-color: hsl(var(--primary) / 0.30); }
+.kb-lista-3 { background-color: color-mix(in srgb, hsl(var(--background)) 93%, black); box-shadow: inset 0 5px 6px -5px rgb(0 0 0 / 0.28); }
+/* phone split screen: the chat panel's top edge under the aquarium — the column edge turned 90°, glow spilling up */
+.kb-chat-hrana-nahore { position: absolute; left: 0; right: 0; top: 0; height: 2px; pointer-events: none; background: hsl(var(--primary) / 0.55); }
+.kb-chat-hrana-nahore::after { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 18px; background: linear-gradient(to top, hsl(var(--primary) / 0.22), transparent); }
 /* New conversation (13 Nov 2026): the message area turns like a page and the ✎ button pulses once, so a press in an
    already empty chat is visible too; reduced motion → a plain fade */
 /* 15 Nov 2026: WITHOUT perspective, like the Office turn — with perspective(900px) the list's hit area moved for 0.4 s and a chip

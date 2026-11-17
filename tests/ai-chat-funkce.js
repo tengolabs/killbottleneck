@@ -184,7 +184,7 @@ H.beh(async () => {
   fronta.push(nastroj('update_rule', { map_id: 'Truhlářství', rule_id: 'Hotovo → oznámit', name: 'Hotovo → oznámit vlastníkovi', trigger: { type: 'node_status_changed', status: 'done' }, actions: [{ type: 'notify', to: 'map_owner', message: 'Krok je hotový' }] }));
   r = await chatuj(A, { chat_id: chat.id, message: 'Přejmenuj to pravidlo na Hotovo → oznámit vlastníkovi' });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
-  expect(!!k && k.popis === 'Změnit pravidlo „Hotovo → oznámit vlastníkovi“ v projektu „Truhlářství“ (node_status_changed → notify)', `karta úpravy pravidla podle názvu (${k && k.popis})`);
+  expect(!!k && k.popis === 'Změnit pravidlo „Hotovo → oznámit vlastníkovi“ v projektu „Truhlářství“: Když u kteréhokoli kroku dáte Hotovo, přijde upozornění vlastníkovi projektu.', `karta úpravy pravidla podle názvu (${k && k.popis})`);
   fronta.push(text('x'));
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   pravidla = (await inst.api('GET', `/api/kb/rules?map=${map.id}`, { token: A })).json.rules || [];
@@ -210,7 +210,7 @@ H.beh(async () => {
   fronta.push(nastroj('save_rule_template', { name: 'Hotovo → oznámit (šablona)', trigger: { type: 'node_status_changed', status: 'done' }, actions: [{ type: 'notify', to: 'map_owner', message: 'Krok hotov' }] }));
   r = await chatuj(A, { chat_id: chat.id, message: 'Ulož to jako šablonu' });
   chat = r.json.chat; k = posledniKarta(chat, 'akce');
-  expect(!!k && k.popis === 'Uložit šablonu pravidla „Hotovo → oznámit (šablona)“ (node_status_changed → notify)', `karta šablony (${k && k.popis})`);
+  expect(!!k && k.popis === 'Uložit šablonu pravidla „Hotovo → oznámit (šablona)“: Když u kteréhokoli kroku dáte Hotovo, přijde upozornění vlastníkovi projektu.', `karta šablony (${k && k.popis})`);
   fronta.push(text('x'));
   r = await potvrd(A, chat.id, k.id, true); chat = r.json.chat;
   let sablony = (await inst.api('GET', '/api/kb/rule-templates', { token: A })).json.templates || [];

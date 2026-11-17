@@ -58,6 +58,7 @@
   "actionNo": "No",
   "actionAll": "Do all ({{count}})",
   "actionWaiting": "Waiting for confirmation",
+  "actionThen": "Then: {{text}}",
   "actionDone": "Done",
   "actionDeclined": "Declined",
   "actionError": "Failed",

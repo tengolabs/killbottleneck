@@ -29,6 +29,8 @@
   },
   "toolbar": {
     "back": "Back",
+    "toolsHide": "Hide the tools row",
+    "toolsShow": "Show the tools row",
     "titlePlaceholder": "Map title...",
     "searchPlaceholder": "Search goals...",
     "directionGroup": "Map layout",
