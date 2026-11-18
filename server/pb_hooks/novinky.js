@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.6.3": {
+    cs: [
+      "Když asistentovi při plánování nového projektu rovnou napíšete „řeším to já“, kroky s termínem dostanete hned a druhá otázka na řešitele už nepřijde.",
+      "Asistent už netvrdí „řešitelem jste vy“, když žádný krok řešitele nedostal (třeba u plánu bez termínů) — napíše, jak to v mapě opravdu je.",
+      "Návrh projektu i doplňující otázky přijdou napoprvé, i když se modelu v odpovědi zatoulá závorka — bez čekání na nový pokus.",
+    ],
+    en: [
+      "When you plan a new project and tell the assistant right away \"I'll handle it\", you get the steps with a deadline straight away and no second question about the assignee.",
+      "The assistant no longer says you are the assignee when no step got one (for example a plan without deadlines) — it says how things really are in the map.",
+      "The project proposal and the follow-up questions arrive on the first try even when the model adds a stray bracket — no waiting for another attempt.",
+    ],
+  },
   "v1.6.2": {
     cs: [
       "Tlačítko zpět (na myši, Alt+←, na telefonu i v aplikaci pro Windows) zavře, co je otevřené, a už nevyhodí z aplikace na přihlášení.",

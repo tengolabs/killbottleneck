@@ -661,10 +661,10 @@ H.beh(async () => {
     const bezKaret = rr.json.chat.messages.flatMap((m) => m.karty || []).filter((x) => x.type === 'akce');
     const chybaBez = (volani[volani.length - 1].messages || []).filter((m) => m.role === 'tool').map((m) => m.content).join(' ');
     expect(volani.length - predBez === 2 && bezKaret.length === 0 && /has not been asked who handles these steps with a deadline: "Termínový krok"/.test(chybaBez) && /Chcete být řešitelem kroků s termínem/.test(chybaBez), `krok s termínem bez řešitele: žádná karta, model dostane pokyn zeptat se (${chybaBez.slice(0, 120)})`);
-    // uživatel „řeší to sám“ (owner me) BEZ otázky → taky chyba, žádná karta (rc4: model se neptal a přiřadil)
+    // model sám dá owner me BEZ otázky (a uživatel nic takového nenapsal) → taky chyba, žádná karta (rc4: model se neptal a přiřadil)
     const predMe = volani.length;
     fronta.push(nastroj('create_project', { title: 'Bez otázky', outline: [{ title: 'Můj termín', deadline: den(1), owner: 'me' }] }), text('Zeptám se.'));
-    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Založ projekt, řeším to já' } });
+    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Založ projekt se zítřejším termínem' } });
     const chybaMe = (volani[volani.length - 1].messages || []).filter((m) => m.role === 'tool').map((m) => m.content).join(' ');
     expect(volani.length - predMe === 2 && !rr.json.chat.messages.some((m) => (m.karty || []).some((x) => x.type === 'akce')) && /has not been asked who handles these steps with a deadline: "Můj termín"/.test(chybaMe), `owner me bez otázky: žádná karta, pokyn zeptat se (${chybaMe.slice(0, 90)})`);
     const cid7 = await zeptejResitele();
@@ -683,6 +683,8 @@ H.beh(async () => {
     rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: cid8, message: '1) Ano, řeším je já — založ projekt' } });
     p = await potvrdPosledni(rr.json.chat.id, 'Založeno.');
     expect(/přiřazeno: admin@example\.com/.test(p.karta.popis) && !/přiřazeno:.*\bme\b/i.test(p.karta.popis), `karta ukáže e-mail uživatele, ne „me“ (${p.karta.popis})`);
+    const vysl8 = toolZ(posledniVolani()).map((m) => m.content).join(' ');
+    expect(/Assignee: the user on 2 step\(s\); the remaining new steps have none/.test(vysl8), `výsledek zápisu řekne modelu, komu kroky skutečně patří (${vysl8.slice(-160)})`);
     const sady = (await inst.api('GET', `/api/collections/goalmaps/records?filter=(title='Dodávka sad')`, { token: A })).json.items[0];
     const vl = (t) => ((sady && sady.nodes.find((n) => (n.data || {}).title === t)) || {}).data || {};
     expect(!!sady && vl('Dodat 105 sad').owner === 'admin@example.com' && vl('Fakturovat').owner === 'admin@example.com' && !vl('Bez řešitele').owner, `owner „me“/„Já“ = e-mail uživatele, krok bez ownera zůstal bez (${vl('Dodat 105 sad').owner} / ${vl('Fakturovat').owner} / ${vl('Bez řešitele').owner || '-'})`);
@@ -691,7 +693,7 @@ H.beh(async () => {
     // v témž rozhovoru je otázka STARŠÍ než založení projektu → další kroky s termínem chtějí novou otázku
     const predStara = volani.length;
     fronta.push(nastroj('add_nodes', { map_id: 'Dodávka sad', parent_id: 'apex', items: [{ title: 'Další hovor', deadline: den(2), owner: 'me' }] }), text('Zeptám se znovu.'));
-    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: cid8, message: 'Přidej do mapy Dodávka sad další hovor, řeším ho já' } });
+    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: cid8, message: 'Přidej do mapy Dodávka sad další hovor' } });
     const chybaStara = (volani[volani.length - 1].messages || []).filter((m) => m.role === 'tool').map((m) => m.content).join(' ');
     expect(volani.length - predStara === 2 && /has not been asked/.test(chybaStara), `otázka starší než poslední zápis kroků neplatí — ptát se znovu (${chybaStara.slice(0, 60)})`);
     await zeptejResitele(cid8);
@@ -708,6 +710,63 @@ H.beh(async () => {
     const tool9 = rr.json.chat.messages.filter((m) => m.role === 'tool').map((m) => String(m.content || ''));
     const k9 = rr.json.chat.messages.flatMap((m) => m.karty || []).filter((x) => x.type === 'akce' && x.stav === 'ceka').pop();
     expect(tool9.some((t) => /expected array/.test(t)) && !tool9.some((t) => /has not been asked/.test(t)) && !!k9 && /Sklad Brno/.test(k9.popis), `odmítnutý pokus nezneplatní odpověď na řešitele → opravený strom rovnou na kartu (${tool9.map((t) => t.slice(0, 40)).join(' | ')})`);
+    // 13. 11. 2026 (Richard): the user's own clear "řeším to já" in the chat counts as the assignee answer —
+    // no second card; doubt, negation, a question, an image transcript or owner "none" still need the question
+    const resimJaTah = async (zprava, outline) => {
+      const pred = volani.length;
+      fronta.push(nastroj('create_project', { title: 'Večírek ' + pred, goal: 'Uspořádat večírek', outline }), text('Zeptám se.'));
+      const q = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: zprava } });
+      const tool = (volani[volani.length - 1].messages || []).filter((m) => m.role === 'tool').map((m) => m.content).join(' ');
+      const karta = q.json.chat.messages.flatMap((m) => m.karty || []).find((x) => x.type === 'akce' && x.stav === 'ceka');
+      fronta.length = 0; // a card ends the turn — the spare reply must not leak into the next one
+      return { karta, tool };
+    };
+    let rj = await resimJaTah('Chci naplánovat nový projekt: firemní vánoční večírek, termín 18. 12., řeším to já', [{ title: 'Objednat sál', deadline: den(5), owner: 'me' }]);
+    expect(!!rj.karta && /přiřazeno: admin@example\.com/.test(rj.karta.popis) && !/has not been asked/.test(rj.tool), `„řeším to já“ v textu = odpověď na řešitele → rovnou karta (${rj.karta ? rj.karta.popis : rj.tool.slice(0, 80)})`);
+    for (const zprava of ['Chci naplánovat nový projekt: večírek, termín 18. 12., já nevím, kdo to řeší', 'Založ večírek, neřeším to já', 'Založ večírek, řeším to já?', 'Založ projekt z fotky\n\n[Přepis obrázku]\nVečírek\n- řeším to já']) {
+      rj = await resimJaTah(zprava, [{ title: 'Objednat sál', deadline: den(5), owner: 'me' }]);
+      expect(!rj.karta && /has not been asked/.test(rj.tool), `bez jasného „řeším já“ se dál ptá (${zprava.replace(/\n/g, ' ')})`);
+    }
+    rj = await resimJaTah('Založ večírek, termín 18. 12., řeším to já', [{ title: 'Objednat sál', deadline: den(5), owner: 'none' }]);
+    expect(!rj.karta && /has not been asked/.test(rj.tool), 'owner „none“ se textem „řeším já“ nepotvrdí (chce otázku)');
+    // 12.–13. 11. 2026 (measurement): the model sends the tree as a JSON string with 1–2 closing brackets too many
+    // ("}]" or "}") — the server reads it instead of rejecting it (the model used to regenerate the whole tree)
+    const outlineTah = async (outline) => {
+      const pred = volani.length;
+      fronta.push(nastroj('create_project', { title: 'Strom ' + pred, goal: 'Strom', outline }), text('Opravím.'));
+      const q = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Založ projekt' } });
+      const tool = (volani[volani.length - 1].messages || []).filter((m) => m.role === 'tool').map((m) => m.content).join(' ');
+      const karta = q.json.chat.messages.flatMap((m) => m.karty || []).find((x) => x.type === 'akce' && x.stav === 'ceka');
+      fronta.length = 0; // a card ends the turn — the spare reply must not leak into the next one
+      return { karta, tool, cid: q.json.chat.id };
+    };
+    const stromJson = JSON.stringify([{ title: 'Oblast A', children: [{ title: 'Krok A1' }, { title: 'Krok A2' }] }, { title: 'Oblast B' }]);
+    for (const [popis, outline] of [['čistý JSON', stromJson], ['JSON + „}]“ navíc', stromJson + '}]'], ['JSON + „}“ navíc', stromJson + '}'], ['JSON + „ ] }“ s mezerou', stromJson + ' ] }']]) {
+      const o = await outlineTah(outline);
+      expect(!!o.karta && /Krok A2/.test(JSON.stringify(o.karta)) && !/expected array/.test(o.tool), `strom jako text (${popis}) se přečte → karta s celým stromem (${o.tool.slice(0, 80)})`);
+    }
+    for (const [popis, outline] of [['odrážky', '- Oblast A\n- Oblast B'], ['nesmysl', 'Oblast A, Oblast B'], ['useknutý JSON', stromJson.slice(0, -3)], ['víc než 8 závorek navíc', stromJson + '}]}]}]}]}]'], ['přes 100 000 znaků', JSON.stringify(Array.from({ length: 1500 }, (_, i) => ({ title: 'Krok ' + i, description: 'x'.repeat(60) }))) + '}]']]) {
+      const o = await outlineTah(outline);
+      expect(!o.karta && /Invalid type for "outline": expected array, got string/.test(o.tool), `strom jako text (${popis}) → chyba beze změny`);
+    }
+    // 13. 11. 2026 (Richard): "Yes, I handle them" + a tree without deadlines assigned nobody, yet the reply
+    // said "you are the assignee" → the write result tells the model that no step has an assignee
+    {
+      const o = await outlineTah([{ title: 'Bez termínu 1' }, { title: 'Bez termínu 2' }]);
+      await potvrdPosledni(o.cid, 'Založeno.');
+      const vysl = toolZ(posledniVolani()).map((m) => m.content).join(' ');
+      expect(/No new step has an assignee .* do not tell the user they are the assignee/.test(vysl), `strom bez řešitele: výsledek zápisu to modelu řekne (${vysl.slice(-160)})`);
+    }
+    fronta.push({ tool_calls: [{ function: { name: 'ask_user', arguments: { questions: JSON.stringify([{ text: 'Závorka navíc?', options: ['Ano', 'Ne'] }]) + ']' } } }] });
+    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Zkus otázku se závorkou navíc' } });
+    expect(rr.json.chat.messages[rr.json.chat.messages.length - 1].karty.some((k) => k.type === 'otazky' && k.questions[0].text === 'Závorka navíc?'), 'i jiné pole (ask_user questions) s „]“ navíc se přečte');
+    fronta.push(text('Dobře.'));
+    await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: rr.json.chat.id, message: '1) Ano' } });
+    fronta.push({ tool_calls: [{ function: { name: 'ask_user', arguments: { questions: JSON.stringify([{ text: 'Chybí závorka?', options: ['Ano', 'Ne'] }]).slice(0, -1) } } }] });
+    rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { message: 'Zkus otázku bez poslední závorky' } });
+    expect(rr.json.chat.messages[rr.json.chat.messages.length - 1].karty.some((k) => k.type === 'otazky' && k.questions[0].text === 'Chybí závorka?'), 'pole bez poslední „]“ se přečte (8 z 96 odmítnutí v měření)');
+    fronta.push(text('Dobře.'));
+    await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: rr.json.chat.id, message: '1) Ano' } });
     // update_node takes owner "me" like new steps do (before: "Unknown owner \"me\"")
     fronta.push(nastroj('update_node', { map_id: 'Dodávka sad', node_id: 'Bez řešitele', owner: 'me' }));
     rr = await inst.api('POST', '/api/kb/chat', { token: A, body: { chat_id: cid8, message: 'Krok Bez řešitele v Dodávka sad řeším taky já' } });

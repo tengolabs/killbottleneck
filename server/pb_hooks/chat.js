@@ -690,7 +690,7 @@ const P = {
       "- Když uživatel řekne, že je úkol hotový (hotovo, vyřešeno, udělal jsem, poslal jsem), HNED zavolej update_node se status=done pro KAŽDÝ takový úkol — uživatel potvrdí kartou a teprve tím se uzel označí. Nikdy neber „hotovo“ jako vyřízené bez zápisu. U otázky na konkrétní úkol nabídni i volbu „Už je hotové“. Když napíše jen „hotovo“ bez názvu, vztáhni to k úkolu, o kterém jste právě mluvili, a do `note` napiš jednou větou, o co jde (např. „= telefonát s pí. Krausovou, který jsme právě připravili“) — název uzlu v mapě bývá jiný než slova v rozhovoru. Když to není jasné, zeptej se přes ask_user.",
       "- Když uživatel řekne CÍL nebo PROBLÉM (chtěl bych víc…, nedaří se mi…, nevím, jak…), není to jen věc kalendáře. Kromě zařazení do dne nabídni i pomoc s podstatou: v ask_user nebo suggest_next dej VŽDY jednu volbu „Poradit, jak na to“ (nebo „Navrhnout postup“). Když ji zvolí, poraď jako zkušený kolega: 3–5 konkrétních kroků nebo zásad vztažených k jeho mapě a situaci (žádné obecné fráze), a nabídni je zapsat do mapy jako podkroky (add_nodes) pod nejvhodnější uzel. Nešoupej jen termíny — pomáhej řešit.",
       "- Termín (deadline) = dohodnuté datum s někým dalším (jednání, dodávka, odevzdání). Když takové datum plyne z podkladů nebo od uživatele („zítřejší jednání“, „dodat do pátku“), navrhni termín: u nových uzlů pole deadline v outline/items, u existujícího uzlu update_node s deadline (i změnu nebo zrušení termínu; prázdný řetězec termín ruší). Uživatel všechno potvrdí kartou. Kdy se úkol bude ŘEŠIT, je plán (planned_on): jakmile uživatel řekne „dnes / zítra / v pondělí / tento týden“ u konkrétního úkolu, HNED zavolej update_node s planned_on (datum YYYY-MM-DD, do 7 dnů; uživatel potvrdí kartou) — nepiš o tom, zapiš to.",
-      "- Řešitel kroků s termínem: když nové kroky (create_project, add_nodes) nesou termín, zeptej se PŘED zápisem VŽDY (i když se zdá, že je řeší uživatel; neptej se jen, když je má řešit někdo jiný) jedinou otázkou přes ask_user: „Chcete být řešitelem kroků s termínem? Pak je uvidíte v Můj den.“ s volbami „Ano, řeším je já“ a „Ne, nechat bez řešitele“. Při Ano dej těm krokům owner \"me\", při Ne owner \"none\" (krok s termínem bez ownera aplikace nezapíše). Slovo „me“ je jen hodnota pro nástroj — do textu pro uživatele ho nikdy nepiš (piš „vy“ / „řešitelem budete vy“). Tahle otázka platí i u projektu z obrázku a je výjimkou z pravidla „rovnou zavolej create_project“.",
+      "- Řešitel kroků s termínem: když nové kroky (create_project, add_nodes) nesou termín, zeptej se PŘED zápisem VŽDY (i když se zdá, že je řeší uživatel; neptej se jen, když je má řešit někdo jiný nebo uživatel napsal „řeším to já“ — pak owner \"me\") jedinou otázkou přes ask_user: „Chcete být řešitelem kroků s termínem? Pak je uvidíte v Můj den.“ s volbami „Ano, řeším je já“ a „Ne, nechat bez řešitele“. Při Ano dej těm krokům owner \"me\", při Ne owner \"none\" (krok s termínem bez ownera aplikace nezapíše). Slovo „me“ je jen hodnota pro nástroj — do textu pro uživatele ho nikdy nepiš (piš „vy“ / „řešitelem budete vy“). Tahle otázka platí i u projektu z obrázku a je výjimkou z pravidla „rovnou zavolej create_project“.",
       "- Kam nový krok patří (add_nodes, add_idea_to_map): co je POD uzlem, to je potřeba udělat, aby se ten uzel splnil. Krok, který je PODMÍNKOU existujícího kroku (nakoupit suroviny → upéct cukroví, objednat díly → smontovat, získat souhlas → podepsat), dej POD ten krok (parent_id = jeho přesný název), ne vedle něj. Krok, který je NÁSLEDKEM nebo další fází, dej VEDLE něj (pod téhož rodiče). Neřaď jen podle tématu („cukroví k cukroví“) — řaď podle toho, co musí být hotové dřív. Když z věty nejde poznat, zda jde o podmínku, zeptej se jednou otázkou přes ask_user (např. „Je nákup surovin podmínkou pečení? Pak ho dám pod krok Upéct cukroví.“ s volbami „Ano, pod něj“ / „Ne, vedle něj“). Když už TÁŽ VĚTEV (cílový rodič, kroky nad ním nebo pod ním) má uzel se stejným nebo skoro stejným názvem, nepřidávej ho znovu — řekni to a nabídni použít ten stávající (update_node), nebo se zeptej, co přesně má vzniknout. Stejný název pod JINÝM rodičem (např. „Objednat materiál“ pod dvěma zakázkami) je v pořádku — přidej ho bez otázky.",
       "- Neslibuj, co aplikace neumí, a nedomýšlej podrobnosti. Kdy a komu přijde upozornění z pravidla, říkej JEN podle výsledku nástroje create_rule (žádné „večer“, žádný čas navíc). Když nástroj vrátí chybu, řekni ji uživateli po lidsku a nabídni opravu (např. nejdřív nastavit termín nebo vlastníka).",
       "- E-mail, body k poradě, body k telefonátu, poznámku, souhrn nebo jiný text k použití NIKDY nepiš do odpovědi — pošli ho nástrojem draft_text: uloží se uživateli do Dokumentů (panel vedle chatu, kde ho čte, upravuje a kopíruje), v textu jen jednu větu komentáře. U e-mailu dej předmět do `subject` a adresáta do `to` (jen když ho znáš), do `text` jen tělo. Hranice: nápady a úkoly (věci k udělání) do draft_text NIKDY nedávej — patří do zásobníku nápadů (add_idea / add_ideas) nebo do projektu, odkud se dostanou do plánu a porad. Dokument je jen delší text ke čtení nebo odeslání (e-mail, zápis, sumář, podklady). Když text dokumentu obsahuje úkoly nebo nápady, nabídni v suggest_next dát je do zásobníku nebo do projektu. Když se koncept týká projektu (zakázka, zákazník, dodavatel, sumář projektu), dej do draft_text i `map` = název projektu — dokument pak odkazuje na mapu projektu. Do paměti projektu (remember s map) patří jen krátké poznatky (kdo rozhoduje, na co se čeká, dohody), NIKDY celé texty e-mailů nebo sumářů — ty jsou v Dokumentech. Takové koncepty aktivně nabízej v suggest_next („Napiš e-mail dodavatelům“, „Připrav body k poradě“, „Body k telefonátu s …“). Prezentace ke stažení (PowerPoint/PDF), přání, PF, pozvánka, plakát a diplom NEJSOU draft_text — na ně otevři skupinu kancelar (open_tools) a použij draft_presentation / draft_card; po sumáři projektu nebo přípravě na schůzku nabídni v suggest_next i „Udělat z toho prezentaci“.",
@@ -947,7 +947,7 @@ const P = {
       "- When the user says a task is done (done, solved, I did it, I sent it), IMMEDIATELY call update_node with status=done for EVERY such task — the user confirms with a card and only that marks the node. Never treat \"done\" as handled without writing it. For a question about a specific task also offer the option \"Already done\". When they write just \"done\" without a name, relate it to the task you were just discussing and put one sentence into `note` explaining which one (e.g. \"= the phone call with Mrs. Krausová we just prepared\") — the node title in the map often differs from the words in the conversation. When unclear, ask via ask_user.",
       "- When the user states a GOAL or a PROBLEM (I'd like to…, I struggle with…, I don't know how…), it is not only a calendar matter. Besides scheduling, offer help with the substance: in ask_user or suggest_next ALWAYS include one option \"Advise me how to do it\" (or \"Propose an approach\"). When chosen, advise like an experienced colleague: 3–5 concrete steps or principles tied to their map and situation (no generic phrases), and offer to write them into the map as sub-steps (add_nodes) under the most fitting node. Do not just move dates — help solve it.",
       "- A deadline = a date agreed with someone else (a meeting, a delivery, a hand-over). When such a date follows from the material or from the user (\"tomorrow's meeting\", \"deliver by Friday\"), propose the deadline: for new nodes the deadline field in outline/items, for an existing node update_node with deadline (changing or removing it too; an empty string removes it). The user confirms everything with a card. WHEN a task will be worked on is the plan (planned_on): as soon as the user says \"today / tomorrow / on Monday / this week\" about a specific task, IMMEDIATELY call update_node with planned_on (YYYY-MM-DD, within 7 days; the user confirms with a card) — do not talk about it, write it.",
-      "- Assignee of steps with a deadline: when new steps (create_project, add_nodes) carry a deadline, ALWAYS ask BEFORE writing (even if the user seems to handle them; skip only when someone else is to handle them) with a single ask_user question: \"Do you want to be the assignee of the steps with a deadline? Then you will see them in My day.\" with the options \"Yes, I handle them\" and \"No, leave them unassigned\". On Yes give those steps owner \"me\", on No owner \"none\" (the app refuses a step with a deadline and no owner). \"me\" is only a tool value — never write it in text for the user (say \"you\"). This question applies to a project from an image too and is an exception to the rule \"call create_project right away\".",
+      "- Assignee of steps with a deadline: when new steps (create_project, add_nodes) carry a deadline, ALWAYS ask BEFORE writing (even if the user seems to handle them; skip only when someone else is to handle them or the user wrote \"I'll handle it\" — then owner \"me\") with a single ask_user question: \"Do you want to be the assignee of the steps with a deadline? Then you will see them in My day.\" with the options \"Yes, I handle them\" and \"No, leave them unassigned\". On Yes give those steps owner \"me\", on No owner \"none\" (the app refuses a step with a deadline and no owner). \"me\" is only a tool value — never write it in text for the user (say \"you\"). This question applies to a project from an image too and is an exception to the rule \"call create_project right away\".",
       "- Where a new step belongs (add_nodes, add_idea_to_map): what is UNDER a node is what has to be done for that node to be achieved. A step that is a PREREQUISITE of an existing step (buy ingredients → bake the cookies, order parts → assemble, get approval → sign) goes UNDER that step (parent_id = its exact title), not next to it. A step that is a CONSEQUENCE or the next phase goes NEXT to it (under the same parent). Do not place by topic alone (\"cookies with cookies\") — place by what must be finished first. When the sentence does not tell whether it is a prerequisite, ask once via ask_user (e.g. \"Is buying the ingredients a prerequisite of baking? Then I put it under Bake the cookies.\" with options \"Yes, under it\" / \"No, next to it\"). When the SAME BRANCH (the target parent, the steps above it or below it) already has a node with the same or nearly the same title, do not add it again — say so and offer to use the existing one (update_node), or ask what exactly should be created. The same title under a DIFFERENT parent (e.g. \"Order material\" under two orders) is fine — add it without asking.",
       "- Do not promise what the app cannot do and do not invent details. When and to whom a rule notification arrives, say ONLY according to the create_rule tool result (no \"in the evening\", no extra time). When a tool returns an error, tell the user plainly and offer a fix (e.g. set the deadline or the owner first).",
       "- An e-mail, meeting points, phone-call points, a note, a summary or any other text to be used NEVER goes into the reply — send it with draft_text: it is saved to the user's Documents (a panel next to the chat where they read, edit and copy it). For an e-mail put the subject into `subject` and the recipient into `to` (only when known), only the body into `text`. Boundary: NEVER put ideas or tasks (things to do) into draft_text — they belong in the idea buffer (add_idea / add_ideas) or a project, from where they reach the plan and the briefings. A document is only a longer text to read or send (e-mail, minutes, summary, background). When a document's text contains tasks or ideas, offer in suggest_next to put them into the buffer or a project. In the text only a one-line comment. When the draft concerns a project (an order, a customer, a supplier, a project summary), pass `map` = the project title in draft_text — the document then links to the project's map. Project memory (remember with map) holds only short facts (who decides, what is awaited, agreements), NEVER whole e-mails or summaries — those live in Documents. Offer such drafts actively in suggest_next (\"Write the e-mail to the suppliers\", \"Prepare meeting points\", \"Points for the call with …\"). A downloadable presentation (PowerPoint/PDF), greeting card, season's greetings, invitation, poster or certificate is NOT draft_text — open the kancelar group (open_tools) and use draft_presentation / draft_card; after a project summary or meeting preparation also offer \"Turn this into a presentation\" in suggest_next.",
@@ -1200,6 +1200,15 @@ function vlastniciStromu(items, out) {
   for (const i of (Array.isArray(items) ? items : [])) { if (i && i.owner && !out.includes(String(i.owner))) out.push(String(i.owner).slice(0, 80)); vlastniciStromu(i && i.children, out); }
   return out;
 }
+// One sentence for the model after a write: who really got assigned (Richard 13. 11. 2026: "Yes, I handle them"
+// + a tree without deadlines assigned nobody, yet the reply said "you are the assignee").
+function vetaResitelu(items, email) {
+  let ja = 0, jini = 0;
+  const projdi = (arr) => { for (const i of (Array.isArray(arr) ? arr : [])) { if (!i) continue; if (typeof i.owner === "string" && i.owner.trim()) { if (i.owner.trim().toLowerCase() === String(email || "").toLowerCase()) ja++; else jini++; } projdi(i.children); } };
+  projdi(items);
+  if (!ja && !jini) return " No new step has an assignee (the assignee is set only on steps with a deadline) — do not tell the user they are the assignee.";
+  return ` Assignee: the user on ${ja} step(s)${jini ? `, other people on ${jini}` : ""}; the remaining new steps have none.`;
+}
 // owner „me“/„já“ v osnově (vč. vnořených) → e-mail uživatele; ostatní hodnoty beze změny
 function ownerJa(items, email) {
   for (const i of (Array.isArray(items) ? items : [])) {
@@ -1207,6 +1216,30 @@ function ownerJa(items, email) {
     else if (i && typeof i.owner === "string" && /^(none|nikdo|-)$/i.test(i.owner.trim())) delete i.owner; // „Ne, nechat bez řešitele“
     if (i) ownerJa(i.children, email);
   }
+}
+// The user's own words say they handle the steps themselves ("řeším to já", "já to řeším", "I'll handle it").
+// Only the user's typed / dictated text counts — an image transcript or PDF text appended to the message is
+// data, not their answer. A sentence with doubt ("nevím, jestli to řeším já", a question) does not count.
+const PISMENO = "a-záčďéěíňóřšťúůýžäöüß";
+const slovo = (vzor) => new RegExp(`(^|[^${PISMENO}])${vzor}(?![${PISMENO}])`);
+const RESIM_JA_OBJ = "(?:(?:to|je|ho|ji|tohle|všechno|vše)\\s+)?";
+const RESIM_JA = [
+  slovo(`řeším\\s+${RESIM_JA_OBJ}(?:já|sám|sama)`),
+  slovo(`já\\s+${RESIM_JA_OBJ}(?:řeším|budu\\s+řešit|vyřeším|vyřídím|zařídím)`),
+  slovo(`řešit\\s+${RESIM_JA_OBJ}budu\\s+(?:já|sám|sama)`),
+  slovo("(?:řešitelem|řešitel)\\s+(?:budu|jsem)\\s+já"),
+  slovo("já\\s+(?:budu|jsem)\\s+(?:řešitelem|řešitel)"),
+  slovo("i(?:'ll|’ll|\\s+will)?\\s+handle\\s+(?:it|them|this|these|that|everything)"),
+  slovo("assign\\s+(?:it\\s+|them\\s+)?to\\s+me"),
+];
+const RESIM_JA_POCHYBA = slovo("(?:nevím|jestli|zda|možná|asi|not sure|maybe|whether|perhaps)");
+function resimJa(content) {
+  const vlastni = String(content || "").slice(0, 4000).split(/\[(?:Přepis obrázku|Image transcript|Text z PDF|PDF text)/)[0].toLowerCase();
+  for (const veta of vlastni.match(/[^.!?;\n]*[.!?;\n]?/g) || []) {
+    if (/\?\s*$/.test(veta) || RESIM_JA_POCHYBA.test(veta)) continue;
+    if (RESIM_JA.some((re) => re.test(veta))) return true;
+  }
+  return false;
 }
 // Krok s termínem bez řešitele se nezapíše, dokud se model nezeptá (Richard 17. 9. 2026:
 // „Zakázka pana Meyera“ — samotný pokyn v promptu model přeskočil, Můj den zůstal prázdný).
@@ -1217,8 +1250,9 @@ function ownerJa(items, email) {
 function chybaResitele(items, msgs, email) {
   const bez = [];
   const mluvi = [];
+  let nikdo = false;
   const jaNebo = (o) => { const v = typeof o === "string" ? o.trim().toLowerCase() : ""; return !v || v === String(email || "").toLowerCase() || /^(me|já|ja|@me|none|nikdo|-)$/.test(v); };
-  const projdi = (arr) => { for (const i of (Array.isArray(arr) ? arr : [])) { if (i && i.deadline) { const t = String(i.title || "").slice(0, 80); if (!(typeof i.owner === "string" && i.owner.trim())) bez.push(t); else if (jaNebo(i.owner)) mluvi.push(t); } if (i) projdi(i.children); } };
+  const projdi = (arr) => { for (const i of (Array.isArray(arr) ? arr : [])) { if (i && i.deadline) { const t = String(i.title || "").slice(0, 80); if (!(typeof i.owner === "string" && i.owner.trim())) bez.push(t); else if (jaNebo(i.owner)) { mluvi.push(t); if (/^(none|nikdo|-)$/i.test(i.owner.trim())) nikdo = true; } } if (i) projdi(i.children); } };
   projdi(items);
   if (!bez.length && !mluvi.length) return null;
   if (!bez.length) {
@@ -1227,11 +1261,15 @@ function chybaResitele(items, msgs, email) {
     // a write the server rejected ("Error: …" result) wrote nothing — it must not make the answer look stale
     // (measured 12. 11. 2026: a tree rejected for its format, then the corrected one failed "not asked" → asked twice)
     const odmitnute = new Set(msgs.filter((m) => m && m.role === "tool" && /^Error/.test(String(m.content || ""))).map((m) => m.toolCallId));
+    // Richard 13. 11. 2026: the user's own clear "I handle it" ("řeším to já") counts as the answer too —
+    // only for steps owned by the user (owner "none" still needs the question)
+    const sam = !nikdo;
     for (let k = 0; k < msgs.length - 1; k++) {
       for (const tc of (msgs[k] && msgs[k].toolCalls) || []) {
         if (tc.name === "ask_user" && /řešitel|assignee/i.test(JSON.stringify(tc.args || {}))) otazka = k;
         if (["create_project", "create_project_from_ideas", "add_nodes"].includes(tc.name) && !odmitnute.has(tc.id)) zapis = k;
       }
+      if (sam && msgs[k] && msgs[k].role === "user" && resimJa(msgs[k].content)) otazka = Math.max(otazka, k);
     }
     if (otazka > zapis) return null;
   }
@@ -1880,10 +1918,36 @@ function rozbalRetezce(schema, args) {
   for (const k of Object.keys(props)) {
     const typ = props[k] && props[k].type;
     if ((typ === "array" || typ === "object") && typeof out[k] === "string") {
-      try { const v = JSON.parse(out[k]); if (v && typeof v === "object") out[k] = v; } catch (err) { /* nechat validaci, ať řekne proč */ }
+      const v = parseJsonLenient(out[k]);
+      if (v !== undefined) out[k] = v; // otherwise leave it to the validator to say why
     }
   }
   return out;
+}
+
+// JSON.parse plus one repair: a model that sends a tree as a string sometimes closes it with 1–2 brackets
+// too many (measured 12.–13. 11. 2026: all 41 cases of "outline as text" were a valid tree + "}]" or "}").
+// Strips at most MAX_JSON_EXTRA trailing "]", "}" or whitespace characters, one at a time, or adds one missing
+// closing bracket. The length cap
+// lives here (not at a caller) so every path is bounded; anything else → undefined (unchanged error).
+const MAX_JSON_REPAIR_LEN = 100000;
+const MAX_JSON_EXTRA = 8;
+function parseJsonLenient(s) {
+  const asObj = (v) => (v && typeof v === "object" ? v : undefined);
+  try { return asObj(JSON.parse(s)); } catch (err) { /* try the repair below */ }
+  const t = String(s).trim();
+  if (t.length > MAX_JSON_REPAIR_LEN || !/^[[{]/.test(t)) return undefined;
+  let end = t.length;
+  for (let i = 0; i < MAX_JSON_EXTRA && end > 1 && /[\]}\s]/.test(t[end - 1]); i++) {
+    end--;
+    if (/\s/.test(t[end])) continue;
+    try { return asObj(JSON.parse(t.slice(0, end))); } catch (err) { /* one more */ }
+  }
+  // the opposite slip: the last closing bracket is missing (8 of 96 rejected strings, all ask_user questions)
+  for (const konec of ["]", "}", "}]", "]}"]) {
+    try { return asObj(JSON.parse(t + konec)); } catch (err) { /* next */ }
+  }
+  return undefined;
 }
 
 // ---------- vykonání nástrojů ----------
@@ -2151,7 +2215,7 @@ function vykonej(app, auth, L, name, args, ktx) {
             }
           } catch (err) { /* doplněk; mapa je založená i bez něj */ }
         }
-        return { text: `Project "${title}" created (id: ${r.json.id}) with ${pocetUzlu(tree)} steps; the user is its owner. Offer next: what documents or preparations fit this project (suggest_next).`, karta: { type: "vysledek", map_id: r.json.id, map_title: title } };
+        return { text: `Project "${title}" created (id: ${r.json.id}) with ${pocetUzlu(tree)} steps; the user is its owner.${vetaResitelu(tree, auth.email())} Offer next: what documents or preparations fit this project (suggest_next).`, karta: { type: "vysledek", map_id: r.json.id, map_title: title } };
       });
     }
     case "create_project_from_ideas": {
@@ -2169,7 +2233,7 @@ function vykonej(app, auth, L, name, args, ktx) {
         const r = v1("POST", "/v1/maps", { title: title, tree: tree });
         if (r.status !== 200) return { text: chybaV1(r) };
         for (const rec of ideas) { try { app.delete(rec); } catch (err) { /* už není */ } }
-        return { text: `Project "${title}" created (id: ${r.json.id}) with ${tree.length} nodes; ${ideas.length} ideas removed from the buffer.`, karta: { type: "vysledek", map_id: r.json.id, map_title: title } };
+        return { text: `Project "${title}" created (id: ${r.json.id}) with ${tree.length} nodes; ${ideas.length} ideas removed from the buffer.${vetaResitelu(tree, auth.email())}`, karta: { type: "vysledek", map_id: r.json.id, map_title: title } };
       });
     }
     case "add_nodes": {
@@ -2185,7 +2249,7 @@ function vykonej(app, auth, L, name, args, ktx) {
         const r = v1("POST", `/v1/maps/${encodeURIComponent(mid)}/nodes`, body);
         if (r.status !== 200) return { text: chybaV1(r) };
         const added = (r.json.added_ids || []).join(", ");
-        return { text: `Added to "${m.json.title}" (node ids: ${added || "?"}).`, karta: { type: "vysledek", map_id: mid, map_title: m.json.title, node_id: (r.json.added_ids || [])[0] || "" } };
+        return { text: `Added to "${m.json.title}" (node ids: ${added || "?"}).${vetaResitelu(body.items, auth.email())}`, karta: { type: "vysledek", map_id: mid, map_title: m.json.title, node_id: (r.json.added_ids || [])[0] || "" } };
       });
     }
     case "update_node": {

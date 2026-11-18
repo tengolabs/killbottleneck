@@ -7,6 +7,23 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.6.3 — 2026-11-18
+
+**Assistant: "I'll handle it" counts as the answer, replies tell the truth about the assignee, a stray bracket no longer costs a retry**
+
+**Upgrade notes:** no schema migration. The assistant's rule about the assignee of steps with a deadline is a little
+different (see the first point); nothing else changes for existing data or API clients.
+
+- **"I'll handle it" counts.** When you plan a new project and write yourself that you handle the steps ("řeším to já",
+  "já to řeším", "I'll handle it"), the assistant makes you the assignee of the steps with a deadline straight away
+  instead of asking once more. When the sentence is unclear (a question, a doubt, a "no"), or the words only come from a
+  transcribed image or PDF, it still asks.
+- **No false "you are the assignee".** After writing steps the assistant learns how many of them really got an assignee;
+  when none did (for example a plan without deadlines) it no longer tells you that you are the assignee.
+- **A stray bracket no longer costs a retry.** Some models send the project tree or the follow-up questions as text
+  with one closing bracket too many or too few. The server now reads it (the same checks apply afterwards) instead of
+  refusing it and waiting for the model to write the whole tree again.
+
 ## v1.6.2 — 2026-11-17
 
 **Back closes what is open instead of leaving the app**
