@@ -11,7 +11,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/shared/NotificationBell';
 import TimerWidget from '@/components/shared/TimerWidget';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Smartphone, Bot } from 'lucide-react';
+import { ArrowLeft, Smartphone, Bot, Files } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
 import { useAiModes, stavAsistenta } from '@/hooks/useAiEnabled';
 import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
@@ -116,7 +116,9 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+        {/* phone: 4 px gaps and square icons (Assistant, Documents, New project) — with the Documents button the row did not
+            fit and squeezed every icon (390 px: 36 → 32 px); Richard 23 Nov 2026: "the assistant can be narrower" */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 w-full sm:w-auto justify-end">
           {actions}
           <TimerWidget />
           {/* AI chat na boku — přepínač; panel sám žije v App.jsx přes všechny stránky */}
@@ -125,7 +127,7 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
               variant={asistent.open ? 'default' : 'outline'}
               // telefon: zvýrazněné jako „+ Nový" (Richard 29. 9. 2026: „nechal bych i toho agenta");
               // stav „otevřeno" tam barva hlásit nemusí, panel překryje celou obrazovku
-              className="relative max-sm:bg-primary max-sm:text-primary-foreground max-sm:border-primary max-sm:hover:bg-primary/90 max-sm:hover:text-primary-foreground"
+              className="relative max-sm:w-9 max-sm:px-0 max-sm:bg-primary max-sm:text-primary-foreground max-sm:border-primary max-sm:hover:bg-primary/90 max-sm:hover:text-primary-foreground"
               onClick={() => asistent.setOpen((v) => !v)}
               title={popisAs}
               aria-label={popisAs}
@@ -137,6 +139,24 @@ export default function AppHeader({ active, backTo, actions, org: orgProp, onInv
                   „v mapě je tlačítko větší a lepší než na home“; na úzkém displeji jen ikona. */}
               <Bot className="w-4 h-4" />
               <span className="hidden sm:inline">{t('nav.aiChat')}</span>
+            </Button>
+          )}
+          {/* Documents beside the Assistant (Richard 23 Nov 2026: "one more way in — a button at the top"; before, only a small
+              icon in the assistant's header opened them, and with the assistant closed not at all). Same visibility as the
+              Assistant — the panel lives beside it. Phone: icon only. */}
+          {user && stavAs !== 'skryto' && (
+            <Button
+              variant={asistent.open && asistent.dokOpen ? 'default' : 'outline'}
+              // phone: a square icon like the bell (36 px, not 50) — the row must fit 320 px
+              className="max-sm:w-9 max-sm:px-0"
+              onClick={asistent.toggleDocuments}
+              title={t('nav.documentsHint')}
+              aria-label={t('nav.documents')}
+              aria-pressed={!!(asistent.open && asistent.dokOpen)}
+              data-testid="lista-dokumenty"
+            >
+              <Files className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('nav.documents')}</span>
             </Button>
           )}
           <NotificationBell />

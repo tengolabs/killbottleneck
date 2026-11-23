@@ -26,14 +26,17 @@ export default function NewMapActions({ onCreate }) {
           akce nesmí zdražet), šipka otevře nabídku s importem. Bonus: import
           je teď dostupný i na mobilu (dřív hidden md:inline-flex). */}
       <div className="inline-flex">
-        <Button onClick={onCreate} className="rounded-r-none">
+        {/* phone: a square "+" (36 px) and a narrower arrow — the top row must fit (Richard 23 Nov 2026) */}
+        {/* computer: short "+ New" (Richard 23 Nov 2026: "the new project button is needlessly big on phone and PC",
+            variant C); the full name stays as tooltip and accessible name. Tests find it by data-testid, not by text. */}
+        <Button onClick={onCreate} className="rounded-r-none max-sm:w-9 max-sm:px-0" title={t('newMap.newProject')} aria-label={t('newMap.newProject')} data-testid="novy-projekt">
           <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">{t('newMap.newProject')}</span>
+          <span className="hidden sm:inline">{t('newMap.newShort')}</span>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              className="rounded-l-none border-l border-primary-foreground/25 px-2"
+              className="rounded-l-none border-l border-primary-foreground/25 px-2 max-sm:px-1.5"
               aria-label={t('newMap.moreOptions')}
             >
               <ChevronDown className="w-4 h-4" />

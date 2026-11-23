@@ -29,6 +29,8 @@
     "templates": "Šablony",
     "organizace": "Organizace",
     "aiChat": "Asistent",
+    "documents": "Dokumenty",
+    "documentsHint": "Dokumenty — poznámky, e-maily, sumáře a další, co napsal asistent",
     "aiChatVypadek": "Asistent – dočasný výpadek AI",
     "aiChatVlastniVypadek": "Asistent – AI neodpovídá"
   },

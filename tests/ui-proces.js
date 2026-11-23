@@ -49,7 +49,7 @@ H.beh(async () => {
   await login(page, 'admin@e2e.cz');
 
   console.log('== Nový projekt: dlaždice Proces ==');
-  expect(await klikText(page, 'button', /^Nový projekt$/), 'tlačítko Nový projekt');
+  expect(await page.click('[data-testid="novy-projekt"]').then(() => true).catch(() => false), 'tlačítko Nový projekt');
   await page.waitForSelector('[data-testid="create-kind-process"]', { timeout: 10000 });
   let dialog = await page.$eval('[role="dialog"]', (d) => d.innerText);
   expect(/Chci něco dokončit/.test(dialog) && /Chci, aby něco běželo/.test(dialog), 'dialog nabízí Projekt i Proces');

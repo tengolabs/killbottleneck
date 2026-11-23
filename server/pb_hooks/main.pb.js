@@ -2751,12 +2751,18 @@ kbRoute("POST", "/chat/pamet", (e) => {
 // Soukromé poznámky, koncepty e-mailů a sumáře (dokumenty.js). Vlastník se hlídá v modulu:
 // cizí id = 404 stejně jako neexistující (neprozrazovat, že dokument existuje).
 // ⚠️ pomocné funkce v modulu — handler v PB JSVM nevidí funkce deklarované v tomhle souboru.
-// ?skupina=poznamky|emaily|sumare &q=hledání → bez plného textu (náhled)
+// ?skupina=poznamky|emaily|sumare &q=hledání &map=<id>|- (project filter, "-" = no project) → bez plného textu (náhled);
+// `projekty` / `bez_projektu` = choices for the panel's project filter (23 Nov 2026)
 kbRoute("GET", "/chat/dokumenty", (e) => {
   const D = require(`${__hooks}/dokumenty.js`);
   const q = e.requestInfo().query || {};
-  const rows = D.seznam($app, e.auth.id, { skupina: String(q.skupina || ""), q: String(q.q || "") });
-  return e.json(200, { dokumenty: D.sProjekty($app, e.auth, rows.map((r) => D.dto(r, false))), max: D.MAX_DOKUMENTU });
+  const rows = D.seznam($app, e.auth.id, { skupina: String(q.skupina || ""), q: String(q.q || ""), map: String(q.map || "") });
+  const p = D.projects($app, e.auth, String(q.map || ""));
+  // filtered to a project: how many documents WITHOUT a project match the same kind and search — the list offers them
+  // in a row below ("1 more without a project"), else a card the assistant just wrote outside a project vanishes on "Back"
+  const mapQ = String(q.map || "").trim();
+  const noneHere = mapQ && mapQ !== "-" ? D.seznam($app, e.auth.id, { skupina: String(q.skupina || ""), q: String(q.q || ""), map: "-" }).length : 0;
+  return e.json(200, { dokumenty: D.sProjekty($app, e.auth, rows.map((r) => D.dto(r, false))), max: D.MAX_DOKUMENTU, projekty: p.projects, bez_projektu: p.none, bez_projektu_filtr: noneHere });
 }, $apis.requireAuth());
 
 kbRoute("GET", "/chat/dokument/{id}", (e) => {

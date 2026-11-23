@@ -156,6 +156,15 @@ export function AsistentProvider({ children }) {
       return next;
     });
   }, []);
+  // "Documents" button in the top bar (23 Nov 2026, Richard: "one more way in — a button at the top"): the Office panel
+  // stands beside the assistant, so opening it opens the assistant too (closed assistant = no panel at all); it opens on
+  // the list. Visible panel → close it (unsaved changes ask first). Panel "open" behind a closed assistant → just show it.
+  const toggleDocuments = useCallback(() => {
+    if (dokOpen && open) { opatrne(() => setDokOpen(false)); return; }
+    if (!dokOpen) setDokId('');
+    setDokOpen(true);
+    if (!open) setOpen(true);
+  }, [dokOpen, open, opatrne, setDokOpen, setOpen]);
   const setWidth = useCallback((w) => {
     const n = Math.min(MAX_W, Math.max(MIN_W, Math.round(w)));
     setWidthState(n);
@@ -261,18 +270,18 @@ export function AsistentProvider({ children }) {
 
   const value = useMemo(() => ({
     open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, setLeftTabShown, leftPanelWidth, setLeftPanelWidth, dostupny, setDostupny, funkcni, setFunkcni, uzel, setUzel, liteOpen, setLiteOpen,
-    dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, docPreview, setDocPreview, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
+    dokOpen, setDokOpen, toggleDocuments, dokWidth, setDokWidth, dokId, setDokId, otevriDokument, docPreview, setDocPreview, dokVerze: dokZmena.verze, dokZmenene: dokZmena.ids, obnovDokumenty,
     hlidac, opatrne, odchod, setOdchod, zahodZmeny,
     zadost, spust, vyridZadost, pdfSoubory, setPdfSoubory,
     relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax,
     brain, startBrain, stopBrain, updateBrain, zavriZony,
     prohlizec, otevriObrazek, zavriObrazek, setProhlizec,
-  }), [open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, leftPanelWidth, setLeftPanelWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, dokWidth, setDokWidth, dokId, otevriDokument, docPreview, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, brain, startBrain, stopBrain, updateBrain, zavriZony, prohlizec, otevriObrazek, zavriObrazek]);
+  }), [open, setOpen, width, setWidth, odsun, leftInset, side, setSide, railOffset, leftPanelWidth, setLeftPanelWidth, dostupny, funkcni, uzel, liteOpen, dokOpen, setDokOpen, toggleDocuments, dokWidth, setDokWidth, dokId, otevriDokument, docPreview, dokZmena, obnovDokumenty, opatrne, odchod, zahodZmeny, zadost, spust, vyridZadost, pdfSoubory, relax, spustRelax, ukonciRelax, prodluzRelax, upravRelax, brain, startBrain, stopBrain, updateBrain, zavriZony, prohlizec, otevriObrazek, zavriObrazek]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 // Mimo provider (testy, lite) vrací neutrální stav — nic nespadne.
-const PRAZDNO = { open: false, width: 0, odsun: 0, leftInset: 0, side: 'right', setSide: () => {}, railOffset: 0, setLeftTabShown: () => {}, leftPanelWidth: 0, setLeftPanelWidth: () => {}, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, otevriDokument: () => {}, docPreview: '', setDocPreview: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {}, brain: null, startBrain: () => {}, stopBrain: () => {}, updateBrain: () => {}, prohlizec: null, otevriObrazek: () => {}, zavriObrazek: () => {}, setProhlizec: () => {} };
+const PRAZDNO = { open: false, width: 0, odsun: 0, leftInset: 0, side: 'right', setSide: () => {}, railOffset: 0, setLeftTabShown: () => {}, leftPanelWidth: 0, setLeftPanelWidth: () => {}, dostupny: false, funkcni: false, uzel: null, setUzel: () => {}, liteOpen: false, setLiteOpen: () => {}, dokOpen: false, toggleDocuments: () => {}, otevriDokument: () => {}, docPreview: '', setDocPreview: () => {}, opatrne: (fn) => fn(), zadost: null, spust: () => {}, vyridZadost: () => {}, pdfSoubory: [], setPdfSoubory: () => {}, relax: null, spustRelax: () => {}, ukonciRelax: () => {}, prodluzRelax: () => {}, upravRelax: () => {}, brain: null, startBrain: () => {}, stopBrain: () => {}, updateBrain: () => {}, prohlizec: null, otevriObrazek: () => {}, zavriObrazek: () => {}, setProhlizec: () => {} };
 export function useAsistent() {
   return useContext(Ctx) || PRAZDNO;
 }

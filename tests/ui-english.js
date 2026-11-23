@@ -62,7 +62,7 @@ const czechWords = (txt) => (txt.match(/\b(Projekty|Úkoly|Šablony|Nový projek
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
     await sleep(1200);
     body = await page.evaluate(() => document.body.innerText);
-    expect(/New project/i.test(body), 'Home ukazuje „New project"');
+    expect(await page.$eval('[data-testid="novy-projekt"]', (b) => b.innerText.trim() === 'New' && b.getAttribute('aria-label') === 'New project').catch(() => false), 'Home ukazuje „+ New“ (popisek „New project“)');
     const cw = czechWords(body);
     expect(cw.length === 0, `Home bez českých slov ${cw.length ? JSON.stringify([...new Set(cw)]) : ''}`);
     expect(!CZ.test(body), `Home bez české diakritiky ${CZ.test(body) ? '(' + (body.match(new RegExp('.{0,20}' + CZ.source + '.{0,20}'))?.[0] || '') + ')' : ''}`);

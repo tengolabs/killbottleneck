@@ -91,7 +91,8 @@
     "readabilityHint_titleOnly": "Largest text, title only — no description or progress.",
     "fitAlignTitle": "Tidy the map by your settings (Arrange and Sort) and show all of it",
     "rules": "Rules",
-    "asistent": "Assistant"
+    "asistent": "Assistant",
+    "documents": "Documents"
   },
   "saveState": {
     "saving": "Saving...",

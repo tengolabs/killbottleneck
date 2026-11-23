@@ -213,8 +213,19 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-dok-filtr"][data-skupina="kancelar"]'), 'filtr Kancelář v seznamu');
   await page.click('[data-testid="chat-dok-filtr"][data-skupina="kancelar"]');
   await sleep(600);
-  const druhy = await page.$$eval('[data-testid="chat-dok-polozka"]', (els) => els.map((e) => e.getAttribute('data-kind')));
-  expect(druhy.length === 2 && druhy.every((k) => k === 'presentation' || k === 'card'), `filtr Kancelář = prezentace + přání (${druhy.join(',')})`);
+  // inside the map the list starts filtered to the project (v1.7.0): the deck belongs to Truhlářství, the card was written
+  // without a project → one row below offers it ("1 more document without a project"), a click shows it
+  let druhy = await page.$$eval('[data-testid="chat-dok-polozka"]', (els) => els.map((e) => e.getAttribute('data-kind')));
+  expect(druhy.join() === 'presentation', `in the map: Office filter = the project's deck (${druhy.join(',')})`);
+  expect(await cekej('[data-testid="chat-dok-projekt-bez"]') && /1 dokument bez projektu/.test(await page.$eval('[data-testid="chat-dok-projekt-bez"]', (el) => el.textContent)), 'row "Další 1 dokument bez projektu — ukázat" (the card written without a project does not vanish)');
+  await page.click('[data-testid="chat-dok-projekt-bez"]');
+  await sleep(600);
+  druhy = await page.$$eval('[data-testid="chat-dok-polozka"]', (els) => els.map((e) => e.getAttribute('data-kind')));
+  expect(druhy.join() === 'card' && await page.$eval('[data-testid="chat-dok-projekt-filtr"]', (el) => el.value) === '-', `the row switches to "Bez projektu" → the card (${druhy.join(',')})`);
+  await page.click('[data-testid="chat-dok-projekt-zrusit"]');
+  await sleep(600);
+  druhy = await page.$$eval('[data-testid="chat-dok-polozka"]', (els) => els.map((e) => e.getAttribute('data-kind')));
+  expect(druhy.length === 2 && druhy.every((k) => k === 'presentation' || k === 'card'), `filtr Kancelář (všechny projekty) = prezentace + přání (${druhy.join(',')})`);
   await page.click('[data-testid="chat-novy"]');
   expect(await cekej('[data-testid="chat-blok-kancelar"]'), 'AI blok nabízí Prezentace, přání, pozvánka');
   const predForm = volani.length;

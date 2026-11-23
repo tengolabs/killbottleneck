@@ -52,12 +52,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
     await sleep(1000);
     let body = await page.evaluate(() => document.body.innerText);
-    expect(/Nový projekt/i.test(body), 'Home ukazuje tlačítko „Nový projekt"');
+    expect(await page.$eval('[data-testid="novy-projekt"]', (b) => b.innerText.trim() === 'Nový' && b.getAttribute('aria-label') === 'Nový projekt').catch(() => false), 'Home ukazuje tlačítko „+ Nový“ (popisek „Nový projekt“)');
     expect(/Moje projekty|Kde působím|projekt/i.test(body), 'Home ukazuje sekce projektů');
 
     console.log('== založení projektu ==');
     const clicked = await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => /Nový projekt/i.test(x.textContent));
+      const b = document.querySelector('[data-testid="novy-projekt"]');
       if (b) { b.click(); return true; } return false;
     });
     expect(clicked, 'kliknuto na Nový projekt');

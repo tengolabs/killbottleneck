@@ -53,9 +53,9 @@ const api = async (method, path, { token, body } = {}) => {
     console.log('== Nový projekt → Ze šablony: kanban šablona v nabídce s odznakem pravidel ==');
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
     // čekat na vykreslenou hlavičku, ne pevný spánek (lekce flaku ui-kanban)
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Nový projekt/.test(b.textContent || '')), { timeout: 45000 });
+    await page.waitForFunction(() => !!document.querySelector('[data-testid="novy-projekt"]'), { timeout: 45000 });
     ok(await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => /Nový projekt/.test(x.textContent || ''));
+      const b = document.querySelector('[data-testid="novy-projekt"]');
       b && b.click();
       return !!b;
     }), 'tlačítko Nový projekt na Home');
@@ -395,11 +395,11 @@ const api = async (method, path, { token, body } = {}) => {
     const soubor = path.join(os.tmpdir(), 'kb-ui-import-test.kb.json');
     fs.writeFileSync(soubor, JSON.stringify(exportObj));
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Nový projekt/.test(b.textContent || '')), { timeout: 45000 });
+    await page.waitForFunction(() => !!document.querySelector('[data-testid="novy-projekt"]'), { timeout: 45000 });
     // šipka vedle Nový projekt → Radix menu → Importovat (vše skutečnou myší)
     const sipka = await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => /Nový projekt/.test(x.textContent || ''));
-      const arrow = b && b.parentElement.querySelector('button[aria-label]');
+      const b = document.querySelector('[data-testid="novy-projekt"]');
+      const arrow = b && b.parentElement.querySelector('button[aria-haspopup]');
       if (!arrow) return null;
       const r = arrow.getBoundingClientRect();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };

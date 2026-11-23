@@ -141,6 +141,37 @@ function sProjekty(app, auth, dtos) {
   return dtos;
 }
 
+// Projects the user's documents belong to, for the panel's project filter (23 Nov 2026):
+// { projects: [{ id, title, count }] sorted by title, none: count without a project }.
+// Only maps the user can still read are offered — like sProjekty, an unreadable map is not revealed
+// (its documents stay visible under "All projects", without a project link).
+// `current` = the project the panel filters by: offered even with no documents yet (opened inside a fresh project),
+// if the user can read it.
+function projects(app, auth, current) {
+  const { v1ReadableMap } = require(`${__hooks}/helpers.js`);
+  let rows = [];
+  try { rows = app.findRecordsByFilter("ai_documents", "user = {:u}", "-updated", MAX_SEZNAM, 0, { u: auth.id }); } catch (err) { rows = []; }
+  const counts = {};
+  let none = 0;
+  for (const r of rows) {
+    const m = r.getString("map");
+    if (!m) { none++; continue; }
+    counts[m] = (counts[m] || 0) + 1;
+  }
+  const out = [];
+  for (const id of Object.keys(counts)) {
+    const r = v1ReadableMap(app, id, auth);
+    if (r) out.push({ id: id, title: r.map.getString("title"), count: counts[id] });
+  }
+  const cur = String(current || "");
+  if (cur && cur !== "-" && !counts[cur] && /^[a-z0-9]{1,40}$/.test(cur)) {
+    const r = v1ReadableMap(app, cur, auth);
+    if (r) out.push({ id: cur, title: r.map.getString("title"), count: 0 });
+  }
+  out.sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  return { projects: out, none: none };
+}
+
 // dokument uživatele podle id; cizí nebo neexistující → null
 function najdi(app, userId, id) {
   if (!id) return null;
@@ -159,6 +190,14 @@ function seznam(app, userId, opt) {
   }
   const q = String(o.q || "").trim().slice(0, 100);
   if (q) { params.q = q; filtr += " && (title ~ {:q} || text ~ {:q} || email_to ~ {:q} || email_subject ~ {:q})"; }
+  // project filter (23 Nov 2026): "" = all, "-" = documents without a project, otherwise a map id.
+  // A malformed id matches nothing (an empty list, not every document).
+  const map = String(o.map || "").trim();
+  if (map === "-") filtr += " && map = ''";
+  else if (map) {
+    if (!/^[a-z0-9]{1,40}$/.test(map)) return [];
+    params.m = map; filtr += " && map = {:m}";
+  }
   const limit = Math.max(1, Math.min(MAX_SEZNAM, parseInt(o.limit, 10) || MAX_SEZNAM));
   try {
     return app.findRecordsByFilter("ai_documents", filtr, "-updated", limit, 0, params);
@@ -352,6 +391,6 @@ function nastrojCteni(app, userId, ref) {
 
 module.exports = {
   MAX_TEXT, MAX_TITLE, MAX_DOKUMENTU, MAX_META, DRUHY, SKUPINY, SABLONY, ocistiMeta,
-  dto, sProjekty, najdi, seznam, podleOdkazu, uloz, vratit, smazat, pridejObrazek, doplnChat, vratitTah, snimek,
+  dto, sProjekty, projects, najdi, seznam, podleOdkazu, uloz, vratit, smazat, pridejObrazek, doplnChat, vratitTah, snimek,
   rozdelPredmet, nazevZTextu, odpovedChyby, jeZastupny, norm, radek, nastrojSeznam, nastrojCteni,
 };

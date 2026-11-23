@@ -38,6 +38,9 @@ H.beh(async () => {
   const textDok = () => page.evaluate(() => document.querySelector('[data-testid="chat-dokumenty"]')?.innerText || '');
   const cekejTextDok = async (s, ms = 10000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if ((await textDok()).includes(s)) return true; await sleep(250); } return false; };
   const box = async (sel) => { const el = await page.$(sel); return el ? el.boundingBox() : null; };
+  // inside a map the documents list starts filtered to that project (23 Nov 2026) — sections that work with documents
+  // without a project switch the filter to all projects after the panel (re)opens there
+  const vsechnyProjekty = async () => { if (!(await cekej('[data-testid="chat-dok-projekt-filtr"]', 5000))) return; if (await page.$eval('[data-testid="chat-dok-projekt-filtr"]', (el) => el.value)) await page.select('[data-testid="chat-dok-projekt-filtr"]', ''); };
   const napis = async (s) => { await page.click('[data-testid="chat-input"]'); await page.keyboard.type(s); await page.keyboard.press('Enter'); };
 
   console.log('== asistent napíše e-mail → Dokumenty se samy otevřou vlevo od chatu, přes mapu ==');
@@ -77,7 +80,10 @@ H.beh(async () => {
   expect(await cekej('[data-testid="chat-dok-hlaska"]') && await cekejTextDok('Uloženo.'), 'uloženo');
   await page.reload({ waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-dokumenty"]'), 'po reloadu jsou dokumenty pořád otevřené');
-  expect(await cekej('[data-testid="chat-dok-polozka"]'), 'po reloadu seznam dokumentů');
+  // inside the map the list is filtered to this project (23 Nov 2026) — the e-mail has no project → empty state with "Show all projects"
+  expect(await cekej('[data-testid="chat-dok-prazdno"]') && await cekejTextDok('V tomhle projektu zatím žádné dokumenty nejsou'), 'po reloadu v mapě: filtr na projekt, e-mail bez projektu tu není');
+  await page.click('[data-testid="chat-dok-projekt-vse"]');
+  expect(await cekej('[data-testid="chat-dok-polozka"]'), '„Ukázat všechny projekty“ → seznam dokumentů');
   await page.click('[data-testid="chat-dok-polozka"]');
   expect(await cekejTextDok('DOPSANO-KLAVESNICI'), 'ruční úprava přežila reload');
   await page.click('[data-testid="chat-dok-vratit"]');
@@ -131,6 +137,9 @@ H.beh(async () => {
   await cekej('[data-testid="chat-dokumenty"]');
   if (await page.$('[data-testid="chat-dok-zpet"]')) await page.click('[data-testid="chat-dok-zpet"]');
   await cekej('[data-testid="chat-dok-seznam"]');
+  // reload inside the map = filter back on this project; note B has no project → all projects
+  await vsechnyProjekty();
+  await cekej('[data-testid="chat-dok-polozka"][data-kind="note"]');
   // smazat B ať dál sedí počty
   await page.click('[data-testid="chat-dok-polozka"][data-kind="note"]');
   await cekej('[data-testid="chat-dok-smazat"]'); await page.click('[data-testid="chat-dok-smazat"]');
@@ -152,6 +161,7 @@ H.beh(async () => {
   await page.click('[data-testid="chat-dokumenty-btn"]');
   await cekej('[data-testid="chat-dokumenty"]');
   if (await page.$('[data-testid="chat-dok-zpet"]')) await page.click('[data-testid="chat-dok-zpet"]');
+  await vsechnyProjekty();
   await cekej('[data-testid="chat-dok-polozka"][data-kind="email"]');
   for (const el of await page.$$('[data-testid="chat-dok-polozka"]')) { if ((await el.evaluate((x) => x.innerText)).includes('E-mail ke kuchyni')) { await el.click(); break; } }
   await cekej('[data-testid="chat-dok-smazat"]'); await page.click('[data-testid="chat-dok-smazat"]');
@@ -194,7 +204,19 @@ H.beh(async () => {
   expect(await cekej('.react-flow') && !!(await page.$('[data-testid="chat-dok-detail"][data-kind="note"]')), 'na počítači zůstane dokument otevřený vedle mapy');
   await page.click('[data-testid="chat-dok-zpet"]');
   expect(await cekej('[data-testid="chat-dok-polozka"][data-kind="note"]'), 'poznámka v seznamu');
-  expect((await page.$$('[data-testid="chat-dok-polozka"]')).length === 2, 'v seznamu 2 dokumenty');
+  // project filter (Richard 23 Nov 2026: "filter by project — now I see everything mixed together"): inside the map
+  // the list starts on that project — only the note, without the repeated project line; × = all projects again
+  const filtrHodnota = () => page.$eval('[data-testid="chat-dok-projekt-filtr"]', (el) => el.value).catch(() => null);
+  const pocetPolozek = (n) => page.waitForFunction((k) => document.querySelectorAll('[data-testid="chat-dok-polozka"]').length === k, { timeout: 5000 }, n).then(() => true).catch(() => false);
+  expect(await filtrHodnota() === map.id, `inside the map the project filter starts on this project (${await filtrHodnota()})`);
+  expect(await pocetPolozek(1) && !(await page.$('[data-testid="chat-dok-polozka-projekt"]')), 'filtered to the project: only its note, no repeated project line');
+  expect((await page.$eval('[data-testid="chat-dok-projekt-filtr"]', (el) => [...el.options].map((o) => o.textContent).join(' | '))).includes('Truhlářství (1)'), 'the filter offers the project with its document count');
+  await page.click('[data-testid="chat-dok-projekt-zrusit"]');
+  expect(await pocetPolozek(2) && await filtrHodnota() === '', '× → all projects, both documents');
+  await page.select('[data-testid="chat-dok-projekt-filtr"]', '-');
+  expect(await page.waitForFunction(() => { const p = [...document.querySelectorAll('[data-testid="chat-dok-polozka"]')]; return p.length === 1 && p[0].dataset.kind === 'email'; }, { timeout: 5000 }).then(() => true).catch(() => false), '„No project“ → only the e-mail');
+  await page.select('[data-testid="chat-dok-projekt-filtr"]', '');
+  expect(await pocetPolozek(2), 'v seznamu 2 dokumenty');
   await page.click('[data-testid="chat-dok-filtr"][data-skupina="emaily"]');
   await sleep(600);
   const emaily = await page.$$eval('[data-testid="chat-dok-polozka"]', (el) => el.map((x) => x.dataset.kind));
@@ -250,9 +272,55 @@ H.beh(async () => {
   await cekej('[data-testid="chat-panel"]');
   expect(!(await page.$('[data-testid="chat-dokumenty"]')), 'zavřené dokumenty zůstanou po reloadu zavřené');
 
+  console.log('== "Documents" button in the top bar (Richard 23 Nov 2026) ==');
+  // map editor, wide bar (≥ 1850 px): assistant closed → the button opens the assistant AND the documents, on this project
+  await page.setViewport({ width: 1900, height: 900 });
+  await page.evaluate(() => { localStorage.setItem('kb-chat-open', '0'); localStorage.setItem('kb-chat-dok-open', '0'); });
+  await page.reload({ waitUntil: 'networkidle2' });
+  expect(await cekej('[data-testid="toolbar-dokumenty"]') && !(await page.$('[data-testid="chat-panel"]')), 'map bar: Documents button, assistant closed');
+  await page.click('[data-testid="toolbar-dokumenty"]');
+  expect(await cekej('[data-testid="chat-panel"]') && await cekej('[data-testid="chat-dok-seznam"]'), 'map bar button opens the assistant and the documents list');
+  expect(await page.waitForFunction((id) => document.querySelector('[data-testid="chat-dok-projekt-filtr"]')?.value === id, { timeout: 5000 }, map.id).then(() => true).catch(() => false), 'opened inside the map → filtered to this project');
+  expect(await page.$eval('[data-testid="toolbar-dokumenty"]', (b) => b.className.includes('bg-primary')), 'the button shows the panel is open');
+  await page.click('[data-testid="toolbar-dokumenty"]');
+  expect(await zmizi('[data-testid="chat-dokumenty"]') && !!(await page.$('[data-testid="chat-panel"]')), 'second click closes the documents, the assistant stays');
+  // home page bar (AppHeader), normal width
+  await page.setViewport({ width: 1400, height: 900 });
+  await page.evaluate(() => { localStorage.setItem('kb-chat-open', '0'); localStorage.setItem('kb-chat-dok-open', '0'); });
+  await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  expect(await cekej('[data-testid="lista-dokumenty"]') && (await page.$eval('[data-testid="lista-dokumenty"]', (b) => b.innerText)).includes('Dokumenty'), 'home bar: „Dokumenty“ button beside the Assistant');
+  await page.click('[data-testid="lista-dokumenty"]');
+  expect(await cekej('[data-testid="chat-panel"]') && await cekej('[data-testid="chat-dok-seznam"]') && await page.$eval('[data-testid="lista-dokumenty"]', (b) => b.getAttribute('aria-pressed')) === 'true', 'home bar button opens the assistant and the documents');
+  expect(await cekej('[data-testid="chat-dok-polozka"]') && await filtrHodnota() === '', `outside a map: all projects (${await filtrHodnota()})`);
+  await page.click('[data-testid="lista-dokumenty"]');
+  expect(await zmizi('[data-testid="chat-dokumenty"]'), 'second click closes the documents');
+  await page.goto(`${inst.base}/map/${map.id}`, { waitUntil: 'networkidle2' });
+  await cekej('[data-testid="chat-panel"]');
+
   console.log('== karta „Otevřít vedle“ ==');
   await page.click('[data-testid="chat-koncept-otevrit"]');
   expect(await cekej('[data-testid="chat-dok-detail"][data-kind="email"]'), '„Otevřít vedle“ otevře dokument z karty');
+
+  console.log('== phone: the top bar action row fits with the Documents button (Richard 23 Nov 2026: "do the buttons fit?") ==');
+  // before the fix the Documents button squeezed every icon (390 px: 36 → 32 px) and at 320 px pushed "+" off the left edge
+  for (const [w, plna] of [[390, true], [412, true], [320, false]]) {
+    await page.setViewport({ width: w, height: 800, isMobile: true, hasTouch: true });
+    await page.evaluate(() => { localStorage.setItem('kb-chat-open', '0'); localStorage.setItem('kb-chat-dok-open', '0'); });
+    await page.goto(`${inst.base}/tasks`, { waitUntil: 'networkidle2' });
+    await cekej('[data-testid="lista-dokumenty"]');
+    const rada = await page.evaluate(() => {
+      const row = document.querySelector('[data-testid="lista-dokumenty"]').parentElement;
+      const sipka = document.querySelector('[data-testid="novy-projekt"]')?.nextElementSibling; // the narrow arrow beside "+" is meant to be narrow
+      const btn = [...row.querySelectorAll('button')].filter((b) => b.offsetWidth && b !== sipka);
+      const r = btn.map((b) => b.getBoundingClientRect());
+      return { min: Math.min(...r.filter((x) => x.width < 45).map((x) => Math.round(x.width))), left: Math.min(...r.map((x) => x.left)), right: Math.max(...r.map((x) => x.right)), vw: window.innerWidth, novy: (document.querySelector('[data-testid="novy-projekt"]')?.getBoundingClientRect().width) || 0 };
+    });
+    expect(rada.left >= 0 && rada.right <= rada.vw, `${w} px: no top-bar button off the screen (${Math.round(rada.left)}..${Math.round(rada.right)} / ${rada.vw})`);
+    if (plna) expect(rada.min >= 36 && Math.round(rada.novy) === 36, `${w} px: icons full size, not squeezed (smallest ${rada.min} px, „+“ ${Math.round(rada.novy)} px)`);
+  }
+  await page.setViewport({ width: 1400, height: 900 });
+  await page.goto(`${inst.base}/`, { waitUntil: 'networkidle2' });
+  expect(await page.$eval('[data-testid="novy-projekt"]', (b) => b.innerText.trim()) === 'Nový', 'computer: the New project button reads „+ Nový“ (Richard 23 Nov 2026, variant C)');
 
   console.log('== telefon: pod lištou přes zbytek obrazovky nad chatem, samo se neotevírá ==');
   await page.setViewport({ width: 400, height: 800 });
@@ -279,6 +347,9 @@ H.beh(async () => {
   await page.evaluate(() => { localStorage.setItem('kb-chat-open', '1'); localStorage.setItem('kb-chat-dok-open', '1'); });
   await page.goto(`${inst.base}/map/${jina.id}`, { waitUntil: 'networkidle2' });
   expect(await cekej('[data-testid="chat-dokumenty"]'), 'telefon: dokumenty otevřené');
+  // in "Jiný projekt" the list starts on that (empty) project; the summary belongs to Truhlářství
+  expect(await cekej('[data-testid="chat-dok-projekt-vse"]'), 'telefon: v jiném projektu prázdno s „Ukázat všechny projekty“');
+  await page.click('[data-testid="chat-dok-projekt-vse"]');
   await cekej('[data-testid="chat-dok-polozka"][data-kind="summary"]');
   await page.click('[data-testid="chat-dok-polozka"][data-kind="summary"]');
   await cekej('[data-testid="chat-dok-projekt"]');

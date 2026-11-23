@@ -130,6 +130,37 @@ H.beh(async () => {
   expect((await inst.api('GET', '/api/kb/chat/dokumenty?skupina=poznamky', { token: A })).json.dokumenty.map((x) => x.title).join() === 'Rozměry kuchyně', 'filtr Poznámky');
   expect((await inst.api('GET', '/api/kb/chat/dokumenty?q=Ostrůvek', { token: A })).json.dokumenty.map((x) => x.title).join() === 'Rozměry kuchyně', 'hledání v textu');
 
+  console.log('== project filter (?map=) and the project choices (23 Nov 2026) ==');
+  const nazvy = (j) => j.dokumenty.map((x) => x.title).sort().join(' | ');
+  let fp = (await inst.api('GET', `/api/kb/chat/dokumenty?map=${map.id}`, { token: A })).json;
+  expect(nazvy(fp) === 'Rozměry kuchyně', `?map=<project> → only that project's documents (${nazvy(fp)})`);
+  fp = (await inst.api('GET', '/api/kb/chat/dokumenty?map=-', { token: A })).json;
+  expect(fp.dokumenty.length === 3 && fp.dokumenty.every((x) => !x.map), `?map=- → only documents without a project (${nazvy(fp)})`);
+  expect(seznam.projekty.length === 1 && seznam.projekty[0].id === map.id && seznam.projekty[0].title === 'Truhlářství' && seznam.projekty[0].count === 1 && seznam.bez_projektu === 3, `the list offers projects with counts + count without one (${JSON.stringify(seznam.projekty)} / ${seznam.bez_projektu})`);
+  expect((await inst.api('GET', `/api/kb/chat/dokumenty?skupina=emaily&map=${map.id}`, { token: A })).json.dokumenty.length === 0, 'project filter combines with the kind filter (E-mails in Truhlářství = 0)');
+  expect((await inst.api('GET', `/api/kb/chat/dokumenty?q=Ostrůvek&map=-`, { token: A })).json.dokumenty.length === 0, 'project filter combines with search');
+  // filtered to a project: the count of documents WITHOUT a project matching the same kind + search (the "N more" row)
+  fp = (await inst.api('GET', `/api/kb/chat/dokumenty?map=${map.id}`, { token: A })).json;
+  expect(fp.bez_projektu_filtr === 3, `filtered to a project → bez_projektu_filtr = documents without a project (${fp.bez_projektu_filtr})`);
+  const emailyBez = (await inst.api('GET', '/api/kb/chat/dokumenty?skupina=emaily&map=-', { token: A })).json.dokumenty.length;
+  fp = (await inst.api('GET', `/api/kb/chat/dokumenty?skupina=emaily&map=${map.id}`, { token: A })).json;
+  expect(fp.bez_projektu_filtr === emailyBez && emailyBez < 3, `…it respects the kind filter (E-mails: ${fp.bez_projektu_filtr} = ${emailyBez})`);
+  fp = (await inst.api('GET', `/api/kb/chat/dokumenty?q=Ostrůvek&map=${map.id}`, { token: A })).json;
+  expect(fp.bez_projektu_filtr === 0, `…and the search (${fp.bez_projektu_filtr})`);
+  expect((await inst.api('GET', '/api/kb/chat/dokumenty', { token: A })).json.bez_projektu_filtr === 0 && (await inst.api('GET', '/api/kb/chat/dokumenty?map=-', { token: A })).json.bez_projektu_filtr === 0, '…and is 0 when not filtered to a project');
+  const prazdna = (await inst.api('POST', '/api/collections/goalmaps/records', { token: A, body: { title: 'Prázdný projekt', nodes: [], edges: [] } })).json;
+  fp = (await inst.api('GET', `/api/kb/chat/dokumenty?map=${prazdna.id}`, { token: A })).json;
+  expect(fp.dokumenty.length === 0 && fp.projekty.some((p) => p.id === prazdna.id && p.title === 'Prázdný projekt' && p.count === 0), 'the filtered project is offered even with no documents yet (opened inside a fresh project)');
+  expect(!(await inst.api('GET', '/api/kb/chat/dokumenty', { token: A })).json.projekty.some((p) => p.id === prazdna.id), '…but not offered otherwise (only projects with documents)');
+  const ciziMapa = (await inst.api('POST', '/api/collections/goalmaps/records', { token: B, body: { title: 'Cizí tajný projekt', nodes: [], edges: [] } })).json;
+  fp = await inst.api('GET', `/api/kb/chat/dokumenty?map=${ciziMapa.id}`, { token: A });
+  expect(fp.status === 200 && fp.json.dokumenty.length === 0 && !JSON.stringify(fp.json.projekty).includes('Cizí tajný'), 'someone else\'s project: nothing listed, its title not revealed');
+  for (const bad of ['%27%20%7C%7C%201%3D1', 'x'.repeat(60), 'ABC']) {
+    fp = await inst.api('GET', `/api/kb/chat/dokumenty?map=${bad}`, { token: A });
+    expect(fp.status === 200 && fp.json.dokumenty.length === 0, `malformed ?map=${bad.slice(0, 20)} → 200 and an empty list, not everything`);
+  }
+  await inst.api('DELETE', `/api/collections/goalmaps/records/${prazdna.id}`, { token: A });
+
   console.log('== list_documents / get_document / update_document ==');
   fronta.push(nastroj('list_documents', {}), nastroj('get_document', { document: 'Poptávka spárovek' }),
     nastroj('update_document', { document: 'Poptávka spárovek', text: 'Vážený pane,\ndovoluji si poptat. DOK-FORMALNI' }), text('Upraveno.'));

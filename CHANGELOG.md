@@ -7,6 +7,23 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.7.0 — 2026-11-23
+
+**Documents: a button at the top and a filter by project; a shorter "+ New" button**
+
+**Upgrade notes:** no schema migration. Nothing changes for existing data or API clients.
+
+- **Documents button at the top.** Next to **Assistant** in the top bar (home page, Tasks, Calendar and the map editor;
+  an icon on a phone) a **Documents** button opens the Office with your documents. It opens the assistant too when it
+  is closed — before, the documents could only be opened from a small icon in the assistant's header.
+- **Filter documents by project.** Under the search in the documents list: **All projects**, each project with its
+  number of documents, or **No project**. Open the documents inside a project's map and the list starts on that
+  project; the cross next to the filter goes back to all. Documents without a project stay one click away — a row
+  under the list says how many there are. Only projects you can see are offered. Invoices have no project filter.
+- **Shorter "+ New" button.** The button for a new project reads **+ New** (the full name is its tooltip), and on a
+  phone the Assistant, Documents and "+" buttons are square icons, so the whole top bar fits from 390 px wide and is
+  roomier on narrower phones than before.
+
 ## v1.6.3 — 2026-11-18
 
 **Assistant: "I'll handle it" counts as the answer, replies tell the truth about the assignee, a stray bracket no longer costs a retry**

@@ -29,6 +29,8 @@
     "templates": "Templates",
     "organizace": "Organization",
     "aiChat": "Assistant",
+    "documents": "Documents",
+    "documentsHint": "Documents — notes, emails, summaries and more the assistant wrote",
     "aiChatVypadek": "Assistant – temporary AI outage",
     "aiChatVlastniVypadek": "Assistant – AI isn't responding"
   },

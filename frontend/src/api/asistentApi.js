@@ -26,10 +26,11 @@ export const chatPamet = () => kbSend('/api/kb/chat/pamet', { method: 'GET' });
 export const chatPametUloz = (text, mapId) => kbSend('/api/kb/chat/pamet', { body: mapId ? { text, map_id: mapId } : { text } });
 export const chatModely = () => kbSend('/api/kb/chat/modely', { method: 'GET' });
 // Dokumenty asistenta (30. 9. 2026): soukromé poznámky, koncepty e-mailů a sumáře
-export const dokumenty = ({ skupina, q } = {}) => {
+export const dokumenty = ({ skupina, q, map } = {}) => {
   const p = new URLSearchParams();
   if (skupina) p.set('skupina', skupina);
   if (q) p.set('q', q);
+  if (map) p.set('map', map); // project filter: map id, or '-' = no project
   const qs = p.toString();
   return kbSend(`/api/kb/chat/dokumenty${qs ? `?${qs}` : ''}`, { method: 'GET' });
 };

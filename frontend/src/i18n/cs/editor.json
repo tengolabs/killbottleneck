@@ -91,7 +91,8 @@
     "readabilityHint_titleOnly": "Největší písmo, jen název — bez popisu a pokroku.",
     "fitAlignTitle": "Srovnat mapu podle nastavení (Zarovnat a Uspořádat) a zobrazit celou",
     "rules": "Pravidla",
-    "asistent": "Asistent"
+    "asistent": "Asistent",
+    "documents": "Dokumenty"
   },
   "saveState": {
     "saving": "Ukládání...",

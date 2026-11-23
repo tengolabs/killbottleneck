@@ -3,7 +3,7 @@ import { routeBackSteps } from '@/lib/backLayers';
 import { useTranslation } from 'react-i18next';
 import { useOhlasSpodekHlavicky } from '@/hooks/useSpodekHlavicky';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ChevronDown, Plus, Loader2, Check, AlertTriangle, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot, RotateCw, Target } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Plus, Loader2, Check, AlertTriangle, Download, Share2, Eye, Users, Undo2, AlignCenter, CheckSquare, MoreVertical, LayoutGrid, Archive, ArchiveRestore, FileJson, StretchHorizontal, Shrink, Maximize, ALargeSmall, Type, Heading, Columns3, Flame, ArrowDownWideNarrow, CalendarClock, CalendarCheck, UserRound, CircleDot, Bot, RotateCw, Target, Files } from 'lucide-react';
 import { useAsistent } from '@/lib/AsistentContext';
 import { stavAsistenta } from '@/hooks/useAiEnabled';
 import { useMedia } from '@/lib/useMedia';
@@ -297,6 +297,19 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
       testIdListy: 'toolbar-asistent',
       varianta: asistent.open ? 'default' : 'outline',
       onClick: () => asistent.setOpen((v) => !v),
+    },
+    {
+      // Documents beside the Assistant (Richard 23 Nov 2026: "one more way in — a button at the top") — opens the
+      // assistant too, the panel stands beside it; inside a project the list starts filtered to this project
+      klic: 'dokumenty',
+      sekceListy: 'akce2',
+      viditelna: stavAs !== 'skryto' && user,
+      Ikona: Files,
+      popisek: t('toolbar.documents'),
+      titulekListy: t('nav:nav.documentsHint'),
+      testIdListy: 'toolbar-dokumenty',
+      varianta: asistent.open && asistent.dokOpen ? 'default' : 'outline',
+      onClick: asistent.toggleDocuments,
     },
     {
       klic: 'exportPng',
@@ -643,6 +656,11 @@ export default function EditorToolbar({ nav, layout, access, state, actions }) {
             <Button variant="default" size="icon" className="sm:hidden relative h-9 w-9 shrink-0" onClick={() => asistent.setOpen((v) => !v)} title={popisAs} aria-label={popisAs} data-testid="toolbar-asistent-mobil" data-stav={stavAs}>
               <Bot className="w-4 h-4" />
               {stavAs === 'vypadek' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-background" aria-hidden="true" />}
+            </Button>
+          )}
+          {user && stavAs !== 'skryto' && (
+            <Button variant={asistent.open && asistent.dokOpen ? 'default' : 'outline'} size="icon" className="sm:hidden h-9 w-9 shrink-0" onClick={asistent.toggleDocuments} title={t('nav:nav.documentsHint')} aria-label={t('toolbar.documents')} aria-pressed={!!(asistent.open && asistent.dokOpen)} data-testid="toolbar-dokumenty-mobil">
+              <Files className="w-4 h-4" />
             </Button>
           )}
           <NotificationBell />

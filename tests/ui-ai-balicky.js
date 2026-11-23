@@ -118,7 +118,7 @@ H.beh(async () => {
   console.log('== Nový projekt: odkaz v dialogu → asistent, 4 otázky, celý strom, projekt s barvou z dialogu ==');
   await page.click('[data-testid="chat-zavrit"]');
   await sleep(400);
-  expect(await klikText(page, 'Nový projekt'), 'lišta: „Nový projekt“');
+  expect(await klikText(page, 'Nový', '[data-testid="novy-projekt"]'), 'lišta: „+ Nový“ (projekt)');
   expect(await cekej('#project-name'), 'dialog Nový projekt je otevřený');
   await page.type('#project-name', 'Kavárna u nádraží');
   const barva = await page.evaluate(() => { const b = [...document.querySelectorAll('[role="dialog"] button')].find((e) => e.style.backgroundColor === 'rgb(59, 130, 246)'); if (b) b.click(); return !!b; });
@@ -297,7 +297,7 @@ H.beh(async () => {
   await priprav(p2, B);
   await p2.goto(`${bez.base}/`, { waitUntil: 'networkidle2' });
   await sleep(1500);
-  expect(await klikText(p2, 'Nový projekt'), 'bez AI: „Nový projekt“');
+  expect(await klikText(p2, 'Nový', '[data-testid="novy-projekt"]'), 'bez AI: „+ Nový“ (projekt)');
   expect(await cekej('#project-name', 5000, p2), 'bez AI: dialog otevřen');
   await sleep(500);
   expect(!(await p2.$('[data-testid="create-project-ai"]')), 'bez asistenta dialog odkaz na AI nemá');

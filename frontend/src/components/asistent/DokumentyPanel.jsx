@@ -74,7 +74,9 @@ function datum(iso, lang) {
 
 
 // filtr a hledání drží panel (ne seznam) — po návratu z dokumentu zůstanou, jak byly
-function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ }) {
+// project filter (23 Nov 2026, Richard: "filter by project — now I see everything mixed together"):
+// projekt '' = all, '-' = no project, otherwise a map id; inside a map the panel starts on that project
+function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ, projekt, setProjekt }) {
   const { t, i18n } = useTranslation('asistent');
   // názvy druhů pro čipy prázdného stavu (líný ns kancelar — stejné texty jako formulář Nový dokument)
   const kancReady = useLazyNs('kancelar');
@@ -82,16 +84,22 @@ function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ }) {
   const [hledat, setHledat] = useState('');
   const [rows, setRows] = useState(null);
   const [chyba, setChyba] = useState('');
+  const [projekty, setProjekty] = useState(null); // { list: [{ id, title, count }], none } — choices for the project filter
   // hledání až po krátké pauze v psaní — ne dotaz na každé písmeno
   useEffect(() => { const h = setTimeout(() => setHledat(q.trim()), 250); return () => clearTimeout(h); }, [q]);
   useEffect(() => {
     let zivy = true;
     if (skupina === 'faktury') { setRows([]); return () => { zivy = false; }; }
-    apiSeznam({ skupina, q: hledat })
-      .then((r) => { if (zivy) { setRows(r.dokumenty || []); setChyba(''); } })
+    apiSeznam({ skupina, q: hledat, map: projekt })
+      .then((r) => { if (zivy) { setRows(r.dokumenty || []); setChyba(''); setProjekty({ list: r.projekty || [], none: r.bez_projektu || 0, noneHere: r.bez_projektu_filtr || 0, pro: projekt }); } })
       .catch((e) => { if (zivy) { setRows((p) => p || []); setChyba(e.message || t('dok.errorLoad')); } });
     return () => { zivy = false; };
-  }, [skupina, hledat, verze, t]);
+  }, [skupina, hledat, projekt, verze, t]);
+  // the server offers every project the user can read (the filtered one even with no documents) — a filtered project
+  // missing from ITS OWN answer is one the user cannot read (a public map, a deleted one) → back to all projects
+  useEffect(() => {
+    if (projekty && projekty.pro === projekt && projekt && projekt !== '-' && !projekty.list.some((p) => p.id === projekt)) setProjekt('');
+  }, [projekty, projekt, setProjekt]);
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="px-3 pt-3 pb-2 space-y-2 border-b shrink-0">
@@ -119,6 +127,30 @@ function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ }) {
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('dok.search')} className="h-8 pl-8 text-sm" data-testid="chat-dok-hledat" />
         </div>}
+        {/* invoices have no project → no project filter there */}
+        {skupina !== 'faktury' && (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <FolderKanban className={`w-3.5 h-3.5 shrink-0 ${projekt ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden="true" />
+            <select
+              value={projekt}
+              onChange={(e) => setProjekt(e.target.value)}
+              aria-label={t('dok.projectFilter')}
+              className={`h-8 min-w-0 flex-1 truncate rounded-md border bg-background px-2 text-sm ${projekt ? 'border-primary text-primary font-medium' : 'border-input'}`}
+              data-testid="chat-dok-projekt-filtr"
+            >
+              <option value="">{t('dok.projectAll')}</option>
+              {/* the selected project stays a choice even before the list arrives (no jump to "All") */}
+              {projekt && projekt !== '-' && !(projekty && projekty.list.some((p) => p.id === projekt)) && <option value={projekt}>{'…'}</option>}
+              {(projekty ? projekty.list : []).map((p) => <option key={p.id} value={p.id}>{`${p.title || '—'} (${p.count})`}</option>)}
+              {(projekt === '-' || (projekty && projekty.none > 0)) && <option value="-">{`${t('dok.projectNone')}${projekty ? ` (${projekty.none})` : ''}`}</option>}
+            </select>
+            {projekt && (
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" title={t('dok.projectClear')} aria-label={t('dok.projectClear')} onClick={() => setProjekt('')} data-testid="chat-dok-projekt-zrusit">
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       {skupina === 'faktury' ? <FakturySeznam verze={verze} onOtevri={onOtevri} /> : (
       <div className="flex-1 overflow-y-auto p-2 space-y-1" data-testid="chat-dok-seznam">
@@ -127,7 +159,8 @@ function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ }) {
         {rows && rows.length === 0 && !chyba && (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground" data-testid="chat-dok-prazdno">
             <FileText className="w-6 h-6 mx-auto mb-2 opacity-60" />
-            <p>{hledat || skupina ? t('dok.emptyFiltered') : t('dok.empty')}</p>
+            <p>{projekt && !hledat ? t('dok.projectEmpty') : hledat || skupina || projekt ? t('dok.emptyFiltered') : t('dok.empty')}</p>
+            {projekt && <button type="button" onClick={() => setProjekt('')} className="mt-2 text-xs text-primary hover:underline" data-testid="chat-dok-projekt-vse">{t('dok.projectShowAll')}</button>}
             {/* čipy druhů místo věty „zkuste napsat…“ — jde na ně kliknout (1. 11. 2026) */}
             {!hledat && kancReady && (DRUHY_PRO_FILTR[skupina] || []).length > 0 && (
               <div className="mt-3 flex flex-wrap justify-center gap-1.5" data-testid="chat-dok-prazdno-sablony">
@@ -157,14 +190,21 @@ function Seznam({ verze, onOtevri, onNova, skupina, setSkupina, q, setQ }) {
                 <span className="text-sm font-medium truncate flex-1">{d.title || t(`dok.kind.${d.kind}`)}</span>
                 <span className="text-[11px] text-muted-foreground shrink-0">{datum(d.updated, i18n.language)}</span>
               </div>
-              {d.map_title && <p className="text-[11px] text-primary/90 truncate mt-0.5 pl-6 inline-flex items-center gap-1 max-w-full" data-testid="chat-dok-polozka-projekt"><FolderKanban className="w-3 h-3 shrink-0" /><span className="truncate">{d.map_title}</span></p>}
+              {d.map_title && !(projekt && projekt !== '-') && <p className="text-[11px] text-primary/90 truncate mt-0.5 pl-6 inline-flex items-center gap-1 max-w-full" data-testid="chat-dok-polozka-projekt"><FolderKanban className="w-3 h-3 shrink-0" /><span className="truncate">{d.map_title}</span></p>}
               {d.nahled && <p className="text-xs text-muted-foreground truncate mt-0.5 pl-6">{d.nahled}</p>}
             </button>
           );
         })}
+        {/* filtered to a project: documents without a project matching the same kind/search stay one click away
+            (a card the assistant wrote in this map without naming the project would otherwise vanish on "Back") */}
+        {rows && !chyba && projekt && projekt !== '-' && projekty && projekty.pro === projekt && projekty.noneHere > 0 && (
+          <button type="button" onClick={() => setProjekt('-')} className="w-full text-left px-2.5 py-2 text-xs text-primary hover:underline" data-testid="chat-dok-projekt-bez">
+            {t('dok.projectNoneMore', { count: projekty.noneHere })}
+          </button>
+        )}
         {/* paměť asistenta — nenápadný řádek AŽ POD seznamem, jen v „Vše“ bez hledání (Richard 2. 11. 2026:
             nahoře mátla a většina lidí ji vidět nepotřebuje) */}
-        {!skupina && !hledat && (
+        {!skupina && !hledat && !projekt && (
           <button type="button" onClick={() => onOtevri(PAMET)} title={t('dok.memoryHint')} className="w-full text-left rounded-md px-2.5 py-1.5 mt-2 flex items-center gap-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors" data-testid="chat-dok-pamet">
             <Brain className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{t('dok.memory')}</span>
@@ -578,6 +618,12 @@ export default function DokumentyPanel({ mobil }) {
   const A = useAsistent();
   const [skupina, setSkupina] = useState('');
   const [q, setQ] = useState('');
+  const location = useLocation();
+  const mapaZAdresy = (location.pathname.match(/^\/map\/([^/]+)/) || [])[1] || '';
+  // project filter: starts on the project whose map is open (Richard 23 Nov 2026), follows the address when the map
+  // changes; a hand-picked choice holds until then
+  const [projekt, setProjekt] = useState(mapaZAdresy);
+  useEffect(() => { setProjekt(mapaZAdresy); }, [mapaZAdresy]);
   // Stránky asistenta (14. 10. 2026): druhá záložka panelu (Moje | Tým); jen když instance stránky nabízí (config.pages, KB_PAGES=0 → nic)
   const { config } = useKbConfig();
   const strankyOn = !!(config && config.pages);
@@ -611,8 +657,6 @@ export default function DokumentyPanel({ mobil }) {
       ))}
     </div>
   );
-  const location = useLocation();
-  const mapaZAdresy = (location.pathname.match(/^\/map\/([^/]+)/) || [])[1] || '';
   // zpráva složená formulářem jde do chatu přes žádost kontextu (panel chatu je líný, vyřídí ji, až je volný)
   const posliZpravu = useCallback((text) => { A.setDokId(''); A.spust('zprava', { text }); }, [A]);
   const [okno, setOkno] = useState(() => window.innerWidth);
@@ -709,7 +753,7 @@ export default function DokumentyPanel({ mobil }) {
       {A.dokId === PAMET
         ? <PametPohled />
         : novyDok
-        ? <NovyDokument key={A.dokId} druh={novyDruh} mapId={mapaZAdresy} onOdeslat={posliZpravu} onZpet={() => A.setDokId('')} />
+        ? <NovyDokument key={A.dokId} druh={novyDruh} mapId={projekt && projekt !== '-' ? projekt : mapaZAdresy} onOdeslat={posliZpravu} onZpet={() => A.setDokId('')} />
         : !A.dokId && obrazkyOn && zalozka === 'obrazky'
         ? <SeznamObrazku />
         : !A.dokId && zalozka === 'pdf'
@@ -724,7 +768,7 @@ export default function DokumentyPanel({ mobil }) {
         ? <FakturaDetail key={A.dokId} id={A.dokId.slice(FAKTURA_PREFIX.length)} onZpet={() => { setSkupina('faktury'); A.setDokId(''); }} />
         : A.dokId
         ? <Detail key={A.dokId} id={A.dokId} mobil={mobil} verze={A.dokVerze} zmenene={A.dokZmenene} hlidac={hlidac} onProjekt={naProjekt} onZpet={() => A.setDokId('')} onSmazano={() => { A.setDokId(''); A.obnovDokumenty(); }} />
-        : <Seznam verze={A.dokVerze} onOtevri={(id) => A.setDokId(id)} onNova={otevriNovy} skupina={skupina} setSkupina={setSkupina} q={q} setQ={setQ} />}
+        : <Seznam verze={A.dokVerze} onOtevri={(id) => A.setDokId(id)} onNova={otevriNovy} skupina={skupina} setSkupina={setSkupina} q={q} setQ={setQ} projekt={projekt} setProjekt={setProjekt} />}
       </div>
     </aside>
   );

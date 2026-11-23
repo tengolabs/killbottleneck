@@ -10,6 +10,18 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.7.0": {
+    cs: [
+      "Nahoře vedle Asistenta je nové tlačítko Dokumenty — poznámky, e-maily a souhrny otevře jedním klikem, i když je asistent zavřený.",
+      "Dokumenty jdou filtrovat podle projektu. V mapě projektu se rovnou ukážou jen jeho dokumenty, křížkem se vrátíte ke všem. Dokumenty bez projektu máte pod seznamem na jeden klik.",
+      "Tlačítko pro nový projekt je kratší („+ Nový“) a horní lišta se na telefonu vejde celá.",
+    ],
+    en: [
+      "A new Documents button sits at the top next to the Assistant — it opens your notes, emails and summaries in one click, even with the assistant closed.",
+      "Documents can be filtered by project. Inside a project's map you see just its documents straight away; the cross takes you back to all of them. Documents without a project are one click away under the list.",
+      "The new project button is shorter (\"+ New\") and the top bar fits on a phone.",
+    ],
+  },
   "v1.6.3": {
     cs: [
       "Když asistentovi při plánování nového projektu rovnou napíšete „řeším to já“, kroky s termínem dostanete hned a druhá otázka na řešitele už nepřijde.",
