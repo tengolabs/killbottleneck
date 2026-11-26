@@ -73,19 +73,31 @@ export function TimerProvider({ children }) {
   }, [running]);
 
   // start({map_id, task_id, node_id, client_id, label}) — server případný běžící záznam zavře
-  const start = useCallback(async (target = {}) => {
-    const rec = await base44.entities.TimeEntry.create({
-      started: new Date().toISOString(),
-      ended: '',
+  // A start that is still on its way is not sent again for the same target: on a slow connection the second
+  // click (nothing on the screen had changed yet) used to create a second entry. Both callers get the one entry.
+  const starting = useRef(null); // { key, promise }
+  const start = useCallback((target = {}) => {
+    const body = {
       map_id: target.map_id || '',
       task_id: target.task_id || '',
       node_id: target.node_id || '',
       client_id: target.client_id || '',
       label: (target.label || '').slice(0, 200),
-    });
-    gen.current++;
-    setRunning(rec);
-    return rec;
+    };
+    const key = JSON.stringify(body);
+    if (starting.current && starting.current.key === key) return starting.current.promise;
+    const promise = (async () => {
+      try {
+        const rec = await base44.entities.TimeEntry.create({ started: new Date().toISOString(), ended: '', ...body });
+        gen.current++;
+        setRunning(rec);
+        return rec;
+      } finally {
+        if (starting.current && starting.current.promise === promise) starting.current = null;
+      }
+    })();
+    starting.current = { key, promise };
+    return promise;
   }, []);
 
   // přiřazení ZA BĚHU (projekt/klient/poznámka) — timer běží dál

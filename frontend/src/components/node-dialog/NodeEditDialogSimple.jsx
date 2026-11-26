@@ -30,12 +30,12 @@ import OdkazyVPopisu from '@/components/shared/OdkazyVPopisu';
 // řešitel úkolu na uzlu), požádá o změnu termínu a komentuje. Přílohy jen
 // VIDÍ (FilesSection readOnly — nahrání by u automatizovaného kroku krok
 // spustilo, Richard 20. 8.). Mapu tenhle dialog NEUKLÁDÁ — žádné onSave.
-export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, onWorkStatusSaved, canRequestDeadline }) {
+export default function NodeEditDialogSimple({ node, mapId, onClose, mapAccess, onWorkStatusSaved, canRequestDeadline, onDeadlineRequestChanged }) {
   const { t } = useTranslation('editor');
   const { toast } = useToast();
   const { user } = useAuth();
   // onSave se nepředává — hook ho pro čtecí/žádací akce nepotřebuje
-  const s = useNodeEditState({ node, mapId, onSave: () => {}, mapAccess });
+  const s = useNodeEditState({ node, mapId, onSave: () => {}, mapAccess, onDeadlineRequestChanged });
   const [savingStatus, setSavingStatus] = useState(false);
   const d = node?.data || {};
 

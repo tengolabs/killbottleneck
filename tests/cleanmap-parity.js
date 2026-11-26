@@ -66,6 +66,9 @@ const EDITOR_EDGES = [
   // ikona uzlu (v1 od 15. 10. 2026) — treeItemsToNodes ji volá, musí být ve stejném scope
   // eslint-disable-next-line no-eval, no-unused-vars
   const ikonaUzlu = eval('(' + extractFn(helpersSrc, 'ikonaUzlu') + ')');
+  // a real day of the calendar (analysis 5, c11-1) — treeItemsToNodes calls it, same scope needed
+  // eslint-disable-next-line no-eval, no-unused-vars
+  const isRealDay = eval('(' + extractFn(helpersSrc, 'isRealDay') + ')');
   // eslint-disable-next-line no-eval
   const treeItemsToNodes = eval('(' + extractFn(helpersSrc, 'treeItemsToNodes') + ')');
   // eslint-disable-next-line no-eval
@@ -221,6 +224,8 @@ const EDITOR_EDGES = [
       'wait_for_children a status se přenesly');
     const convBad = treeItemsToNodes([{ title: 'Špatný termín', deadline: '15.8.' }], 'T');
     ok(!!convBad.error, `nový vstup s deadline mimo RRRR-MM-DD → chyba (${(convBad.error || '').slice(0, 40)})`);
+    const convUnreal = treeItemsToNodes([{ title: 'X', deadline: '2027-02-31' }], 'B');
+    ok(!!convUnreal.error && !convUnreal.nodes, 'a deadline that is not a day of the calendar (2027-02-31) → error, no nodes');
     // strop hloubky rekurze: hluboce vnořený vstup NEsmí přetéct zásobník, vrátí chybu
     let deep = { title: 'x' }; for (let i = 0; i < 5000; i++) deep = { title: 'x', children: [deep] };
     let convDeep, crashed = false;

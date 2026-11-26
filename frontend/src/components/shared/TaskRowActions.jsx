@@ -22,6 +22,15 @@ const BTN = 'inline-flex items-center justify-center w-7 h-7 rounded-md text-mut
 
 const WHEN = ['today', 'tomorrow', 'nextWeek'];
 
+// "Done" is guarded ACROSS rows, not only inside one row: a ticked row leaves the list and the next one slides
+// under the finger, so an impatient second tap (200–400 ms later) used to tick a different task — silently.
+// While one "done" is on its way no other row takes a "done", and for a short while after the ticked row has
+// left the list the taps on "done" are ignored. 700 ms is longer than a repeated tap and shorter than reading the
+// next title; the layout stays as it is (keeping the ticked row in place would be the other fix).
+export const DONE_SETTLE_MS = 700;
+const doneGuard = { inFlight: false, until: 0 };
+const doneGuarded = () => doneGuard.inFlight || Date.now() < doneGuard.until;
+
 // only: zúžení nabídky pro pohledy, kde už některou akci obsluhuje něco jiného
 // (v tabulce úkolů cykluje stav klik na štítek stavu — druhé „hotovo" vedle něj
 // by bylo zdvojení bez užitku, což zakazuje anti-bloat pravidlo).
@@ -44,6 +53,10 @@ export default function TaskRowActions({ item, onDone, onError, className = '', 
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
   }, [open, focusOpen]);
 
+  // the settle time counts from the moment the ticked row really leaves the list (the reload may be slow)
+  const doneSent = useRef(false);
+  useEffect(() => () => { if (doneSent.current) doneGuard.until = Date.now() + DONE_SETTLE_MS; }, []);
+
   const actions = only ? availableActions(item).filter((a) => only.includes(a)) : availableActions(item);
   if (actions.length === 0) return null;
 
@@ -57,14 +70,19 @@ export default function TaskRowActions({ item, onDone, onError, className = '', 
   // by KAŽDÉ odbavení — a ubírat kliknutí je celý smysl řádkových akcí.
   const run = async (key, fn, note, undo) => {
     if (busy) return;
+    const isDone = key === 'done';
+    if (isDone && doneGuarded()) return;
+    if (isDone) doneGuard.inFlight = true;
     setBusy(key);
     try {
       const res = await fn();
+      if (isDone) { doneSent.current = true; doneGuard.until = Date.now() + DONE_SETTLE_MS; }
       setOpen(false);
       onDone?.(res, note, undo);
     } catch (e) {
       onError?.(e);
     } finally {
+      if (isDone) doneGuard.inFlight = false;
       setBusy('');
     }
   };

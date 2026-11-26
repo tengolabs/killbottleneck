@@ -1,6 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-    darkMode: ["class"],
+    // `dark:` follows the surface that is really painted, not the mode: lib/theme.js sets .kb-dark-surface from
+    // the luminance of --background (a skin may be dark in its light section — the default one is). The class
+    // strategy with another class name keeps the generated selectors exactly as they were.
+    darkMode: ["class", ".kb-dark-surface"],
     content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx}"],
   theme: {
   	extend: {

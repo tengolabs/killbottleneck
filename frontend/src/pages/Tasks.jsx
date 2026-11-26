@@ -252,6 +252,17 @@ export default function Tasks({ kalendar = false }) {
     } catch { /* toast řeší updateMapNode */ }
   };
 
+  // A request for another deadline is written by its own route (the dialog calls it): the list
+  // must take the result over, or the reopened dialog and the row showed the state from before
+  // the request until the page was reloaded (analysis 5, c3-1).
+  const handleDeadlineRequestChanged = (nodeId, fields) => {
+    const mapId = editNodeItem?.map_id;
+    if (!mapId) return;
+    setMaps((prev) => prev.map((m) => (m.id !== mapId ? m : {
+      ...m, nodes: (m.nodes || []).map((n) => (n.id === nodeId ? { ...n, data: { ...(n.data || {}), ...fields } } : n)),
+    })));
+  };
+
   const handleQuickAddNode = async (mapId, title) => {
     try {
       await addNodeToMap(mapId, 'auto', title);
@@ -261,7 +272,11 @@ export default function Tasks({ kalendar = false }) {
     }
   };
 
+  // One "+" at a time: a double click used to add two sub-goals (the row has no dialog that would swallow the second click).
+  const addingChild = useRef(false);
   const handleAddChildNode = async (item) => {
+    if (addingChild.current) return;
+    addingChild.current = true;
     try {
       const newId = await addNodeToMap(item.map_id, item.node_id, t('tasksPage.newSubgoal'));
       setEditNodeItem({
@@ -276,6 +291,8 @@ export default function Tasks({ kalendar = false }) {
       });
     } catch (e) {
       toast({ title: t('tasksPage.addSubgoalFailed'), description: e?.message, variant: 'destructive' });
+    } finally {
+      addingChild.current = false;
     }
   };
 
@@ -872,6 +889,7 @@ export default function Tasks({ kalendar = false }) {
             onShareAdd={(email) => shareMapWith(editNodeItem.map_id, email)}
             onContactsChanged={reloadMembers}
             onSave={handleSaveNodeFull}
+            onDeadlineRequestChanged={handleDeadlineRequestChanged}
             onStash={handleStashNodeFromTable}
             onDelete={handleDeleteNodeFromTable}
             onOpenMap={() => openNodeInMap(editNodeItem)}

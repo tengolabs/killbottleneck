@@ -719,8 +719,10 @@ export default function TaskTimeline({
           onScroll={handleLeftPanelScroll}
           className={`${leftPanelWidthClass} shrink-0 border-r border-border bg-card z-20 flex flex-col select-none shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)] overflow-y-auto transition-[width] duration-150`}
         >
-          {/* Sticky hlavička levého panelu */}
-          <div className="sticky top-0 z-30 h-[70px] px-2.5 sm:px-3.5 border-b border-border flex items-center justify-between bg-muted/80 backdrop-blur-xs font-semibold text-xs text-muted-foreground">
+          {/* Sticky header of the left panel. shrink-0: the panel is a column flexbox with its own scrolling,
+              so without it a list taller than the axis squeezed the header from 70 px to the height of its text
+              (17 px) and every bar on the right sat 54 px below the name of its row. */}
+          <div data-testid="osa-hlavicka-vlevo" className="sticky top-0 z-30 h-[70px] shrink-0 px-2.5 sm:px-3.5 border-b border-border flex items-center justify-between bg-muted/80 backdrop-blur-xs font-semibold text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5 truncate">
               <Folder className="w-3.5 h-3.5 text-primary shrink-0" />
               <span className="truncate">{t('timeline.itemHeader', 'Projekt / Cíl / Úkol')}</span>
@@ -771,6 +773,7 @@ export default function TaskTimeline({
                         return (
                           <div
                             key={item.key}
+                            data-testid={`osa-radek-${item.key}`}
                             onClick={() => {
                               if (item.type === 'node') onOpenNode?.(item.raw);
                               else onEdit?.(item.raw);

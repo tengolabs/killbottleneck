@@ -221,3 +221,191 @@ export function trojcestnyMerge(zaklad, moje, server) {
       || title !== (server.title || '') || color !== (server.color || ''),
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// THREE-WAY MERGE THAT ALWAYS HAS A RESULT (analysis 5, c5-1) — for the save that ran into 409.
+//
+// `trojcestnyMerge` above answers "may this be merged without asking?" and gives up at the first
+// thing both sides touched. That left two people who each edited a DIFFERENT step of one map
+// with a dialog whose "Keep my changes" overwrote everything the colleague had saved. This
+// function merges node by node and edge by edge and reports where the two sides really cross:
+//   · changed on one side only → that side's version;
+//   · changed on both sides, differently (the same node edited by both, a node deleted by one
+//     and edited by the other, the same connection, the same node re-plugged under two parents,
+//     a loop made of both sides' connections) → a CONFLICT; the result carries MY version there.
+// The caller merges silently when `conflicts` is empty, and otherwise asks the person — "Keep my
+// changes" then saves exactly this result: mine at the disputed places, every other change of
+// the colleague kept.
+// Not a conflict, by decision:
+//   · position — a node moved by both keeps MY position (the canvas the person is looking at
+//     must not jump under the cursor; a position is cheap to redo, unlike a text). A node that
+//     one side only moved and the other deleted is deleted;
+//   · status alone — my choice wins quietly, as it has since v0.27 (`overridden` counts it).
+// Inputs in the canonical shape (lib/cleanMap.js), as for trojcestnyMerge.
+// Returns { title, color, nodes, edges,
+//   conflicts: [{ id, title, kind }]  kind: 'node' | 'deleted' | 'connection' | 'title' | 'color'
+//   foreign:   [{ id, title }]        what the other side changed (content, not mere positions)
+//   foreignIds, taken, statusOnly, overridden, mineExtra }
+export function mergeKeepMine(zaklad, moje, server) {
+  const eq = (a, b) => stableJson({ v: a }) === stableJson({ v: b });
+  const idx = (a) => new Map((a || []).map((x) => [x.id, x]));
+  const titleOf = (n) => String((n && n.data && (n.data.title || n.data.apexText)) || '');
+  const order = (...maps) => { const seen = new Set(); const out = []; for (const m of maps) for (const id of m.keys()) if (!seen.has(id)) { seen.add(id); out.push(id); } return out; };
+
+  const conflicts = new Map();
+  const foreign = new Map();
+  let taken = 0; let statusOnly = true; let overridden = 0;
+
+  const B = idx(zaklad.nodes); const S = idx(server.nodes);
+  const M = idx((moje.nodes || []).map((x) => doplnServerova(x, B.get(x.id))));
+  const nameOf = (id) => titleOf(M.get(id) || S.get(id) || B.get(id));
+  const conflict = (id, kind) => { if (!conflicts.has(id)) conflicts.set(id, { id, title: nameOf(id), kind }); };
+  const theirs = (id) => { if (!foreign.has(id)) foreign.set(id, { id, title: titleOf(S.get(id) || B.get(id) || M.get(id)) }); };
+
+  // ---- header ----
+  const head = (key, kind) => {
+    const o = tricestne(zaklad[key] || '', moje[key] || '', server[key] || '');
+    if (o.kolize) { conflicts.set(`#${kind}`, { id: `#${kind}`, title: '', kind }); foreign.set(`#${kind}`, { id: `#${kind}`, title: '', kind }); return moje[key] || ''; }
+    if (o.zmenaServeru) { taken++; statusOnly = false; foreign.set(`#${kind}`, { id: `#${kind}`, title: '', kind }); }
+    return o.volba === 'server' ? (server[key] || '') : (moje[key] || '');
+  };
+  const title = head('title', 'title');
+  const color = head('color', 'color');
+
+  // ---- nodes ----
+  const nodes = [];
+  const revived = new Set(); // deleted by the other side, kept because I edited them
+  for (const id of order(S, M, B)) {
+    const b = B.get(id); const m = M.get(id); const s = S.get(id);
+    if (m && s) {
+      if (!b) {
+        // the same id added on both sides
+        if (!eq(m, s)) { conflict(id, 'node'); theirs(id); }
+        nodes.push(m);
+        continue;
+      }
+      const mineChanged = !eq(bezPozice(b), bezPozice(m));
+      const theirsChanged = !eq(bezPozice(b), bezPozice(s));
+      let out = m;
+      if (theirsChanged && !eq(bezPozice(m), bezPozice(s))) {
+        if (!mineChanged) {
+          out = s; taken++; theirs(id);
+          if (!lisiSeJenStavem(b, s)) statusOnly = false;
+        } else if (lisiSeJenStavem(b, m) && lisiSeJenStavem(b, s)) {
+          overridden++;
+        } else {
+          conflict(id, 'node'); theirs(id);
+        }
+      }
+      const p = tricestne(b.position, m.position, s.position);
+      const takeTheirPosition = !p.kolize && p.volba === 'server';
+      if (takeTheirPosition && p.zmenaServeru) { taken++; statusOnly = false; }
+      nodes.push({ ...out, position: takeTheirPosition ? s.position : m.position });
+      continue;
+    }
+    if (m && !s) {
+      if (!b) { nodes.push(m); continue; }              // my new node
+      theirs(id);
+      if (eq(bezPozice(m), bezPozice(b))) { taken++; statusOnly = false; continue; } // deleted by the other side, untouched by me
+      conflict(id, 'deleted'); nodes.push(m); revived.add(id);
+      continue;
+    }
+    if (!m && s) {
+      if (!b) { nodes.push(s); taken++; statusOnly = false; theirs(id); continue; } // added by the other side
+      if (!eq(bezPozice(s), bezPozice(b))) { conflict(id, 'deleted'); theirs(id); } // I deleted what the other side edited → stays deleted
+    }
+  }
+
+  // ---- edges ----
+  const BE = idx(zaklad.edges); const ME = idx(moje.edges); const SE = idx(server.edges);
+  let edges = [];
+  for (const id of order(SE, ME, BE)) {
+    const b = BE.get(id); const m = ME.get(id); const s = SE.get(id);
+    if (m && s) {
+      if (!b) { if (!eq(m, s)) { conflict(m.target, 'connection'); theirs(s.target); } edges.push(m); continue; }
+      const o = tricestne(b, m, s);
+      if (o.kolize) { conflict(m.target, 'connection'); theirs(s.target); edges.push(m); continue; }
+      if (o.zmenaServeru) { taken++; statusOnly = false; theirs(s.target); }
+      edges.push(o.volba === 'server' ? s : m);
+      continue;
+    }
+    if (m && !s) {
+      if (!b) { edges.push(m); continue; }
+      if (eq(m, b)) { taken++; statusOnly = false; if (S.has(b.target)) theirs(b.target); continue; } // removed by the other side
+      conflict(m.target, 'connection'); edges.push(m);
+      continue;
+    }
+    if (!m && s) {
+      if (!b) { edges.push(s); taken++; statusOnly = false; theirs(s.target); continue; }
+      if (!eq(s, b)) conflict(s.target, 'connection'); // I removed what the other side re-plugged → stays removed
+    }
+  }
+
+  // ---- structure: the merged map must stay a tree where each side alone was one ----
+  const has = (id) => nodes.some((n) => n.id === id);
+  const dangling = (ns, es) => { const ids = new Set((ns || []).map((n) => n.id)); return new Set((es || []).filter((e) => !ids.has(e.source) || !ids.has(e.target)).map((e) => e.id)); };
+  const damagedBefore = new Set([...dangling(moje.nodes, moje.edges), ...dangling(server.nodes, server.edges)]);
+  const putBackMyEdgesOf = (nodeId) => {
+    for (const e of ME.values()) {
+      if ((e.source === nodeId || e.target === nodeId) && !edges.some((x) => x.id === e.id)) edges.push(e);
+    }
+  };
+  for (const id of revived) putBackMyEdgesOf(id);
+  // a connection must not end in nothing: my connection brings back the node the other side
+  // deleted (with my connections of it); the other side's connection to a node I deleted goes
+  for (let round = 0; round < 1000; round++) {
+    const bad = edges.find((e) => !damagedBefore.has(e.id) && (!has(e.source) || !has(e.target)));
+    if (!bad) break;
+    const missing = !has(bad.source) ? bad.source : bad.target;
+    if (ME.has(bad.id) && M.has(missing)) {
+      nodes.push(M.get(missing)); revived.add(missing);
+      conflict(missing, 'deleted'); theirs(missing);
+      putBackMyEdgesOf(missing);
+    } else {
+      edges = edges.filter((e) => e.id !== bad.id);
+      conflict(missing, 'deleted');
+    }
+  }
+  // one parent only: where both sides plugged the same node somewhere, my connection stays
+  const incoming = new Map();
+  for (const e of edges) { if (!incoming.has(e.target)) incoming.set(e.target, []); incoming.get(e.target).push(e); }
+  for (const [target, list] of incoming) {
+    if (list.length < 2) continue;
+    const mine = list.filter((e) => ME.has(e.id));
+    if (!mine.length || mine.length === list.length) continue; // damage one side already carried — not made by the merge
+    const drop = new Set(list.filter((e) => !ME.has(e.id)).map((e) => e.id));
+    edges = edges.filter((e) => !drop.has(e.id));
+    conflict(target, 'connection'); theirs(target);
+  }
+  // no loops: a loop closed by the other side's connection loses that connection
+  const loopEdges = () => {
+    const parent = new Map();
+    for (const e of edges) if (!parent.has(e.target)) parent.set(e.target, e);
+    for (const start of parent.keys()) {
+      const path = []; const seen = new Set(); let cur = start;
+      while (parent.has(cur) && !seen.has(cur)) { seen.add(cur); const e = parent.get(cur); path.push(e); cur = e.source; }
+      if (cur === start && path.length) return path;
+    }
+    return null;
+  };
+  for (let round = 0; round < 1000; round++) {
+    const loop = loopEdges();
+    if (!loop) break;
+    const their = loop.find((e) => !ME.has(e.id));
+    if (!their) break; // my own loop (older damage) — the editor offers a repair for it
+    edges = edges.filter((e) => e.id !== their.id);
+    conflict(their.target, 'connection'); theirs(their.target);
+  }
+
+  const result = { title, color, nodes, edges };
+  return {
+    ...result,
+    conflicts: [...conflicts.values()],
+    foreign: [...foreign.values()],
+    foreignIds: [...foreign.keys()].filter((id) => !id.startsWith('#')),
+    taken,
+    statusOnly,
+    overridden,
+    mineExtra: stableJson(result) !== stableJson({ title: server.title || '', color: server.color || '', nodes: server.nodes || [], edges: server.edges || [] }),
+  };
+}

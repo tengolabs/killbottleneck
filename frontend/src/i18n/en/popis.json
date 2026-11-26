@@ -49,12 +49,13 @@
     "coOdejdeProhlizec": "browser and operating system",
     "chciOdpoved": "I want a reply — include my e-mail address",
     "coOdejdeVerze": "app version",
-    "coOdejdeAdresa": "your address",
-    "bezAdresy": "NOT your address or company name",
+    "coOdejdeAdresa": "your e-mail address",
+    "bezAdresy": "NOT your e-mail address",
     "priloha": "Attach a screenshot",
     "prilohaHint": "or paste it into the text with Ctrl+V",
     "prilohaOdebrat": "Remove screenshot",
     "prilohaChyba": "The image could not be processed.",
-    "coOdejdeSnimek": "the attached screenshot"
+    "coOdejdeSnimek": "the attached screenshot",
+    "coOdejdeOrganizace": "the name of your organization and the address you use the app at"
   }
 }

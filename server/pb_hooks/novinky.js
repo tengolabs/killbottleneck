@@ -10,6 +10,22 @@
 //
 // Tři až pět bodů, každý jedna věta, jazykem uživatele. Ne changelog.
 module.exports = {
+  "v1.7.1": {
+    cs: [
+      "Zpět po přetažení kroku v mapě vrátí jen jeho pozici — už nesmaže název nebo popis, který jste napsali předtím.",
+      "Když dva lidé upravují různé kroky téže mapy, jejich změny se spojí. Okno o střetu přijde jen u téhož kroku, vyjmenuje sporné kroky a „Ponechat moje změny“ přepíše jen je.",
+      "Žádost o jiný termín už nezmizí, když v témže okně ještě něco uložíte.",
+      "Časová osa v Úkolech má pruhy zase v řadě s názvy; dvojklik už nezaloží dva kroky ani dva nápady; šablona z rozběhnutého projektu drží rozestupy termínů.",
+      "PDF mapy je mnohonásobně menší a první načtení aplikace lehčí (písma se stahují jen jednou).",
+    ],
+    en: [
+      "Undo after dragging a step in the map returns just its position — it no longer wipes the name or description you wrote before.",
+      "When two people edit different steps of the same map, their changes are merged. The conflict window comes only for the same step, names the steps in question, and \"Keep my changes\" overwrites just those.",
+      "A request for a different deadline no longer disappears when you save something else in the same window.",
+      "The timeline in Tasks has its bars level with the names again; a double click no longer creates two steps or two ideas; a template from a running project keeps the spacing of deadlines.",
+      "The map PDF is many times smaller and the first load of the app is lighter (fonts are downloaded only once).",
+    ],
+  },
   "v1.7.0": {
     cs: [
       "Nahoře vedle Asistenta je nové tlačítko Dokumenty — poznámky, e-maily a souhrny otevře jedním klikem, i když je asistent zavřený.",

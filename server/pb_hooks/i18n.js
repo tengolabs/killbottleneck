@@ -323,6 +323,15 @@ const STRINGS = {
     cs: "Pokud jste o obnovení nežádali, nic nedělejte — vaše dosavadní heslo platí dál.",
     en: "If you did not request this, do nothing — your current password stays valid.",
   },
+  // the same mail when an administrator did the reset (/reset-user-password): the old password is gone
+  "sysmail.resetBodyByAdmin": {
+    cs: "{admin} vám obnovil heslo k účtu. Dosavadní heslo už neplatí a ze všech zařízení jste odhlášeni. Nové heslo si nastavíte tímto odkazem — platí omezenou dobu.",
+    en: "{admin} has reset the password for your account. Your previous password no longer works and you have been signed out on all devices. Use this link to set a new one — it is valid for a limited time.",
+  },
+  "sysmail.resetIgnoreByAdmin": {
+    cs: "Bez nového hesla se už nepřihlásíte. Zrušily se také vaše klíče API — pokud jste je používali (připojený agent, automatizace), vytvořte si v aplikaci nové.",
+    en: "You cannot sign in without a new password. Your API keys were cancelled as well — if you used any (a connected agent, an automation), create new ones in the app.",
+  },
   "sysmail.changeSubject": { cs: "Potvrzení nové e-mailové adresy", en: "Confirm your new e-mail address" },
   "sysmail.changeHeading": { cs: "Změna e-mailové adresy", en: "E-mail address change" },
   "sysmail.changeBody": {
@@ -1451,6 +1460,15 @@ const STRINGS = {
   "err.badDate": {
     cs: "Neplatné datum — použijte formát RRRR-MM-DD.",
     en: "Invalid date — use YYYY-MM-DD format.",
+  },
+  // the shape is right but the calendar has no such day (2026-13-45, 2027-02-31)
+  "err.dateNotReal": {
+    cs: "Datum {date} v kalendáři není — zadejte skutečný den ve tvaru RRRR-MM-DD.",
+    en: "The date {date} is not a day of the calendar — use a real day in YYYY-MM-DD format.",
+  },
+  "err.dateNotRealItem": {
+    cs: "Datum {date} u uzlu {id} v kalendáři není — zadejte skutečný den ve tvaru RRRR-MM-DD.",
+    en: "The date {date} on node {id} is not a day of the calendar — use a real day in YYYY-MM-DD format.",
   },
   // v1/MCP: neznámá pole = chyba s výčtem, ne tiché ignorování (28. 8. 2026 —
   // agent poslal `priority`, dostal 200 a ohlásil „hotovo" nad nezměněnou mapou)

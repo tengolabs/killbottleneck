@@ -100,6 +100,10 @@ const api = async (method, path, { token, body } = {}) => {
 
     console.log('== 1) výběr nabízí kolegy, ne mě ==');
     await otevritSdileni();
+    // The opening sentence must not promise access "after signing up with the same address" — since S4-02 only
+    // the invitation link gives it (sdileni-pozvanka.js: sign-up without the link → 404); whole-app analysis 5, d1-4.
+    const intro = await page.evaluate(() => (document.querySelector('[role="dialog"]') || {}).innerText || '');
+    ok(/přes ten odkaz/.test(intro) && !/uvidí po registraci se stejnou adresou/.test(intro), 'the opening sentence of the Share window says the map opens through the invitation link, not by signing up alone');
     let m = await moznosti();
     ok(m.includes(KOLEGA) && m.includes(KOLEGYNE), `výběr nabízí oba kolegy (${m.join(', ')})`);
     ok(!m.includes(SEF), 'výběr nenabízí mě samotného');

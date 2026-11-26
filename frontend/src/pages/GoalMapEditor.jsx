@@ -204,7 +204,7 @@ function EditorContent({ mapId, personalMap = false }) {
   const templateSeedsRef = useRef(null); // {idMap, rules} z náhledu šablony — pravidla se založí až s mapou
   // Zpět — hooks/useMapHistory.js (F1-07)
   const {
-    canUndo, pushHistory, handleUndo, undoEnv, noteForeign,
+    canUndo, pushHistory, beginMove, pushMove, handleUndo, undoEnv, noteForeign,
   } = useMapHistory({ nodesNow, edgesNow, setNodes, setEdges });
   const buffer = useBufferNodes(user);
   const { bufferOpen, timeLogOpen, toggleBuffer, toggleTimeLog } = useSidePanels();
@@ -681,7 +681,7 @@ function EditorContent({ mapId, personalMap = false }) {
   // při odchodu) — obojí hook vrací.
   const {
     conflict, remoteChanged, saveStatus, saveError, retrySave, baseUpdated, zapamatujServer, zrcadliStavDoZakladny,
-    saveTimer, pendingSave, nasadNaPlatno, handleKeepMine,
+    saveTimer, pendingSave, nasadNaPlatno, handleKeepMine, mirrorNodeDataToBase, takeOverOwnWrite,
   } = useMapAutosave({
     mapId, activeMapId, setActiveMapId, isDraft, canEdit, isPublicView, isTemplatePreview,
     nodes, edges, title, color, setNodes, setEdges, setTitle, setColor,
@@ -919,26 +919,44 @@ function EditorContent({ mapId, personalMap = false }) {
   // rozdíl (dx→y, dy→x). Pořadí v řadě, které člověk vidí na telefonu, tak sedí
   // i na počítači; autosave (cleanMapData) čte canonicalPosRef. Ve svislém view
   // se nic nepřepočítává — pozice uzlu je rovnou kanonická.
+  // Every drag is also ONE step of Undo (analysis 5, c4-1) — in both views, for one node or a
+  // whole selection: the positions before the drag are noted at its start and handed to the
+  // history at its end (hooks/useMapHistory.js, pushMove). In the horizontal view the step also
+  // carries the canonical positions it moved, so that Undo puts back what gets SAVED as well.
   const dragStartRef = useRef(new Map());
   const onNodeDragStart = useCallback((_e, _node, tazene) => {
-    if (directionRef.current !== 'horizontal') return;
+    beginMove();
     dragStartRef.current = new Map((tazene || []).map((n) => [n.id, { ...n.position }]));
-  }, [directionRef]);
+  }, [beginMove]);
   const onNodeDragStop = useCallback((_e, _node, tazene) => {
-    if (directionRef.current !== 'horizontal') return;
+    const starts = dragStartRef.current;
+    dragStartRef.current = new Map();
+    const moved = new Map();
+    const ends = new Map();
+    const canonSteps = [];
+    const horizontal = directionRef.current === 'horizontal';
     const canon = canonicalPosRef.current;
     for (const n of tazene || []) {
-      if (n.type === 'note') continue;
-      const start = dragStartRef.current.get(n.id);
+      const start = starts.get(n.id);
       if (!start) continue;
       const dx = n.position.x - start.x, dy = n.position.y - start.y;
       if (!dx && !dy) continue;
+      moved.set(n.id, start);
+      ends.set(n.id, { ...n.position });
+      if (!horizontal || n.type === 'note') continue;
       // bez kanonické pozice (uzel vzniklý ve vodorovném view) se vezme prohozená výchozí
-      const puv = canon.get(n.id) || { x: start.y, y: start.x };
-      canon.set(n.id, { x: puv.x + dy, y: puv.y + dx });
+      const from = canon.get(n.id) || null;
+      const puv = from || { x: start.y, y: start.x };
+      const to = { x: puv.x + dy, y: puv.y + dx };
+      canon.set(n.id, to);
+      canonSteps.push({ id: n.id, from, to });
     }
-    dragStartRef.current = new Map();
-  }, [directionRef, canonicalPosRef]);
+    pushMove(moved, ends, { canon: canonSteps });
+  }, [directionRef, canonicalPosRef, pushMove]);
+  // Dragging the frame around several selected nodes reports itself through other callbacks
+  // (no "node under the cursor") — same handling.
+  const onSelectionDragStart = useCallback((e, tazene) => onNodeDragStart(e, null, tazene), [onNodeDragStart]);
+  const onSelectionDragStop = useCallback((e, tazene) => onNodeDragStop(e, null, tazene), [onNodeDragStop]);
 
   const handleNodesChange = useCallback(
     (changes) => {
@@ -1173,6 +1191,16 @@ function EditorContent({ mapId, personalMap = false }) {
     }),
     onRestoreFailed: () => toast({ title: t('tasks:tasksPage.stashFailed'), description: t('common:misc.tryAgainPlease'), variant: 'destructive' }),
     restoreProjectColor: (c) => setColor((cur) => ((cur || '') === c.to ? c.from : cur)),
+    // a drag in the horizontal view moved the canonical position too; it goes back only while it
+    // still is where that drag left it
+    restoreCanon: (list) => {
+      const canon = canonicalPosRef.current;
+      for (const c of list || []) {
+        const cur = canon.get(c.id);
+        if (!cur || cur.x !== c.to.x || cur.y !== c.to.y) continue;
+        if (c.from) canon.set(c.id, c.from); else canon.delete(c.id);
+      }
+    },
   };
 
   // Ctrl+Z / Cmd+Z = the Undo button. Not while typing (the field keeps its own undo), not over
@@ -1327,6 +1355,18 @@ function EditorContent({ mapId, personalMap = false }) {
   );
 
   const progressMap = useMemo(() => computeProgressMap(nodes, childrenMap), [nodes, childrenMap]);
+
+  // A request for another deadline (sent / withdrawn / declined in the node dialog) is written
+  // by its own server route, not by the save of the map. The canvas and the merge base take the
+  // result over at once — the canvas used to keep the node from before the request, so the next
+  // save of the map ran into 409 and "Keep my changes" wiped the request, while the dialog went
+  // on claiming it (analysis 5, c3-1). Somebody without the right to edit only gets the badge.
+  const handleDeadlineRequestChanged = useCallback((nodeId, fields) => {
+    setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...fields } } : n)));
+    if (!canEdit) return;
+    mirrorNodeDataToBase(nodeId, fields);
+    takeOverOwnWrite();
+  }, [canEdit, setNodes, mirrorNodeDataToBase, takeOverOwnWrite]);
 
   const handleSaveNode = useCallback(
     (nodeId, newData, nodeType) => {
@@ -1685,6 +1725,8 @@ function EditorContent({ mapId, personalMap = false }) {
             nodesConnectable={canEdit && !locked}
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
+            onSelectionDragStart={onSelectionDragStart}
+            onSelectionDragStop={onSelectionDragStop}
             elementsSelectable={canEdit}
             selectionOnDrag
             selectionActivationKeyCode="Shift"
@@ -1873,7 +1915,7 @@ function EditorContent({ mapId, personalMap = false }) {
         access={{ user, canEdit, canWork, ctenarSPraci, isPublicView, bufferEnabled }}
         node={{
           editNode, handleSaveNode, setEditNodeId, handleShareAdd, handleStashNode,
-          setTaskStatsVersion, reloadMembers, setNodes, zrcadliStavDoZakladny, baseUpdated,
+          setTaskStatsVersion, reloadMembers, setNodes, zrcadliStavDoZakladny, baseUpdated, handleDeadlineRequestChanged,
           openRulesFromNode, setMapRules,
         }}
         dialogs={{

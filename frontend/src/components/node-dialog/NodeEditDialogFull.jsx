@@ -27,9 +27,9 @@ import HistorySection from './sections/HistorySection';
 //
 // extraExecutorContent: sem editor mapy vloží pravidla uzlu (RuleBuilder, M7) —
 // kategorie Automatizace tím roste bez zásahu do tohohle souboru.
-export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAccess, members = [], onShareAdd, onStash, onDelete, onOpenMap, map, emailOptions = [], onTasksChanged, onContactsChanged, extraExecutorContent, extraBehaviorContent, extraAssignmentContent, orgMap }) {
+export default function NodeEditDialogFull({ node, mapId, onSave, onClose, mapAccess, members = [], onShareAdd, onStash, onDelete, onOpenMap, map, emailOptions = [], onTasksChanged, onContactsChanged, extraExecutorContent, extraBehaviorContent, extraAssignmentContent, orgMap, onDeadlineRequestChanged }) {
   const { t } = useTranslation('editor');
-  const s = useNodeEditState({ node, mapId, onSave, mapAccess, orgMap });
+  const s = useNodeEditState({ node, mapId, onSave, mapAccess, orgMap, onDeadlineRequestChanged });
   const orgNode = !!orgMap && !s.isApex;
   const [cat, setCat] = useState('basics');
   // nový uzel = začít vždy na Základu (jiná kategorie z minula by mátla)

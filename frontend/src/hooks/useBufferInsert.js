@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { BUFFER_DRAG_MIME } from '@/components/goal-map/BufferPanel';
 
 // Zásobník nápadů v editoru (F1-07, krok 10): příznak dostupnosti zásobníku
@@ -102,6 +102,9 @@ export function useBufferInsert({
     [rfInstance, insertBufferItem]
   );
 
+  // one stash at a time: a double click on the button in the step window (or on the icon of the node, where
+  // one confirmation answers both clicks) used to put the same idea into the buffer twice
+  const stashing = useRef(false);
   const handleStashNode = useCallback(
     async (nodeId, override) => {
       const node = nodes.find((n) => n.id === nodeId);
@@ -112,20 +115,26 @@ export function useBufferInsert({
       // zásobníku (obchvat zámku termínu); kontrola PŘED zápisem do bufferu,
       // jinak by se nápad zduplikoval a uzel v mapě zůstal
       if (!canRemoveNodeShared(node)) { assignedDeleteRefused(node); return; }
+      if (stashing.current) return;
+      stashing.current = true;
       try {
-        await buffer.add({
-          title: nodeTitle,
-          description: override?.description ?? node.data?.description ?? '',
-          color: override?.color ?? node.data?.color ?? '',
-          deadline: override?.deadline ?? node.data?.deadline ?? '',
-        });
-      } catch {
-        toast({ title: t('tasks:tasksPage.stashFailed'), description: t('common:misc.tryAgainPlease'), variant: 'destructive' });
-        return;
+        try {
+          await buffer.add({
+            title: nodeTitle,
+            description: override?.description ?? node.data?.description ?? '',
+            color: override?.color ?? node.data?.color ?? '',
+            deadline: override?.deadline ?? node.data?.deadline ?? '',
+          });
+        } catch {
+          toast({ title: t('tasks:tasksPage.stashFailed'), description: t('common:misc.tryAgainPlease'), variant: 'destructive' });
+          return;
+        }
+        handleDeleteNode(nodeId);
+        setEditNodeId(null);
+        toast({ title: t('tasks:tasksPage.stashedToBuffer'), description: nodeTitle });
+      } finally {
+        stashing.current = false;
       }
-      handleDeleteNode(nodeId);
-      setEditNodeId(null);
-      toast({ title: t('tasks:tasksPage.stashedToBuffer'), description: nodeTitle });
     },
     [nodes, buffer, handleDeleteNode, toast, canRemoveNodeShared, assignedDeleteRefused]
   );

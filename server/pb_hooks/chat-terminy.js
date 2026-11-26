@@ -54,6 +54,7 @@ function overZapis(app, auth, name, a) {
         }
         if (!d.deadline) return "Error: the step has no deadline, so there is nothing to change — ask the assigner directly.";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(a.date || ""))) return "Error: date must be YYYY-MM-DD.";
+        if (!require(`${__hooks}/helpers.js`).isRealDay(a.date)) return `Error: ${a.date} is not a day of the calendar.`;
         if (String(a.date) === String(d.deadline)) return "Error: the wanted date equals the current deadline.";
         if (!["work", "edit"].includes(p.level) && !nodeIsMine(app, p.map.id, node, email)) return "Error: the user can ask for a different deadline only on their own step (where they are the owner or have the task).";
         if (d.deadlineChangeWanted && String(d.deadlineChangeRequestedBy || "").toLowerCase() !== email) return `Error: another request (${d.deadlineChangeWanted}) by ${d.deadlineChangeRequestedBy} is already pending on this step.`;

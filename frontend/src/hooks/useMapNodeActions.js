@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { askConfirm, askDelete } from '@/lib/appDialogs';
 import { base44 } from '@/api/base44Client';
 import { shareMap } from '@/api/kb';
@@ -167,17 +167,21 @@ export function useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editN
     updateMapNode(item, { owner: email }).catch(() => {});
   }, [maps, nodeHasWorkAccess, nodeIsShared, shareMapWith, t, updateMapNode]);
 
+  const stashing = useRef(false);
   const handleStashNodeFromTable = useCallback(async (nodeId, override) => {
     const item = editNodeItem;
     const nodeTitle = (override?.title || item?.title || '').trim();
     if (!nodeTitle) return;
-    const freshMap = (await base44.entities.GoalMap.filter({ id: item.map_id }))[0];
-    const blocked = nodeRemovalBlockedBy(freshMap, (freshMap?.nodes || []).find((n) => n.id === nodeId));
-    if (blocked) {
-      toast({ title: t('tasksPage.stashFailed'), description: t('tasksPage.nodeRemoveAssignerOnly', { email: blocked }), variant: 'destructive' });
-      return;
-    }
+    // one stash at a time: a double click used to put the same idea into the buffer twice
+    if (stashing.current) return;
+    stashing.current = true;
     try {
+      const freshMap = (await base44.entities.GoalMap.filter({ id: item.map_id }))[0];
+      const blocked = nodeRemovalBlockedBy(freshMap, (freshMap?.nodes || []).find((n) => n.id === nodeId));
+      if (blocked) {
+        toast({ title: t('tasksPage.stashFailed'), description: t('tasksPage.nodeRemoveAssignerOnly', { email: blocked }), variant: 'destructive' });
+        return;
+      }
       await buffer.add({
         title: nodeTitle,
         description: override?.description ?? '',
@@ -189,6 +193,8 @@ export function useMapNodeActions({ maps, setMaps, user, buffer, toast, t, editN
       toast({ title: t('tasksPage.stashedToBuffer'), description: nodeTitle });
     } catch (e) {
       toast({ title: t('tasksPage.stashFailed'), description: e?.message, variant: 'destructive' });
+    } finally {
+      stashing.current = false;
     }
   }, [buffer, editNodeItem, nodeRemovalBlockedBy, removeMapNode, setEditNodeItem, t, toast]);
 

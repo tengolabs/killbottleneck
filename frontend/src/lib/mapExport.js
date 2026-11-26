@@ -16,9 +16,13 @@ const appFg = () => {
   return v ? `hsl(${v})` : '#1e293b';
 };
 
+// jsPDF image compression of the map picture in the PDF: 'FAST' = zlib level 1 with the Sub filter
+export const PDF_IMAGE_COMPRESSION = 'FAST';
+
+// Returns true when a file was handed over to the browser, false when there was nothing to export.
 export async function captureAndSave(nodes, title, format) {
   const viewport = document.querySelector('.react-flow__viewport');
-  if (!viewport || nodes.length === 0) return;
+  if (!viewport || nodes.length === 0) return false;
 
   // Calculate bounding box of all nodes
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -88,9 +92,14 @@ export async function captureAndSave(nodes, title, format) {
       const imgH = captureHeight * scale;
       const offX = (pageW - imgW) / 2;
       const offY = (pageH - imgH) / 2;
-      pdf.addImage(dataUrl, 'PNG', offX, offY, imgW, imgH);
+      // Compressed (Flate, lossless — the same pixels as the PNG export, so the text stays as sharp as it was).
+      // Without the last argument jsPDF stores the picture RAW: a map of 61 steps made a PDF of 103 MB,
+      // 9 steps 20 MB (whole-app analysis 5, c4-2) — nothing one could send by e-mail. Not JPEG: flat colours
+      // and small text compress better and without artefacts this way.
+      pdf.addImage(dataUrl, 'PNG', offX, offY, imgW, imgH, undefined, PDF_IMAGE_COMPRESSION);
       await savePdf(pdf, `${fileName}.pdf`);
     }
+    return true;
   } finally {
     if (titleEl) viewport.removeChild(titleEl);
     viewport.style.transform = currentTransform;

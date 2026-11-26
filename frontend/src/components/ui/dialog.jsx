@@ -20,6 +20,27 @@ const PodListouProvider = ({ children }) => <PodListouCtx.Provider value={true}>
 // (UserMenu drží všech 10 dialogů namontovaných s open=false) a zámek pak platil trvale → od v0.90-beta
 // nešlo kolečkem rolovat na titulce, v úkolech ani v kalendáři (Richard 28. 10. 2026). Nekontrolovaný
 // dialog (bez `open`) si stav hlídá sám přes onOpenChange.
+
+// The lock COUNTS open dialogs instead of remembering "the previous value" per dialog: with two dialogs open at
+// once (Clients opened from Time worked) the second one remembered "hidden" as its original value, and when the
+// first closed before the second, the second restored "hidden" for good — no page scrolled until a reload.
+let bodyScrollLocks = 0
+let bodyOverflowBeforeLock = ""
+const lockBodyScroll = () => {
+  if (bodyScrollLocks === 0) {
+    bodyOverflowBeforeLock = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+  }
+  bodyScrollLocks += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    bodyScrollLocks -= 1
+    if (bodyScrollLocks === 0) document.body.style.overflow = bodyOverflowBeforeLock
+  }
+}
+
 const Dialog = ({ open, defaultOpen, onOpenChange, ...props }) => {
   const podListou = React.useContext(PodListouCtx)
   const [vnitrni, setVnitrni] = React.useState(!!defaultOpen)
@@ -27,9 +48,7 @@ const Dialog = ({ open, defaultOpen, onOpenChange, ...props }) => {
   const zmena = React.useCallback((v) => { setVnitrni(v); if (onOpenChange) onOpenChange(v) }, [onOpenChange])
   React.useEffect(() => {
     if (!podListou || !otevren) return undefined
-    const puvodni = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    return () => { document.body.style.overflow = puvodni }
+    return lockBodyScroll()
   }, [podListou, otevren])
   // browser / phone back closes the open dialog (a confirmation answers "Cancel"); a dialog whose owner refuses to
   // close (unsaved changes) stays and back keeps working — lib/backLayers.js. Always controlled (open={otevren}), so

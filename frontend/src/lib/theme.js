@@ -27,12 +27,58 @@ export const effectiveTheme = () =>
 
 export const applyTheme = (t) => {
   document.documentElement.classList.toggle('dark', t === 'dark');
+  updateDarkSurface();
   updateThemeColorMeta();
 };
 
 export const setTheme = (t) => {
   ulozKlic(KEY, t);
   applyTheme(t);
+};
+
+// ---- dark SURFACE (what the `dark:` utilities follow) ----
+//
+// The class `dark` is the MODE (which section of the skin applies). Whether the page is really dark is another
+// question: the default skin Midnight is dark in its `light` section too, so with the system in light mode the
+// page was dark blue while every fixed colour meant for a white page stayed on (`text-red-600`, `bg-blue-50`…):
+// "Overdue" 2.7 : 1, the chosen status of a step 1.14 : 1 (whole-app analysis 5, v1-1, c5-7, c14-6, c14-10).
+// Tailwind's `dark:` variant therefore follows the class `kb-dark-surface` (tailwind.config.js), which is set
+// from the background that is really painted. Where mode and surface agree — a dark section that is dark, a
+// light section that is light — the class equals `dark` and nothing changes.
+export const DARK_SURFACE_CLASS = 'kb-dark-surface';
+
+// relative luminance (WCAG) of a token value "H S% L%"; null when it is not one
+export const tokenLuminance = (value) => {
+  const m = /^\s*(-?[\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%/.exec(String(value || ''));
+  if (!m) return null;
+  const h = (((Number(m[1]) % 360) + 360) % 360) / 360;
+  const sat = Math.min(100, Number(m[2])) / 100;
+  const l = Math.min(100, Number(m[3])) / 100;
+  const q = l < 0.5 ? l * (1 + sat) : l + sat - l * sat;
+  const p = 2 * l - q;
+  const channel = (t0) => {
+    let t = t0;
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    const c = t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(h + 1 / 3) + 0.7152 * channel(h) + 0.0722 * channel(h - 1 / 3);
+};
+
+// dark = white text reads better on it than black text (luminance under ~0.179)
+export const isDarkSurface = (value, fallback = false) => {
+  const lum = tokenLuminance(value);
+  return lum === null ? fallback : lum < 0.179;
+};
+
+const updateDarkSurface = () => {
+  try {
+    const root = document.documentElement;
+    const v = getComputedStyle(root).getPropertyValue('--background').trim();
+    // no token yet (the stylesheet has not arrived) → the mode is the best guess
+    root.classList.toggle(DARK_SURFACE_CLASS, isDarkSurface(v, root.classList.contains('dark')));
+  } catch { /* no DOM */ }
 };
 
 // ---- skiny ----
@@ -102,6 +148,7 @@ export const applySkin = (skin) => {
   let el = document.getElementById('kb-skin');
   if (!skin) {
     if (el) el.remove();
+    updateDarkSurface();
     updateThemeColorMeta();
     return;
   }
@@ -111,6 +158,7 @@ export const applySkin = (skin) => {
   }
   el.textContent = skinToCss(skin);
   document.head.appendChild(el);   // vždy až ZA bundlovaný CSS (HMR umí pořadí rozházet)
+  updateDarkSurface();
   updateThemeColorMeta();
 };
 
@@ -232,12 +280,14 @@ export const withDefaultLook = async (fn) => {
   if (el) el.disabled = true;
   if (wasDark) root.classList.remove('dark');
   document.head.appendChild(tisk);
+  updateDarkSurface();   // the print look is light → the `dark:` utilities must be off for the shot
   try {
     return await fn();
   } finally {
     tisk.remove();
     if (el) el.disabled = false;
     if (wasDark) root.classList.add('dark');
+    updateDarkSurface();
   }
 };
 

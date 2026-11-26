@@ -49,12 +49,13 @@
     "coOdejdeProhlizec": "prohlížeč a operační systém",
     "chciOdpoved": "Chci odpověď — přiložit moji e-mailovou adresu",
     "coOdejdeVerze": "verze aplikace",
-    "coOdejdeAdresa": "vaše adresa",
-    "bezAdresy": "vaše adresa ani název firmy NE",
+    "coOdejdeAdresa": "vaše e-mailová adresa",
+    "bezAdresy": "vaše e-mailová adresa NE",
     "priloha": "Přiložit snímek obrazovky",
     "prilohaHint": "nebo ho vložte do textu klávesami Ctrl+V",
     "prilohaOdebrat": "Odebrat snímek",
     "prilohaChyba": "Obrázek se nepodařilo zpracovat.",
-    "coOdejdeSnimek": "přiložený snímek obrazovky"
+    "coOdejdeSnimek": "přiložený snímek obrazovky",
+    "coOdejdeOrganizace": "název vaší organizace a adresa, na které aplikaci používáte"
   }
 }

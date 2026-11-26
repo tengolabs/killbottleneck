@@ -211,6 +211,9 @@ export default function ReportDialog({ open, onClose, userEmail, version }) {
                 <li>· {t('report.coOdejdeVerze')}{version ? `: ${version}` : ''}</li>
                 <li>· {t('report.coOdejdeStranka')}: {nazevStranky(window.location.pathname, t)}</li>
                 <li className="truncate" title={navigator.userAgent}>· {t('report.coOdejdeProhlizec')}</li>
+                {/* the e-mail carries the organization name (subject, header) and the instance address (footer) —
+                    support needs them, so the box says so instead of promising the opposite */}
+                <li data-report-org>· {t('report.coOdejdeOrganizace')}</li>
                 {snimek && <li>· {t('report.coOdejdeSnimek')}</li>}
                 <li className={chciOdpoved ? 'text-foreground' : ''}>
                   · {chciOdpoved ? `${t('report.coOdejdeAdresa')}: ${userEmail || ''}` : t('report.bezAdresy')}

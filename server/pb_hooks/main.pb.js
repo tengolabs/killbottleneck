@@ -86,7 +86,18 @@ onMailerRecordPasswordResetSend((e) => {
       };
     }
   }
-  prepisSystemovyMail(e, pozvankaCeka ? klicePozvanky : {
+  // A reset done BY AN ADMINISTRATOR (route /reset-user-password) is a different message: the old password
+  // is already gone, the person is signed out everywhere and their API keys are cancelled. The generic text
+  // ("someone, most likely you, asked… your current password stays valid") was false in every sentence
+  // (whole-app analysis 5, c12-1). The route leaves the administrator's address in the app store for the
+  // moment of sending — hooks do not share variables with routes.
+  let resetBy = "";
+  try { resetBy = String(e.app.store().get("admin-reset-mail:" + e.record.id) || ""); } catch (err) { resetBy = ""; }
+  prepisSystemovyMail(e, pozvankaCeka ? klicePozvanky : resetBy ? {
+    subject: "sysmail.resetSubject", heading: "sysmail.resetHeading",
+    body: { key: "sysmail.resetBodyByAdmin", params: { admin: resetBy } }, button: "sysmail.resetButton", ignore: "sysmail.resetIgnoreByAdmin",
+    cesta: "/reset-password",
+  } : {
     subject: "sysmail.resetSubject", heading: "sysmail.resetHeading",
     body: "sysmail.resetBody", button: "sysmail.resetButton", ignore: "sysmail.resetIgnore",
     cesta: "/reset-password",  // vlastní lokalizovaná stránka místo admin konzole
@@ -3162,10 +3173,19 @@ routerUse((e) => {
 // SPA index.html se nesmí cachovat — jinak prohlížeč po nasazení drží starý
 // frontend (assety jsou hashované, ty cache mít můžou). Bez tohohle musel
 // uživatel po každém deployi dělat tvrdý refresh.
+//
+// The opposite for what never changes under its name: /assets/* carry a content hash in the file name and
+// the UI fonts are one file per content — without a Cache-Control the browser re-validated or re-downloaded
+// them after every release (whole-app analysis 5, measurement m-1). Only for files that exist: a cached 404
+// would be worse than no caching. Fonts get a month, not "immutable" — their names carry no hash.
 routerUse((e) => {
   const p = e.request.url.path;
   if (!p.startsWith("/api/") && !p.startsWith("/assets/") && !p.includes(".")) {
     e.response.header().set("Cache-Control", "no-store");
+  } else if ((p.startsWith("/assets/") || (p.startsWith("/fonts/") && p.endsWith(".woff2"))) && !p.includes("..")) {
+    let exists = false;
+    try { exists = !$os.stat(`${__hooks}/../pb_public${p}`).isDir(); } catch (err) { exists = false; }
+    if (exists) e.response.header().set("Cache-Control", p.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "public, max-age=2592000");
   }
   return e.next();
 });
@@ -4322,7 +4342,8 @@ kbRoute("POST", "/deadline-requests", (e) => {
       return e.json(409, { error: t(L, "err.deadlineRequestPending") });
     }
     const date = String(info.date || "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return e.json(400, { error: t(L, "err.badDate") });
+    const HD = require(`${__hooks}/helpers.js`);
+    if (!HD.isRealDay(date)) return e.json(400, { error: HD.badDayError(L, date) });
     const note = String(info.note || "").slice(0, 500);
     // razítko žadatele doplní stampDeadlineRequesters uvnitř v1SaveMapData
     const saved = saveNodes({ deadlineChangeWanted: date, deadlineChangeNote: note });
@@ -5251,11 +5272,16 @@ kbRoute("POST", "/reset-user-password", (e) => {
   } catch (err) { /* oznámení je bonus, heslo je změněné */ }
 
   if ($app.settings().smtp.enabled) {
+    // tells the mail hook (onMailerRecordPasswordResetSend) that this reset was done by an administrator
+    const mailMark = "admin-reset-mail:" + rec.id;
     try {
+      $app.store().set(mailMark, String(e.auth.email() || ""));
       $mails.sendRecordPasswordReset($app, rec);
       return e.json(200, { success: true, email: email, sent_via_email: true });
     } catch (err) {
       // pošta selhala — spadneme na ruční předání, heslo už je změněné
+    } finally {
+      try { $app.store().remove(mailMark); } catch (err2) { /* nothing to clean */ }
     }
   }
   return e.json(200, { success: true, email: email, temp_password: tempPassword });
@@ -5550,6 +5576,7 @@ kbRoute("POST", "/import-all", (e) => {
   }
   // zásobník nápadů — vlastní záznamy importéra
   const ideas = (Array.isArray(info.buffer_nodes) ? info.buffer_nodes : []).slice(0, 2000);
+  const realDay = require(`${__hooks}/helpers.js`).isRealDay;
   for (const b of ideas) {
     const title = String((b && b.title) || "").trim().slice(0, 200);
     if (!title) continue;
@@ -5558,8 +5585,8 @@ kbRoute("POST", "/import-all", (e) => {
       rec.set("title", title);
       rec.set("description", String(b.description || "").slice(0, 2000));
       rec.set("color", String(b.color || "").slice(0, 20));
-      if (/^\d{4}-\d{2}-\d{2}$/.test(String(b.deadline || ""))) rec.set("deadline", String(b.deadline));
-      if (/^\d{4}-\d{2}-\d{2}$/.test(String(b.planned_on || ""))) rec.set("planned_on", String(b.planned_on));
+      if (realDay(b.deadline)) rec.set("deadline", String(b.deadline));
+      if (realDay(b.planned_on)) rec.set("planned_on", String(b.planned_on));
       rec.set("owner", e.auth.id);
       $app.save(rec);
       out.ideas_imported++;
@@ -6778,8 +6805,9 @@ kbRoute("POST", "/v1/maps/{id}/nodes/{nodeId}", (e) => {
     if (p.error) return e.json(400, { error: t(a.lang, "err.badPlan") });
     plannedOn = p.value;
   }
-  if (info.deadline !== undefined && String(info.deadline || "") !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(String(info.deadline))) {
-    return e.json(400, { error: t(a.lang, "err.badDate") });
+  // a real day of the calendar, not only the shape (2026-13-45 used to be stored and the map showed "Invalid Date")
+  if (info.deadline !== undefined && String(info.deadline || "") !== "" && !H.isRealDay(info.deadline)) {
+    return e.json(400, { error: H.badDayError(a.lang, info.deadline) });
   }
   const nodes = origNodes.map((n) => (n.id === nodeId ? Object.assign({}, n, { data: Object.assign({}, n.data) }) : n));
   const node = nodes[idx];

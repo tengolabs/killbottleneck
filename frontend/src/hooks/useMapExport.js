@@ -15,7 +15,9 @@ export function useMapExport({ visibleNodes, title, cleanMapData, activeMapId, u
     setExporting(true);
     await new Promise((resolve) => setTimeout(resolve, 200));
     try {
-      await captureAndSave(visibleNodes, title, format);
+      const saved = await captureAndSave(visibleNodes, title, format);
+      // the export used to end without a word — after a few seconds of nothing a file just appeared (c4-2)
+      if (saved) toast({ title: t(format === 'png' ? 'toasts.pngExported' : 'toasts.pdfExported') });
     } catch (e) {
       console.error(e);
       // a failed picture / PDF export used to end in silence (code analysis 4, F1-13)

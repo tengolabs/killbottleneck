@@ -15,6 +15,7 @@ export default function ConflictBanners({
   const { t } = useTranslation('editor');
   // back must not leave the editor in the middle of a version conflict (the unsaved map would be lost): decide first
   useBackLayer(!!conflict, null, true, 5);
+  const names = (list) => list.join(', ');
   return (
     <>
       {conflict && (
@@ -24,6 +25,17 @@ export default function ConflictBanners({
             <p className="text-sm text-muted-foreground">
               {t('conflict.body')}
             </p>
+            {/* what the other side changed and where it crosses mine — by name (analysis 5, c5-1) */}
+            {conflict.changed?.length > 0 && (
+              <p className="text-sm" data-testid="conflict-changed">
+                {t(conflict.changedMore ? 'conflict.changedMore' : 'conflict.changed', { names: names(conflict.changed), count: conflict.changedMore })}
+              </p>
+            )}
+            {conflict.disputed?.length > 0 && (
+              <p className="text-sm font-medium" data-testid="conflict-disputed">
+                {t(conflict.disputedMore ? 'conflict.disputedMore' : 'conflict.disputed', { names: names(conflict.disputed), count: conflict.disputedMore })}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               {t('conflict.keepMineHint')} {t('conflict.reloadHint')}
             </p>

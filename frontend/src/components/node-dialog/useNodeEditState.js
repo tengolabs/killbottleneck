@@ -37,7 +37,7 @@ export function nodeFormValues(node) {
   };
 }
 
-export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
+export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap, onDeadlineRequestChanged }) {
   const { t } = useTranslation('editor');
   const { toast } = useToast();
   const { user } = useAuth();
@@ -55,14 +55,20 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
     || user?.email === taskAssigner;
   const canEditDeadline = canManageTask;
 
-  // Žádost o změnu termínu (řešitel nesmí termín měnit, ale smí navrhnout) —
-  // pole nese uzel (deadlineChange*), razítko žadatele drží server; dlReqLocal
-  // je jen lokální odraz po akci, dokud rodič nedodá čerstvá data uzlu.
+  // A request for another deadline (the assignee may not change the deadline, only propose one).
+  // The node carries it (deadlineChange*), the requester's stamp is kept by the server — and the
+  // request is written by its OWN route, not by the save of the map. Whoever shows the dialog
+  // must therefore take the result over (onDeadlineRequestChanged → the canvas of the editor /
+  // the list of the Tasks page): otherwise the next save of the whole node wrote the copy from
+  // before the request and the request silently vanished (analysis 5, c3-1). dlReqLocal is only
+  // the reflection of the action until the parent delivers the fresh node — then it is dropped,
+  // so a reopened dialog never claims a request that is not there any more.
   const [dlReqOpen, setDlReqOpen] = useState(false);
   const [dlReqDate, setDlReqDate] = useState('');
   const [dlReqNote, setDlReqNote] = useState('');
   const [dlReqBusy, setDlReqBusy] = useState(false);
   const [dlReqLocal, setDlReqLocal] = useState(null);
+  useEffect(() => { setDlReqLocal(null); }, [node?.id, node?.data?.deadlineChangeWanted, node?.data?.deadlineChangeNote, node?.data?.deadlineChangeRequestedBy]);
   const dlWanted = dlReqLocal ? dlReqLocal.wanted : (node?.data?.deadlineChangeWanted || '');
   const dlNote = dlReqLocal ? dlReqLocal.note : (node?.data?.deadlineChangeNote || '');
   const dlBy = dlReqLocal ? dlReqLocal.by : (node?.data?.deadlineChangeRequestedBy || '');
@@ -72,6 +78,11 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
       await pb.send('/api/kb/deadline-requests', { method: 'POST', body: { mapId, nodeId: node.id, ...body } });
       setDlReqLocal(localAfter);
       setDlReqOpen(false);
+      if (onDeadlineRequestChanged) {
+        onDeadlineRequestChanged(node.id, {
+          deadlineChangeWanted: localAfter.wanted || '', deadlineChangeNote: localAfter.note || '', deadlineChangeRequestedBy: localAfter.by || '',
+        });
+      }
       toast({ title: t(okKey) });
     } catch (e) {
       toast({ title: t('nodeDialog.dlRequestFailed'), description: e?.message, variant: 'destructive' });
@@ -279,6 +290,13 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
   const handleSave = (overrideDeadline) => {
     // override: „Schválit" uloží rovnou navržený termín (onClick předává event → typeof)
     const dl = typeof overrideDeadline === 'string' ? overrideDeadline : deadline;
+    // The request for another deadline is NOT part of what the dialog saves: it has its own route
+    // and the copy the dialog was opened with may be older than the request (c3-1). The one
+    // exception mirrors the server rule "a changed deadline settles the request": then the
+    // request fields are cleared here too, so the canvas does not send the settled request back.
+    const settled = dlWanted && dl !== origDeadline
+      ? { deadlineChangeWanted: '', deadlineChangeNote: '', deadlineChangeRequestedBy: '' }
+      : {};
     if (isApex) {
       if (!apexText.trim()) return;
       onSave(node.id, {
@@ -292,10 +310,7 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
         icon,
         deadline: dl,
         owner,
-        // žádost o změnu termínu nesmí uložením dialogu zmizet (razítko drží server)
-        deadlineChangeWanted: node.data?.deadlineChangeWanted || '',
-        deadlineChangeNote: node.data?.deadlineChangeNote || '',
-        deadlineChangeRequestedBy: node.data?.deadlineChangeRequestedBy || '',
+        ...settled,
       }, 'apexNode');
     } else if (orgMap) {
       // pozice/funkce: žádný stav, termín ani vykonavatel — jen obsazení.
@@ -335,10 +350,7 @@ export function useNodeEditState({ node, mapId, onSave, mapAccess, orgMap }) {
         automationNote: automationWanted ? automationNote.trim() : '',
         // kdo o automatizaci požádal plní server (klient by si mohl podstrčit cizí jméno)
         automationRequestedBy: node.data?.automationRequestedBy || '',
-        // žádost o změnu termínu nesmí uložením dialogu zmizet (razítko drží server)
-        deadlineChangeWanted: node.data?.deadlineChangeWanted || '',
-        deadlineChangeNote: node.data?.deadlineChangeNote || '',
-        deadlineChangeRequestedBy: node.data?.deadlineChangeRequestedBy || '',
+        ...settled,
       }, 'goalNode');
     }
   };

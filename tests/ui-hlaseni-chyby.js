@@ -130,12 +130,13 @@ const polozkyMenu = async (page) => {
     ok(dialog.odeslatVypnuto, 'Odeslat je zašedlé, dokud není co poslat');
 
     console.log('== před odesláním je vidět, co odejde ==');
-    // ⚠️ Adresa ani instance se od 19. 8. 2026 NEODESÍLAJÍ (Richard: „nepotřebujeme
-    // vědět, jaký uživatel a jaká firma"). Dialog to musí říct nahlas a nabídnout
-    // zaškrtnutí pro ty, kdo o odpověď stojí.
+    // The box must tell the truth about what leaves (whole-app analysis 5, c14-2): the e-mail carries the
+    // organization name (subject + header) and the instance address (footer) — the box used to promise
+    // "NOT your address or company name". Only the person's e-mail address stays behind unless they tick the box.
     ok(/v0\.38-test/.test(dialog.text), 'v dialogu je vidět verze aplikace');
-    ok(!/127\.0\.0\.1:|localhost:/.test(dialog.text), 'adresa instance se NEUVÁDÍ');
-    ok(/adresa ani název firmy NE/i.test(dialog.text), 'a je řečeno, že adresa neodejde');
+    ok(/název vaší organizace a adresa, na které aplikaci používáte/i.test(dialog.text), 'the box admits that the organization name and the instance address are sent');
+    ok(!/firmy NE/i.test(dialog.text), 'and no longer promises that the company name is not sent');
+    ok(/e-mailová adresa NE/i.test(dialog.text), 'the e-mail address is not sent unless asked for');
     ok(dialog.maOdpoved, 'je tam zaškrtnutí „Chci odpověď"');
     ok(dialog.odpovedVypnuta, 'a je ve výchozím stavu VYPNUTÉ');
 

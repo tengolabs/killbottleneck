@@ -23,7 +23,7 @@ export default function EditorDialogs({ mapa, access, node, dialogs }) {
   const { user, canEdit, canWork, ctenarSPraci, isPublicView, bufferEnabled } = access;
   const {
     editNode, handleSaveNode, setEditNodeId, handleShareAdd, handleStashNode,
-    setTaskStatsVersion, reloadMembers, setNodes, zrcadliStavDoZakladny, baseUpdated,
+    setTaskStatsVersion, reloadMembers, setNodes, zrcadliStavDoZakladny, baseUpdated, handleDeadlineRequestChanged,
     openRulesFromNode, setMapRules,
   } = node;
   const {
@@ -51,6 +51,7 @@ export default function EditorDialogs({ mapa, access, node, dialogs }) {
         emailOptions={ownerOptions}
         onTasksChanged={() => setTaskStatsVersion((v) => v + 1)}
         onContactsChanged={reloadMembers}
+        onDeadlineRequestChanged={handleDeadlineRequestChanged}
         onWorkStatusSaved={(nodeId, next, updated) => {
           // zrcadlo handleCycleStatusWork: lokální stav + verze pro base_updated
           setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, status: next } } : n)));

@@ -111,22 +111,45 @@ export function templateToMap(rawTpl, { startDate } = {}) {
   };
 }
 
-// ofset termínu ode dneška (dny, min 0); null = bez termínu
-const deadlineOffset = (deadline) => {
+// Day the deadlines of a saved template are counted from.
+//  • No deadline has passed yet (a fresh project) → today, as it always was.
+//  • Some deadlines have passed (a running or finished project — the one a template "from practice" is made
+//    of) → the earliest deadline. Counting those from today clamped every past deadline to 0 days, so a new
+//    project had dozens of steps due on its first day and two months of spacing were gone. From the earliest
+//    deadline the spacing between all steps stays exactly as it was; the first step is due on the start day.
+// The rule is continuous (a project saved the day before its first deadline passes gets nearly the same
+// offsets) and changes nothing for projects whose deadlines are all ahead.
+const parseDay = (deadline) => {
   if (!deadline) return null;
-  const today = dateOnly(new Date());
-  const diff = Math.round((dateOnly(new Date(deadline + 'T00:00:00')) - today) / 86400000);
-  return Math.max(0, diff);
+  const d = dateOnly(new Date(String(deadline).slice(0, 10) + 'T00:00:00'));
+  return Number.isNaN(d.getTime()) ? null : d;
 };
 
-// mapa → {ai_nodes, nodeIdMap} pro uložení šablony; termíny → ofsety ode dneška (min 0).
-// nodeIdMap (reálné id uzlu → n1…) slouží k převodu úkolů mapy na task_seeds.
-export function mapToTemplateNodes(nodes, edges) {
+export function templateScheduleStart(deadlines, today = new Date()) {
+  let start = dateOnly(today);
+  for (const dl of deadlines || []) {
+    const d = parseDay(dl);
+    if (d && d < start) start = d;
+  }
+  return start;
+}
+
+// deadline offset in days from the schedule start (never negative); null = no deadline
+const deadlineOffset = (deadline, start) => {
+  const d = parseDay(deadline);
+  if (!d) return null;
+  return Math.max(0, Math.round((d - start) / 86400000));
+};
+
+// map → {ai_nodes, nodeIdMap} for saving a template; deadlines → offsets from templateScheduleStart().
+// nodeIdMap (real node id → n1…) is used to convert the map's tasks to task_seeds.
+export function mapToTemplateNodes(nodes, edges, { today = new Date() } = {}) {
   const parentOf = {};
   for (const e of edges) parentOf[e.target] = e.source;
   const real = nodes.filter((n) => n.type !== 'note');
   const shortId = {};
   real.forEach((n, i) => { shortId[n.id] = `n${i + 1}`; });
+  const start = templateScheduleStart(real.map((n) => n.data?.deadline), today);
   const aiNodes = real.map((n) => {
     const d = n.data || {};
     return {
@@ -135,7 +158,7 @@ export function mapToTemplateNodes(nodes, edges) {
       description: d.nodeType === 'apex' ? (d.apexText || d.description || '') : (d.description || ''),
       parentId: parentOf[n.id] && shortId[parentOf[n.id]] ? shortId[parentOf[n.id]] : null,
       owner: d.owner || '',
-      deadline_offset_days: deadlineOffset(d.deadline),
+      deadline_offset_days: deadlineOffset(d.deadline, start),
       wait_for_children: !!d.waitForChildren,
     };
   });

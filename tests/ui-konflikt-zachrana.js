@@ -1,7 +1,8 @@
 // UI e2e: dva uživatelé nad TOUTÉŽ mapou — hlídání na pozadí + záchrana práce.
 // Scénář A: kolega uloží změnu → druhé okno se to dozví BEZ editace (pruh, žádný PATCH).
-// Scénář B: kolega uloží změnu → já upravím → 409 → dialog → „Ponechat moje změny"
-// → o svoji úpravu NEPŘIJDU (kotva = razítko v databázi, ne pohyb uzlů v DOM).
+// Scénář B: kolega uloží změnu → já upravím JINÝ uzel → 409 → slije se bez dialogu (c5-1);
+// kolega a já upravíme TÝŽ uzel → dialog → „Ponechat moje změny" → o svoji úpravu NEPŘIJDU
+// a přepíše se jen sporný uzel (kotva = razítko v databázi, ne pohyb uzlů v DOM).
 //
 // První sada v repu se DVĚMA reálně přihlášenými uživateli: druhé okno běží
 // v izolovaném browser contextu (vlastní localStorage), jinak by obě okna
@@ -167,7 +168,7 @@ const cekejNaTitulVDb = async (token, mapId, nodeId, titul, s = 15) => {
     expect(patchuA === patchuAPredtim, `okno A: detekce jen četla, žádný PATCH (${patchuA - patchuAPredtim} navíc)`);
     expect(await pageA.evaluate(() => document.querySelectorAll('.react-flow__node').length) === 3, 'okno A: stále 3 uzly');
 
-    console.log('== Scénář B: konflikt při editaci → „Ponechat moje změny" ==');
+    console.log('== Scénář B: souběh při editaci → slití různých uzlů; týž uzel → „Ponechat moje změny" ==');
     // čistý start okna A: reload = převzatá aktuální verze, pruh zmizel
     await pageA.reload({ waitUntil: 'networkidle2' });
     expect(await cekejNaUzly(pageA, 3) === 3, 'okno A po reloadu: 3 uzly');
@@ -177,14 +178,32 @@ const cekejNaTitulVDb = async (token, mapId, nodeId, titul, s = 15) => {
     expect(await prejmenuj(pageB, 'Krok jedna od kolegy', 'Krok jedna PODRUHÉ'), 'okno B: druhé přejmenování');
     expect(!!(await cekejNaTitulVDb(V, mapId, 'n1', 'Krok jedna PODRUHÉ')), 'druhá kolegova změna v databázi');
 
-    // …a já v okně A rozepíšu svoji úpravu jiného uzlu → autosave → 409 → dialog
-    expect(await prejmenuj(pageA, 'Krok dva', 'MOJE ROZDĚLANÉ'), 'okno A: rozepsána vlastní úprava');
+    // …and I edit ANOTHER node in window A → autosave → 409. Since analysis 5 (c5-1) this is not a
+    // conflict any more: the two edits do not cross, so they are merged without a dialog. (This
+    // suite used to expect the dialog here and — after "Ponechat moje změny" — the colleague's
+    // node overwritten with the version window A had seen: exactly the silent loss of the
+    // colleague's work the finding was about.)
+    expect(await prejmenuj(pageA, 'Krok dva', 'MOJE ROZDĚLANÉ'), 'okno A: rozepsána vlastní úprava JINÉHO uzlu');
+    const poSliti = await cekejNaTitulVDb(V, mapId, 'n2', 'MOJE ROZDĚLANÉ');
+    expect(!!poSliti, 'moje úprava je v databázi (o práci jsem nepřišel)');
+    await sleep(1500);
+    const bezDialogu = await pageA.evaluate(() => document.body.innerText);
+    expect(!/Mapa byla mezitím změněna/.test(bezDialogu), 'okno A: úpravy RŮZNÝCH uzlů se slily bez dialogu');
+    expect(poSliti?.nodes?.find((n) => n.id === 'n1')?.data?.title === 'Krok jedna PODRUHÉ',
+      `kolegova úprava jiného uzlu zůstala (${poSliti?.nodes?.find((n) => n.id === 'n1')?.data?.title})`);
+    expect(/Krok jedna PODRUHÉ/.test(bezDialogu) && /MOJE ROZDĚLANÉ/.test(bezDialogu), 'okno A ukazuje kolegovu i moji úpravu');
+
+    // A real crossing: the colleague renames a node and I rename the SAME node → the dialog.
+    expect(await prejmenuj(pageB, 'Krok jedna PODRUHÉ', 'Krok jedna POTŘETÍ'), 'okno B: třetí přejmenování téhož uzlu');
+    expect(!!(await cekejNaTitulVDb(V, mapId, 'n1', 'Krok jedna POTŘETÍ')), 'třetí kolegova změna v databázi');
+    expect(await prejmenuj(pageA, 'Krok jedna PODRUHÉ', 'MOJE VERZE JEDNIČKY'), 'okno A: přejmenován TÝŽ uzel');
     await pageA.waitForFunction(
       () => document.body.innerText.includes('Mapa byla mezitím změněna'),
       { timeout: 10000 },
     ).catch(() => {});
     const dialog = await pageA.evaluate(() => document.body.innerText);
-    expect(/Mapa byla mezitím změněna/.test(dialog), 'okno A: dialog konfliktu vyskočil');
+    expect(/Mapa byla mezitím změněna/.test(dialog), 'okno A: dialog konfliktu vyskočil (týž uzel upraven oběma)');
+    expect(/Mezitím změněno: „Krok jedna POTŘETÍ“/.test(dialog) && /Kříží se s vašimi úpravami: „MOJE VERZE JEDNIČKY“/.test(dialog), 'dialog jmenuje, co kolega změnil a co se kříží');
     expect(/Ponechat moje změny/.test(dialog), 'dialog nabízí „Ponechat moje změny"');
     expect(/Stáhnout zálohu/.test(dialog), 'dialog nabízí stažení zálohy (JSON)');
     expect(/Načíst aktuální verzi/.test(dialog), 'dialog nabízí i načtení aktuální verze');
@@ -199,15 +218,15 @@ const cekejNaTitulVDb = async (token, mapId, nodeId, titul, s = 15) => {
     ).catch(() => {});
     const poKliku = await pageA.evaluate(() => document.body.innerText);
     expect(!/Mapa byla mezitím změněna/.test(poKliku), 'dialog po volbě zmizel');
-    expect(/MOJE ROZDĚLANÉ/.test(poKliku), 'moje rozepsaná úprava zůstala v okně');
+    expect(/MOJE VERZE JEDNIČKY/.test(poKliku) && /MOJE ROZDĚLANÉ/.test(poKliku), 'moje úpravy zůstaly v okně');
     expect(await pageA.evaluate(() => document.querySelectorAll('.react-flow__node').length) === 3, 'okno A: stále 3 uzly');
 
-    // KOTVA V DATABÁZI: moje úprava se uložila; kolegův uzel má verzi, kterou
-    // okno A vidělo — jeho „PODRUHÉ" se VĚDOMĚ přepsalo (to je smysl volby).
-    const poUlozeni = await cekejNaTitulVDb(V, mapId, 'n2', 'MOJE ROZDĚLANÉ');
-    expect(!!poUlozeni, 'moje úprava je v databázi (o práci jsem nepřišel)');
-    expect(poUlozeni?.nodes?.find((n) => n.id === 'n1')?.data?.title === 'Krok jedna od kolegy',
-      `kolegův uzel má verzi z okna A — vědomé přepsání (${poUlozeni?.nodes?.find((n) => n.id === 'n1')?.data?.title})`);
+    // ANCHOR IN THE DATABASE: at the disputed node my version (that is what the choice means),
+    // the other node untouched.
+    const poUlozeni = await cekejNaTitulVDb(V, mapId, 'n1', 'MOJE VERZE JEDNIČKY');
+    expect(!!poUlozeni, 'sporný uzel nese moji verzi — vědomé přepsání jen tam, kde se úpravy křížily');
+    expect(poUlozeni?.nodes?.find((n) => n.id === 'n2')?.data?.title === 'MOJE ROZDĚLANÉ',
+      `druhý uzel zůstal (${poUlozeni?.nodes?.find((n) => n.id === 'n2')?.data?.title})`);
 
     // žádná smyčka konfliktů: dialog se sám znovu neobjeví
     await sleep(5000);

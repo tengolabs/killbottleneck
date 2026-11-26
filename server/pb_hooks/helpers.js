@@ -1638,19 +1638,20 @@ function treeItemsToNodes(items, idPrefix, lang) {
   const MAX_TREE_NODES = 200, MAX_TREE_DEPTH = 50;
   const ts = idPrefix || String(new Date().getTime());
   let counter = 0;
-  let badDeadline = null, badPlan = null, overLimit = false;
+  let badDeadline = null, badPlan = null, unrealDay = null, overLimit = false;
   const nodes = [], edges = [], rootIds = [];
   const walk = (list, parentId, depth) => {
-    if (!Array.isArray(list) || badDeadline || badPlan || overLimit) return;
+    if (!Array.isArray(list) || badDeadline || badPlan || unrealDay || overLimit) return;
     if (depth > MAX_TREE_DEPTH) { overLimit = true; return; }
     list.forEach((item, idx) => {
-      if (!item || typeof item !== "object" || badDeadline || badPlan || overLimit) return;
+      if (!item || typeof item !== "object" || badDeadline || badPlan || unrealDay || overLimit) return;
       if (counter >= MAX_TREE_NODES) { overLimit = true; return; }
       const deadline = String(item.deadline || "");
       if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
         badDeadline = String(item.title || "?");
         return;
       }
+      if (deadline && !isRealDay(deadline)) { unrealDay = { id: String(item.title || "?"), date: deadline }; return; }
       // plán („kdy to chci řešit") — formát jako termín; rozsah dnes…+7 dní
       // hlídají v1 routy (checkTreePlans), tady jen tvar, aby exekutor pravidel
       // nad ULOŽENOU šablonkou nepadal na plánu, který mezitím propadl
@@ -1659,6 +1660,7 @@ function treeItemsToNodes(items, idPrefix, lang) {
         badPlan = String(item.title || "?");
         return;
       }
+      if (plannedOn && !isRealDay(plannedOn)) { unrealDay = { id: String(item.title || "?"), date: plannedOn }; return; }
       const id = `node-${ts}-${++counter}`;
       // barvu server umí i v update_node; přijímáme jen #rrggbb, ať se do mapy
       // nedostane libovolný řetězec z LLM (renderuje se do stylu uzlu)
@@ -1699,6 +1701,7 @@ function treeItemsToNodes(items, idPrefix, lang) {
   walk(items, null, 0);
   if (badDeadline) return { error: t(lang, "err.badDeadline", { id: badDeadline }) };
   if (badPlan) return { error: t(lang, "err.badPlanItem", { id: badPlan }) };
+  if (unrealDay) return { error: t(lang, "err.dateNotRealItem", unrealDay) };
   if (overLimit) return { error: t(lang, "err.tooManyItems", { max: MAX_TREE_NODES }) };
   return { nodes: nodes, edges: edges, rootIds: rootIds, count: counter };
 }
@@ -1844,17 +1847,28 @@ function validatePlannedOn(v) {
   if (diff < -1 || diff > 8) return { error: true };
   return { value: s };
 }
+// A day that exists in the calendar. The shape alone (\d{4}-\d{2}-\d{2}) lets 2026-13-45 and 2027-02-31
+// through — the map then showed "Invalid Date" or silently another day (whole-app analysis 5, c11-1).
+// Every write path that takes a deadline, a plan or another day goes through this.
+const DAY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+function isRealDay(v) {
+  const s = String(v === undefined || v === null ? "" : v);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false; // self-contained on purpose: tests/cleanmap-parity.js lifts this function out
+  const d = new Date(s + "T00:00:00Z");
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+// the error text for a day that was refused: wrong shape → "use YYYY-MM-DD", right shape but no such day → say so
+function badDayError(lang, v) {
+  const { t } = require(`${__hooks}/i18n.js`);
+  const s = String(v === undefined || v === null ? "" : v);
+  return DAY_SHAPE.test(s) ? t(lang, "err.dateNotReal", { date: s }) : t(lang, "err.badDate");
+}
 // Request hook of buffer_nodes (main.pb.js): a changed deadline / plan must be a real day, the colour short.
 function checkBufferDates(e) {
   const orig = e.record.original ? e.record.original() : null;
   const isNew = e.record.isNew();
   const changed = (f) => isNew || !orig || orig.getString(f) !== e.record.getString(f);
-  const realDay = (v) => {
-    if (v === "") return true;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
-    const d = new Date(v + "T00:00:00Z");
-    return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
-  };
+  const realDay = (v) => v === "" || isRealDay(v);
   const { t, requestLang } = require(`${__hooks}/i18n.js`);
   for (const f of ["deadline", "planned_on"]) {
     if (changed(f) && !realDay(e.record.getString(f))) throw new BadRequestError(t(requestLang(e), "err.bufferDateInvalid"));
@@ -5875,7 +5889,7 @@ function executeRuleActions(app, map, rule, node, depth, budget) {
         date = addDaysStr(new Date(), days);
       } else {
         date = String(a.date || "");
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("set_deadline: invalid date");
+        if (!isRealDay(date)) throw new Error("set_deadline: invalid date");
       }
       if ((tn.data || {}).deadline !== date) { tn.data = Object.assign({}, tn.data, { deadline: date }); changed = true; }
       // opakování: plán „kdy to chci řešit" patřil k minulému výskytu — vyčistit
@@ -6649,7 +6663,8 @@ function validateRuleInput(app, map, body, opts) {
       } else if (a.relative_days !== undefined) {
         if (!Number.isInteger(a.relative_days) || a.relative_days < 0 || a.relative_days > 3650) return { error: "set_deadline.relative_days must be an integer 0-3650" };
         actions.push(Object.assign({ type: a.type, relative_days: a.relative_days }, target ? { target: target } : {}));
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(a.date || ""))) {
+      } else if (DAY_SHAPE.test(String(a.date || ""))) {
+        if (!isRealDay(a.date)) return { error: `set_deadline.date ${String(a.date)} is not a day of the calendar` };
         actions.push(Object.assign({ type: a.type, date: String(a.date) }, target ? { target: target } : {}));
       } else return { error: "set_deadline needs date YYYY-MM-DD, relative_days, or advance daily|weekly|monthly" };
     } else if (a.type === "reset_subtree") {
@@ -9471,7 +9486,7 @@ function zrusApiKlice(app, userId) {
   return n;
 }
 
-module.exports = { ASSIST_MODES,
+module.exports = { isRealDay, badDayError, ASSIST_MODES,
   zrusApiKlice,
   normText,
   fmtDateLocal, addDaysStr, mapChangeGroups, jeAdminNeboManazer,

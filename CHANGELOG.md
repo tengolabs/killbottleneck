@@ -7,6 +7,40 @@ The version you are running is shown in the **About** dialog; the same string is
 (see [Updating](https://killbottleneck.com/guide/updating)) — read the **Upgrade notes**
 below before you jump several versions.
 
+## v1.7.1 — 2026-11-26
+
+**Fixes from a walk through the whole app: no more silently lost work in the map, two people edit one map without overwriting each other**
+
+**Upgrade notes:** no schema migration. Two behaviours change. (1) When two people edit different steps of the same
+map, their changes are merged and you only get a short notice; the "Map was changed meanwhile" window appears only
+when both touched the same step, names those steps, and **Keep my changes** overwrites just them. (2) In the default
+skin on a device set to light mode, status pills and labels now use their dark variants (the same look as on a device
+set to dark mode) — before, some of them were unreadable. The public API, MCP and the assistant now refuse a deadline
+or plan that is not a real calendar day (for example `2027-02-31`) with HTTP 400. Fonts are served as four files
+instead of eighteen and static files get `Cache-Control`, so the first load is lighter.
+
+- **Undo after dragging a step.** Dragging a step (or several selected ones) is now one Undo step: Undo returns the
+  position and nothing else. Before, Undo after a drag silently reverted the previous edit — a name, a description,
+  a deadline — sometimes of a different step.
+- **Two people on one map.** Edits of different steps are merged instead of raising a conflict; in a real conflict
+  the window lists the steps in question and **Keep my changes** no longer wipes the colleague's other saved edits.
+- **A request for a different deadline no longer disappears.** It survives saving the step window (from Tasks and
+  from the map) and any later save of the map; a withdrawn or declined request does not come back.
+- **Timeline in Tasks.** Bars sit level with their rows again when the list is longer than the window (they were
+  about a row and a half lower).
+- **Page scrolls after closing Clients.** Closing the Clients window opened from Time worked no longer locks
+  scrolling of the whole app until a reload.
+- **A double click does one thing.** "+" in a Tasks row, **Put into stash**, the stopwatch and the ✓ in the simple
+  phone view no longer create two steps, two ideas, two time entries or tick two tasks.
+- **Template from a running project** keeps the spacing between deadlines instead of putting most steps on the
+  start day.
+- **Map PDF is small.** The exported PDF of a map is tens of times smaller with the same picture (a 30-step map:
+  0.6 MB instead of 48 MB); PNG and PDF export now confirm when they are done.
+- **Truthful texts.** The **Report a bug** window lists what is really sent (the organisation name and the instance
+  address are; your e-mail address is not). The e-mail after an administrator resets a member's password no longer
+  says the old password still works, and the confirmation mentions that the member's API keys are revoked. The
+  **Share map** window no longer promises access just by signing up with the invited address.
+
 ## v1.7.0 — 2026-11-23
 
 **Documents: a button at the top and a filter by project; a shorter "+ New" button**

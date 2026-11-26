@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { rulesApi } from '@/components/rules/rulesApi';
 import { isApexNode as isApexNodeShared } from '@/lib/mapNodes';
 import { cleanMapData as cleanMap } from '@/lib/cleanMap';
-import { trojcestnyMerge, stableJson } from '@/lib/mergeMap';
+import { trojcestnyMerge, mergeKeepMine, stableJson } from '@/lib/mergeMap';
 import { createProjectRecord } from '@/lib/createProject';
 import { isDesktopShell } from '@/lib/shell';
 
@@ -51,7 +51,9 @@ export function useMapAutosave({
   nodes, edges, title, color, setNodes, setEdges, setTitle, setColor,
   nodesNow, edgesNow, mapRulesNow, skipNextSave, cleanMapData, toast, t, noteForeign, setIsMapOwner,
 }) {
-  const [conflict, setConflict] = useState(false); // B3: mapa změněna z jiného místa
+  // B3: the map was changed from elsewhere AND the change crosses mine. false, or what the dialog
+  // says about it: { changed: [names], changedMore, disputed: [names], disputedMore } (c5-1).
+  const [conflict, setConflict] = useState(false);
   // Hlídání na pozadí zjistilo cizí změnu DŘÍV, než uživatel začal psát.
   // Ukazuje se jako nenásilný pruh, ne dialog — nic se ještě nerozbilo.
   const [remoteChanged, setRemoteChanged] = useState(false);
@@ -148,6 +150,14 @@ export function useMapAutosave({
   const zrcadliStavDoZakladny = (nodeId, stav) => {
     serverNodes.current = (serverNodes.current || []).map((n) => (
       n.id === nodeId ? { ...n, data: { ...(n.data || {}), status: stav } } : n
+    ));
+  };
+  // The same for any node field a server route of its own writes (the request for another
+  // deadline, /api/kb/deadline-requests — analysis 5, c3-1): the caller puts the fields on the
+  // canvas, this puts them into the base, and takeOverOwnWrite() below then moves the version.
+  const mirrorNodeDataToBase = (nodeId, fields) => {
+    serverNodes.current = (serverNodes.current || []).map((n) => (
+      n.id === nodeId ? { ...n, data: { ...(n.data || {}), ...fields } } : n
     ));
   };
   // PATCH mapy právě letí — hlídání na pozadí musí mlčet, jinak GET verze
@@ -333,7 +343,21 @@ export function useMapAutosave({
         // rukama. Tvrdý dotaz „načíst znovu?" by tady znamenal ztrátu rozepsané
         // změny, a to zrovna ve scénáři, kvůli kterému se automatizace zavádějí.
         // Když se cizí zásah s mojí prací nepotkal, slijeme ho tiše.
-        if (await slitCiziZmenu()) {
+        // Two steps (analysis 5, c5-1). First the merge as it was: an automation's change is
+        // taken over with its own message. What that refuses — a change made by a PERSON — is
+        // merged as well when it does not cross my work (another step, another connection): two
+        // people editing different steps of one map must not get a dialog, let alone one whose
+        // "Keep my changes" overwrites everything the colleague saved. Only a real crossing asks.
+        let srv = null;
+        try { srv = (await base44.entities.GoalMap.filter({ id: activeMapId }))?.[0] || null; } catch { srv = null; }
+        let merged = !!srv && (await slitCiziZmenu(srv));
+        let crossing = null;
+        if (!merged && srv) {
+          const m = slitLidskouZmenu(srv);
+          merged = m.merged;
+          crossing = m.crossing;
+        }
+        if (merged) {
           // Rozepsanou práci odešle autosave, který slití samo vyvolá. Když
           // ale nezůstalo nic k odeslání, nikdo už lištu nepřepne a zůstala by
           // svítit na „Ukládání…".
@@ -347,7 +371,7 @@ export function useMapAutosave({
           return;
         }
         clearSaveError(); // the conflict dialog takes over
-        setConflict(true);
+        setConflict(crossing || { changed: [], changedMore: 0, disputed: [], disputedMore: 0 });
         setSaveStatus('idle');
         return;
       };
@@ -709,12 +733,60 @@ export function useMapAutosave({
      
   }, [activeMapId, nasadNaPlatno, uzlyBehlychPravidel, toast, t]);
 
-  // „Ponechat moje změny" v dialogu konfliktu: převezme čerstvou verzi jako
-  // základnu a VĚDOMĚ uloží můj rozepsaný stav přes cizí úpravy. Server dál
-  // drží autoritu (base_updated) — tohle není tiché přepsání, ale volba
-  // uživatele s vysvětleným následkem. Když mezi GET verze a PATCH uloží
-  // někdo další (409), dialog zůstává a jde to zkusit znovu — záměrně žádná
-  // automatická smyčka, každý pokus = nové vědomé rozhodnutí.
+  // ---- a change made by a PERSON met my save (409) — analysis 5, c5-1 ----
+  // The three inputs of the merge in the canonical shape (see slitCiziZmenu for why all three).
+  const kanonMapy = (m) => {
+    const { cleanNodes, cleanEdges } = cleanMap(m.nodes || [], m.edges || []);
+    return { title: m.title || '', color: m.color || '', nodes: cleanNodes, edges: cleanEdges };
+  };
+  const platnoTed = () => {
+    const { cleanNodes, cleanEdges } = cleanMapData();
+    const { title: tt, color: cc } = hlavickaNow.current;
+    return { title: tt, color: cc, nodes: cleanNodes, edges: cleanEdges };
+  };
+  const zakladnaTed = () => kanonMapy({ title: serverTitle.current, color: serverColor.current, nodes: serverNodes.current, edges: serverEdges.current });
+  // The merged map goes on the canvas (no network between reading the canvas and this).
+  const nasadSlite = (r, pred) => {
+    if (r.title !== pred.title) setTitle(r.title);
+    if (r.color !== pred.color) setColor(r.color);
+    nasadNaPlatno(r.nodes, r.edges);
+    // Undo must not take back a step over what somebody else changed meanwhile (F1-02)
+    if (noteForeign && r.foreignIds.length) noteForeign(r.foreignIds);
+  };
+  // What the dialog says: the steps the other side changed and the ones that cross mine —
+  // by name, five at most, the rest as a number.
+  const popisStretu = (r) => {
+    const jmeno = (x) => (x.kind === 'title' ? t('conflict.mapTitle') : x.kind === 'color' ? t('conflict.mapColor') : t('conflict.quoted', { name: x.title || t('conflict.unnamed') }));
+    const vypis = (list) => { const names = [...new Set(list.map(jmeno))]; return { names: names.slice(0, 5), more: Math.max(0, names.length - 5) }; };
+    const zmeneno = vypis(r.foreign); const sporne = vypis(r.conflicts);
+    return { changed: zmeneno.names, changedMore: zmeneno.more, disputed: sporne.names, disputedMore: sporne.more };
+  };
+  // Merges a person's change that does not cross my work, silently (a toast only). Returns
+  // { merged: true } or { merged: false, crossing } with the description for the dialog.
+  const slitLidskouZmenu = (srv) => {
+    try {
+      const pred = platnoTed();
+      const r = mergeKeepMine(zakladnaTed(), pred, kanonMapy(srv));
+      if (r.conflicts.length) return { merged: false, crossing: popisStretu(r) };
+      nasadSlite(r, pred);
+      // my work on top of the server's goes out with the next autosave round (new base)
+      skipNextSave.current = !r.mineExtra;
+      zapamatujServer(srv); // last, as in slitCiziZmenu: the base moves only once the take-over is done
+      setRemoteChanged(false); // the canvas now holds what the banner was about
+      if (r.taken > 0 || r.overridden > 0) toast({ title: t(r.statusOnly ? 'toasts.mapMergedStatus' : 'toasts.mapMergedColleague') });
+      return { merged: true, crossing: null };
+    } catch (err) {
+      console.error('merge of a concurrent change failed', err?.status, err?.message);
+      return { merged: false, crossing: null };
+    }
+  };
+
+  // "Keep my changes" in the conflict dialog. It used to save the WHOLE canvas over whatever the
+  // colleague had stored meanwhile — every step of theirs, not just the one that crossed mine
+  // (c5-1). Now it saves the merge of the fresh map with the canvas: at the disputed places my
+  // version, everywhere else the colleague's changes stay. The server keeps the authority
+  // (base_updated of the map just read): when somebody saves again in between (409) the dialog
+  // stays and the person may try again — no automatic loop, every attempt is a decision.
   const handleKeepMine = async () => {
     let dolet = null; let doletBase = null;
     try {
@@ -722,17 +794,22 @@ export function useMapAutosave({
       setSaveStatus('saving');
       saveInFlight.current = true;
       inFlightPromise.current = new Promise((res) => { dolet = res; });
-      const fresh = await base44.entities.GoalMap.get(activeMapId, { fields: 'updated' });
-      const { cleanNodes, cleanEdges } = cleanMapData();
+      const fresh = (await base44.entities.GoalMap.filter({ id: activeMapId }))?.[0];
+      if (!fresh) throw new Error('map not found');
+      const pred = platnoTed();
+      const r = mergeKeepMine(zakladnaTed(), pred, kanonMapy(fresh));
       const updated = await base44.entities.GoalMap.update(activeMapId, {
-        title,
-        color,
-        nodes: cleanNodes,
-        edges: cleanEdges,
+        title: r.title,
+        color: r.color,
+        nodes: r.nodes,
+        edges: r.edges,
         base_updated: fresh.updated_date,
       });
       doletBase = updated.updated_date || null;
-      zapamatujServer({ updated_date: updated.updated_date, title, color, nodes: cleanNodes, edges: cleanEdges });
+      // the dialog is modal, the canvas is what it was when read → the merged map replaces it
+      skipNextSave.current = true;
+      nasadSlite(r, pred);
+      zapamatujServer({ updated_date: updated.updated_date, title: r.title, color: r.color, nodes: updated.nodes || r.nodes, edges: updated.edges || r.edges });
       clearSaveError();
       setConflict(false);
       setRemoteChanged(false);
@@ -747,6 +824,18 @@ export function useMapAutosave({
       if (dolet) dolet(doletBase);
     }
   };
+
+  // The person's own action was written by a server route outside the save of the map (and
+  // mirrored to the canvas and the base by the caller): the version of the map moved, so the
+  // fresh map is taken over right away — otherwise the next autosave would run into 409 over
+  // the person's own request. Nothing is lost when this does not get through (a save in flight,
+  // typing under the hands): the 409 path of the autosave does the same merge later.
+  const takeOverOwnWrite = useCallback(async () => {
+    if (!activeMapId || unmounted.current) return;
+    try { if (saveInFlight.current) await inFlightPromise.current; } catch { /* reported by the save itself */ }
+    if (saveInFlight.current || unmounted.current || mapIdNow.current !== mapId) return;
+    await slitCiziZmenu(null, { duvera: true });
+  }, [activeMapId, mapId, slitCiziZmenu]);
 
   // Levné hlídání na pozadí: do 13. 8. se aplikace serveru ptala jen dík vadě
   // (autosave posílal i prázdná uložení). Po její opravě by se cizí změna
@@ -786,6 +875,6 @@ export function useMapAutosave({
     conflict, remoteChanged, saveError, retrySave,
     // a failed save outlives the 2 s "saved" timer of an earlier one — the indicator follows the error
     saveStatus: saveError ? (saveStatus === 'saving' ? 'saving' : 'error') : (saveStatus === 'error' ? 'idle' : saveStatus), baseUpdated, zapamatujServer, zrcadliStavDoZakladny,
-    saveTimer, pendingSave, nasadNaPlatno, handleKeepMine,
+    saveTimer, pendingSave, nasadNaPlatno, handleKeepMine, mirrorNodeDataToBase, takeOverOwnWrite,
   };
 }

@@ -20,6 +20,14 @@ import { revertStep } from '@/lib/undoStep';
 //   restoreProjectColor(c) — a step saved from the dialog of the top node also set the PROJECT
 //                            colour (meta.projectColor = { from, to }); it goes back only when the
 //                            project still has the colour the step gave it
+//   restoreCanon(list)     — a drag in the horizontal view also moved the canonical (saved)
+//                            position (meta.canon = [{ id, from, to }]); see pushMove
+//
+// A DRAG is a step too (analysis 5, c4-1: it was not, so Undo after a drag took back the step
+// before it — the name and description of some node). The editor calls beginMove() when a drag
+// starts and pushMove(starts) when it ends. Such a step is built as "the canvas after the drag,
+// with the dragged nodes at the positions they started from" — so its difference is POSITIONS of
+// the dragged nodes and nothing else, whatever else changed on the canvas during the drag.
 export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
   const historyRef = useRef([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -29,7 +37,28 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
   const foreignAt = useRef(new Map()); // node id → seq of the last change taken over from the server
   const busy = useRef(false);
 
+  const moving = useRef(null);    // the drag step whose final canvas has not rendered yet
+  const moveTimer = useRef(0);
+  useEffect(() => () => { if (moveTimer.current) clearTimeout(moveTimer.current); }, []);
+
   const now = () => ({ nodes: nodesNow.current, edges: edgesNow.current });
+  const samePos = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y;
+  // Closes whatever step is still open, with the canvas as it is right now.
+  const settle = () => {
+    if (pending.current) { pending.current.after = now(); pending.current = null; }
+    const e = moving.current;
+    if (!e) return;
+    moving.current = null;
+    // Both sides of the step are the canvas of this moment with only the dragged nodes placed:
+    // where they started (before) and where the drag left them (after).
+    const cur = now();
+    const place = (at) => (cur.nodes || []).map((n) => {
+      const p = e.starts.has(n.id) ? at.get(n.id) : null;
+      return p && !samePos(p, n.position) ? { ...n, position: { ...p } } : n;
+    });
+    e.before = { nodes: place(e.starts), edges: cur.edges };
+    e.after = { nodes: place(e.ends), edges: cur.edges };
+  };
   // runs after every render: the refs already hold the canvas of this render
   useEffect(() => {
     const e = pending.current;
@@ -41,7 +70,7 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
   });
 
   const pushHistory = useCallback((meta) => {
-    if (pending.current) { pending.current.after = now(); pending.current = null; }
+    settle();
     const entry = { before: now(), after: null, seq: ++seq.current, meta: meta && (meta.bufferItem || meta.projectColor) ? { bufferItem: meta.bufferItem || null, projectColor: meta.projectColor || null } : null };
     pending.current = entry;
     historyRef.current.push(entry);
@@ -49,18 +78,38 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
     setCanUndo(historyRef.current.length > 0);
   }, [nodesNow, edgesNow]);
 
+  // A drag starts: the step before it is closed now, so that the first pixel of the drag is not
+  // taken for its result (a step whose action never changed the canvas would otherwise swallow it).
+  const beginMove = useCallback(() => { settle(); }, []);
+  // A drag ended. `starts` / `ends` = Map(node id → position before / after the drag) of the nodes
+  // that really moved, `meta.canon` see undoEnv. The last position change of the drag may still
+  // be on its way to the state when the canvas library reports the end, so the step is closed a
+  // tick later (or by whatever comes first: another step, a merge from the server, Undo itself).
+  const pushMove = useCallback((starts, ends, meta) => {
+    settle();
+    if (!starts || !starts.size) return; // a click, or a drag back to the same spot — no step
+    const entry = { before: null, after: null, seq: ++seq.current, starts, ends, meta: meta && meta.canon && meta.canon.length ? { canon: meta.canon } : null };
+    moving.current = entry;
+    historyRef.current.push(entry);
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    setCanUndo(true);
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    moveTimer.current = setTimeout(() => { moveTimer.current = 0; if (moving.current === entry) settle(); }, 0);
+  }, [nodesNow, edgesNow]);
+
   // Nodes changed by somebody else (merged in from the server). A step that ADDED such a node
   // is not undone over that change.
   const noteForeign = useCallback((ids) => {
     // A step whose action never changed the canvas (e.g. a refused delete) is closed here, before
     // the merged change renders — otherwise it would take the colleague's change for its own.
-    if (pending.current) { pending.current.after = now(); pending.current = null; }
+    settle();
     const at = ++seq.current;
     for (const id of ids || []) foreignAt.current.set(id, at);
   }, []);
 
   const handleUndo = useCallback(async () => {
     if (busy.current) return;
+    settle();
     // steps that changed nothing are skipped — a click on Undo must not be spent on them
     let entry = null;
     while (historyRef.current.length > 0) {
@@ -89,6 +138,12 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
     }
     drop();
     if (entry.meta && entry.meta.projectColor && env.restoreProjectColor) env.restoreProjectColor(entry.meta.projectColor);
+    if (entry.meta && entry.meta.canon && env.restoreCanon) {
+      // only for the nodes whose position on the canvas really went back (a node moved again
+      // since the step keeps where it is — and so does its saved position)
+      const back = new Map(r.nodes.map((n) => [n.id, n]));
+      env.restoreCanon(entry.meta.canon.filter((c) => samePos((back.get(c.id) || {}).position, entry.starts.get(c.id))));
+    }
     // No skipNextSave: the fingerprint in the autosave notices the difference and sends it.
     setNodes(r.nodes);
     setEdges(r.edges);
@@ -96,5 +151,5 @@ export function useMapHistory({ nodesNow, edgesNow, setNodes, setEdges }) {
   // NOTE: lib/undoStep.js compares node `data` + `position` and edge existence only; a future step
   // that changes a node's `type` / `hidden` or re-plugs an edge under the same id needs it extended.
 
-  return { historyRef, canUndo, pushHistory, handleUndo, undoEnv, noteForeign };
+  return { historyRef, canUndo, pushHistory, beginMove, pushMove, handleUndo, undoEnv, noteForeign };
 }

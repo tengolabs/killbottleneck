@@ -29,9 +29,9 @@ import ColorPicker from './sections/ColorPicker';
 // (onShareAdd, jen vlastník). Volný text zrušen — zodpovědná osoba se jen vybírá.
 // map + emailOptions + onTasksChanged: volitelné — když volající předá mapu (DTO s id+nodes),
 // dialog nabídne založení úkolu k uzlu (vč. opakování) stejným formulářem jako tabulka úkolů.
-export default function NodeEditDialogCompact({ node, mapId, onSave, onClose, mapAccess, members = [], onShareAdd, onStash, onDelete, onOpenMap, map, emailOptions = [], onTasksChanged, onContactsChanged }) {
+export default function NodeEditDialogCompact({ node, mapId, onSave, onClose, mapAccess, members = [], onShareAdd, onStash, onDelete, onOpenMap, map, emailOptions = [], onTasksChanged, onContactsChanged, onDeadlineRequestChanged }) {
   const { t } = useTranslation('editor');
-  const s = useNodeEditState({ node, mapId, onSave, mapAccess });
+  const s = useNodeEditState({ node, mapId, onSave, mapAccess, onDeadlineRequestChanged });
 
   return (
     <Dialog open={!!node} onOpenChange={(open) => !open && onClose()}>

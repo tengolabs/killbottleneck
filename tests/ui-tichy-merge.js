@@ -14,9 +14,10 @@
 //
 // Hlídá se obojí:
 //   POZITIVNÍ — zásah pravidla, kterého se uživatel nedotkl, se slije tiše
-//   NEGATIVNÍ — skutečná kolize (obě strany na témže uzlu) i cizí LIDSKÁ
-//               změna dál končí pruhem/dialogem; jinak by se tichý merge stal
-//               tichým přepisem
+//   NEGATIVNÍ — skutečná kolize (obě strany na témže uzlu) dál končí
+//               pruhem/dialogem; jinak by se tichý merge stal tichým přepisem
+//   c5-1 (analýza 5) — cizí LIDSKÁ změna, která se s mojí prací nekříží, se
+//               při mém uložení slije (obojí zůstane) a ohlásí se hláškou
 const puppeteer = require('puppeteer-core');
 const { execSync } = require('child_process');
 
@@ -250,10 +251,13 @@ const titleOf = (m, id) => ((m.nodes || []).find((n) => n.id === id) || {}).data
       expect(/ODE MĚ/.test(await telo()), 'moje rozepsaná změna se přitom nezahodila');
     }
 
-    // ================= 3. NEGATIVNÍ: cizí LIDSKÁ změna bez pravidla ==========
-    // Strukturální změna, které se nedotýkám, ale nestojí za ní žádné pravidlo →
-    // pruh musí zůstat. Bez téhle podmínky by tichý merge polykal práci kolegů.
-    console.log('\n== 3. cizí lidská změna struktury (bez pravidla) → pruh zůstává ==');
+    // ================= 3. A PERSON's change of something I did not touch ==========
+    // A structural change with no rule behind it. Until analysis 5 (c5-1) this ended with the
+    // banner / the dialog — and the dialog's "Ponechat moje změny" then overwrote the colleague's
+    // change. Now a change that does not cross my work is merged when my save meets it (409):
+    // BOTH are kept, and a toast says that somebody else's changes arrived. (A change met by the
+    // background watcher, without a save of mine, still shows the banner — ui-konflikt-zachrana.)
+    console.log('\n== 3. cizí lidská změna struktury (bez pravidla) → slije se, obojí zůstane ==');
     {
       await page.reload({ waitUntil: 'networkidle2' });
       await sleep(3500);
@@ -270,7 +274,11 @@ const titleOf = (m, id) => ((m.nodes || []).find((n) => n.id === id) || {}).data
       await sleep(1200);
       await prepisNazev('Můj krok DRUHÉ KOLO');
       await sleep(6000);
-      expect((await pruh()) || (await dialog()), 'cizí lidská změna struktury dál hlásí pruh/dialog');
+      expect(!(await dialog()), 'úprava jiného uzlu se s cizí změnou struktury nekříží → žádný dialog');
+      expect(/přibyly změny někoho jiného/.test(await telo()), 'o cizí změně řekla hláška');
+      const po = await freshMap(A, map.id);
+      expect(((po.edges || []).find((e) => e.target === 'K1') || {}).source === 'D1', `kolegovo přepojení karty zůstalo (${((po.edges || []).find((e) => e.target === 'K1') || {}).source})`);
+      expect(((po.nodes || []).find((n) => n.id === 'muj') || { data: {} }).data.title === 'Můj krok DRUHÉ KOLO', 'moje přejmenování se uložilo');
     }
 
     // ========== 4. Editace PŘÍMO BĚHEM okna slévání ==========
